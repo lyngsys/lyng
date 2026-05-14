@@ -1139,6 +1139,33 @@ fn phase6_functions_expand_custom_iterables_for_all_spread_positions() {
 }
 
 #[test]
+fn phase6_functions_preserve_call_target_argument_order_and_this_binding() {
+    let result = compile_and_run_string(
+        r#"
+        let log = "";
+        const object = {
+            tag: "receiver",
+            get method() {
+                log += "callee>";
+                return function(first, second) {
+                    log += "body>" + this.tag + ">" + first + second;
+                    return log;
+                };
+            }
+        };
+        function argument(label) {
+            log += label + ">";
+            return label;
+        }
+
+        object.method(argument("A"), argument("B"));
+        "#,
+    );
+
+    assert_eq!(result, "callee>A>B>body>receiver>AB");
+}
+
+#[test]
 fn phase4_functions_mark_tail_call_capable_headers_when_lowering_tail_calls() {
     let mut atoms = AtomTable::new();
     let unit = compile_unit(

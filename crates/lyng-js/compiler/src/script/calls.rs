@@ -6,6 +6,44 @@ use super::{
     SafepointKind, WellKnownAtom,
 };
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct CallArgumentPlan {
+    expressions: Vec<ExprId>,
+    spread_mask: u64,
+}
+
+impl CallArgumentPlan {
+    const fn len(&self) -> usize {
+        self.expressions.len()
+    }
+
+    const fn is_empty(&self) -> bool {
+        self.expressions.is_empty()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CallSlotLayout {
+    Small { call_base: u16, argument_count: u8 },
+    Generic { argument_range: CallRange },
+}
+
+impl CallSlotLayout {
+    const fn argument_base(self) -> u16 {
+        match self {
+            Self::Small { call_base, .. } => call_base + 1,
+            Self::Generic { argument_range } => argument_range.argument_base(),
+        }
+    }
+
+    const fn this_register(self) -> Option<u16> {
+        match self {
+            Self::Small { call_base, .. } => Some(call_base),
+            Self::Generic { .. } => None,
+        }
+    }
+}
+
 impl FunctionCompiler<'_, '_> {
     fn direct_eval_identifier(&self, callee: ExprId) -> LoweringResult<bool> {
         let mut current = callee;
@@ -344,51 +382,24 @@ impl FunctionCompiler<'_, '_> {
         if self.lower_direct_eval_call_expression(expr_id, callee, arguments, dest)? {
             return Ok(());
         }
-        let (callee_register, this_register) = self.lower_call_target(callee)?;
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let (instruction_offset, argument_count, call_result, move_back) = if let Some(call_base) =
-            self.materialize_small_call_block(
-                this_register,
-                &argument_values.registers,
-                argument_values.spread_mask,
-            )? {
-            let (call_result, call_callee, move_back) =
-                self.bridge_small_call_registers(dest, callee_register)?;
-            let argument_count = u8::try_from(argument_values.registers.len())
-                .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
-            (
-                self.builder.emit_small_call(
-                    self.encode_register(call_result)?,
-                    self.encode_register(call_callee)?,
-                    self.encode_register(call_base)?,
-                    argument_count,
-                )?,
-                u16::from(argument_count),
-                call_result,
-                move_back,
-            )
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let slot_layout = self.reserve_call_slot_layout(&argument_plan)?;
+        let callee_register = self.alloc_temp()?;
+        let this_register = if let Some(this_register) = slot_layout.this_register() {
+            this_register
         } else {
-            let argument_range = self.materialize_argument_block(&argument_values.registers)?;
-            let (call_result, call_callee, call_this, move_back) =
-                self.bridge_call_registers(dest, callee_register, this_register)?;
-            (
-                self.builder.emit_call(
-                    self.encode_register(call_result)?,
-                    self.encode_register(call_callee)?,
-                    self.encode_register(call_this)?,
-                    argument_range,
-                )?,
-                argument_range.argument_count(),
-                call_result,
-                move_back,
-            )
+            self.alloc_temp()?
         };
+        self.lower_call_target_into(callee, callee_register, this_register)?;
+        self.lower_call_arguments_into(&argument_plan, slot_layout.argument_base())?;
+        let (instruction_offset, argument_count, call_result, move_back) =
+            self.emit_call_from_slot_layout(dest, callee_register, this_register, slot_layout)?;
         let span = self.ast().get_expr(expr_id).span();
         self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
-            self.call_feedback_metadata(argument_count, argument_values.spread_mask),
+            self.call_feedback_metadata(argument_count, argument_plan.spread_mask),
         )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
@@ -417,9 +428,12 @@ impl FunctionCompiler<'_, '_> {
         if self.lower_direct_eval_tail_call_expression(expr_id, callee, arguments)? {
             return Ok(());
         }
-        let (callee_register, this_register) = self.lower_call_target(callee)?;
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let argument_range = self.materialize_argument_block(&argument_values.registers)?;
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let argument_range = self.reserve_call_argument_range(&argument_plan)?;
+        let callee_register = self.alloc_temp()?;
+        let this_register = self.alloc_temp()?;
+        self.lower_call_target_into(callee, callee_register, this_register)?;
+        self.lower_call_arguments_into(&argument_plan, argument_range.argument_base())?;
         let (tail_callee, tail_this) =
             self.bridge_tail_call_registers(callee_register, this_register)?;
         let instruction_offset = self.builder.emit_tail_call(
@@ -432,10 +446,7 @@ impl FunctionCompiler<'_, '_> {
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
-            self.call_feedback_metadata(
-                argument_range.argument_count(),
-                argument_values.spread_mask,
-            ),
+            self.call_feedback_metadata(argument_range.argument_count(), argument_plan.spread_mask),
         )?;
         Ok(())
     }
@@ -447,9 +458,10 @@ impl FunctionCompiler<'_, '_> {
         arguments: lyng_js_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let argument_range = self.reserve_call_argument_range(&argument_plan)?;
         let callee_register = self.lower_expr_to_temp(callee)?;
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let argument_range = self.materialize_argument_block(&argument_values.registers)?;
+        self.lower_call_arguments_into(&argument_plan, argument_range.argument_base())?;
         let (call_result, call_callee, move_back) =
             self.bridge_construct_registers(dest, callee_register)?;
         let instruction_offset = self.builder.emit_construct(
@@ -462,10 +474,7 @@ impl FunctionCompiler<'_, '_> {
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Construct,
-            self.call_feedback_metadata(
-                argument_range.argument_count(),
-                argument_values.spread_mask,
-            ),
+            self.call_feedback_metadata(argument_range.argument_count(), argument_plan.spread_mask),
         )?;
         if let Some(dest) = move_back {
             self.emit_move(dest, call_result)?;
@@ -478,79 +487,80 @@ impl FunctionCompiler<'_, '_> {
         reason = "call target lowering keeps direct eval, super, private, and optional call setup together"
     )]
     pub(super) fn lower_call_target(&mut self, callee: ExprId) -> LoweringResult<(u16, u16)> {
+        let callee_register = self.alloc_temp()?;
+        let this_register = self.alloc_temp()?;
+        self.lower_call_target_into(callee, callee_register, this_register)?;
+        Ok((callee_register, this_register))
+    }
+
+    #[allow(
+        clippy::too_many_lines,
+        reason = "call target lowering keeps direct eval, super, private, and optional call setup together"
+    )]
+    pub(super) fn lower_call_target_into(
+        &mut self,
+        callee: ExprId,
+        callee_dest: u16,
+        this_dest: u16,
+    ) -> LoweringResult<()> {
         let expr = self.ast().get_expr(callee).clone();
         match expr {
-            Expr::ParenthesizedExpression { expression, .. } => self.lower_call_target(expression),
+            Expr::ParenthesizedExpression { expression, .. } => {
+                self.lower_call_target_into(expression, callee_dest, this_dest)
+            }
             Expr::OptionalChainExpression { .. } => {
                 let shorted = self.alloc_temp()?;
                 self.emit_load_bool(shorted, false)?;
-                let callee_register = self.alloc_temp()?;
-                let this_register = self.alloc_temp()?;
-                self.lower_optional_chain_call_target(
-                    callee,
-                    callee_register,
-                    this_register,
-                    shorted,
-                )?;
-                Ok((callee_register, this_register))
+                self.lower_optional_chain_call_target(callee, callee_dest, this_dest, shorted)
             }
             Expr::Identifier { name, .. }
                 if self.use_site(callee)?.resolution_kind == ResolutionKind::Dynamic =>
             {
                 let reference = self.alloc_temp()?;
                 self.emit_capture_name(reference, name)?;
-                let callee_register = self.alloc_temp()?;
-                self.emit_load_captured_name(callee_register, reference)?;
-                let this_register = self.alloc_temp()?;
-                self.emit_load_captured_name_this(this_register, reference)?;
-                Ok((callee_register, this_register))
+                self.emit_load_captured_name(callee_dest, reference)?;
+                self.emit_load_captured_name_this(this_dest, reference)
             }
             Expr::StaticMemberExpression {
                 object, property, ..
             } => {
                 if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
-                    let receiver = self.lower_super_receiver()?;
+                    self.lower_super_receiver_into(this_dest)?;
                     let key = self.alloc_temp()?;
                     self.emit_load_atom_string(key, property)?;
-                    let callee_register = self.alloc_temp()?;
                     self.emit_super_property_get(
-                        receiver,
+                        this_dest,
                         key,
                         self.ast().get_expr(object).span(),
-                        callee_register,
+                        callee_dest,
                     )?;
-                    return Ok((callee_register, receiver));
+                    return Ok(());
                 }
-                let receiver = self.lower_expr_to_temp(object)?;
-                let callee_register = self.alloc_temp()?;
-                self.emit_get_property_by_atom(callee_register, receiver, property)?;
-                Ok((callee_register, receiver))
+                self.lower_expr_into(object, this_dest)?;
+                self.emit_get_property_by_atom(callee_dest, this_dest, property)
             }
             Expr::ComputedMemberExpression {
                 object, property, ..
             } => {
                 if matches!(self.ast().get_expr(object), Expr::Super { .. }) {
-                    let receiver = self.lower_super_receiver()?;
+                    self.lower_super_receiver_into(this_dest)?;
                     let key = self.lower_expr_to_temp(property)?;
-                    let callee_register = self.alloc_temp()?;
                     self.emit_super_property_get(
-                        receiver,
+                        this_dest,
                         key,
                         self.ast().get_expr(object).span(),
-                        callee_register,
+                        callee_dest,
                     )?;
-                    return Ok((callee_register, receiver));
+                    return Ok(());
                 }
-                let receiver = self.lower_expr_to_temp(object)?;
-                let callee_register = self.alloc_temp()?;
+                self.lower_expr_into(object, this_dest)?;
                 let key = self.lower_expr_to_temp(property)?;
-                self.emit_get_keyed_property(callee_register, receiver, key)?;
-                Ok((callee_register, receiver))
+                self.emit_get_keyed_property(callee_dest, this_dest, key)
             }
             Expr::PrivateMemberExpression {
                 object, property, ..
             } => {
-                let receiver = self.lower_expr_to_temp(object)?;
+                self.lower_expr_into(object, this_dest)?;
                 let descriptor_index = {
                     let private_use = self.private_use(callee)?;
                     let layout = self
@@ -569,22 +579,180 @@ impl FunctionCompiler<'_, '_> {
                 let class_depth = i16::try_from(self.private_use(callee)?.class_depth())
                     .map_err(|_| LoweringError::UnsupportedExpression { expr: callee })?;
                 self.emit_load_smi(depth, class_depth)?;
-                let callee_register = self.alloc_temp()?;
                 self.emit_internal_builtin_call_into(
                     internal_private_field_get_builtin(),
-                    &[receiver, descriptor, depth],
+                    &[this_dest, descriptor, depth],
                     self.ast().get_expr(callee).span(),
-                    callee_register,
-                )?;
-                Ok((callee_register, receiver))
+                    callee_dest,
+                )
             }
             _ => {
-                let callee_register = self.lower_expr_to_temp(callee)?;
-                let this_register = self.alloc_temp()?;
-                self.emit_load_undefined(this_register)?;
-                Ok((callee_register, this_register))
+                self.lower_expr_into(callee, callee_dest)?;
+                self.emit_load_undefined(this_dest)
             }
         }
+    }
+
+    fn lower_super_receiver_into(&mut self, dest: u16) -> LoweringResult<()> {
+        if let Some(this_override) = self.this_override_register {
+            self.emit_move(dest, this_override)
+        } else {
+            self.emit_load_this(dest)
+        }
+    }
+
+    fn collect_call_argument_plan(
+        &self,
+        arguments: lyng_js_ast::NodeList<ExprId>,
+    ) -> LoweringResult<CallArgumentPlan> {
+        let mut plan = CallArgumentPlan::default();
+        for (index, argument) in self
+            .ast()
+            .get_expr_list(arguments)
+            .to_vec()
+            .into_iter()
+            .enumerate()
+        {
+            if let Expr::SpreadElement { argument, .. } = self.ast().get_expr(argument).clone() {
+                if index >= u64::BITS as usize {
+                    return Err(LoweringError::UnsupportedExpression { expr: argument });
+                }
+                plan.spread_mask |= 1_u64 << index;
+                plan.expressions.push(argument);
+            } else {
+                plan.expressions.push(argument);
+            }
+        }
+        Ok(plan)
+    }
+
+    fn reserve_call_argument_range(
+        &mut self,
+        argument_plan: &CallArgumentPlan,
+    ) -> LoweringResult<CallRange> {
+        if argument_plan.is_empty() {
+            return Ok(CallRange::new(0, 0));
+        }
+
+        let count = u16::try_from(argument_plan.len())
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let base = self
+            .builder
+            .try_alloc_registers(count)
+            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        Ok(CallRange::new(base, count))
+    }
+
+    fn reserve_call_slot_layout(
+        &mut self,
+        argument_plan: &CallArgumentPlan,
+    ) -> LoweringResult<CallSlotLayout> {
+        if argument_plan.spread_mask == 0
+            && argument_plan.len() <= 3
+            && u8::try_from(self.builder.header().register_count()).is_ok()
+        {
+            let block_width = u16::try_from(argument_plan.len() + 1)
+                .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+            if let Some(call_base) = self.builder.try_alloc_registers(block_width) {
+                let argument_count = u8::try_from(argument_plan.len())
+                    .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+                return Ok(CallSlotLayout::Small {
+                    call_base,
+                    argument_count,
+                });
+            }
+        }
+
+        Ok(CallSlotLayout::Generic {
+            argument_range: self.reserve_call_argument_range(argument_plan)?,
+        })
+    }
+
+    fn lower_call_arguments_into(
+        &mut self,
+        argument_plan: &CallArgumentPlan,
+        base: u16,
+    ) -> LoweringResult<()> {
+        for (index, expression) in argument_plan.expressions.iter().copied().enumerate() {
+            let target = base + u16::try_from(index).unwrap_or(u16::MAX);
+            self.lower_expr_into(expression, target)?;
+        }
+        Ok(())
+    }
+
+    fn emit_call_from_slot_layout(
+        &mut self,
+        dest: u16,
+        callee_register: u16,
+        this_register: u16,
+        slot_layout: CallSlotLayout,
+    ) -> LoweringResult<(u32, u16, u16, Option<u16>)> {
+        match slot_layout {
+            CallSlotLayout::Small {
+                call_base,
+                argument_count,
+            } => {
+                if this_register != call_base {
+                    self.emit_move(call_base, this_register)?;
+                }
+                let (call_result, call_callee, move_back) =
+                    self.bridge_small_call_registers(dest, callee_register)?;
+                let instruction_offset = self.builder.emit_small_call(
+                    self.encode_register(call_result)?,
+                    self.encode_register(call_callee)?,
+                    self.encode_register(call_base)?,
+                    argument_count,
+                )?;
+                Ok((
+                    instruction_offset,
+                    u16::from(argument_count),
+                    call_result,
+                    move_back,
+                ))
+            }
+            CallSlotLayout::Generic { argument_range } => {
+                let (call_result, call_callee, call_this, move_back) =
+                    self.bridge_call_registers(dest, callee_register, this_register)?;
+                let instruction_offset = self.builder.emit_call(
+                    self.encode_register(call_result)?,
+                    self.encode_register(call_callee)?,
+                    self.encode_register(call_this)?,
+                    argument_range,
+                )?;
+                Ok((
+                    instruction_offset,
+                    argument_range.argument_count(),
+                    call_result,
+                    move_back,
+                ))
+            }
+        }
+    }
+
+    pub(super) fn emit_call_with_prelowered_target(
+        &mut self,
+        expr_id: ExprId,
+        callee_register: u16,
+        this_register: u16,
+        arguments: lyng_js_ast::NodeList<ExprId>,
+        dest: u16,
+    ) -> LoweringResult<()> {
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let slot_layout = self.reserve_call_slot_layout(&argument_plan)?;
+        self.lower_call_arguments_into(&argument_plan, slot_layout.argument_base())?;
+        let (instruction_offset, argument_count, call_result, move_back) =
+            self.emit_call_from_slot_layout(dest, callee_register, this_register, slot_layout)?;
+        let span = self.ast().get_expr(expr_id).span();
+        self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
+        self.builder.add_feedback_site(
+            instruction_offset,
+            FeedbackSiteKind::Call,
+            self.call_feedback_metadata(argument_count, argument_plan.spread_mask),
+        )?;
+        if let Some(dest) = move_back {
+            self.emit_move(dest, call_result)?;
+        }
+        Ok(())
     }
 
     pub(super) fn lower_call_arguments(
@@ -635,32 +803,6 @@ impl FunctionCompiler<'_, '_> {
         }
 
         Ok(CallRange::new(base, count))
-    }
-
-    pub(super) fn materialize_small_call_block(
-        &mut self,
-        this_value: u16,
-        arguments: &[u16],
-        spread_mask: u64,
-    ) -> LoweringResult<Option<u16>> {
-        if spread_mask != 0 || arguments.len() > 3 {
-            return Ok(None);
-        }
-        let call_base = self.builder.header().register_count();
-        if call_base > u16::from(u8::MAX) {
-            return Ok(None);
-        }
-        let block_width = u16::try_from(arguments.len() + 1)
-            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
-        let Some(call_base) = self.builder.try_alloc_registers(block_width) else {
-            return Ok(None);
-        };
-        self.emit_move(call_base, this_value)?;
-        for (index, source) in arguments.iter().enumerate() {
-            let target = call_base + 1 + u16::try_from(index).unwrap_or(u16::MAX);
-            self.emit_move(target, *source)?;
-        }
-        Ok(Some(call_base))
     }
 
     #[allow(

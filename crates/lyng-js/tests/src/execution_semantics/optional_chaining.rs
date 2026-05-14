@@ -64,6 +64,36 @@ fn optional_calls_support_builtin_and_spread_arguments() {
 }
 
 #[test]
+fn optional_calls_skip_arguments_on_nullish_callee_and_preserve_member_this() {
+    let result = compile_and_run_string(
+        r#"
+            let effects = 0;
+            const missing = undefined;
+            function skipped() {
+                effects += 100;
+                return 1;
+            }
+            const skippedResult = missing?.(skipped());
+
+            const object = {
+                tag: "ok",
+                method(value) {
+                    return this.tag + ":" + value + ":" + effects;
+                }
+            };
+            function value() {
+                effects += 1;
+                return 7;
+            }
+
+            String(skippedResult === undefined) + ":" + object.method?.(value()) + ":" + effects;
+        "#,
+    );
+
+    assert_eq!(result, "true:ok:7:1:1");
+}
+
+#[test]
 fn optional_chain_class_heritage_allows_runtime_null_superclass() {
     let result = compile_and_run_string(
         r"
