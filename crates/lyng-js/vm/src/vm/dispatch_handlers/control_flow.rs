@@ -15,11 +15,13 @@
 //! Conditional jumps (`JumpIfTrue`, `JumpIfFalse`, `JumpIfTrue8`,
 //! `JumpIfFalse8`) land in follow-up commits.
 
+use lyng_js_ops::read;
 use lyng_js_types::Value;
 
 use crate::error::VmError;
 use crate::vm::dispatch::{
-    advance_dispatch_frame, decode_ax8_operands, decode_ax_operands, jump_dispatch_frame,
+    advance_dispatch_frame, decode_abx8_operands, decode_abx_operands, decode_ax8_operands,
+    decode_ax_operands, jump_dispatch_frame,
 };
 use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::vm::Vm;
@@ -89,6 +91,93 @@ pub extern "C" fn op_return(state: &mut DispatchState) -> Step {
     };
     let value = state.vm.read_register(state.frame.registers(), register);
     finish_return(state, value)
+}
+
+// =====================================================================
+// Conditional jumps — JumpIfTrue / JumpIfFalse + 8-byte variants.
+// =====================================================================
+
+/// Shared body for `JumpIfTrue` / `JumpIfFalse` / their 8-byte variants.
+/// `condition_register` reads the value, `delta` is the relative offset,
+/// and `take_if_truthy` selects between the two opcode behaviors.
+#[inline]
+fn op_jump_if_impl(
+    state: &mut DispatchState,
+    condition_register: u16,
+    delta: i32,
+    instruction_len: u32,
+    take_if_truthy: bool,
+) -> Step {
+    let condition = state.vm.read_register(state.frame.registers(), condition_register);
+    let truthy_result = read::to_boolean_agent(state.agent, condition).map_err(VmError::Abrupt);
+    let truthy = match try_step!(state.handle_dispatch_result(truthy_result)) {
+        Some(t) => t,
+        None => {
+            // The abrupt completion was caught — handler PC was rewritten by
+            // transfer_to_exception_handler. Resume dispatch at the new PC.
+            dispatch_next!(state);
+        }
+    };
+    let should_jump = if take_if_truthy { truthy } else { !truthy };
+    if should_jump {
+        if delta < 0 {
+            Vm::poll_incremental_mark_safepoint(state.agent);
+        }
+        try_step!(jump_dispatch_frame(
+            &mut state.frame,
+            instruction_len,
+            delta,
+        ));
+    } else {
+        advance_dispatch_frame(&mut state.frame, instruction_len);
+    }
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_jump_if_true(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        None,
+        false,
+        code,
+        pc,
+    ));
+    let delta = i32::from_le_bytes(bx.to_le_bytes());
+    op_jump_if_impl(state, a, delta, instruction_len, true)
+}
+
+pub extern "C" fn op_jump_if_false(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        None,
+        false,
+        code,
+        pc,
+    ));
+    let delta = i32::from_le_bytes(bx.to_le_bytes());
+    op_jump_if_impl(state, a, delta, instruction_len, false)
+}
+
+pub extern "C" fn op_jump_if_true8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) =
+        try_step!(decode_abx8_operands(state.current_bytes(), false, code, pc));
+    let delta = i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]]));
+    op_jump_if_impl(state, a, delta, instruction_len, true)
+}
+
+pub extern "C" fn op_jump_if_false8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) =
+        try_step!(decode_abx8_operands(state.current_bytes(), false, code, pc));
+    let delta = i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]]));
+    op_jump_if_impl(state, a, delta, instruction_len, false)
 }
 
 pub extern "C" fn op_return_undefined(state: &mut DispatchState) -> Step {

@@ -131,3 +131,35 @@ fn trampoline_executes_smi_sequence_returns_last_value() {
 
     assert_eq!(result, Value::from_smi(3));
 }
+
+/// `if (true) 1; else 2;` exercises a JumpIfFalse over the consequent.
+#[test]
+fn trampoline_executes_if_true_consequent() {
+    let unit = compile_test_unit(7, "if (true) { 1 } else { 2 }");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("trampoline-dispatch should execute if/else cleanly");
+
+    assert_eq!(result, Value::from_smi(1));
+}
+
+/// `if (false) 1; else 2;` takes the else branch via JumpIfFalse.
+#[test]
+fn trampoline_executes_if_false_alternate() {
+    let unit = compile_test_unit(8, "if (false) { 1 } else { 2 }");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("trampoline-dispatch should execute if/else cleanly");
+
+    assert_eq!(result, Value::from_smi(2));
+}
