@@ -124,23 +124,22 @@ pub fn decode_instruction_bytes(bytes: &[u8]) -> Result<Instruction, DecodeError
         });
     }
 
-    let base_opcode = opcode.profiled_base_opcode();
-    let form = instruction_form(base_opcode);
+    let form = instruction_form(opcode);
     let instruction = match form {
         InstructionForm::Abc => {
             let (a, b, c, slot_offset) = decode_abc(bytes, opcode_offset, prefix, opcode)?;
-            if opcode.is_profiled() {
+            if opcode.has_feedback_slot() {
                 let slot = decode_feedback_slot(bytes, slot_offset)?;
-                Instruction::feedback_abc(base_opcode, a, b, c, slot)
+                Instruction::abc_slot(opcode, a, b, c, slot)
             } else {
                 Instruction::abc(opcode, a, b, c)
             }
         }
         InstructionForm::Abx => {
             let (a, bx, slot_offset) = decode_abx(bytes, opcode_offset, prefix, opcode)?;
-            if opcode.is_profiled() {
+            if opcode.has_feedback_slot() {
                 let slot = decode_feedback_slot(bytes, slot_offset)?;
-                Instruction::feedback_abx(base_opcode, a, bx, slot)
+                Instruction::abx_slot(opcode, a, bx, slot)
             } else {
                 Instruction::abx(opcode, a, bx)
             }
@@ -200,11 +199,8 @@ pub fn decode_instruction_bytes(bytes: &[u8]) -> Result<Instruction, DecodeError
                 u16::from_le_bytes([*base_low, *base_high]),
                 u16::from_le_bytes([*count_low, *count_high]),
             );
-            let slot = if opcode.is_profiled() {
-                Some(decode_feedback_slot(bytes, 8)?)
-            } else {
-                None
-            };
+            // After Track H every Call/TailCall/Construct carries a mandatory slot.
+            let slot = decode_feedback_slot(bytes, 8)?;
             Instruction::CallRange {
                 opcode,
                 a: u16::from(*a),
@@ -355,7 +351,7 @@ fn decode_feedback_slot(bytes: &[u8], offset: usize) -> Result<FeedbackSlotId, D
     reason = "the decoder keeps one exhaustive opcode-to-encoding table for auditability"
 )]
 const fn instruction_form(opcode: Opcode) -> InstructionForm {
-    match opcode.profiled_base_opcode() {
+    match opcode {
         Opcode::Nop
         | Opcode::TypeOf
         | Opcode::Jump
@@ -458,10 +454,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wide_abc_decodes_without_side_payloads() {
+    fn wide_abc_decodes_with_inline_feedback_slot() {
+        // Add is IC-shaped, so the wide encoding carries the 2-byte slot inline
+        // after the 8-byte wide ABC envelope.
         let decoded = decode_instruction_bytes(&[
             Opcode::Wide as u8,
-            Opcode::AddProfiled as u8,
+            Opcode::Add as u8,
             0x23,
             0x45,
             0xab,
@@ -471,10 +469,10 @@ mod tests {
             1,
             0,
         ])
-        .expect("wide profiled add should decode");
+        .expect("wide add should decode");
         assert_eq!(
             decoded,
-            Instruction::feedback_abc(Opcode::Add, 0x0123, 0x0045, 0x01ab, slot(1))
+            Instruction::abc_slot(Opcode::Add, 0x0123, 0x0045, 0x01ab, slot(1))
         );
     }
 
@@ -482,7 +480,7 @@ mod tests {
     fn extra_wide_abx_decodes_u32_payload() {
         let decoded = decode_instruction_bytes(&[
             Opcode::ExtraWide as u8,
-            Opcode::LoadGlobalProfiled as u8,
+            Opcode::LoadGlobal as u8,
             0x02,
             0x04,
             0x03,
@@ -492,10 +490,10 @@ mod tests {
             1,
             0,
         ])
-        .expect("extra-wide profiled global load should decode");
+        .expect("extra-wide global load should decode");
         assert_eq!(
             decoded,
-            Instruction::feedback_abx(Opcode::LoadGlobal, 0x0102, 0x0102_0304, slot(1))
+            Instruction::abx_slot(Opcode::LoadGlobal, 0x0102, 0x0102_0304, slot(1))
         );
     }
 
@@ -508,19 +506,18 @@ mod tests {
     }
 
     #[test]
-    fn call_profiled_decodes_inline_range_and_slot() {
-        let decoded =
-            decode_instruction_bytes(&[Opcode::CallProfiled as u8, 1, 2, 3, 5, 0, 4, 0, 1, 0])
-                .expect("profiled call should decode");
+    fn call_decodes_inline_range_and_slot() {
+        let decoded = decode_instruction_bytes(&[Opcode::Call as u8, 1, 2, 3, 5, 0, 4, 0, 1, 0])
+            .expect("call should decode");
         assert_eq!(
             decoded,
             Instruction::CallRange {
-                opcode: Opcode::CallProfiled,
+                opcode: Opcode::Call,
                 a: 1,
                 b: 2,
                 c: 3,
                 range: CallRange::new(4, 5),
-                slot: Some(slot(1))
+                slot: slot(1)
             }
         );
     }

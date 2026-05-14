@@ -252,9 +252,8 @@ fn validate_instruction_registers(
     register_len: u16,
     instruction: Instruction,
 ) -> VmResult<()> {
-    let instruction = instruction.without_feedback_slot();
     match instruction {
-        Instruction::Abc { opcode, a, b, c } => match opcode {
+        Instruction::Abc { opcode, a, b, c } | Instruction::AbcSlot { opcode, a, b, c, .. } => match opcode {
             Opcode::Move
             | Opcode::Ldar
             | Opcode::Negate
@@ -347,7 +346,7 @@ fn validate_instruction_registers(
             }
             _ => Ok(()),
         },
-        Instruction::Abx { opcode, a, bx } => {
+        Instruction::Abx { opcode, a, bx } | Instruction::AbxSlot { opcode, a, bx, .. } => {
             let operands = WideAbxOperands::new(a, bx);
             let a = operands.a();
             let bx = operands.bx();
@@ -442,9 +441,6 @@ fn validate_instruction_registers(
             }
             _ => Ok(()),
         },
-        Instruction::FeedbackAbc { .. } | Instruction::FeedbackAbx { .. } => {
-            unreachable!("profiled instructions are stripped before register validation")
-        }
         Instruction::CallRange {
             opcode,
             a,
@@ -452,7 +448,7 @@ fn validate_instruction_registers(
             c,
             range,
             ..
-        } => match opcode.profiled_base_opcode() {
+        } => match opcode {
             Opcode::Call => {
                 validate_registers(code, register_len, [a, b, c])?;
                 validate_call_range(code, register_len, range)

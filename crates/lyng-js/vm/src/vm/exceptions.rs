@@ -75,16 +75,17 @@ impl Vm {
     ) -> Option<u32> {
         let (instruction_offset, instruction) =
             installed.instruction_before(frame.instruction_offset())?;
-        match instruction.without_feedback_slot() {
+        match instruction {
             Instruction::Abc {
-                opcode:
-                    Opcode::Call0
-                    | Opcode::Call1
-                    | Opcode::Call2
-                    | Opcode::Call3
-                    | Opcode::Call
-                    | Opcode::TailCall
-                    | Opcode::Construct,
+                opcode: Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3,
+                ..
+            }
+            | Instruction::AbcSlot {
+                opcode: Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3,
+                ..
+            }
+            | Instruction::CallRange {
+                opcode: Opcode::Call | Opcode::TailCall | Opcode::Construct,
                 ..
             } => Some(instruction_offset),
             _ => None,

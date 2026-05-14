@@ -4,31 +4,26 @@ use lyng_js_sema::analyze_script;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
-fn semantic_opcode(opcode: Opcode) -> Opcode {
-    opcode.profiled_base_opcode()
-}
+// Track H merged the *Profiled opcode mirror into the base opcodes, so the
+// helpers below no longer need to map between profiled and base forms — the
+// opcode in the instruction is already the semantic opcode.
 
 fn instruction_semantic_opcode(instruction: lyng_js_bytecode::Instruction) -> Opcode {
-    semantic_opcode(instruction.opcode())
+    instruction.opcode()
 }
 
 fn is_ordinary_call_opcode(opcode: Opcode) -> bool {
-    let opcode = semantic_opcode(opcode);
     opcode == Opcode::Call || opcode.small_call_arity().is_some()
-}
-
-fn opcode_matches(actual: Opcode, expected: Opcode) -> bool {
-    actual == expected || semantic_opcode(actual) == expected
 }
 
 fn small_call_base_and_count(instruction: lyng_js_bytecode::Instruction) -> Option<(u16, u16)> {
     match instruction {
         lyng_js_bytecode::Instruction::Abc { opcode, c, .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, c, .. } => {
+        | lyng_js_bytecode::Instruction::AbcSlot { opcode, c, .. } => {
             opcode.small_call_arity().map(|arity| (c, u16::from(arity)))
         }
         lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::AbxSlot { .. }
         | lyng_js_bytecode::Instruction::Ax { .. }
         | lyng_js_bytecode::Instruction::CallRange { .. } => None,
     }
@@ -38,28 +33,23 @@ fn generic_call_argument_range(
     instruction: lyng_js_bytecode::Instruction,
 ) -> Option<lyng_js_bytecode::CallRange> {
     match instruction {
-        lyng_js_bytecode::Instruction::CallRange { opcode, range, .. }
-            if semantic_opcode(opcode) == Opcode::Call =>
-        {
-            Some(range)
-        }
-        lyng_js_bytecode::Instruction::Abc { .. }
-        | lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::Ax { .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbc { .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
-        | lyng_js_bytecode::Instruction::CallRange { .. } => None,
+        lyng_js_bytecode::Instruction::CallRange {
+            opcode: Opcode::Call,
+            range,
+            ..
+        } => Some(range),
+        _ => None,
     }
 }
 
 fn has_move_to_register(instructions: &[lyng_js_bytecode::Instruction], dest: u16) -> bool {
     instructions.iter().any(|instruction| match *instruction {
         lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. } => {
-            opcode_matches(opcode, Opcode::Move) && a == dest
+        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
+            opcode == Opcode::Move && a == dest
         }
         lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::AbxSlot { .. }
         | lyng_js_bytecode::Instruction::Ax { .. }
         | lyng_js_bytecode::Instruction::CallRange { .. } => false,
     })
@@ -72,13 +62,10 @@ fn has_writer_with_opcode(
 ) -> bool {
     instructions.iter().any(|instruction| match *instruction {
         lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. }
+        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. }
         | lyng_js_bytecode::Instruction::Abx { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbx { opcode, a, .. } => {
-            a == dest
-                && opcodes
-                    .iter()
-                    .any(|expected| opcode_matches(opcode, *expected))
+        | lyng_js_bytecode::Instruction::AbxSlot { opcode, a, .. } => {
+            a == dest && opcodes.contains(&opcode)
         }
         lyng_js_bytecode::Instruction::Ax { .. }
         | lyng_js_bytecode::Instruction::CallRange { .. } => false,
@@ -92,11 +79,11 @@ fn has_small_call_result_in_register(
 ) -> bool {
     instructions.iter().any(|instruction| match *instruction {
         lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbc { opcode, a, .. } => {
+        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
             a == dest && opcode.small_call_arity() == Some(argument_count)
         }
         lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::FeedbackAbx { .. }
+        | lyng_js_bytecode::Instruction::AbxSlot { .. }
         | lyng_js_bytecode::Instruction::Ax { .. }
         | lyng_js_bytecode::Instruction::CallRange { .. } => false,
     })

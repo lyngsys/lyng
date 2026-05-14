@@ -19,6 +19,22 @@ use std::collections::HashMap;
 
 mod peephole;
 
+/// Sentinel slot id stored in the byte stream by IC-shaped emit methods until
+/// [`BytecodeBuilder::attach_feedback_slots`] replaces it during finalization.
+///
+/// Real feedback slot ids are allocated sequentially from 1 by
+/// [`BytecodeBuilder::add_feedback_site`] and capped one below this value so
+/// the sentinel never collides with a legitimate slot. The sentinel must fit in
+/// u16 so the bytecode round-trips through [`crate::instruction::write_feedback_slot`]
+/// without tripping its narrow-encoding assertion.
+const PENDING_FEEDBACK_SLOT_RAW: u32 = u16::MAX as u32;
+const PENDING_FEEDBACK_SLOT: FeedbackSlotId = match FeedbackSlotId::from_raw(
+    PENDING_FEEDBACK_SLOT_RAW,
+) {
+    Some(slot) => slot,
+    None => unreachable!(),
+};
+
 pub type BytecodeBuildResult<T> = Result<T, BytecodeBuildError>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -249,6 +265,66 @@ const fn full_conditional_jump_opcode(opcode: Opcode) -> Option<Opcode> {
         Opcode::JumpIfTrue | Opcode::JumpIfTrue8 => Some(Opcode::JumpIfTrue),
         Opcode::JumpIfFalse | Opcode::JumpIfFalse8 => Some(Opcode::JumpIfFalse),
         _ => None,
+    }
+}
+
+/// Pick the default [`FeedbackSiteKind`] for an IC-shaped opcode when no
+/// compiler site has registered a more specific kind. Used by
+/// [`BytecodeBuilder::attach_feedback_slots`] to honor the Track H invariant
+/// that every IC-shaped emission ends up with an allocated feedback slot.
+#[allow(
+    clippy::match_same_arms,
+    reason = "opcode families stay grouped per feedback kind to keep the table auditable"
+)]
+const fn default_feedback_kind_for(opcode: Opcode) -> FeedbackSiteKind {
+    match opcode {
+        Opcode::Add
+        | Opcode::AddSmi
+        | Opcode::Sub
+        | Opcode::SubSmi
+        | Opcode::Mul
+        | Opcode::MulSmi
+        | Opcode::Div
+        | Opcode::DivSmi
+        | Opcode::Mod
+        | Opcode::ModSmi
+        | Opcode::Exp
+        | Opcode::BitOr
+        | Opcode::BitXor
+        | Opcode::BitAnd
+        | Opcode::BitAndSmi
+        | Opcode::BitNot
+        | Opcode::ShiftLeft
+        | Opcode::ShiftRight
+        | Opcode::UnsignedShiftRight
+        | Opcode::Negate
+        | Opcode::Increment
+        | Opcode::Decrement => FeedbackSiteKind::Arithmetic,
+        Opcode::Equal
+        | Opcode::StrictEqual
+        | Opcode::EqualZero
+        | Opcode::LessThan
+        | Opcode::LessEqual
+        | Opcode::GreaterThan
+        | Opcode::GreaterEqual => FeedbackSiteKind::Comparison,
+        Opcode::LoadGlobal | Opcode::GetNamedProperty => FeedbackSiteKind::NamedPropertyLoad,
+        Opcode::StoreGlobal
+        | Opcode::AssignGlobal
+        | Opcode::SetNamedProperty
+        | Opcode::AssignNamedProperty
+        | Opcode::StrictAssignNamedProperty => FeedbackSiteKind::NamedPropertyStore,
+        Opcode::GetKeyedProperty
+        | Opcode::SetKeyedProperty
+        | Opcode::AssignKeyedProperty
+        | Opcode::StrictAssignKeyedProperty => FeedbackSiteKind::KeyedPropertyAccess,
+        Opcode::Call0
+        | Opcode::Call1
+        | Opcode::Call2
+        | Opcode::Call3
+        | Opcode::Call
+        | Opcode::TailCall => FeedbackSiteKind::Call,
+        Opcode::Construct => FeedbackSiteKind::Construct,
+        _ => FeedbackSiteKind::Arithmetic, // catch-all; opcode must be IC-shaped per caller
     }
 }
 
@@ -814,12 +890,21 @@ impl BytecodeBuilder {
         {
             return self.emit(instruction);
         }
-        let offset = self.emit(Instruction::abc(
-            opcode,
-            operands.a(),
-            operands.b(),
-            operands.c(),
-        ))?;
+        // IC-shaped opcodes always carry a trailing feedback slot. The slot id
+        // is filled in later by `attach_feedback_slots`; until then a sentinel
+        // placeholder occupies the operand so the encoded length is correct.
+        let instruction = if opcode.has_feedback_slot() {
+            Instruction::abc_slot(
+                opcode,
+                operands.a(),
+                operands.b(),
+                operands.c(),
+                PENDING_FEEDBACK_SLOT,
+            )
+        } else {
+            Instruction::abc(opcode, operands.a(), operands.b(), operands.c())
+        };
+        let offset = self.emit(instruction)?;
         Ok(offset)
     }
 
@@ -842,7 +927,15 @@ impl BytecodeBuilder {
         if let Some(instruction) = compact_abx_instruction(opcode, operands)? {
             return self.emit(instruction);
         }
-        let offset = self.emit(Instruction::abx(opcode, operands.a(), operands.bx()))?;
+        // IC-shaped ABX opcodes (LoadGlobal / StoreGlobal / AssignGlobal) carry a
+        // mandatory feedback slot. Use the sentinel placeholder until
+        // `attach_feedback_slots` substitutes the real id.
+        let instruction = if opcode.has_feedback_slot() {
+            Instruction::abx_slot(opcode, operands.a(), operands.bx(), PENDING_FEEDBACK_SLOT)
+        } else {
+            Instruction::abx(opcode, operands.a(), operands.bx())
+        };
+        let offset = self.emit(instruction)?;
         Ok(offset)
     }
 
@@ -926,6 +1019,7 @@ impl BytecodeBuilder {
             u16::from(callee),
             u16::from(this_value),
             arguments,
+            PENDING_FEEDBACK_SLOT,
         ))
     }
 
@@ -959,11 +1053,14 @@ impl BytecodeBuilder {
         let result = narrow_call_operand(result, BytecodeOperandKind::CallResult)?;
         let callee = narrow_call_operand(callee, BytecodeOperandKind::CallCallee)?;
         let call_base = narrow_call_operand(call_base, BytecodeOperandKind::CallBase)?;
-        self.emit(Instruction::abc(
+        // Call0..3 are IC-shaped after Track H — emit with the slot placeholder
+        // and let `attach_feedback_slots` substitute the real id at finalize.
+        self.emit(Instruction::abc_slot(
             opcode,
             u16::from(result),
             u16::from(callee),
             u16::from(call_base),
+            PENDING_FEEDBACK_SLOT,
         ))
     }
 
@@ -991,6 +1088,7 @@ impl BytecodeBuilder {
             u16::from(this_value),
             0,
             arguments,
+            PENDING_FEEDBACK_SLOT,
         ))
     }
 
@@ -1015,6 +1113,7 @@ impl BytecodeBuilder {
             u16::from(callee),
             0,
             arguments,
+            PENDING_FEEDBACK_SLOT,
         ))
     }
 
@@ -1204,7 +1303,9 @@ impl BytecodeBuilder {
                 kind: BytecodeLimitKind::FeedbackSlot,
             },
         )?;
-        if u16::try_from(slot.get()).is_err() {
+        // Reserve PENDING_FEEDBACK_SLOT_RAW (u16::MAX) for the builder's pending
+        // sentinel, so real feedback slot ids stay strictly below it.
+        if u16::try_from(slot.get()).is_err() || slot.get() >= PENDING_FEEDBACK_SLOT_RAW {
             return Err(BytecodeBuildError::LimitExceeded {
                 kind: BytecodeLimitKind::FeedbackSlot,
             });
@@ -1275,23 +1376,79 @@ impl BytecodeBuilder {
         self.deopt_snapshots.push(snapshot);
     }
 
-    fn attach_feedback_slots(&self, logical_instructions: &[Instruction]) -> Vec<Instruction> {
-        let feedback_slots = self
+    fn attach_feedback_slots(
+        &mut self,
+        logical_instructions: &[Instruction],
+    ) -> BytecodeBuildResult<Vec<Instruction>> {
+        let mut feedback_slots = self
             .feedback_sites
             .iter()
             .map(|site| (site.instruction_offset(), site.slot()))
             .collect::<HashMap<_, _>>();
-        logical_instructions
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(offset, instruction)| {
-                feedback_slots
-                    .get(&u32::try_from(offset).expect("instruction offset should fit u32"))
-                    .and_then(|slot| instruction.with_feedback_slot(*slot))
-                    .unwrap_or(instruction)
-            })
-            .collect()
+        let mut result = Vec::with_capacity(logical_instructions.len());
+        for (offset, instruction) in logical_instructions.iter().copied().enumerate() {
+            let logical_offset = u32::try_from(offset).map_err(|_| {
+                BytecodeBuildError::LimitExceeded {
+                    kind: BytecodeLimitKind::InstructionStream,
+                }
+            })?;
+            // IC-shaped instructions emitted with the sentinel placeholder must
+            // bind a real feedback slot before the bytecode is finalized.
+            // Compiler sites that already called `add_feedback_site` have one
+            // registered; sites that emitted only via `emit_abc` / `emit_abx` /
+            // `emit_call*` without an explicit feedback metadata call get an
+            // auto-allocated default-metadata slot here so the "always-allocate"
+            // invariant from the Track H plan holds for every IC-shaped opcode.
+            let needs_slot = matches!(
+                instruction,
+                Instruction::AbcSlot { .. }
+                    | Instruction::AbxSlot { .. }
+                    | Instruction::CallRange { .. }
+            );
+            let slot = if needs_slot {
+                if let Some(slot) = feedback_slots.get(&logical_offset).copied() {
+                    Some(slot)
+                } else {
+                    let kind = default_feedback_kind_for(instruction.opcode());
+                    let slot =
+                        self.add_feedback_site(logical_offset, kind, FeedbackSiteMetadata::None)?;
+                    feedback_slots.insert(logical_offset, slot);
+                    Some(slot)
+                }
+            } else {
+                None
+            };
+            let updated = match (slot, instruction) {
+                (Some(slot), Instruction::AbcSlot { opcode, a, b, c, .. }) => {
+                    Instruction::abc_slot(opcode, a, b, c, slot)
+                }
+                (Some(slot), Instruction::AbxSlot { opcode, a, bx, .. }) => {
+                    Instruction::abx_slot(opcode, a, bx, slot)
+                }
+                (
+                    Some(slot),
+                    Instruction::CallRange {
+                        opcode,
+                        a,
+                        b,
+                        c,
+                        range,
+                        ..
+                    },
+                ) => Instruction::call_range(opcode, a, b, c, range, slot),
+                _ => instruction,
+            };
+            debug_assert!(
+                !matches!(updated,
+                    Instruction::AbcSlot { slot, .. }
+                    | Instruction::AbxSlot { slot, .. }
+                    | Instruction::CallRange { slot, .. }
+                    if slot == PENDING_FEEDBACK_SLOT),
+                "every IC-shaped instruction must have its placeholder slot replaced by attach_feedback_slots"
+            );
+            result.push(updated);
+        }
+        Ok(result)
     }
 
     fn rewrite_jumps_to_byte_offsets(
@@ -1335,7 +1492,7 @@ impl BytecodeBuilder {
 
     fn lower_labels_to_byte_offsets(&mut self) -> BytecodeBuildResult<()> {
         let logical_instructions = InstructionStream::new(&self.instructions).to_vec();
-        let mut lowered = self.attach_feedback_slots(&logical_instructions);
+        let mut lowered = self.attach_feedback_slots(&logical_instructions)?;
         Self::rewrite_jumps_to_byte_offsets(&logical_instructions, &mut lowered)?;
 
         let (byte_offsets, byte_len) = byte_offsets_for(&lowered)?;
@@ -1596,11 +1753,11 @@ mod tests {
 
         assert_eq!(
             function.instructions().get(0),
-            Some(Instruction::feedback_abc(Opcode::Add, 0, 1, 2, add_slot))
+            Some(Instruction::abc_slot(Opcode::Add, 0, 1, 2, add_slot))
         );
         assert_eq!(
             function.instructions().get(1),
-            Some(Instruction::feedback_abx(
+            Some(Instruction::abx_slot(
                 Opcode::LoadGlobal,
                 0,
                 7,
@@ -1636,11 +1793,11 @@ mod tests {
 
         assert_eq!(
             function.instruction_at(0),
-            Some(Instruction::feedback_abc(Opcode::Add, 0, 1, 2, add_slot))
+            Some(Instruction::abc_slot(Opcode::Add, 0, 1, 2, add_slot))
         );
         assert_eq!(
             function.instruction_at(6),
-            Some(Instruction::feedback_abx(
+            Some(Instruction::abx_slot(
                 Opcode::LoadGlobal,
                 0,
                 7,
@@ -1790,6 +1947,8 @@ mod tests {
         );
         builder.alloc_registers(2)?;
         let call = builder.emit_tail_call(0, 1, CallRange::new(0, 1))?;
+        // Call/TailCall/Construct always carry a feedback slot after Track H.
+        builder.add_feedback_site(call, FeedbackSiteKind::Call, FeedbackSiteMetadata::None)?;
         builder.add_source_map_entry(SourceId::new(9), call, 4, 18);
         let safepoint = builder.add_safepoint_at(call, SafepointKind::Allocation, 2)?;
         builder.add_deopt_snapshot(DeoptSnapshot::new(
@@ -1840,7 +1999,8 @@ mod tests {
             ArgumentsMode::None,
         );
         builder.alloc_registers(6)?;
-        builder.emit_tail_call(2, 3, CallRange::new(4, 2))?;
+        let tail = builder.emit_tail_call(2, 3, CallRange::new(4, 2))?;
+        builder.add_feedback_site(tail, FeedbackSiteKind::Call, FeedbackSiteMetadata::None)?;
         let function = builder.finish()?;
 
         let text = disassemble(&function);

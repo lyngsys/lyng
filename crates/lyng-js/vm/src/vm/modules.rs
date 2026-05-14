@@ -605,7 +605,7 @@ impl Vm {
             opcode: Opcode::CreateClosure,
             a: create_register,
             bx: child_index,
-        } = create_instruction.without_feedback_slot()
+        } = create_instruction
         else {
             return None;
         };
@@ -616,7 +616,7 @@ impl Vm {
             opcode: Opcode::StoreEnvSlot,
             a: store_register,
             bx: env_operand,
-        } = store_instruction.without_feedback_slot()
+        } = store_instruction
         else {
             return None;
         };

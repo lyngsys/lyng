@@ -124,6 +124,28 @@ mod tests {
     }
 
     #[test]
+    fn dispatch_loop_does_not_call_profiled_metadata_helpers() {
+        // Track H removed the *Profiled opcode mirror. The dispatch loop must no
+        // longer derive `is_profiled` / base opcode via the 46-arm match jump
+        // tables that those helpers compiled into — that jump table was the
+        // second indirect branch we're eliminating.
+        let source = include_str!("dispatch.rs");
+        let run_loop = source
+            .split("\n    fn run_dispatch_loop")
+            .nth(1)
+            .expect("dispatch loop should stay in this module");
+
+        assert!(
+            !run_loop.contains("profiled_base_opcode("),
+            "hot dispatch should not call profiled_base_opcode (Track H removed *Profiled mirror)"
+        );
+        assert!(
+            !run_loop.contains(".is_profiled()"),
+            "hot dispatch should not call Opcode::is_profiled (Track H removed *Profiled mirror)"
+        );
+    }
+
+    #[test]
     fn move_arm_uses_direct_register_window_access() {
         let source = include_str!("dispatch.rs");
         let run_loop = source
@@ -740,11 +762,15 @@ impl Vm {
                 } else {
                     (None, first)
                 };
-                let opcode = semantic_opcode.profiled_base_opcode();
-                let is_profiled = semantic_opcode.is_profiled();
+                // After Track H, the *Profiled opcode mirror is gone; the slot is a
+                // mandatory trailing operand of every IC-shaped opcode. `has_feedback_slot()`
+                // returns a `bool`, which LLVM should fold to a bitset or to per-arm
+                // constant-propagation without producing a separate indirect-branch
+                // jump table the way the previous `profiled_base_opcode` did.
+                let is_profiled = semantic_opcode.has_feedback_slot();
 
                 if COUNT_OPCODES {
-                    self.record_opcode_dispatch(opcode);
+                    self.record_opcode_dispatch(semantic_opcode);
                 }
                 #[cfg(debug_assertions)]
                 self.assert_deopt_safepoint_state(agent, state.frame(), installed.as_ref());
@@ -776,7 +802,7 @@ impl Vm {
                         self.register_stack[target] = value;
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::Add | Opcode::AddProfiled => {
+                    Opcode::Add => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -809,7 +835,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::AddSmi | Opcode::AddSmiProfiled => {
+                    Opcode::AddSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -843,7 +869,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Sub | Opcode::SubProfiled => {
+                    Opcode::Sub => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -876,7 +902,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::SubSmi | Opcode::SubSmiProfiled => {
+                    Opcode::SubSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -910,7 +936,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Mul | Opcode::MulProfiled => {
+                    Opcode::Mul => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -942,7 +968,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::MulSmi | Opcode::MulSmiProfiled => {
+                    Opcode::MulSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -975,7 +1001,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Div | Opcode::DivProfiled => {
+                    Opcode::Div => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -995,7 +1021,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::DivSmi | Opcode::DivSmiProfiled => {
+                    Opcode::DivSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1016,7 +1042,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Mod | Opcode::ModProfiled => {
+                    Opcode::Mod => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1048,7 +1074,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ModSmi | Opcode::ModSmiProfiled => {
+                    Opcode::ModSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1081,7 +1107,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Exp | Opcode::ExpProfiled => {
+                    Opcode::Exp => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1101,7 +1127,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitOr | Opcode::BitOrProfiled => {
+                    Opcode::BitOr => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1121,7 +1147,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitAnd | Opcode::BitAndProfiled => {
+                    Opcode::BitAnd => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1153,7 +1179,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitAndSmi | Opcode::BitAndSmiProfiled => {
+                    Opcode::BitAndSmi => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1186,7 +1212,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitXor | Opcode::BitXorProfiled => {
+                    Opcode::BitXor => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1206,7 +1232,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ShiftLeft | Opcode::ShiftLeftProfiled => {
+                    Opcode::ShiftLeft => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1227,7 +1253,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ShiftRight | Opcode::ShiftRightProfiled => {
+                    Opcode::ShiftRight => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1248,7 +1274,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::UnsignedShiftRight | Opcode::UnsignedShiftRightProfiled => {
+                    Opcode::UnsignedShiftRight => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1270,7 +1296,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Equal | Opcode::EqualProfiled => {
+                    Opcode::Equal => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1290,7 +1316,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::StrictEqual | Opcode::StrictEqualProfiled => {
+                    Opcode::StrictEqual => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1310,7 +1336,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::EqualZero | Opcode::EqualZeroProfiled => {
+                    Opcode::EqualZero => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1330,7 +1356,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::LessThan | Opcode::LessThanProfiled => {
+                    Opcode::LessThan => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1351,7 +1377,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::LessEqual | Opcode::LessEqualProfiled => {
+                    Opcode::LessEqual => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1372,7 +1398,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::GreaterThan | Opcode::GreaterThanProfiled => {
+                    Opcode::GreaterThan => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1393,7 +1419,7 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::GreaterEqual | Opcode::GreaterEqualProfiled => {
+                    Opcode::GreaterEqual => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1435,7 +1461,7 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::Negate | Opcode::NegateProfiled => {
+                    Opcode::Negate => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1454,7 +1480,7 @@ impl Vm {
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::BitNot | Opcode::BitNotProfiled => {
+                    Opcode::BitNot => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1475,9 +1501,9 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::Increment
-                    | Opcode::IncrementProfiled
+                   
                     | Opcode::Decrement
-                    | Opcode::DecrementProfiled => {
+                    => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1492,7 +1518,7 @@ impl Vm {
                             registry,
                             frame,
                             b,
-                            opcode == Opcode::Increment,
+                            semantic_opcode == Opcode::Increment,
                         );
                         let Some((numeric, value)) =
                             self.handle_dispatch_result(agent, frame_depth, frame, update_result)?
@@ -1504,7 +1530,7 @@ impl Vm {
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::GetNamedProperty | Opcode::GetNamedPropertyProfiled => {
+                    Opcode::GetNamedProperty => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1527,11 +1553,11 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetNamedProperty
-                    | Opcode::SetNamedPropertyProfiled
+                   
                     | Opcode::AssignNamedProperty
-                    | Opcode::AssignNamedPropertyProfiled
+                   
                     | Opcode::StrictAssignNamedProperty
-                    | Opcode::StrictAssignNamedPropertyProfiled => {
+                    => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1548,7 +1574,7 @@ impl Vm {
                             frame,
                             instruction_len,
                             feedback_slot,
-                            opcode,
+                            semantic_opcode,
                             a,
                             b,
                             c,
@@ -1575,7 +1601,7 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::GetKeyedProperty | Opcode::GetKeyedPropertyProfiled => {
+                    Opcode::GetKeyedProperty => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1598,11 +1624,11 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetKeyedProperty
-                    | Opcode::SetKeyedPropertyProfiled
+                   
                     | Opcode::AssignKeyedProperty
-                    | Opcode::AssignKeyedPropertyProfiled
+                   
                     | Opcode::StrictAssignKeyedProperty
-                    | Opcode::StrictAssignKeyedPropertyProfiled => {
+                    => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1619,7 +1645,7 @@ impl Vm {
                             frame,
                             instruction_len,
                             feedback_slot,
-                            opcode,
+                            semantic_opcode,
                             a,
                             b,
                             c,
@@ -1769,14 +1795,7 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::Call0
-                    | Opcode::Call0Profiled
-                    | Opcode::Call1
-                    | Opcode::Call1Profiled
-                    | Opcode::Call2
-                    | Opcode::Call2Profiled
-                    | Opcode::Call3
-                    | Opcode::Call3Profiled => {
+                    Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 => {
                         let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
                             bytes,
                             prefix,
@@ -1796,7 +1815,7 @@ impl Vm {
                             a,
                             b,
                             c,
-                            opcode.small_call_arity().unwrap_or(0),
+                            semantic_opcode.small_call_arity().unwrap_or(0),
                         );
                         let Some(()) =
                             self.handle_dispatch_result(agent, frame_depth, frame, call_result)?
@@ -1804,7 +1823,7 @@ impl Vm {
                             continue;
                         };
                     }
-                    Opcode::Call | Opcode::CallProfiled => {
+                    Opcode::Call => {
                         let (a, b, c, call_range, feedback_slot, instruction_len) =
                             decode_call_range_operands(
                                 bytes,
@@ -1816,7 +1835,7 @@ impl Vm {
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
-                            opcode,
+                            opcode: semantic_opcode,
                         })?;
                         let spread_mask = feedback_slot
                             .and_then(|slot| installed.feedback_descriptor_for_slot(slot))
@@ -1841,7 +1860,7 @@ impl Vm {
                             continue;
                         };
                     }
-                    Opcode::TailCall | Opcode::TailCallProfiled => {
+                    Opcode::TailCall => {
                         let (a, b, c, call_range, feedback_slot, instruction_len) =
                             decode_call_range_operands(
                                 bytes,
@@ -1853,7 +1872,7 @@ impl Vm {
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
-                            opcode,
+                            opcode: semantic_opcode,
                         })?;
                         let spread_mask = feedback_slot
                             .and_then(|slot| installed.feedback_descriptor_for_slot(slot))
@@ -1881,7 +1900,7 @@ impl Vm {
                         }
                         self.refresh_dispatch_frame(frame_depth, frame);
                     }
-                    Opcode::Construct | Opcode::ConstructProfiled => {
+                    Opcode::Construct => {
                         let (a, b, c, call_range, feedback_slot, instruction_len) =
                             decode_call_range_operands(
                                 bytes,
@@ -1893,7 +1912,7 @@ impl Vm {
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
-                            opcode,
+                            opcode: semantic_opcode,
                         })?;
                         let spread_mask = feedback_slot
                             .and_then(|slot| installed.feedback_descriptor_for_slot(slot))
@@ -2192,7 +2211,7 @@ impl Vm {
                             instruction_offset,
                         )?;
 
-                        let target = opcode
+                        let target = semantic_opcode
                             .accumulator_store_index()
                             .expect("store-accumulator opcode should have an index");
                         let value = self.read_register(frame.registers(), 0);
@@ -2344,7 +2363,7 @@ impl Vm {
                         let (a, feedback_slot, instruction_len) =
                             decode_local_operands(bytes, is_profiled, code, instruction_offset)?;
 
-                        let local = opcode
+                        let local = semantic_opcode
                             .local_load_index()
                             .expect("load-local opcode should have an index");
                         let value = self.read_register(frame.registers(), local);
@@ -2358,7 +2377,7 @@ impl Vm {
                         let (a, feedback_slot, instruction_len) =
                             decode_local_operands(bytes, is_profiled, code, instruction_offset)?;
 
-                        let local = opcode
+                        let local = semantic_opcode
                             .local_store_index()
                             .expect("store-local opcode should have an index");
                         let value = self.read_register(frame.registers(), a);
@@ -2471,7 +2490,7 @@ impl Vm {
                         self.leave_env_scope(frame, a, bx);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::LoadGlobal | Opcode::LoadGlobalProfiled => {
+                    Opcode::LoadGlobal => {
                         let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
                             bytes,
                             prefix,
@@ -2721,7 +2740,7 @@ impl Vm {
                         };
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::StoreGlobal | Opcode::StoreGlobalProfiled => {
+                    Opcode::StoreGlobal => {
                         let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
                             bytes,
                             prefix,
@@ -2749,7 +2768,7 @@ impl Vm {
                         };
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::AssignGlobal | Opcode::AssignGlobalProfiled => {
+                    Opcode::AssignGlobal => {
                         let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
                             bytes,
                             prefix,
@@ -2875,7 +2894,7 @@ impl Vm {
                             continue;
                         };
                         let delta = i32::from_le_bytes(bx.to_le_bytes());
-                        let should_jump = match opcode {
+                        let should_jump = match semantic_opcode {
                             Opcode::JumpIfTrue => truthy,
                             Opcode::JumpIfFalse => !truthy,
                             _ => unreachable!("guarded by opcode match"),
@@ -2904,7 +2923,7 @@ impl Vm {
                             continue;
                         };
                         let delta = i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]]));
-                        let should_jump = match opcode {
+                        let should_jump = match semantic_opcode {
                             Opcode::JumpIfTrue8 => truthy,
                             Opcode::JumpIfFalse8 => !truthy,
                             _ => unreachable!("guarded by opcode match"),
@@ -3097,7 +3116,7 @@ impl Vm {
                                 u32::try_from(ax - 1).map_err(|_| VmError::UnsupportedOpcode {
                                     code: frame.code(),
                                     instruction_offset: frame.instruction_offset(),
-                                    opcode,
+                                    opcode: semantic_opcode,
                                 })?,
                             )
                         } else {
@@ -3294,7 +3313,7 @@ impl Vm {
                         return Err(VmError::UnsupportedOpcode {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
-                            opcode,
+                            opcode: semantic_opcode,
                         });
                     }
                 }
