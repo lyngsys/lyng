@@ -89,7 +89,7 @@ pub extern "C" fn op_return(state: &mut DispatchState) -> Step {
             });
         }
     };
-    let value = state.vm.read_register(state.frame.registers(), register);
+    let value = state.vm.read_register_unchecked(state.frame.registers(), register);
     finish_return(state, value)
 }
 
@@ -108,7 +108,7 @@ fn op_jump_if_impl(
     instruction_len: u32,
     take_if_truthy: bool,
 ) -> Step {
-    let condition = state.vm.read_register(state.frame.registers(), condition_register);
+    let condition = state.vm.read_register_unchecked(state.frame.registers(), condition_register);
     let truthy_result = read::to_boolean_agent(state.agent, condition).map_err(VmError::Abrupt);
     let truthy = match try_step!(state.handle_dispatch_result(truthy_result)) {
         Some(t) => t,

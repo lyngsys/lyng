@@ -43,8 +43,8 @@ pub extern "C" fn op_move(state: &mut DispatchState) -> Step {
     ));
 
     let registers = state.frame.registers();
-    let value = state.vm.read_register(registers, b);
-    state.vm.write_register(registers, a, value);
+    let value = state.vm.read_register_unchecked(registers, b);
+    state.vm.write_register_unchecked(registers, a, value);
     state.advance(instruction_len);
     dispatch_next!(state);
 }
@@ -65,7 +65,7 @@ macro_rules! op_lda_constant {
                 pc,
             ));
             let registers = state.frame.registers();
-            state.vm.write_register(registers, 0, $value);
+            state.vm.write_register_unchecked(registers, 0, $value);
             state.advance(instruction_len);
             dispatch_next!(state);
         }
@@ -97,7 +97,7 @@ macro_rules! op_load_constant_abx {
                 pc,
             ));
             let registers = state.frame.registers();
-            state.vm.write_register(registers, a, $value);
+            state.vm.write_register_unchecked(registers, a, $value);
             state.advance(instruction_len);
             dispatch_next!(state);
         }
@@ -128,8 +128,8 @@ macro_rules! op_star_n {
                 pc,
             ));
             let registers = state.frame.registers();
-            let value = state.vm.read_register(registers, 0);
-            state.vm.write_register(registers, $target, value);
+            let value = state.vm.read_register_unchecked(registers, 0);
+            state.vm.write_register_unchecked(registers, $target, value);
             state.advance(instruction_len);
             dispatch_next!(state);
         }
@@ -178,7 +178,7 @@ pub extern "C" fn op_lda_const8(state: &mut DispatchState) -> Step {
     ));
     let value = try_step!(state.read_constant(bx));
     let registers = state.frame.registers();
-    state.vm.write_register(registers, 0, value);
+    state.vm.write_register_unchecked(registers, 0, value);
     state.advance(instruction_len);
     dispatch_next!(state);
 }
@@ -193,8 +193,8 @@ pub extern "C" fn op_ldar(state: &mut DispatchState) -> Step {
         pc,
     ));
     let registers = state.frame.registers();
-    let value = state.vm.read_register(registers, a);
-    state.vm.write_register(registers, 0, value);
+    let value = state.vm.read_register_unchecked(registers, a);
+    state.vm.write_register_unchecked(registers, 0, value);
     state.advance(instruction_len);
     dispatch_next!(state);
 }
@@ -255,7 +255,7 @@ pub extern "C" fn op_load_const(state: &mut DispatchState) -> Step {
     ));
     let value = try_step!(state.read_constant(bx));
     let registers = state.frame.registers();
-    state.vm.write_register(registers, a, value);
+    state.vm.write_register_unchecked(registers, a, value);
     state.advance(instruction_len);
     dispatch_next!(state);
 }
@@ -271,7 +271,7 @@ pub extern "C" fn op_load_const8(state: &mut DispatchState) -> Step {
     ));
     let value = try_step!(state.read_constant(bx));
     let registers = state.frame.registers();
-    state.vm.write_register(registers, a, value);
+    state.vm.write_register_unchecked(registers, a, value);
     state.advance(instruction_len);
     dispatch_next!(state);
 }
@@ -292,8 +292,8 @@ macro_rules! op_load_local_n {
                 pc,
             ));
             let registers = state.frame.registers();
-            let value = state.vm.read_register(registers, $local);
-            state.vm.write_register(registers, a, value);
+            let value = state.vm.read_register_unchecked(registers, $local);
+            state.vm.write_register_unchecked(registers, a, value);
             state.advance(instruction_len);
             dispatch_next!(state);
         }
@@ -317,8 +317,8 @@ macro_rules! op_store_local_n {
                 pc,
             ));
             let registers = state.frame.registers();
-            let value = state.vm.read_register(registers, a);
-            state.vm.write_register(registers, $local, value);
+            let value = state.vm.read_register_unchecked(registers, a);
+            state.vm.write_register_unchecked(registers, $local, value);
             state.advance(instruction_len);
             dispatch_next!(state);
         }
