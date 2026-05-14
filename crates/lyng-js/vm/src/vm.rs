@@ -297,6 +297,25 @@ impl Vm {
         }
     }
 
+    /// Trampoline-side opcode counter: translates the raw byte to `Opcode`,
+    /// skips `Wide` / `ExtraWide` prefixes (legacy counts the semantic only),
+    /// and records the dispatch. No-op when counters are disabled. Called
+    /// from `dispatch_next!` and `run_trampoline`, so kept cheap on the hot
+    /// path: the disabled case is a single load + branch.
+    #[inline]
+    pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
+        let Some(counts) = &self.opcode_dispatch_counts else {
+            return;
+        };
+        let Some(opcode) = Opcode::from_byte(byte) else {
+            return;
+        };
+        if opcode.is_prefix() {
+            return;
+        }
+        counts.increment(opcode);
+    }
+
     pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
         self.debug_hook = Some(Box::new(hook));
     }

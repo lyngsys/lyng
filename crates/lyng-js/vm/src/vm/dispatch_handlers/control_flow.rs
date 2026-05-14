@@ -25,7 +25,7 @@ use crate::vm::dispatch::{
 };
 use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::vm::Vm;
-use crate::{dispatch_next, try_step};
+use crate::{dispatch_next, try_step, VmDebugSafepointKind};
 
 pub extern "C" fn op_nop(state: &mut DispatchState) -> Step {
     let code = state.code();
@@ -78,6 +78,14 @@ pub extern "C" fn op_loop_header(state: &mut DispatchState) -> Step {
     let (_ax, _feedback_slot, instruction_len) =
         try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
 
+    if state.vm.debug_poll_enabled() {
+        state.sync_active_frame();
+        {
+            let DispatchState { vm, agent, .. } = &mut *state;
+            vm.poll_debug_safepoint(agent, VmDebugSafepointKind::LoopHeader);
+        }
+        try_step!(state.refresh_from_active_frame());
+    }
     state.vm.observe_tier_backedge_event(code);
     Vm::poll_incremental_mark_safepoint(state.agent);
     advance_dispatch_frame(&mut state.frame, instruction_len);
