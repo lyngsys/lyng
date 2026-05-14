@@ -1,8 +1,8 @@
 use super::registers::absolute_register;
 use super::values::decode_env_operand;
 use super::{
-    code_index, Agent, CallRange, CodeRef, FrameRecord, HostHooks, InstalledFunction,
-    NativeFunctionRegistry, Opcode, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
+    code_index, Agent, CallRange, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry,
+    Opcode, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
 };
 use lyng_js_ops::{errors, read};
 use lyng_js_types::{AbruptCompletion, FeedbackSlotId, PropertyKey};
@@ -35,6 +35,14 @@ mod tests {
         assert!(
             !run_loop.contains("instruction.encoded_len()"),
             "hot dispatch should advance from opcode byte layout, not Instruction::encoded_len"
+        );
+        assert!(
+            !run_loop.contains("decode_dispatch_instruction("),
+            "hot dispatch should inline opcode + operand decode, not call out to a centralized decoder"
+        );
+        assert!(
+            !run_loop.contains("DispatchDecode"),
+            "hot dispatch should not construct a DispatchDecode struct per opcode"
         );
     }
 
@@ -122,22 +130,6 @@ mod tests {
 }
 
 #[derive(Clone, Copy)]
-enum DispatchOperands {
-    Abc { a: u16, b: u16, c: u16 },
-    Abx { a: u16, bx: u32 },
-    Ax { ax: i32 },
-}
-
-#[derive(Clone, Copy)]
-struct DispatchDecode {
-    opcode: Opcode,
-    feedback_slot: Option<FeedbackSlotId>,
-    operands: DispatchOperands,
-    call_range: Option<CallRange>,
-    encoded_len: u32,
-}
-
-#[derive(Clone, Copy)]
 pub(in crate::vm) struct DispatchState {
     frame_depth: usize,
     code: CodeRef,
@@ -191,364 +183,6 @@ enum DispatchOperandForm {
     CallRange,
 }
 
-fn decode_dispatch_instruction(
-    installed: &InstalledFunction,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<DispatchDecode> {
-    let bytes = instruction_bytes_at(installed, code, instruction_offset)?;
-    let raw_opcode = *bytes.first().ok_or(VmError::InstructionOutOfBounds {
-        code,
-        instruction_offset,
-    })?;
-    let first = opcode_from_byte(code, instruction_offset, raw_opcode)?;
-    let (prefix, opcode_offset, semantic_opcode) = if first.is_prefix() {
-        let raw_semantic = *bytes.get(1).ok_or(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        })?;
-        let semantic = opcode_from_byte(code, instruction_offset, raw_semantic)?;
-        if semantic.is_prefix() {
-            return Err(VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            });
-        }
-        (Some(first), 1usize, semantic)
-    } else {
-        (None, 0usize, first)
-    };
-    let opcode = semantic_opcode.profiled_base_opcode();
-    let (operands, call_range, operand_len) = decode_unprofiled_operands(
-        bytes,
-        code,
-        instruction_offset,
-        prefix,
-        opcode_offset,
-        opcode,
-    )?;
-    let feedback_slot = if semantic_opcode.is_profiled() {
-        Some(feedback_slot_at(
-            bytes,
-            code,
-            instruction_offset,
-            operand_len,
-        )?)
-    } else {
-        None
-    };
-    let encoded_len = operand_len
-        .checked_add(if feedback_slot.is_some() { 2 } else { 0 })
-        .and_then(|len| u32::try_from(len).ok())
-        .ok_or(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        })?;
-    Ok(DispatchDecode {
-        opcode,
-        feedback_slot,
-        operands,
-        call_range,
-        encoded_len,
-    })
-}
-
-fn feedback_slot_at(
-    bytes: &[u8],
-    code: CodeRef,
-    instruction_offset: u32,
-    offset: usize,
-) -> VmResult<FeedbackSlotId> {
-    let [slot_low, slot_high, ..] = bytes.get(offset..).ok_or(VmError::InstructionOutOfBounds {
-        code,
-        instruction_offset,
-    })?
-    else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    feedback_slot_from_bytes(code, instruction_offset, *slot_low, *slot_high)
-}
-
-const fn reject_dispatch_prefix(
-    prefix: Option<Opcode>,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<()> {
-    if prefix.is_some() {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    }
-    Ok(())
-}
-
-#[allow(
-    clippy::too_many_lines,
-    reason = "the byte-stream dispatcher keeps operand decoding table-local for hot-path auditability"
-)]
-fn decode_unprofiled_operands(
-    bytes: &[u8],
-    code: CodeRef,
-    instruction_offset: u32,
-    prefix: Option<Opcode>,
-    opcode_offset: usize,
-    opcode: Opcode,
-) -> VmResult<(DispatchOperands, Option<CallRange>, usize)> {
-    match dispatch_operand_form(opcode) {
-        DispatchOperandForm::Abc => {
-            if prefix.is_some() {
-                let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] = bytes else {
-                    return Err(VmError::InstructionOutOfBounds {
-                        code,
-                        instruction_offset,
-                    });
-                };
-                return Ok((
-                    DispatchOperands::Abc {
-                        a: u16::from_le_bytes([*a_low, *a_high]),
-                        b: u16::from_le_bytes([*b_low, *b_high]),
-                        c: u16::from_le_bytes([*c_low, *c_high]),
-                    },
-                    None,
-                    8,
-                ));
-            }
-            let operands =
-                bytes
-                    .get(opcode_offset + 1..)
-                    .ok_or(VmError::InstructionOutOfBounds {
-                        code,
-                        instruction_offset,
-                    })?;
-            let [a, b, c, ..] = operands else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abc {
-                    a: u16::from(*a),
-                    b: u16::from(*b),
-                    c: u16::from(*c),
-                },
-                None,
-                4,
-            ))
-        }
-        DispatchOperandForm::Abx => {
-            if let Some(prefix) = prefix {
-                let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
-                    return Err(VmError::InstructionOutOfBounds {
-                        code,
-                        instruction_offset,
-                    });
-                };
-                let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
-                return Ok((
-                    DispatchOperands::Abx {
-                        a: u16::from_le_bytes([*a_low, *a_high]),
-                        bx: u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
-                    },
-                    None,
-                    8,
-                ));
-            }
-            let operands =
-                bytes
-                    .get(opcode_offset + 1..)
-                    .ok_or(VmError::InstructionOutOfBounds {
-                        code,
-                        instruction_offset,
-                    })?;
-            let [a, bx_low, bx_high, ..] = operands else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abx {
-                    a: u16::from(*a),
-                    bx: u32::from(u16::from_le_bytes([*bx_low, *bx_high])),
-                },
-                None,
-                4,
-            ))
-        }
-        DispatchOperandForm::Abx8 => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, a, bx, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abx {
-                    a: u16::from(*a),
-                    bx: u32::from(*bx),
-                },
-                None,
-                3,
-            ))
-        }
-        DispatchOperandForm::Ax => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, first, second, third, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Ax {
-                    ax: sign_extend_i24([*first, *second, *third]),
-                },
-                None,
-                4,
-            ))
-        }
-        DispatchOperandForm::Ax8 => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, ax, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Ax {
-                    ax: i32::from(i8::from_le_bytes([*ax])),
-                },
-                None,
-                2,
-            ))
-        }
-        DispatchOperandForm::Local => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, register, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abx {
-                    a: u16::from(*register),
-                    bx: 0,
-                },
-                None,
-                2,
-            ))
-        }
-        DispatchOperandForm::Accumulator => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            Ok((DispatchOperands::Abc { a: 0, b: 0, c: 0 }, None, 1))
-        }
-        DispatchOperandForm::AccumulatorByte => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, operand, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abx {
-                    a: 0,
-                    bx: u32::from(*operand),
-                },
-                None,
-                2,
-            ))
-        }
-        DispatchOperandForm::AccumulatorRegister => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, register, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abc {
-                    a: u16::from(*register),
-                    b: 0,
-                    c: 0,
-                },
-                None,
-                2,
-            ))
-        }
-        DispatchOperandForm::CallRange => {
-            reject_dispatch_prefix(prefix, code, instruction_offset)?;
-            let [_, a, b, c, count_low, count_high, base_low, base_high, ..] = bytes else {
-                return Err(VmError::InstructionOutOfBounds {
-                    code,
-                    instruction_offset,
-                });
-            };
-            Ok((
-                DispatchOperands::Abc {
-                    a: u16::from(*a),
-                    b: u16::from(*b),
-                    c: u16::from(*c),
-                },
-                Some(CallRange::new(
-                    u16::from_le_bytes([*base_low, *base_high]),
-                    u16::from_le_bytes([*count_low, *count_high]),
-                )),
-                8,
-            ))
-        }
-    }
-}
-
-fn instruction_bytes_at(
-    installed: &InstalledFunction,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<&[u8]> {
-    installed
-        .function
-        .instruction_bytes()
-        .get(
-            usize::try_from(instruction_offset).map_err(|_| VmError::InstructionOutOfBounds {
-                code,
-                instruction_offset,
-            })?..,
-        )
-        .ok_or(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        })
-}
-
-fn opcode_from_byte(code: CodeRef, instruction_offset: u32, raw_opcode: u8) -> VmResult<Opcode> {
-    Opcode::from_byte(raw_opcode).ok_or(VmError::InstructionOutOfBounds {
-        code,
-        instruction_offset,
-    })
-}
-
-fn feedback_slot_from_bytes(
-    code: CodeRef,
-    instruction_offset: u32,
-    slot_low: u8,
-    slot_high: u8,
-) -> VmResult<FeedbackSlotId> {
-    let raw_slot = u16::from_le_bytes([slot_low, slot_high]);
-    FeedbackSlotId::from_raw(u32::from(raw_slot)).ok_or(VmError::InstructionOutOfBounds {
-        code,
-        instruction_offset,
-    })
-}
-
 const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
     let sign = if bytes[2] & 0x80 == 0 { 0 } else { 0xff };
     i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
@@ -597,9 +231,11 @@ pub(in crate::vm) const fn next_dispatch_instruction_offset(
         .expect("instruction offset should stay within u32")
 }
 
+#[inline(always)]
 #[allow(
     clippy::too_many_lines,
-    reason = "the dispatch decoder mirrors the bytecode operand layout table"
+    clippy::inline_always,
+    reason = "the dispatch decoder mirrors the bytecode operand layout table; inline(always) is required so the form match folds into the per-opcode dispatch in the hot loop"
 )]
 const fn dispatch_operand_form(opcode: Opcode) -> DispatchOperandForm {
     match opcode {
@@ -880,56 +516,255 @@ impl Vm {
                     break;
                 }
                 let instruction_offset = state.frame().instruction_offset();
-                let decoded =
-                    decode_dispatch_instruction(installed.as_ref(), code, instruction_offset)?;
-                let instruction_len = decoded.encoded_len;
+
+                // === Track A: Inline opcode + operand decode ===
+                // The previous shape called `decode_dispatch_instruction` per opcode and
+                // returned a typed decode struct. On Richards/Crypto that function was
+                // 26-40% of total time. We inline it here so LLVM can fuse the decode with
+                // the subsequent opcode dispatch into one tight loop body.
+                let pc_usize = usize::try_from(instruction_offset).map_err(|_| {
+                    VmError::InstructionOutOfBounds {
+                        code,
+                        instruction_offset,
+                    }
+                })?;
+                let bytes = installed
+                    .function
+                    .instruction_bytes()
+                    .get(pc_usize..)
+                    .ok_or(VmError::InstructionOutOfBounds {
+                        code,
+                        instruction_offset,
+                    })?;
+                let raw_first = *bytes.first().ok_or(VmError::InstructionOutOfBounds {
+                    code,
+                    instruction_offset,
+                })?;
+                let first = Opcode::from_byte(raw_first).ok_or(
+                    VmError::InstructionOutOfBounds {
+                        code,
+                        instruction_offset,
+                    },
+                )?;
+                // Hot path: no prefix. Wide/ExtraWide are essentially zero share on real
+                // workloads; we still handle them via the same inline path.
+                let (prefix, semantic_opcode) = if first.is_prefix() {
+                    let raw_semantic = *bytes.get(1).ok_or(
+                        VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        },
+                    )?;
+                    let semantic = Opcode::from_byte(raw_semantic).ok_or(
+                        VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        },
+                    )?;
+                    if semantic.is_prefix() {
+                        return Err(VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        });
+                    }
+                    (Some(first), semantic)
+                } else {
+                    (None, first)
+                };
+                let opcode = semantic_opcode.profiled_base_opcode();
+                let is_profiled = semantic_opcode.is_profiled();
+
                 if COUNT_OPCODES {
-                    self.record_opcode_dispatch(decoded.opcode);
+                    self.record_opcode_dispatch(opcode);
                 }
                 #[cfg(debug_assertions)]
                 self.assert_deopt_safepoint_state(agent, state.frame(), installed.as_ref());
-                let feedback_slot = decoded.feedback_slot;
-                let call_range = decoded.call_range;
-                let opcode = decoded.opcode;
 
-                // Decode raw byte operands without constructing `Instruction`.
+                // Decode operands inline by form. `dispatch_operand_form` is a const fn
+                // marked `#[inline(always)]` (see below); LLVM lowers it to a constant per
+                // arm of the outer opcode match because the opcode is known at this point.
                 let mut a: u16 = 0;
                 let mut b: u16 = 0;
                 let mut c: u16 = 0;
                 let mut bx: u32 = 0;
                 let mut ax: i32 = 0;
-                match decoded.operands {
-                    DispatchOperands::Abc {
-                        a: ra,
-                        b: rb,
-                        c: rc,
-                    } => {
-                        let (da, db, dc) = Self::decode_abc_operands(
-                            installed.as_ref(),
-                            instruction_offset,
-                            opcode,
-                            ra,
-                            rb,
-                            rc,
-                        );
-                        a = da;
-                        b = db;
-                        c = dc;
+                let mut call_range: Option<CallRange> = None;
+                let operand_end: usize;
+                #[allow(
+                    clippy::match_same_arms,
+                    reason = "operand-form arms stay grouped per semantic form even when bodies are byte-identical"
+                )]
+                match dispatch_operand_form(opcode) {
+                    DispatchOperandForm::Abc => {
+                        if prefix.is_some() {
+                            let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] =
+                                bytes
+                            else {
+                                return Err(VmError::InstructionOutOfBounds {
+                                    code,
+                                    instruction_offset,
+                                });
+                            };
+                            a = u16::from_le_bytes([*a_low, *a_high]);
+                            b = u16::from_le_bytes([*b_low, *b_high]);
+                            c = u16::from_le_bytes([*c_low, *c_high]);
+                            operand_end = 8;
+                        } else {
+                            let [_, ra, rb, rc, ..] = bytes else {
+                                return Err(VmError::InstructionOutOfBounds {
+                                    code,
+                                    instruction_offset,
+                                });
+                            };
+                            a = u16::from(*ra);
+                            b = u16::from(*rb);
+                            c = u16::from(*rc);
+                            operand_end = 4;
+                        }
                     }
-                    DispatchOperands::Abx { a: ra, bx: rbx } => {
-                        let (da, dbx) = Self::decode_abx_operands(
-                            installed.as_ref(),
-                            instruction_offset,
-                            ra,
-                            rbx,
-                        );
-                        a = da;
-                        bx = dbx;
+                    DispatchOperandForm::Abx => {
+                        if let Some(prefix) = prefix {
+                            let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
+                                return Err(VmError::InstructionOutOfBounds {
+                                    code,
+                                    instruction_offset,
+                                });
+                            };
+                            let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
+                            a = u16::from_le_bytes([*a_low, *a_high]);
+                            bx = u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]);
+                            operand_end = 8;
+                        } else {
+                            let [_, ra, bx_low, bx_high, ..] = bytes else {
+                                return Err(VmError::InstructionOutOfBounds {
+                                    code,
+                                    instruction_offset,
+                                });
+                            };
+                            a = u16::from(*ra);
+                            bx = u32::from(u16::from_le_bytes([*bx_low, *bx_high]));
+                            operand_end = 4;
+                        }
                     }
-                    DispatchOperands::Ax { ax: rax } => {
-                        ax = rax;
+                    DispatchOperandForm::Abx8 => {
+                        let [_, ra, rbx, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        a = u16::from(*ra);
+                        bx = u32::from(*rbx);
+                        operand_end = 3;
+                    }
+                    DispatchOperandForm::Ax => {
+                        let [_, first_byte, second, third, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        ax = sign_extend_i24([*first_byte, *second, *third]);
+                        operand_end = 4;
+                    }
+                    DispatchOperandForm::Ax8 => {
+                        let [_, raw_ax, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        ax = i32::from(i8::from_le_bytes([*raw_ax]));
+                        operand_end = 2;
+                    }
+                    DispatchOperandForm::Local => {
+                        let [_, register, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        a = u16::from(*register);
+                        operand_end = 2;
+                    }
+                    DispatchOperandForm::Accumulator => {
+                        operand_end = 1;
+                    }
+                    DispatchOperandForm::AccumulatorByte => {
+                        let [_, operand, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        bx = u32::from(*operand);
+                        operand_end = 2;
+                    }
+                    DispatchOperandForm::AccumulatorRegister => {
+                        let [_, register, ..] = bytes else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        a = u16::from(*register);
+                        operand_end = 2;
+                    }
+                    DispatchOperandForm::CallRange => {
+                        let [_, ra, rb, rc, count_low, count_high, base_low, base_high, ..] =
+                            bytes
+                        else {
+                            return Err(VmError::InstructionOutOfBounds {
+                                code,
+                                instruction_offset,
+                            });
+                        };
+                        a = u16::from(*ra);
+                        b = u16::from(*rb);
+                        c = u16::from(*rc);
+                        call_range = Some(CallRange::new(
+                            u16::from_le_bytes([*base_low, *base_high]),
+                            u16::from_le_bytes([*count_low, *count_high]),
+                        ));
+                        operand_end = 8;
                     }
                 }
+                let (feedback_slot, instruction_len) = if is_profiled {
+                    let [slot_low, slot_high, ..] =
+                        bytes.get(operand_end..).ok_or(VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        })?
+                    else {
+                        return Err(VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        });
+                    };
+                    let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
+                    let slot = FeedbackSlotId::from_raw(u32::from(raw_slot)).ok_or(
+                        VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        },
+                    )?;
+                    let len = u32::try_from(operand_end + 2).map_err(|_| {
+                        VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        }
+                    })?;
+                    (Some(slot), len)
+                } else {
+                    let len = u32::try_from(operand_end).map_err(|_| {
+                        VmError::InstructionOutOfBounds {
+                            code,
+                            instruction_offset,
+                        }
+                    })?;
+                    (None, len)
+                };
+
                 let frame_depth = state.frame_depth();
                 let frame = &mut state.frame;
 

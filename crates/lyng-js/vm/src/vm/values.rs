@@ -1,6 +1,6 @@
 use super::{
     Agent, AtomId, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, EnvironmentRef,
-    FrameRecord, HostHooks, InstalledFunction, NativeFunctionRegistry, ObjectRef, Opcode, RealmRef,
+    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef,
     Value, Vm, VmError, VmResult,
 };
 use crate::vm::property_access::ToPrimitiveHint;
@@ -508,30 +508,6 @@ impl Vm {
 
         output.extend(Self::value_to_string_text(agent, value)?.encode_utf16());
         Ok(())
-    }
-
-    #[inline]
-    pub(super) const fn decode_abc_operands(
-        installed: &InstalledFunction,
-        instruction_offset: u32,
-        opcode: Opcode,
-        a: u16,
-        b: u16,
-        c: u16,
-    ) -> (u16, u16, u16) {
-        let _ = (installed, instruction_offset, opcode);
-        (a, b, c)
-    }
-
-    #[inline]
-    pub(super) const fn decode_abx_operands(
-        installed: &InstalledFunction,
-        instruction_offset: u32,
-        a: u16,
-        bx: u32,
-    ) -> (u16, u32) {
-        let _ = (installed, instruction_offset);
-        (a, bx)
     }
 
     pub(super) fn object_register(
