@@ -147,7 +147,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn define_length_property(
+    pub(in crate::vm) fn define_length_property(
         agent: &mut Agent,
         object: ObjectRef,
         length: u32,
@@ -156,7 +156,7 @@ impl Vm {
         Self::define_length_property_with_attrs(agent, object, length, true, configurable)
     }
 
-    pub(super) fn define_length_property_with_attrs(
+    pub(in crate::vm) fn define_length_property_with_attrs(
         agent: &mut Agent,
         object: ObjectRef,
         length: u32,
