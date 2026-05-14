@@ -142,6 +142,18 @@ macro_rules! dispatch_next {
     };
 }
 
+/// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
+/// `return Step::Error(e)` on Err.
+#[macro_export]
+macro_rules! try_step {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(error) => return $crate::vm::dispatch_state::Step::Error(error),
+        }
+    };
+}
+
 /// Sized to cover every byte that could land in `bytes[pc]`. The first
 /// `lyng_js_bytecode::OPCODE_COUNT` slots map to real or stub handlers; the
 /// rest are `op_stub`, so an invalid byte fails cleanly rather than indexing
