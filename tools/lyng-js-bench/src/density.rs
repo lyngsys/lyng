@@ -287,17 +287,17 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     let entry = unit
         .function(unit.entry())
         .expect("compiled unit should contain its entry function");
-    let entry_words = entry.instruction_count() + entry.wide_operands().len();
-    let entry_bytes = entry.instruction_bytes().len() + entry.wide_operands().len() * 4;
+    let entry_words = entry.instruction_count();
+    let entry_bytes = entry.instruction_bytes().len();
     let unit_words = unit
         .functions()
         .iter()
-        .map(|function| function.instruction_count() + function.wide_operands().len())
+        .map(lyng_js_bytecode::BytecodeFunction::instruction_count)
         .sum::<usize>();
     let unit_bytes = unit
         .functions()
         .iter()
-        .map(|function| function.instruction_bytes().len() + function.wide_operands().len() * 4)
+        .map(|function| function.instruction_bytes().len())
         .sum::<usize>();
     let base_words = unit
         .functions()
@@ -307,7 +307,7 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     let wide_words = unit
         .functions()
         .iter()
-        .map(|function| function.wide_operands().len())
+        .map(|function| count_wide_prefixes(function.instruction_bytes()))
         .sum::<usize>();
     let metadata_records = unit
         .functions()
@@ -347,6 +347,16 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
         metadata_records,
         max_registers,
     }
+}
+
+fn count_wide_prefixes(bytes: &[u8]) -> usize {
+    bytes
+        .iter()
+        .filter(|byte| {
+            **byte == lyng_js_bytecode::Opcode::Wide as u8
+                || **byte == lyng_js_bytecode::Opcode::ExtraWide as u8
+        })
+        .count()
 }
 
 fn measure_throughput(

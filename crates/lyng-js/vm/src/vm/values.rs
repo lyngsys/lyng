@@ -4,7 +4,6 @@ use super::{
     Value, Vm, VmError, VmResult,
 };
 use crate::vm::property_access::ToPrimitiveHint;
-use lyng_js_bytecode::{WideAbcOperands, WideAbxOperands};
 use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
 use lyng_js_ops::{errors, number_to_string, object, read};
 use lyng_js_types::{AbruptCompletion, PropertyKey, StringRef};
@@ -512,45 +511,34 @@ impl Vm {
     }
 
     #[inline]
-    pub(super) fn decode_abc_operands(
+    pub(super) const fn decode_abc_operands(
         installed: &InstalledFunction,
-        frame: &FrameRecord,
+        instruction_offset: u32,
         opcode: Opcode,
-        a: u8,
-        b: u8,
-        c: u8,
+        a: u16,
+        b: u16,
+        c: u16,
     ) -> (u16, u16, u16) {
-        if opcode.small_call_arity().is_some()
-            || matches!(opcode, Opcode::Call | Opcode::TailCall | Opcode::Construct)
-        {
-            return (u16::from(a), u16::from(b), u16::from(c));
-        }
-        let operands = installed
-            .wide_payload(frame.instruction_offset())
-            .map_or_else(
-                || WideAbcOperands::narrow(a, b, c),
-                |payload| WideAbcOperands::decode(a, b, c, payload),
-            );
-        (operands.a(), operands.b(), operands.c())
+        let _ = (installed, instruction_offset, opcode);
+        (a, b, c)
     }
 
     #[inline]
-    pub(super) fn decode_abx_operands(
+    pub(super) const fn decode_abx_operands(
         installed: &InstalledFunction,
-        frame: &FrameRecord,
-        a: u8,
-        bx: u16,
+        instruction_offset: u32,
+        a: u16,
+        bx: u32,
     ) -> (u16, u32) {
-        let operands = installed
-            .wide_payload(frame.instruction_offset())
-            .map_or_else(
-                || WideAbxOperands::narrow(a, bx),
-                |payload| WideAbxOperands::decode(a, bx, payload),
-            );
-        (operands.a(), operands.bx())
+        let _ = (installed, instruction_offset);
+        (a, bx)
     }
 
-    pub(super) fn object_register(&self, frame: &FrameRecord, register: u16) -> VmResult<ObjectRef> {
+    pub(super) fn object_register(
+        &self,
+        frame: &FrameRecord,
+        register: u16,
+    ) -> VmResult<ObjectRef> {
         let value = self.read_register(frame.registers(), register);
         Self::require_object(frame, value)
     }

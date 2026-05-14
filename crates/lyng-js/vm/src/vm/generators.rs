@@ -1,4 +1,5 @@
 use super::bytecode_calls::PreparedBytecodeCall;
+use super::dispatch::advance_dispatch_frame;
 use super::runtime_objects::VmIteratorBridge;
 use super::{
     Agent, AsyncGeneratorFrameState, AsyncGeneratorRequest, ExecutionContext, FrameFlags,
@@ -830,7 +831,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -846,7 +849,9 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
+                instruction_len,
                 iterator_register,
                 result_register,
                 done_register,
@@ -879,6 +884,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
+                            frame_depth,
                             frame,
                             iterator_register,
                             record,
@@ -944,6 +950,7 @@ impl Vm {
                             agent,
                             host,
                             registry,
+                            frame_depth,
                             frame,
                             iterator_register,
                             record,
@@ -973,7 +980,9 @@ impl Vm {
                             agent,
                             host,
                             registry,
+                            frame_depth,
                             frame,
+                            instruction_len,
                             iterator_register,
                             result_register,
                             done_register,
@@ -1023,7 +1032,9 @@ impl Vm {
 
         self.finish_delegate_yield_outcome(
             agent,
+            frame_depth,
             frame,
+            instruction_len,
             result_register,
             done_register,
             register_base,
@@ -1041,7 +1052,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -1067,6 +1080,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
+                        frame_depth,
                         frame,
                         iterator_register,
                         record,
@@ -1096,6 +1110,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
+                        frame_depth,
                         frame,
                         iterator_register,
                         record,
@@ -1123,7 +1138,9 @@ impl Vm {
 
         self.finish_delegate_yield_outcome(
             agent,
+            frame_depth,
             frame,
+            instruction_len,
             result_register,
             done_register,
             frame.registers().base(),
@@ -1139,7 +1156,9 @@ impl Vm {
     fn finish_delegate_yield_outcome(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         result_register: u16,
         done_register: u16,
         register_base: u32,
@@ -1156,6 +1175,7 @@ impl Vm {
                     .insert(register_base, iterator_register, record);
                 self.write_register(frame.registers(), result_register, value);
                 self.write_register(frame.registers(), done_register, Value::from_bool(false));
+                self.sync_dispatch_frame(frame_depth, *frame);
                 self.suspend_current_generator_frame(
                     agent,
                     frame,
@@ -1167,7 +1187,7 @@ impl Vm {
             DelegateYieldOutcome::Complete { value } => {
                 self.write_register(frame.registers(), result_register, value);
                 self.write_register(frame.registers(), done_register, Value::from_bool(true));
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 Ok(())
             }
         }
@@ -1182,6 +1202,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame_depth: usize,
         frame: &FrameRecord,
         iterator_register: u16,
         record: iterator::IteratorRecord,
@@ -1212,6 +1233,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
+                    frame_depth,
                     frame,
                     iterator_register,
                     record,
@@ -1247,6 +1269,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
+                    frame_depth,
                     frame,
                     iterator_register,
                     record,
@@ -1268,6 +1291,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame_depth: usize,
         frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
@@ -1281,6 +1305,7 @@ impl Vm {
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
+        self.sync_dispatch_frame(frame_depth, *frame);
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -1293,6 +1318,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame_depth: usize,
         frame: &FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
@@ -1330,6 +1356,7 @@ impl Vm {
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
+        self.sync_dispatch_frame(frame_depth, *frame);
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -1346,7 +1373,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
         done_register: u16,
@@ -1356,10 +1385,7 @@ impl Vm {
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::None);
         let resume_kind = frame.resume_kind();
         let resume_value = frame.resume_value();
-        self.clear_active_resume();
-        let frame = self
-            .frame()
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        frame.clear_resume();
         if resume_kind == GeneratorResumeKind::Throw {
             if let iterator::DelegateYieldAwaitState::Value { done: false, .. } = await_state
                 && record.is_async_from_sync()
@@ -1369,7 +1395,7 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: &frame,
+                    frame,
                 };
                 let _: () = iterator::iterator_close(
                     &mut bridge,
@@ -1393,7 +1419,7 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame: &frame,
+                        frame,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -1405,7 +1431,8 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        &frame,
+                        frame_depth,
+                        frame,
                         iterator_register,
                         record,
                         value,
@@ -1425,7 +1452,9 @@ impl Vm {
                 };
                 self.finish_delegate_yield_outcome(
                     agent,
-                    &frame,
+                    frame_depth,
+                    frame,
+                    instruction_len,
                     result_register,
                     done_register,
                     frame.registers().base(),
@@ -1440,11 +1469,13 @@ impl Vm {
                 if done {
                     record.set_done(true);
                     if return_completion {
-                        self.reactivate_delegate_return_completion(agent, resume_value)?;
+                        *frame = (*frame).with_resume(GeneratorResumeKind::Return, resume_value);
                     }
                     self.finish_delegate_yield_outcome(
                         agent,
-                        &frame,
+                        frame_depth,
+                        frame,
+                        instruction_len,
                         result_register,
                         done_register,
                         frame.registers().base(),
@@ -1456,7 +1487,9 @@ impl Vm {
                 } else {
                     self.finish_delegate_yield_outcome(
                         agent,
-                        &frame,
+                        frame_depth,
+                        frame,
+                        instruction_len,
                         result_register,
                         done_register,
                         frame.registers().base(),
@@ -1473,19 +1506,6 @@ impl Vm {
                 Err(VmError::Abrupt(errors::throw_type_error(agent)))
             }
         }
-    }
-
-    fn reactivate_delegate_return_completion(
-        &mut self,
-        agent: &mut Agent,
-        value: Value,
-    ) -> VmResult<()> {
-        let frame = self
-            .frames
-            .last_mut()
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        *frame = frame.with_resume(GeneratorResumeKind::Return, value);
-        Ok(())
     }
 
     pub(super) fn restore_suspended_execution(

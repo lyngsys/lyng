@@ -798,9 +798,8 @@ fn compiled_script_diagnostics(unit: &CompiledScriptUnit) -> Test262RuntimeDiagn
         ..Test262RuntimeDiagnostics::default()
     };
     for function in unit.functions() {
-        diagnostics.instruction_words +=
-            function.instruction_count() + function.wide_operands().len();
-        diagnostics.wide_operands += function.wide_operands().len();
+        diagnostics.instruction_words += function.instruction_count();
+        diagnostics.wide_prefixes += count_wide_prefixes(function.instruction_bytes());
         diagnostics.constants += function.constants().len();
         diagnostics.metadata_records += function.constants().len()
             + function.child_functions().len()
@@ -817,6 +816,16 @@ fn compiled_script_diagnostics(unit: &CompiledScriptUnit) -> Test262RuntimeDiagn
         diagnostics.live_feedback_sites += function.feedback_sites().len();
     }
     diagnostics
+}
+
+fn count_wide_prefixes(bytes: &[u8]) -> usize {
+    bytes
+        .iter()
+        .filter(|byte| {
+            **byte == lyng_js_bytecode::Opcode::Wide as u8
+                || **byte == lyng_js_bytecode::Opcode::ExtraWide as u8
+        })
+        .count()
 }
 
 fn collect_vm_diagnostics(vm: &Vm, root: CodeRef, diagnostics: &mut Test262RuntimeDiagnostics) {

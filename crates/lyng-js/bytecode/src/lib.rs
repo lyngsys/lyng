@@ -42,6 +42,6 @@ pub use metadata::{
     DirectEvalLexicalScope, DirectEvalLexicalSite, DirectEvalSiteFlags, ExceptionHandler,
     ExceptionHandlerKind, FeedbackSiteDescriptor, FeedbackSiteKind, FeedbackSiteMetadata,
     LoopIterationEnvironmentSite, RuntimeStateCapture, SafepointDescriptor, SafepointKind,
-    SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands, WideOperand,
+    SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands,
 };
 pub use opcode::{Opcode, OPCODE_COUNT};

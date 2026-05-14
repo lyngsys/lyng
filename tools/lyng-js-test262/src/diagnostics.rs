@@ -90,7 +90,7 @@ pub struct Test262DiagnosticTimings {
 pub struct Test262RuntimeDiagnostics {
     pub function_count: usize,
     pub instruction_words: usize,
-    pub wide_operands: usize,
+    pub wide_prefixes: usize,
     pub metadata_records: usize,
     pub constants: usize,
     pub source_map_entries: usize,

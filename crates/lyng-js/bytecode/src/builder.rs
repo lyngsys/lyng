@@ -10,7 +10,7 @@ use crate::metadata::{
     ConstantValue, DeoptSnapshot, DirectEvalLexicalScope, DirectEvalLexicalSite,
     DirectEvalSiteFlags, ExceptionHandler, FeedbackSiteDescriptor, FeedbackSiteKind,
     FeedbackSiteMetadata, LoopIterationEnvironmentSite, RuntimeStateCapture, SafepointDescriptor,
-    SafepointKind, SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands, WideOperand,
+    SafepointKind, SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands,
 };
 use crate::Opcode;
 use lyng_js_common::{AtomId, SourceId, Span};
@@ -117,14 +117,36 @@ const fn store_local_opcode(register: u16) -> Option<Opcode> {
     }
 }
 
+const fn accumulator_store_opcode(register: u16) -> Option<Opcode> {
+    match register {
+        0 => Some(Opcode::Star0),
+        1 => Some(Opcode::Star1),
+        2 => Some(Opcode::Star2),
+        3 => Some(Opcode::Star3),
+        4 => Some(Opcode::Star4),
+        5 => Some(Opcode::Star5),
+        6 => Some(Opcode::Star6),
+        7 => Some(Opcode::Star7),
+        _ => None,
+    }
+}
+
 fn compact_move_instruction(operands: WideAbcOperands) -> Option<Instruction> {
     if operands.needs_wide() || operands.c() != 0 {
         return None;
     }
-    if let Some(opcode) = store_local_opcode(operands.a()) {
-        return Some(Instruction::abx(opcode, operands.narrow_b(), 0));
+    if operands.b() == 0
+        && let Some(opcode) = accumulator_store_opcode(operands.a())
+    {
+        return Some(Instruction::abc(opcode, 0, 0, 0));
     }
-    load_local_opcode(operands.b()).map(|opcode| Instruction::abx(opcode, operands.narrow_a(), 0))
+    if operands.a() == 0 && u8::try_from(operands.b()).is_ok() {
+        return Some(Instruction::abc(Opcode::Ldar, operands.b(), 0, 0));
+    }
+    if let Some(opcode) = store_local_opcode(operands.a()) {
+        return Some(Instruction::abx(opcode, operands.b(), 0));
+    }
+    load_local_opcode(operands.b()).map(|opcode| Instruction::abx(opcode, operands.a(), 0))
 }
 
 fn validate_short_abx_operands(
@@ -144,9 +166,39 @@ fn compact_abx_instruction(
     operands: WideAbxOperands,
 ) -> BytecodeBuildResult<Option<Instruction>> {
     match opcode {
+        Opcode::LoadUndefined if operands.a() == 0 => {
+            Ok(Some(Instruction::abc(Opcode::LdaUndefined, 0, 0, 0)))
+        }
+        Opcode::LoadNull if operands.a() == 0 => {
+            Ok(Some(Instruction::abc(Opcode::LdaNull, 0, 0, 0)))
+        }
+        Opcode::LoadTrue if operands.a() == 0 => {
+            Ok(Some(Instruction::abc(Opcode::LdaTrue, 0, 0, 0)))
+        }
+        Opcode::LoadFalse if operands.a() == 0 => {
+            Ok(Some(Instruction::abc(Opcode::LdaFalse, 0, 0, 0)))
+        }
+        Opcode::LoadZero if operands.a() == 0 => {
+            Ok(Some(Instruction::abc(Opcode::LdaZero, 0, 0, 0)))
+        }
+        Opcode::LoadOne if operands.a() == 0 => Ok(Some(Instruction::abc(Opcode::LdaOne, 0, 0, 0))),
+        Opcode::LoadConst
+            if operands.a() == 0
+                && !operands.needs_wide()
+                && u8::try_from(operands.bx()).is_ok() =>
+        {
+            Ok(Some(Instruction::abx(Opcode::LdaConst8, 0, operands.bx())))
+        }
+        Opcode::LoadSmi if operands.a() == 0 && !operands.needs_wide() => {
+            let raw = operands.narrow_bx();
+            let value = i16::from_le_bytes(raw.to_le_bytes());
+            Ok(i8::try_from(value).ok().map(|value| {
+                Instruction::abx(Opcode::LdaSmi8, 0, u32::from(value.cast_unsigned()))
+            }))
+        }
         Opcode::LoadSmi8 | Opcode::LoadConst8 | Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8 => {
             let (a, bx) = validate_short_abx_operands(operands, BytecodeOperandKind::Bx)?;
-            Ok(Some(Instruction::abx(opcode, a, u16::from(bx))))
+            Ok(Some(Instruction::abx(opcode, u16::from(a), u32::from(bx))))
         }
         Opcode::LoadLocal0
         | Opcode::LoadLocal1
@@ -160,13 +212,13 @@ fn compact_abx_instruction(
                 u8::try_from(operands.a()).map_err(|_| BytecodeBuildError::OperandOverflow {
                     kind: BytecodeOperandKind::A,
                 })?;
-            Ok(Some(Instruction::abx(opcode, a, 0)))
+            Ok(Some(Instruction::abx(opcode, u16::from(a), 0)))
         }
         Opcode::LoadConst if !operands.needs_wide() && u8::try_from(operands.bx()).is_ok() => {
             Ok(Some(Instruction::abx(
                 Opcode::LoadConst8,
-                operands.narrow_a(),
-                operands.narrow_bx(),
+                operands.a(),
+                operands.bx(),
             )))
         }
         Opcode::LoadSmi if !operands.needs_wide() => {
@@ -175,8 +227,8 @@ fn compact_abx_instruction(
             Ok(i8::try_from(value).ok().map(|value| {
                 Instruction::abx(
                     Opcode::LoadSmi8,
-                    operands.narrow_a(),
-                    u16::from(value.cast_unsigned()),
+                    operands.a(),
+                    u32::from(value.cast_unsigned()),
                 )
             }))
         }
@@ -240,7 +292,6 @@ fn byte_boundary_for(byte_offsets: &[u32], byte_len: u32, logical_offset: u32) -
 fn logical_jump_target(
     logical_offset: u32,
     instruction: Instruction,
-    wide_operands: &[WideOperand],
     instruction_len: usize,
 ) -> Option<u32> {
     let delta = match instruction {
@@ -250,12 +301,9 @@ fn logical_jump_target(
         } => ax,
         Instruction::Abx {
             opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
-            a,
             bx,
-        } => {
-            let operands = decode_abx_operands(wide_operands, logical_offset, a, bx);
-            i32::from_le_bytes(operands.bx().to_le_bytes())
-        }
+            ..
+        } => i32::from_le_bytes(bx.to_le_bytes()),
         Instruction::Abx {
             opcode: Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8,
             bx,
@@ -276,7 +324,6 @@ fn rewrite_jump_for_byte_target(
     logical_offset: u32,
     byte_offset: u32,
     target_byte: u32,
-    wide_operands: &[WideOperand],
 ) -> BytecodeBuildResult<Instruction> {
     match instruction {
         Instruction::Ax {
@@ -299,11 +346,7 @@ fn rewrite_jump_for_byte_target(
             ))
         }
         Instruction::Abx { opcode, a, bx } if opcode.is_jump() => {
-            let condition = if matches!(opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8) {
-                u16::from(a)
-            } else {
-                decode_abx_operands(wide_operands, logical_offset, a, bx).a()
-            };
+            let condition = a;
             let short_delta = i64::from(target_byte) - (i64::from(byte_offset) + 3);
             if let (Ok(condition), Ok(delta)) =
                 (u8::try_from(condition), i32::try_from(short_delta))
@@ -315,51 +358,39 @@ fn rewrite_jump_for_byte_target(
                             instruction_offset: logical_offset,
                         },
                     )?,
-                    condition,
-                    u16::from(
+                    u16::from(condition),
+                    u32::from(
                         i8::try_from(delta)
                             .expect("delta should fit i8")
                             .cast_unsigned(),
                     ),
                 ));
             }
-            let full_delta = i64::from(target_byte) - (i64::from(byte_offset) + 4);
-            let delta =
-                i32::try_from(full_delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
+            let opcode = full_conditional_jump_opcode(opcode).ok_or(
+                BytecodeBuildError::InvalidJumpPatch {
                     instruction_offset: logical_offset,
-                    target_offset: target_byte,
-                })?;
-            let updated = WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
-            Ok(Instruction::abx(
-                full_conditional_jump_opcode(opcode).ok_or(
-                    BytecodeBuildError::InvalidJumpPatch {
+                },
+            )?;
+            let mut encoded_len = 4_i64;
+            let mut updated = WideAbxOperands::new(condition, 0);
+            for _ in 0..2 {
+                let full_delta = i64::from(target_byte) - (i64::from(byte_offset) + encoded_len);
+                let delta = i32::try_from(full_delta).map_err(|_| {
+                    BytecodeBuildError::JumpDeltaOverflow {
                         instruction_offset: logical_offset,
-                    },
-                )?,
-                updated.narrow_a(),
-                updated.narrow_bx(),
-            ))
+                        target_offset: target_byte,
+                    }
+                })?;
+                updated = WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
+                encoded_len = i64::try_from(
+                    Instruction::abx(opcode, updated.a(), updated.bx()).encoded_len(),
+                )
+                .expect("instruction length should fit i64");
+            }
+            Ok(Instruction::abx(opcode, updated.a(), updated.bx()))
         }
         _ => Ok(instruction),
     }
-}
-
-fn decode_abx_operands(
-    wide_operands: &[WideOperand],
-    instruction_offset: u32,
-    a: u8,
-    bx: u16,
-) -> WideAbxOperands {
-    wide_payload(wide_operands, instruction_offset).map_or_else(
-        || WideAbxOperands::narrow(a, bx),
-        |payload| WideAbxOperands::decode(a, bx, payload),
-    )
-}
-
-fn wide_payload(wide_operands: &[WideOperand], instruction_offset: u32) -> Option<u32> {
-    wide_operands.iter().find_map(|operand| {
-        (operand.instruction_offset() == instruction_offset).then_some(operand.payload())
-    })
 }
 
 const fn remap_safepoint_descriptor(
@@ -398,7 +429,6 @@ pub struct BytecodeBuilder {
     exception_handlers: Vec<ExceptionHandler>,
     feedback_sites: Vec<FeedbackSiteDescriptor>,
     source_map: Vec<SourceMapEntry>,
-    wide_operands: Vec<WideOperand>,
     safepoints: Vec<SafepointDescriptor>,
     deopt_snapshots: Vec<DeoptSnapshot>,
     next_feedback_slot: u32,
@@ -427,7 +457,6 @@ impl BytecodeBuilder {
             exception_handlers: Vec::new(),
             feedback_sites: Vec::new(),
             source_map: Vec::new(),
-            wide_operands: Vec::new(),
             safepoints: Vec::new(),
             deopt_snapshots: Vec::new(),
             next_feedback_slot: 1,
@@ -745,41 +774,6 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    fn wide_payload(&self, instruction_offset: u32) -> Option<u32> {
-        self.wide_operands.iter().find_map(|operand| {
-            (operand.instruction_offset() == instruction_offset).then_some(operand.payload())
-        })
-    }
-
-    #[inline]
-    fn set_wide_operand(&mut self, instruction_offset: u32, payload: u32) {
-        if let Some(operand) = self
-            .wide_operands
-            .iter_mut()
-            .find(|operand| operand.instruction_offset() == instruction_offset)
-        {
-            *operand = WideOperand::new(instruction_offset, payload);
-            return;
-        }
-        self.wide_operands
-            .push(WideOperand::new(instruction_offset, payload));
-    }
-
-    #[inline]
-    fn remove_wide_operand(&mut self, instruction_offset: u32) {
-        self.wide_operands
-            .retain(|operand| operand.instruction_offset() != instruction_offset);
-    }
-
-    #[inline]
-    fn decode_abx_operands(&self, instruction_offset: u32, a: u8, bx: u16) -> WideAbxOperands {
-        self.wide_payload(instruction_offset).map_or_else(
-            || WideAbxOperands::narrow(a, bx),
-            |payload| WideAbxOperands::decode(a, bx, payload),
-        )
-    }
-
-    #[inline]
     /// Append one fully encoded instruction to the function body.
     ///
     /// # Errors
@@ -792,7 +786,7 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    /// Append an ABC-form instruction, recording a wide payload when any operand is out of range.
+    /// Append an ABC-form instruction, using an inline wide prefix when any operand is out of range.
     ///
     /// # Errors
     /// Returns [`BytecodeBuildError::OperandOverflow`] when an operand cannot be represented in the
@@ -822,18 +816,15 @@ impl BytecodeBuilder {
         }
         let offset = self.emit(Instruction::abc(
             opcode,
-            operands.narrow_a(),
-            operands.narrow_b(),
-            operands.narrow_c(),
+            operands.a(),
+            operands.b(),
+            operands.c(),
         ))?;
-        if operands.needs_wide() {
-            self.add_wide_operand(offset, operands.encode_payload());
-        }
         Ok(offset)
     }
 
     #[inline]
-    /// Append an ABx-form instruction, recording a wide payload when either operand is out of range.
+    /// Append an ABx-form instruction, using an inline wide prefix when either operand is out of range.
     ///
     /// # Errors
     /// Returns [`BytecodeBuildError::OperandOverflow`] when an operand cannot be represented in the
@@ -851,14 +842,7 @@ impl BytecodeBuilder {
         if let Some(instruction) = compact_abx_instruction(opcode, operands)? {
             return self.emit(instruction);
         }
-        let offset = self.emit(Instruction::abx(
-            opcode,
-            operands.narrow_a(),
-            operands.narrow_bx(),
-        ))?;
-        if operands.needs_wide() {
-            self.add_wide_operand(offset, operands.encode_payload());
-        }
+        let offset = self.emit(Instruction::abx(opcode, operands.a(), operands.bx()))?;
         Ok(offset)
     }
 
@@ -936,10 +920,13 @@ impl BytecodeBuilder {
         let result = narrow_call_operand(result, BytecodeOperandKind::CallResult)?;
         let callee = narrow_call_operand(callee, BytecodeOperandKind::CallCallee)?;
         let this_value = narrow_call_operand(this_value, BytecodeOperandKind::CallThis)?;
-        let instruction_offset =
-            self.emit(Instruction::abc(Opcode::Call, result, callee, this_value))?;
-        self.add_wide_operand(instruction_offset, arguments.encode());
-        Ok(instruction_offset)
+        self.emit(Instruction::call_range(
+            Opcode::Call,
+            u16::from(result),
+            u16::from(callee),
+            u16::from(this_value),
+            arguments,
+        ))
     }
 
     #[inline]
@@ -972,7 +959,12 @@ impl BytecodeBuilder {
         let result = narrow_call_operand(result, BytecodeOperandKind::CallResult)?;
         let callee = narrow_call_operand(callee, BytecodeOperandKind::CallCallee)?;
         let call_base = narrow_call_operand(call_base, BytecodeOperandKind::CallBase)?;
-        self.emit(Instruction::abc(opcode, result, callee, call_base))
+        self.emit(Instruction::abc(
+            opcode,
+            u16::from(result),
+            u16::from(callee),
+            u16::from(call_base),
+        ))
     }
 
     #[inline]
@@ -993,10 +985,13 @@ impl BytecodeBuilder {
         self.header = self
             .header
             .with_flags(self.header.flags().with_tail_call_capable(true));
-        let instruction_offset =
-            self.emit(Instruction::abc(Opcode::TailCall, callee, this_value, 0))?;
-        self.add_wide_operand(instruction_offset, arguments.encode());
-        Ok(instruction_offset)
+        self.emit(Instruction::call_range(
+            Opcode::TailCall,
+            u16::from(callee),
+            u16::from(this_value),
+            0,
+            arguments,
+        ))
     }
 
     #[inline]
@@ -1014,10 +1009,13 @@ impl BytecodeBuilder {
     ) -> BytecodeBuildResult<u32> {
         let result = narrow_call_operand(result, BytecodeOperandKind::ConstructResult)?;
         let callee = narrow_call_operand(callee, BytecodeOperandKind::ConstructCallee)?;
-        let instruction_offset =
-            self.emit(Instruction::abc(Opcode::Construct, result, callee, 0))?;
-        self.add_wide_operand(instruction_offset, arguments.encode());
-        Ok(instruction_offset)
+        self.emit(Instruction::call_range(
+            Opcode::Construct,
+            u16::from(result),
+            u16::from(callee),
+            0,
+            arguments,
+        ))
     }
 
     #[inline]
@@ -1055,39 +1053,29 @@ impl BytecodeBuilder {
                     Instruction::ax(Opcode::Jump, delta)
                 }
             }
-            Instruction::Abx { opcode, a, bx } if opcode.is_jump() => {
+            Instruction::Abx { opcode, a, .. } if opcode.is_jump() => {
                 let delta =
                     i32::try_from(delta).map_err(|_| BytecodeBuildError::JumpDeltaOverflow {
                         instruction_offset,
                         target_offset,
                     })?;
-                let condition = if matches!(opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8) {
-                    u16::from(a)
-                } else {
-                    self.decode_abx_operands(instruction_offset, a, bx).a()
-                };
+                let condition = a;
                 if signed_i8_fits(delta)
                     && let (Ok(condition), Ok(delta)) =
                         (u8::try_from(condition), i8::try_from(delta))
                 {
-                    self.remove_wide_operand(instruction_offset);
                     Instruction::abx(
                         short_conditional_jump_opcode(opcode)
                             .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?,
-                        condition,
-                        u16::from(delta.cast_unsigned()),
+                        u16::from(condition),
+                        u32::from(delta.cast_unsigned()),
                     )
                 } else {
                     let opcode = full_conditional_jump_opcode(opcode)
                         .ok_or(BytecodeBuildError::InvalidJumpPatch { instruction_offset })?;
                     let updated =
                         WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
-                    if updated.needs_wide() {
-                        self.set_wide_operand(instruction_offset, updated.encode_payload());
-                    } else {
-                        self.remove_wide_operand(instruction_offset);
-                    }
-                    Instruction::abx(opcode, updated.narrow_a(), updated.narrow_bx())
+                    Instruction::abx(opcode, updated.a(), updated.bx())
                 }
             }
             _ => {
@@ -1241,12 +1229,6 @@ impl BytecodeBuilder {
     }
 
     #[inline]
-    pub fn add_wide_operand(&mut self, instruction_offset: u32, payload: u32) {
-        self.wide_operands
-            .push(WideOperand::new(instruction_offset, payload));
-    }
-
-    #[inline]
     pub fn add_safepoint(&mut self, safepoint: SafepointDescriptor) {
         self.safepoints.push(safepoint);
     }
@@ -1313,7 +1295,6 @@ impl BytecodeBuilder {
     }
 
     fn rewrite_jumps_to_byte_offsets(
-        &self,
         logical_instructions: &[Instruction],
         lowered: &mut Vec<Instruction>,
     ) -> BytecodeBuildResult<()> {
@@ -1328,7 +1309,6 @@ impl BytecodeBuilder {
                 let Some(logical_target) = logical_jump_target(
                     logical_offset_u32,
                     instruction,
-                    &self.wide_operands,
                     logical_instructions.len(),
                 ) else {
                     continue;
@@ -1343,7 +1323,6 @@ impl BytecodeBuilder {
                     logical_offset_u32,
                     byte_offsets[logical_offset],
                     target_byte,
-                    &self.wide_operands,
                 )?;
             }
             if next == *lowered {
@@ -1354,77 +1333,12 @@ impl BytecodeBuilder {
         Ok(())
     }
 
-    fn rebuild_wide_operands_for_byte_offsets(
-        &mut self,
-        logical_instructions: &[Instruction],
-        lowered: &[Instruction],
-        byte_offsets: &[u32],
-        byte_len: u32,
-    ) -> BytecodeBuildResult<()> {
-        let old_wide_operands = std::mem::take(&mut self.wide_operands);
-        let mut byte_wide_operands = Vec::new();
-        for (logical_offset, instruction) in logical_instructions.iter().copied().enumerate() {
-            let logical_offset_u32 = checked_instruction_offset(logical_offset)?;
-            let byte_offset = byte_offsets[logical_offset];
-            if instruction.opcode().is_jump() {
-                if let Some(Instruction::Abx {
-                    opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
-                    a,
-                    bx,
-                }) = lowered.get(logical_offset).copied()
-                {
-                    let condition =
-                        decode_abx_operands(&old_wide_operands, logical_offset_u32, a, bx).a();
-                    let Some(logical_target) = logical_jump_target(
-                        logical_offset_u32,
-                        instruction,
-                        &old_wide_operands,
-                        logical_instructions.len(),
-                    ) else {
-                        continue;
-                    };
-                    let Some(target_byte) =
-                        byte_boundary_for(byte_offsets, byte_len, logical_target)
-                    else {
-                        continue;
-                    };
-                    let delta = i64::from(target_byte)
-                        - (i64::from(byte_offset)
-                            + i64::try_from(lowered[logical_offset].encoded_len())
-                                .expect("instruction length should fit i64"));
-                    let delta = i32::try_from(delta).map_err(|_| {
-                        BytecodeBuildError::JumpDeltaOverflow {
-                            instruction_offset: logical_offset_u32,
-                            target_offset: logical_target,
-                        }
-                    })?;
-                    let updated =
-                        WideAbxOperands::new(condition, u32::from_le_bytes(delta.to_le_bytes()));
-                    if updated.needs_wide() {
-                        byte_wide_operands
-                            .push(WideOperand::new(byte_offset, updated.encode_payload()));
-                    }
-                }
-            } else if let Some(payload) = wide_payload(&old_wide_operands, logical_offset_u32) {
-                byte_wide_operands.push(WideOperand::new(byte_offset, payload));
-            }
-        }
-        self.wide_operands = byte_wide_operands;
-        Ok(())
-    }
-
     fn lower_labels_to_byte_offsets(&mut self) -> BytecodeBuildResult<()> {
         let logical_instructions = InstructionStream::new(&self.instructions).to_vec();
         let mut lowered = self.attach_feedback_slots(&logical_instructions);
-        self.rewrite_jumps_to_byte_offsets(&logical_instructions, &mut lowered)?;
+        Self::rewrite_jumps_to_byte_offsets(&logical_instructions, &mut lowered)?;
 
         let (byte_offsets, byte_len) = byte_offsets_for(&lowered)?;
-        self.rebuild_wide_operands_for_byte_offsets(
-            &logical_instructions,
-            &lowered,
-            &byte_offsets,
-            byte_len,
-        )?;
         self.remap_label_metadata_to_byte_offsets(&byte_offsets, byte_len)?;
         self.replace_decoded_instructions(lowered);
         Ok(())
@@ -1558,7 +1472,6 @@ impl BytecodeBuilder {
                 exception_handlers: self.exception_handlers,
                 feedback_sites: self.feedback_sites,
                 source_map: self.source_map,
-                wide_operands: self.wide_operands,
                 safepoints: self
                     .safepoints
                     .into_iter()
@@ -1619,7 +1532,7 @@ mod tests {
             function.instructions().to_vec().as_slice(),
             [
                 Instruction::Abx {
-                    opcode: Opcode::LoadConst8,
+                    opcode: Opcode::LdaConst8,
                     ..
                 },
                 Instruction::Ax {
@@ -1629,8 +1542,8 @@ mod tests {
             ]
         ));
         assert_eq!(function.exception_handlers()[0].protected_start(), 0);
-        assert_eq!(function.exception_handlers()[0].protected_end(), 3);
-        assert_eq!(function.exception_handlers()[0].handler(), 3);
+        assert_eq!(function.exception_handlers()[0].protected_end(), 2);
+        assert_eq!(function.exception_handlers()[0].handler(), 2);
         Ok(())
     }
 
@@ -1658,7 +1571,8 @@ mod tests {
     }
 
     #[test]
-    fn builder_inlines_feedback_slot_operand_on_profiled_instructions() -> BytecodeBuildResult<()> {
+    fn builder_inlines_feedback_slot_operand_on_semantic_profiled_instructions(
+    ) -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(90).unwrap()),
             BytecodeFunctionKind::Function,
@@ -1682,11 +1596,11 @@ mod tests {
 
         assert_eq!(
             function.instructions().get(0),
-            Some(Instruction::profiled_abc(Opcode::Add, 0, 1, 2, add_slot))
+            Some(Instruction::feedback_abc(Opcode::Add, 0, 1, 2, add_slot))
         );
         assert_eq!(
             function.instructions().get(1),
-            Some(Instruction::profiled_abx(
+            Some(Instruction::feedback_abx(
                 Opcode::LoadGlobal,
                 0,
                 7,
@@ -1697,7 +1611,8 @@ mod tests {
     }
 
     #[test]
-    fn final_function_metadata_uses_profiled_instruction_byte_offsets() -> BytecodeBuildResult<()> {
+    fn final_function_metadata_uses_semantic_profiled_instruction_byte_offsets(
+    ) -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(91).unwrap()),
             BytecodeFunctionKind::Function,
@@ -1721,11 +1636,11 @@ mod tests {
 
         assert_eq!(
             function.instruction_at(0),
-            Some(Instruction::profiled_abc(Opcode::Add, 0, 1, 2, add_slot))
+            Some(Instruction::feedback_abc(Opcode::Add, 0, 1, 2, add_slot))
         );
         assert_eq!(
-            function.instruction_at(7),
-            Some(Instruction::profiled_abx(
+            function.instruction_at(6),
+            Some(Instruction::feedback_abx(
                 Opcode::LoadGlobal,
                 0,
                 7,
@@ -1733,7 +1648,7 @@ mod tests {
             ))
         );
         assert_eq!(function.feedback_sites()[0].instruction_offset(), 0);
-        assert_eq!(function.feedback_sites()[1].instruction_offset(), 7);
+        assert_eq!(function.feedback_sites()[1].instruction_offset(), 6);
         Ok(())
     }
 
@@ -1781,8 +1696,8 @@ mod tests {
         assert!(matches!(
             function.instructions().to_vec().as_slice(),
             [
-                Instruction::Abx {
-                    opcode: Opcode::LoadTrue,
+                Instruction::Abc {
+                    opcode: Opcode::LdaTrue,
                     ..
                 },
                 Instruction::Abx {
@@ -1912,7 +1827,7 @@ mod tests {
 
         assert_eq!(
             text,
-            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LoadConst8      r0, const[0] ; Smi(7)\n0003: Return          r0\nconstants:\n  [0] Smi(7)\n"
+            "function BytecodeFunctionId(3) kind=Function this=Global args=None params=0 min_args=0 regs=2 hidden=0 env=false env_slots=0 rest=false\n0000: LdaConst8       const[0] ; Smi(7)\n0002: Return          r0\nconstants:\n  [0] Smi(7)\n"
         );
         Ok(())
     }
@@ -1959,7 +1874,7 @@ mod tests {
     }
 
     #[test]
-    fn builder_records_wide_register_and_constant_operands() -> BytecodeBuildResult<()> {
+    fn builder_inlines_wide_register_and_constant_operands() -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(5).unwrap()),
             BytecodeFunctionKind::Script,
@@ -1979,7 +1894,7 @@ mod tests {
 
         assert_eq!(function.register_count(), 300);
         assert_eq!(function.constants().len(), 70_000);
-        assert_eq!(function.wide_operands().len(), 2);
+        assert!(function.instruction_bytes().contains(&(Opcode::Wide as u8)));
         assert!(text.contains("LoadConst       r299, const[69999]"));
         assert!(text.contains("Move            r298, r299"));
         Ok(())
@@ -2193,7 +2108,7 @@ mod tests {
     }
 
     #[test]
-    fn conditional_jump_patch_uses_wide_payload_for_large_spans() -> BytecodeBuildResult<()> {
+    fn conditional_jump_patch_uses_inline_wide_prefix_for_large_spans() -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(6).unwrap()),
             BytecodeFunctionKind::Script,
@@ -2210,13 +2125,13 @@ mod tests {
         let function = builder.finish()?;
         let text = disassemble(&function);
 
-        assert!(function
-            .wide_operands()
-            .iter()
-            .any(|operand| operand.instruction_offset() == conditional));
+        let conditional = usize::try_from(conditional).expect("offset should fit usize");
+        assert_eq!(
+            function.instruction_bytes().get(conditional),
+            Some(&(Opcode::Wide as u8))
+        );
         assert!(text.contains("JumpIfFalse"));
         assert!(text.contains("r299"));
-        assert!(text.contains("+160000"));
         Ok(())
     }
 }

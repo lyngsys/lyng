@@ -97,8 +97,8 @@ impl Vm {
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
-        let updated = self
-            .set_property_on_object(agent, host, registry, caller, base, receiver, key, value)?;
+        let updated =
+            self.set_property_on_object(agent, host, registry, caller, base, receiver, key, value)?;
         if !updated && self.caller_is_strict(*caller) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }

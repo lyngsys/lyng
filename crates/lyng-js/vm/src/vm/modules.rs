@@ -622,18 +622,8 @@ impl Vm {
         };
         let next_offset =
             store_offset.checked_add(u32::try_from(store_instruction.encoded_len()).ok()?)?;
-        let create_operands = installed.wide_payload(create_offset).map_or_else(
-            || lyng_js_bytecode::WideAbxOperands::narrow(create_register, child_index),
-            |payload| {
-                lyng_js_bytecode::WideAbxOperands::decode(create_register, child_index, payload)
-            },
-        );
-        let store_operands = installed.wide_payload(store_offset).map_or_else(
-            || lyng_js_bytecode::WideAbxOperands::narrow(store_register, env_operand),
-            |payload| {
-                lyng_js_bytecode::WideAbxOperands::decode(store_register, env_operand, payload)
-            },
-        );
+        let create_operands = lyng_js_bytecode::WideAbxOperands::new(create_register, child_index);
+        let store_operands = lyng_js_bytecode::WideAbxOperands::new(store_register, env_operand);
         if create_operands.a() != store_operands.a() {
             return None;
         }

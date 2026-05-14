@@ -1,3 +1,4 @@
+use super::dispatch::advance_dispatch_frame;
 use super::{
     Agent, CallRange, FrameFlags, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef,
     RealmRef, Value, Vm, VmResult,
@@ -22,7 +23,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -33,7 +36,9 @@ impl Vm {
             agent,
             host,
             registry,
+            frame_depth,
             frame,
+            instruction_len,
             feedback_slot,
             result_register,
             callee,
@@ -44,7 +49,8 @@ impl Vm {
             return Ok(());
         }
         if Self::bytecode_entry(agent, callee).is_some() {
-            self.advance_instruction();
+            advance_dispatch_frame(frame, instruction_len);
+            self.sync_dispatch_frame(frame_depth, *frame);
             return self.enter_bytecode_call(
                 agent,
                 host,
@@ -63,7 +69,9 @@ impl Vm {
             agent,
             host,
             registry,
+            frame_depth,
             frame,
+            instruction_len,
             feedback_slot,
             result_register,
             callee,
@@ -72,6 +80,7 @@ impl Vm {
         )? {
             return Ok(());
         }
+        self.sync_dispatch_frame(frame_depth, *frame);
         let result = if let Some(result) = self.call_builtin(
             agent, host, registry, frame, callee, this_value, arguments, None,
         )? {
@@ -92,8 +101,10 @@ impl Vm {
         } else {
             object::call(agent, callee, this_value, arguments, registry).map_err(VmError::Abrupt)?
         };
+        self.refresh_dispatch_frame(frame_depth, frame);
         self.write_register(frame.registers(), result_register, result);
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
+        self.sync_dispatch_frame(frame_depth, *frame);
         Ok(())
     }
 
@@ -106,7 +117,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_value: Value,
@@ -127,7 +140,9 @@ impl Vm {
             agent,
             host,
             registry,
+            frame_depth,
             frame,
+            instruction_len,
             feedback_slot,
             result_register,
             callee,
@@ -147,7 +162,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -166,7 +183,8 @@ impl Vm {
             return Ok(false);
         };
         self.write_register(frame.registers(), result_register, result);
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
+        self.sync_dispatch_frame(frame_depth, *frame);
         Ok(true)
     }
 
@@ -179,7 +197,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee: ObjectRef,
@@ -206,7 +226,9 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
+                instruction_len,
                 feedback_slot,
                 result_register,
                 target,
@@ -221,7 +243,9 @@ impl Vm {
             agent,
             host,
             registry,
+            frame_depth,
             frame,
+            instruction_len,
             feedback_slot,
             result_register,
             target,
@@ -240,11 +264,13 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame_depth: usize,
         frame: &FrameRecord,
         callee: ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Option<Value>> {
+        self.sync_dispatch_frame(frame_depth, *frame);
         if let Some(code) = Self::bytecode_entry(agent, callee) {
             if self
                 .installed_function(code)
@@ -305,7 +331,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -331,7 +359,9 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
+                instruction_len,
                 feedback_slot,
                 result_register,
                 callee_value,
@@ -352,7 +382,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -365,14 +397,18 @@ impl Vm {
         collected_arguments.clear();
         collected_arguments.reserve(usize::from(argument_count));
         for offset in 0..argument_count {
-            collected_arguments
-                .push(self.read_register(frame.registers(), call_base_register + 1 + u16::from(offset)));
+            collected_arguments.push(self.read_register(
+                frame.registers(),
+                call_base_register + 1 + u16::from(offset),
+            ));
         }
         let result = self.invoke_collected_call_value(
             agent,
             host,
             registry,
+            frame_depth,
             frame,
+            instruction_len,
             feedback_slot,
             result_register,
             callee_value,
@@ -392,6 +428,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
+        frame_depth: usize,
         frame: &FrameRecord,
         _feedback_slot: Option<FeedbackSlotId>,
         callee_register: u16,
@@ -427,6 +464,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
                 callee,
                 effective_this,
@@ -450,7 +488,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
         callee_register: u16,
@@ -485,6 +525,7 @@ impl Vm {
             }
 
             if agent.objects().is_proxy_object(callee) {
+                self.sync_dispatch_frame(frame_depth, *frame);
                 let result = proxy::construct(
                     &mut VmProxyBridge {
                         vm: self,
@@ -504,8 +545,14 @@ impl Vm {
                     callee,
                     Some(result),
                 );
-                self.write_register(frame.registers(), result_register, Value::from_object_ref(result));
-                self.advance_instruction();
+                self.refresh_dispatch_frame(frame_depth, frame);
+                self.write_register(
+                    frame.registers(),
+                    result_register,
+                    Value::from_object_ref(result),
+                );
+                advance_dispatch_frame(frame, instruction_len);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 return Ok(());
             }
 
@@ -533,7 +580,8 @@ impl Vm {
                     callee,
                     construct_this,
                 );
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 return self.enter_bytecode_call(
                     agent,
                     host,
@@ -548,6 +596,7 @@ impl Vm {
                 );
             }
 
+            self.sync_dispatch_frame(frame_depth, *frame);
             let result = if Self::builtin_entry(agent, callee).is_some()
                 && !agent.objects().is_constructor(callee)
             {
@@ -575,9 +624,15 @@ impl Vm {
                 )
                 .map_err(VmError::Abrupt)?
             };
+            self.refresh_dispatch_frame(frame_depth, frame);
             self.observe_construct_target(agent, frame.code(), feedback_slot, callee, Some(result));
-            self.write_register(frame.registers(), result_register, Value::from_object_ref(result));
-            self.advance_instruction();
+            self.write_register(
+                frame.registers(),
+                result_register,
+                Value::from_object_ref(result),
+            );
+            advance_dispatch_frame(frame, instruction_len);
+            self.sync_dispatch_frame(frame_depth, *frame);
             Ok(())
         })();
         self.argument_scratch = collected_arguments;

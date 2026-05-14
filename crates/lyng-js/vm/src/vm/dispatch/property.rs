@@ -1,5 +1,7 @@
+use super::advance_dispatch_frame;
 use crate::error::VmResult;
 use crate::vm::property_access::VmProxyBridge;
+use crate::vm::registers::absolute_register;
 use crate::{FrameRecord, Vm, VmError};
 use lyng_js_bytecode::Opcode;
 use lyng_js_env::Agent;
@@ -19,7 +21,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         target: u16,
         key_register: u16,
         receiver_register: u16,
@@ -29,11 +33,12 @@ impl Vm {
         let object_result = receiver
             .as_object_ref()
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
-        let Some(object) = self.handle_vm_result(agent, object_result)? else {
+        let Some(object) = self.handle_dispatch_result(agent, frame_depth, frame, object_result)?
+        else {
             return Ok(());
         };
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
         let has_property = {
@@ -46,11 +51,13 @@ impl Vm {
             };
             object::has_property_in_context(&mut bridge, object, key)
         };
-        let Some(has_property) = self.handle_vm_result(agent, has_property)? else {
+        let Some(has_property) =
+            self.handle_dispatch_result(agent, frame_depth, frame, has_property)?
+        else {
             return Ok(());
         };
         self.write_register(frame.registers(), target, Value::from_bool(has_property));
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -63,13 +70,18 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         target: u16,
         receiver_register: u16,
         atom_operand: u16,
     ) -> VmResult<()> {
-        let receiver = self.read_register(frame.registers(), receiver_register);
+        let registers = frame.registers();
+        let receiver_index = absolute_register(registers, receiver_register);
+        let target_index = absolute_register(registers, target);
+        let receiver = self.register_stack[receiver_index];
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
         let value = if let Some(object) = receiver.as_object_ref() {
@@ -79,13 +91,15 @@ impl Vm {
                 feedback_slot,
                 object,
             ) {
-                self.write_register(frame.registers(), target, value);
-                self.advance_instruction();
+                self.register_stack[target_index] = value;
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             let property_result =
                 self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) = self.handle_vm_result(agent, property_result)? else {
+            let Some(value) =
+                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+            else {
                 return Ok(());
             };
             self.observe_named_property_slow_path(
@@ -100,13 +114,15 @@ impl Vm {
         } else {
             let property_result =
                 self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) = self.handle_vm_result(agent, property_result)? else {
+            let Some(value) =
+                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+            else {
                 return Ok(());
             };
             value
         };
-        self.write_register(frame.registers(), target, value);
-        self.advance_instruction();
+        self.register_stack[target_index] = value;
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -119,7 +135,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
@@ -131,8 +149,9 @@ impl Vm {
             Opcode::AssignNamedProperty | Opcode::StrictAssignNamedProperty
         );
         let strict_assignment = matches!(opcode, Opcode::StrictAssignNamedProperty);
-        let receiver = self.read_register(frame.registers(), receiver_register);
-        let value = self.read_register(frame.registers(), value_register);
+        let registers = frame.registers();
+        let receiver = self.register_stack[absolute_register(registers, receiver_register)];
+        let value = self.register_stack[absolute_register(registers, value_register)];
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
         if let Some(object) = receiver.as_object_ref() {
@@ -150,12 +169,14 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
                 self.record_feedback_slot(frame.code(), feedback_slot);
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             let set_result = if Self::prototype_chain_has_proxy(agent, object) {
@@ -166,19 +187,22 @@ impl Vm {
                         .map_err(VmError::Abrupt);
                 match set_result {
                     Ok(result) => Ok(result),
-                    Err(VmError::Abrupt(_)) => {
-                        self.set_property_on_value(agent, host, registry, frame, receiver, key, value)
-                    }
+                    Err(VmError::Abrupt(_)) => self
+                        .set_property_on_value(agent, host, registry, frame, receiver, key, value),
                     Err(error) => Err(error),
                 }
             };
-            let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+            let Some(stored) =
+                self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
+            else {
                 return Ok(());
             };
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                let Some(()) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                else {
                     return Ok(());
                 };
             }
@@ -193,18 +217,22 @@ impl Vm {
         } else {
             let store_result =
                 self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-            let Some(stored) = self.handle_vm_result(agent, store_result)? else {
+            let Some(stored) =
+                self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
+            else {
                 return Ok(());
             };
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                let Some(()) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                else {
                     return Ok(());
                 };
             }
         }
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -217,7 +245,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         object_register: u16,
         value_register: u16,
         atom_operand: u16,
@@ -226,8 +256,17 @@ impl Vm {
         let value = self.read_register(frame.registers(), value_register);
         let key =
             PropertyKey::from_atom(self.read_atom_constant(frame.code(), u32::from(atom_operand))?);
-        self.define_data_property(agent, host, registry, frame, object, key, value)?;
-        self.advance_instruction();
+        self.define_data_property(
+            agent,
+            host,
+            registry,
+            frame_depth,
+            frame,
+            object,
+            key,
+            value,
+        )?;
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -241,7 +280,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         target: u16,
         receiver_register: u16,
@@ -250,7 +291,8 @@ impl Vm {
         let receiver = self.read_register(frame.registers(), receiver_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
+        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
+        else {
             return Ok(());
         };
         if let Some(object) = receiver.as_object_ref()
@@ -266,11 +308,12 @@ impl Vm {
                 index,
             ) {
                 self.write_register(frame.registers(), target, value);
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             let value = if let Some(result) = self.mapped_arguments_get(agent, object, index) {
-                let Some(value) = self.handle_vm_result(agent, result)? else {
+                let Some(value) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
+                else {
                     return Ok(());
                 };
                 Some(value)
@@ -283,12 +326,12 @@ impl Vm {
             if let Some(value) = value {
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 self.write_register(frame.registers(), target, value);
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
         }
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
         let value = if let Some(object) = receiver.as_object_ref() {
@@ -301,11 +344,13 @@ impl Vm {
                     index,
                 ) {
                     self.write_register(frame.registers(), target, value);
-                    self.advance_instruction();
+                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 let value = if let Some(result) = self.mapped_arguments_get(agent, object, index) {
-                    let Some(value) = self.handle_vm_result(agent, result)? else {
+                    let Some(value) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, result)?
+                    else {
                         return Ok(());
                     };
                     value
@@ -318,7 +363,9 @@ impl Vm {
                 } else {
                     let property_result =
                         self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                    let Some(value) = self.handle_vm_result(agent, property_result)? else {
+                    let Some(value) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+                    else {
                         return Ok(());
                     };
                     value
@@ -335,12 +382,14 @@ impl Vm {
                 ) {
                     self.record_feedback_slot(frame.code(), feedback_slot);
                     self.write_register(frame.registers(), target, value);
-                    self.advance_instruction();
+                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 let property_result =
                     self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                let Some(value) = self.handle_vm_result(agent, property_result)? else {
+                let Some(value) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+                else {
                     return Ok(());
                 };
                 self.observe_keyed_atom_slow_path(
@@ -355,7 +404,9 @@ impl Vm {
             } else {
                 let property_result =
                     self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                let Some(value) = self.handle_vm_result(agent, property_result)? else {
+                let Some(value) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+                else {
                     return Ok(());
                 };
                 self.observe_keyed_generic_slow_path(frame.code(), feedback_slot);
@@ -364,13 +415,15 @@ impl Vm {
         } else {
             let property_result =
                 self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) = self.handle_vm_result(agent, property_result)? else {
+            let Some(value) =
+                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+            else {
                 return Ok(());
             };
             value
         };
         self.write_register(frame.registers(), target, value);
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -384,7 +437,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
@@ -400,7 +455,8 @@ impl Vm {
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
+        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
+        else {
             return Ok(());
         };
         if let Some(object) = receiver.as_object_ref()
@@ -423,18 +479,21 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             let mut used_index_fast_path = false;
             let stored = if let Some(result) =
                 self.mapped_arguments_set(agent, object, index, value)
             {
-                let Some(()) = self.handle_vm_result(agent, result)? else {
+                let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
+                else {
                     return Ok(());
                 };
                 Some(true)
@@ -442,7 +501,9 @@ impl Vm {
                 let fast_result = self.try_fast_set_typed_array_index(
                     agent, host, registry, frame, object, index, value,
                 );
-                let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                let Some(fast_result) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, fast_result)?
+                else {
                     return Ok(());
                 };
                 if let Some(stored) = fast_result {
@@ -451,7 +512,9 @@ impl Vm {
                 } else {
                     let fast_result =
                         Self::try_fast_set_engine_array_index(agent, object, index, value);
-                    let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                    let Some(fast_result) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, fast_result)?
+                    else {
                         return Ok(());
                     };
                     if let Some(stored) = fast_result {
@@ -461,7 +524,9 @@ impl Vm {
                         let fast_result = Self::try_fast_set_ordinary_index_data_property(
                             agent, object, index, value,
                         );
-                        let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                        let Some(fast_result) =
+                            self.handle_dispatch_result(agent, frame_depth, frame, fast_result)?
+                        else {
                             return Ok(());
                         };
                         fast_result.inspect(|_| {
@@ -478,7 +543,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
@@ -486,12 +553,12 @@ impl Vm {
                     Self::sync_engine_array_length(agent, object)?;
                 }
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
-                self.advance_instruction();
+                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
         }
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
         if let Some(object) = receiver.as_object_ref() {
@@ -511,18 +578,26 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
                             return Ok(());
                         };
                     }
-                    self.advance_instruction();
+                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 let mut used_index_fast_path = false;
                 let stored = if let Some(result) =
                     self.mapped_arguments_set(agent, object, index, value)
                 {
-                    let Some(()) = self.handle_vm_result(agent, result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, result)?
+                    else {
                         return Ok(());
                     };
                     true
@@ -530,7 +605,9 @@ impl Vm {
                     let fast_result = self.try_fast_set_typed_array_index(
                         agent, host, registry, frame, object, index, value,
                     );
-                    let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                    let Some(fast_result) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, fast_result)?
+                    else {
                         return Ok(());
                     };
                     if let Some(stored) = fast_result {
@@ -539,7 +616,9 @@ impl Vm {
                     } else {
                         let fast_result =
                             Self::try_fast_set_engine_array_index(agent, object, index, value);
-                        let Some(fast_result) = self.handle_vm_result(agent, fast_result)? else {
+                        let Some(fast_result) =
+                            self.handle_dispatch_result(agent, frame_depth, frame, fast_result)?
+                        else {
                             return Ok(());
                         };
                         if let Some(stored) = fast_result {
@@ -549,7 +628,12 @@ impl Vm {
                             let fast_result = Self::try_fast_set_ordinary_index_data_property(
                                 agent, object, index, value,
                             );
-                            let Some(fast_result) = self.handle_vm_result(agent, fast_result)?
+                            let Some(fast_result) = self.handle_dispatch_result(
+                                agent,
+                                frame_depth,
+                                frame,
+                                fast_result,
+                            )?
                             else {
                                 return Ok(());
                             };
@@ -560,7 +644,13 @@ impl Vm {
                                 let set_result = self.set_property_on_value(
                                     agent, host, registry, frame, receiver, key, value,
                                 );
-                                let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+                                let Some(stored) = self.handle_dispatch_result(
+                                    agent,
+                                    frame_depth,
+                                    frame,
+                                    set_result,
+                                )?
+                                else {
                                     return Ok(());
                                 };
                                 stored
@@ -575,7 +665,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
@@ -599,17 +691,25 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
                             return Ok(());
                         };
                     }
                     self.record_feedback_slot(frame.code(), feedback_slot);
-                    self.advance_instruction();
+                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 let set_result =
                     self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-                let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+                let Some(stored) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
+                else {
                     return Ok(());
                 };
                 if assignment {
@@ -619,7 +719,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
@@ -634,7 +736,9 @@ impl Vm {
             } else {
                 let set_result =
                     self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-                let Some(stored) = self.handle_vm_result(agent, set_result)? else {
+                let Some(stored) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
+                else {
                     return Ok(());
                 };
                 if assignment {
@@ -644,7 +748,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
                         return Ok(());
                     };
                 }
@@ -653,18 +759,22 @@ impl Vm {
         } else {
             let store_result =
                 self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-            let Some(stored) = self.handle_vm_result(agent, store_result)? else {
+            let Some(stored) =
+                self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
+            else {
                 return Ok(());
             };
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) = self.handle_vm_result(agent, assignment_result)? else {
+                let Some(()) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                else {
                     return Ok(());
                 };
             }
         }
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -677,7 +787,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         object_register: u16,
         value_register: u16,
         key_register: u16,
@@ -686,34 +798,49 @@ impl Vm {
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
-        self.define_data_property(agent, host, registry, frame, object, key, value)?;
+        self.define_data_property(
+            agent,
+            host,
+            registry,
+            frame_depth,
+            frame,
+            object,
+            key,
+            value,
+        )?;
         if key.as_index().is_some() {
             Self::sync_engine_array_length(agent, object)?;
         }
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
+    )]
     pub(super) fn execute_to_property_key_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         target: u16,
         key_register: u16,
     ) -> VmResult<()> {
         let key_value = self.read_register(frame.registers(), key_register);
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
         let value = self.property_key_to_enumeration_value(agent, key);
         self.write_register(frame.registers(), target, value);
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -726,7 +853,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         target: u16,
         receiver_register: u16,
         key_register: u16,
@@ -734,26 +863,30 @@ impl Vm {
         let receiver = self.read_register(frame.registers(), receiver_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_vm_result(agent, coercible_result)? else {
+        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
+        else {
             return Ok(());
         };
         let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_vm_result(agent, key_result)? else {
+        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
             return Ok(());
         };
         let delete_result =
             self.delete_property_from_value(agent, host, registry, frame, receiver, key);
-        let Some(deleted) = self.handle_vm_result(agent, delete_result)? else {
+        let Some(deleted) =
+            self.handle_dispatch_result(agent, frame_depth, frame, delete_result)?
+        else {
             return Ok(());
         };
         if !deleted && self.frame_is_strict(frame) {
             let type_error = Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            let Some(()) = self.handle_vm_result(agent, type_error)? else {
+            let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, type_error)?
+            else {
                 return Ok(());
             };
         }
         self.write_register(frame.registers(), target, Value::from_bool(deleted));
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -766,7 +899,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         target_register: u16,
         source_register: u16,
         excluded_register: u16,
@@ -776,10 +911,10 @@ impl Vm {
         let excluded_keys = self.read_register(frame.registers(), excluded_register);
         let copy_result =
             self.copy_data_properties(agent, host, registry, frame, target, source, excluded_keys);
-        let Some(()) = self.handle_vm_result(agent, copy_result)? else {
+        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, copy_result)? else {
             return Ok(());
         };
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -792,7 +927,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         receiver_register: u16,
         value_register: u16,
         index_operand: u16,
@@ -825,11 +962,12 @@ impl Vm {
                 PropertyKey::Index(u32::from(index_operand)),
                 value,
             );
-            let Some(_) = self.handle_vm_result(agent, store_result)? else {
+            let Some(_) = self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
+            else {
                 return Ok(());
             };
         }
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -842,7 +980,9 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         target: u16,
         receiver_register: u16,
         index_operand: u16,
@@ -851,7 +991,8 @@ impl Vm {
         let value = if let Some(object) = receiver.as_object_ref() {
             if let Some(result) = self.mapped_arguments_get(agent, object, u32::from(index_operand))
             {
-                let Some(value) = self.handle_vm_result(agent, result)? else {
+                let Some(value) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
+                else {
                     return Ok(());
                 };
                 value
@@ -868,7 +1009,9 @@ impl Vm {
                     receiver,
                     PropertyKey::Index(u32::from(index_operand)),
                 );
-                let Some(value) = self.handle_vm_result(agent, property_result)? else {
+                let Some(value) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+                else {
                     return Ok(());
                 };
                 value
@@ -879,7 +1022,9 @@ impl Vm {
                     PropertyKey::Index(u32::from(index_operand)),
                 )
                 .map_err(VmError::Abrupt);
-                let Some(value) = self.handle_vm_result(agent, element)? else {
+                let Some(value) =
+                    self.handle_dispatch_result(agent, frame_depth, frame, element)?
+                else {
                     return Ok(());
                 };
                 value
@@ -893,13 +1038,15 @@ impl Vm {
                 receiver,
                 PropertyKey::Index(u32::from(index_operand)),
             );
-            let Some(value) = self.handle_vm_result(agent, property_result)? else {
+            let Some(value) =
+                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
+            else {
                 return Ok(());
             };
             value
         };
         self.write_register(frame.registers(), target, value);
-        self.advance_instruction();
+        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -912,7 +1059,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
         object: lyng_js_types::ObjectRef,
         key: PropertyKey,
         value: Value,
@@ -935,12 +1083,15 @@ impl Vm {
             descriptor,
             AllocationLifetime::Default,
         );
-        let Some(created) = self.handle_vm_result(agent, define_result)? else {
+        let Some(created) =
+            self.handle_dispatch_result(agent, frame_depth, frame, define_result)?
+        else {
             return Ok(());
         };
         if !created {
             let type_error = Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            let Some(()) = self.handle_vm_result(agent, type_error)? else {
+            let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, type_error)?
+            else {
                 return Ok(());
             };
         }

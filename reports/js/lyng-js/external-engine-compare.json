@@ -20,388 +20,93 @@
   ],
   "results": [
     {
-      "category": "arithmetic-control-flow",
+      "category": "v8-v7",
       "command": [
         "target/release/lyng-js",
-        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "lyng-js",
       "error": null,
-      "max_ms": 13.207208,
-      "median_ms": 6.846875,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 6.607166,
-      "quickjs_ratio": 1.051740526405206,
+      "max_ms": 2034.0683749999998,
+      "median_ms": 2034.0683749999998,
+      "median_score": 199.0,
+      "metric_kind": "score",
+      "min_ms": 2034.0683749999998,
+      "quickjs_ratio": 4.8793969849246235,
       "samples_ms": [
-        13.207208,
-        6.846875,
-        6.607166
+        2034.0683749999998
       ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
+      "score_samples": [
+        199.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
-      "workload": "arithmetic-loop"
+      "workload": "Richards"
     },
     {
-      "category": "arithmetic-control-flow",
+      "category": "v8-v7",
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "quickjs",
       "error": null,
-      "max_ms": 6.604083999999999,
-      "median_ms": 6.510041999999999,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 5.982458,
+      "max_ms": 2010.325125,
+      "median_ms": 2010.325125,
+      "median_score": 971.0,
+      "metric_kind": "score",
+      "min_ms": 2010.325125,
       "quickjs_ratio": 1.0,
       "samples_ms": [
-        6.604083999999999,
-        6.510041999999999,
-        5.982458
+        2010.325125
       ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
+      "score_samples": [
+        971.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
-      "workload": "arithmetic-loop"
+      "workload": "Richards"
     },
     {
-      "category": "arithmetic-control-flow",
+      "category": "v8-v7",
       "command": [
         "/opt/homebrew/bin/boa",
-        "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js"
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "boa",
-      "error": null,
-      "max_ms": 12.936625,
-      "median_ms": 12.822417,
+      "error": "external engine `boa` failed for workload `Richards` with status exit status: 101\nstdout:\n\nstderr:\n\u001b[31mThe application panicked (crashed).\u001b[0m\nMessage:  \u001b[36mAttempted to create a NULL object.\u001b[0m\nLocation: \u001b[35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs\u001b[0m:\u001b[35m154\u001b[0m\n\u001b[31mThe application panicked (crashed).\u001b[0m\nMessage:  \u001b[36mevent loop thread panicked\u001b[0m\nLocation: \u001b[35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.23/src/blocking/client.rs\u001b[0m:\u001b[35m1523\u001b[0m\n",
+      "max_ms": null,
+      "median_ms": null,
       "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 12.810125000000001,
-      "quickjs_ratio": 1.9696366014228481,
-      "samples_ms": [
-        12.936625,
-        12.810125000000001,
-        12.822417
-      ],
+      "metric_kind": "score",
+      "min_ms": null,
+      "quickjs_ratio": null,
+      "samples_ms": [],
       "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js",
-      "status": "completed",
-      "workload": "arithmetic-loop"
-    },
-    {
-      "category": "array-object",
-      "command": [
-        "target/release/lyng-js",
-        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
-      ],
-      "engine": "lyng-js",
-      "error": null,
-      "max_ms": 12.852041,
-      "median_ms": 12.820625,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 12.810958000000001,
-      "quickjs_ratio": 1.973542428324033,
-      "samples_ms": [
-        12.820625,
-        12.810958000000001,
-        12.852041
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
-      "status": "completed",
-      "workload": "array-object-loop"
-    },
-    {
-      "category": "array-object",
-      "command": [
-        "/opt/homebrew/bin/qjs",
-        "--script",
-        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
-      ],
-      "engine": "quickjs",
-      "error": null,
-      "max_ms": 6.56975,
-      "median_ms": 6.49625,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 6.49575,
-      "quickjs_ratio": 1.0,
-      "samples_ms": [
-        6.49625,
-        6.56975,
-        6.49575
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
-      "status": "completed",
-      "workload": "array-object-loop"
-    },
-    {
-      "category": "array-object",
-      "command": [
-        "/opt/homebrew/bin/boa",
-        "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js"
-      ],
-      "engine": "boa",
-      "error": null,
-      "max_ms": 12.885416000000001,
-      "median_ms": 12.847875,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 11.942708,
-      "quickjs_ratio": 1.9777371560515682,
-      "samples_ms": [
-        12.885416000000001,
-        11.942708,
-        12.847875
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/array-object-loop.js",
-      "status": "completed",
-      "workload": "array-object-loop"
-    },
-    {
-      "category": "polymorphic-property",
-      "command": [
-        "target/release/lyng-js",
-        "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js"
-      ],
-      "engine": "lyng-js",
-      "error": null,
-      "max_ms": 6.579,
-      "median_ms": 6.483417,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 6.0785,
-      "quickjs_ratio": 1.0068590286135808,
-      "samples_ms": [
-        6.0785,
-        6.579,
-        6.483417
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js",
-      "status": "completed",
-      "workload": "polymorphic-property-loop"
-    },
-    {
-      "category": "polymorphic-property",
-      "command": [
-        "/opt/homebrew/bin/qjs",
-        "--script",
-        "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js"
-      ],
-      "engine": "quickjs",
-      "error": null,
-      "max_ms": 6.509208,
-      "median_ms": 6.4392499999999995,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 6.135459,
-      "quickjs_ratio": 1.0,
-      "samples_ms": [
-        6.4392499999999995,
-        6.135459,
-        6.509208
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js",
-      "status": "completed",
-      "workload": "polymorphic-property-loop"
-    },
-    {
-      "category": "polymorphic-property",
-      "command": [
-        "/opt/homebrew/bin/boa",
-        "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js"
-      ],
-      "engine": "boa",
-      "error": null,
-      "max_ms": 12.88475,
-      "median_ms": 12.834625,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 11.671707999999999,
-      "quickjs_ratio": 1.993186318282409,
-      "samples_ms": [
-        12.88475,
-        12.834625,
-        11.671707999999999
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js",
-      "status": "completed",
-      "workload": "polymorphic-property-loop"
-    },
-    {
-      "category": "pair-object-instanceof",
-      "command": [
-        "target/release/lyng-js",
-        "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js"
-      ],
-      "engine": "lyng-js",
-      "error": null,
-      "max_ms": 12.877540999999999,
-      "median_ms": 12.862874999999999,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 12.826917,
-      "quickjs_ratio": 2.007863414634146,
-      "samples_ms": [
-        12.877540999999999,
-        12.826917,
-        12.862874999999999
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js",
-      "status": "completed",
-      "workload": "pair-instanceof-loop"
-    },
-    {
-      "category": "pair-object-instanceof",
-      "command": [
-        "/opt/homebrew/bin/qjs",
-        "--script",
-        "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js"
-      ],
-      "engine": "quickjs",
-      "error": null,
-      "max_ms": 6.434875,
-      "median_ms": 6.40625,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 5.517875,
-      "quickjs_ratio": 1.0,
-      "samples_ms": [
-        6.40625,
-        5.517875,
-        6.434875
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js",
-      "status": "completed",
-      "workload": "pair-instanceof-loop"
-    },
-    {
-      "category": "pair-object-instanceof",
-      "command": [
-        "/opt/homebrew/bin/boa",
-        "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js"
-      ],
-      "engine": "boa",
-      "error": null,
-      "max_ms": 18.944417,
-      "median_ms": 18.413791,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 18.272834000000003,
-      "quickjs_ratio": 2.874347863414634,
-      "samples_ms": [
-        18.413791,
-        18.944417,
-        18.272834000000003
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js",
-      "status": "completed",
-      "workload": "pair-instanceof-loop"
-    },
-    {
-      "category": "builtin-heavy",
-      "command": [
-        "target/release/lyng-js",
-        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
-      ],
-      "engine": "lyng-js",
-      "error": null,
-      "max_ms": 18.142,
-      "median_ms": 17.968,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 17.623458000000003,
-      "quickjs_ratio": 1.4425755690257318,
-      "samples_ms": [
-        17.968,
-        18.142,
-        17.623458000000003
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
-      "status": "completed",
-      "workload": "builtin-string-regexp-loop"
-    },
-    {
-      "category": "builtin-heavy",
-      "command": [
-        "/opt/homebrew/bin/qjs",
-        "--script",
-        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
-      ],
-      "engine": "quickjs",
-      "error": null,
-      "max_ms": 12.835209,
-      "median_ms": 12.455499999999999,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 12.193458000000001,
-      "quickjs_ratio": 1.0,
-      "samples_ms": [
-        12.835209,
-        12.193458000000001,
-        12.455499999999999
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
-      "status": "completed",
-      "workload": "builtin-string-regexp-loop"
-    },
-    {
-      "category": "builtin-heavy",
-      "command": [
-        "/opt/homebrew/bin/boa",
-        "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js"
-      ],
-      "engine": "boa",
-      "error": null,
-      "max_ms": 24.890167,
-      "median_ms": 24.668833,
-      "median_score": null,
-      "metric_kind": "wall-time",
-      "min_ms": 23.881290999999997,
-      "quickjs_ratio": 1.9805574244309745,
-      "samples_ms": [
-        24.668833,
-        23.881290999999997,
-        24.890167
-      ],
-      "score_samples": [],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js",
-      "status": "completed",
-      "workload": "builtin-string-regexp-loop"
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
+      "status": "failed",
+      "workload": "Richards"
     }
   ],
   "schema_version": 1,
   "settings": {
-    "corpus": "synthetic",
-    "filter": null,
+    "corpus": "v8-v7",
+    "filter": "richards",
     "full_suite": false,
     "json_path": "reports/js/lyng-js/external-engine-compare.json",
-    "loop_trips": 2048,
+    "loop_trips": 1024,
     "policy": {
       "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere.",
       "primary_baseline": "quickjs",
       "secondary_reference": "boa"
     },
     "report_path": "reports/js/lyng-js/external-engine-compare.md",
-    "samples": 3,
+    "samples": 1,
     "scripts_dir": "/tmp/lyng-js-bench-compare-scripts",
-    "timeout_ms": 30000,
-    "warmup_samples": 1
+    "timeout_ms": 5000,
+    "warmup_samples": 0
   },
   "suite": "external-engine-compare"
 }

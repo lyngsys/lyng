@@ -2,14 +2,13 @@
 
 use lyng_js_bytecode::{
     decode_instruction_stream, disassemble, disassemble_instruction, ArgumentsMode,
-    BytecodeFunction, BytecodeFunctionId, ConstantValue, WideOperand,
+    BytecodeFunction, BytecodeFunctionId, ConstantValue,
 };
 use lyng_js_common::AtomId;
 use libfuzzer_sys::fuzz_target;
 
 const MAX_INPUT_LEN: usize = 4096;
 const MAX_CONSTANTS: usize = 64;
-const MAX_WIDE_OPERANDS: usize = 64;
 
 fuzz_target!(|data: &[u8]| {
     if data.len() > MAX_INPUT_LEN {
@@ -19,7 +18,6 @@ fuzz_target!(|data: &[u8]| {
     let decoded = decode_instruction_stream(data);
     let instructions = decoded.instructions().to_vec();
     let constants = decode_constants(data);
-    let wide_operands = decode_wide_operands(data, instructions.len());
 
     let arguments_mode = match data.first().copied().unwrap_or(0) % 3 {
         0 => ArgumentsMode::None,
@@ -33,8 +31,7 @@ fuzz_target!(|data: &[u8]| {
         arguments_mode,
     )
     .with_instructions(instructions)
-    .with_constants(constants)
-    .with_wide_operands(wide_operands);
+    .with_constants(constants);
 
     let _ = decoded.invalid_words();
     let _ = decoded.trailing_byte_count();
@@ -54,24 +51,6 @@ fn decode_constants(bytes: &[u8]) -> Vec<ConstantValue> {
                 1 => ConstantValue::Float64Bits(read_u64(chunk, 1)),
                 _ => ConstantValue::Atom(AtomId::from_raw(read_u32(chunk, 1))),
             }
-        })
-        .collect()
-}
-
-fn decode_wide_operands(bytes: &[u8], instruction_count: usize) -> Vec<WideOperand> {
-    if instruction_count == 0 {
-        return Vec::new();
-    }
-
-    bytes.chunks(8)
-        .take(MAX_WIDE_OPERANDS)
-        .map(|chunk| {
-            let offset = usize::try_from(read_u32(chunk, 0)).unwrap_or(usize::MAX) % instruction_count;
-            let payload = read_u32(chunk, 4);
-            WideOperand::new(
-                u32::try_from(offset).expect("fuzz instruction offset should fit u32"),
-                payload,
-            )
         })
         .collect()
 }

@@ -1,0 +1,1794 @@
+{
+  "has_previous": true,
+  "runtime_snapshots": [
+    {
+      "backing_stores": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "heap": {
+        "live_bytes": 1029,
+        "old_live_bytes": 1029,
+        "reserved_bytes": 11104,
+        "young_live_bytes": 0
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.empty",
+      "live_bytes": 1029,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 0,
+        "last_background_sweep_candidates": 0,
+        "last_background_sweep_completed": false,
+        "last_background_sweep_duration_ns": 0,
+        "last_background_sweep_reclaimed": 0,
+        "last_background_sweep_started": false,
+        "last_background_sweep_worker_thread_id": 0,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 0,
+        "last_mark_finish_work_items": 0,
+        "last_mark_slice_budget": 64,
+        "last_mark_slices": 0,
+        "last_mark_work_items": 0,
+        "last_max_mark_pause_ns": 0,
+        "last_max_mark_slice_work_items": 0,
+        "last_total_mark_pause_ns": 0
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Fresh runtime with the default root-agent shell only.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 0,
+          "nursery_allocations": 0,
+          "old_allocations": 49
+        },
+        "capacity_bytes": 1048576,
+        "last_minor_cards_dirtied": 0,
+        "last_minor_cards_scanned": 0,
+        "last_minor_pause_ns": 0,
+        "last_minor_reclaimed": 0,
+        "last_minor_survivors": 0,
+        "last_minor_tenured": 0,
+        "minor_collections": 0,
+        "used_bytes": 0
+      },
+      "promise_jobs": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_payloads": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      }
+    },
+    {
+      "backing_stores": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "heap": {
+        "live_bytes": 254416,
+        "old_live_bytes": 11049,
+        "reserved_bytes": 272640,
+        "young_live_bytes": 243367
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.spec-bootstrap",
+      "live_bytes": 254416,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 0,
+        "last_background_sweep_candidates": 0,
+        "last_background_sweep_completed": false,
+        "last_background_sweep_duration_ns": 0,
+        "last_background_sweep_reclaimed": 0,
+        "last_background_sweep_started": false,
+        "last_background_sweep_worker_thread_id": 0,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 0,
+        "last_mark_finish_work_items": 0,
+        "last_mark_slice_budget": 64,
+        "last_mark_slices": 0,
+        "last_mark_work_items": 0,
+        "last_max_mark_pause_ns": 0,
+        "last_max_mark_slice_work_items": 0,
+        "last_total_mark_pause_ns": 0
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Spec-only default-realm bootstrap baseline.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 82,
+          "nursery_allocations": 4189,
+          "old_allocations": 884
+        },
+        "capacity_bytes": 1048576,
+        "last_minor_cards_dirtied": 0,
+        "last_minor_cards_scanned": 0,
+        "last_minor_pause_ns": 0,
+        "last_minor_reclaimed": 0,
+        "last_minor_survivors": 0,
+        "last_minor_tenured": 0,
+        "minor_collections": 0,
+        "used_bytes": 243367
+      },
+      "promise_jobs": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_payloads": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      }
+    },
+    {
+      "backing_stores": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "heap": {
+        "live_bytes": 255530,
+        "old_live_bytes": 11141,
+        "reserved_bytes": 274008,
+        "young_live_bytes": 244389
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.regexp-literal-cache",
+      "live_bytes": 256750,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 0,
+        "last_background_sweep_candidates": 0,
+        "last_background_sweep_completed": false,
+        "last_background_sweep_duration_ns": 0,
+        "last_background_sweep_reclaimed": 0,
+        "last_background_sweep_started": false,
+        "last_background_sweep_worker_thread_id": 0,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 0,
+        "last_mark_finish_work_items": 0,
+        "last_mark_slice_budget": 64,
+        "last_mark_slices": 0,
+        "last_mark_work_items": 0,
+        "last_max_mark_pause_ns": 0,
+        "last_max_mark_slice_work_items": 0,
+        "last_total_mark_pause_ns": 0
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Executed repeated RegExp literal evaluations so retained compiled literal payload cache accounting is visible. RegExp payload bytes are a lower-bound estimate because backend-owned regex tables are opaque.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 82,
+          "nursery_allocations": 4204,
+          "old_allocations": 891
+        },
+        "capacity_bytes": 1048576,
+        "last_minor_cards_dirtied": 0,
+        "last_minor_cards_scanned": 0,
+        "last_minor_pause_ns": 0,
+        "last_minor_reclaimed": 0,
+        "last_minor_survivors": 0,
+        "last_minor_tenured": 0,
+        "minor_collections": 0,
+        "used_bytes": 244389
+      },
+      "promise_jobs": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 314,
+        "metadata_bytes": 188,
+        "payload_bytes": 126,
+        "records": 1
+      },
+      "regexp_payloads": {
+        "live_bytes": 906,
+        "metadata_bytes": 528,
+        "payload_bytes": 378,
+        "records": 3
+      }
+    },
+    {
+      "backing_stores": {
+        "live_bytes": 4176,
+        "metadata_bytes": 80,
+        "payload_bytes": 4096,
+        "records": 1
+      },
+      "heap": {
+        "live_bytes": 2058,
+        "old_live_bytes": 2058,
+        "reserved_bytes": 22208,
+        "young_live_bytes": 0
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.promise-and-backing-store",
+      "live_bytes": 6331,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 0,
+        "last_background_sweep_candidates": 0,
+        "last_background_sweep_completed": false,
+        "last_background_sweep_duration_ns": 0,
+        "last_background_sweep_reclaimed": 0,
+        "last_background_sweep_started": false,
+        "last_background_sweep_worker_thread_id": 0,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 0,
+        "last_mark_finish_work_items": 0,
+        "last_mark_slice_budget": 128,
+        "last_mark_slices": 0,
+        "last_mark_work_items": 0,
+        "last_max_mark_pause_ns": 0,
+        "last_max_mark_slice_work_items": 0,
+        "last_total_mark_pause_ns": 0
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Seeded promise-job queue entry plus one shared backing-store fixture. Iterator state remains transient VM execution state, so the post-run iterator and module-cache domains stay at zero in this retained-runtime snapshot.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 0,
+          "nursery_allocations": 0,
+          "old_allocations": 98
+        },
+        "capacity_bytes": 2097152,
+        "last_minor_cards_dirtied": 0,
+        "last_minor_cards_scanned": 0,
+        "last_minor_pause_ns": 0,
+        "last_minor_reclaimed": 0,
+        "last_minor_survivors": 0,
+        "last_minor_tenured": 0,
+        "minor_collections": 0,
+        "used_bytes": 0
+      },
+      "promise_jobs": {
+        "live_bytes": 97,
+        "metadata_bytes": 80,
+        "payload_bytes": 17,
+        "records": 1
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_payloads": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      }
+    },
+    {
+      "backing_stores": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "heap": {
+        "live_bytes": 712,
+        "old_live_bytes": 72,
+        "reserved_bytes": 11112,
+        "young_live_bytes": 640
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.nursery-minor-gc",
+      "live_bytes": 712,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 291,
+        "last_background_sweep_candidates": 63,
+        "last_background_sweep_completed": true,
+        "last_background_sweep_duration_ns": 42,
+        "last_background_sweep_reclaimed": 63,
+        "last_background_sweep_started": true,
+        "last_background_sweep_worker_thread_id": 2688427941405105545,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 83,
+        "last_mark_finish_work_items": 1,
+        "last_mark_slice_budget": 64,
+        "last_mark_slices": 0,
+        "last_mark_work_items": 0,
+        "last_max_mark_pause_ns": 0,
+        "last_max_mark_slice_work_items": 0,
+        "last_total_mark_pause_ns": 0
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Allocated more than 1 MiB of short-lived ordinary object records through a rooted mutator so the nursery limit triggers a visible minor GC.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 99,
+          "nursery_allocations": 16394,
+          "old_allocations": 50
+        },
+        "capacity_bytes": 1048576,
+        "last_minor_cards_dirtied": 1,
+        "last_minor_cards_scanned": 1,
+        "last_minor_pause_ns": 1542,
+        "last_minor_reclaimed": 4,
+        "last_minor_survivors": 1,
+        "last_minor_tenured": 1,
+        "minor_collections": 1,
+        "used_bytes": 640
+      },
+      "promise_jobs": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_payloads": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      }
+    },
+    {
+      "backing_stores": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "heap": {
+        "live_bytes": 336,
+        "old_live_bytes": 0,
+        "reserved_bytes": 11120,
+        "young_live_bytes": 336
+      },
+      "iterator_records": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "label": "runtime.major-gc-mark-slices",
+      "live_bytes": 336,
+      "major_gc": {
+        "last_background_sweep_apply_pause_ns": 2000,
+        "last_background_sweep_candidates": 35,
+        "last_background_sweep_completed": true,
+        "last_background_sweep_duration_ns": 41,
+        "last_background_sweep_reclaimed": 35,
+        "last_background_sweep_started": true,
+        "last_background_sweep_worker_thread_id": 6279463968646665849,
+        "last_gray_work_items_after_finish": 0,
+        "last_mark_finish_pause_ns": 458,
+        "last_mark_finish_work_items": 5,
+        "last_mark_slice_budget": 1,
+        "last_mark_slices": 2,
+        "last_mark_work_items": 2,
+        "last_max_mark_pause_ns": 83,
+        "last_max_mark_slice_work_items": 1,
+        "last_total_mark_pause_ns": 125
+      },
+      "module_caches": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "note": "Forced a major collection over rooted and dead objects with a one-item mark budget so mark-slice distribution, atomic finish pause, and background sweep reporting are visible.",
+      "nursery": {
+        "allocation_profile": {
+          "nursery_allocation_percent": 14,
+          "nursery_allocations": 8,
+          "old_allocations": 49
+        },
+        "capacity_bytes": 1048576,
+        "last_minor_cards_dirtied": 0,
+        "last_minor_cards_scanned": 0,
+        "last_minor_pause_ns": 0,
+        "last_minor_reclaimed": 0,
+        "last_minor_survivors": 0,
+        "last_minor_tenured": 0,
+        "minor_collections": 0,
+        "used_bytes": 400
+      },
+      "promise_jobs": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_literal_cache": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      },
+      "regexp_payloads": {
+        "live_bytes": 0,
+        "metadata_bytes": 0,
+        "payload_bytes": 0,
+        "records": 0
+      }
+    }
+  ],
+  "schema_version": 1,
+  "settings": {
+    "count_opcodes": true,
+    "frontend_repetitions": 24,
+    "json_path": "reports/js/lyng-js/bench.json",
+    "loop_trip_count": 2048,
+    "report_path": "reports/js/lyng-js/bench.md",
+    "runs_per_sample": 9,
+    "samples": 7,
+    "warmup_runs": 2
+  },
+  "suite": "runtime",
+  "tool": "lyng-js-bench runtime",
+  "workloads": [
+    {
+      "delta": {
+        "median_ns_per_operation": -349.4330512152774
+      },
+      "memory": {
+        "allocated_feedback_bytes": 25336,
+        "allocated_feedback_code_count": 4,
+        "atom_payload_bytes": 13,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 1,
+        "call_cache_poly_sites": 1,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 639,
+        "feedback_slots": 23,
+        "functions": 4,
+        "live_feedback_sites": 23,
+        "metadata_records": 54,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 3652
+      },
+      "name": "array-heavy.iterator-runtime",
+      "note": "Array for-of traversal plus iterator-driven array-literal and call spread on the current iterator runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 5548410,
+            "opcode": "Move"
+          },
+          {
+            "count": 2064384,
+            "opcode": "Add"
+          },
+          {
+            "count": 1935486,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 1548288,
+            "opcode": "Jump8"
+          },
+          {
+            "count": 1290240,
+            "opcode": "AdvanceIterator"
+          },
+          {
+            "count": 645309,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 645120,
+            "opcode": "JumpIfTrue"
+          },
+          {
+            "count": 645120,
+            "opcode": "JumpIfTrue8"
+          },
+          {
+            "count": 645120,
+            "opcode": "SetKeyedProperty"
+          },
+          {
+            "count": 516096,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 516096,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 516096,
+            "opcode": "LeaveHandler"
+          },
+          {
+            "count": 516096,
+            "opcode": "StoreDenseElement"
+          },
+          {
+            "count": 516096,
+            "opcode": "StrictEqual"
+          },
+          {
+            "count": 258111,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 258048,
+            "opcode": "CreateArray"
+          },
+          {
+            "count": 258048,
+            "opcode": "CreateIterator"
+          },
+          {
+            "count": 258048,
+            "opcode": "GetKeyedProperty"
+          },
+          {
+            "count": 258048,
+            "opcode": "LoadOne"
+          },
+          {
+            "count": 129150,
+            "opcode": "Return"
+          }
+        ],
+        "total": 20387367
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 9948.079427083334,
+        "median_total_ns": 183363000,
+        "median_us_per_run": 20373.666666666668,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": 17.53515625
+      },
+      "memory": {
+        "allocated_feedback_bytes": 24208,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 3,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 1,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 350,
+        "feedback_slots": 22,
+        "functions": 3,
+        "live_feedback_sites": 22,
+        "metadata_records": 40,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 2665
+      },
+      "name": "array-heavy.literal-indexed-runtime",
+      "note": "Array-literal creation plus repeated dense indexed reads and writes on the current runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 2838843,
+            "opcode": "Move"
+          },
+          {
+            "count": 903168,
+            "opcode": "GetKeyedProperty"
+          },
+          {
+            "count": 645120,
+            "opcode": "Add"
+          },
+          {
+            "count": 645120,
+            "opcode": "LoadSmi8"
+          },
+          {
+            "count": 516096,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 516096,
+            "opcode": "StoreDenseElement"
+          },
+          {
+            "count": 387198,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 258048,
+            "opcode": "AssignKeyedProperty"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "CreateArray"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump"
+          },
+          {
+            "count": 129024,
+            "opcode": "LoadOne"
+          },
+          {
+            "count": 129024,
+            "opcode": "SubSmi"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          },
+          {
+            "count": 126,
+            "opcode": "Return"
+          },
+          {
+            "count": 63,
+            "opcode": "Call0"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadConst8"
+          }
+        ],
+        "total": 7613865
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 916.8994683159722,
+        "median_total_ns": 16900291,
+        "median_us_per_run": 1877.8101111111112,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -204.671296296297
+      },
+      "memory": {
+        "allocated_feedback_bytes": null,
+        "allocated_feedback_code_count": null,
+        "atom_payload_bytes": 1321,
+        "call_cache_mega_sites": null,
+        "call_cache_mono_sites": null,
+        "call_cache_poly_sites": null,
+        "call_cache_uninit_sites": null,
+        "construct_cache_mega_sites": null,
+        "construct_cache_mono_sites": null,
+        "construct_cache_poly_sites": null,
+        "construct_cache_uninit_sites": null,
+        "construct_created_shape_entries": null,
+        "encoded_bytes": null,
+        "feedback_slots": null,
+        "functions": null,
+        "live_feedback_sites": null,
+        "metadata_records": null,
+        "note": "Frontend-only source and atom surface for the current async benchmark row.",
+        "template_bytes": null
+      },
+      "name": "async-heavy.frontend",
+      "note": "Async functions, async generators, and await-heavy syntax through the current frontend-only async benchmark surface.",
+      "opcode_dispatch_counts": null,
+      "pipeline": "script.frontend",
+      "throughput": {
+        "median_ns_per_operation": 3663.384259259259,
+        "median_total_ns": 791291,
+        "median_us_per_run": 87.92122222222221,
+        "operations_per_run": 24,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -39.24782986111086
+      },
+      "memory": {
+        "allocated_feedback_bytes": 34232,
+        "allocated_feedback_code_count": 8,
+        "atom_payload_bytes": 69,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 1,
+        "call_cache_poly_sites": 3,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 1,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 1421,
+        "feedback_slots": 31,
+        "functions": 8,
+        "live_feedback_sites": 31,
+        "metadata_records": 203,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 9174
+      },
+      "name": "class-heavy.runtime",
+      "note": "Class construction, instance and static private state, static blocks, and super dispatch on the current class runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 5551812,
+            "opcode": "Move"
+          },
+          {
+            "count": 1420965,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 1420650,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 1291437,
+            "opcode": "Call"
+          },
+          {
+            "count": 1290555,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 1161216,
+            "opcode": "LoadThis"
+          },
+          {
+            "count": 903168,
+            "opcode": "Add"
+          },
+          {
+            "count": 774396,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 516159,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 516159,
+            "opcode": "LoadOne"
+          },
+          {
+            "count": 516096,
+            "opcode": "LoadEnvSlot"
+          },
+          {
+            "count": 387198,
+            "opcode": "Return"
+          },
+          {
+            "count": 387135,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 258174,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 258111,
+            "opcode": "Call0"
+          },
+          {
+            "count": 258048,
+            "opcode": "ReturnUndefined"
+          },
+          {
+            "count": 129087,
+            "opcode": "AssignNamedProperty"
+          },
+          {
+            "count": 129087,
+            "opcode": "DefineNamedProperty"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadSmi8"
+          }
+        ],
+        "total": 18074574
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 2790.6516927083335,
+        "median_total_ns": 51437292,
+        "median_us_per_run": 5715.254666666667,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": 60.56944444444434
+      },
+      "memory": {
+        "allocated_feedback_bytes": null,
+        "allocated_feedback_code_count": null,
+        "atom_payload_bytes": 1070,
+        "call_cache_mega_sites": null,
+        "call_cache_mono_sites": null,
+        "call_cache_poly_sites": null,
+        "call_cache_uninit_sites": null,
+        "construct_cache_mega_sites": null,
+        "construct_cache_mono_sites": null,
+        "construct_cache_poly_sites": null,
+        "construct_cache_uninit_sites": null,
+        "construct_created_shape_entries": null,
+        "encoded_bytes": 0,
+        "feedback_slots": null,
+        "functions": null,
+        "live_feedback_sites": null,
+        "metadata_records": 0,
+        "note": "Placeholder module compile unit plus atom payload bytes.",
+        "template_bytes": 224
+      },
+      "name": "module-heavy.compile",
+      "note": "Static import/export-heavy module sources through the current compile_module path.",
+      "opcode_dispatch_counts": null,
+      "pipeline": "module.compile",
+      "throughput": {
+        "median_ns_per_operation": 3181.134259259259,
+        "median_total_ns": 687125,
+        "median_us_per_run": 76.34722222222223,
+        "operations_per_run": 24,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -29.667588975695253
+      },
+      "memory": {
+        "allocated_feedback_bytes": 18728,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 108,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 2,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 1,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 1,
+        "encoded_bytes": 371,
+        "feedback_slots": 17,
+        "functions": 3,
+        "live_feedback_sites": 17,
+        "metadata_records": 62,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 3575
+      },
+      "name": "regexp-constructor-compile.runtime",
+      "note": "Repeated RegExp constructor compilation over a small rotating pattern set.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 2709819,
+            "opcode": "Move"
+          },
+          {
+            "count": 387072,
+            "opcode": "Add"
+          },
+          {
+            "count": 387072,
+            "opcode": "GetKeyedProperty"
+          },
+          {
+            "count": 258048,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 258048,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 129843,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "BitAndSmi"
+          },
+          {
+            "count": 129024,
+            "opcode": "Call1"
+          },
+          {
+            "count": 129024,
+            "opcode": "Construct"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump"
+          },
+          {
+            "count": 129024,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 129024,
+            "opcode": "LoadGlobal"
+          },
+          {
+            "count": 756,
+            "opcode": "StoreDenseElement"
+          },
+          {
+            "count": 189,
+            "opcode": "CreateArray"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          },
+          {
+            "count": 126,
+            "opcode": "LoadZero"
+          }
+        ],
+        "total": 5293134
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 3926.3531901041665,
+        "median_total_ns": 72370542,
+        "median_us_per_run": 8041.171333333334,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -1250.2396375868047
+      },
+      "memory": {
+        "allocated_feedback_bytes": 34072,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 144,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 4,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 551,
+        "feedback_slots": 31,
+        "functions": 3,
+        "live_feedback_sites": 31,
+        "metadata_records": 81,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 4319
+      },
+      "name": "regexp-heavy.runtime",
+      "note": "Repeated global exec, sticky matches, and named-capture replacement on the current RegExp runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 11999925,
+            "opcode": "Move"
+          },
+          {
+            "count": 3354624,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 2580480,
+            "opcode": "GetKeyedProperty"
+          },
+          {
+            "count": 1935360,
+            "opcode": "Add"
+          },
+          {
+            "count": 1290429,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 1290240,
+            "opcode": "StrictEqual"
+          },
+          {
+            "count": 1032255,
+            "opcode": "LoadOne"
+          },
+          {
+            "count": 1032192,
+            "opcode": "Call1"
+          },
+          {
+            "count": 1032192,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 645120,
+            "opcode": "Jump"
+          },
+          {
+            "count": 645120,
+            "opcode": "LoadFalse"
+          },
+          {
+            "count": 645120,
+            "opcode": "LoadNull"
+          },
+          {
+            "count": 516600,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 516096,
+            "opcode": "AssignNamedProperty"
+          },
+          {
+            "count": 516096,
+            "opcode": "LoadSmi8"
+          },
+          {
+            "count": 387072,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 258048,
+            "opcode": "Jump8"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          }
+        ],
+        "total": 30194262
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 47117.673502604164,
+        "median_total_ns": 868472958,
+        "median_us_per_run": 96496.99533333333,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": 67.91634114583348
+      },
+      "memory": {
+        "allocated_feedback_bytes": 19824,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 60,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 2,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 267,
+        "feedback_slots": 18,
+        "functions": 3,
+        "live_feedback_sites": 18,
+        "metadata_records": 49,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 2991
+      },
+      "name": "regexp-legacy-statics.runtime",
+      "note": "Successful matches followed by Annex B RegExp legacy static accessor reads.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 1290744,
+            "opcode": "Move"
+          },
+          {
+            "count": 903168,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 387072,
+            "opcode": "Add"
+          },
+          {
+            "count": 387072,
+            "opcode": "LoadGlobal"
+          },
+          {
+            "count": 129276,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 129024,
+            "opcode": "Call1"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump"
+          },
+          {
+            "count": 252,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          },
+          {
+            "count": 126,
+            "opcode": "Return"
+          },
+          {
+            "count": 63,
+            "opcode": "Call"
+          },
+          {
+            "count": 63,
+            "opcode": "Call0"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadLocal3"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadSmi"
+          },
+          {
+            "count": 63,
+            "opcode": "SetFunctionName"
+          }
+        ],
+        "total": 3872736
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 2258.355034722222,
+        "median_total_ns": 41626000,
+        "median_us_per_run": 4625.111111111111,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -15.5888671875
+      },
+      "memory": {
+        "allocated_feedback_bytes": 8864,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 102,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 2,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 215,
+        "feedback_slots": 8,
+        "functions": 3,
+        "live_feedback_sites": 8,
+        "metadata_records": 36,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 2549
+      },
+      "name": "regexp-named-replace.runtime",
+      "note": "Global named-capture replacement without the broader mixed RegExp-heavy workload.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 1548792,
+            "opcode": "Move"
+          },
+          {
+            "count": 258048,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 129339,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "Add"
+          },
+          {
+            "count": 129024,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 129024,
+            "opcode": "Call2"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump8"
+          },
+          {
+            "count": 252,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          },
+          {
+            "count": 126,
+            "opcode": "Return"
+          },
+          {
+            "count": 63,
+            "opcode": "Call"
+          },
+          {
+            "count": 63,
+            "opcode": "Call0"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadLocal3"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadSmi"
+          },
+          {
+            "count": 63,
+            "opcode": "SetFunctionName"
+          },
+          {
+            "count": 63,
+            "opcode": "TailCall"
+          }
+        ],
+        "total": 2840607
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 12722.249348958334,
+        "median_total_ns": 234496500,
+        "median_us_per_run": 26055.166666666668,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": -857.9982638888832
+      },
+      "memory": {
+        "allocated_feedback_bytes": 36264,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 111,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 7,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 690,
+        "feedback_slots": 33,
+        "functions": 3,
+        "live_feedback_sites": 33,
+        "metadata_records": 107,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 5017
+      },
+      "name": "regexp-stable-exec.runtime",
+      "note": "Repeated default exec/test over stable Latin-1, UTF-16, astral, and lone-surrogate input strings.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 44901675,
+            "opcode": "Move"
+          },
+          {
+            "count": 10838142,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 9289728,
+            "opcode": "StrictEqual"
+          },
+          {
+            "count": 5677182,
+            "opcode": "Call1"
+          },
+          {
+            "count": 5677056,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 5161023,
+            "opcode": "Add"
+          },
+          {
+            "count": 5160960,
+            "opcode": "Jump8"
+          },
+          {
+            "count": 4644864,
+            "opcode": "LoadFalse"
+          },
+          {
+            "count": 4644864,
+            "opcode": "LoadNull"
+          },
+          {
+            "count": 516285,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 516096,
+            "opcode": "AssignNamedProperty"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump"
+          },
+          {
+            "count": 1134,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 441,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 252,
+            "opcode": "Call"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          }
+        ],
+        "total": 97675893
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 35732.589192708336,
+        "median_total_ns": 658623084,
+        "median_us_per_run": 73180.34266666666,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": 12.478298611111057
+      },
+      "memory": {
+        "allocated_feedback_bytes": 7768,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 19,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 1,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 0,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 0,
+        "encoded_bytes": 185,
+        "feedback_slots": 7,
+        "functions": 3,
+        "live_feedback_sites": 7,
+        "metadata_records": 25,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 2116
+      },
+      "name": "string-heavy.concat-runtime",
+      "note": "Repeated string concatenation and equality checks on the current runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 1161342,
+            "opcode": "Move"
+          },
+          {
+            "count": 283941,
+            "opcode": "LoadConst8"
+          },
+          {
+            "count": 258111,
+            "opcode": "JumpIfFalse8"
+          },
+          {
+            "count": 154791,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "Add"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump8"
+          },
+          {
+            "count": 129024,
+            "opcode": "StrictEqual"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadUndefined"
+          },
+          {
+            "count": 126,
+            "opcode": "CreateClosure"
+          },
+          {
+            "count": 126,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 126,
+            "opcode": "Return"
+          },
+          {
+            "count": 63,
+            "opcode": "Call0"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadLocal3"
+          },
+          {
+            "count": 63,
+            "opcode": "LoadSmi"
+          },
+          {
+            "count": 63,
+            "opcode": "SetFunctionName"
+          },
+          {
+            "count": 63,
+            "opcode": "TailCall"
+          }
+        ],
+        "total": 2504313
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 221.49207899305554,
+        "median_total_ns": 4082542,
+        "median_us_per_run": 453.6157777777778,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    },
+    {
+      "delta": {
+        "median_ns_per_operation": 19.96299913194457
+      },
+      "memory": {
+        "allocated_feedback_bytes": 36264,
+        "allocated_feedback_code_count": 3,
+        "atom_payload_bytes": 61,
+        "call_cache_mega_sites": 0,
+        "call_cache_mono_sites": 3,
+        "call_cache_poly_sites": 0,
+        "call_cache_uninit_sites": 1,
+        "construct_cache_mega_sites": 0,
+        "construct_cache_mono_sites": 4,
+        "construct_cache_poly_sites": 0,
+        "construct_cache_uninit_sites": 0,
+        "construct_created_shape_entries": 4,
+        "encoded_bytes": 505,
+        "feedback_slots": 33,
+        "functions": 3,
+        "live_feedback_sites": 33,
+        "metadata_records": 72,
+        "note": "Warmed script-template and feedback-vector footprint.",
+        "template_bytes": 3838
+      },
+      "name": "typed-array-heavy.runtime",
+      "note": "ArrayBuffer-backed typed-array views plus DataView read/write traffic on the current binary-data runtime path.",
+      "opcode_dispatch_counts": {
+        "top": [
+          {
+            "count": 3871602,
+            "opcode": "Move"
+          },
+          {
+            "count": 645120,
+            "opcode": "Add"
+          },
+          {
+            "count": 645120,
+            "opcode": "GetKeyedProperty"
+          },
+          {
+            "count": 645120,
+            "opcode": "LoadOne"
+          },
+          {
+            "count": 387261,
+            "opcode": "LoadZero"
+          },
+          {
+            "count": 387072,
+            "opcode": "AddSmi"
+          },
+          {
+            "count": 387072,
+            "opcode": "AssignKeyedProperty"
+          },
+          {
+            "count": 258174,
+            "opcode": "LoadSmi8"
+          },
+          {
+            "count": 258048,
+            "opcode": "BitAndSmi"
+          },
+          {
+            "count": 258048,
+            "opcode": "GetNamedProperty"
+          },
+          {
+            "count": 258048,
+            "opcode": "LoadTrue"
+          },
+          {
+            "count": 129087,
+            "opcode": "JumpIfFalse"
+          },
+          {
+            "count": 129087,
+            "opcode": "LessThan"
+          },
+          {
+            "count": 129087,
+            "opcode": "LoadLocal0"
+          },
+          {
+            "count": 129024,
+            "opcode": "Call2"
+          },
+          {
+            "count": 129024,
+            "opcode": "Call3"
+          },
+          {
+            "count": 129024,
+            "opcode": "Jump"
+          },
+          {
+            "count": 252,
+            "opcode": "Construct"
+          },
+          {
+            "count": 252,
+            "opcode": "LoadGlobal"
+          },
+          {
+            "count": 189,
+            "opcode": "LoadUndefined"
+          }
+        ],
+        "total": 8776341
+      },
+      "pipeline": "script.runtime",
+      "throughput": {
+        "median_ns_per_operation": 959.7687717013889,
+        "median_total_ns": 17690458,
+        "median_us_per_run": 1965.6064444444444,
+        "operations_per_run": 2048,
+        "runs_per_sample": 9,
+        "samples": 7
+      }
+    }
+  ]
+}

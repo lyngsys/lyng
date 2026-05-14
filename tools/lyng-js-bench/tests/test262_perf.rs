@@ -22,7 +22,7 @@ fn sample(elapsed_ms: u64, eval_ms: u64) -> Test262Sample {
         diagnostics: Some(Test262VariantDiagnostics {
             function_count: 4,
             instruction_words: 120,
-            wide_operands: 8,
+            wide_prefixes: 8,
             metadata_records: 17,
             feedback_slots: 6,
             live_feedback_sites: 5,

@@ -58,7 +58,7 @@ pub enum VmError {
         instruction_offset: u32,
         opcode: Opcode,
     },
-    MissingWideOperand {
+    MissingInlineCallRange {
         code: CodeRef,
         instruction_offset: u32,
         opcode: Opcode,

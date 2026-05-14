@@ -1088,9 +1088,8 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
 fn compiled_unit_encoded_bytes(unit: &CompiledScriptUnit) -> usize {
     unit.functions()
         .iter()
-        .map(|function| function.instruction_count() + function.wide_operands().len())
+        .map(|function| function.instruction_bytes().len())
         .sum::<usize>()
-        .saturating_mul(4)
 }
 
 fn compiled_unit_metadata_records(unit: &CompiledScriptUnit) -> usize {
@@ -1143,7 +1142,6 @@ fn function_template_bytes(function: &BytecodeFunction) -> usize {
         + size_of_val(function.exception_handlers())
         + size_of_val(function.feedback_sites())
         + size_of_val(function.source_map())
-        + size_of_val(function.wide_operands())
         + size_of_val(function.safepoints())
         + size_of_val(function.deopt_snapshots())
 }

@@ -1,4 +1,4 @@
-use crate::{Instruction, Opcode};
+use crate::{metadata::CallRange, Instruction, Opcode};
 use lyng_js_types::FeedbackSlotId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -9,15 +9,19 @@ enum InstructionForm {
     Ax,
     Ax8,
     Local,
-    ProfiledAbc,
-    ProfiledAbx,
+    Accumulator,
+    AccumulatorByte,
+    AccumulatorRegister,
+    CallRange,
 }
 
-/// Decoder error for one malformed 4-byte instruction word.
+/// Decoder error for one malformed instruction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     InvalidOpcode(u8),
     InvalidFeedbackSlot(u16),
+    InvalidPrefixStack { prefix: Opcode, next: Opcode },
+    UnexpectedPrefix { prefix: Opcode, opcode: Opcode },
     TruncatedInstruction { len: usize },
 }
 
@@ -86,74 +90,132 @@ pub fn decode_instruction_word(word: u32) -> Result<Instruction, DecodeError> {
 ///
 /// # Errors
 /// Returns [`DecodeError::TruncatedInstruction`] when fewer bytes than the opcode requires are
-/// supplied and
-/// [`DecodeError::InvalidOpcode`] when the opcode byte is not recognized.
+/// supplied, [`DecodeError::InvalidOpcode`] when the opcode byte is not recognized, and prefix
+/// errors when a `Wide` / `ExtraWide` byte appears outside the durable prefix position.
+#[allow(
+    clippy::too_many_lines,
+    reason = "the decoder keeps the byte layout cases together for prefix auditability"
+)]
 pub fn decode_instruction_bytes(bytes: &[u8]) -> Result<Instruction, DecodeError> {
-    let [raw_opcode, operands @ ..] = bytes else {
+    let [raw_opcode, ..] = bytes else {
         return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
     };
-    let opcode = Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
+    let first = Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
+    let (prefix, opcode_offset, opcode) = if first.is_prefix() {
+        let raw_semantic = *bytes
+            .get(1)
+            .ok_or(DecodeError::TruncatedInstruction { len: bytes.len() })?;
+        let semantic =
+            Opcode::from_byte(raw_semantic).ok_or(DecodeError::InvalidOpcode(raw_semantic))?;
+        if semantic.is_prefix() {
+            return Err(DecodeError::InvalidPrefixStack {
+                prefix: first,
+                next: semantic,
+            });
+        }
+        (Some(first), 1usize, semantic)
+    } else {
+        (None, 0usize, first)
+    };
+    if opcode.is_prefix() {
+        return Err(DecodeError::InvalidPrefixStack {
+            prefix: opcode,
+            next: opcode,
+        });
+    }
 
-    Ok(match instruction_form(opcode) {
+    let base_opcode = opcode.profiled_base_opcode();
+    let form = instruction_form(base_opcode);
+    let instruction = match form {
         InstructionForm::Abc => {
-            let [a, b, c, ..] = operands else {
-                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
-            };
-            Instruction::abc(opcode, *a, *b, *c)
+            let (a, b, c, slot_offset) = decode_abc(bytes, opcode_offset, prefix, opcode)?;
+            if opcode.is_profiled() {
+                let slot = decode_feedback_slot(bytes, slot_offset)?;
+                Instruction::feedback_abc(base_opcode, a, b, c, slot)
+            } else {
+                Instruction::abc(opcode, a, b, c)
+            }
         }
         InstructionForm::Abx => {
-            let [a, bx_low, bx_high, ..] = operands else {
-                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
-            };
-            Instruction::abx(opcode, *a, u16::from_le_bytes([*bx_low, *bx_high]))
+            let (a, bx, slot_offset) = decode_abx(bytes, opcode_offset, prefix, opcode)?;
+            if opcode.is_profiled() {
+                let slot = decode_feedback_slot(bytes, slot_offset)?;
+                Instruction::feedback_abx(base_opcode, a, bx, slot)
+            } else {
+                Instruction::abx(opcode, a, bx)
+            }
         }
         InstructionForm::Abx8 => {
-            let [a, bx, ..] = operands else {
+            reject_prefix(prefix, opcode)?;
+            let [_, a, bx, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
-            Instruction::abx(opcode, *a, u16::from(*bx))
+            Instruction::abx(opcode, u16::from(*a), u32::from(*bx))
         }
         InstructionForm::Ax => {
-            let [first, second, third, ..] = operands else {
+            reject_prefix(prefix, opcode)?;
+            let [_, first, second, third, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
             Instruction::ax(opcode, sign_extend_i24([*first, *second, *third]))
         }
         InstructionForm::Ax8 => {
-            let [ax, ..] = operands else {
+            reject_prefix(prefix, opcode)?;
+            let [_, ax, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
             Instruction::ax(opcode, i32::from(i8::from_le_bytes([*ax])))
         }
         InstructionForm::Local => {
-            let [register, ..] = operands else {
+            reject_prefix(prefix, opcode)?;
+            let [_, register, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
-            Instruction::abx(opcode, *register, 0)
+            Instruction::abx(opcode, u16::from(*register), 0)
         }
-        InstructionForm::ProfiledAbc => {
-            let [raw_opcode, a, b, c, slot_low, slot_high, ..] = operands else {
+        InstructionForm::Accumulator => {
+            reject_prefix(prefix, opcode)?;
+            Instruction::abc(opcode, 0, 0, 0)
+        }
+        InstructionForm::AccumulatorByte => {
+            reject_prefix(prefix, opcode)?;
+            let [_, operand, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
-            let opcode =
-                Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
-            let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
-            let slot = FeedbackSlotId::from_raw(u32::from(raw_slot))
-                .ok_or(DecodeError::InvalidFeedbackSlot(raw_slot))?;
-            Instruction::profiled_abc(opcode, *a, *b, *c, slot)
+            Instruction::abx(opcode, 0, u32::from(*operand))
         }
-        InstructionForm::ProfiledAbx => {
-            let [raw_opcode, a, bx_low, bx_high, slot_low, slot_high, ..] = operands else {
+        InstructionForm::AccumulatorRegister => {
+            reject_prefix(prefix, opcode)?;
+            let [_, register, ..] = bytes else {
                 return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
             };
-            let opcode =
-                Opcode::from_byte(*raw_opcode).ok_or(DecodeError::InvalidOpcode(*raw_opcode))?;
-            let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
-            let slot = FeedbackSlotId::from_raw(u32::from(raw_slot))
-                .ok_or(DecodeError::InvalidFeedbackSlot(raw_slot))?;
-            Instruction::profiled_abx(opcode, *a, u16::from_le_bytes([*bx_low, *bx_high]), slot)
+            Instruction::abc(opcode, u16::from(*register), 0, 0)
         }
-    })
+        InstructionForm::CallRange => {
+            reject_prefix(prefix, opcode)?;
+            let [_, a, b, c, count_low, count_high, base_low, base_high, ..] = bytes else {
+                return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+            };
+            let range = CallRange::new(
+                u16::from_le_bytes([*base_low, *base_high]),
+                u16::from_le_bytes([*count_low, *count_high]),
+            );
+            let slot = if opcode.is_profiled() {
+                Some(decode_feedback_slot(bytes, 8)?)
+            } else {
+                None
+            };
+            Instruction::CallRange {
+                opcode,
+                a: u16::from(*a),
+                b: u16::from(*b),
+                c: u16::from(*c),
+                range,
+                slot,
+            }
+        }
+    };
+    Ok(instruction)
 }
 
 /// Decode as many full instructions as possible from an opaque byte buffer.
@@ -180,7 +242,14 @@ pub fn decode_instruction_stream(bytes: &[u8]) -> DecodedInstructionStream {
                 invalid_words.push(InvalidInstructionWord::new(word_index, raw_opcode));
                 byte_offset += 1;
             }
-            Err(DecodeError::InvalidFeedbackSlot(_)) => {
+            Err(DecodeError::InvalidFeedbackSlot(raw_slot)) => {
+                invalid_words.push(InvalidInstructionWord::new(
+                    word_index,
+                    u8::try_from(raw_slot).unwrap_or(bytes[byte_offset]),
+                ));
+                byte_offset += 1;
+            }
+            Err(DecodeError::InvalidPrefixStack { .. } | DecodeError::UnexpectedPrefix { .. }) => {
                 invalid_words.push(InvalidInstructionWord::new(word_index, bytes[byte_offset]));
                 byte_offset += 1;
             }
@@ -201,12 +270,92 @@ pub fn decode_instruction_stream(bytes: &[u8]) -> DecodedInstructionStream {
     }
 }
 
+const fn reject_prefix(prefix: Option<Opcode>, opcode: Opcode) -> Result<(), DecodeError> {
+    if let Some(prefix) = prefix {
+        return Err(DecodeError::UnexpectedPrefix { prefix, opcode });
+    }
+    Ok(())
+}
+
+fn decode_abc(
+    bytes: &[u8],
+    opcode_offset: usize,
+    prefix: Option<Opcode>,
+    opcode: Opcode,
+) -> Result<(u16, u16, u16, usize), DecodeError> {
+    if prefix.is_some() {
+        let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] = bytes else {
+            return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+        };
+        return Ok((
+            u16::from_le_bytes([*a_low, *a_high]),
+            u16::from_le_bytes([*b_low, *b_high]),
+            u16::from_le_bytes([*c_low, *c_high]),
+            8,
+        ));
+    }
+    let operands = bytes
+        .get(opcode_offset + 1..)
+        .ok_or(DecodeError::TruncatedInstruction { len: bytes.len() })?;
+    let [a, b, c, ..] = operands else {
+        return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+    };
+    if opcode.is_prefix() {
+        return Err(DecodeError::InvalidPrefixStack {
+            prefix: opcode,
+            next: opcode,
+        });
+    }
+    Ok((u16::from(*a), u16::from(*b), u16::from(*c), 4))
+}
+
+fn decode_abx(
+    bytes: &[u8],
+    opcode_offset: usize,
+    prefix: Option<Opcode>,
+    _opcode: Opcode,
+) -> Result<(u16, u32, usize), DecodeError> {
+    if let Some(prefix) = prefix {
+        let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
+            return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+        };
+        let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
+        return Ok((
+            u16::from_le_bytes([*a_low, *a_high]),
+            u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
+            8,
+        ));
+    }
+    let operands = bytes
+        .get(opcode_offset + 1..)
+        .ok_or(DecodeError::TruncatedInstruction { len: bytes.len() })?;
+    let [a, bx_low, bx_high, ..] = operands else {
+        return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+    };
+    Ok((
+        u16::from(*a),
+        u32::from(u16::from_le_bytes([*bx_low, *bx_high])),
+        4,
+    ))
+}
+
+fn decode_feedback_slot(bytes: &[u8], offset: usize) -> Result<FeedbackSlotId, DecodeError> {
+    let [low, high, ..] = bytes
+        .get(offset..)
+        .ok_or(DecodeError::TruncatedInstruction { len: bytes.len() })?
+    else {
+        return Err(DecodeError::TruncatedInstruction { len: bytes.len() });
+    };
+    let raw_slot = u16::from_le_bytes([*low, *high]);
+    FeedbackSlotId::from_raw(u32::from(raw_slot)).ok_or(DecodeError::InvalidFeedbackSlot(raw_slot))
+}
+
 #[allow(
     clippy::too_many_lines,
     reason = "the decoder keeps one exhaustive opcode-to-encoding table for auditability"
 )]
 const fn instruction_form(opcode: Opcode) -> InstructionForm {
-    match opcode {
+    match opcode.profiled_base_opcode() {
         Opcode::Nop
         | Opcode::TypeOf
         | Opcode::Jump
@@ -278,69 +427,24 @@ const fn instruction_form(opcode: Opcode) -> InstructionForm {
         | Opcode::StoreLocal1
         | Opcode::StoreLocal2
         | Opcode::StoreLocal3 => InstructionForm::Local,
-        Opcode::ProfiledAbc => InstructionForm::ProfiledAbc,
-        Opcode::ProfiledAbx => InstructionForm::ProfiledAbx,
-        Opcode::Move
-        | Opcode::Add
-        | Opcode::AddSmi
-        | Opcode::Sub
-        | Opcode::SubSmi
-        | Opcode::Mul
-        | Opcode::MulSmi
-        | Opcode::Div
-        | Opcode::Mod
-        | Opcode::DivSmi
-        | Opcode::ModSmi
-        | Opcode::Exp
-        | Opcode::BitOr
-        | Opcode::BitXor
-        | Opcode::BitAnd
-        | Opcode::BitAndSmi
-        | Opcode::BitNot
-        | Opcode::ShiftLeft
-        | Opcode::ShiftRight
-        | Opcode::UnsignedShiftRight
-        | Opcode::Negate
-        | Opcode::Increment
-        | Opcode::Decrement
-        | Opcode::Equal
-        | Opcode::StrictEqual
-        | Opcode::EqualZero
-        | Opcode::LessThan
-        | Opcode::LessEqual
-        | Opcode::GreaterThan
-        | Opcode::GreaterEqual
-        | Opcode::InstanceOf
-        | Opcode::In
-        | Opcode::DefineNamedProperty
-        | Opcode::DefineKeyedProperty
-        | Opcode::StoreDenseElement
-        | Opcode::LoadDenseElement
-        | Opcode::GetNamedProperty
-        | Opcode::SetNamedProperty
-        | Opcode::AssignNamedProperty
-        | Opcode::StrictAssignNamedProperty
-        | Opcode::GetKeyedProperty
-        | Opcode::SetKeyedProperty
-        | Opcode::AssignKeyedProperty
-        | Opcode::StrictAssignKeyedProperty
-        | Opcode::DeleteProperty
-        | Opcode::CopyDataProperties
-        | Opcode::SetFunctionName
-        | Opcode::ToPropertyKey
-        | Opcode::Call0
-        | Opcode::Call1
-        | Opcode::Call2
-        | Opcode::Call3
-        | Opcode::Call
-        | Opcode::CallMethod
-        | Opcode::TailCall
-        | Opcode::Construct
-        | Opcode::CreateForIn
-        | Opcode::AdvanceForIn
-        | Opcode::CreateIterator
-        | Opcode::AdvanceIterator
-        | Opcode::DelegateYield => InstructionForm::Abc,
+        Opcode::LdaUndefined
+        | Opcode::LdaNull
+        | Opcode::LdaTrue
+        | Opcode::LdaFalse
+        | Opcode::LdaZero
+        | Opcode::LdaOne
+        | Opcode::Star0
+        | Opcode::Star1
+        | Opcode::Star2
+        | Opcode::Star3
+        | Opcode::Star4
+        | Opcode::Star5
+        | Opcode::Star6
+        | Opcode::Star7 => InstructionForm::Accumulator,
+        Opcode::LdaSmi8 | Opcode::LdaConst8 => InstructionForm::AccumulatorByte,
+        Opcode::Ldar => InstructionForm::AccumulatorRegister,
+        Opcode::Call | Opcode::TailCall | Opcode::Construct => InstructionForm::CallRange,
+        _ => InstructionForm::Abc,
     }
 }
 
@@ -352,129 +456,76 @@ const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        disassemble, disassemble_instruction, ArgumentsMode, BytecodeFunction, BytecodeFunctionId,
-        ConstantValue, WideOperand,
-    };
 
     #[test]
-    fn decode_instruction_word_round_trips_abc_abx_and_ax_forms() {
-        let abc = Instruction::abc(Opcode::Add, 1, 2, 3);
-        let abx = Instruction::abx(Opcode::LoadConst, 7, 0x3412);
-        let ax = Instruction::ax(Opcode::Jump, -7);
-
-        assert_eq!(decode_instruction_word(abc.encode_word()), Ok(abc));
-        assert_eq!(decode_instruction_word(abx.encode_word()), Ok(abx));
-        assert_eq!(decode_instruction_word(ax.encode_word()), Ok(ax));
-    }
-
-    #[test]
-    fn decode_instruction_stream_tracks_invalid_words_and_trailing_bytes() {
-        let add = Instruction::abc(Opcode::Add, 1, 2, 3)
-            .encode_word()
-            .to_le_bytes();
-        let decoded = decode_instruction_stream(&[
-            add[0],
-            add[1],
-            add[2],
-            add[3],
-            0xff,
-            Opcode::LoadConst as u8,
-        ]);
-
-        assert_eq!(
-            decoded.instructions(),
-            &[Instruction::abc(Opcode::Add, 1, 2, 3)]
-        );
-        assert_eq!(
-            decoded.invalid_words(),
-            &[InvalidInstructionWord::new(1, 0xff)]
-        );
-        assert_eq!(decoded.trailing_byte_count(), 1);
-    }
-
-    #[test]
-    fn decoded_stream_can_be_disassembled_without_panicking() {
-        let bytes = [
-            Opcode::LoadConst as u8,
-            0,
-            0,
-            0,
-            Opcode::Call as u8,
-            1,
-            2,
-            3,
-            Opcode::Return as u8,
+    fn wide_abc_decodes_without_side_payloads() {
+        let decoded = decode_instruction_bytes(&[
+            Opcode::Wide as u8,
+            Opcode::AddProfiled as u8,
+            0x23,
+            0x45,
+            0xab,
+            0x01,
+            0x00,
+            0x01,
             1,
             0,
-            0,
-            0xff,
-            0,
-            0,
-            0,
-        ];
-        let decoded = decode_instruction_stream(&bytes);
-        let function = BytecodeFunction::new(
-            BytecodeFunctionId::from_raw(1).expect("non-zero bytecode id"),
-            None,
-            ArgumentsMode::None,
-        )
-        .with_instructions(decoded.instructions().to_vec())
-        .with_constants(vec![ConstantValue::Smi(7)])
-        .with_wide_operands(vec![WideOperand::new(1, 0x0002_0003)]);
-
-        let _ = disassemble(&function);
-        for instruction in function.instructions() {
-            let _ = disassemble_instruction(&instruction, &function);
-        }
+        ])
+        .expect("wide profiled add should decode");
+        assert_eq!(
+            decoded,
+            Instruction::feedback_abc(Opcode::Add, 0x0123, 0x0045, 0x01ab, slot(1))
+        );
     }
 
     #[test]
-    fn specialized_smi_opcodes_decode_and_disassemble_immediates() {
-        let function = BytecodeFunction::new(
-            BytecodeFunctionId::from_raw(2).expect("non-zero bytecode id"),
-            None,
-            ArgumentsMode::None,
-        )
-        .with_instructions(vec![
-            Instruction::abx(Opcode::LoadZero, 0, 0),
-            Instruction::abx(Opcode::LoadOne, 1, 0),
-            Instruction::abc(Opcode::AddSmi, 2, 1, 13),
-            Instruction::abc(Opcode::SubSmi, 3, 2, 5),
-            Instruction::abc(Opcode::MulSmi, 4, 3, 7),
-            Instruction::abc(Opcode::DivSmi, 5, 4, 2),
-            Instruction::abc(Opcode::ModSmi, 6, 5, 3),
-            Instruction::abc(Opcode::BitAndSmi, 7, 6, 1),
-            Instruction::abc(Opcode::EqualZero, 8, 7, 0),
-        ]);
-
+    fn extra_wide_abx_decodes_u32_payload() {
+        let decoded = decode_instruction_bytes(&[
+            Opcode::ExtraWide as u8,
+            Opcode::LoadGlobalProfiled as u8,
+            0x02,
+            0x04,
+            0x03,
+            0x01,
+            0x02,
+            0x01,
+            1,
+            0,
+        ])
+        .expect("extra-wide profiled global load should decode");
         assert_eq!(
-            decode_instruction_word(
-                function
-                    .instructions()
-                    .get(2)
-                    .expect("third instruction should decode")
-                    .encode_word()
-            ),
-            Ok(Instruction::abc(Opcode::AddSmi, 2, 1, 13))
+            decoded,
+            Instruction::feedback_abx(Opcode::LoadGlobal, 0x0102, 0x0102_0304, slot(1))
         );
+    }
 
-        let text = disassemble(&function);
-        assert!(text.contains("LoadZero"));
-        assert!(text.contains("LoadOne"));
-        assert!(text.contains("AddSmi"));
-        assert!(text.contains("r2, r1, 13"));
-        assert!(text.contains("SubSmi"));
-        assert!(text.contains("r3, r2, 5"));
-        assert!(text.contains("MulSmi"));
-        assert!(text.contains("r4, r3, 7"));
-        assert!(text.contains("DivSmi"));
-        assert!(text.contains("r5, r4, 2"));
-        assert!(text.contains("ModSmi"));
-        assert!(text.contains("r6, r5, 3"));
-        assert!(text.contains("BitAndSmi"));
-        assert!(text.contains("r7, r6, 1"));
-        assert!(text.contains("EqualZero"));
-        assert!(text.contains("r8, r7"));
+    #[test]
+    fn prefix_stacking_is_rejected() {
+        assert!(matches!(
+            decode_instruction_bytes(&[Opcode::Wide as u8, Opcode::ExtraWide as u8]),
+            Err(DecodeError::InvalidPrefixStack { .. })
+        ));
+    }
+
+    #[test]
+    fn call_profiled_decodes_inline_range_and_slot() {
+        let decoded =
+            decode_instruction_bytes(&[Opcode::CallProfiled as u8, 1, 2, 3, 5, 0, 4, 0, 1, 0])
+                .expect("profiled call should decode");
+        assert_eq!(
+            decoded,
+            Instruction::CallRange {
+                opcode: Opcode::CallProfiled,
+                a: 1,
+                b: 2,
+                c: 3,
+                range: CallRange::new(4, 5),
+                slot: Some(slot(1))
+            }
+        );
+    }
+
+    fn slot(raw: u32) -> FeedbackSlotId {
+        FeedbackSlotId::from_raw(raw).expect("test slot should be non-zero")
     }
 }

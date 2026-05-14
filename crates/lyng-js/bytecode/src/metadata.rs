@@ -780,33 +780,6 @@ pub enum SafepointKind {
     ExceptionEdge,
 }
 
-/// Optional wide-operand side table entry reserved for later large-function support.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct WideOperand {
-    instruction_offset: u32,
-    payload: u32,
-}
-
-impl WideOperand {
-    #[inline]
-    pub const fn new(instruction_offset: u32, payload: u32) -> Self {
-        Self {
-            instruction_offset,
-            payload,
-        }
-    }
-
-    #[inline]
-    pub const fn instruction_offset(self) -> u32 {
-        self.instruction_offset
-    }
-
-    #[inline]
-    pub const fn payload(self) -> u32 {
-        self.payload
-    }
-}
-
 /// Runtime state carried at one safepoint for later GC and deoptimization work.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RuntimeStateCapture {

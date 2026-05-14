@@ -2070,6 +2070,40 @@ fn phase6_derived_constructors_reject_primitive_return_before_super() {
 }
 
 #[test]
+fn phase6_derived_constructor_iterator_close_can_initialize_this_before_return() {
+    let result = compile_and_run_string(
+        r"
+        var iter = {
+            [Symbol.iterator]() { return this; },
+            next() { return { done: false }; },
+            return() {
+                this.f();
+                return { done: true };
+            },
+        };
+
+        class C extends class {} {
+            constructor() {
+                iter.f = () => super();
+                for (var k of iter) {
+                    return;
+                }
+            }
+        }
+
+        try {
+            var o = new C();
+            typeof o;
+        } catch (error) {
+            error.name;
+        }
+        ",
+    );
+
+    assert_eq!(result, "object");
+}
+
+#[test]
 fn phase6_derived_super_call_selects_constructor_before_evaluating_arguments() {
     let result = compile_and_run_string(
         r#"

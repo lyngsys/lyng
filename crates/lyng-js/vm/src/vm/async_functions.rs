@@ -1,4 +1,5 @@
 use super::bytecode_calls::PreparedBytecodeCall;
+use super::dispatch::advance_dispatch_frame;
 use super::{
     Agent, AsyncFrameState, FrameRecord, HostHooks, ModuleStatus, NativeFunctionRegistry,
     ObjectRef, RealmRef, Vm, VmError, VmResult, WellKnownAtom,
@@ -145,32 +146,41 @@ impl Vm {
         Ok(promise)
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
+    )]
     pub(super) fn await_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
         register: u16,
     ) -> VmResult<()> {
         if frame.resume_active() {
             let resume_value = frame.resume_value();
             let resume_kind = frame.resume_kind();
-            self.clear_active_resume();
+            frame.clear_resume();
             if resume_kind == GeneratorResumeKind::Throw {
+                self.sync_dispatch_frame(frame_depth, *frame);
                 if self.transfer_to_exception_handler(agent, resume_value)? {
+                    self.refresh_dispatch_frame(frame_depth, frame);
                     return Ok(());
                 }
                 return Err(VmError::Abrupt(AbruptCompletion::Throw(resume_value)));
             }
             self.write_register(frame.registers(), register, resume_value);
-            self.advance_instruction();
+            advance_dispatch_frame(frame, instruction_len);
             return Ok(());
         }
 
         let value = self.read_register(frame.registers(), register);
         let promise =
             self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
+        self.sync_dispatch_frame(frame_depth, *frame);
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
