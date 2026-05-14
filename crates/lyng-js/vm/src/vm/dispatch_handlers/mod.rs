@@ -11,7 +11,7 @@
 //!
 //! Each family file holds the `extern "C" fn` handlers for a related group of
 //! opcodes. The spike implements one representative handler per family so the
-//! trampoline shape can be measured; Phase 1 proper scales this to all 157
+//! trampoline shape can be measured; Phase 1 proper scales this to all 152
 //! opcodes per the JSC-aligned roadmap.
 
 use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
@@ -24,21 +24,25 @@ pub mod loads;
 pub mod opcode_stubs;
 pub mod stub;
 
-pub use arithmetic::op_add;
-pub use control_flow::{op_jump_back, op_return};
-pub use loads::{op_load_undefined, op_move};
+pub use control_flow::{op_jump, op_jump8, op_loop_header};
+pub use loads::{
+    op_lda_false, op_lda_null, op_lda_one, op_lda_true, op_lda_undefined, op_lda_zero,
+    op_load_false, op_load_null, op_load_one, op_load_true, op_load_undefined,
+    op_load_uninitialized_lexical, op_load_zero, op_move, op_star_0, op_star_1, op_star_2,
+    op_star_3, op_star_4, op_star_5, op_star_6, op_star_7,
+};
 
 /// Build the dispatch table at compile time.
 ///
 /// 1. Every byte 0..256 starts as `op_stub` — handles invalid bytes outside
-///    the valid `Opcode` range (157..256).
+///    the valid `Opcode` range (152..256).
 /// 2. Every valid opcode slot (0..OPCODE_COUNT) is overwritten with a
-///    `op_unimplemented::<N>` monomorphization, giving 157 distinct symbols
+///    `op_unimplemented::<N>` monomorphization, giving 152 distinct symbols
 ///    (Phase 1's structural invariant from lyng-33i2).
-/// 3. The five real handlers from the spike override the slots for opcodes
-///    we've already ported. Family-conversion sub-issues (lyng-5zrf,
-///    lyng-54em, lyng-5mqv, lyng-1fie, lyng-59e6) overwrite progressively
-///    more slots until every valid opcode lands on a real handler.
+/// 3. The real handlers from sub-3 onward override the slots for opcodes
+///    we've ported. Family-conversion sub-issues (lyng-5zrf, lyng-54em,
+///    lyng-5mqv, lyng-1fie, lyng-59e6) overwrite progressively more slots
+///    until every valid opcode lands on a real handler.
 ///
 /// Adding a real handler in a family file without registering it here is a
 /// silent bug — the handler would be dead code and the opcode would still
@@ -54,11 +58,37 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     }
 
     // (3) Real handlers — overrides the unimplemented stubs above.
+    //
+    // sub-3 (lyng-5zrf): loads + control_flow family.
     table[Opcode::Move as u8 as usize] = op_move;
-    table[Opcode::LdaUndefined as u8 as usize] = op_load_undefined;
-    table[Opcode::Add as u8 as usize] = op_add;
-    table[Opcode::Jump as u8 as usize] = op_jump_back;
-    table[Opcode::Return as u8 as usize] = op_return;
+
+    table[Opcode::LdaUndefined as u8 as usize] = op_lda_undefined;
+    table[Opcode::LdaNull as u8 as usize] = op_lda_null;
+    table[Opcode::LdaTrue as u8 as usize] = op_lda_true;
+    table[Opcode::LdaFalse as u8 as usize] = op_lda_false;
+    table[Opcode::LdaZero as u8 as usize] = op_lda_zero;
+    table[Opcode::LdaOne as u8 as usize] = op_lda_one;
+
+    table[Opcode::LoadUndefined as u8 as usize] = op_load_undefined;
+    table[Opcode::LoadNull as u8 as usize] = op_load_null;
+    table[Opcode::LoadTrue as u8 as usize] = op_load_true;
+    table[Opcode::LoadFalse as u8 as usize] = op_load_false;
+    table[Opcode::LoadZero as u8 as usize] = op_load_zero;
+    table[Opcode::LoadOne as u8 as usize] = op_load_one;
+    table[Opcode::LoadUninitializedLexical as u8 as usize] = op_load_uninitialized_lexical;
+
+    table[Opcode::Star0 as u8 as usize] = op_star_0;
+    table[Opcode::Star1 as u8 as usize] = op_star_1;
+    table[Opcode::Star2 as u8 as usize] = op_star_2;
+    table[Opcode::Star3 as u8 as usize] = op_star_3;
+    table[Opcode::Star4 as u8 as usize] = op_star_4;
+    table[Opcode::Star5 as u8 as usize] = op_star_5;
+    table[Opcode::Star6 as u8 as usize] = op_star_6;
+    table[Opcode::Star7 as u8 as usize] = op_star_7;
+
+    table[Opcode::Jump as u8 as usize] = op_jump;
+    table[Opcode::Jump8 as u8 as usize] = op_jump8;
+    table[Opcode::LoopHeader as u8 as usize] = op_loop_header;
 
     table
 }

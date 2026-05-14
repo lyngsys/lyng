@@ -1,28 +1,66 @@
-//! Control-flow handlers — branches and returns.
+//! Control-flow handlers for the trampoline dispatch path (lyng-5zrf).
 //!
-//! Encoding for the spike:
-//! - `op_jump_back`: `[opcode, abs_target]` (2 bytes) — sets `pc` to
-//!   `abs_target` (1-byte absolute offset, sufficient for the spike's tiny
-//!   bytecode buffer).
-//! - `op_return`: `[opcode, src]` (2 bytes) — returns `regs[src]` via
-//!   `Step::Done`.
+//! Covers:
+//! - `Jump` (Ax form, signed-i24 relative offset).
+//! - `Jump8` (Ax8 form, signed-i8 relative offset).
+//! - `LoopHeader` — marker plus tier-backedge + incremental-mark safepoint.
+//!
+//! Conditional jumps (`JumpIfTrue`, `JumpIfFalse`, `JumpIfTrue8`,
+//! `JumpIfFalse8`) and `Return` / `ReturnUndefined` land in follow-up
+//! commits — the Return family requires frame-transition handling that
+//! crosses into sub-6 (Calls).
 
-use crate::dispatch_next;
+use crate::vm::dispatch::{
+    advance_dispatch_frame, decode_ax8_operands, decode_ax_operands, jump_dispatch_frame,
+};
 use crate::vm::dispatch_state::{DispatchState, Step};
+use crate::vm::Vm;
+use crate::{dispatch_next, try_step};
 
-pub extern "C" fn op_jump_back(state: &mut DispatchState) -> Step {
-    let header: &[u8; 2] = state.current_bytes()[..2]
-        .try_into()
-        .expect("op_jump_back: encoding invariant — at least 2 bytes from pc");
-    let target = u32::from(header[1]);
-    state.frame.set_instruction_offset(target);
+pub extern "C" fn op_jump(state: &mut DispatchState) -> Step {
+    let code = state.frame.code();
+    let pc = state.frame.instruction_offset();
+    let (ax, _feedback_slot, instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+
+    if ax < 0 {
+        state.vm.observe_tier_backedge_event(code);
+        Vm::poll_incremental_mark_safepoint(state.agent);
+    }
+    try_step!(jump_dispatch_frame(
+        &mut state.frame,
+        instruction_len,
+        ax,
+    ));
     dispatch_next!(state);
 }
 
-pub extern "C" fn op_return(state: &mut DispatchState) -> Step {
-    let header: &[u8; 2] = state.current_bytes()[..2]
-        .try_into()
-        .expect("op_return: encoding invariant — at least 2 bytes from pc");
-    let src = u16::from(header[1]);
-    Step::Done(state.read_register(src))
+pub extern "C" fn op_jump8(state: &mut DispatchState) -> Step {
+    let code = state.frame.code();
+    let pc = state.frame.instruction_offset();
+    let (ax, _feedback_slot, instruction_len) =
+        try_step!(decode_ax8_operands(state.current_bytes(), false, code, pc));
+
+    if ax < 0 {
+        state.vm.observe_tier_backedge_event(code);
+        Vm::poll_incremental_mark_safepoint(state.agent);
+    }
+    try_step!(jump_dispatch_frame(
+        &mut state.frame,
+        instruction_len,
+        ax,
+    ));
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_loop_header(state: &mut DispatchState) -> Step {
+    let code = state.frame.code();
+    let pc = state.frame.instruction_offset();
+    let (_ax, _feedback_slot, instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+
+    state.vm.observe_tier_backedge_event(code);
+    Vm::poll_incremental_mark_safepoint(state.agent);
+    advance_dispatch_frame(&mut state.frame, instruction_len);
+    dispatch_next!(state);
 }

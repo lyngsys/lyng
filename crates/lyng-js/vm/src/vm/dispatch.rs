@@ -226,7 +226,7 @@ impl DispatchFrameSnapshot {
     }
 }
 
-const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
+pub(in crate::vm) const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
     let sign = if bytes[2] & 0x80 == 0 { 0 } else { 0xff };
     i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
 }
@@ -284,7 +284,7 @@ pub(in crate::vm) const fn next_dispatch_instruction_offset(
 }
 
 #[inline]
-fn decode_feedback_slot_operand(
+pub(in crate::vm) fn decode_feedback_slot_operand(
     bytes: &[u8],
     operand_end: usize,
     is_profiled: bool,
@@ -327,7 +327,7 @@ fn decode_feedback_slot_operand(
 }
 
 #[inline]
-fn decode_abc_operands(
+pub(in crate::vm) fn decode_abc_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,
@@ -362,7 +362,7 @@ fn decode_abc_operands(
 }
 
 #[inline]
-fn decode_abx_operands(
+pub(in crate::vm) fn decode_abx_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,
@@ -401,7 +401,7 @@ fn decode_abx_operands(
 }
 
 #[inline]
-fn decode_abx8_operands(
+pub(in crate::vm) fn decode_abx8_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -424,7 +424,7 @@ fn decode_abx8_operands(
 }
 
 #[inline]
-fn decode_ax_operands(
+pub(in crate::vm) fn decode_ax_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -446,7 +446,7 @@ fn decode_ax_operands(
 }
 
 #[inline]
-fn decode_ax8_operands(
+pub(in crate::vm) fn decode_ax8_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -468,7 +468,7 @@ fn decode_ax8_operands(
 }
 
 #[inline]
-fn decode_local_operands(
+pub(in crate::vm) fn decode_local_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -486,7 +486,7 @@ fn decode_local_operands(
 }
 
 #[inline]
-fn decode_accumulator_operands(
+pub(in crate::vm) fn decode_accumulator_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -496,7 +496,7 @@ fn decode_accumulator_operands(
 }
 
 #[inline]
-fn decode_accumulator_byte_operands(
+pub(in crate::vm) fn decode_accumulator_byte_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
@@ -514,7 +514,7 @@ fn decode_accumulator_byte_operands(
 }
 
 #[inline]
-fn decode_accumulator_register_operands(
+pub(in crate::vm) fn decode_accumulator_register_operands(
     bytes: &[u8],
     is_profiled: bool,
     code: CodeRef,
