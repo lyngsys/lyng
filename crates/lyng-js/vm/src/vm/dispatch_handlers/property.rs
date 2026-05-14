@@ -19,8 +19,10 @@
 //! the spec assigns to each form.
 
 use lyng_js_bytecode::Opcode;
+use lyng_js_ops::errors;
 use lyng_js_types::Value;
 
+use crate::error::VmError;
 use crate::vm::dispatch::{decode_abc_operands, decode_abx_operands};
 use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::vm::Vm;
@@ -249,6 +251,230 @@ pub extern "C" fn op_define_named_property(state: &mut DispatchState) -> Step {
 // compiler's emission they always precede property loads/stores, so
 // pulling them into sub-5 unlocks the property parity tests.
 // =====================================================================
+
+// =====================================================================
+// Delete / In / ToPropertyKey / CopyDataProperties / SetFunctionName /
+// CheckObjectCoercible / ThrowIfUninitialized — round 3 of sub-5.
+// =====================================================================
+
+pub extern "C" fn op_delete_property(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.execute_delete_property_opcode(
+            agent,
+            *host,
+            &mut **registry,
+            *frame_depth,
+            frame,
+            instruction_len,
+            a,
+            b,
+            c,
+        )
+    };
+    try_step!(result);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_in(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.execute_in_opcode(
+            agent,
+            *host,
+            &mut **registry,
+            *frame_depth,
+            frame,
+            instruction_len,
+            a,
+            b,
+            c,
+        )
+    };
+    try_step!(result);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_to_property_key(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.execute_to_property_key_opcode(
+            agent,
+            *host,
+            &mut **registry,
+            *frame_depth,
+            frame,
+            instruction_len,
+            a,
+            b,
+        )
+    };
+    try_step!(result);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_copy_data_properties(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            frame_depth,
+            ..
+        } = &mut *state;
+        vm.execute_copy_data_properties_opcode(
+            agent,
+            *host,
+            &mut **registry,
+            *frame_depth,
+            frame,
+            instruction_len,
+            a,
+            b,
+            c,
+        )
+    };
+    try_step!(result);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_set_function_name(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let function = try_step!(state.vm.object_register(&state.frame, a));
+    let name_value = state.vm.read_register_unchecked(state.frame.registers(), b);
+    let set_result = {
+        let DispatchState { agent, .. } = &mut *state;
+        Vm::set_function_name(agent, function, name_value)
+    };
+    if try_step!(state.handle_dispatch_result(set_result)).is_none() {
+        dispatch_next!(state);
+    }
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_check_object_coercible(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
+    let result = {
+        let DispatchState { agent, .. } = &mut *state;
+        Vm::check_object_coercible(agent, value)
+    };
+    if try_step!(state.handle_dispatch_result(result)).is_none() {
+        dispatch_next!(state);
+    }
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_throw_if_uninitialized(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        prefix,
+        false,
+        code,
+        pc,
+    ));
+    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
+    if value == Value::uninitialized_lexical() {
+        let result: Result<(), VmError> = {
+            let DispatchState { agent, .. } = &mut *state;
+            Err(VmError::Abrupt(errors::throw_reference_error(agent)))
+        };
+        if try_step!(state.handle_dispatch_result(result)).is_none() {
+            dispatch_next!(state);
+        }
+    }
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
 
 pub extern "C" fn op_store_dense_element(state: &mut DispatchState) -> Step {
     let code = state.code();
