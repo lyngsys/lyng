@@ -8,11 +8,17 @@ architectural shape.
 
 ## Goal
 
-Reach **JSC LLInt-class interpreter performance** (~3–5× past QuickJS on
-Octane-style workloads) followed by **JSC Baseline-class JIT performance**
-(~10–15× past QuickJS). The route is the JSC playbook: a metadata-driven
-inline-IC interpreter with threaded dispatch as the substrate, then a
-template-style Baseline JIT consuming the same bytecode and IC state.
+Reach **near-JSC LLInt-class interpreter performance** (~2.5–4× past
+QuickJS on Octane-style workloads) followed by **JSC Baseline-class
+JIT performance** (~8–12× past QuickJS). The route is the JSC
+playbook: a metadata-driven inline-IC interpreter with per-handler
+function dispatch as the substrate, then a template-style Baseline
+JIT consuming the same bytecode and IC state.
+
+The interpreter targets are α-bounded — see "Dispatch Architecture
+(Decided)" below. The α-vs-β interpreter gap is ~5–10%; the JIT gap
+is ~5%. β/γ remain documented escape hatches if profiles later
+justify them.
 
 This roadmap explicitly rejects two prior framings:
 
@@ -97,152 +103,309 @@ These should hold across every phase.
   workstream landed as a series of commits + status report. Mid-phase
   state goes on a branch.
 
-## Open Decision Before Phase 1: `unsafe` / Nightly Policy
+## Dispatch Architecture (Decided)
 
-JSC's interpreter design exists because **offlineasm gives you proper
-threaded dispatch with register pinning**. Safe stable Rust does not
-offer a clean equivalent. The choices, ranked by perf upside × invasiveness:
+The dispatch substrate is **Option α** — stable safe Rust,
+per-handler `extern "C" fn` + central trampoline — with a one-line
+macro abstraction that lets us swap to Option γ (inline-asm tail
+calls) or Option β (nightly `become`) later without touching any
+handler body.
 
-**Option α — Stable safe Rust only.** Use a central trampoline that
-dispatches to `extern "C" fn` handlers via a function-pointer table.
-Each handler is its own function (independent register allocation,
-independent inlining decisions, doesn't pollute neighbor handlers'
-icache). One indirect branch per dispatch, same as today, but the
-handlers are no longer one giant function. *Conservative; estimated
-~10–15% gain from per-function optimization alone.*
+### Why α and not β
 
-**Option β — Nightly `become` (tail calls).** Each handler ends with
-`become handler[next_opcode](state)`. Per-handler tail-call dispatch,
-matching JSC's structural pattern exactly. Per-handler indirect-branch
-site gives the ~2× branch-prediction win. *The actual JSC LLInt
-shape. Requires accepting nightly Rust for the dispatch core.*
+- Nightly Rust is too operationally risky to depend on for the
+  production dispatch loop. The user explicitly rejected nightly.
+- α delivers ~85–90% of β's interpreter ceiling. The remaining 5–10%
+  is recoverable via the macro swap if profiles justify it later.
+- The major perf wins in this roadmap — **inline IC fast path
+  (Phase 3) and Baseline JIT (Phase 6) — are orthogonal to the
+  dispatch mechanism.** They land equally on α. The α-vs-β gap is
+  bounded to the per-dispatch overhead (3–4 instructions) and the
+  per-handler-BTB-prediction quality (a few percent on
+  dispatch-bound workloads).
 
-**Option γ — Localized `unsafe` for raw pointers and/or inline asm.**
-Drop `ObjectRef = u32` indirection. Optionally use `asm!` for
-register-pinned dispatch. *Maximum perf but largest cultural change.*
+### Why this abstraction matters
 
-The roadmap is **written assuming Option β** — nightly `become` —
-because that is what cashes out JSC's interpreter design in Rust. If
-the team rejects nightly, fall back to Option α and accept the smaller
-ceiling. Option γ should be revisited in Phase 2 (cell access) where
-it's most contained.
+By making the dispatch mechanism a single point of variation — the
+`dispatch_next!` macro — we ensure that:
 
-This decision blocks Phase 1. Make it before starting.
+- Every handler body is identical across α / β / γ.
+- The swap is mechanical: change one macro definition and (for β) a
+  few lines of the trampoline.
+- We don't paint ourselves into an α-shaped corner; γ/β are real
+  escape hatches when measurement justifies them.
+
+### The unified API
+
+Handler signature, dispatch table, and `Step` enum live in
+`crates/lyng-js/vm/src/vm/dispatch_state.rs` (new):
+
+```rust
+pub struct DispatchState<'vm> { /* pc, bytes, regs, agent, frame, … */ }
+
+pub type Handler = extern "C" fn(&mut DispatchState) -> Step;
+
+pub enum Step {
+    Continue(Handler),   // α uses; β/γ never construct
+    Done(Value),
+    Error(VmError),
+}
+
+pub static DISPATCH_TABLE: [Handler; OPCODE_COUNT as usize] = [
+    op_nop, op_move, op_load_undefined, /* … 149 more */
+];
+```
+
+### Every handler body ends with `dispatch_next!`
+
+```rust
+extern "C" fn op_add(state: &mut DispatchState) -> Step {
+    let (a, b, c, slot, len) = decode_abc_with_slot(state);
+    let left  = state.read_register(b);
+    let right = state.read_register(c);
+    if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
+        && let Some(v) = l.checked_add(r)
+    {
+        state.record_feedback_slot(slot);
+        state.write_register(a, Value::from_smi(v));
+        state.advance(len);
+        dispatch_next!(state);
+    }
+    // Cold path — function call OK here, slow path computes Step itself.
+    op_add_slow(state, a, b, c, slot, len)
+}
+```
+
+### The `dispatch_next!` macro (α — current)
+
+```rust
+macro_rules! dispatch_next {
+    ($state:expr) => {
+        return $crate::vm::Step::Continue(
+            DISPATCH_TABLE[$state.next_opcode_byte() as usize]
+        );
+    };
+}
+```
+
+### The central trampoline (α — current)
+
+```rust
+pub fn run(state: &mut DispatchState) -> VmResult<Value> {
+    let mut handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
+    loop {
+        match (handler)(state) {
+            Step::Continue(next) => handler = next,
+            Step::Done(v) => return Ok(v),
+            Step::Error(e) => return Err(e),
+        }
+    }
+}
+```
+
+### Future swap to Option γ (inline-asm tail call, stable + localized unsafe)
+
+Per-arch macro replacing only the dispatch site:
+
+```rust
+#[cfg(target_arch = "aarch64")]
+macro_rules! dispatch_next {
+    ($state:expr) => {{
+        let next = DISPATCH_TABLE[$state.next_opcode_byte() as usize];
+        unsafe {
+            core::arch::asm!(
+                "br {next}",
+                next = in(reg) next,
+                in("x0") $state,
+                options(noreturn),
+            );
+        }
+    }};
+}
+
+#[cfg(target_arch = "x86_64")]
+macro_rules! dispatch_next {
+    ($state:expr) => {{
+        let next = DISPATCH_TABLE[$state.next_opcode_byte() as usize];
+        unsafe {
+            core::arch::asm!(
+                "jmp {next}",
+                next = in(reg) next,
+                in("rdi") $state,
+                options(noreturn),
+            );
+        }
+    }};
+}
+```
+
+γ requires per-handler attention to prologue/epilogue (no stack
+allocation in hot handlers, no callee-save clobbers). `#[naked]` is
+available on AArch64 / x86_64 in recent stable Rust with
+restrictions, and is the cleanest way to ensure no prologue/epilogue.
+Plan on a per-handler audit if/when γ is adopted.
+
+### Future swap to Option β (nightly `become`)
+
+Macro flip plus trampoline simplification:
+
+```rust
+macro_rules! dispatch_next {
+    ($state:expr) => {
+        become (DISPATCH_TABLE[$state.next_opcode_byte() as usize])($state);
+    };
+}
+
+pub fn run(state: &mut DispatchState) -> VmResult<Value> {
+    match (DISPATCH_TABLE[state.first_opcode_byte() as usize])(state) {
+        Step::Done(v) => Ok(v),
+        Step::Error(e) => Err(e),
+        Step::Continue(_) => unreachable!("become handlers don't return Continue"),
+    }
+}
+```
+
+### When to adopt γ or β
+
+Phase 3's inline-IC work shrinks every IC-shaped handler body
+considerably. After Phase 3 lands, **re-profile**:
+
+- If `run()`'s central indirect call and the `Step::Continue` match
+  appear in the top-5 `sample` frames, the trampoline overhead has
+  become a measurable bottleneck — adopt γ.
+- If those frames are negligible, the trampoline cost is acceptable.
+  Leave γ/β as deferred work.
+
+The decision is data-driven, not speculative. Don't pre-commit to γ
+or β based on theory.
 
 ---
 
 ## Phase 1 — Threaded Dispatch + Per-Handler ABI
 
-**Workstream:** convert the central `match opcode` dispatch into per-handler
-functions with tail-call dispatch. This is the structural foundation;
-every other phase assumes it.
+**Workstream:** implement the dispatch architecture defined above
+(Option α + macro abstraction). Convert the central `match opcode`
+dispatch into per-handler `extern "C" fn` handlers with a central
+trampoline. This is the structural foundation; every other phase
+assumes it.
 
 **Files:**
-- `crates/lyng-js/vm/src/vm/dispatch.rs` — restructure top-level loop.
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/` — new module hierarchy,
-  one file per opcode family (`arithmetic.rs`, `property.rs`, `calls.rs`,
-  `control_flow.rs`, etc.). Each opcode is an `extern "C" fn` handler.
-- `crates/lyng-js/vm/src/vm/dispatch_state.rs` — new struct carrying
-  the pinned-register state (`pc`, `bytecode_base`, `register_stack_top`,
-  `frame_ptr`, `vm: &mut Vm`). Same role as JSC's `cfr` / `t0`.
+- `crates/lyng-js/vm/src/vm/dispatch_state.rs` (new) — `DispatchState`
+  struct, `Handler` typedef, `Step` enum, `DISPATCH_TABLE` static,
+  the `dispatch_next!` macro.
+- `crates/lyng-js/vm/src/vm/dispatch_handlers/` (new module
+  hierarchy) — one file per opcode family (`arithmetic.rs`,
+  `property.rs`, `calls.rs`, `control_flow.rs`, `loads.rs`, `scope.rs`,
+  `generators.rs`, `exceptions.rs`, etc.). Each opcode is an
+  `extern "C" fn` handler.
+- `crates/lyng-js/vm/src/vm/dispatch.rs` — rewritten to a thin
+  trampoline + module-glue. The 3300-line monolithic match goes away;
+  what remains is `run()` and the `mod dispatch_handlers;` declaration.
 
-**Shape per handler (Option β):**
+**Handler shape** (concrete; see the Dispatch Architecture section
+above for full context):
 
 ```rust
-extern "C" fn op_add(state: &mut DispatchState) -> DispatchOutcome {
-    // operand decode inline (no helper call)
-    let bytes = &state.code()[state.pc..];
+extern "C" fn op_add(state: &mut DispatchState) -> Step {
+    let bytes = state.current_bytes();
     let a = u16::from(bytes[1]);
     let b = u16::from(bytes[2]);
     let c = u16::from(bytes[3]);
-    let slot = u16::from_le_bytes([bytes[4], bytes[5]]);
+    let slot_raw = u16::from_le_bytes([bytes[4], bytes[5]]);
 
-    // SMI fast path inline
-    let left = state.read_register(b);
+    let left  = state.read_register(b);
     let right = state.read_register(c);
-    if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
-        if let Some(v) = l.checked_add(r) {
-            state.record_feedback_smi(slot);
-            state.write_register(a, Value::from_smi(v));
-            state.advance(6);
-            // Tail-call dispatch to next handler.
-            let next = state.next_opcode_byte();
-            become DISPATCH_TABLE[next as usize](state);
-        }
+    if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
+        && let Some(v) = l.checked_add(r)
+    {
+        // FeedbackSlotId is always present for Add post-Track-H.
+        state.record_feedback_arithmetic_smi(slot_raw);
+        state.write_register(a, Value::from_smi(v));
+        state.advance(6);
+        dispatch_next!(state);
     }
 
-    // Cold path — function call OK here
-    op_add_slow(state, a, b, c, slot)
+    op_add_slow(state, a, b, c, slot_raw)
 }
 ```
 
-**Shape per handler (Option α fallback):**
+`op_add_slow` returns a `Step` directly (probably `Step::Continue(...)`
+after recording the feedback) — slow paths share the same return
+type, so escape hatch swaps to β/γ don't touch them either.
 
-```rust
-extern "C" fn op_add(state: &mut DispatchState) -> Option<extern "C" fn(&mut DispatchState)> {
-    // ... same body ...
-    let next = state.next_opcode_byte();
-    Some(DISPATCH_TABLE[next as usize])
-}
-
-// Central trampoline:
-fn run(state: &mut DispatchState) -> VmResult<Value> {
-    let mut handler: extern "C" fn(&mut DispatchState) = DISPATCH_TABLE[state.first_opcode() as usize];
-    while let Some(next) = (handler)(state) {
-        handler = next;
-    }
-    state.take_result()
-}
-```
+**Cold-handler treatment.** Mark handlers for rare opcodes
+(`Opcode::Yield`, `Opcode::DelegateYield`, `Opcode::Await`,
+exception-machinery opcodes) with `#[cold]` so LLVM places their
+code outside the hot icache footprint. The hot subset (≈30 opcodes:
+arithmetic, property access, calls, jumps, loads, moves, returns)
+should fit in L1i comfortably.
 
 **Verification:**
 
 - `cargo build --release -p lyng-js-cli` — green.
 - `cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler` — full pass.
-- `cargo asm` on each opcode function (`op_add`, `op_move`, `op_get_named_property`, `op_call_0`):
-  - Body is one function in the symbol table per handler.
-  - For Option β: each handler ends with `br x<N>` directly into the
-    dispatch table (a tail-call). One indirect branch per dispatch.
-  - For Option α: each handler returns a function pointer; one
-    indirect call in the central trampoline.
-- Per-handler binary size: hot opcodes like `op_add` should be < 200
-  bytes; cold ones can be larger. Track total dispatch code size; the
-  goal is for the *hot subset* to fit in L1i.
+- `cargo asm` evidence per phase:
+  - Each opcode is a separate symbol in `nm target/release/lyng-js`.
+  - Hot handlers (e.g., `op_add`, `op_move`, `op_get_named_property`)
+    are < 200 bytes of asm each.
+  - `op_add`'s tail is `mov w<N>, [DISPATCH_TABLE + ...]; ret` — the
+    handler returns a `Step::Continue(next)` value, the trampoline
+    loops on it.
+  - The central trampoline `run()` has exactly one indirect call
+    (`blr` / `call`) reachable from the dispatch loop.
+- Per-handler binary size dumped into `reports/js/lyng-js/phase-1-asm.md`.
+- Structural regression test added: assert that `dispatch.rs`
+  contains no `match opcode` over more than (say) 10 arms, ensuring
+  no opcode dispatch creeps back into the trampoline.
 
-**Benchmarks:** 5-sample median via `lyng-js-bench compare`, in
-isolation (no concurrent build or Test262):
+**Benchmarks** (5-sample median via `lyng-js-bench compare` in
+isolation, no concurrent build or Test262):
 
-| Bench | Pre-phase target | Post-phase target |
+| Bench | Pre-phase | Phase 1 (α) target |
 | --- | ---: | ---: |
-| Richards | 234 | ≥ 280 (+20%) |
-| DeltaBlue | 277 | ≥ 330 (+19%) |
-| Crypto | 236 | ≥ 280 (+19%) |
-| RayTrace | 387 | ≥ 460 (+19%) |
-| NavierStokes | 424 | ≥ 500 (+18%) |
-| Splay | 1198 | ≥ 1400 (+17%) |
+| Richards | 234 | ≥ 260 (+11%) |
+| DeltaBlue | 277 | ≥ 310 (+12%) |
+| Crypto | 236 | ≥ 265 (+12%) |
+| RayTrace | 387 | ≥ 430 (+11%) |
+| NavierStokes | 424 | ≥ 470 (+11%) |
+| Splay | 1198 | ≥ 1330 (+11%) |
+
+The α targets are intentionally conservative (~10–15% gain). β would
+push these to +18–20% range; γ to roughly β's range minus the
+prologue/epilogue cost. If α delivers above the +11% floor, the
+package theory is intact and Phase 2 can begin.
 
 **Exit criteria:**
 
-- Per-handler dispatch shape verified by `cargo asm` on every IC-shaped
-  opcode + Move/Jump/Load.
-- Benchmark targets hit or within noise (within 5% on either side); no
-  workload regresses > 2%.
+- Per-handler dispatch shape verified by `cargo asm` on every
+  IC-shaped opcode + Move/Jump/Load/Return.
+- Benchmark targets hit or within noise (within 5% on either side);
+  no workload regresses > 2%.
 - Test262 baseline preserved (49722/49729 or better).
-- Per-handler structural regression tests added that fail if any opcode
-  reverts to flat-`match` shape.
+- Per-handler structural regression test in place.
+- `dispatch_next!` macro is the only mention of `DISPATCH_TABLE` in
+  any handler body (verify by grep).
 
 **Risks:**
 
-- **Nightly `become` rejection.** If Option β is rejected, fall to
-  Option α. Expected gain drops from +20% to +10–15%.
-- **Code size explosion** — 152 per-handler functions vs one flat
-  dispatch. Cold handlers should be `#[cold]`. If hot-handler icache
-  pressure measurably increases over the current shape, consider
-  splitting non-IC arms into a separate "common" handler that does
-  generic operand decode and dispatches further.
-- **Refactor blast radius** — `dispatch.rs` is 3300 lines today; the
-  rewrite touches every line. Plan for 2-3 weeks of focused work and a
-  rebase against any concurrent main changes.
+- **LLVM trampoline optimization quality.** The central trampoline's
+  `match Step { Continue(next) => handler = next, … }` plus indirect
+  call must lower cleanly to: load next handler from `Step` enum tag
+  payload, indirect-call, loop. If LLVM materializes the `Step` enum
+  in memory (rather than registers) or doesn't elide the `match`
+  branch on a hot path, α's overhead could exceed the 10–15% gain
+  ceiling and Phase 1 underperforms. **Mitigation**: profile and
+  inspect asm of `run()` first, before scaling the handler-rewrite
+  effort. If the trampoline overhead is excessive, fall back to γ
+  early (the macro swap is one line).
+- **Code size growth from 152 separate functions.** Hot subset must
+  still fit in L1i. Use `#[cold]` aggressively on rare opcodes. If
+  hot-handler icache pressure measurably increases vs the current
+  shape, consider grouping rarely-used IC-shaped opcodes (e.g.,
+  `Exp`, `BitXor`) behind a generic-arithmetic helper.
+- **Refactor blast radius.** `dispatch.rs` is 3300 lines today; the
+  rewrite touches all of it. Plan for 2-3 weeks of focused work and
+  a clean rebase against any concurrent main changes.
 
 **Estimated effort:** 2–3 weeks for one engineer.
 
@@ -402,27 +565,49 @@ Matches JSC's `performGetByIDHelper`.
 - Crypto regression from Track H should fully recover and then some
   (Phase 3 is what makes the bookkeeping cash out).
 
-**Benchmarks (post-Phase-3, cumulative from Phases 1+2+3):**
+**Benchmarks (post-Phase-3, cumulative from Phases 1+2+3, α-bounded):**
 
-| Bench | Phase 0 (today) | Phase 3 target |
+| Bench | Phase 0 (today) | Phase 3 (α) target |
 | --- | ---: | ---: |
-| Richards | 234 | ≥ 380 (+62%) |
-| DeltaBlue | 277 | ≥ 460 (+66%) |
-| Crypto | 236 | ≥ 400 (+69%) |
-| RayTrace | 387 | ≥ 640 (+65%) |
-| NavierStokes | 424 | ≥ 700 (+65%) |
-| Splay | 1198 | ≥ 1800 (+50%) |
+| Richards | 234 | ≥ 340 (+45%) |
+| DeltaBlue | 277 | ≥ 400 (+44%) |
+| Crypto | 236 | ≥ 360 (+53%) |
+| RayTrace | 387 | ≥ 560 (+45%) |
+| NavierStokes | 424 | ≥ 610 (+44%) |
+| Splay | 1198 | ≥ 1650 (+38%) |
 
-These targets put the interpreter at roughly 2× past QuickJS — the JSC
-LLInt-only territory.
+These α-bounded targets put the interpreter at roughly 1.7–2× past
+QuickJS — near-JSC-LLInt territory. β/γ would add another ~10% on top.
 
 **Exit criteria:**
 
 - All 10 IC-shaped opcodes have the flat hit-path verified in `cargo
-  asm`.
+  asm` (one `cmp` + one `b.ne` + one `ldr` on the hit path, no `bl`
+  to IC helpers).
 - Crypto recovers to or beyond pre-Track-H level (≥ 260).
-- Geomean gain over Phase 0 is ≥ 40%.
+- Geomean gain over Phase 0 is ≥ 35%.
 - Test262 baseline preserved.
+
+**γ-swap evaluation** (gated, after Phase 3 lands):
+
+After Phase 3, the IC-shaped handlers are much leaner — the inline IC
+collapses to a few inline loads + one branch + dispatch. At that
+point the trampoline overhead becomes a larger fraction of per-opcode
+cost. Re-profile Richards / Crypto and check:
+
+- Does `run()`'s indirect call appear in the top-5 `sample` frames?
+- Does the `Step::Continue` match show measurable cost in `cargo asm`
+  of `run()`?
+- Is the gap to QuickJS narrower than ~1.8× yet?
+
+If yes to any of these, the γ swap (asm tail-call) becomes
+attractive. The swap is a few-line macro change (per-arch) plus
+per-handler `#[naked]` audit. Expected gain over α-shape at this
+point: an additional **5–8%** on dispatch-bound workloads. Cost:
+localized `unsafe` at one dispatch macro site.
+
+If the trampoline isn't visible in the profile, leave γ deferred and
+move to Phase 4.
 
 **Risks:**
 
@@ -633,19 +818,22 @@ After each sub-phase:
   another 2–3× over the interpreter for arithmetic-heavy workloads,
   per V8 Sparkplug numbers.
 
-**Cumulative benchmark targets (Phase 6 complete):**
+**Cumulative benchmark targets (Phase 6 complete, α-bounded):**
 
-| Bench | Phase 0 (today) | Phase 6 target |
+| Bench | Phase 0 (today) | Phase 6 (α) target |
 | --- | ---: | ---: |
-| Richards | 234 | ≥ 900 (~4×) |
-| DeltaBlue | 277 | ≥ 1000 |
-| Crypto | 236 | ≥ 1000 (~4×) |
-| RayTrace | 387 | ≥ 1400 |
-| NavierStokes | 424 | ≥ 1500 |
-| Splay | 1198 | ≥ 2500 |
+| Richards | 234 | ≥ 800 (~3.4×) |
+| DeltaBlue | 277 | ≥ 900 |
+| Crypto | 236 | ≥ 900 (~3.8×) |
+| RayTrace | 387 | ≥ 1250 |
+| NavierStokes | 424 | ≥ 1350 |
+| Splay | 1198 | ≥ 2300 |
 
 These targets put lyng-js into JSC-Baseline / V8-Sparkplug territory:
-roughly half of full V8, several times QuickJS.
+roughly half of full V8, several times QuickJS. The JIT cost gap
+between α and β is small (~5%) because the JIT bypasses interpreter
+dispatch entirely for hot code; the α tax matters mostly for
+unjitted warm code.
 
 **Exit criteria:**
 
@@ -726,8 +914,12 @@ accidentally reverted. Examples:
 
 ## Risks Across the Roadmap
 
-- **Nightly `become` dependency.** Phase 1's biggest decision. Without
-  it, ceiling drops from JSC-LLInt-class to a softer target.
+- **LLVM trampoline optimization quality** (Phase 1). The α central
+  trampoline's `match Step { Continue(next) => … }` plus indirect call
+  must lower cleanly. If the `Step` enum materializes in memory or
+  the match doesn't elide, α underperforms its 10–15% gain target.
+  Mitigation: inspect `run()`'s asm early; fall to γ before scaling
+  the rewrite if α's overhead is excessive.
 - **Cranelift integration cost.** Cranelift is well-supported but
   non-trivial. Budget 1–2 weeks at the start of Phase 5 for plumbing
   alone.
@@ -740,6 +932,12 @@ accidentally reverted. Examples:
 - **Each phase's gain estimate is calibrated against the cumulative
   package.** If Phase 1 underperforms, downstream phases may
   underperform proportionally. The estimates are not independent.
+- **α ceiling vs β ceiling.** α delivers ~85–90% of β's interpreter
+  performance. The roadmap's targets are α-bounded throughout. If
+  later profiling shows the trampoline as a top hot frame, the γ swap
+  recovers most of the gap on stable Rust with one localized
+  `unsafe` site — but per-handler `#[naked]` / prologue audit is
+  required and is real work.
 
 ## Timeline (One Engineer, Sequential)
 
@@ -752,12 +950,16 @@ accidentally reverted. Examples:
 | 5: JIT prerequisites | 3–4 weeks | 16 weeks |
 | 6: Baseline JIT | 3–4 months | 28 weeks |
 
-**Interpreter-only milestone (Phases 1-4):** ~3 months. Delivers
-roughly 2× past QuickJS — JSC LLInt-class on the interpreter alone.
+**Interpreter-only milestone (Phases 1-4, α-bounded):** ~3 months.
+Delivers roughly 1.7–2× past QuickJS — near-JSC-LLInt-class on the
+interpreter alone. The γ swap would push this to JSC-LLInt-class
+proper (+5–8% over α) if profiles justify it.
 
-**Full Baseline JIT milestone (Phases 1-6):** ~7 months. Delivers
-roughly JSC Baseline / V8 Sparkplug-class — several times QuickJS,
-half of full V8.
+**Full Baseline JIT milestone (Phases 1-6, α-bounded):** ~7 months.
+Delivers roughly JSC Baseline / V8 Sparkplug-class — ~8–12× past
+QuickJS, ~half of full V8. The α-vs-β JIT-cost gap is small (~5%)
+because the JIT bypasses interpreter dispatch entirely; α doesn't
+meaningfully cap this milestone.
 
 With more engineers, Phase 2a/2b and parts of Phase 4 parallelize with
 Phase 1. Phase 6 sub-phases (6b through 6d) parallelize once 6a is
@@ -765,13 +967,18 @@ green.
 
 ## Re-evaluation Checkpoints
 
-After **Phase 1**: if the threaded-dispatch gain is < 10%, the
-package theory is wrong. Stop. Reassess.
+After **Phase 1**: if α's gain is < 8% geomean (below even the
+conservative target), the package theory is wrong or LLVM is
+materializing the `Step` enum on the hot path. Stop. Inspect `run()`
+asm. If the trampoline is visibly the cost, try the γ swap before
+scaling further work. If γ doesn't recover either, the per-handler
+function model itself is wrong — rethink.
 
 After **Phase 3**: if Crypto isn't recovered to at least pre-Track-H
-levels, the inline IC isn't paying off in our substrate. Consider
-rolling back Track H + Phase 3 and going QuickJS-shaped (drop
-per-callsite ICs entirely).
+levels (≥ 260), the inline IC isn't paying off in our substrate.
+Consider rolling back Track H + Phase 3 and going QuickJS-shaped
+(drop per-callsite ICs entirely). Also the natural γ-swap evaluation
+point — see Phase 3's γ-swap section.
 
 After **Phase 6 sub-phase 6c**: if JIT'd property access isn't
 showing measurable wins over the interpreted hot path, the IC handler
@@ -784,11 +991,33 @@ These are honest off-ramps, not just optimistic checkpoints.
 
 ## Pre-Work Before Phase 1
 
-1. Resolve the `unsafe` / nightly decision (Option α / β / γ).
-2. Lock the verification methodology in CI (isolated bench harness,
-   automated `cargo asm` capture, Test262 gate).
-3. Snapshot Phase-0 evidence: full V8 v7 sweep, full Test262, `cargo
-   asm` of current `run_dispatch_loop`. This is the baseline every
-   phase will be measured against.
+The `unsafe` / nightly decision is **resolved** — see "Dispatch
+Architecture (Decided)." α is the substrate; β and γ are documented
+future swaps gated on profile evidence.
+
+1. Lock the verification methodology in CI:
+   - Isolated bench harness (`lyng-js-bench compare` with 5-sample
+     warmup + 2-sample median, run sequentially, fail-on-concurrent-load
+     check).
+   - Automated `cargo asm` capture for each opcode handler post-Phase-1.
+   - Test262 gate that compares pass-count delta against the
+     committed baseline.
+2. Snapshot Phase-0 evidence:
+   - Full V8 v7 sweep, isolated. Commit to
+     `reports/js/lyng-js/phase-0-bench.md`.
+   - Full Test262 run with the current submodule revision.
+     Commit to `reports/js/lyng-js/phase-0-test262.md`.
+   - `cargo asm` of current `run_dispatch_loop` (all 4 monomorphs).
+     Commit to `reports/js/lyng-js/phase-0-asm.md`.
+3. Prototype the `DispatchState` struct and the `Step` enum
+   independently (without rewriting handlers yet). Verify the
+   trampoline emits clean asm: load fn pointer, indirect call, no
+   `Step` materialization on the hot path. **If this verification
+   fails before scaling to 152 handlers, halt and reconsider** — the
+   α trampoline is the foundation everything else builds on; if it
+   doesn't optimize cleanly, Phase 1 won't deliver.
+
+Step (3) is a 1-day spike, not a full Phase 1. Do it before
+committing to the multi-week rewrite.
 
 Once those three are done, Phase 1 is unblocked.
