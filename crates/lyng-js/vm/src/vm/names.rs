@@ -518,7 +518,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
-    pub(super) fn load_global_with_feedback(
+    pub(in crate::vm) fn load_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -569,7 +569,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
-    pub(super) fn store_global_with_feedback(
+    pub(in crate::vm) fn store_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -618,7 +618,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
-    pub(super) fn assign_global_with_feedback(
+    pub(in crate::vm) fn assign_global_with_feedback(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -809,7 +809,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn load_captured_name_with_context(
+    pub(in crate::vm) fn load_captured_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -854,7 +854,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn load_captured_name_this_with_context(
+    pub(in crate::vm) fn load_captured_name_this_with_context(
         &self,
         frame: &FrameRecord,
         reference_register: u16,
@@ -877,7 +877,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn assign_captured_name_with_context(
+    pub(in crate::vm) fn assign_captured_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -938,7 +938,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn resolve_name_with_context(
+    pub(in crate::vm) fn resolve_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -990,7 +990,7 @@ impl Vm {
             .unwrap_or_else(Value::undefined))
     }
 
-    pub(super) fn load_name_with_context(
+    pub(in crate::vm) fn load_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -1021,7 +1021,7 @@ impl Vm {
         .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
     }
 
-    pub(super) fn capture_name_with_context(
+    pub(in crate::vm) fn capture_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -1040,7 +1040,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn assign_name_with_context(
+    pub(in crate::vm) fn assign_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -1096,7 +1096,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn assign_variable_name_with_context(
+    pub(in crate::vm) fn assign_variable_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -1158,7 +1158,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn delete_name_with_context(
+    pub(in crate::vm) fn delete_name_with_context(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

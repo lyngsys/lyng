@@ -21,6 +21,7 @@ use super::dispatch_state::{Handler, DISPATCH_TABLE_LEN};
 pub mod arithmetic;
 pub mod control_flow;
 pub mod loads;
+pub mod names;
 pub mod opcode_stubs;
 pub mod prefix;
 pub mod property;
@@ -46,6 +47,12 @@ pub use loads::{
     op_star_6, op_star_7, op_store_local_0, op_store_local_1, op_store_local_2, op_store_local_3,
 };
 pub use prefix::{op_extra_wide, op_wide};
+pub use names::{
+    op_assign_captured_name, op_assign_global, op_assign_name, op_assign_variable_name,
+    op_capture_name, op_delete_global, op_delete_name, op_load_callee, op_load_captured_name,
+    op_load_captured_name_this, op_load_global, op_load_name, op_load_new_target, op_load_this,
+    op_resolve_global, op_resolve_name, op_store_global,
+};
 pub use property::{
     op_assign_keyed_property, op_assign_named_property, op_create_array, op_create_object,
     op_define_keyed_property, op_define_named_property, op_get_keyed_property,
@@ -187,6 +194,25 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::CreateArray as u8 as usize] = op_create_array;
     table[Opcode::StoreDenseElement as u8 as usize] = op_store_dense_element;
     table[Opcode::LoadDenseElement as u8 as usize] = op_load_dense_element;
+
+    // Globals + names + captured names + frame-state loads
+    table[Opcode::LoadGlobal as u8 as usize] = op_load_global;
+    table[Opcode::StoreGlobal as u8 as usize] = op_store_global;
+    table[Opcode::AssignGlobal as u8 as usize] = op_assign_global;
+    table[Opcode::DeleteGlobal as u8 as usize] = op_delete_global;
+    table[Opcode::LoadName as u8 as usize] = op_load_name;
+    table[Opcode::ResolveName as u8 as usize] = op_resolve_name;
+    table[Opcode::ResolveGlobal as u8 as usize] = op_resolve_global;
+    table[Opcode::AssignName as u8 as usize] = op_assign_name;
+    table[Opcode::AssignVariableName as u8 as usize] = op_assign_variable_name;
+    table[Opcode::DeleteName as u8 as usize] = op_delete_name;
+    table[Opcode::CaptureName as u8 as usize] = op_capture_name;
+    table[Opcode::LoadCapturedName as u8 as usize] = op_load_captured_name;
+    table[Opcode::LoadCapturedNameThis as u8 as usize] = op_load_captured_name_this;
+    table[Opcode::AssignCapturedName as u8 as usize] = op_assign_captured_name;
+    table[Opcode::LoadThis as u8 as usize] = op_load_this;
+    table[Opcode::LoadCallee as u8 as usize] = op_load_callee;
+    table[Opcode::LoadNewTarget as u8 as usize] = op_load_new_target;
 
     table
 }

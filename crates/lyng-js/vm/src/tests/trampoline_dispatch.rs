@@ -354,3 +354,25 @@ fn trampoline_executes_array_literal_and_indexed_load() {
     let result = vm.evaluate_script(agent, realm, &unit).unwrap();
     assert_eq!(result, Value::from_smi(20));
 }
+
+#[test]
+fn trampoline_executes_undefined_via_load_global() {
+    let unit = compile_test_unit(24, "undefined");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::undefined());
+}
+
+#[test]
+fn trampoline_executes_nan_via_load_global() {
+    let unit = compile_test_unit(25, "NaN");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert!(result.is_nan(), "NaN global should resolve to a NaN Value");
+}
