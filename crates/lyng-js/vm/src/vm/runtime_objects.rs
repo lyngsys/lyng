@@ -533,7 +533,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
         iterator_register: u16,
     ) -> VmResult<Option<Value>> {
         let mut record = self
@@ -545,6 +546,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
                 iterator_register,
                 record,
@@ -568,12 +570,17 @@ impl Vm {
         Ok(Some(value))
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
+    )]
     pub(super) fn close_iterator_state(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
         iterator_register: u16,
         preserve_completion: bool,
     ) -> VmResult<()> {
@@ -588,6 +595,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
+                frame_depth,
                 frame,
                 iterator_register,
                 record,
@@ -598,14 +606,19 @@ impl Vm {
             self.close_iterator_state_preserving_completion(agent, host, registry, frame, record);
             return Ok(());
         }
-        let mut bridge = VmIteratorBridge {
-            vm: self,
-            agent,
-            host,
-            registry,
-            frame,
+        self.sync_dispatch_frame(frame_depth, *frame);
+        let result = {
+            let mut bridge = VmIteratorBridge {
+                vm: self,
+                agent,
+                host,
+                registry,
+                frame,
+            };
+            iterator::iterator_close(&mut bridge, &mut record, Ok(()))
         };
-        let _: () = iterator::iterator_close(&mut bridge, &mut record, Ok(()))?;
+        self.refresh_dispatch_frame(frame_depth, frame);
+        let _: () = result?;
         Ok(())
     }
 
@@ -697,6 +710,10 @@ impl Vm {
     }
 
     #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
+    )]
+    #[expect(
         clippy::too_many_lines,
         reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
@@ -705,14 +722,15 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
     ) -> VmResult<Option<Value>> {
         if frame.resume_active() {
             let resume_kind = frame.resume_kind();
             let resume_value = frame.resume_value();
-            self.clear_active_resume();
+            frame.clear_resume();
             if resume_kind == crate::frame::GeneratorResumeKind::Throw {
                 return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
                     resume_value,
@@ -799,6 +817,7 @@ impl Vm {
                 )?;
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 self.suspend_for_await_promise(agent, frame, promise)?;
                 Ok(None)
             }
@@ -842,6 +861,7 @@ impl Vm {
                 record.set_async_from_sync_state(iterator::AsyncFromSyncState::Next { done });
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 self.suspend_for_await_promise(agent, frame, promise)?;
                 Ok(None)
             }
@@ -862,7 +882,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         preserve_completion: bool,
@@ -872,7 +893,7 @@ impl Vm {
             let resume_value = frame.resume_value();
             let preserve_completion = record.preserve_completion_on_close();
             record.set_preserve_completion_on_close(false);
-            self.clear_active_resume();
+            frame.clear_resume();
             if resume_kind == crate::frame::GeneratorResumeKind::Throw {
                 if preserve_completion {
                     record.set_done(true);
@@ -977,6 +998,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 self.suspend_for_await_promise(agent, frame, promise)
             }
             iterator::IteratorKind::AsyncFromSync => {
@@ -1034,6 +1056,7 @@ impl Vm {
                 record.set_preserve_completion_on_close(preserve_completion);
                 self.iterator_states
                     .insert(frame.registers().base(), iterator_register, record);
+                self.sync_dispatch_frame(frame_depth, *frame);
                 self.suspend_for_await_promise(agent, frame, promise)
             }
             iterator::IteratorKind::Sync => Err(VmError::Abrupt(errors::throw_type_error(agent))),

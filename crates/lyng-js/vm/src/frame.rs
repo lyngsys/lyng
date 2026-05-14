@@ -188,14 +188,14 @@ impl FrameMetadata {
 
 /// Mutable per-opcode half of [`FrameRecord`].
 ///
-/// Read through `self.frames.last()` per opcode (a small Copy is cheap compared to
-/// the previous 88-byte `FrameRecord` snapshot). Fields here are written by
-/// `advance_instruction`, `jump_by`, `set_lexical_env`, the exception handler,
-/// generator resume helpers, super-ops (`set_this_value`/`set_construct_this`
-/// after `super()` returns into a still-dispatching derived constructor frame),
-/// and tail-call installation (`set_tail_caller` writes the brand-new same-depth
-/// activation's tail-caller record without changing `code`, so the outer-loop
-/// `code`+`depth` invariant alone cannot detect it).
+/// Hoisted into local dispatch state for the active loop and synced back to the
+/// frame stack at observable boundaries. Fields here are written by local PC
+/// advancement, environment changes, the exception handler, generator resume
+/// helpers, super-ops (`set_this_value`/`set_construct_this` after `super()`
+/// returns into a still-dispatching derived constructor frame), and tail-call
+/// installation (`set_tail_caller` writes the brand-new same-depth activation's
+/// tail-caller record without changing `code`, so the outer-loop `code`+`depth`
+/// invariant alone cannot detect it).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FrameState {
     instruction_offset: u32,
@@ -594,7 +594,11 @@ mod tests {
         frame.set_lexical_env(replacement_env);
         frame.clear_resume();
 
-        assert_eq!(frame.metadata(), metadata, "metadata is untouched by state edits");
+        assert_eq!(
+            frame.metadata(),
+            metadata,
+            "metadata is untouched by state edits"
+        );
         assert_eq!(frame.instruction_offset(), 41);
         assert_eq!(frame.handler_cursor(), 9);
         assert_eq!(frame.lexical_env(), replacement_env);

@@ -101,7 +101,7 @@ pub struct Test262PhaseTimings {
 pub struct Test262VariantDiagnostics {
     pub function_count: usize,
     pub instruction_words: usize,
-    pub wide_operands: usize,
+    pub wide_prefixes: usize,
     pub metadata_records: usize,
     pub constants: usize,
     pub source_map_entries: usize,
@@ -559,7 +559,7 @@ fn sample_from_outcome(outcome: &Test262DiagnosticOutcome) -> Test262Sample {
             .map(|diagnostics| Test262VariantDiagnostics {
                 function_count: diagnostics.function_count,
                 instruction_words: diagnostics.instruction_words,
-                wide_operands: diagnostics.wide_operands,
+                wide_prefixes: diagnostics.wide_prefixes,
                 metadata_records: diagnostics.metadata_records,
                 constants: diagnostics.constants,
                 source_map_entries: diagnostics.source_map_entries,
@@ -955,7 +955,7 @@ fn diagnostics_json(diagnostics: &Test262VariantDiagnostics) -> Value {
     json!({
         "function_count": diagnostics.function_count,
         "instruction_words": diagnostics.instruction_words,
-        "wide_operands": diagnostics.wide_operands,
+        "wide_prefixes": diagnostics.wide_prefixes,
         "metadata_records": diagnostics.metadata_records,
         "constants": diagnostics.constants,
         "source_map_entries": diagnostics.source_map_entries,

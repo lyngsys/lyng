@@ -6,7 +6,7 @@ use crate::instruction::{Instruction, INSTRUCTION_WIDTH};
 use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CaptureDescriptor, ConstantValue,
     DeoptSnapshot, DirectEvalLexicalSite, ExceptionHandler, FeedbackSiteDescriptor,
-    LoopIterationEnvironmentSite, SafepointDescriptor, SourceMapEntry, ThisMode, WideOperand,
+    LoopIterationEnvironmentSite, SafepointDescriptor, SourceMapEntry, ThisMode,
 };
 use lyng_js_common::{AtomId, Span};
 use std::fmt;
@@ -25,7 +25,6 @@ pub struct BytecodeFunction {
     exception_handlers: Vec<ExceptionHandler>,
     feedback_sites: Vec<FeedbackSiteDescriptor>,
     source_map: Vec<SourceMapEntry>,
-    wide_operands: Vec<WideOperand>,
     safepoints: Vec<SafepointDescriptor>,
     deopt_snapshots: Vec<DeoptSnapshot>,
 }
@@ -42,7 +41,6 @@ pub struct BytecodeFunctionBody {
     pub(crate) exception_handlers: Vec<ExceptionHandler>,
     pub(crate) feedback_sites: Vec<FeedbackSiteDescriptor>,
     pub(crate) source_map: Vec<SourceMapEntry>,
-    pub(crate) wide_operands: Vec<WideOperand>,
     pub(crate) safepoints: Vec<SafepointDescriptor>,
     pub(crate) deopt_snapshots: Vec<DeoptSnapshot>,
 }
@@ -199,7 +197,6 @@ impl BytecodeFunction {
             exception_handlers: Vec::new(),
             feedback_sites: Vec::new(),
             source_map: Vec::new(),
-            wide_operands: Vec::new(),
             safepoints: Vec::new(),
             deopt_snapshots: Vec::new(),
         }
@@ -219,7 +216,6 @@ impl BytecodeFunction {
             exception_handlers: body.exception_handlers,
             feedback_sites: body.feedback_sites,
             source_map: body.source_map,
-            wide_operands: body.wide_operands,
             safepoints: body.safepoints,
             deopt_snapshots: body.deopt_snapshots,
         }
@@ -397,11 +393,6 @@ impl BytecodeFunction {
     }
 
     #[inline]
-    pub fn wide_operands(&self) -> &[WideOperand] {
-        &self.wide_operands
-    }
-
-    #[inline]
     pub fn safepoints(&self) -> &[SafepointDescriptor] {
         &self.safepoints
     }
@@ -574,12 +565,6 @@ impl BytecodeFunction {
     #[inline]
     pub fn with_source_map(mut self, source_map: Vec<SourceMapEntry>) -> Self {
         self.source_map = source_map;
-        self
-    }
-
-    #[inline]
-    pub fn with_wide_operands(mut self, wide_operands: Vec<WideOperand>) -> Self {
-        self.wide_operands = wide_operands;
         self
     }
 

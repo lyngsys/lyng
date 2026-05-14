@@ -1,0 +1,144 @@
+{
+  "aggregate": {
+    "base_words": 995,
+    "max_entry_bytes": 3262,
+    "max_unit_bytes": 3267,
+    "unit_bytes": 4553,
+    "wide_share_percent": 14.957264957264957,
+    "wide_words": 175
+  },
+  "has_previous": false,
+  "schema_version": 1,
+  "settings": {
+    "evals_per_sample": 15,
+    "json_path": "reports/js/lyng-js/bytecode-density-aarch64.json",
+    "loop_trip_count": 2048,
+    "report_path": "reports/js/lyng-js/bytecode-density-aarch64.md",
+    "samples": 7,
+    "target_arch": "aarch64"
+  },
+  "suite": "density",
+  "tool": "lyng-js-bench density",
+  "workloads": [
+    {
+      "delta": null,
+      "density": {
+        "base_words": 60,
+        "entry_bytes": 244,
+        "entry_words": 60,
+        "functions": 1,
+        "max_registers": 33,
+        "metadata_records": 20,
+        "unit_bytes": 244,
+        "unit_words": 60,
+        "wide_share_percent": 0.0,
+        "wide_words": 0
+      },
+      "name": "script.core.objects-and-arrays",
+      "note": "Representative script-core locals, arrays, object literals, named properties, and while-loop control flow.",
+      "throughput": {
+        "checksum": 9189595297426270208,
+        "evals_per_sample": 15,
+        "median_total_ns": 33361708,
+        "median_us_per_eval": 2224.1138666666666,
+        "samples": 7
+      }
+    },
+    {
+      "delta": null,
+      "density": {
+        "base_words": 45,
+        "entry_bytes": 150,
+        "entry_words": 36,
+        "functions": 3,
+        "max_registers": 26,
+        "metadata_records": 25,
+        "unit_bytes": 184,
+        "unit_words": 45,
+        "wide_share_percent": 0.0,
+        "wide_words": 0
+      },
+      "name": "functions.closure-calls",
+      "note": "Closure capture and repeated bytecode call dispatch inside one loop-heavy script evaluation.",
+      "throughput": {
+        "checksum": 9189595297379191808,
+        "evals_per_sample": 15,
+        "median_total_ns": 29252583,
+        "median_us_per_eval": 1950.1722,
+        "samples": 7
+      }
+    },
+    {
+      "delta": null,
+      "density": {
+        "base_words": 124,
+        "entry_bytes": 283,
+        "entry_words": 67,
+        "functions": 4,
+        "max_registers": 48,
+        "metadata_records": 55,
+        "unit_bytes": 527,
+        "unit_words": 124,
+        "wide_share_percent": 0.0,
+        "wide_words": 0
+      },
+      "name": "activation.arguments-rest-for-in",
+      "note": "Mapped arguments, rest arrays, and ordinary-object for-in enumeration inside one activation-heavy path.",
+      "throughput": {
+        "checksum": 9189595297347765248,
+        "evals_per_sample": 15,
+        "median_total_ns": 58365333,
+        "median_us_per_eval": 3891.0222,
+        "samples": 7
+      }
+    },
+    {
+      "delta": null,
+      "density": {
+        "base_words": 87,
+        "entry_bytes": 142,
+        "entry_words": 35,
+        "functions": 2,
+        "max_registers": 30,
+        "metadata_records": 26,
+        "unit_bytes": 331,
+        "unit_words": 87,
+        "wide_share_percent": 0.0,
+        "wide_words": 0
+      },
+      "name": "exceptions.try-catch-finally",
+      "note": "Catch/finally edges and abrupt-completion bookkeeping on a looped control-flow-heavy workload.",
+      "throughput": {
+        "checksum": 9189595297347580928,
+        "evals_per_sample": 15,
+        "median_total_ns": 22819125,
+        "median_us_per_eval": 1521.275,
+        "samples": 7
+      }
+    },
+    {
+      "delta": null,
+      "density": {
+        "base_words": 679,
+        "entry_bytes": 3262,
+        "entry_words": 677,
+        "functions": 2,
+        "max_registers": 343,
+        "metadata_records": 17,
+        "unit_bytes": 3267,
+        "unit_words": 679,
+        "wide_share_percent": 20.491803278688526,
+        "wide_words": 175
+      },
+      "name": "wide.large-register-function",
+      "note": "Large-register stress case that forces wide operands without changing the default 4-byte base layout.",
+      "throughput": {
+        "checksum": 9189595297349980928,
+        "evals_per_sample": 15,
+        "median_total_ns": 22553875,
+        "median_us_per_eval": 1503.5916666666667,
+        "samples": 7
+      }
+    }
+  ]
+}

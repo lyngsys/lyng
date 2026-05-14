@@ -39,7 +39,8 @@ impl Vm {
         {
             let generator =
                 self.instantiate_generator_call(agent, host, registry, prepared, arguments)?;
-            self.write_register(caller_frame.registers(),
+            self.write_register(
+                caller_frame.registers(),
                 result_register,
                 Value::from_object_ref(generator),
             );
@@ -51,7 +52,8 @@ impl Vm {
         {
             let promise =
                 self.instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
-            self.write_register(caller_frame.registers(),
+            self.write_register(
+                caller_frame.registers(),
                 result_register,
                 Value::from_object_ref(promise),
             );

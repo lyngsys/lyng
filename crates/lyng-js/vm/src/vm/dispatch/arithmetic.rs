@@ -17,128 +17,547 @@ const fn decode_smi_immediate(raw: u16) -> i16 {
     i16::from_le_bytes(raw.to_le_bytes())
 }
 
+#[inline]
+fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
+    if (left == 0 || right == 0) && (left < 0 || right < 0) {
+        return None;
+    }
+    left.checked_mul(right).map(Value::from_smi)
+}
+
+#[inline]
+const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
+    if right == 0 || (left == i32::MIN && right == -1) {
+        return None;
+    }
+    let result = left % right;
+    if result == 0 && left < 0 {
+        return None;
+    }
+    Some(Value::from_smi(result))
+}
+
 impl Vm {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
-    pub(super) fn execute_abc_value_opcode(
+    pub(super) fn execute_add_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: &FrameRecord,
-        opcode: Opcode,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_add(frame, left, right) {
+            return Ok(value);
+        }
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Add, left, right)
+        {
+            return Ok(value);
+        }
+        self.add_values(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_add_smi_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: u16,
+    ) -> VmResult<Value> {
+        let immediate = decode_smi_immediate(immediate);
+        if let Some(value) = self.try_smi_add_immediate(frame, left, immediate) {
+            return Ok(value);
+        }
+        self.add_value_and_smi(agent, host, registry, frame, left, immediate)
+    }
+
+    pub(super) fn execute_sub_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_sub(frame, left, right) {
+            return Ok(value);
+        }
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Sub, left, right)
+        {
+            return Ok(value);
+        }
+        self.sub_values(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_sub_smi_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: u16,
+    ) -> VmResult<Value> {
+        let immediate = decode_smi_immediate(immediate);
+        if let Some(value) = self.try_smi_sub_immediate(frame, left, immediate) {
+            return Ok(value);
+        }
+        self.sub_value_and_smi(agent, host, registry, frame, left, immediate)
+    }
+
+    pub(super) fn execute_mul_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_mul(frame, left, right) {
+            return Ok(value);
+        }
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Mul, left, right)
+        {
+            return Ok(value);
+        }
+        self.mul_values(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_div_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
         if let Some(value) =
-            self.execute_smi_immediate_opcode(agent, host, registry, frame, opcode, left, right)
+            self.try_primitive_number_binary_opcode(frame, Opcode::Div, left, right)
         {
-            return value;
-        }
-        if let Some(value) = self.try_primitive_number_binary_opcode(frame, opcode, left, right) {
             return Ok(value);
         }
-        match opcode {
-            Opcode::Add => self.add_values(agent, host, registry, frame, left, right),
-            Opcode::Sub => self.sub_values(agent, host, registry, frame, left, right),
-            Opcode::Mul => self.mul_values(agent, host, registry, frame, left, right),
-            Opcode::Div => self.div_values(agent, host, registry, frame, left, right),
-            Opcode::Mod => self.rem_values(agent, host, registry, frame, left, right),
-            Opcode::Exp => self.exp_values(agent, host, registry, frame, left, right),
-            Opcode::BitOr => self.bitwise_or(agent, host, registry, frame, left, right),
-            Opcode::BitAnd => self.bitwise_and(agent, host, registry, frame, left, right),
-            Opcode::BitXor => self.bitwise_xor(agent, host, registry, frame, left, right),
-            Opcode::ShiftLeft => self.shift_left(agent, host, registry, frame, left, right),
-            Opcode::ShiftRight => self.shift_right(agent, host, registry, frame, left, right),
-            Opcode::UnsignedShiftRight => {
-                self.unsigned_shift_right(agent, host, registry, frame, left, right)
-            }
-            Opcode::Equal => {
-                let left = self.read_register(frame.registers(), left);
-                let right = self.read_register(frame.registers(), right);
-                Ok(Value::from_bool(self.loosely_equal(
-                    agent, host, registry, frame, left, right,
-                )?))
-            }
-            Opcode::StrictEqual => {
-                let left = self.read_register(frame.registers(), left);
-                let right = self.read_register(frame.registers(), right);
-                if let Some(result) = pure::is_strictly_equal(left, right) {
-                    return Ok(Value::from_bool(result));
-                }
-                Ok(Value::from_bool(
-                    read::is_strictly_equal(agent.heap().view(), left, right)
-                        .map_err(VmError::Abrupt)?,
-                ))
-            }
-            Opcode::LessThan => {
-                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
-                    ordering.is_lt()
-                })
-            }
-            Opcode::LessEqual => {
-                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
-                    !ordering.is_gt()
-                })
-            }
-            Opcode::GreaterThan => {
-                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
-                    ordering.is_gt()
-                })
-            }
-            Opcode::GreaterEqual => {
-                self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
-                    !ordering.is_lt()
-                })
-            }
-            _ => unreachable!("caller filters supported ABC value opcodes"),
-        }
+        self.div_values(agent, host, registry, frame, left, right)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
-    fn execute_smi_immediate_opcode(
+    pub(super) fn execute_mul_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame: &FrameRecord,
-        opcode: Opcode,
         left: u16,
         immediate: u16,
-    ) -> Option<VmResult<Value>> {
+    ) -> VmResult<Value> {
         let immediate = decode_smi_immediate(immediate);
-        match opcode {
-            Opcode::AddSmi => {
-                Some(self.add_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::SubSmi => {
-                Some(self.sub_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::MulSmi => {
-                Some(self.mul_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::DivSmi => {
-                Some(self.div_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::ModSmi => {
-                Some(self.rem_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::BitAndSmi => {
-                Some(self.bitwise_and_value_and_smi(agent, host, registry, frame, left, immediate))
-            }
-            Opcode::EqualZero => {
-                let value = self.read_register(frame.registers(), left);
-                Some(Ok(Value::from_bool(
-                    value.as_f64().is_some_and(|number| number == 0.0),
-                )))
-            }
-            _ => None,
+        if let Some(value) = self.try_smi_mul_immediate(frame, left, immediate) {
+            return Ok(value);
         }
+        self.mul_value_and_smi(agent, host, registry, frame, left, immediate)
+    }
+
+    pub(super) fn execute_mod_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_mod(frame, left, right) {
+            return Ok(value);
+        }
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Mod, left, right)
+        {
+            return Ok(value);
+        }
+        self.rem_values(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_div_smi_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: u16,
+    ) -> VmResult<Value> {
+        self.div_value_and_smi(
+            agent,
+            host,
+            registry,
+            frame,
+            left,
+            decode_smi_immediate(immediate),
+        )
+    }
+
+    pub(super) fn execute_mod_smi_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: u16,
+    ) -> VmResult<Value> {
+        let immediate = decode_smi_immediate(immediate);
+        if let Some(value) = self.try_smi_mod_immediate(frame, left, immediate) {
+            return Ok(value);
+        }
+        self.rem_value_and_smi(agent, host, registry, frame, left, immediate)
+    }
+
+    pub(super) fn execute_exp_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Exp, left, right)
+        {
+            return Ok(value);
+        }
+        self.exp_values(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_bitor_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::BitOr, left, right)
+        {
+            return Ok(value);
+        }
+        self.bitwise_or(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_bitand_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) = self.try_smi_bitand(frame, left, right) {
+            return Ok(value);
+        }
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::BitAnd, left, right)
+        {
+            return Ok(value);
+        }
+        self.bitwise_and(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_bitand_smi_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: u16,
+    ) -> VmResult<Value> {
+        let immediate = decode_smi_immediate(immediate);
+        if let Some(value) = self.try_smi_bitand_immediate(frame, left, immediate) {
+            return Ok(value);
+        }
+        self.bitwise_and_value_and_smi(agent, host, registry, frame, left, immediate)
+    }
+
+    pub(super) fn execute_bitxor_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::BitXor, left, right)
+        {
+            return Ok(value);
+        }
+        self.bitwise_xor(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_shift_left_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::ShiftLeft, left, right)
+        {
+            return Ok(value);
+        }
+        self.shift_left(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_shift_right_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::ShiftRight, left, right)
+        {
+            return Ok(value);
+        }
+        self.shift_right(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_unsigned_shift_right_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::UnsignedShiftRight, left, right)
+        {
+            return Ok(value);
+        }
+        self.unsigned_shift_right(agent, host, registry, frame, left, right)
+    }
+
+    pub(super) fn execute_equal_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::Equal, left, right)
+        {
+            return Ok(value);
+        }
+        let left = self.read_register(frame.registers(), left);
+        let right = self.read_register(frame.registers(), right);
+        Ok(Value::from_bool(self.loosely_equal(
+            agent, host, registry, frame, left, right,
+        )?))
+    }
+
+    pub(super) fn execute_strict_equal_opcode(
+        &self,
+        agent: &Agent,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::StrictEqual, left, right)
+        {
+            return Ok(value);
+        }
+        let left = self.read_register(frame.registers(), left);
+        let right = self.read_register(frame.registers(), right);
+        if let Some(result) = pure::is_strictly_equal(left, right) {
+            return Ok(Value::from_bool(result));
+        }
+        Ok(Value::from_bool(
+            read::is_strictly_equal(agent.heap().view(), left, right).map_err(VmError::Abrupt)?,
+        ))
+    }
+
+    pub(super) fn execute_equal_zero_opcode(&self, frame: &FrameRecord, register: u16) -> Value {
+        let value = self.read_register(frame.registers(), register);
+        Value::from_bool(value.as_f64().is_some_and(|number| number == 0.0))
+    }
+
+    pub(super) fn execute_less_than_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::LessThan, left, right)
+        {
+            return Ok(value);
+        }
+        self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+            ordering.is_lt()
+        })
+    }
+
+    pub(super) fn execute_less_equal_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::LessEqual, left, right)
+        {
+            return Ok(value);
+        }
+        self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+            !ordering.is_gt()
+        })
+    }
+
+    pub(super) fn execute_greater_than_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::GreaterThan, left, right)
+        {
+            return Ok(value);
+        }
+        self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+            ordering.is_gt()
+        })
+    }
+
+    pub(super) fn execute_greater_equal_opcode(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        frame: &FrameRecord,
+        left: u16,
+        right: u16,
+    ) -> VmResult<Value> {
+        if let Some(value) =
+            self.try_primitive_number_binary_opcode(frame, Opcode::GreaterEqual, left, right)
+        {
+            return Ok(value);
+        }
+        self.relational_compare(agent, host, registry, frame, left, right, |ordering| {
+            !ordering.is_lt()
+        })
+    }
+
+    fn try_smi_add(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        let right = self.read_register(frame.registers(), right).as_smi()?;
+        left.checked_add(right).map(Value::from_smi)
+    }
+
+    fn try_smi_add_immediate(
+        &self,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: i16,
+    ) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        left.checked_add(i32::from(immediate)).map(Value::from_smi)
+    }
+
+    fn try_smi_sub(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        let right = self.read_register(frame.registers(), right).as_smi()?;
+        left.checked_sub(right).map(Value::from_smi)
+    }
+
+    fn try_smi_sub_immediate(
+        &self,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: i16,
+    ) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        left.checked_sub(i32::from(immediate)).map(Value::from_smi)
+    }
+
+    fn try_smi_mul(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        let right = self.read_register(frame.registers(), right).as_smi()?;
+        smi_mul_result(left, right)
+    }
+
+    fn try_smi_mul_immediate(
+        &self,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: i16,
+    ) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        smi_mul_result(left, i32::from(immediate))
+    }
+
+    fn try_smi_mod(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        let right = self.read_register(frame.registers(), right).as_smi()?;
+        smi_mod_result(left, right)
+    }
+
+    fn try_smi_mod_immediate(
+        &self,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: i16,
+    ) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        smi_mod_result(left, i32::from(immediate))
+    }
+
+    fn try_smi_bitand(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        let right = self.read_register(frame.registers(), right).as_smi()?;
+        Some(Value::from_smi(left & right))
+    }
+
+    fn try_smi_bitand_immediate(
+        &self,
+        frame: &FrameRecord,
+        left: u16,
+        immediate: i16,
+    ) -> Option<Value> {
+        let left = self.read_register(frame.registers(), left).as_smi()?;
+        Some(Value::from_smi(left & i32::from(immediate)))
     }
 
     #[allow(
@@ -275,8 +694,14 @@ impl Vm {
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
         if right.is_object() && !left.is_object() {
-            let right =
-                self.to_primitive(agent, host, registry, frame, right, ToPrimitiveHint::Default)?;
+            let right = self.to_primitive(
+                agent,
+                host,
+                registry,
+                frame,
+                right,
+                ToPrimitiveHint::Default,
+            )?;
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
 
@@ -694,5 +1119,20 @@ mod tests {
             Some(3.75),
             "primitive number addition should avoid the generic conversion path"
         );
+    }
+
+    #[test]
+    fn smi_mul_fast_path_defers_negative_zero_results() {
+        assert_eq!(smi_mul_result(-1, 0), None);
+        assert_eq!(smi_mul_result(0, -1), None);
+        assert_eq!(smi_mul_result(6, -7), Some(Value::from_smi(-42)));
+    }
+
+    #[test]
+    fn smi_mod_fast_path_defers_negative_zero_results() {
+        assert_eq!(smi_mod_result(-4, 2), None);
+        assert_eq!(smi_mod_result(-4, -2), None);
+        assert_eq!(smi_mod_result(4, 2), Some(Value::from_smi(0)));
+        assert_eq!(smi_mod_result(5, 2), Some(Value::from_smi(1)));
     }
 }

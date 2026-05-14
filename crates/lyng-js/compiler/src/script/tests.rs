@@ -4,7 +4,16 @@ use lyng_js_sema::analyze_script;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
+fn semantic_opcode(opcode: Opcode) -> Opcode {
+    opcode.profiled_base_opcode()
+}
+
+fn instruction_semantic_opcode(instruction: lyng_js_bytecode::Instruction) -> Opcode {
+    semantic_opcode(instruction.opcode())
+}
+
 fn is_ordinary_call_opcode(opcode: Opcode) -> bool {
+    let opcode = semantic_opcode(opcode);
     opcode == Opcode::Call || opcode.small_call_arity().is_some()
 }
 
@@ -33,10 +42,10 @@ fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_gl
     );
     assert!(instructions
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::AssignGlobal));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::AssignGlobal));
     assert!(instructions
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::LoadGlobal));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadGlobal));
     assert!(instructions
         .iter()
         .any(|instruction| instruction.opcode() == Opcode::LoadEnvSlot));
@@ -60,11 +69,11 @@ fn compile_script_assigns_and_loads_global_var_declarations_through_global_ops()
     assert!(entry
         .instructions()
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::AssignGlobal));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::AssignGlobal));
     assert!(entry
         .instructions()
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::LoadGlobal));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadGlobal));
 }
 
 #[test]
@@ -225,13 +234,10 @@ fn compile_script_lowers_unresolved_arguments_in_eval_poisoned_arrow_bodies_thro
             ..
         }
     )));
-    assert!(!arrow.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadGlobal,
-            ..
-        }
-    )));
+    assert!(!arrow
+        .instructions()
+        .iter()
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadGlobal));
 }
 
 #[test]
@@ -274,13 +280,7 @@ fn compile_script_lowers_function_expression_eval_callee_through_load_name() {
     assert!(!function_expr
         .instructions()
         .iter()
-        .any(|instruction| matches!(
-            instruction,
-            lyng_js_bytecode::Instruction::Abx {
-                opcode: Opcode::LoadGlobal,
-                ..
-            }
-        )));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadGlobal));
 }
 
 #[test]
@@ -304,14 +304,20 @@ fn compile_script_lowers_logical_member_assignments_through_assign_property_ops(
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
 
-    assert!(entry
-        .instructions()
-        .iter()
-        .any(|instruction| instruction.opcode() == Opcode::AssignNamedProperty));
-    assert!(entry
-        .instructions()
-        .iter()
-        .any(|instruction| instruction.opcode() == Opcode::AssignKeyedProperty));
+    assert!(
+        entry
+            .instructions()
+            .iter()
+            .any(|instruction| instruction_semantic_opcode(instruction)
+                == Opcode::AssignNamedProperty)
+    );
+    assert!(
+        entry
+            .instructions()
+            .iter()
+            .any(|instruction| instruction_semantic_opcode(instruction)
+                == Opcode::AssignKeyedProperty)
+    );
 }
 
 #[test]
@@ -351,13 +357,10 @@ fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
             "expected {opcode:?} in with-call lowering"
         );
     }
-    assert!(!entry.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abx {
-            opcode: Opcode::LoadGlobal,
-            ..
-        }
-    )));
+    assert!(!entry
+        .instructions()
+        .iter()
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadGlobal));
 }
 
 #[test]
@@ -732,11 +735,14 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
     let entry = unit.function(unit.entry()).unwrap();
 
     assert!(entry.register_count() > 255);
-    assert!(!entry.wide_operands().is_empty());
+    assert!(entry
+        .instruction_bytes()
+        .iter()
+        .any(|byte| *byte == Opcode::Wide as u8 || *byte == Opcode::ExtraWide as u8));
     assert!(entry
         .instructions()
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::Call));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::Call));
 }
 
 #[test]
@@ -765,7 +771,7 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
         assert!(
             instructions
                 .iter()
-                .any(|instruction| instruction.opcode() == opcode),
+                .any(|instruction| instruction_semantic_opcode(instruction) == opcode),
             "expected {opcode:?} in:\n{}",
             lyng_js_bytecode::disassemble(entry)
         );
@@ -773,7 +779,7 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
     assert_eq!(
         instructions
             .iter()
-            .filter(|instruction| matches!(instruction.opcode(), Opcode::Call))
+            .filter(|instruction| instruction_semantic_opcode(*instruction) == Opcode::Call)
             .count(),
         2,
         "four-argument and spread calls should keep the Call fallback:\n{}",
@@ -964,33 +970,35 @@ fn compile_script_specializes_hot_smi_constants_and_arithmetic() {
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions();
 
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction_semantic_opcode(instruction),
+        Opcode::LoadZero | Opcode::LdaZero
+    )));
+    assert!(instructions.iter().any(|instruction| matches!(
+        instruction_semantic_opcode(instruction),
+        Opcode::LoadOne | Opcode::LdaOne
+    )));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::LoadZero)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::AddSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::LoadOne)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::SubSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::AddSmi)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::MulSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::SubSmi)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::DivSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::MulSmi)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::ModSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::DivSmi)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::BitAndSmi)));
     assert!(instructions
         .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::ModSmi)));
-    assert!(instructions
-        .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::BitAndSmi)));
-    assert!(instructions
-        .iter()
-        .any(|instruction| matches!(instruction.opcode(), Opcode::EqualZero)));
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::EqualZero)));
 }
 
 #[test]
@@ -1029,9 +1037,12 @@ fn compile_script_emits_short_local_move_opcodes() {
     );
     assert!(
         function.instructions().iter().any(|instruction| matches!(
-            instruction.opcode(),
+            instruction_semantic_opcode(instruction),
             Opcode::StoreLocal0 | Opcode::StoreLocal1 | Opcode::StoreLocal2 | Opcode::StoreLocal3
-        )),
+        ) || instruction
+            .opcode()
+            .accumulator_store_index()
+            .is_some()),
         "{disassembly}"
     );
 }
@@ -1173,7 +1184,7 @@ fn compile_script_marks_direct_tail_calls_explicitly() {
     assert!(recur
         .instructions()
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::TailCall));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::TailCall));
     assert!(!recur
         .instructions()
         .iter()
@@ -1229,24 +1240,18 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
         .instructions()
         .iter()
         .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
-    assert!(!direct.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::TailCall,
-            ..
-        }
-    )));
+    assert!(!direct
+        .instructions()
+        .iter()
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::TailCall)));
     assert!(guarded
         .instructions()
         .iter()
         .any(|instruction| is_ordinary_call_opcode(instruction.opcode())));
-    assert!(!guarded.instructions().iter().any(|instruction| matches!(
-        instruction,
-        lyng_js_bytecode::Instruction::Abc {
-            opcode: Opcode::TailCall,
-            ..
-        }
-    )));
+    assert!(!guarded
+        .instructions()
+        .iter()
+        .any(|instruction| matches!(instruction_semantic_opcode(instruction), Opcode::TailCall)));
 }
 
 #[test]
@@ -1274,7 +1279,7 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
     let tail_calls = branch
         .instructions()
         .iter()
-        .filter(|instruction| instruction.opcode() == Opcode::TailCall)
+        .filter(|instruction| instruction_semantic_opcode(*instruction) == Opcode::TailCall)
         .count();
 
     assert_eq!(tail_calls, 2);
@@ -1307,7 +1312,7 @@ fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
     assert!(recur
         .instructions()
         .iter()
-        .any(|instruction| instruction.opcode() == Opcode::TailCall));
+        .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::TailCall));
     assert!(recur
         .instructions()
         .iter()
@@ -1950,14 +1955,8 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
         .byte_offsets()
         .zip(entry.instructions().iter())
         .find_map(|(offset, instruction)| {
-            matches!(
-                instruction,
-                lyng_js_bytecode::Instruction::Abc {
-                    opcode: Opcode::Call,
-                    ..
-                }
-            )
-            .then(|| u32::try_from(offset).expect("instruction offset should fit u32"))
+            (instruction_semantic_opcode(instruction) == Opcode::Call)
+                .then(|| u32::try_from(offset).expect("instruction offset should fit u32"))
         })
         .expect("direct eval should lower through an internal builtin call");
 

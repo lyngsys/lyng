@@ -290,7 +290,7 @@ impl Vm {
             agent,
             host,
             registry,
-            frame: frame,
+            frame,
         };
         proxy::delete_property(
             &mut bridge,

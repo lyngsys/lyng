@@ -23,6 +23,27 @@ fn script_core_supports_phase6_number_math_and_bigint_basics() {
 }
 
 #[test]
+fn script_core_specialized_smi_arithmetic_preserves_negative_zero() {
+    let result = compile_and_run(
+        r"
+        let negative = -1;
+        let zero = 0;
+        let negativeFour = -4;
+        let total = 0;
+        total += (Object.is(negative * 0, -0) ? 1 : 0);
+        total += (Object.is(zero * negative, -0) ? 2 : 0);
+        total += (Object.is(negativeFour % 2, -0) ? 4 : 0);
+        total += (Object.is(negativeFour % -2, -0) ? 8 : 0);
+        total += (Object.is(0 * 1, +0) ? 16 : 0);
+        total += (Object.is(4 % 2, +0) ? 32 : 0);
+        total;
+        ",
+    );
+
+    assert_eq!(result, Value::from_smi(63));
+}
+
+#[test]
 fn script_core_number_min_value_is_minimum_subnormal() {
     let result = compile_and_run(
         r"

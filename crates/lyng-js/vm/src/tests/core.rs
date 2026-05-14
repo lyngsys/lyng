@@ -251,7 +251,7 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
             .opcode_dispatch_counts()
             .expect("enabled opcode counters should produce a snapshot");
         assert_eq!(counts.total(), 4);
-        assert_eq!(counts.count(Opcode::LoadOne), 1);
+        assert_eq!(counts.count(Opcode::LdaOne), 1);
         assert_eq!(counts.count(Opcode::AddSmi), 1);
         assert_eq!(counts.count(Opcode::StoreLocal2), 1);
         assert_eq!(counts.count(Opcode::Return), 1);

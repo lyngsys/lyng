@@ -4,7 +4,7 @@ impl Vm {
     pub(super) fn push_with_environment(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: &mut FrameRecord,
         value: Value,
     ) -> VmResult<()> {
         let previous_lexical_env = frame.lexical_env();
@@ -22,14 +22,11 @@ impl Vm {
             frame_depth: self.frames.len(),
             previous_lexical_env,
         });
-        self.frames
-            .last_mut()
-            .expect("pushing a with environment requires one active frame")
-            .set_lexical_env(with_environment);
+        frame.set_lexical_env(with_environment);
         Ok(())
     }
 
-    pub(super) fn pop_with_environment(&mut self) {
+    pub(super) fn pop_with_environment(&mut self, frame: &mut FrameRecord) {
         let frame_depth = self.frames.len();
         let Some(index) = self
             .with_environment_states
@@ -39,10 +36,7 @@ impl Vm {
             return;
         };
         let state = self.with_environment_states.remove(index);
-        self.frames
-            .last_mut()
-            .expect("popping a with environment requires one active frame")
-            .set_lexical_env(state.previous_lexical_env);
+        frame.set_lexical_env(state.previous_lexical_env);
     }
 
     pub(super) fn close_with_environment_frames(&mut self, frame_depth: usize) {

@@ -8,261 +8,75 @@ It runs the same standalone JavaScript workload files through Lyng JS, QuickJS, 
 - Report: `reports/js/lyng-js/external-engine-compare.md`
 - JSON: `reports/js/lyng-js/external-engine-compare.json`
 - Scripts dir: `/tmp/lyng-js-bench-compare-scripts`
-- Corpus: `synthetic`
+- Corpus: `v8-v7`
+- Filter: `richards`
 - Full suite: `false`
-- Samples: `3`
-- Warmup samples: `1`
-- Loop trips: `2048`
-- Timeout: `30000ms`
+- Samples: `1`
+- Warmup samples: `0`
+- Loop trips: `1024`
+- Timeout: `5000ms`
 
 ## Comparison Policy
 
 - QuickJS is the primary interpreter baseline.
 - Boa is a Rust-engine reference point.
 - Treat parity as a workload-family measurement, not exact equality across every script.
+- QuickJS score ratio is `quickjs score / engine score`; lower is better, and QuickJS is `1.00x`.
 
 ## Workloads
 
 | Workload | Category | Script | Note |
 | --- | --- | --- | --- |
-| `arithmetic-loop` | `arithmetic-control-flow` | `/tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js` | Integer arithmetic, branches, and loop backedges without builtin calls. |
-| `array-object-loop` | `array-object` | `/tmp/lyng-js-bench-compare-scripts/array-object-loop.js` | Array growth, dense indexed reads, object literals, and named property reads. |
-| `polymorphic-property-loop` | `polymorphic-property` | `/tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js` | Single named-property load site cycling through six receiver shapes. |
-| `pair-instanceof-loop` | `pair-object-instanceof` | `/tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js` | EarleyBoyer-shaped global constructor calls, pair allocation, car/cdr property traffic, and instanceof checks. |
-| `builtin-string-regexp-loop` | `builtin-heavy` | `/tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js` | String case mapping, RegExp replacement, URI decoding, and character access. |
+| `Richards` | `v8-v7` | `/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` | External engine comparison workload. |
 
 ## Results
 
 | Workload | Category | Engine | Status | Metric | Samples | Score median | Wall-time median | Min wall-time | Max wall-time | QuickJS score ratio | QuickJS wall-time ratio | Error | Command |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| `arithmetic-loop` | `arithmetic-control-flow` | `lyng-js` | `completed` | `wall-time` | `3` | `n/a` | `6.847ms` | `6.607ms` | `13.207ms` | `n/a` | `1.05x` | `` | `target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js` |
-| `arithmetic-loop` | `arithmetic-control-flow` | `quickjs` | `completed` | `wall-time` | `3` | `n/a` | `6.510ms` | `5.982ms` | `6.604ms` | `n/a` | `1.00x` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js` |
-| `arithmetic-loop` | `arithmetic-control-flow` | `boa` | `completed` | `wall-time` | `3` | `n/a` | `12.822ms` | `12.810ms` | `12.937ms` | `n/a` | `1.97x` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js` |
-| `array-object-loop` | `array-object` | `lyng-js` | `completed` | `wall-time` | `3` | `n/a` | `12.821ms` | `12.811ms` | `12.852ms` | `n/a` | `1.97x` | `` | `target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/array-object-loop.js` |
-| `array-object-loop` | `array-object` | `quickjs` | `completed` | `wall-time` | `3` | `n/a` | `6.496ms` | `6.496ms` | `6.570ms` | `n/a` | `1.00x` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/array-object-loop.js` |
-| `array-object-loop` | `array-object` | `boa` | `completed` | `wall-time` | `3` | `n/a` | `12.848ms` | `11.943ms` | `12.885ms` | `n/a` | `1.98x` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/array-object-loop.js` |
-| `polymorphic-property-loop` | `polymorphic-property` | `lyng-js` | `completed` | `wall-time` | `3` | `n/a` | `6.483ms` | `6.079ms` | `6.579ms` | `n/a` | `1.01x` | `` | `target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js` |
-| `polymorphic-property-loop` | `polymorphic-property` | `quickjs` | `completed` | `wall-time` | `3` | `n/a` | `6.439ms` | `6.135ms` | `6.509ms` | `n/a` | `1.00x` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js` |
-| `polymorphic-property-loop` | `polymorphic-property` | `boa` | `completed` | `wall-time` | `3` | `n/a` | `12.835ms` | `11.672ms` | `12.885ms` | `n/a` | `1.99x` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js` |
-| `pair-instanceof-loop` | `pair-object-instanceof` | `lyng-js` | `completed` | `wall-time` | `3` | `n/a` | `12.863ms` | `12.827ms` | `12.878ms` | `n/a` | `2.01x` | `` | `target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js` |
-| `pair-instanceof-loop` | `pair-object-instanceof` | `quickjs` | `completed` | `wall-time` | `3` | `n/a` | `6.406ms` | `5.518ms` | `6.435ms` | `n/a` | `1.00x` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js` |
-| `pair-instanceof-loop` | `pair-object-instanceof` | `boa` | `completed` | `wall-time` | `3` | `n/a` | `18.414ms` | `18.273ms` | `18.944ms` | `n/a` | `2.87x` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js` |
-| `builtin-string-regexp-loop` | `builtin-heavy` | `lyng-js` | `completed` | `wall-time` | `3` | `n/a` | `17.968ms` | `17.623ms` | `18.142ms` | `n/a` | `1.44x` | `` | `target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js` |
-| `builtin-string-regexp-loop` | `builtin-heavy` | `quickjs` | `completed` | `wall-time` | `3` | `n/a` | `12.455ms` | `12.193ms` | `12.835ms` | `n/a` | `1.00x` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js` |
-| `builtin-string-regexp-loop` | `builtin-heavy` | `boa` | `completed` | `wall-time` | `3` | `n/a` | `24.669ms` | `23.881ms` | `24.890ms` | `n/a` | `1.98x` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js` |
+| `Richards` | `v8-v7` | `lyng-js` | `completed` | `score` | `1` | `199.000` | `2.034s` | `2.034s` | `2.034s` | `4.88x` | `n/a` | `` | `target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `quickjs` | `completed` | `score` | `1` | `971.000` | `2.010s` | `2.010s` | `2.010s` | `1.00x` | `n/a` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `boa` | `failed` | `score` | `0` | `n/a` | `n/a` | `n/a` | `n/a` | `n/a` | `n/a` | `external engine `boa` failed for workload `Richards` with status exit status: 101
+stdout:
+
+stderr:
+[31mThe application panicked (crashed).[0m
+Message:  [36mAttempted to create a NULL object.[0m
+Location: [35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/system-configuration-0.6.1/src/dynamic_store.rs[0m:[35m154[0m
+[31mThe application panicked (crashed).[0m
+Message:  [36mevent loop thread panicked[0m
+Location: [35m/Users/brew/Library/Caches/Homebrew/cargo_cache/registry/src/index.crates.io-1949cf8c6b5b557f/reqwest-0.12.23/src/blocking/client.rs[0m:[35m1523[0m
+` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
 
 ## Profiler Commands
 
 Build Lyng JS first with `cargo build --release -p lyng-js-cli`.
 Use `--preset profile-target` to regenerate scripts with longer loops before attaching a profiler.
 
-### `arithmetic-loop` on `lyng-js`
+### `Richards` on `lyng-js`
 
 ```sh
-target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js &
+target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js &
 pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-arithmetic-loop.sample.txt
+sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-Richards.sample.txt
 wait "$pid"
 
 xcrun xctrace record \
   --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-lyng-js-arithmetic-loop.trace \
-  --launch -- target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js
+  --output /tmp/lyng-js-compare-lyng-js-Richards.trace \
+  --launch -- target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js
 ```
 
-### `arithmetic-loop` on `quickjs`
+### `Richards` on `quickjs`
 
 ```sh
-/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js &
+/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js &
 pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-arithmetic-loop.sample.txt
+sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-Richards.sample.txt
 wait "$pid"
 
 xcrun xctrace record \
   --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-quickjs-arithmetic-loop.trace \
-  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js
-```
-
-### `arithmetic-loop` on `boa`
-
-```sh
-/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-boa-arithmetic-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-boa-arithmetic-loop.trace \
-  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/arithmetic-loop.js
-```
-
-### `array-object-loop` on `lyng-js`
-
-```sh
-target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/array-object-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-array-object-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-lyng-js-array-object-loop.trace \
-  --launch -- target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/array-object-loop.js
-```
-
-### `array-object-loop` on `quickjs`
-
-```sh
-/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/array-object-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-array-object-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-quickjs-array-object-loop.trace \
-  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/array-object-loop.js
-```
-
-### `array-object-loop` on `boa`
-
-```sh
-/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/array-object-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-boa-array-object-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-boa-array-object-loop.trace \
-  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/array-object-loop.js
-```
-
-### `polymorphic-property-loop` on `lyng-js`
-
-```sh
-target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-polymorphic-property-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-lyng-js-polymorphic-property-loop.trace \
-  --launch -- target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js
-```
-
-### `polymorphic-property-loop` on `quickjs`
-
-```sh
-/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-polymorphic-property-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-quickjs-polymorphic-property-loop.trace \
-  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js
-```
-
-### `polymorphic-property-loop` on `boa`
-
-```sh
-/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-boa-polymorphic-property-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-boa-polymorphic-property-loop.trace \
-  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/polymorphic-property-loop.js
-```
-
-### `pair-instanceof-loop` on `lyng-js`
-
-```sh
-target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-pair-instanceof-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-lyng-js-pair-instanceof-loop.trace \
-  --launch -- target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js
-```
-
-### `pair-instanceof-loop` on `quickjs`
-
-```sh
-/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-pair-instanceof-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-quickjs-pair-instanceof-loop.trace \
-  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js
-```
-
-### `pair-instanceof-loop` on `boa`
-
-```sh
-/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-boa-pair-instanceof-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-boa-pair-instanceof-loop.trace \
-  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/pair-instanceof-loop.js
-```
-
-### `builtin-string-regexp-loop` on `lyng-js`
-
-```sh
-target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-lyng-js-builtin-string-regexp-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-lyng-js-builtin-string-regexp-loop.trace \
-  --launch -- target/release/lyng-js /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js
-```
-
-### `builtin-string-regexp-loop` on `quickjs`
-
-```sh
-/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-quickjs-builtin-string-regexp-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-quickjs-builtin-string-regexp-loop.trace \
-  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js
-```
-
-### `builtin-string-regexp-loop` on `boa`
-
-```sh
-/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js &
-pid=$!
-sample "$pid" 10 -file /tmp/lyng-js-compare-boa-builtin-string-regexp-loop.sample.txt
-wait "$pid"
-
-xcrun xctrace record \
-  --template 'Time Profiler' \
-  --output /tmp/lyng-js-compare-boa-builtin-string-regexp-loop.trace \
-  --launch -- /opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/builtin-string-regexp-loop.js
+  --output /tmp/lyng-js-compare-quickjs-Richards.trace \
+  --launch -- /opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js
 ```
 

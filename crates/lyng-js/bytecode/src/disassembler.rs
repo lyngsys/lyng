@@ -33,36 +33,12 @@ const fn format_this_mode(this_mode: ThisMode) -> &'static str {
     }
 }
 
-fn wide_payload(function: &BytecodeFunction, instruction_offset: usize) -> Option<u32> {
-    let instruction_offset = u32::try_from(instruction_offset).ok()?;
-    function.wide_operands().iter().find_map(|operand| {
-        (operand.instruction_offset() == instruction_offset).then_some(operand.payload())
-    })
+const fn abc_operands(a: u16, b: u16, c: u16) -> WideAbcOperands {
+    WideAbcOperands::new(a, b, c)
 }
 
-fn abc_operands(
-    function: &BytecodeFunction,
-    instruction_offset: usize,
-    a: u8,
-    b: u8,
-    c: u8,
-) -> WideAbcOperands {
-    wide_payload(function, instruction_offset).map_or_else(
-        || WideAbcOperands::narrow(a, b, c),
-        |payload| WideAbcOperands::decode(a, b, c, payload),
-    )
-}
-
-fn abx_operands(
-    function: &BytecodeFunction,
-    instruction_offset: usize,
-    a: u8,
-    bx: u16,
-) -> WideAbxOperands {
-    wide_payload(function, instruction_offset).map_or_else(
-        || WideAbxOperands::narrow(a, bx),
-        |payload| WideAbxOperands::decode(a, bx, payload),
-    )
+const fn abx_operands(a: u16, bx: u32) -> WideAbxOperands {
+    WideAbxOperands::new(a, bx)
 }
 
 fn format_call_range(range: CallRange) -> String {
@@ -75,11 +51,10 @@ fn format_call_range(range: CallRange) -> String {
 
 fn format_call_like_instruction(
     opcode: &str,
-    instruction_offset: usize,
-    function: &BytecodeFunction,
-    result: u8,
-    callee: u8,
-    this_value: u8,
+    result: u16,
+    callee: u16,
+    this_value: u16,
+    range: CallRange,
     has_result: bool,
 ) -> String {
     let result_prefix = if has_result {
@@ -87,23 +62,18 @@ fn format_call_like_instruction(
     } else {
         String::new()
     };
-    if let Some(payload) = wide_payload(function, instruction_offset) {
-        let range = format_call_range(CallRange::decode(payload));
-        return format!(
-            "{opcode}{result_prefix}callee=r{callee}, this=r{this_value}, args={range}"
-        );
-    }
-    format!("{opcode}{result_prefix}callee=r{callee}, this=r{this_value}")
+    let range = format_call_range(range);
+    format!("{opcode}{result_prefix}callee=r{callee}, this=r{this_value}, args={range}")
 }
 
 fn format_small_call_instruction(
     opcode: &str,
-    result: u8,
-    callee: u8,
-    call_base: u8,
+    result: u16,
+    callee: u16,
+    call_base: u16,
     argument_count: u8,
 ) -> String {
-    let argument_base = u16::from(call_base) + 1;
+    let argument_base = call_base + 1;
     let argument_end = argument_base + u16::from(argument_count);
     format!(
         "{opcode}r{result}, callee=r{callee}, this=r{call_base}, args=[r{argument_base}..r{argument_end})"
@@ -112,16 +82,12 @@ fn format_small_call_instruction(
 
 fn format_construct_instruction(
     opcode: &str,
-    instruction_offset: usize,
-    function: &BytecodeFunction,
-    result: u8,
-    callee: u8,
+    result: u16,
+    callee: u16,
+    range: CallRange,
 ) -> String {
-    if let Some(payload) = wide_payload(function, instruction_offset) {
-        let range = format_call_range(CallRange::decode(payload));
-        return format!("{opcode}r{result}, callee=r{callee}, args={range}");
-    }
-    format!("{opcode}r{result}, callee=r{callee}")
+    let range = format_call_range(range);
+    format!("{opcode}r{result}, callee=r{callee}, args={range}")
 }
 
 fn format_named_property_instruction(
@@ -153,6 +119,23 @@ fn format_abc_instruction(
     function: &BytecodeFunction,
 ) -> String {
     match bytecode_opcode {
+        crate::Opcode::LdaUndefined
+        | crate::Opcode::LdaNull
+        | crate::Opcode::LdaTrue
+        | crate::Opcode::LdaFalse
+        | crate::Opcode::LdaZero
+        | crate::Opcode::LdaOne
+        | crate::Opcode::LdaSmi8
+        | crate::Opcode::LdaConst8 => opcode.trim_end().to_owned(),
+        crate::Opcode::Ldar => format!("{opcode}r{}", operands.a()),
+        crate::Opcode::Star0
+        | crate::Opcode::Star1
+        | crate::Opcode::Star2
+        | crate::Opcode::Star3
+        | crate::Opcode::Star4
+        | crate::Opcode::Star5
+        | crate::Opcode::Star6
+        | crate::Opcode::Star7 => format!("{opcode}r0"),
         crate::Opcode::Move
         | crate::Opcode::Negate
         | crate::Opcode::BitNot
@@ -247,6 +230,17 @@ fn format_abx_instruction(
     function: &BytecodeFunction,
 ) -> String {
     match bytecode_opcode {
+        crate::Opcode::LdaConst8 => {
+            let constant = function
+                .constants()
+                .get(usize::try_from(operands.bx()).unwrap_or(usize::MAX))
+                .map_or_else(|| format!("const[{}]", operands.bx()), format_constant);
+            format!("{opcode}const[{}] ; {constant}", operands.bx())
+        }
+        crate::Opcode::LdaSmi8 => {
+            let value = i8::from_le_bytes([operands.bx().to_le_bytes()[0]]);
+            format!("{opcode}{value}")
+        }
         crate::Opcode::LoadConst | crate::Opcode::LoadConst8 => {
             let constant = function
                 .constants()
@@ -361,7 +355,7 @@ pub fn disassemble(function: &BytecodeFunction) -> String {
         let _ = writeln!(
             output,
             "{index:04}: {}",
-            disassemble_instruction_at(index, instruction, function)
+            disassemble_instruction_at(instruction, function)
         );
     }
 
@@ -429,14 +423,10 @@ pub fn disassemble(function: &BytecodeFunction) -> String {
 
 /// Disassemble a single instruction in the context of one bytecode template.
 pub fn disassemble_instruction(instruction: &Instruction, function: &BytecodeFunction) -> String {
-    disassemble_instruction_at(usize::MAX, *instruction, function)
+    disassemble_instruction_at(*instruction, function)
 }
 
-fn disassemble_instruction_at(
-    instruction_offset: usize,
-    instruction: Instruction,
-    function: &BytecodeFunction,
-) -> String {
+fn disassemble_instruction_at(instruction: Instruction, function: &BytecodeFunction) -> String {
     let feedback_slot = instruction.feedback_slot();
     let instruction = instruction.without_feedback_slot();
     let opcode = instruction.opcode().name();
@@ -454,21 +444,21 @@ fn disassemble_instruction_at(
                 instruction.opcode().small_call_arity().unwrap_or(0),
             ),
             crate::Opcode::Call => {
-                format_call_like_instruction(&opcode, instruction_offset, function, a, b, c, true)
+                format!("{opcode}r{a}, callee=r{b}, this=r{c}")
             }
             crate::Opcode::Construct => {
-                format_construct_instruction(&opcode, instruction_offset, function, a, b)
+                format!("{opcode}r{a}, callee=r{b}")
             }
             crate::Opcode::TailCall => {
-                format_call_like_instruction(&opcode, instruction_offset, function, 0, a, b, false)
+                format!("{opcode}callee=r{a}, this=r{b}")
             }
             bytecode_opcode => {
-                let operands = abc_operands(function, instruction_offset, a, b, c);
+                let operands = abc_operands(a, b, c);
                 format_abc_instruction(&opcode, bytecode_opcode, operands, function)
             }
         },
         Instruction::Abx { opcode: _, a, bx } => {
-            let operands = abx_operands(function, instruction_offset, a, bx);
+            let operands = abx_operands(a, bx);
             format_abx_instruction(&opcode, instruction.opcode(), operands, function)
         }
         Instruction::Ax { opcode, ax } => match opcode {
@@ -486,7 +476,20 @@ fn disassemble_instruction_at(
             crate::Opcode::ReturnUndefined => opcode.name().to_owned(),
             _ => format!("{opcode_name:<16}{ax}", opcode_name = opcode.name()),
         },
-        Instruction::ProfiledAbc { .. } | Instruction::ProfiledAbx { .. } => unreachable!(),
+        Instruction::FeedbackAbc { .. } | Instruction::FeedbackAbx { .. } => unreachable!(),
+        Instruction::CallRange {
+            opcode: call_opcode,
+            a,
+            b,
+            c,
+            range,
+            ..
+        } => match call_opcode {
+            crate::Opcode::Call => format_call_like_instruction(&opcode, a, b, c, range, true),
+            crate::Opcode::TailCall => format_call_like_instruction(&opcode, 0, a, b, range, false),
+            crate::Opcode::Construct => format_construct_instruction(&opcode, a, b, range),
+            _ => unreachable!("only call-like opcodes use inline call ranges"),
+        },
     };
     if let Some(slot) = feedback_slot {
         let _ = write!(text, " ; feedback s{}", slot.get());

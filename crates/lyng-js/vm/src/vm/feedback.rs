@@ -1644,31 +1644,31 @@ impl FeedbackVector {
     /// Returns `true` once `sites` has been populated. Stays `true` for the lifetime of the
     /// vector (sites are never cleared once allocated).
     #[inline]
-    fn is_allocated(&self) -> bool {
+    const fn is_allocated(&self) -> bool {
         !self.sites.is_empty()
     }
 
     #[inline]
-    fn warmup_counter(&self) -> u16 {
+    const fn warmup_counter(&self) -> u16 {
         self.warmup_counter
     }
 
     /// Saturating increment of the warmup counter; returns the new value. Used on the cold
     /// path before allocation; once allocated the dispatch loop skips this entirely.
     #[inline]
-    fn bump_warmup(&mut self) -> u16 {
+    const fn bump_warmup(&mut self) -> u16 {
         self.warmup_counter = self.warmup_counter.saturating_add(1);
         self.warmup_counter
     }
 
     #[cfg(test)]
     #[inline]
-    fn set_warmup_for_test(&mut self, value: u16) {
+    const fn set_warmup_for_test(&mut self, value: u16) {
         self.warmup_counter = value;
     }
 
     #[inline]
-    fn sites_capacity_bytes(&self) -> usize {
+    const fn sites_capacity_bytes(&self) -> usize {
         self.sites.len() * size_of::<Option<FeedbackSiteState>>()
     }
 

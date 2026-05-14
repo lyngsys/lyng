@@ -7,7 +7,7 @@ use lyng_js_builtins::{
 use lyng_js_bytecode::{
     ArgumentsMode, BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionId, CallRange,
     CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue, DeoptSnapshot,
-    GlobalScriptInstantiationPlan, Instruction, Opcode, SafepointDescriptor, SourceMapEntry,
+    GlobalScriptInstantiationPlan, Opcode, SafepointDescriptor, SourceMapEntry,
 };
 use lyng_js_common::{AtomId, SourceId, WellKnownAtom};
 use lyng_js_compiler::dynamic::DynamicFunctionCacheKey;
@@ -143,11 +143,6 @@ impl FeedbackVectorFootprint {
 pub struct Vm {
     register_stack: Vec<Value>,
     register_stack_top: usize,
-    /// Encoded byte length of the instruction currently dispatched by `run`. The dispatch loop
-    /// decodes the next instruction once, caches its `encoded_len` here, and then uses this when
-    /// the active opcode handler calls `advance_instruction` or `jump_by` — so neither helper has
-    /// to re-decode the same bytes a second time. Reset to `0` outside an active dispatch.
-    current_instruction_len: u32,
     frames: Vec<FrameRecord>,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
@@ -211,7 +206,6 @@ impl Vm {
         Self {
             register_stack: Vec::new(),
             register_stack_top: 0,
-            current_instruction_len: 0,
             frames: Vec::new(),
             installed: Vec::new(),
             current_exception: None,
