@@ -24,6 +24,7 @@
 
 use std::sync::Arc;
 
+use lyng_js_bytecode::Opcode;
 use lyng_js_env::Agent;
 use lyng_js_host::HostHooks;
 use lyng_js_objects::NativeFunctionRegistry;
@@ -55,6 +56,10 @@ pub struct DispatchState<'vm> {
     pub(crate) frame: FrameRecord,
     pub(crate) frame_depth: usize,
     pub(crate) frame_check_epoch: u32,
+    /// Set by `op_wide` / `op_extra_wide` to widen the next handler's
+    /// operand decoding. The semantic handler consumes the prefix via
+    /// `state.prefix.take()` so subsequent handlers see `None`.
+    pub(crate) prefix: Option<Opcode>,
 }
 
 impl<'vm> DispatchState<'vm> {
@@ -205,16 +210,23 @@ pub enum Step {
 /// inside `Step::Continue`. The trampoline turns this into one indirect call
 /// per opcode.
 ///
+/// Also clears `state.prefix` so a Wide/ExtraWide prefix consumed by the
+/// just-finishing handler doesn't leak into the next handler. `op_wide` /
+/// `op_extra_wide` manually return `Step::Continue` instead of going
+/// through this macro so the prefix they just set survives until the
+/// semantic handler reads it.
+///
 /// `dispatch_next!` is the *only* place in any handler body that should
 /// reference `DISPATCH_TABLE` — Phase 1's acceptance criteria grep for this
 /// invariant.
 #[macro_export]
 macro_rules! dispatch_next {
-    ($state:expr) => {
+    ($state:expr) => {{
+        $state.prefix = None;
         return $crate::vm::dispatch_state::Step::Continue(
             $crate::vm::dispatch_state::DISPATCH_TABLE[$state.next_opcode_byte() as usize],
-        )
-    };
+        );
+    }};
 }
 
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
@@ -311,6 +323,7 @@ impl Vm {
             frame,
             frame_depth,
             frame_check_epoch,
+            prefix: None,
         };
 
         run_trampoline(&mut state)
