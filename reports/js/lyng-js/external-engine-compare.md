@@ -33,9 +33,9 @@ It runs the same standalone JavaScript workload files through Lyng JS, QuickJS, 
 
 | Workload | Category | Engine | Status | Metric | Samples | Score median | Wall-time median | Min wall-time | Max wall-time | QuickJS score ratio | QuickJS wall-time ratio | Error | Command |
 | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| `Richards` | `v8-v7` | `lyng-js` | `completed` | `score` | `1` | `221.000` | `2.330s` | `2.330s` | `2.330s` | `4.37x` | `n/a` | `` | `target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
-| `Richards` | `v8-v7` | `quickjs` | `completed` | `score` | `1` | `965.000` | `2.020s` | `2.020s` | `2.020s` | `1.00x` | `n/a` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
-| `Richards` | `v8-v7` | `boa` | `completed` | `score` | `1` | `178.000` | `2.073s` | `2.073s` | `2.073s` | `5.42x` | `n/a` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `lyng-js` | `completed` | `score` | `1` | `237.000` | `2.360s` | `2.360s` | `2.360s` | `4.07x` | `n/a` | `` | `target/release/lyng-js --shell /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `quickjs` | `completed` | `score` | `1` | `964.000` | `2.019s` | `2.019s` | `2.019s` | `1.00x` | `n/a` | `` | `/opt/homebrew/bin/qjs --script /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
+| `Richards` | `v8-v7` | `boa` | `completed` | `score` | `1` | `178.000` | `2.078s` | `2.078s` | `2.078s` | `5.42x` | `n/a` | `` | `/opt/homebrew/bin/boa /tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js` |
 
 ## Profiler Commands
 

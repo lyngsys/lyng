@@ -28,17 +28,17 @@
       ],
       "engine": "lyng-js",
       "error": null,
-      "max_ms": 2329.896791,
-      "median_ms": 2329.896791,
-      "median_score": 221.0,
+      "max_ms": 2360.4192089999997,
+      "median_ms": 2360.4192089999997,
+      "median_score": 237.0,
       "metric_kind": "score",
-      "min_ms": 2329.896791,
-      "quickjs_ratio": 4.366515837104072,
+      "min_ms": 2360.4192089999997,
+      "quickjs_ratio": 4.067510548523207,
       "samples_ms": [
-        2329.896791
+        2360.4192089999997
       ],
       "score_samples": [
-        221.0
+        237.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -53,17 +53,17 @@
       ],
       "engine": "quickjs",
       "error": null,
-      "max_ms": 2020.1096249999998,
-      "median_ms": 2020.1096249999998,
-      "median_score": 965.0,
+      "max_ms": 2018.9467909999998,
+      "median_ms": 2018.9467909999998,
+      "median_score": 964.0,
       "metric_kind": "score",
-      "min_ms": 2020.1096249999998,
+      "min_ms": 2018.9467909999998,
       "quickjs_ratio": 1.0,
       "samples_ms": [
-        2020.1096249999998
+        2018.9467909999998
       ],
       "score_samples": [
-        965.0
+        964.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -77,14 +77,14 @@
       ],
       "engine": "boa",
       "error": null,
-      "max_ms": 2073.304708,
-      "median_ms": 2073.304708,
+      "max_ms": 2077.518333,
+      "median_ms": 2077.518333,
       "median_score": 178.0,
       "metric_kind": "score",
-      "min_ms": 2073.304708,
-      "quickjs_ratio": 5.421348314606742,
+      "min_ms": 2077.518333,
+      "quickjs_ratio": 5.415730337078652,
       "samples_ms": [
-        2073.304708
+        2077.518333
       ],
       "score_samples": [
         178.0
