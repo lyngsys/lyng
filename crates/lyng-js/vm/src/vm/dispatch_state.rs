@@ -32,6 +32,7 @@ use lyng_js_types::{CodeRef, Value};
 
 use crate::error::{VmError, VmResult};
 use crate::FrameRecord;
+use lyng_js_types::AbruptCompletion;
 
 use super::dispatch_handlers;
 use super::install::InstalledFunction;
@@ -188,16 +189,31 @@ impl<'vm> DispatchState<'vm> {
     /// `Ok(None)` if the abrupt completion was caught by an active handler
     /// (the handler should `dispatch_next!` to continue at the new PC), or
     /// `Err(error)` if the abrupt completion escapes the current code.
+    ///
+    /// When a throw is caught and `transfer_to_exception_handler` unwound
+    /// frames across the trampoline boundary (callee → caller handler), the
+    /// snapshot fields in `self` (`frame`, `frame_depth`, `installed`) point
+    /// at the dead callee. Detect that case and refresh from the now-active
+    /// caller frame so the subsequent `dispatch_next!` reads from the right
+    /// bytecode. Legacy `run_dispatch_loop` got this for free via the
+    /// outer-loop re-read after `request_dispatch_frame_check`.
     #[inline]
     pub(crate) fn handle_dispatch_result<T>(&mut self, result: VmResult<T>) -> VmResult<Option<T>> {
-        let DispatchState {
-            vm,
-            agent,
-            frame,
-            frame_depth,
-            ..
-        } = self;
-        vm.handle_dispatch_result(agent, *frame_depth, frame, result)
+        let was_throw = matches!(&result, Err(VmError::Abrupt(AbruptCompletion::Throw(_))));
+        let outcome = {
+            let DispatchState {
+                vm,
+                agent,
+                frame,
+                frame_depth,
+                ..
+            } = &mut *self;
+            vm.handle_dispatch_result(agent, *frame_depth, frame, result)?
+        };
+        if was_throw && outcome.is_none() {
+            self.refresh_from_active_frame()?;
+        }
+        Ok(outcome)
     }
 
     /// Re-snapshot frame/depth/installed/epoch after a frame-changing
@@ -254,11 +270,13 @@ pub enum Step {
 /// invariant.
 #[macro_export]
 macro_rules! dispatch_next {
-    ($state:expr) => {
+    ($state:expr) => {{
+        let byte = $state.next_opcode_byte();
+        $state.vm.maybe_record_opcode_dispatch(byte);
         return $crate::vm::dispatch_state::Step::Continue(
-            $crate::vm::dispatch_state::DISPATCH_TABLE[$state.next_opcode_byte() as usize],
-        )
-    };
+            $crate::vm::dispatch_state::DISPATCH_TABLE[byte as usize],
+        );
+    }};
 }
 
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
@@ -293,7 +311,9 @@ pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
 /// be revisited.
 #[inline(never)]
 pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
-    let mut handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
+    let first_byte = state.first_opcode_byte();
+    state.vm.maybe_record_opcode_dispatch(first_byte);
+    let mut handler = DISPATCH_TABLE[first_byte as usize];
     loop {
         match (handler)(state) {
             Step::Continue(next) => handler = next,
