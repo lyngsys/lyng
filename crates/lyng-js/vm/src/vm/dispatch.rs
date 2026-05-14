@@ -590,7 +590,7 @@ impl Vm {
     }
 
     #[inline]
-    const fn dispatch_frame_check_epoch(&self) -> u32 {
+    pub(in crate::vm) const fn dispatch_frame_check_epoch(&self) -> u32 {
         self.dispatch_frame_check_epoch
     }
 
@@ -647,9 +647,19 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
+        // Phase 1 (lyng-33i2): the `trampoline-dispatch` feature swaps in the
+        // per-handler `extern "C" fn` dispatch path. Off by default until
+        // sub-3..sub-7 land real handlers for every opcode family; the cutover
+        // (sub-8, lyng-9gyk) flips the default and deletes the legacy match.
+        #[cfg(feature = "trampoline-dispatch")]
+        {
+            return self.run_via_trampoline(agent, host, registry);
+        }
+
         // Two const-generic switches at the dispatcher boundary: opcode-counter recording
         // and debugger safepoint polling. Both are zero-overhead when disabled because the
         // const propagates through `run_dispatch_loop` and LLVM strips the dead branches.
+        #[cfg(not(feature = "trampoline-dispatch"))]
         match (
             self.opcode_dispatch_counts_enabled(),
             self.debug_poll_enabled(),
