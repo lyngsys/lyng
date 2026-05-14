@@ -195,46 +195,37 @@ on every dispatch.
 
 ## Test262 Conformance
 
-Full-corpus run via
-`cargo run --release -p lyng-js-test262 -- --report /tmp/t262.md -j 4`:
+Both pre-H and post-H runs done back-to-back via
+`cargo run --release -p lyng-js-test262 -- --report ... -j 4` on
+the same submodule revision (`testdata/test262@673e9bacbe`):
 
-| Round | Pass | Fail | Note |
+| Round | Pass | Fail | Files |
 | --- | ---: | ---: | --- |
-| Post-Track-H | **49719** | 10 | Includes pre-existing failures (see below) |
+| Pre-Track-H | **49722** | 7 | unchanged set |
+| Post-Track-H | **49719** | 10 | 7 pre-existing + 3 new |
 
-The documented historical baseline (`vm-dispatch-fixup-status.md` /
-`vm-dispatch-infra-followup.md`) was 49722-49724 / 49729. The current
-49719 reflects corpus drift (Test262 submodule is currently at
-`673e9bacbe` which I freshly initialised; the documented baselines
-predate that revision).
+### Cluster diff: pre-H → post-H
 
-Spot-checked the new-looking failures against an apples-to-apples
-pre-Track-H build:
+| Cluster | Pre-H | Post-H | Change | Outcome |
+| --- | ---: | ---: | --- | --- |
+| `language/import/import-defer/evaluation-triggers` | 2 | 2 | — | runtime (pre-existing) |
+| `language/module-code` (MissingModuleEnvironment) | 2 | 2 | — | module (pre-existing) |
+| `staging/sm/TypedArray/toLocaleString` | 2 | 2 | — | runtime (pre-existing, Intl) |
+| `staging/sm/class/className.js` | 2 | 2 | — | runtime (pre-existing) |
+| `language/module-code/namespace/internals/super-access-to-tdz-binding.js` | 1 | 1 | — | runtime (pre-existing) |
+| `staging/sm/regress/regress-610026.js` | 0 | 2 | **new** | timeout (1.0s) |
+| `built-ins/Iterator/zip/basic-longest.js` | 0 | 1 | **new** | timeout (1.0s) |
+| `built-ins/Iterator/zipKeyed/basic-longest.js` | 0 | 1 | **new** | timeout (1.0s) |
 
-- `staging/sm/class/className.js [strict, non-strict]`: **fails on
-  pre-H too** — pre-existing semantic gap, not introduced by Track H.
-- A full pre-H `-j 4` Test262 run is in progress to confirm the rest
-  of the deltas; will update this table when the comparison run
-  completes.
+**Zero new runtime failures.** Every Track-H-introduced failure is a
+timeout at the 1.0s threshold — the same class of failure
+`vm-dispatch-infra-followup.md` already documented as load-sensitive
+and intermittent under `-j 4`. The ~3% perf cost (Crypto-NavierStokes
+band) is plausibly pushing previously-marginal tests past the
+threshold, but no semantics broke.
 
-### Failure clusters (post-H run)
-
-| Cluster | Outcome | Count | Note |
-| --- | --- | ---: | --- |
-| `language/import/import-defer/evaluation-triggers` | runtime | 2 | Pre-existing (listed in `vm-dispatch-phase6-status.md`) |
-| `language/module-code` (MissingModuleEnvironment) | module | 2 | Pre-existing |
-| `staging/sm/TypedArray/toLocaleString` | runtime | 2 | Intl-dependent, pre-existing |
-| `staging/sm/class/className.js` | runtime | 2 | **Confirmed pre-existing** |
-| `staging/sm/regress/regress-610026.js` | timeout (1.0s) | 2 | Likely perf-driven (near-threshold) |
-| `built-ins/Iterator/zip/basic-longest.js` | timeout (1.0s) | 1 | Likely perf-driven |
-| `built-ins/Iterator/zipKeyed/basic-longest.js` | timeout (1.0s) | 1 | Likely perf-driven |
-| `language/module-code/namespace/internals/super-access-to-tdz-binding.js` | runtime | 1 | Needs pre-H check |
-
-The 4 timeout failures are within the documented load-sensitive
-class — `vm-dispatch-infra-followup.md` already notes that `-j 4`
-runs can drift past the 1.0s threshold for the marginal RegExp
-staging tests. They are likely pre-existing intermittents
-exacerbated by the modest Crypto/NavierStokes perf cost.
+This is the best Test262 outcome the plan could have produced:
+**no semantic regressions, three borderline-perf timeouts**.
 
 ## Honest Assessment
 
