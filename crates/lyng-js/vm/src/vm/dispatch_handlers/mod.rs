@@ -21,6 +21,9 @@ use super::dispatch_state::{Handler, DISPATCH_TABLE_LEN};
 pub mod arithmetic;
 pub mod calls;
 pub mod control_flow;
+pub mod exceptions;
+pub mod generators;
+pub mod iterators;
 pub mod loads;
 pub mod names;
 pub mod opcode_stubs;
@@ -38,7 +41,7 @@ pub use arithmetic::{
 };
 pub use control_flow::{
     op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
-    op_loop_header, op_return, op_return_undefined,
+    op_loop_header, op_nop, op_return, op_return_undefined,
 };
 pub use loads::{
     op_lda_const8, op_lda_false, op_lda_null, op_lda_one, op_lda_smi8, op_lda_true,
@@ -58,6 +61,15 @@ pub use names::{
     op_capture_name, op_delete_global, op_delete_name, op_load_callee, op_load_captured_name,
     op_load_captured_name_this, op_load_global, op_load_name, op_load_new_target, op_load_this,
     op_resolve_global, op_resolve_name, op_store_global,
+};
+pub use exceptions::{op_enter_handler, op_leave_handler, op_load_exception, op_throw};
+pub use generators::{
+    op_await, op_delegate_yield, op_load_resume_kind, op_load_resume_value,
+    op_suspend_generator_start, op_yield,
+};
+pub use iterators::{
+    op_advance_for_in, op_advance_iterator, op_close_for_in, op_close_iterator, op_create_for_in,
+    op_create_iterator,
 };
 pub use scope::{
     op_assign_env_slot, op_enter_env_scope, op_leave_env_scope, op_load_env_slot,
@@ -255,6 +267,31 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::PushWithEnv as u8 as usize] = op_push_with_env;
     table[Opcode::PopWithEnv as u8 as usize] = op_pop_with_env;
     table[Opcode::TypeOf as u8 as usize] = op_type_of;
+
+    // sub-7 round 2: iterators + for-in.
+    table[Opcode::CreateForIn as u8 as usize] = op_create_for_in;
+    table[Opcode::AdvanceForIn as u8 as usize] = op_advance_for_in;
+    table[Opcode::CloseForIn as u8 as usize] = op_close_for_in;
+    table[Opcode::CreateIterator as u8 as usize] = op_create_iterator;
+    table[Opcode::AdvanceIterator as u8 as usize] = op_advance_iterator;
+    table[Opcode::CloseIterator as u8 as usize] = op_close_iterator;
+
+    // sub-7 round 3: exceptions.
+    table[Opcode::Throw as u8 as usize] = op_throw;
+    table[Opcode::EnterHandler as u8 as usize] = op_enter_handler;
+    table[Opcode::LeaveHandler as u8 as usize] = op_leave_handler;
+    table[Opcode::LoadException as u8 as usize] = op_load_exception;
+
+    // sub-7 round 4: generators / async.
+    table[Opcode::SuspendGeneratorStart as u8 as usize] = op_suspend_generator_start;
+    table[Opcode::Yield as u8 as usize] = op_yield;
+    table[Opcode::DelegateYield as u8 as usize] = op_delegate_yield;
+    table[Opcode::Await as u8 as usize] = op_await;
+    table[Opcode::LoadResumeKind as u8 as usize] = op_load_resume_kind;
+    table[Opcode::LoadResumeValue as u8 as usize] = op_load_resume_value;
+
+    // sub-7 round 5: Nop.
+    table[Opcode::Nop as u8 as usize] = op_nop;
 
     table
 }

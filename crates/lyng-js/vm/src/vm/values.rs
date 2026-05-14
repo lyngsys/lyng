@@ -705,7 +705,7 @@ impl Vm {
             .map(lyng_js_env::EnvironmentBindingLayout::flags)
     }
 
-    pub(super) fn property_key_to_enumeration_value(
+    pub(in crate::vm) fn property_key_to_enumeration_value(
         &self,
         agent: &mut Agent,
         key: PropertyKey,

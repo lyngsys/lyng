@@ -433,7 +433,7 @@ impl Vm {
         self.delete_property_from_object(agent, object, key)
     }
 
-    pub(super) fn create_for_in_enumerator_for_value(
+    pub(in crate::vm) fn create_for_in_enumerator_for_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -473,7 +473,7 @@ impl Vm {
         Ok(ForInEnumerator::new(keys))
     }
 
-    pub(super) fn create_iterator_for_value(
+    pub(in crate::vm) fn create_iterator_for_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -528,7 +528,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn advance_iterator_state(
+    pub(in crate::vm) fn advance_iterator_state(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
