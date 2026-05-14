@@ -85,8 +85,52 @@ After Tracks A + D + IC inline hint (Richards):
 | Other handler bodies | rest | — |
 
 `decode_dispatch_instruction` and `dispatch_operand_form` are
-**absent** from the post profile. The dispatch *infrastructure* cost is
-gone; remaining time is in handler bodies + IC machinery.
+**absent as separate symbols** from the post profile — but the *work*
+they did was inlined into `run_dispatch_loop`, not eliminated. Earlier
+revisions of this doc claimed "dispatch infrastructure cost is gone" /
+"the profile confirms decode is gone." Both overstate what Track A
+delivered.
+
+### What Track A actually bought
+
+- Removed the **function-call boundary** around decode — no
+  register-spill/reload, no prologue/epilogue. That's worth a
+  meaningful chunk on its own.
+- Opened up **Track D's inline SMI fast paths**. Without Track A, the
+  decode return type forced a uniform calling convention that prevented
+  per-arm SMI continuation; once decode was inline the SMI fast paths
+  could `continue;` the loop directly.
+- The +22% on Richards is consistent with **"removed call overhead +
+  inlined SMI arithmetic,"** not "removed decode."
+
+### Symbol-level fresh sample (Richards on current main, 12429 samples)
+
+Decoded offsets inside `run_dispatch_loop`:
+
+| Offset | Samples | What it is |
+| --- | ---: | --- |
+| +740 / +404 (collapsed) | 5156 | Back-edge frame-validity check + register-zero between the two `br x0` jump tables |
+| +9740 | 2589 | Post-call return-handling for `execute_get_named_property_opcode` (the `ldr [sp,#0xda0]; cmp; b.ne; b loop_top` epilogue after every helper call) |
+| +2256 | 1027 | Post-call return-handling for `call_value_small` |
+| +2904 | 874 | Same shape, another helper call site |
+
+There are **three indirect branches** still threaded into the loop
+body:
+
+1. **Offset +628** (`br x0`) — prefix opcode dispatch (Wide / ExtraWide).
+2. **Offset +764** (`br x0`) — main opcode dispatch.
+3. **Offset +2092** (`br x13`) — operand-form dispatch.
+
+Plus a per-iteration back-edge that re-validates the active frame
+against a cookie before reading the next instruction (the +404 region),
+and a chain of `mov w<N>, #0` register-zeroing instructions between the
+dispatch layers.
+
+**Roughly 30-40% of the `run_dispatch_loop` self-time is still dispatch
+infrastructure** — three sequential jump tables, the back-edge
+frame-validity check, and the post-helper return-handling sequence. The
+decode *work* didn't disappear; the function-call boundary around it
+did.
 
 ## Tracks B And C — Attempted and Documented
 
@@ -155,8 +199,9 @@ the "fix the IC tax" side conversation that delivered real wins
 ## Where The Remaining Gap Lives
 
 Post-fixup we are still 1.9-4.1x slower than QuickJS. The remaining
-delta is **not in dispatch** — the profile confirms decode is gone.
-The next places to look:
+delta has two parts:
+
+### Handler-body / IC / call work
 
 - **Compiler Move elimination via direct argument lowering** (real
   Track C, deferred): 27-50% of dispatches are still Move. Each Move
@@ -170,9 +215,49 @@ The next places to look:
   is the symmetric IC path to the load we inlined. Same inline hints
   should help similarly.
 
-A second-pass focused on these three would likely deliver another
-15-30%. Threaded dispatch (Phase 7) still doesn't look needed — the
-central match is not the bottleneck.
+### Remaining dispatch infrastructure (revised)
+
+Earlier drafts of this doc said "threaded dispatch (Phase 7) doesn't
+look needed — the central match is not the bottleneck." That conclusion
+is **wrong** in the form it was stated. The central `match` *itself*
+is fine — LLVM lowers it cleanly. But there are **three sequential
+jump tables plus a back-edge cookie check plus per-helper return
+epilogues** still inlined into the loop body, accounting for ~30-40%
+of `run_dispatch_loop` self-time. That is dispatch infrastructure
+even if it no longer shows up under a separate symbol name.
+
+Three structural items to attack, in order of expected impact:
+
+1. **Collapse the 3-layer jump table.** Today: prefix opcode → main
+   opcode → operand form, each its own `br`. A single table indexed by
+   `(prefix, opcode)` with the operand form folded into each arm
+   eliminates two of the three indirect branches per iteration. This
+   is essentially what direct-threaded dispatch buys, and is the same
+   territory Phase 7 deferred. The Phase 7 evaluation cited "the
+   central match already lowers to a jump table" — true at the source
+   level but missing that there are **three** jump tables, not one.
+2. **Drop the per-iteration back-edge cookie check.** Today every loop
+   iteration re-validates `frame_depth == stored_depth` even on
+   opcodes that can't change the frame. Re-validation only needs to
+   happen after `Call` / `Return` / `Throw` / `Yield` / `Await` and
+   handler entry/exit. The +404 region samples (~5k / 12.4k) are
+   largely this check + register-zero in the back-edge.
+3. **Inline helper return-handling.** Every non-leaf opcode arm has a
+   4-instruction epilogue after the `bl` to the helper
+   (`ldr [sp,#0xda0]; cmp; b.ne; b loop_top`). The +9740 / +2256 /
+   +2904 hot offsets (~4.5k / 12.4k samples combined) are these
+   epilogues for the three hottest helpers
+   (`execute_get_named_property_opcode`, `call_value_small`, another
+   helper at +2904). Marking the hot helpers `#[inline]` — or adding
+   a fast-return shape so the helper returns the same shape the loop
+   expects without the explicit re-check — should fold this back into
+   the helper itself.
+
+A second pass on items 1 + 2 + 3 plus the three handler-body items
+above would plausibly deliver another **30-50% combined**. Phase 7
+(direct-threaded dispatch) is the right *direction* for item 1; the
+specific implementation should be revisited against the current
+profile, not the old "single jump table" framing.
 
 ## Reproduce
 
