@@ -137,6 +137,16 @@ impl<'vm> DispatchState<'vm> {
         vm.finish_frame(agent, value)
     }
 
+    /// Read constant `bx` from the active function's constant pool. Splits
+    /// the `&mut vm` + `&mut agent` borrow that `Vm::read_constant`
+    /// requires.
+    #[inline]
+    pub(crate) fn read_constant(&mut self, bx: u32) -> VmResult<Value> {
+        let code = self.frame.code();
+        let DispatchState { vm, agent, .. } = self;
+        vm.read_constant(agent, code, bx)
+    }
+
     /// Re-snapshot frame/depth/installed/epoch after a frame-changing
     /// operation. Required after a return that didn't terminate the script
     /// (caller frame is now active) or after a call (callee frame is now

@@ -26,10 +26,12 @@ pub mod stub;
 
 pub use control_flow::{op_jump, op_jump8, op_loop_header, op_return, op_return_undefined};
 pub use loads::{
-    op_lda_false, op_lda_null, op_lda_one, op_lda_true, op_lda_undefined, op_lda_zero,
-    op_load_false, op_load_null, op_load_one, op_load_true, op_load_undefined,
-    op_load_uninitialized_lexical, op_load_zero, op_move, op_star_0, op_star_1, op_star_2,
-    op_star_3, op_star_4, op_star_5, op_star_6, op_star_7,
+    op_lda_const8, op_lda_false, op_lda_null, op_lda_one, op_lda_smi8, op_lda_true,
+    op_lda_undefined, op_lda_zero, op_ldar, op_load_const, op_load_const8, op_load_false,
+    op_load_local_0, op_load_local_1, op_load_local_2, op_load_local_3, op_load_null, op_load_one,
+    op_load_smi, op_load_smi8, op_load_true, op_load_undefined, op_load_uninitialized_lexical,
+    op_load_zero, op_move, op_star_0, op_star_1, op_star_2, op_star_3, op_star_4, op_star_5,
+    op_star_6, op_star_7, op_store_local_0, op_store_local_1, op_store_local_2, op_store_local_3,
 };
 
 /// Build the dispatch table at compile time.
@@ -85,6 +87,25 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::Star5 as u8 as usize] = op_star_5;
     table[Opcode::Star6 as u8 as usize] = op_star_6;
     table[Opcode::Star7 as u8 as usize] = op_star_7;
+
+    table[Opcode::LdaSmi8 as u8 as usize] = op_lda_smi8;
+    table[Opcode::LdaConst8 as u8 as usize] = op_lda_const8;
+    table[Opcode::Ldar as u8 as usize] = op_ldar;
+
+    table[Opcode::LoadSmi as u8 as usize] = op_load_smi;
+    table[Opcode::LoadSmi8 as u8 as usize] = op_load_smi8;
+    table[Opcode::LoadConst as u8 as usize] = op_load_const;
+    table[Opcode::LoadConst8 as u8 as usize] = op_load_const8;
+
+    table[Opcode::LoadLocal0 as u8 as usize] = op_load_local_0;
+    table[Opcode::LoadLocal1 as u8 as usize] = op_load_local_1;
+    table[Opcode::LoadLocal2 as u8 as usize] = op_load_local_2;
+    table[Opcode::LoadLocal3 as u8 as usize] = op_load_local_3;
+
+    table[Opcode::StoreLocal0 as u8 as usize] = op_store_local_0;
+    table[Opcode::StoreLocal1 as u8 as usize] = op_store_local_1;
+    table[Opcode::StoreLocal2 as u8 as usize] = op_store_local_2;
+    table[Opcode::StoreLocal3 as u8 as usize] = op_store_local_3;
 
     table[Opcode::Jump as u8 as usize] = op_jump;
     table[Opcode::Jump8 as u8 as usize] = op_jump8;

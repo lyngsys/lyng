@@ -18,7 +18,11 @@
 
 use lyng_js_types::Value;
 
-use crate::vm::dispatch::{decode_abc_operands, decode_abx_operands, decode_accumulator_operands};
+use crate::vm::dispatch::{
+    decode_abc_operands, decode_abx8_operands, decode_abx_operands,
+    decode_accumulator_byte_operands, decode_accumulator_operands,
+    decode_accumulator_register_operands, decode_local_operands,
+};
 use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::{dispatch_next, try_step};
 
@@ -138,3 +142,186 @@ op_star_n!(op_star_4, 4);
 op_star_n!(op_star_5, 5);
 op_star_n!(op_star_6, 6);
 op_star_n!(op_star_7, 7);
+
+// =====================================================================
+// Lda* with operands — small SMI, constant pool, register-to-accumulator.
+// =====================================================================
+
+pub extern "C" fn op_lda_smi8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (bx, _feedback_slot, instruction_len) = try_step!(decode_accumulator_byte_operands(
+        state.current_bytes(),
+        false,
+        code,
+        pc,
+    ));
+    let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
+    let registers = state.frame.registers();
+    state
+        .vm
+        .write_register(registers, 0, Value::from_smi(i32::from(value)));
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_lda_const8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (bx, _feedback_slot, instruction_len) = try_step!(decode_accumulator_byte_operands(
+        state.current_bytes(),
+        false,
+        code,
+        pc,
+    ));
+    let value = try_step!(state.read_constant(bx));
+    let registers = state.frame.registers();
+    state.vm.write_register(registers, 0, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_ldar(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, _feedback_slot, instruction_len) = try_step!(decode_accumulator_register_operands(
+        state.current_bytes(),
+        false,
+        code,
+        pc,
+    ));
+    let registers = state.frame.registers();
+    let value = state.vm.read_register(registers, a);
+    state.vm.write_register(registers, 0, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+// =====================================================================
+// Load* with operands — SMI, constant, all into an explicit register a.
+// =====================================================================
+
+pub extern "C" fn op_load_smi(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        None,
+        false,
+        code,
+        pc,
+    ));
+    let bytes = bx.to_le_bytes();
+    let value = i16::from_le_bytes([bytes[0], bytes[1]]);
+    let registers = state.frame.registers();
+    state
+        .vm
+        .write_register(registers, a, Value::from_smi(i32::from(value)));
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_load_smi8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx8_operands(
+        state.current_bytes(),
+        false,
+        code,
+        pc,
+    ));
+    let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
+    let registers = state.frame.registers();
+    state
+        .vm
+        .write_register(registers, a, Value::from_smi(i32::from(value)));
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_load_const(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+        state.current_bytes(),
+        None,
+        false,
+        code,
+        pc,
+    ));
+    let value = try_step!(state.read_constant(bx));
+    let registers = state.frame.registers();
+    state.vm.write_register(registers, a, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_load_const8(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx8_operands(
+        state.current_bytes(),
+        false,
+        code,
+        pc,
+    ));
+    let value = try_step!(state.read_constant(bx));
+    let registers = state.frame.registers();
+    state.vm.write_register(registers, a, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+// =====================================================================
+// LoadLocal0..3 / StoreLocal0..3 — fixed local-index ↔ explicit register.
+// =====================================================================
+
+macro_rules! op_load_local_n {
+    ($name:ident, $local:expr) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let (a, _feedback_slot, instruction_len) = try_step!(decode_local_operands(
+                state.current_bytes(),
+                false,
+                code,
+                pc,
+            ));
+            let registers = state.frame.registers();
+            let value = state.vm.read_register(registers, $local);
+            state.vm.write_register(registers, a, value);
+            state.advance(instruction_len);
+            dispatch_next!(state);
+        }
+    };
+}
+
+op_load_local_n!(op_load_local_0, 0);
+op_load_local_n!(op_load_local_1, 1);
+op_load_local_n!(op_load_local_2, 2);
+op_load_local_n!(op_load_local_3, 3);
+
+macro_rules! op_store_local_n {
+    ($name:ident, $local:expr) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let (a, _feedback_slot, instruction_len) = try_step!(decode_local_operands(
+                state.current_bytes(),
+                false,
+                code,
+                pc,
+            ));
+            let registers = state.frame.registers();
+            let value = state.vm.read_register(registers, a);
+            state.vm.write_register(registers, $local, value);
+            state.advance(instruction_len);
+            dispatch_next!(state);
+        }
+    };
+}
+
+op_store_local_n!(op_store_local_0, 0);
+op_store_local_n!(op_store_local_1, 1);
+op_store_local_n!(op_store_local_2, 2);
+op_store_local_n!(op_store_local_3, 3);
