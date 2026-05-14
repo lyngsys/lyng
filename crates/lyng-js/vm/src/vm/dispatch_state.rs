@@ -27,7 +27,6 @@ use lyng_js_types::{CodeRef, Value};
 
 use crate::error::{VmError, VmResult};
 use crate::FrameRecord;
-use lyng_js_types::AbruptCompletion;
 
 use super::dispatch_handlers;
 use super::install::InstalledFunction;
@@ -158,30 +157,20 @@ impl<'vm> DispatchState<'vm> {
     /// (the handler should `dispatch_next!` to continue at the new PC), or
     /// `Err(error)` if the abrupt completion escapes the current code.
     ///
-    /// When a throw is caught and `transfer_to_exception_handler` unwound
-    /// frames across the trampoline boundary (callee → caller handler), the
-    /// snapshot fields in `self` (`frame`, `frame_depth`, `installed`) point
-    /// at the dead callee. Detect that case and refresh from the now-active
-    /// caller frame so the subsequent `dispatch_next!` reads from the right
-    /// bytecode. Legacy `run_dispatch_loop` got this for free via the
-    /// outer-loop re-read after `request_dispatch_frame_check`.
+    /// Frame-state refresh after a cross-frame catch happens in
+    /// `run_trampoline`'s epoch check, not here — `Vm::handle_dispatch_result`
+    /// bumps the dispatch-frame-check epoch via `request_dispatch_frame_check`,
+    /// so the trampoline picks up the unwind on the next iteration.
     #[inline]
     pub(crate) fn handle_dispatch_result<T>(&mut self, result: VmResult<T>) -> VmResult<Option<T>> {
-        let was_throw = matches!(&result, Err(VmError::Abrupt(AbruptCompletion::Throw(_))));
-        let outcome = {
-            let DispatchState {
-                vm,
-                agent,
-                frame,
-                frame_depth,
-                ..
-            } = &mut *self;
-            vm.handle_dispatch_result(agent, *frame_depth, frame, result)?
-        };
-        if was_throw && outcome.is_none() {
-            self.refresh_from_active_frame()?;
-        }
-        Ok(outcome)
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = self;
+        vm.handle_dispatch_result(agent, *frame_depth, frame, result)
     }
 
     /// Re-snapshot frame/depth/installed/epoch after a frame-changing
@@ -292,7 +281,46 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
     let mut handler = DISPATCH_TABLE[first_byte as usize];
     loop {
         match (handler)(state) {
-            Step::Continue(next) => handler = next,
+            Step::Continue(next) => {
+                // Mirror legacy's inner-loop epoch check + `active_in` validation.
+                // The Vm bumps the epoch via `request_dispatch_frame_check`
+                // whenever frame state changes (function call/return, exception
+                // transfer). When that fires we have to decide: is `state.frame`
+                // still the active frame, or did the underlying frame stack
+                // change?
+                //
+                // - Property getter calls, builtin invocations, etc. bump the
+                //   epoch but leave `self.frames.last()` pointing at the same
+                //   caller frame. The handler-local pc advance in `state.frame`
+                //   is the source of truth (the legacy helpers don't write back
+                //   to `self.frames` on success). DON'T refresh — clobbering
+                //   pc with `self.frames.last()` would revert the advance and
+                //   re-dispatch the same opcode (the bug behind a 30 GB OOM in
+                //   nested-call hot paths).
+                //
+                // - Cross-frame exception transfer or a call's manual refresh
+                //   (handlers in `calls.rs`) bumps the epoch AND changes which
+                //   frame is on top. Frame depth / top-frame code differs from
+                //   `state`'s snapshot — refresh and re-dispatch from the new
+                //   active frame's pc.
+                if state.frame_check_epoch != state.vm.dispatch_frame_check_epoch() {
+                    state.frame_check_epoch = state.vm.dispatch_frame_check_epoch();
+                    let still_active = state.frame_depth == state.vm.frames().len()
+                        && state
+                            .vm
+                            .frames()
+                            .last()
+                            .is_some_and(|f| f.code() == state.frame.code());
+                    if !still_active {
+                        state.refresh_from_active_frame()?;
+                        let byte = state.first_opcode_byte();
+                        state.vm.maybe_record_opcode_dispatch(byte);
+                        handler = DISPATCH_TABLE[byte as usize];
+                        continue;
+                    }
+                }
+                handler = next;
+            }
             Step::Done(value) => return Ok(value),
             Step::Error(error) => return Err(error),
         }
