@@ -2,7 +2,7 @@ use super::{code_index, Agent, FrameRecord, InstalledFunction, Value, Vm, VmResu
 use lyng_js_bytecode::{ExceptionHandler, ExceptionHandlerKind, Instruction, Opcode};
 
 impl Vm {
-    pub(super) fn transfer_to_exception_handler(
+    pub(in crate::vm) fn transfer_to_exception_handler(
         &mut self,
         agent: &mut Agent,
         thrown: Value,

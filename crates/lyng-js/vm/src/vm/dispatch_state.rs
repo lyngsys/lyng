@@ -314,6 +314,53 @@ impl Vm {
             .cloned()
     }
 
+    /// Read the for-in enumerator slot off the side table. Mirrors the
+    /// legacy `self.for_in_states.advance(agent, base, register)` direct
+    /// access from a trampoline-safe wrapper.
+    #[inline]
+    pub(in crate::vm) fn for_in_advance(
+        &mut self,
+        agent: &mut lyng_js_env::Agent,
+        base: u32,
+        register: u16,
+    ) -> VmResult<Option<lyng_js_types::PropertyKey>> {
+        self.for_in_states.advance(agent, base, register)
+    }
+
+    /// Insert an iterator enumerator into the for-in side table.
+    #[inline]
+    pub(in crate::vm) fn for_in_insert(
+        &mut self,
+        base: u32,
+        register: u16,
+        enumerator: lyng_js_ops::enumeration::ForInEnumerator,
+    ) {
+        self.for_in_states.insert(base, register, enumerator);
+    }
+
+    /// Drop the for-in enumerator at `register`.
+    #[inline]
+    pub(in crate::vm) fn for_in_remove(&mut self, base: u32, register: u16) {
+        let _ = self.for_in_states.remove(base, register);
+    }
+
+    /// Insert an iterator state into the iterator side table.
+    #[inline]
+    pub(in crate::vm) fn iterator_insert(
+        &mut self,
+        base: u32,
+        register: u16,
+        iterator: lyng_js_ops::iterator::IteratorRecord,
+    ) {
+        self.iterator_states.insert(base, register, iterator);
+    }
+
+    /// Read the current exception (used by `LoadException`).
+    #[inline]
+    pub(in crate::vm) fn current_exception_value(&self) -> Value {
+        self.current_exception().unwrap_or_else(Value::undefined)
+    }
+
     /// Bridge from the live `Vm::run` entrypoint into the trampoline
     /// dispatch path. Constructs a `DispatchState` from the current active
     /// frame, then hands control to `run_trampoline`.

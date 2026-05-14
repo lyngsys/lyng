@@ -487,3 +487,47 @@ fn trampoline_executes_typeof() {
         "typeof should produce a string Value, got {result:?}"
     );
 }
+
+#[test]
+fn trampoline_executes_for_of_loop() {
+    let unit = compile_test_unit(35, "let sum = 0; for (let x of [1, 2, 3, 4, 5]) { sum = sum + x }; sum");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(15));
+}
+
+#[test]
+fn trampoline_executes_for_in_loop() {
+    let unit = compile_test_unit(36, "let count = 0; for (let _k in { a: 1, b: 2, c: 3 }) { count = count + 1 }; count");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(3));
+}
+
+#[test]
+fn trampoline_executes_try_catch_with_thrown_value() {
+    let unit = compile_test_unit(37, "let v = 0; try { throw 42 } catch (e) { v = e }; v");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
+fn trampoline_executes_while_loop() {
+    let unit = compile_test_unit(38, "let i = 0; while (i < 10) { i = i + 1 }; i");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(10));
+}

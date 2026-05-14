@@ -150,7 +150,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
     )]
-    pub(super) fn await_value(
+    pub(in crate::vm) fn await_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

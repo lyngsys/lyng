@@ -27,6 +27,15 @@ use crate::vm::dispatch_state::{DispatchState, Step};
 use crate::vm::Vm;
 use crate::{dispatch_next, try_step};
 
+pub extern "C" fn op_nop(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (_ax, _feedback_slot, instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
 pub extern "C" fn op_jump(state: &mut DispatchState) -> Step {
     let code = state.frame.code();
     let pc = state.frame.instruction_offset();

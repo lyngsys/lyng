@@ -774,7 +774,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn suspend_current_generator_frame(
+    pub(in crate::vm) fn suspend_current_generator_frame(
         &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
@@ -800,7 +800,7 @@ impl Vm {
         })
     }
 
-    pub(super) fn suspend_generator_start(
+    pub(in crate::vm) fn suspend_generator_start(
         &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
@@ -828,7 +828,7 @@ impl Vm {
         clippy::too_many_lines,
         reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
     )]
-    pub(super) fn delegate_yield(
+    pub(in crate::vm) fn delegate_yield(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
