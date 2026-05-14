@@ -26,8 +26,9 @@ pub mod prefix;
 pub mod stub;
 
 pub use arithmetic::{
-    op_add, op_add_smi, op_bit_not, op_decrement, op_increment, op_mul, op_mul_smi, op_negate,
-    op_sub, op_sub_smi,
+    op_add, op_add_smi, op_bit_not, op_decrement, op_equal, op_equal_zero, op_greater_equal,
+    op_greater_than, op_increment, op_less_equal, op_less_than, op_mul, op_mul_smi, op_negate,
+    op_strict_equal, op_sub, op_sub_smi,
 };
 pub use control_flow::{
     op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
@@ -140,6 +141,13 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::BitNot as u8 as usize] = op_bit_not;
     table[Opcode::Increment as u8 as usize] = op_increment;
     table[Opcode::Decrement as u8 as usize] = op_decrement;
+    table[Opcode::Equal as u8 as usize] = op_equal;
+    table[Opcode::StrictEqual as u8 as usize] = op_strict_equal;
+    table[Opcode::EqualZero as u8 as usize] = op_equal_zero;
+    table[Opcode::LessThan as u8 as usize] = op_less_than;
+    table[Opcode::LessEqual as u8 as usize] = op_less_equal;
+    table[Opcode::GreaterThan as u8 as usize] = op_greater_than;
+    table[Opcode::GreaterEqual as u8 as usize] = op_greater_equal;
 
     table
 }
