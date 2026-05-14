@@ -324,6 +324,7 @@ impl Vm {
         self.frames.push(frame);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
+        self.request_dispatch_frame_check();
         Ok(())
     }
 

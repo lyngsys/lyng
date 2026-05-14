@@ -1,0 +1,515 @@
+Analysis of sampling lyng-js (pid 31827) every 1 millisecond
+Process:         lyng-js [31827]
+Path:            /Users/USER/*/lyng-js
+Load Address:    0x100c48000
+Identifier:      lyng-js
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  codex [79924]
+Target Type:     live task
+
+Date/Time:       2026-05-14 14:16:55.669 +0200
+Launch Time:     2026-05-14 14:16:41.817 +0200
+OS Version:      macOS 26.4.1 (25E253)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         25.0M
+Physical footprint (peak):  31.4M
+Idle exit:                  untracked
+----
+
+Call graph:
+    12354 Thread_111037490   DispatchQueue_1: com.apple.main-thread  (serial)
+      12354 start  (in dyld) + 6992  [0x18b073da4]
+        12354 main  (in lyng-js) + 52  [0x100c54bdc]
+          12354 std::rt::lang_start_internal::h48672da3ca81ba76  (in lyng-js) + 932  [0x100f564b8]
+            12354 std::rt::lang_start::_$u7b$$u7b$closure$u7d$$u7d$::hf8250c0c3e45377e  (in lyng-js) + 16  [0x100c54ae8]
+              12354 std::sys::backtrace::__rust_begin_short_backtrace::h5cdc225d0d6a8489  (in lyng-js) + 12  [0x100c54b00]
+                12354 lyng_js::main::hdeb25c4d37704675  (in lyng-js) + 24  [0x100c54b3c]
+                  12354 lyng_js_cli::run_from_env::h10b4a6439b97fd2b  (in lyng-js) + 928  [0x100cc089c]
+                    12354 lyng_js_cli::run::hb1b196f23d9f2c42  (in lyng-js) + 348  [0x100cc0b40]
+                      12354 lyng_js_cli::execution::run_script::h563063d128165bfc  (in lyng-js) + 4292  [0x100cb5440]
+                        12354 lyng_js_vm::vm::Vm::evaluate_script_with_registry_and_host_referrer_and_extensions::h37eee5485b0af101  (in lyng-js) + 280  [0x100dff4e4]
+                          12354 lyng_js_vm::vm::Vm::evaluate_script_with_registry_and_host_referrer::hed454ed731089399  (in lyng-js) + 380  [0x100dff3ac]
+                            12354 lyng_js_vm::vm::Vm::evaluate_entry_with_registry_and_checkpoint::h5d1fa19bef78eb62  (in lyng-js) + 88  [0x100dff140]
+                              12354 lyng_js_vm::vm::Vm::evaluate_entry_with_registry_from_offset::hc3e98ebb44b5e8be  (in lyng-js) + 1416  [0x100dfea80]
+                                4783 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 740,420,...  [0x100e1d8b4,0x100e1d774,...]
+                                2915 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 9740  [0x100e1fbdc]
+                                + 1739 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js) + 676  [0x100e454cc]
+                                + ! 724 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 300  [0x100e4af08]
+                                + ! : 724 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::load_from_named_property_cache::ha7a03fbaa97bc759  (in lyng-js) + 12,892,...  [0x100e4be88,0x100e4c1f8,...]
+                                + ! 527 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 16,100,...  [0x100e4adec,0x100e4ae40,...]
+                                + ! 269 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 152  [0x100e4ae74]
+                                + ! : 269 lyng_js_objects::runtime::ObjectRuntime::object_header::he56cc74609909ebb  (in lyng-js) + 148,44,...  [0x100d5ddfc,0x100d5dd94,...]
+                                + ! 143 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 432  [0x100e4af8c]
+                                + ! : 143 lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution::h643a0f42e5639b16  (in lyng-js) + 0,124,...  [0x100e49190,0x100e4920c,...]
+                                + ! 72 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 444  [0x100e4af98]
+                                + ! : 72 lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_feedback_event::hadacccf6741ef1ca  (in lyng-js) + 100,0,...  [0x100e17644,0x100e175e0,...]
+                                + ! 4 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::load_from_named_property_cache::ha7a03fbaa97bc759  (in lyng-js) + 900  [0x100e4c200]
+                                + 568 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js) + 44,252,...  [0x100e45254,0x100e45324,...]
+                                + 545 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 328,324  [0x100e4af24,0x100e4af20]
+                                + 37 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js) + 804  [0x100e4554c]
+                                + ! 32 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_value::hc64d8f39989b3097  (in lyng-js) + 264  [0x100de3f54]
+                                + ! : 32 lyng_js_ops::proxy::get::h33254bbdabfda0c9  (in lyng-js) + 520  [0x100e8ca14]
+                                + ! :   7 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object::h8777c2841228c751  (in lyng-js) + 348  [0x100de44f4]
+                                + ! :   | 5 lyng_js_ops::proxy::get::h33254bbdabfda0c9  (in lyng-js) + 520  [0x100e8ca14]
+                                + ! :   | + 3 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 248  [0x100de6290]
+                                + ! :   | + ! 2 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 4,352  [0x100d56784,0x100d568e0]
+                                + ! :   | + ! 1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 432  [0x100d56930]
+                                + ! :   | + !   1 lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 224  [0x100d889b8]
+                                + ! :   | + 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 64,108  [0x100de61d8,0x100de6204]
+                                + ! :   | 2 lyng_js_ops::proxy::get::h33254bbdabfda0c9  (in lyng-js) + 52  [0x100e8c840]
+                                + ! :   7 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 248  [0x100de6290]
+                                + ! :   | 3 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 432  [0x100d56930]
+                                + ! :   | + 3 lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 48,240,...  [0x100d88908,0x100d889c8,...]
+                                + ! :   | 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 1484  [0x100de6764]
+                                + ! :   | + 2 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::get_prototype_of::h12ed6c2638235873  (in lyng-js) + 52,104  [0x100d58040,0x100d58074]
+                                + ! :   | 1 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::get_own_property::h3edc767488902304  (in lyng-js) + 164  [0x100d57c78]
+                                + ! :   | 1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 28  [0x100d5679c]
+                                + ! :   6 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 1188,208,...  [0x100de663c,0x100de6268,...]
+                                + ! :   5 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 96  [0x100de61f8]
+                                + ! :   | 3 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace::h7f81dbe88d6f9a87  (in lyng-js) + 8,44  [0x100de6990,0x100de69b4]
+                                + ! :   | 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace_object::h0ce0e48e23b662a4  (in lyng-js) + 44  [0x100de716c]
+                                + ! :   3 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object::h8777c2841228c751  (in lyng-js) + 64,168,...  [0x100de43d8,0x100de4440,...]
+                                + ! :   2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace_object::h0ce0e48e23b662a4  (in lyng-js) + 728  [0x100de7418]
+                                + ! :   1 lyng_js_ops::proxy::get::h33254bbdabfda0c9  (in lyng-js) + 540  [0x100e8ca28]
+                                + ! :   1 lyng_js_ops::typed_array::numeric_key::hfd1a0de58831e3b1  (in lyng-js) + 232  [0x100d95f70]
+                                + ! 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_value::hc64d8f39989b3097  (in lyng-js) + 136  [0x100de3ed4]
+                                + ! : 2 lyng_js_ops::object::primitive_wrappers::to_object::hc6fa19558dc782cc  (in lyng-js) + 0,56  [0x100d95ca8,0x100d95ce0]
+                                + ! 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_value::hc64d8f39989b3097  (in lyng-js) + 200  [0x100de3f14]
+                                + ! : 2 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace_object::h0ce0e48e23b662a4  (in lyng-js) + 44  [0x100de716c]
+                                + ! 1 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_value::hc64d8f39989b3097  (in lyng-js) + 40  [0x100de3e74]
+                                + 25 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js) + 884  [0x100e4559c]
+                                + ! 12 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_named_property_slow_path::ha4ebc90567a9cffa  (in lyng-js) + 108  [0x100e4a6f0]
+                                + ! : 8 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::plan_named_property_cache_entry::hce3455c22c213c0c  (in lyng-js) + 44,84,...  [0x100d5571c,0x100d55744,...]
+                                + ! : 4 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::plan_named_property_cache_entry::hce3455c22c213c0c  (in lyng-js) + 352  [0x100d55850]
+                                + ! :   4 lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 48,240,...  [0x100d88908,0x100d889c8,...]
+                                + ! 10 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_named_property_slow_path::ha4ebc90567a9cffa  (in lyng-js) + 188,208,...  [0x100e4a740,0x100e4a754,...]
+                                + ! 2 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_named_property_slow_path::ha4ebc90567a9cffa  (in lyng-js) + 72  [0x100e4a6cc]
+                                + ! : 2 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::ensure_feedback_slot_execution::hb9fbd8dffc2816ae  (in lyng-js) + 44,400  [0x100e4a250,0x100e4a3b4]
+                                + ! 1 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::plan_named_property_cache_entry::hce3455c22c213c0c  (in lyng-js) + 152  [0x100d55788]
+                                + 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_named_property_slow_path::ha4ebc90567a9cffa  (in lyng-js) + 292  [0x100e4a7a8]
+                                1002 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 2256  [0x100e1dea0]
+                                + 886 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_value_small::hb04d13c5c58cb525  (in lyng-js) + 448  [0x100e00fe4]
+                                + ! 692 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 288  [0x100e02268]
+                                + ! : 328 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js) + 356  [0x100ddcd54]
+                                + ! : | 183 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 48,812,...  [0x100dddf00,0x100dde1fc,...]
+                                + ! : | 102 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 376  [0x100dde048]
+                                + ! : | + 96 _platform_memset_pattern16  (in libsystem_platform.dylib) + 208,228,...  [0x18b437250,0x18b437264,...]
+                                + ! : | + 6 DYLD-STUB$$memset_pattern16  (in lyng-js) + 4  [0x100f94d6c]
+                                + ! : | 33 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 992  [0x100dde2b0]
+                                + ! : | + 33 lyng_js_vm::vm::Vm::poll_debug_safepoint::h9c56dc3f47bb6cdd  (in lyng-js) + 28,348,...  [0x100dfde90,0x100dfdfd0,...]
+                                + ! : | 10 lyng_js_vm::vm::Vm::poll_debug_safepoint::h9c56dc3f47bb6cdd  (in lyng-js) + 364,352  [0x100dfdfe0,0x100dfdfd4]
+                                + ! : 174 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js) + 108  [0x100ddcc5c]
+                                + ! : | 141 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 36,1024,...  [0x100ddd520,0x100ddd8fc,...]
+                                + ! : | 28 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 836  [0x100ddd840]
+                                + ! : | + 28 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::resolve_global_this::hf4ffb4313f310d34  (in lyng-js) + 28,296,...  [0x100ddce78,0x100ddcf84,...]
+                                + ! : | 5 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::resolve_global_this::hf4ffb4313f310d34  (in lyng-js) + 172  [0x100ddcf08]
+                                + ! : 80 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js) + 196,128,...  [0x100ddccb4,0x100ddcc70,...]
+                                + ! : 72 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_call_target::h91ea8033b88cb142  (in lyng-js) + 104,1364,...  [0x100e0111c,0x100e01608,...]
+                                + ! : 26 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 136,124,...  [0x100dddf58,0x100dddf4c,...]
+                                + ! : 12 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 220  [0x100ddd5d8]
+                                + ! 95 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 288,52,...  [0x100e02268,0x100e0217c,...]
+                                + ! 45 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 88  [0x100e021a0]
+                                + ! : 45 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::require_callable_object::h7c7bfe65fdd14ad2  (in lyng-js) + 28,36,...  [0x100ddd998,0x100ddd9a0,...]
+                                + ! 23 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 776  [0x100e02450]
+                                + ! : 23 lyng_js_vm::vm::feedback::CallFeedback::observe_target::hc286a5faddcc426a  (in lyng-js) + 8,348,...  [0x100e48890,0x100e489e4,...]
+                                + ! 16 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 192  [0x100e02208]
+                                + ! : 16 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::reject_class_constructor_call::hc34797bebbe61f9d  (in lyng-js) + 44,72,...  [0x100dddd38,0x100dddd54,...]
+                                + ! 11 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js) + 376,384  [0x100ddcd68,0x100ddcd70]
+                                + ! 4 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::require_callable_object::h7c7bfe65fdd14ad2  (in lyng-js) + 80  [0x100ddd9cc]
+                                + 100 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_value_small::hb04d13c5c58cb525  (in lyng-js) + 60,480,...  [0x100e00e60,0x100e01004,...]
+                                + 16 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 1060  [0x100e0256c]
+                                918 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 2904  [0x100e1e128]
+                                + 514 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 1004  [0x100e4710c]
+                                + ! 330 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js) + 348  [0x100e4ad6c]
+                                + ! : 103 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js) + 348  [0x100e4ad6c]
+                                + ! : | 103 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::store_to_named_property_cache::h9d6a8ce9ae5392f5  (in lyng-js) + 68,184,...  [0x100d555b8,0x100d5562c,...]
+                                + ! : 88 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::store_to_named_property_cache::h9d6a8ce9ae5392f5  (in lyng-js) + 316  [0x100d556b0]
+                                + ! : | 45 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js) + 156,188,...  [0x100d36998,0x100d369b8,...]
+                                + ! : | 38 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js) + 92  [0x100d36958]
+                                + ! : | + 38 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::value_points_to_young::h22d2a2ec5274f361  (in lyng-js) + 260,28,...  [0x100d3739c,0x100d372b4,...]
+                                + ! : | 5 lyng_js_gc::mutator::PrimitiveMutator::store_value::hfb86e9e77e20d4bd  (in lyng-js) + 16,20,...  [0x100d5096c,0x100d50970,...]
+                                + ! : 81 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::store_to_named_property_cache::h9d6a8ce9ae5392f5  (in lyng-js) + 360  [0x100d556dc]
+                                + ! : | 58 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_inline_named_slot::h9e457f17deec5c34  (in lyng-js) + 64  [0x100d380d4]
+                                + ! : | + 32 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::value_points_to_young::h22d2a2ec5274f361  (in lyng-js) + 0,260,...  [0x100d37298,0x100d3739c,...]
+                                + ! : | + 26 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_inline_named_slot::h9e457f17deec5c34  (in lyng-js) + 64,168,...  [0x100d380d4,0x100d3813c,...]
+                                + ! : | 13 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_inline_named_slot::h9e457f17deec5c34  (in lyng-js) + 444,0  [0x100d38250,0x100d38094]
+                                + ! : | 10 lyng_js_gc::mutator::PrimitiveMutator::store_value::hfb86e9e77e20d4bd  (in lyng-js) + 48,4,...  [0x100d5098c,0x100d50960,...]
+                                + ! : 55 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::store_to_named_property_cache::h9d6a8ce9ae5392f5  (in lyng-js) + 0,260,...  [0x100d55574,0x100d55678,...]
+                                + ! : 3 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js) + 280  [0x100d36a14]
+                                + ! 113 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js) + 160,296,...  [0x100e4acb0,0x100e4ad38,...]
+                                + ! 71 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js) + 148  [0x100e4aca4]
+                                + !   71 lyng_js_objects::runtime::ObjectRuntime::object_header::he56cc74609909ebb  (in lyng-js) + 8,148,...  [0x100d5dd70,0x100d5ddfc,...]
+                                + 210 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 44,272,...  [0x100e46d4c,0x100e46e30,...]
+                                + 98 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 1660  [0x100e4739c]
+                                + ! 98 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 76,308,...  [0x100e49550,0x100e49638,...]
+                                + 34 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js) + 248  [0x100e4ad08]
+                                + 27 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 1624  [0x100e47378]
+                                + ! 27 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::hf4b18962d527973a  (in lyng-js) + 32,12,...  [0x100e42d04,0x100e42cf0,...]
+                                + 25 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::hf4b18962d527973a  (in lyng-js) + 108,116  [0x100e42d50,0x100e42d58]
+                                + 9 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 1476  [0x100e472e4]
+                                + ! 9 lyng_js_ops::object::ordinary::ordinary_set::h40a08f9d6501f96b  (in lyng-js) + 100  [0x100d97ae4]
+                                + !   9 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::set::he134a191ba0f19b4  (in lyng-js) + 336  [0x100d596b4]
+                                + !     6 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::set::he134a191ba0f19b4  (in lyng-js) + 336  [0x100d596b4]
+                                + !     : 4 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::set::he134a191ba0f19b4  (in lyng-js) + 196  [0x100d59628]
+                                + !     : | 2 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 432  [0x100d56930]
+                                + !     : | + 2 lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 48,124  [0x100d88908,0x100d88954]
+                                + !     : | 1 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::get_own_property::h3edc767488902304  (in lyng-js) + 56  [0x100d57c0c]
+                                + !     : | 1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 448  [0x100d56940]
+                                + !     : 2 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::set::he134a191ba0f19b4  (in lyng-js) + 572  [0x100d597a0]
+                                + !     :   1 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::define_own_property::hfb00ac9a2798a4fc  (in lyng-js) + 812  [0x100d58f50]
+                                + !     :   + 1 lyng_js_objects::internal_methods::ordinary::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_define_own_property::h6bafa897d69b4bef  (in lyng-js) + 356  [0x100d5b564]
+                                + !     :   +   1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_define_own_named_property::h56280f81f22f54ae  (in lyng-js) + 1652  [0x100d57750]
+                                + !     :   +     1 lyng_js_objects::descriptors::write_named_payload::h39200421697b7294  (in lyng-js) + 224  [0x100d836a0]
+                                + !     :   +       1 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js) + 92  [0x100d36958]
+                                + !     :   +         1 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::value_points_to_young::h22d2a2ec5274f361  (in lyng-js) + 260  [0x100d3739c]
+                                + !     :   1 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::define_own_property::hfb00ac9a2798a4fc  (in lyng-js) + 844  [0x100d58f70]
+                                + !     :     1 lyng_js_objects::internal_methods::integrity::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::refresh_integrity_level_flags::h8a15c489df6d1c90  (in lyng-js) + 76  [0x100d5b5d0]
+                                + !     3 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::set::he134a191ba0f19b4  (in lyng-js) + 196  [0x100d59628]
+                                + !       1 lyng_js_objects::internal_methods::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::get_own_property::h3edc767488902304  (in lyng-js) + 180  [0x100d57c88]
+                                + !       1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 432  [0x100d56930]
+                                + !       | 1 lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 56  [0x100d88910]
+                                + !       1 lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js) + 144  [0x100d56810]
+                                + 1 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 1028  [0x100e47124]
+                                +   1 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prototype_chain_has_proxy::he2b0df3e913e7cef  (in lyng-js) + 220  [0x100de49c0]
+                                767 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 25712  [0x100e23a40]
+                                + 292 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 212,1848,...  [0x100e00528,0x100e00b8c,...]
+                                + 169 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1848  [0x100e00b8c]
+                                + ! 85 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 180,576,...  [0x100dddf84,0x100dde110,...]
+                                + ! 43 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 992  [0x100dde2b0]
+                                + ! : 43 lyng_js_vm::vm::Vm::poll_debug_safepoint::h9c56dc3f47bb6cdd  (in lyng-js) + 348,28,...  [0x100dfdfd0,0x100dfde90,...]
+                                + ! 32 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 376  [0x100dde048]
+                                + ! : 27 _platform_memset_pattern16  (in libsystem_platform.dylib) + 180,208,...  [0x18b437234,0x18b437250,...]
+                                + ! : 5 DYLD-STUB$$memset_pattern16  (in lyng-js) + 4  [0x100f94d6c]
+                                + ! 9 lyng_js_vm::vm::Vm::poll_debug_safepoint::h9c56dc3f47bb6cdd  (in lyng-js) + 364,360  [0x100dfdfe0,0x100dfdfdc]
+                                + 78 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1292  [0x100e00960]
+                                + ! 62 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 116,480,...  [0x100ddd570,0x100ddd6dc,...]
+                                + ! 15 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 836  [0x100ddd840]
+                                + ! : 15 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::resolve_global_this::hf4ffb4313f310d34  (in lyng-js) + 8,296,...  [0x100ddce64,0x100ddcf84,...]
+                                + ! 1 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::resolve_global_this::hf4ffb4313f310d34  (in lyng-js) + 172  [0x100ddcf08]
+                                + 51 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 204  [0x100e00520]
+                                + ! 51 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::collect_arguments_into::ha431ff8f1fbb9034  (in lyng-js) + 72,12,...  [0x100e01e84,0x100e01e48,...]
+                                + 41 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::require_callable_object::h7c7bfe65fdd14ad2  (in lyng-js) + 80,84  [0x100ddd9cc,0x100ddd9d0]
+                                + 30 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 240  [0x100e00544]
+                                + ! 30 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::require_callable_object::h7c7bfe65fdd14ad2  (in lyng-js) + 36,140,...  [0x100ddd9a0,0x100ddda08,...]
+                                + 18 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1748  [0x100e00b28]
+                                + ! 18 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 20,44,...  [0x100df5d48,0x100df5d60,...]
+                                + 14 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 564  [0x100e00688]
+                                + ! 14 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::reject_class_constructor_call::hc34797bebbe61f9d  (in lyng-js) + 28,72,...  [0x100dddd28,0x100dddd54,...]
+                                + 12 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js) + 220  [0x100ddd5d8]
+                                + 10 lyng_js_vm::enumeration::ForInStateTable::clear_window::h753dba08370b98eb  (in lyng-js) + 368,376  [0x100ea8640,0x100ea8648]
+                                + 10 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 876,872  [0x100df60a0,0x100df609c]
+                                + 9 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::collect_arguments_into::ha431ff8f1fbb9034  (in lyng-js) + 372,364  [0x100e01fb0,0x100e01fa8]
+                                + 8 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1696  [0x100e00af4]
+                                + ! 8 lyng_js_vm::enumeration::ForInStateTable::clear_window::h753dba08370b98eb  (in lyng-js) + 32,24  [0x100ea84f0,0x100ea84e8]
+                                + 7 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js) + 124,136,...  [0x100dddf4c,0x100dddf58,...]
+                                + 7 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1676  [0x100e00ae0]
+                                + ! 7 alloc::vec::Vec$LT$T$C$A$GT$::retain::hdf25809f06827731  (in lyng-js) + 0,160  [0x100eac330,0x100eac3d0]
+                                + 6 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1728  [0x100e00b14]
+                                + ! 6 lyng_js_vm::name_refs::CapturedNameReferenceTable::clear_window::hbfc71a9081280426  (in lyng-js) + 0,256  [0x100eaeba0,0x100eaeca0]
+                                + 5 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 1712  [0x100e00b04]
+                                +   5 lyng_js_vm::enumeration::IteratorStateTable::clear_window::he6ad6475e21802b4  (in lyng-js) + 0,244  [0x100ea8794,0x100ea8888]
+                                485 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 8620  [0x100e1f77c]
+                                + 239 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_equal_opcode::hf923fd769180adf1  (in lyng-js) + 200  [0x100e190a8]
+                                + ! 126 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::loosely_equal::hc27d1929058420d1  (in lyng-js) + 80,132,...  [0x100e17698,0x100e176cc,...]
+                                + ! 57 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::loosely_equal::hc27d1929058420d1  (in lyng-js) + 708  [0x100e1790c]
+                                + ! : 34 lyng_js_ops::read::is_strictly_equal::h3becfe3afae55d16  (in lyng-js) + 108,0,...  [0x100d94810,0x100d947a4,...]
+                                + ! : 23 lyng_js_ops::read::is_loosely_equal::h50d302eeb6b5fa9b  (in lyng-js) + 112,84,...  [0x100d93eb8,0x100d93e9c,...]
+                                + ! 28 lyng_js_ops::read::is_loosely_equal::h50d302eeb6b5fa9b  (in lyng-js) + 932,928  [0x100d941ec,0x100d941e8]
+                                + ! 28 lyng_js_ops::read::is_strictly_equal::h3becfe3afae55d16  (in lyng-js) + 508,504,...  [0x100d949a0,0x100d9499c,...]
+                                + 141 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_equal_opcode::hf923fd769180adf1  (in lyng-js) + 104  [0x100e19048]
+                                + ! 141 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 96,0,...  [0x100e1c980,0x100e1c920,...]
+                                + 90 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_equal_opcode::hf923fd769180adf1  (in lyng-js) + 104,4,...  [0x100e19048,0x100e18fe4,...]
+                                + 15 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::loosely_equal::hc27d1929058420d1  (in lyng-js) + 776,768,...  [0x100e17950,0x100e17948,...]
+                                474 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 23548  [0x100e231cc]
+                                + 335 lyng_js_vm::vm::names::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::load_global_with_feedback::hc1be24fef4433c10  (in lyng-js) + 632  [0x100e07554]
+                                + ! 131 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 300  [0x100e4af08]
+                                + ! : 131 lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::load_from_named_property_cache::ha7a03fbaa97bc759  (in lyng-js) + 12,144,...  [0x100e4be88,0x100e4bf0c,...]
+                                + ! 96 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 16,264,...  [0x100e4adec,0x100e4aee4,...]
+                                + ! 61 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 152  [0x100e4ae74]
+                                + ! : 61 lyng_js_objects::runtime::ObjectRuntime::object_header::he56cc74609909ebb  (in lyng-js) + 148,8,...  [0x100d5ddfc,0x100d5dd70,...]
+                                + ! 31 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 432  [0x100e4af8c]
+                                + ! : 31 lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution::h643a0f42e5639b16  (in lyng-js) + 0,124,...  [0x100e49190,0x100e4920c,...]
+                                + ! 16 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 444  [0x100e4af98]
+                                + !   16 lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_feedback_event::hadacccf6741ef1ca  (in lyng-js) + 0,100,...  [0x100e175e0,0x100e17644,...]
+                                + 107 lyng_js_vm::vm::names::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::load_global_with_feedback::hc1be24fef4433c10  (in lyng-js) + 84,12,...  [0x100e07330,0x100e072e8,...]
+                                + 32 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js) + 328,320,...  [0x100e4af24,0x100e4af1c,...]
+                                119 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 5560  [0x100e1eb88]
+                                + 75 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_strict_equal_opcode::h0058c7277d1a523e  (in lyng-js) + 84  [0x100e1c230]
+                                + ! 75 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 0,96,...  [0x100e1c920,0x100e1c980,...]
+                                + 44 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_strict_equal_opcode::h0058c7277d1a523e  (in lyng-js) + 168,276,...  [0x100e1c284,0x100e1c2f0,...]
+                                112 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js) + 412,404,...  [0x100e453c4,0x100e453bc,...]
+                                100 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 8660  [0x100e1f7a4]
+                                + 100 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 200,308,...  [0x100e495cc,0x100e49638,...]
+                                98 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 6424  [0x100e1eee8]
+                                + 66 lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js) + 72,1520,...  [0x100e4b3c4,0x100e4b96c,...]
+                                + 18 lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js) + 1476  [0x100e4b940]
+                                + ! 18 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 20,60,...  [0x100df5d48,0x100df5d70,...]
+                                + 14 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 876,880  [0x100df60a0,0x100df60a4]
+                                59 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 2480  [0x100e1df80]
+                                + 59 lyng_js_ops::read::to_boolean::he344157629a2f347  (in lyng-js) + 28,8,...  [0x100d93768,0x100d93754,...]
+                                50 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 23576  [0x100e231e8]
+                                + 50 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::h306c37816e22bb92  (in lyng-js) + 32,16,...  [0x100e42b98,0x100e42b88,...]
+                                41 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 16048  [0x100e21480]
+                                + 29 lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js) + 80,1520,...  [0x100e4b3cc,0x100e4b96c,...]
+                                + 6 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 876,868,...  [0x100df60a0,0x100df6098,...]
+                                + 6 lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js) + 1476  [0x100e4b940]
+                                +   6 lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 44,16,...  [0x100df5d60,0x100df5d44,...]
+                                40 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 3416  [0x100e1e328]
+                                + 27 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::update_register_value::h8cb000098907c656  (in lyng-js) + 60  [0x100e19884]
+                                + ! 15 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::numeric_register_value::h31c57b85a420c800  (in lyng-js) + 32,104,...  [0x100e1a864,0x100e1a8ac,...]
+                                + ! 5 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::numeric_register_value::h31c57b85a420c800  (in lyng-js) + 104  [0x100e1a8ac]
+                                + ! : 5 lyng_js_ops::object::conversions::to_primitive::heab40ccd339e8950  (in lyng-js) + 28,40  [0x100f284e8,0x100f284f4]
+                                + ! 4 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::numeric_register_value::h31c57b85a420c800  (in lyng-js) + 176  [0x100e1a8f4]
+                                + ! : 4 lyng_js_ops::read::to_number::h66ef083194f485fe  (in lyng-js) + 44,28,...  [0x100d94ee8,0x100d94ed8,...]
+                                + ! 3 lyng_js_ops::read::to_number::h66ef083194f485fe  (in lyng-js) + 236  [0x100d94fa8]
+                                + 13 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::update_register_value::h8cb000098907c656  (in lyng-js) + 100,128,...  [0x100e198ac,0x100e198c8,...]
+                                38 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 4932  [0x100e1e914]
+                                + 21 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_keyed_property_opcode::h637ce78a49193fb3  (in lyng-js) + 248  [0x100e44444]
+                                + ! 12 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_load_inline_cache_hit::hf741fc90bae0579b  (in lyng-js) + 136  [0x100e4b040]
+                                + ! : 12 lyng_js_vm::vm::feedback::KeyedPropertyFeedback::match_dense_index_header::h7127da1acf5b3fa8  (in lyng-js) + 68,32,...  [0x100e492bc,0x100e49298,...]
+                                + ! 4 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_load_inline_cache_hit::hf741fc90bae0579b  (in lyng-js) + 16,52  [0x100e4afc8,0x100e4afec]
+                                + ! 2 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_load_inline_cache_hit::hf741fc90bae0579b  (in lyng-js) + 164  [0x100e4b05c]
+                                + ! : 2 lyng_js_vm::vm::feedback::KeyedPropertyFeedback::dense_value_from_header::h06c16b7cf47eda64  (in lyng-js) + 0,64  [0x100e49214,0x100e49254]
+                                + ! 2 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_load_inline_cache_hit::hf741fc90bae0579b  (in lyng-js) + 180  [0x100e4b06c]
+                                + ! : 2 lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution::h643a0f42e5639b16  (in lyng-js) + 0,104  [0x100e49190,0x100e491f8]
+                                + ! 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_load_inline_cache_hit::hf741fc90bae0579b  (in lyng-js) + 192  [0x100e4b078]
+                                + !   1 lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_feedback_event::hadacccf6741ef1ca  (in lyng-js) + 0  [0x100e175e0]
+                                + 17 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_keyed_property_opcode::h637ce78a49193fb3  (in lyng-js) + 192,128,...  [0x100e4440c,0x100e443cc,...]
+                                24 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_equal_opcode::hf923fd769180adf1  (in lyng-js) + 300,308  [0x100e1910c,0x100e19114]
+                                23 lyng_js_ops::read::to_boolean::he344157629a2f347  (in lyng-js) + 164,168  [0x100d937f0,0x100d937f4]
+                                22 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::h306c37816e22bb92  (in lyng-js) + 116,108,...  [0x100e42bec,0x100e42be4,...]
+                                21 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 28996  [0x100e24714]
+                                + 21 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 76,200,...  [0x100e49550,0x100e495cc,...]
+                                20 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 25756  [0x100e23a6c]
+                                + 20 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 76,200,...  [0x100e49550,0x100e495cc,...]
+                                19 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js) + 400,408,...  [0x100e46eb0,0x100e46eb8,...]
+                                18 lyng_js_vm::vm::names::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::load_global_with_feedback::hc1be24fef4433c10  (in lyng-js) + 188,184,...  [0x100e07398,0x100e07394,...]
+                                17 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 14772  [0x100e20f84]
+                                + 15 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_less_than_opcode::hb7e9371b864d5e02  (in lyng-js) + 104  [0x100e1aa00]
+                                + ! 15 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 96,112,...  [0x100e1c980,0x100e1c990,...]
+                                + 2 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_less_than_opcode::hb7e9371b864d5e02  (in lyng-js) + 4  [0x100e1a99c]
+                                16 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js) + 896,892  [0x100e007d4,0x100e007d0]
+                                15 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_value_small::hb04d13c5c58cb525  (in lyng-js) + 532,524,...  [0x100e01038,0x100e01030,...]
+                                14 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 3496  [0x100e1e378]
+                                + 14 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0,8,...  [0x100e49504,0x100e4950c,...]
+                                14 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 5600  [0x100e1ebb0]
+                                + 14 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0,308  [0x100e49504,0x100e49638]
+                                13 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 3044  [0x100e1e1b4]
+                                + 10 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_keyed_property_opcode::h42bc78d19fc01204  (in lyng-js) + 280  [0x100e45cdc]
+                                + ! 6 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 208  [0x100e4b170]
+                                + ! : 5 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 260,220,...  [0x100e4b1a4,0x100e4b17c,...]
+                                + ! : 1 lyng_js_vm::vm::feedback::KeyedPropertyFeedback::match_dense_index_header::h7127da1acf5b3fa8  (in lyng-js) + 0  [0x100e49278]
+                                + ! 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 316  [0x100e4b1dc]
+                                + ! : 1 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js) + 72  [0x100d36944]
+                                + ! 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 328  [0x100e4b1e8]
+                                + ! : 1 lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution::h643a0f42e5639b16  (in lyng-js) + 104  [0x100e491f8]
+                                + ! 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 340  [0x100e4b1f4]
+                                + ! : 1 lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_feedback_event::hadacccf6741ef1ca  (in lyng-js) + 20  [0x100e175f4]
+                                + ! 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js) + 0  [0x100e4b0a0]
+                                + 3 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_keyed_property_opcode::h42bc78d19fc01204  (in lyng-js) + 0,12,...  [0x100e45bc4,0x100e45bd0,...]
+                                13 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 7584  [0x100e1f370]
+                                + 9 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_bitor_opcode::h0da114c6c837b752  (in lyng-js) + 96  [0x100e18cfc]
+                                + ! 9 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 96,2440,...  [0x100e1c980,0x100e1d2a8,...]
+                                + 4 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_bitor_opcode::h0da114c6c837b752  (in lyng-js) + 52,4,...  [0x100e18cd0,0x100e18ca0,...]
+                                13 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 27376  [0x100e240c0]
+                                + 13 lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_backedge_event::hdf3bf35678c608c9  (in lyng-js) + 0,100,...  [0x100e17578,0x100e175dc,...]
+                                10 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 5948  [0x100e1ed0c]
+                                + 7 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_greater_than_opcode::h334bdb3d58362e1e  (in lyng-js) + 104  [0x100e1bd20]
+                                + ! 7 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 96,16,...  [0x100e1c980,0x100e1c930,...]
+                                + 3 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_greater_than_opcode::h334bdb3d58362e1e  (in lyng-js) + 60,812  [0x100e1bcf4,0x100e1bfe4]
+                                10 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 25924  [0x100e23b14]
+                                + 4 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::construct_value::h26fda3d6a1ff1fdd  (in lyng-js) + 932  [0x100dffde8]
+                                + ! 3 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::create_construct_this::h30bb7ada450d7a44  (in lyng-js) + 892  [0x100ddd4bc]
+                                + ! : 1 lyng_js_objects::runtime::ObjectRuntime::alloc_object::h49f743078db062d0  (in lyng-js) + 2332  [0x100d5d7f4]
+                                + ! : | 1 lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::mark_object_card_if_old_points_to_young::hbadf2902b80aacb4  (in lyng-js) + 512  [0x100d386a8]
+                                + ! : |   1 alloc::collections::btree::map::BTreeMap$LT$K$C$V$C$A$GT$::insert::h2471fb94050859d6  (in lyng-js) + 56  [0x100d40e64]
+                                + ! : 1 lyng_js_objects::runtime::ObjectRuntime::alloc_object::h49f743078db062d0  (in lyng-js) + 2632  [0x100d5d920]
+                                + ! : | 1 alloc::vec::Vec$LT$T$C$A$GT$::resize_with::hb742265123f7cd9c  (in lyng-js) + 236  [0x100d7cf0c]
+                                + ! : 1 lyng_js_objects::runtime::ObjectRuntime::alloc_object::h49f743078db062d0  (in lyng-js) + 2696  [0x100d5d960]
+                                + ! :   1 _platform_memmove  (in libsystem_platform.dylib) + 180  [0x18b439474]
+                                + ! 1 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::create_construct_this::h30bb7ada450d7a44  (in lyng-js) + 336  [0x100ddd290]
+                                + !   1 lyng_js_ops::proxy::get::h33254bbdabfda0c9  (in lyng-js) + 520  [0x100e8ca14]
+                                + !     1 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js) + 96  [0x100de61f8]
+                                + !       1 lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace::h7f81dbe88d6f9a87  (in lyng-js) + 56  [0x100de69c0]
+                                + 3 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::construct_value::h26fda3d6a1ff1fdd  (in lyng-js) + 0,120,...  [0x100dffa44,0x100dffabc,...]
+                                + 1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::construct_value::h26fda3d6a1ff1fdd  (in lyng-js) + 172  [0x100dffaf0]
+                                + ! 1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::collect_arguments_into::ha431ff8f1fbb9034  (in lyng-js) + 144  [0x100e01ecc]
+                                + 1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::construct_value::h26fda3d6a1ff1fdd  (in lyng-js) + 1168  [0x100dffed4]
+                                + ! 1 lyng_js_vm::vm::builtin_dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_builtin::hf48995c1d80626da  (in lyng-js) + 1172  [0x100df4f2c]
+                                + !   1 lyng_js_builtins::public::dispatch::date::dispatch_date_builtin::hdeeacc611fd35f84  (in lyng-js) + 1844  [0x100f12768]
+                                + !     1 lyng_js_objects::runtime::ObjectRuntime::alloc_date_object::h8be8995732015eaf  (in lyng-js) + 124  [0x100d5e550]
+                                + 1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::construct_value::h26fda3d6a1ff1fdd  (in lyng-js) + 2484  [0x100e003f8]
+                                +   1 lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js) + 248  [0x100ddcce8]
+                                9 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 5988  [0x100e1ed34]
+                                + 9 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0,76,...  [0x100e49504,0x100e49550,...]
+                                9 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 27388  [0x100e240cc]
+                                + 9 lyng_js_gc::rooting::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::poll_incremental_mark_step::hdad8928259329e71  (in lyng-js) + 32,24  [0x100d391c8,0x100d391c0]
+                                8 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_strict_equal_opcode::h0058c7277d1a523e  (in lyng-js) + 360,364  [0x100e1c344,0x100e1c348]
+                                7 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 7624  [0x100e1f398]
+                                + 7 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 76,60,...  [0x100e49550,0x100e49540,...]
+                                5 lyng_js_gc::rooting::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::poll_incremental_mark_step::hdad8928259329e71  (in lyng-js) + 248,244  [0x100d392a0,0x100d3929c]
+                                5 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 8988  [0x100e1f8ec]
+                                + 4 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_shift_right_opcode::ha78364f2541bb182  (in lyng-js) + 96  [0x100e1b9f0]
+                                + ! 4 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 2440,0,...  [0x100e1d2a8,0x100e1c920,...]
+                                + 1 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_shift_right_opcode::ha78364f2541bb182  (in lyng-js) + 0  [0x100e1b990]
+                                4 lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js) + 1640,1660  [0x100e4b9e4,0x100e4b9f8]
+                                3 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 9028  [0x100e1f914]
+                                + 3 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0,60,...  [0x100e49504,0x100e49540,...]
+                                3 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 14812  [0x100e20fac]
+                                + 3 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0,100,...  [0x100e49504,0x100e49568,...]
+                                3 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 28244  [0x100e24424]
+                                + 3 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 76,100,...  [0x100e49550,0x100e49568,...]
+                                3 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::update_register_value::h8cb000098907c656  (in lyng-js) + 344  [0x100e199a0]
+                                2 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 9152  [0x100e1f990]
+                                + 2 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_bitxor_opcode::hc45b7628803c2830  (in lyng-js) + 96  [0x100e19564]
+                                +   2 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 1068,2440  [0x100e1cd4c,0x100e1d2a8]
+                                2 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_bitor_opcode::h0da114c6c837b752  (in lyng-js) + 800  [0x100e18fbc]
+                                1 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 3272  [0x100e1e298]
+                                + 1 lyng_js_vm::vm::values::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::read_constant::h8d24f017cf4b1e07  (in lyng-js) + 56  [0x100e0bdf8]
+                                1 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 6476  [0x100e1ef1c]
+                                + 1 lyng_js_vm::vm::names::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::type_of_value::hb73b20596172202e  (in lyng-js) + 568  [0x100e05ef4]
+                                +   1 lyng_js_vm::vm::values::alloc_string::h49e7dcfec55caa3f  (in lyng-js) + 228  [0x100e509ec]
+                                +     1 _$LT$alloc..vec..Vec$LT$T$GT$$u20$as$u20$alloc..vec..spec_from_iter_nested..SpecFromIterNested$LT$T$C$I$GT$$GT$::from_iter::h62c602f4e568931d  (in lyng-js) + 464  [0x100ea95fc]
+                                +       1 alloc::raw_vec::RawVecInner$LT$A$GT$::reserve::do_reserve_and_handle::h860ebc8f0c2eccbd  (in lyng-js) + 96  [0x100f904b4]
+                                +         1 alloc::raw_vec::RawVecInner$LT$A$GT$::finish_grow::h3ccf723c3433facb  (in lyng-js) + 248  [0x100f90404]
+                                +           1 _realloc  (in libsystem_malloc.dylib) + 452  [0x18b25ce90]
+                                +             1 _malloc_zone_realloc  (in libsystem_malloc.dylib) + 148  [0x18b25c674]
+                                +               1 xzm_realloc  (in libsystem_malloc.dylib) + 540  [0x18b24cd10]
+                                1 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 6844  [0x100e1f08c]
+                                + 1 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_sub_opcode::hf9fb9038e82103e3  (in lyng-js) + 252  [0x100e189e0]
+                                +   1 lyng_js_vm::vm::values::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::numeric_value::hcb1a5c2bfadc5d15  (in lyng-js) + 104  [0x100e0bcd4]
+                                +     1 lyng_js_ops::object::conversions::to_primitive::heab40ccd339e8950  (in lyng-js) + 684  [0x100f28778]
+                                +       1 lyng_js_vm::vm::internal_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_to_completion::ha8ad22c21e67ff4b  (in lyng-js) + 348  [0x100ddeef8]
+                                +         1 lyng_js_vm::vm::builtin_dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_builtin::hf48995c1d80626da  (in lyng-js) + 1172  [0x100df4f2c]
+                                +           1 lyng_js_builtins::public::dispatch::date::dispatch_date_builtin::hdeeacc611fd35f84  (in lyng-js) + 3860  [0x100f12f48]
+                                +             1 lyng_js_builtins::public::dispatch::date::dispatch_date_conversion_builtin::h180618945d52646d  (in lyng-js) + 440  [0x100f151f4]
+                                1 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 9192  [0x100e1f9b8]
+                                + 1 lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 224  [0x100e495e4]
+                                1 lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js) + 26048  [0x100e23b90]
+                                + 1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_value::hb439ae6c1debc3e9  (in lyng-js) + 288  [0x100dff6f0]
+                                +   1 lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js) + 288  [0x100e02268]
+                                1 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_less_than_opcode::hb7e9371b864d5e02  (in lyng-js) + 832  [0x100e1acd8]
+                                1 lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_shift_right_opcode::ha78364f2541bb182  (in lyng-js) + 772  [0x100e1bc94]
+                                1 lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_keyed_property_opcode::h637ce78a49193fb3  (in lyng-js) + 2876  [0x100e44e88]
+
+Total number in stack (recursive counted multiple, when >=5):
+        12       lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js) + 0  [0x100e49504]
+        7       lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js) + 0  [0x100e1c920]
+        6       lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js) + 0  [0x100df5d34]
+        5       lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js) + 0  [0x100d888d8]
+
+Sort by top of stack, same collapsed (when >= 5):
+        lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::run_dispatch_loop::h3ae27891d3804b79  (in lyng-js)        4783
+        lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_load_inline_cache_hit::h2e85e1451f920ff3  (in lyng-js)        1200
+        lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::load_from_named_property_cache::ha7a03fbaa97bc759  (in lyng-js)        859
+        lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_named_property_opcode::haa5b74cf89fc4847  (in lyng-js)        680
+        lyng_js_objects::runtime::ObjectRuntime::object_header::he56cc74609909ebb  (in lyng-js)        401
+        lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::tail_call_value::h0112274a6688c23b  (in lyng-js)        308
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::install_prepared_bytecode_call::h9246486bf1b78493  (in lyng-js)        301
+        lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::record_feedback_slot::h641d8390286408bb  (in lyng-js)        293
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_primitive_number_binary_opcode::h8cbfd7bb85a5d4fb  (in lyng-js)        253
+        lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_set_named_property_opcode::hae5762af3ec73e1e  (in lyng-js)        229
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::prepare_bytecode_call::hbe92224a4165eb7f  (in lyng-js)        227
+        lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution::h643a0f42e5639b16  (in lyng-js)        177
+        lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::store_to_named_property_cache::h9d6a8ce9ae5392f5  (in lyng-js)        158
+        lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_named_property_store_inline_cache::h2d229f145fa6d407  (in lyng-js)        147
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::loosely_equal::hc27d1929058420d1  (in lyng-js)        141
+        lyng_js_vm::vm::names::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::load_global_with_feedback::hc1be24fef4433c10  (in lyng-js)        125
+        _platform_memset_pattern16  (in libsystem_platform.dylib)        123
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::require_callable_object::h7c7bfe65fdd14ad2  (in lyng-js)        120
+        lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::call_value_small::hb04d13c5c58cb525  (in lyng-js)        115
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_equal_opcode::hf923fd769180adf1  (in lyng-js)        114
+        lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_collected_call_value::h3f983a882a349392  (in lyng-js)        112
+        lyng_js_vm::vm::registers::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finish_frame::h1e019d01b476897e  (in lyng-js)        99
+        lyng_js_vm::vm::Vm::poll_debug_safepoint::h9c56dc3f47bb6cdd  (in lyng-js)        95
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::enter_bytecode_call::hab010e542b4194be  (in lyng-js)        92
+        lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_feedback_event::hadacccf6741ef1ca  (in lyng-js)        90
+        lyng_js_ops::read::to_boolean::he344157629a2f347  (in lyng-js)        82
+        lyng_js_vm::vm::activation_objects::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::finalize_mapped_arguments::h540ae0bb371300b4  (in lyng-js)        72
+        lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::invoke_call_target::h91ea8033b88cb142  (in lyng-js)        72
+        lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::h306c37816e22bb92  (in lyng-js)        72
+        lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::value_points_to_young::h22d2a2ec5274f361  (in lyng-js)        71
+        lyng_js_ops::read::is_strictly_equal::h3becfe3afae55d16  (in lyng-js)        62
+        lyng_js_vm::vm::call::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::collect_arguments_into::ha431ff8f1fbb9034  (in lyng-js)        61
+        lyng_js_vm::vm::dispatch::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::handle_dispatch_result::hf4b18962d527973a  (in lyng-js)        52
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_strict_equal_opcode::h0058c7277d1a523e  (in lyng-js)        52
+        lyng_js_ops::read::is_loosely_equal::h50d302eeb6b5fa9b  (in lyng-js)        51
+        lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_slot::ha7c66ec7b94507dd  (in lyng-js)        49
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::resolve_global_this::hf4ffb4313f310d34  (in lyng-js)        49
+        lyng_js_gc::arena::store_helpers::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::write_object_inline_named_slot::h9e457f17deec5c34  (in lyng-js)        39
+        lyng_js_vm::vm::bytecode_calls::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::reject_class_constructor_call::hc34797bebbe61f9d  (in lyng-js)        30
+        lyng_js_vm::vm::feedback::CallFeedback::observe_target::hc286a5faddcc426a  (in lyng-js)        23
+        lyng_js_vm::enumeration::ForInStateTable::clear_window::h753dba08370b98eb  (in lyng-js)        18
+        lyng_js_vm::vm::dispatch::property::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_get_keyed_property_opcode::h637ce78a49193fb3  (in lyng-js)        18
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::update_register_value::h8cb000098907c656  (in lyng-js)        16
+        lyng_js_gc::mutator::PrimitiveMutator::store_value::hfb86e9e77e20d4bd  (in lyng-js)        15
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::numeric_register_value::h31c57b85a420c800  (in lyng-js)        15
+        lyng_js_gc::rooting::_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$::poll_incremental_mark_step::hdad8928259329e71  (in lyng-js)        14
+        lyng_js_vm::vm::feedback::KeyedPropertyFeedback::match_dense_index_header::h7127da1acf5b3fa8  (in lyng-js)        13
+        lyng_js_vm::vm::tiering::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_tier_backedge_event::hdf3bf35678c608c9  (in lyng-js)        13
+        DYLD-STUB$$memset_pattern16  (in lyng-js)        11
+        lyng_js_objects::object_metadata::ShapeMetadata::property::hfc58b099bc5b9c9b  (in lyng-js)        11
+        lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::observe_named_property_slow_path::ha4ebc90567a9cffa  (in lyng-js)        11
+        lyng_js_objects::internal_methods::property_cache::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::plan_named_property_cache_entry::hce3455c22c213c0c  (in lyng-js)        9
+        lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::get_property_from_object_ordinary::h2dcfd70ecb2bf336  (in lyng-js)        8
+        alloc::vec::Vec$LT$T$C$A$GT$::retain::hdf25809f06827731  (in lyng-js)        7
+        lyng_js_ops::read::to_number::h66ef083194f485fe  (in lyng-js)        7
+        lyng_js_vm::name_refs::CapturedNameReferenceTable::clear_window::hbfc71a9081280426  (in lyng-js)        6
+        lyng_js_vm::vm::dispatch::arithmetic::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::execute_bitor_opcode::h0da114c6c837b752  (in lyng-js)        6
+        lyng_js_vm::vm::feedback::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::try_keyed_dense_index_store_inline_cache_hit::hd2754a742546209d  (in lyng-js)        6
+        lyng_js_vm::vm::property_access::_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$::evaluate_deferred_module_namespace_object::h0ce0e48e23b662a4  (in lyng-js)        6
+        lyng_js_objects::internal_methods::named_properties::_$LT$impl$u20$lyng_js_objects..runtime..ObjectRuntime$GT$::ordinary_own_named_property::h67674b5f1bd09d8b  (in lyng-js)        5
+        lyng_js_ops::object::conversions::to_primitive::heab40ccd339e8950  (in lyng-js)        5
+        lyng_js_vm::enumeration::IteratorStateTable::clear_window::he6ad6475e21802b4  (in lyng-js)        5
+
+Binary Images:
+       0x100c48000 -        0x10106a5db +lyng-js (0) <5A08FA84-8975-3E01-BD89-87B499502951> /Users/*/lyng-js
+       0x18afcc000 -        0x18b01eb4b  libobjc.A.dylib (951.7) <2E858E25-1FF6-3DA6-84F6-911630620512> /usr/lib/libobjc.A.dylib
+       0x18b01f000 -        0x18b053b34  libdyld.dylib (1376.6) <2C3C5F75-3686-39A1-9202-BD4D2133379D> /usr/lib/system/libdyld.dylib
+       0x18b054000 -        0x18b0f9ec7  dyld (1.0.0 - 1376.6) <9F682DCF-340C-3BFA-BCDD-DD702F30313E> /usr/lib/dyld
+       0x18b0fa000 -        0x18b0fd228  libsystem_blocks.dylib (96) <2EA73169-CF76-3DD1-9869-F23C8B338022> /usr/lib/system/libsystem_blocks.dylib
+       0x18b0fe000 -        0x18b15251f  libxpc.dylib (3102.100.102) <618039C8-9965-3782-A7D2-90FD4C3DD66F> /usr/lib/system/libxpc.dylib
+       0x18b153000 -        0x18b1739bf  libsystem_trace.dylib (1861.100.19) <08629650-54FC-3AA6-910E-EACA563804D0> /usr/lib/system/libsystem_trace.dylib
+       0x18b174000 -        0x18b221daf  libcorecrypto.dylib (1922.101.2) <D1EC203E-9B2E-391B-8DE3-7C58F0589437> /usr/lib/system/libcorecrypto.dylib
+       0x18b222000 -        0x18b2721d7  libsystem_malloc.dylib (812.100.31) <2AD21BE3-FFDB-31D5-A3D7-2F7F672D6E92> /usr/lib/system/libsystem_malloc.dylib
+       0x18b273000 -        0x18b2ba23f  libdispatch.dylib (1542.100.32) <E17AA23F-DB2A-3302-B14C-F6B08C540FCF> /usr/lib/system/libdispatch.dylib
+       0x18b2bb000 -        0x18b2bdffb  libsystem_featureflags.dylib (103) <0DE01F76-4B36-35A2-98F9-43DD147EDD95> /usr/lib/system/libsystem_featureflags.dylib
+       0x18b2be000 -        0x18b33eef7  libsystem_c.dylib (1752.100.10) <66EBD321-6899-3863-BA24-5CFC3076A0CB> /usr/lib/system/libsystem_c.dylib
+       0x18b33f000 -        0x18b3cfae7  libc++.1.dylib (2100.43) <1E9541EC-C564-38CB-BED6-46F708E8D863> /usr/lib/libc++.1.dylib
+       0x18b3d0000 -        0x18b3ea75f  libc++abi.dylib (2100.43) <E8D325ED-3B97-325E-B494-B1B0FF93D133> /usr/lib/libc++abi.dylib
+       0x18b3eb000 -        0x18b42828f  libsystem_kernel.dylib (12377.101.15) <51565B39-F595-3E96-A217-FEF29815057A> /usr/lib/system/libsystem_kernel.dylib
+       0x18b429000 -        0x18b435b3b  libsystem_pthread.dylib (539.100.4) <E7A73008-0C09-31E3-9DD9-0C61652F0E85> /usr/lib/system/libsystem_pthread.dylib
+       0x18b436000 -        0x18b43e8f3  libsystem_platform.dylib (375.100.10) <D93EC420-F465-3A3A-916D-A04AF9B023EB> /usr/lib/system/libsystem_platform.dylib
+       0x18b43f000 -        0x18b46e6eb  libsystem_info.dylib (600) <201FD67C-3DF6-3788-B132-A69CAA2AA3D7> /usr/lib/system/libsystem_info.dylib
+       0x18f404000 -        0x18f40de5f  libsystem_darwin.dylib (1752.100.10) <D5BA0CAB-F283-3620-AAA9-1EEB718E1BA8> /usr/lib/system/libsystem_darwin.dylib
+       0x18f86f000 -        0x18f880f5b  libsystem_notify.dylib (348.100.7) <9F46F30B-B7C0-3DD7-AC38-57B78C7971FF> /usr/lib/system/libsystem_notify.dylib
+       0x191b39000 -        0x191b53f5b  libsystem_networkextension.dylib (2226.101.1) <85169C7B-48DD-3542-AD38-F1B88EA2A95A> /usr/lib/system/libsystem_networkextension.dylib
+       0x191bd6000 -        0x191bedfdf  libsystem_asl.dylib (406) <6427D987-7938-3278-8C14-10FB9C06BBD5> /usr/lib/system/libsystem_asl.dylib
+       0x193791000 -        0x193799387  libsystem_symptoms.dylib (2169.100.30) <28B6E34E-9C7D-3437-A3F1-A3C979DE579A> /usr/lib/system/libsystem_symptoms.dylib
+       0x197a2c000 -        0x197a6425f  libsystem_containermanager.dylib (725.100.37) <14750F95-BB3A-3654-8610-A05A454643A8> /usr/lib/system/libsystem_containermanager.dylib
+       0x198e3c000 -        0x198e405d7  libsystem_configuration.dylib (1405.100.8) <634F597D-F8BD-3C00-B967-86047FC15D14> /usr/lib/system/libsystem_configuration.dylib
+       0x198e41000 -        0x198e478cf  libsystem_sandbox.dylib (2680.100.174) <AF76231D-EADC-3399-9414-6AD90FB4EA89> /usr/lib/system/libsystem_sandbox.dylib
+       0x19a487000 -        0x19a48a1fb  libquarantine.dylib (196.100.8) <268FEB6E-A237-3050-BFFF-AE3A66B7EAD4> /usr/lib/system/libquarantine.dylib
+       0x19ac26000 -        0x19ac2cd03  libsystem_coreservices.dylib (191.4.5) <7129349D-04F9-3C3C-BF37-3082C1468654> /usr/lib/system/libsystem_coreservices.dylib
+       0x19b1ab000 -        0x19b1e8a77  libsystem_m.dylib (3312.100.1) <83B173CD-7F32-3901-8E67-C0B2676BE015> /usr/lib/system/libsystem_m.dylib
+       0x19b1ea000 -        0x19b1ed527  libmacho.dylib (1376.6) <9729ECEA-0A08-32E3-8BDB-B42FC15FF258> /usr/lib/system/libmacho.dylib
+       0x19b207000 -        0x19b2143a7  libcommonCrypto.dylib (600035) <710EC5FA-F77C-3646-A9E3-C037C42E1539> /usr/lib/system/libcommonCrypto.dylib
+       0x19b215000 -        0x19b21eca3  libunwind.dylib (2100.2) <FB0518B9-DF0F-3A03-A74B-AF1B21C26F8B> /usr/lib/system/libunwind.dylib
+       0x19b227000 -        0x19b2317ff  libcopyfile.dylib (240) <0B7FF027-5579-3CBF-A12B-68A4FD36641C> /usr/lib/system/libcopyfile.dylib
+       0x19b232000 -        0x19b235987  libcompiler_rt.dylib (103.3) <65E29E6E-7042-3F73-A1D2-F2C4EBCD7524> /usr/lib/system/libcompiler_rt.dylib
+       0x19b236000 -        0x19b23a78b  libsystem_collections.dylib (1752.100.10) <B81193DE-3BEC-3340-86D0-DB7F3683D135> /usr/lib/system/libsystem_collections.dylib
+       0x19b23b000 -        0x19b23e4cf  libsystem_secinit.dylib (168.100.7) <A6B77B36-195D-33F8-8058-FE0B5BFA9D37> /usr/lib/system/libsystem_secinit.dylib
+       0x19b23f000 -        0x19b241bf7  libremovefile.dylib (85.100.6) <BD89B1A3-0D06-3881-B5E1-EFC6CFBDFCC1> /usr/lib/system/libremovefile.dylib
+       0x19b242000 -        0x19b242f27  libkeymgr.dylib (31) <DE8F8219-0072-35C2-8932-C065491ED15D> /usr/lib/system/libkeymgr.dylib
+       0x19b243000 -        0x19b24be3f  libsystem_dnssd.dylib (2881.100.56.0.1) <DEC8BDD2-366C-3BF9-A123-35744DB06354> /usr/lib/system/libsystem_dnssd.dylib
+       0x19b24c000 -        0x19b25109b  libcache.dylib (95) <4D6833A3-C910-3A76-AA8A-303F698B36BF> /usr/lib/system/libcache.dylib
+       0x19b252000 -        0x19b253ce3  libSystem.B.dylib (1356) <E05F5341-06B7-365E-8014-E9CD64C352FE> /usr/lib/libSystem.B.dylib
+       0x28db35000 -        0x28db3c349  libRosetta.dylib (367.5) <2FC1EF06-04C4-35FC-8DC3-BEA1E9FBD63F> /usr/lib/libRosetta.dylib
+       0x28f812000 -        0x28f815a4b  libsystem_darwindirectory.dylib (122) <CCAA2170-32DD-34BD-A927-32DF30893969> /usr/lib/system/libsystem_darwindirectory.dylib
+       0x28f816000 -        0x28f81f5a7  libsystem_eligibility.dylib (319.101.1) <2D19994A-87BB-34B8-A343-CB8DD47FF110> /usr/lib/system/libsystem_eligibility.dylib
+       0x28f820000 -        0x28f8278db  libsystem_sanitizers.dylib (26) <FCB93D2F-4437-3089-A43F-A19BC23DD65B> /usr/lib/system/libsystem_sanitizers.dylib
+       0x28f828000 -        0x28f828bb7  libsystem_trial.dylib (474.2.18) <5BB81430-4E33-3160-94D2-1FFB2B614DB2> /usr/lib/system/libsystem_trial.dylib

@@ -27,10 +27,14 @@ impl Vm {
                     .expect("checked above that one frame is active");
                 frame.set_instruction_offset(handler.handler());
                 frame.set_handler_cursor(u16::try_from(index + 1).unwrap_or(u16::MAX));
-                return Ok(matches!(
+                let handled = matches!(
                     handler.kind(),
                     ExceptionHandlerKind::Catch | ExceptionHandlerKind::Finally
-                ));
+                );
+                if handled {
+                    self.request_dispatch_frame_check();
+                }
+                return Ok(handled);
             }
             if self.frames.len() == 1 {
                 return Ok(false);

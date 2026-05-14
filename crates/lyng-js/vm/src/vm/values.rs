@@ -1,7 +1,7 @@
 use super::{
     Agent, AtomId, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, EnvironmentRef,
-    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef,
-    Value, Vm, VmError, VmResult,
+    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm, VmError,
+    VmResult,
 };
 use crate::vm::property_access::ToPrimitiveHint;
 use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
