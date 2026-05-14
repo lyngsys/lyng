@@ -13,12 +13,12 @@ use lyng_js_ops::{errors, object, pure, read};
 use lyng_js_types::{AbruptCompletion, Value};
 
 #[inline]
-const fn decode_smi_immediate(raw: u16) -> i16 {
+pub(super) const fn decode_smi_immediate(raw: u16) -> i16 {
     i16::from_le_bytes(raw.to_le_bytes())
 }
 
 #[inline]
-fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
+pub(super) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
     if (left == 0 || right == 0) && (left < 0 || right < 0) {
         return None;
     }
@@ -26,7 +26,7 @@ fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
 }
 
 #[inline]
-const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
+pub(super) const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
     if right == 0 || (left == i32::MIN && right == -1) {
         return None;
     }

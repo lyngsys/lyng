@@ -1,5 +1,6 @@
 use super::registers::absolute_register;
 use super::values::decode_env_operand;
+use super::dispatch::arithmetic::{decode_smi_immediate, smi_mod_result, smi_mul_result};
 use super::{
     code_index, Agent, CallRange, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry,
     Opcode, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
@@ -495,6 +496,10 @@ impl Vm {
         clippy::too_many_lines,
         reason = "main interpreter dispatch keeps opcode fetch and branch handling in one profiler-friendly loop"
     )]
+    #[allow(
+        clippy::collapsible_if,
+        reason = "SMI fast paths keep the outer SMI tag check and the inner overflow check on separate lines so the cold fallthrough is obvious"
+    )]
     fn run_dispatch_loop<const COUNT_OPCODES: bool, const DEBUG: bool>(
         &mut self,
         agent: &mut Agent,
@@ -786,7 +791,21 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::Add => {
-                        let result = self.execute_add_opcode(agent, host, registry, frame, b, c);
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let right = self.register_stack[absolute_register(registers, c)];
+                        if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+                            if let Some(v) = l.checked_add(r) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] =
+                                    Value::from_smi(v);
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
+                        let result =
+                            self.execute_add_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -798,6 +817,19 @@ impl Vm {
                         )?;
                     }
                     Opcode::AddSmi => {
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let imm = i32::from(decode_smi_immediate(c));
+                        if let Some(l) = left.as_smi() {
+                            if let Some(v) = l.checked_add(imm) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] =
+                                    Value::from_smi(v);
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
                         let result =
                             self.execute_add_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -811,7 +843,21 @@ impl Vm {
                         )?;
                     }
                     Opcode::Sub => {
-                        let result = self.execute_sub_opcode(agent, host, registry, frame, b, c);
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let right = self.register_stack[absolute_register(registers, c)];
+                        if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+                            if let Some(v) = l.checked_sub(r) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] =
+                                    Value::from_smi(v);
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
+                        let result =
+                            self.execute_sub_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -823,6 +869,19 @@ impl Vm {
                         )?;
                     }
                     Opcode::SubSmi => {
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let imm = i32::from(decode_smi_immediate(c));
+                        if let Some(l) = left.as_smi() {
+                            if let Some(v) = l.checked_sub(imm) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] =
+                                    Value::from_smi(v);
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
                         let result =
                             self.execute_sub_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -836,7 +895,20 @@ impl Vm {
                         )?;
                     }
                     Opcode::Mul => {
-                        let result = self.execute_mul_opcode(agent, host, registry, frame, b, c);
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let right = self.register_stack[absolute_register(registers, c)];
+                        if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+                            if let Some(v) = smi_mul_result(l, r) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] = v;
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
+                        let result =
+                            self.execute_mul_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -848,6 +920,18 @@ impl Vm {
                         )?;
                     }
                     Opcode::MulSmi => {
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let imm = i32::from(decode_smi_immediate(c));
+                        if let Some(l) = left.as_smi() {
+                            if let Some(v) = smi_mul_result(l, imm) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] = v;
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
                         let result =
                             self.execute_mul_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -886,7 +970,20 @@ impl Vm {
                         )?;
                     }
                     Opcode::Mod => {
-                        let result = self.execute_mod_opcode(agent, host, registry, frame, b, c);
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let right = self.register_stack[absolute_register(registers, c)];
+                        if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+                            if let Some(v) = smi_mod_result(l, r) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] = v;
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
+                        let result =
+                            self.execute_mod_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -898,6 +995,18 @@ impl Vm {
                         )?;
                     }
                     Opcode::ModSmi => {
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let imm = i32::from(decode_smi_immediate(c));
+                        if let Some(l) = left.as_smi() {
+                            if let Some(v) = smi_mod_result(l, imm) {
+                                self.record_feedback_slot(frame.code(), feedback_slot);
+                                self.register_stack[absolute_register(registers, a)] = v;
+                                advance_dispatch_frame(frame, instruction_len);
+                                continue;
+                            }
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
                         let result =
                             self.execute_mod_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -935,7 +1044,20 @@ impl Vm {
                         )?;
                     }
                     Opcode::BitAnd => {
-                        let result = self.execute_bitand_opcode(agent, host, registry, frame, b, c);
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let right = self.register_stack[absolute_register(registers, c)];
+                        if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
+                            let v = l & r;
+                            self.record_feedback_slot(frame.code(), feedback_slot);
+                            self.register_stack[absolute_register(registers, a)] =
+                                Value::from_smi(v);
+                            advance_dispatch_frame(frame, instruction_len);
+                            continue;
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
+                        let result =
+                            self.execute_bitand_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -947,6 +1069,18 @@ impl Vm {
                         )?;
                     }
                     Opcode::BitAndSmi => {
+                        let registers = frame.registers();
+                        let left = self.register_stack[absolute_register(registers, b)];
+                        let imm = i32::from(decode_smi_immediate(c));
+                        if let Some(l) = left.as_smi() {
+                            let v = l & imm;
+                            self.record_feedback_slot(frame.code(), feedback_slot);
+                            self.register_stack[absolute_register(registers, a)] =
+                                Value::from_smi(v);
+                            advance_dispatch_frame(frame, instruction_len);
+                            continue;
+                        }
+                        // Cold path: ToPrimitive, BigInt, f64, etc.
                         let result =
                             self.execute_bitand_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
