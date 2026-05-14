@@ -109,6 +109,7 @@ impl ObjectRuntime {
     ///
     /// # Errors
     /// Returns an error when the cached holder object or its slot storage is missing or corrupt.
+    #[inline]
     pub fn load_from_named_property_cache(
         &self,
         heap: PrimitiveHeapView<'_>,
@@ -223,6 +224,7 @@ impl ObjectRuntime {
         ))
     }
 
+    #[inline]
     fn named_property_cache_entry_valid(
         &self,
         heap: PrimitiveHeapView<'_>,
