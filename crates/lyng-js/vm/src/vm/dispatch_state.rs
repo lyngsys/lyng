@@ -147,6 +147,23 @@ impl<'vm> DispatchState<'vm> {
         vm.read_constant(agent, code, bx)
     }
 
+    /// Route a possibly-abrupt operation result through the exception
+    /// transfer machinery. Returns `Ok(Some(value))` for success,
+    /// `Ok(None)` if the abrupt completion was caught by an active handler
+    /// (the handler should `dispatch_next!` to continue at the new PC), or
+    /// `Err(error)` if the abrupt completion escapes the current code.
+    #[inline]
+    pub(crate) fn handle_dispatch_result<T>(&mut self, result: VmResult<T>) -> VmResult<Option<T>> {
+        let DispatchState {
+            vm,
+            agent,
+            frame,
+            frame_depth,
+            ..
+        } = self;
+        vm.handle_dispatch_result(agent, *frame_depth, frame, result)
+    }
+
     /// Re-snapshot frame/depth/installed/epoch after a frame-changing
     /// operation. Required after a return that didn't terminate the script
     /// (caller frame is now active) or after a call (callee frame is now

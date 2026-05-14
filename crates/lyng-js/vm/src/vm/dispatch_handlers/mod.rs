@@ -24,7 +24,10 @@ pub mod loads;
 pub mod opcode_stubs;
 pub mod stub;
 
-pub use control_flow::{op_jump, op_jump8, op_loop_header, op_return, op_return_undefined};
+pub use control_flow::{
+    op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
+    op_loop_header, op_return, op_return_undefined,
+};
 pub use loads::{
     op_lda_const8, op_lda_false, op_lda_null, op_lda_one, op_lda_smi8, op_lda_true,
     op_lda_undefined, op_lda_zero, op_ldar, op_load_const, op_load_const8, op_load_false,
@@ -109,6 +112,10 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
 
     table[Opcode::Jump as u8 as usize] = op_jump;
     table[Opcode::Jump8 as u8 as usize] = op_jump8;
+    table[Opcode::JumpIfTrue as u8 as usize] = op_jump_if_true;
+    table[Opcode::JumpIfFalse as u8 as usize] = op_jump_if_false;
+    table[Opcode::JumpIfTrue8 as u8 as usize] = op_jump_if_true8;
+    table[Opcode::JumpIfFalse8 as u8 as usize] = op_jump_if_false8;
     table[Opcode::LoopHeader as u8 as usize] = op_loop_header;
     table[Opcode::Return as u8 as usize] = op_return;
     table[Opcode::ReturnUndefined as u8 as usize] = op_return_undefined;
