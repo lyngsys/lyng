@@ -34,7 +34,7 @@ use crate::FrameRecord;
 
 use super::dispatch_handlers;
 use super::install::InstalledFunction;
-use super::Vm;
+use super::{code_index, Vm};
 
 /// Per-frame execution state threaded through every handler call.
 ///
@@ -169,5 +169,53 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
             Step::Done(value) => return Ok(value),
             Step::Error(error) => return Err(error),
         }
+    }
+}
+
+impl Vm {
+    /// Bridge from the live `Vm::run` entrypoint into the trampoline
+    /// dispatch path. Constructs a `DispatchState` from the current active
+    /// frame, then hands control to `run_trampoline`.
+    ///
+    /// Reachable only with `--features trampoline-dispatch`. Until
+    /// sub-3..sub-7 land real handlers for every opcode family, most
+    /// programs hit `op_stub` and return `Step::Error(VmError::MissingActiveFrame)`.
+    ///
+    /// Frame transitions (Call*, Construct, TailCall) are handled by the
+    /// family handlers themselves in sub-6; this entry point only sets up
+    /// the initial frame snapshot.
+    pub(super) fn run_via_trampoline(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<Value> {
+        let frame_depth = self.frames.len();
+        let frame = self
+            .frames
+            .last()
+            .copied()
+            .expect("evaluation should install one active frame");
+        let code = frame.code();
+        let installed = self
+            .installed
+            .get(code_index(code))
+            .and_then(Option::as_ref)
+            .cloned()
+            .ok_or(VmError::MissingInstalledCode(code))?;
+        let frame_check_epoch = self.dispatch_frame_check_epoch();
+
+        let mut state = DispatchState {
+            vm: self,
+            agent,
+            host,
+            registry,
+            installed,
+            frame,
+            frame_depth,
+            frame_check_epoch,
+        };
+
+        run_trampoline(&mut state)
     }
 }
