@@ -347,15 +347,15 @@
       "label": "runtime.nursery-minor-gc",
       "live_bytes": 712,
       "major_gc": {
-        "last_background_sweep_apply_pause_ns": 291,
+        "last_background_sweep_apply_pause_ns": 208,
         "last_background_sweep_candidates": 63,
         "last_background_sweep_completed": true,
-        "last_background_sweep_duration_ns": 42,
+        "last_background_sweep_duration_ns": 1,
         "last_background_sweep_reclaimed": 63,
         "last_background_sweep_started": true,
         "last_background_sweep_worker_thread_id": 2688427941405105545,
         "last_gray_work_items_after_finish": 0,
-        "last_mark_finish_pause_ns": 83,
+        "last_mark_finish_pause_ns": 84,
         "last_mark_finish_work_items": 1,
         "last_mark_slice_budget": 64,
         "last_mark_slices": 0,
@@ -380,7 +380,7 @@
         "capacity_bytes": 1048576,
         "last_minor_cards_dirtied": 1,
         "last_minor_cards_scanned": 1,
-        "last_minor_pause_ns": 1542,
+        "last_minor_pause_ns": 875,
         "last_minor_reclaimed": 4,
         "last_minor_survivors": 1,
         "last_minor_tenured": 1,
@@ -428,20 +428,20 @@
       "label": "runtime.major-gc-mark-slices",
       "live_bytes": 336,
       "major_gc": {
-        "last_background_sweep_apply_pause_ns": 2000,
+        "last_background_sweep_apply_pause_ns": 1333,
         "last_background_sweep_candidates": 35,
         "last_background_sweep_completed": true,
-        "last_background_sweep_duration_ns": 41,
+        "last_background_sweep_duration_ns": 1,
         "last_background_sweep_reclaimed": 35,
         "last_background_sweep_started": true,
         "last_background_sweep_worker_thread_id": 6279463968646665849,
         "last_gray_work_items_after_finish": 0,
-        "last_mark_finish_pause_ns": 458,
+        "last_mark_finish_pause_ns": 333,
         "last_mark_finish_work_items": 5,
         "last_mark_slice_budget": 1,
         "last_mark_slices": 2,
         "last_mark_work_items": 2,
-        "last_max_mark_pause_ns": 83,
+        "last_max_mark_pause_ns": 84,
         "last_max_mark_slice_work_items": 1,
         "last_total_mark_pause_ns": 125
       },
@@ -504,7 +504,7 @@
   "workloads": [
     {
       "delta": {
-        "median_ns_per_operation": -349.4330512152774
+        "median_ns_per_operation": -215.63042534722263
       },
       "memory": {
         "allocated_feedback_bytes": 25336,
@@ -616,9 +616,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 9948.079427083334,
-        "median_total_ns": 183363000,
-        "median_us_per_run": 20373.666666666668,
+        "median_ns_per_operation": 9732.449001736111,
+        "median_total_ns": 179388500,
+        "median_us_per_run": 19932.055555555555,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -626,7 +626,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 17.53515625
+        "median_ns_per_operation": -149.98139105902771
       },
       "memory": {
         "allocated_feedback_bytes": 24208,
@@ -738,9 +738,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 916.8994683159722,
-        "median_total_ns": 16900291,
-        "median_us_per_run": 1877.8101111111112,
+        "median_ns_per_operation": 766.9180772569445,
+        "median_total_ns": 14135834,
+        "median_us_per_run": 1570.6482222222223,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -748,7 +748,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -204.671296296297
+        "median_ns_per_operation": 99.53703703703695
       },
       "memory": {
         "allocated_feedback_bytes": null,
@@ -776,9 +776,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.frontend",
       "throughput": {
-        "median_ns_per_operation": 3663.384259259259,
-        "median_total_ns": 791291,
-        "median_us_per_run": 87.92122222222221,
+        "median_ns_per_operation": 3762.921296296296,
+        "median_total_ns": 812791,
+        "median_us_per_run": 90.3101111111111,
         "operations_per_run": 24,
         "runs_per_sample": 9,
         "samples": 7
@@ -786,7 +786,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -39.24782986111086
+        "median_ns_per_operation": -240.96685112847217
       },
       "memory": {
         "allocated_feedback_bytes": 34232,
@@ -898,9 +898,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 2790.6516927083335,
-        "median_total_ns": 51437292,
-        "median_us_per_run": 5715.254666666667,
+        "median_ns_per_operation": 2549.6848415798613,
+        "median_total_ns": 46995791,
+        "median_us_per_run": 5221.754555555556,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -908,7 +908,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 60.56944444444434
+        "median_ns_per_operation": 0.773148148148266
       },
       "memory": {
         "allocated_feedback_bytes": null,
@@ -936,9 +936,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "module.compile",
       "throughput": {
-        "median_ns_per_operation": 3181.134259259259,
-        "median_total_ns": 687125,
-        "median_us_per_run": 76.34722222222223,
+        "median_ns_per_operation": 3181.9074074074074,
+        "median_total_ns": 687292,
+        "median_us_per_run": 76.36577777777778,
         "operations_per_run": 24,
         "runs_per_sample": 9,
         "samples": 7
@@ -946,7 +946,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -29.667588975695253
+        "median_ns_per_operation": -100.5203993055552
       },
       "memory": {
         "allocated_feedback_bytes": 18728,
@@ -1058,9 +1058,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 3926.3531901041665,
-        "median_total_ns": 72370542,
-        "median_us_per_run": 8041.171333333334,
+        "median_ns_per_operation": 3825.8327907986113,
+        "median_total_ns": 70517750,
+        "median_us_per_run": 7835.305555555556,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1068,7 +1068,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -1250.2396375868047
+        "median_ns_per_operation": 294.20757378473354
       },
       "memory": {
         "allocated_feedback_bytes": 34072,
@@ -1180,9 +1180,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 47117.673502604164,
-        "median_total_ns": 868472958,
-        "median_us_per_run": 96496.99533333333,
+        "median_ns_per_operation": 47411.88107638889,
+        "median_total_ns": 873895792,
+        "median_us_per_run": 97099.53244444444,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1190,7 +1190,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 67.91634114583348
+        "median_ns_per_operation": -125.63297526041652
       },
       "memory": {
         "allocated_feedback_bytes": 19824,
@@ -1302,9 +1302,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 2258.355034722222,
-        "median_total_ns": 41626000,
-        "median_us_per_run": 4625.111111111111,
+        "median_ns_per_operation": 2132.7220594618057,
+        "median_total_ns": 39310333,
+        "median_us_per_run": 4367.8147777777785,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1312,7 +1312,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -15.5888671875
+        "median_ns_per_operation": -159.5549587673613
       },
       "memory": {
         "allocated_feedback_bytes": 8864,
@@ -1424,9 +1424,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 12722.249348958334,
-        "median_total_ns": 234496500,
-        "median_us_per_run": 26055.166666666668,
+        "median_ns_per_operation": 12562.694390190973,
+        "median_total_ns": 231555583,
+        "median_us_per_run": 25728.398111111113,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1434,7 +1434,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -857.9982638888832
+        "median_ns_per_operation": -262.1437717013905
       },
       "memory": {
         "allocated_feedback_bytes": 36264,
@@ -1546,9 +1546,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 35732.589192708336,
-        "median_total_ns": 658623084,
-        "median_us_per_run": 73180.34266666666,
+        "median_ns_per_operation": 35470.445421006945,
+        "median_total_ns": 653791250,
+        "median_us_per_run": 72643.47222222222,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1556,7 +1556,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 12.478298611111057
+        "median_ns_per_operation": -35.66265190972217
       },
       "memory": {
         "allocated_feedback_bytes": 7768,
@@ -1660,9 +1660,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 221.49207899305554,
-        "median_total_ns": 4082542,
-        "median_us_per_run": 453.6157777777778,
+        "median_ns_per_operation": 185.82942708333334,
+        "median_total_ns": 3425208,
+        "median_us_per_run": 380.57866666666666,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -1670,7 +1670,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 19.96299913194457
+        "median_ns_per_operation": -134.71815321180543
       },
       "memory": {
         "allocated_feedback_bytes": 36264,
@@ -1782,9 +1782,9 @@
       },
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 959.7687717013889,
-        "median_total_ns": 17690458,
-        "median_us_per_run": 1965.6064444444444,
+        "median_ns_per_operation": 825.0506184895834,
+        "median_total_ns": 15207333,
+        "median_us_per_run": 1689.7036666666668,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
