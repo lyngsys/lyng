@@ -424,6 +424,6 @@ impl ObjectRuntime {
         if !heap.mut_store_object_handle(ObjectHandleStoreTarget::ObjectPrototype(id), prototype) {
             return false;
         }
-        self.bump_invalidation(id, InvalidationCause::PrototypeMutation)
+        self.bump_invalidation(heap, id, InvalidationCause::PrototypeMutation)
     }
 }

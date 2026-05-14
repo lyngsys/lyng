@@ -167,6 +167,13 @@ impl PrimitiveHeap {
         wrote
     }
 
+    #[inline]
+    pub(crate) fn set_object_invalidation_epoch(&mut self, id: ObjectRef, epoch: u64) -> bool {
+        self.objects.update(id, |record| {
+            record.last_invalidation_epoch = epoch;
+        })
+    }
+
     pub(crate) fn write_environment_slot(
         &mut self,
         id: EnvironmentSlotsRef,

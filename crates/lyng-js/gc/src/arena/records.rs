@@ -356,6 +356,7 @@ pub struct RuntimeObjectRecord {
     pub(super) private_slots: Option<ObjectSlotsRef>,
     pub(super) function_payload: Option<FunctionPayloadRef>,
     pub(super) ordinary_payload: Option<PrimitiveValueCellRef>,
+    pub(super) last_invalidation_epoch: u64,
     /// Inline named-property slots packed directly into the object record. Shapes that
     /// pack named properties into positions `0..INLINE_NAMED_SLOT_COUNT` store the
     /// values here rather than allocating a separate `NamedSlotStorage`. Unused slots
@@ -380,6 +381,7 @@ impl RuntimeObjectRecord {
             private_slots: None,
             function_payload,
             ordinary_payload: None,
+            last_invalidation_epoch: 0,
             inline_named_slots: [Value::empty_internal_slot(); RUNTIME_OBJECT_INLINE_SLOT_COUNT],
         }
     }
@@ -431,6 +433,14 @@ impl RuntimeObjectRecord {
     #[inline]
     pub const fn ordinary_payload(self) -> Option<PrimitiveValueCellRef> {
         self.ordinary_payload
+    }
+
+    #[inline]
+    pub const fn last_invalidation_epoch(self) -> Option<u64> {
+        match self.last_invalidation_epoch {
+            0 => None,
+            epoch => Some(epoch),
+        }
     }
 
     #[inline]

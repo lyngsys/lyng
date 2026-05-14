@@ -170,7 +170,7 @@ impl ObjectRuntime {
         {
             return false;
         }
-        self.bump_invalidation(id, InvalidationCause::DictionaryTransition)
+        self.bump_invalidation(heap, id, InvalidationCause::DictionaryTransition)
     }
 
     pub fn redefine_named_property(
@@ -192,7 +192,7 @@ impl ObjectRuntime {
             return false;
         };
         dictionary.upsert(key, payload, attrs);
-        self.bump_invalidation(id, InvalidationCause::PropertyRedefinition)
+        self.bump_invalidation(heap, id, InvalidationCause::PropertyRedefinition)
             && self.refresh_integrity_level_flags(heap.view(), id)
     }
 
@@ -232,7 +232,7 @@ impl ObjectRuntime {
             return false;
         }
         metadata.named_property_churn = metadata.named_property_churn.saturating_add(1);
-        self.bump_invalidation(id, InvalidationCause::PropertyDeletion)
+        self.bump_invalidation(heap, id, InvalidationCause::PropertyDeletion)
             && self.refresh_integrity_level_flags(heap.view(), id)
     }
 

@@ -33,7 +33,6 @@ impl ObjectRuntime {
         let mut dependencies = [None; PROPERTY_CACHE_MAX_DEPENDENCIES];
         let mut dependency_count = 0u8;
         if !Self::push_property_cache_dependency(
-            self,
             heap,
             &mut dependencies,
             &mut dependency_count,
@@ -70,7 +69,6 @@ impl ObjectRuntime {
                 return Ok(None);
             }
             if !Self::push_property_cache_dependency(
-                self,
                 heap,
                 &mut dependencies,
                 &mut dependency_count,
@@ -103,7 +101,7 @@ impl ObjectRuntime {
     ///
     /// The cached `slot_offset` carries an inline/out-of-line bit
     /// ([`super::SlotLocation::decode`]). Inline slots read directly from the holder's
-    /// `ObjectMetadata.inline_slots` (one indexed load past the metadata struct), matching
+    /// `RuntimeObjectRecord.inline_named_slots` (one indexed load past the object header), matching
     /// V8's in-object property fast path; out-of-line slots read from the heap-allocated
     /// `named_slots` array as before.
     ///
@@ -116,17 +114,10 @@ impl ObjectRuntime {
         receiver: ObjectRef,
         entry: NamedPropertyCacheEntry,
     ) -> InternalMethodResult<Option<Value>> {
-        if !self.named_property_cache_entry_valid(heap, receiver, entry)? {
+        let Some(holder) = Self::validated_named_property_cache_holder(heap, receiver, entry)?
+        else {
             return Ok(None);
-        }
-
-        let holder_id = match entry.path() {
-            NamedPropertyCachePath::OwnData => receiver,
-            NamedPropertyCachePath::PrototypeData => entry.holder(),
         };
-        let holder = heap
-            .object(holder_id)
-            .ok_or(InternalMethodError::MissingObject)?;
         match SlotLocation::decode(entry.slot_offset()) {
             SlotLocation::Inline(index) => Ok(holder.inline_named_slot(index as usize)),
             SlotLocation::OutOfLine(offset) => {
@@ -159,9 +150,11 @@ impl ObjectRuntime {
         if entry.path() != NamedPropertyCachePath::OwnData {
             return Ok(None);
         }
-        if !self.named_property_cache_entry_valid(heap.view(), receiver, entry)? {
+        let Some(holder) =
+            Self::validated_named_property_cache_holder(heap.view(), receiver, entry)?
+        else {
             return Ok(None);
-        }
+        };
         if !entry.attrs().writable() {
             return Ok(Some(false));
         }
@@ -175,10 +168,6 @@ impl ObjectRuntime {
                 Ok(Some(true))
             }
             SlotLocation::OutOfLine(offset) => {
-                let holder = heap
-                    .view()
-                    .object(receiver)
-                    .ok_or(InternalMethodError::MissingObject)?;
                 let slots = holder
                     .named_slots()
                     .ok_or(InternalMethodError::CorruptObjectState)?;
@@ -225,88 +214,94 @@ impl ObjectRuntime {
     }
 
     #[inline]
-    fn named_property_cache_entry_valid(
-        &self,
+    fn validated_named_property_cache_holder(
         heap: PrimitiveHeapView<'_>,
         receiver: ObjectRef,
         entry: NamedPropertyCacheEntry,
-    ) -> InternalMethodResult<bool> {
-        let receiver_header = self
-            .object_header(heap, receiver)
+    ) -> InternalMethodResult<Option<RuntimeObjectRecord>> {
+        let Some(receiver_dependency) = entry.dependency(0) else {
+            return Ok(None);
+        };
+        let receiver_record = heap
+            .object(receiver)
             .ok_or(InternalMethodError::MissingObject)?;
-        if receiver_header.shape() != entry.receiver_shape()
-            || receiver_header.flags().uses_named_property_dictionary()
+        if !Self::record_matches_cache_dependency(receiver_record, receiver_dependency)
+            || receiver_record.shape() != Some(entry.receiver_shape())
         {
-            return Ok(false);
+            return Ok(None);
         }
 
         match entry.path() {
-            NamedPropertyCachePath::OwnData => return Ok(true),
+            NamedPropertyCachePath::OwnData => {
+                if entry.dependency_count() != 1 || entry.holder_shape() != entry.receiver_shape() {
+                    return Ok(None);
+                }
+                Ok(Some(receiver_record))
+            }
             NamedPropertyCachePath::PrototypeData => {
-                let mut current = receiver_header.prototype();
+                let mut current = receiver_record.prototype();
+                let mut holder = None;
                 for index in 1..usize::from(entry.dependency_count()) {
                     let Some(dependency) = entry.dependency(index) else {
-                        return Ok(false);
+                        return Ok(None);
                     };
                     let Some(object) = current else {
-                        return Ok(false);
+                        return Ok(None);
                     };
                     if object != dependency.object() {
-                        return Ok(false);
+                        return Ok(None);
                     }
-                    let header = self
-                        .object_header(heap, object)
+                    let record = heap
+                        .object(object)
                         .ok_or(InternalMethodError::MissingObject)?;
-                    if header.shape() != dependency.shape()
-                        || header.flags().uses_named_property_dictionary()
-                    {
-                        return Ok(false);
+                    if !Self::record_matches_cache_dependency(record, dependency) {
+                        return Ok(None);
                     }
-                    let current_epoch = self
-                        .invalidation_event(object)
-                        .map(InvalidationEvent::epoch);
-                    if current_epoch != dependency.invalidation_epoch() {
-                        return Ok(false);
-                    }
-                    current = header.prototype();
+                    current = record.prototype();
+                    holder = Some((object, record));
                 }
+                let Some((holder_id, holder_record)) = holder else {
+                    return Ok(None);
+                };
+                if holder_id != entry.holder()
+                    || holder_record.shape() != Some(entry.holder_shape())
+                {
+                    return Ok(None);
+                }
+                Ok(Some(holder_record))
             }
         }
+    }
 
-        let holder_id = match entry.path() {
-            NamedPropertyCachePath::OwnData => receiver,
-            NamedPropertyCachePath::PrototypeData => entry.holder(),
-        };
-        let holder_header = self
-            .object_header(heap, holder_id)
-            .ok_or(InternalMethodError::MissingObject)?;
-        if holder_header.shape() != entry.holder_shape()
-            || holder_header.flags().uses_named_property_dictionary()
-        {
-            return Ok(false);
-        }
-        Ok(true)
+    #[inline]
+    fn record_matches_cache_dependency(
+        record: RuntimeObjectRecord,
+        dependency: PropertyCacheDependency,
+    ) -> bool {
+        record.shape() == Some(dependency.shape())
+            && record.last_invalidation_epoch() == dependency.invalidation_epoch()
     }
 
     fn push_property_cache_dependency(
-        &self,
         heap: PrimitiveHeapView<'_>,
         dependencies: &mut [Option<PropertyCacheDependency>; PROPERTY_CACHE_MAX_DEPENDENCIES],
         dependency_count: &mut u8,
         object: ObjectRef,
     ) -> InternalMethodResult<bool> {
-        let header = self
-            .object_header(heap, object)
+        let record = heap
+            .object(object)
             .ok_or(InternalMethodError::MissingObject)?;
+        let Some(shape) = record.shape() else {
+            return Err(InternalMethodError::CorruptObjectState);
+        };
         let index = usize::from(*dependency_count);
         if index >= PROPERTY_CACHE_MAX_DEPENDENCIES {
             return Ok(false);
         }
         dependencies[index] = Some(PropertyCacheDependency::new(
             object,
-            header.shape(),
-            self.invalidation_event(object)
-                .map(InvalidationEvent::epoch),
+            shape,
+            record.last_invalidation_epoch(),
         ));
         *dependency_count = dependency_count.saturating_add(1);
         Ok(true)
