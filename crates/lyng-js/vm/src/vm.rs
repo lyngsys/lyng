@@ -285,23 +285,12 @@ impl Vm {
             .map(OpcodeDispatchCounterStore::snapshot)
     }
 
-    #[inline]
-    pub(super) const fn opcode_dispatch_counts_enabled(&self) -> bool {
-        self.opcode_dispatch_counts.is_some()
-    }
-
-    #[inline]
-    pub(super) fn record_opcode_dispatch(&self, opcode: Opcode) {
-        if let Some(counts) = &self.opcode_dispatch_counts {
-            counts.increment(opcode);
-        }
-    }
-
     /// Trampoline-side opcode counter: translates the raw byte to `Opcode`,
-    /// skips `Wide` / `ExtraWide` prefixes (legacy counts the semantic only),
-    /// and records the dispatch. No-op when counters are disabled. Called
-    /// from `dispatch_next!` and `run_trampoline`, so kept cheap on the hot
-    /// path: the disabled case is a single load + branch.
+    /// skips `Wide` / `ExtraWide` prefixes (so the recorded total mirrors
+    /// the legacy "semantic only" count), and records the dispatch. No-op
+    /// when counters are disabled. Called from `dispatch_next!` and
+    /// `run_trampoline`, so kept cheap on the hot path: the disabled case
+    /// is a single load + branch.
     #[inline]
     pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
         let Some(counts) = &self.opcode_dispatch_counts else {

@@ -2,10 +2,6 @@
     improper_ctypes_definitions,
     reason = "extern \"C\" handlers carry Rust enums by value as an ABI-stability choice, not as a real FFI boundary"
 )]
-#![allow(
-    dead_code,
-    reason = "Phase 1 sub-1 in progress: scaffolding is in place ahead of run_trampoline wiring into evaluate_entry behind cfg(feature = \"trampoline-dispatch\")"
-)]
 
 //! Phase 1 Option α dispatch primitives — the per-handler ABI specified in
 //! `reports/js/lyng-js/jsc-aligned-engine-roadmap.md` and verified by the
@@ -18,9 +14,8 @@
 //! `&mut DispatchState` and returning `Step`; the trampoline does the indirect
 //! call and loops on `Step::Continue(handler)`.
 //!
-//! `run_trampoline` is the alternative dispatch entry point. It is not yet
-//! reachable from `evaluate_entry_with_registry_from_offset` — that wiring
-//! lands behind a `trampoline-dispatch` feature flag in a follow-up commit.
+//! Post sub-8 cutover (`lyng-9gyk`), `run_trampoline` is the only dispatch
+//! path — `Vm::run` routes here via `run_via_trampoline`.
 
 use std::sync::Arc;
 
@@ -106,24 +101,6 @@ impl<'vm> DispatchState<'vm> {
         unsafe { *bytes.as_ptr().add(pc) }
     }
 
-    /// Hot-path register read, JSC-LLInt-aligned (no slice bounds check).
-    /// The bytecode validator guarantees `idx < window.len()`, and
-    /// `reserve_register_window` reserves the slot before the frame
-    /// executes. See `Vm::read_register_unchecked` for the safety
-    /// contract.
-    #[inline]
-    pub(crate) fn read_register(&self, idx: u16) -> Value {
-        self.vm.read_register_unchecked(self.frame.registers(), idx)
-    }
-
-    /// Hot-path register write, JSC-LLInt-aligned. See
-    /// `Vm::write_register_unchecked` for the safety contract.
-    #[inline]
-    pub(crate) fn write_register(&mut self, idx: u16, value: Value) {
-        let registers = self.frame.registers();
-        self.vm.write_register_unchecked(registers, idx, value);
-    }
-
     /// Hot-path PC advance, with the u32-overflow check elided.
     /// Validated bytecode is bounded far below `u32::MAX`, so
     /// `wrapping_add` is functionally equivalent to `checked_add` for
@@ -138,15 +115,6 @@ impl<'vm> DispatchState<'vm> {
     #[inline]
     pub(crate) fn code(&self) -> CodeRef {
         self.frame.code()
-    }
-
-    /// Stub for feedback recording — Phase 1 sub-4 wires this through to
-    /// `Vm::record_feedback_slot` against the live `FeedbackVector`. The
-    /// arithmetic handlers call it on the SMI fast path.
-    #[inline]
-    pub(crate) fn record_feedback_arithmetic_smi(&mut self, _slot: u16) {
-        // TODO(lyng-54em): integrate with FeedbackVector via
-        // self.vm.record_feedback_slot(self.code(), Some(FeedbackSlotId::from_raw(slot)?)).
     }
 
     /// Write `self.frame` back to `vm.frames[frame_depth - 1]`. Used before
@@ -273,6 +241,10 @@ macro_rules! dispatch_next {
     ($state:expr) => {{
         let byte = $state.next_opcode_byte();
         $state.vm.maybe_record_opcode_dispatch(byte);
+        #[cfg(debug_assertions)]
+        $state
+            .vm
+            .assert_deopt_safepoint_state($state.agent, &$state.frame, &$state.installed);
         return $crate::vm::dispatch_state::Step::Continue(
             $crate::vm::dispatch_state::DISPATCH_TABLE[byte as usize],
         );
@@ -313,6 +285,10 @@ pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
 pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
     let first_byte = state.first_opcode_byte();
     state.vm.maybe_record_opcode_dispatch(first_byte);
+    #[cfg(debug_assertions)]
+    state
+        .vm
+        .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
     let mut handler = DISPATCH_TABLE[first_byte as usize];
     loop {
         match (handler)(state) {

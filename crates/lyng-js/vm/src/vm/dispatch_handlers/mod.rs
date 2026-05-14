@@ -2,12 +2,8 @@
     improper_ctypes_definitions,
     reason = "extern \"C\" handlers carry Rust enums by value as an ABI-stability choice, not as a real FFI boundary"
 )]
-#![allow(
-    dead_code,
-    reason = "Phase 1 trampoline spike exercises these via tests and cargo-asm only; production cutover lives in follow-up sub-issues"
-)]
 
-//! Phase 1 trampoline spike — handler family modules.
+//! Phase 1 trampoline handler family modules (post sub-8 cutover).
 //!
 //! Each family file holds the `extern "C" fn` handlers for a related group of
 //! opcodes. The spike implements one representative handler per family so the
