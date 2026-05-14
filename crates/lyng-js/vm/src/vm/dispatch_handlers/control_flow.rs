@@ -139,7 +139,7 @@ pub extern "C" fn op_jump_if_true(state: &mut DispatchState) -> Step {
     let pc = state.frame.instruction_offset();
     let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
         state.current_bytes(),
-        None,
+        state.prefix,
         false,
         code,
         pc,
@@ -153,7 +153,7 @@ pub extern "C" fn op_jump_if_false(state: &mut DispatchState) -> Step {
     let pc = state.frame.instruction_offset();
     let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
         state.current_bytes(),
-        None,
+        state.prefix,
         false,
         code,
         pc,

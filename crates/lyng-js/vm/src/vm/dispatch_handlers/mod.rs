@@ -22,6 +22,7 @@ pub mod arithmetic;
 pub mod control_flow;
 pub mod loads;
 pub mod opcode_stubs;
+pub mod prefix;
 pub mod stub;
 
 pub use control_flow::{
@@ -36,6 +37,7 @@ pub use loads::{
     op_load_zero, op_move, op_star_0, op_star_1, op_star_2, op_star_3, op_star_4, op_star_5,
     op_star_6, op_star_7, op_store_local_0, op_store_local_1, op_store_local_2, op_store_local_3,
 };
+pub use prefix::{op_extra_wide, op_wide};
 
 /// Build the dispatch table at compile time.
 ///
@@ -119,6 +121,9 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::LoopHeader as u8 as usize] = op_loop_header;
     table[Opcode::Return as u8 as usize] = op_return;
     table[Opcode::ReturnUndefined as u8 as usize] = op_return_undefined;
+
+    table[Opcode::Wide as u8 as usize] = op_wide;
+    table[Opcode::ExtraWide as u8 as usize] = op_extra_wide;
 
     table
 }
