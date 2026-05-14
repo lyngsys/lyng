@@ -33,9 +33,10 @@ use crate::{dispatch_next, try_step};
 pub extern "C" fn op_move(state: &mut DispatchState) -> Step {
     let code = state.code();
     let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
     let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
         state.current_bytes(),
-        state.prefix,
+        prefix,
         false,
         code,
         pc,
@@ -87,9 +88,10 @@ macro_rules! op_load_constant_abx {
         pub extern "C" fn $name(state: &mut DispatchState) -> Step {
             let code = state.code();
             let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
             let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
                 state.current_bytes(),
-                state.prefix,
+                prefix,
                 false,
                 code,
                 pc,
@@ -204,9 +206,10 @@ pub extern "C" fn op_ldar(state: &mut DispatchState) -> Step {
 pub extern "C" fn op_load_smi(state: &mut DispatchState) -> Step {
     let code = state.code();
     let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
     let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
         state.current_bytes(),
-        state.prefix,
+        prefix,
         false,
         code,
         pc,
@@ -242,9 +245,10 @@ pub extern "C" fn op_load_smi8(state: &mut DispatchState) -> Step {
 pub extern "C" fn op_load_const(state: &mut DispatchState) -> Step {
     let code = state.code();
     let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
     let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
         state.current_bytes(),
-        state.prefix,
+        prefix,
         false,
         code,
         pc,
