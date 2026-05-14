@@ -207,7 +207,7 @@ impl Vm {
         Ok(encode_number(left - f64::from(immediate)))
     }
 
-    pub(super) fn negate_value(
+    pub(in crate::vm) fn negate_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -230,7 +230,7 @@ impl Vm {
         Ok(encode_number(-number))
     }
 
-    pub(super) fn bitwise_not_value(
+    pub(in crate::vm) fn bitwise_not_value(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

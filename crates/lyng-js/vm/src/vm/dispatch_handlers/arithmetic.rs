@@ -242,6 +242,120 @@ fn op_mul_slow(
 }
 
 // =====================================================================
+// Negate / BitNot / Increment / Decrement — unary, no inline SMI fast
+// path (the Vm helpers have one internally)
+// =====================================================================
+
+pub extern "C" fn op_negate(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, _c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let negate_result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.negate_value(agent, *host, &mut **registry, frame, b)
+    };
+    let value = match try_step!(state.handle_dispatch_result(negate_result)) {
+        Some(v) => v,
+        None => dispatch_next!(state),
+    };
+    state.vm.record_feedback_slot(code, feedback_slot);
+    let registers = state.frame.registers();
+    state.vm.write_register_unchecked(registers, a, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_bit_not(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, _c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let bit_not_result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.bitwise_not_value(agent, *host, &mut **registry, frame, b)
+    };
+    let value = match try_step!(state.handle_dispatch_result(bit_not_result)) {
+        Some(v) => v,
+        None => dispatch_next!(state),
+    };
+    state.vm.record_feedback_slot(code, feedback_slot);
+    let registers = state.frame.registers();
+    state.vm.write_register_unchecked(registers, a, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+#[inline]
+fn op_update_register(state: &mut DispatchState, increment: bool) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let prefix = state.prefix.take();
+    let (a, b, _c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+        state.current_bytes(),
+        prefix,
+        true,
+        code,
+        pc,
+    ));
+    let update_result = {
+        let DispatchState {
+            vm,
+            agent,
+            host,
+            registry,
+            frame,
+            ..
+        } = &mut *state;
+        vm.update_register_value(agent, *host, &mut **registry, frame, b, increment)
+    };
+    let (numeric, value) = match try_step!(state.handle_dispatch_result(update_result)) {
+        Some(pair) => pair,
+        None => dispatch_next!(state),
+    };
+    let registers = state.frame.registers();
+    state.vm.write_register_unchecked(registers, b, numeric);
+    state.vm.record_feedback_slot(code, feedback_slot);
+    state.vm.write_register_unchecked(registers, a, value);
+    state.advance(instruction_len);
+    dispatch_next!(state);
+}
+
+pub extern "C" fn op_increment(state: &mut DispatchState) -> Step {
+    op_update_register(state, true)
+}
+
+pub extern "C" fn op_decrement(state: &mut DispatchState) -> Step {
+    op_update_register(state, false)
+}
+
+// =====================================================================
 // AddSmi / SubSmi / MulSmi — register + i16 immediate, Abc-encoded
 // =====================================================================
 
