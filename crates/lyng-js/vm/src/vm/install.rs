@@ -88,7 +88,7 @@ impl InstalledFunction {
     }
 
     #[inline]
-    pub(super) fn loop_iteration_environment_site(
+    pub(in crate::vm) fn loop_iteration_environment_site(
         &self,
         instruction_offset: u32,
     ) -> Option<&lyng_js_bytecode::LoopIterationEnvironmentSite> {

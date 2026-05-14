@@ -5,7 +5,7 @@ use super::{
 use lyng_js_bytecode::{CaptureDescriptor, CaptureSource};
 
 impl Vm {
-    pub(super) fn push_loop_iteration_environment(
+    pub(in crate::vm) fn push_loop_iteration_environment(
         &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
@@ -46,7 +46,7 @@ impl Vm {
         Ok(())
     }
 
-    pub(super) fn pop_loop_iteration_environment(&mut self) {
+    pub(in crate::vm) fn pop_loop_iteration_environment(&mut self) {
         if let Some(index) = self.loop_iteration_envs.iter().rposition(|environment| {
             environment.active && environment.frame_depth == self.frames.len()
         }) {
@@ -449,7 +449,7 @@ impl Vm {
         uses_loop_environment.then_some(active.iteration_environment)
     }
 
-    pub(super) fn environment_for_slot_access(
+    pub(in crate::vm) fn environment_for_slot_access(
         &self,
         agent: &Agent,
         start: EnvironmentRef,
