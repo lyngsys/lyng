@@ -8,7 +8,7 @@ use super::{
 use lyng_js_ops::{errors, read};
 use lyng_js_types::{AbruptCompletion, FeedbackSlotId, PropertyKey};
 
-mod arithmetic;
+pub(in crate::vm) mod arithmetic;
 mod property;
 
 #[cfg(test)]
@@ -662,7 +662,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "hot ABC dispatch keeps frame state, feedback, and target register explicit at call sites"
     )]
-    fn finish_abc_value_result(
+    pub(in crate::vm) fn finish_abc_value_result(
         &mut self,
         agent: &mut Agent,
         frame_depth: usize,

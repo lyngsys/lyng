@@ -13,12 +13,12 @@ use lyng_js_ops::{errors, object, pure, read};
 use lyng_js_types::{AbruptCompletion, Value};
 
 #[inline]
-pub(super) const fn decode_smi_immediate(raw: u16) -> i16 {
+pub(in crate::vm) const fn decode_smi_immediate(raw: u16) -> i16 {
     i16::from_le_bytes(raw.to_le_bytes())
 }
 
 #[inline]
-pub(super) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
+pub(in crate::vm) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
     if (left == 0 || right == 0) && (left < 0 || right < 0) {
         return None;
     }
@@ -38,7 +38,7 @@ pub(super) const fn smi_mod_result(left: i32, right: i32) -> Option<Value> {
 }
 
 impl Vm {
-    pub(super) fn execute_add_opcode(
+    pub(in crate::vm) fn execute_add_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -58,7 +58,7 @@ impl Vm {
         self.add_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_add_smi_opcode(
+    pub(in crate::vm) fn execute_add_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -74,7 +74,7 @@ impl Vm {
         self.add_value_and_smi(agent, host, registry, frame, left, immediate)
     }
 
-    pub(super) fn execute_sub_opcode(
+    pub(in crate::vm) fn execute_sub_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -94,7 +94,7 @@ impl Vm {
         self.sub_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_sub_smi_opcode(
+    pub(in crate::vm) fn execute_sub_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -110,7 +110,7 @@ impl Vm {
         self.sub_value_and_smi(agent, host, registry, frame, left, immediate)
     }
 
-    pub(super) fn execute_mul_opcode(
+    pub(in crate::vm) fn execute_mul_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -130,7 +130,7 @@ impl Vm {
         self.mul_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_div_opcode(
+    pub(in crate::vm) fn execute_div_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -147,7 +147,7 @@ impl Vm {
         self.div_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_mul_smi_opcode(
+    pub(in crate::vm) fn execute_mul_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -163,7 +163,7 @@ impl Vm {
         self.mul_value_and_smi(agent, host, registry, frame, left, immediate)
     }
 
-    pub(super) fn execute_mod_opcode(
+    pub(in crate::vm) fn execute_mod_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -183,7 +183,7 @@ impl Vm {
         self.rem_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_div_smi_opcode(
+    pub(in crate::vm) fn execute_div_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -202,7 +202,7 @@ impl Vm {
         )
     }
 
-    pub(super) fn execute_mod_smi_opcode(
+    pub(in crate::vm) fn execute_mod_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -218,7 +218,7 @@ impl Vm {
         self.rem_value_and_smi(agent, host, registry, frame, left, immediate)
     }
 
-    pub(super) fn execute_exp_opcode(
+    pub(in crate::vm) fn execute_exp_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -235,7 +235,7 @@ impl Vm {
         self.exp_values(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_bitor_opcode(
+    pub(in crate::vm) fn execute_bitor_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -252,7 +252,7 @@ impl Vm {
         self.bitwise_or(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_bitand_opcode(
+    pub(in crate::vm) fn execute_bitand_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -272,7 +272,7 @@ impl Vm {
         self.bitwise_and(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_bitand_smi_opcode(
+    pub(in crate::vm) fn execute_bitand_smi_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -288,7 +288,7 @@ impl Vm {
         self.bitwise_and_value_and_smi(agent, host, registry, frame, left, immediate)
     }
 
-    pub(super) fn execute_bitxor_opcode(
+    pub(in crate::vm) fn execute_bitxor_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -305,7 +305,7 @@ impl Vm {
         self.bitwise_xor(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_shift_left_opcode(
+    pub(in crate::vm) fn execute_shift_left_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -322,7 +322,7 @@ impl Vm {
         self.shift_left(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_shift_right_opcode(
+    pub(in crate::vm) fn execute_shift_right_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -339,7 +339,7 @@ impl Vm {
         self.shift_right(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_unsigned_shift_right_opcode(
+    pub(in crate::vm) fn execute_unsigned_shift_right_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -356,7 +356,7 @@ impl Vm {
         self.unsigned_shift_right(agent, host, registry, frame, left, right)
     }
 
-    pub(super) fn execute_equal_opcode(
+    pub(in crate::vm) fn execute_equal_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -377,7 +377,7 @@ impl Vm {
         )?))
     }
 
-    pub(super) fn execute_strict_equal_opcode(
+    pub(in crate::vm) fn execute_strict_equal_opcode(
         &self,
         agent: &Agent,
         frame: &FrameRecord,
@@ -399,12 +399,12 @@ impl Vm {
         ))
     }
 
-    pub(super) fn execute_equal_zero_opcode(&self, frame: &FrameRecord, register: u16) -> Value {
+    pub(in crate::vm) fn execute_equal_zero_opcode(&self, frame: &FrameRecord, register: u16) -> Value {
         let value = self.read_register(frame.registers(), register);
         Value::from_bool(value.as_f64().is_some_and(|number| number == 0.0))
     }
 
-    pub(super) fn execute_less_than_opcode(
+    pub(in crate::vm) fn execute_less_than_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -423,7 +423,7 @@ impl Vm {
         })
     }
 
-    pub(super) fn execute_less_equal_opcode(
+    pub(in crate::vm) fn execute_less_equal_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -442,7 +442,7 @@ impl Vm {
         })
     }
 
-    pub(super) fn execute_greater_than_opcode(
+    pub(in crate::vm) fn execute_greater_than_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
@@ -461,7 +461,7 @@ impl Vm {
         })
     }
 
-    pub(super) fn execute_greater_equal_opcode(
+    pub(in crate::vm) fn execute_greater_equal_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

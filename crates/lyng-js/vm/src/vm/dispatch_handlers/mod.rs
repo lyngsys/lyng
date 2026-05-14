@@ -25,6 +25,7 @@ pub mod opcode_stubs;
 pub mod prefix;
 pub mod stub;
 
+pub use arithmetic::{op_add, op_add_smi, op_mul, op_mul_smi, op_sub, op_sub_smi};
 pub use control_flow::{
     op_jump, op_jump8, op_jump_if_false, op_jump_if_false8, op_jump_if_true, op_jump_if_true8,
     op_loop_header, op_return, op_return_undefined,
@@ -124,6 +125,14 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
 
     table[Opcode::Wide as u8 as usize] = op_wide;
     table[Opcode::ExtraWide as u8 as usize] = op_extra_wide;
+
+    // sub-4 (lyng-54em): arithmetic family.
+    table[Opcode::Add as u8 as usize] = op_add;
+    table[Opcode::AddSmi as u8 as usize] = op_add_smi;
+    table[Opcode::Sub as u8 as usize] = op_sub;
+    table[Opcode::SubSmi as u8 as usize] = op_sub_smi;
+    table[Opcode::Mul as u8 as usize] = op_mul;
+    table[Opcode::MulSmi as u8 as usize] = op_mul_smi;
 
     table
 }

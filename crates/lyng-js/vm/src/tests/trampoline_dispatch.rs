@@ -163,3 +163,37 @@ fn trampoline_executes_if_false_alternate() {
 
     assert_eq!(result, Value::from_smi(2));
 }
+
+// =====================================================================
+// sub-4 (lyng-54em): arithmetic family parity tests
+// =====================================================================
+
+#[test]
+fn trampoline_executes_smi_add() {
+    let unit = compile_test_unit(9, "5 + 7");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("trampoline-dispatch should execute `5 + 7` cleanly");
+
+    assert_eq!(result, Value::from_smi(12));
+}
+
+#[test]
+fn trampoline_executes_chained_smi_add() {
+    let unit = compile_test_unit(10, "1 + 2 + 3 + 4 + 5");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .expect("trampoline-dispatch should execute chained add cleanly");
+
+    assert_eq!(result, Value::from_smi(15));
+}
