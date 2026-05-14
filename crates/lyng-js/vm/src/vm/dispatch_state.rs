@@ -77,29 +77,60 @@ impl<'vm> DispatchState<'vm> {
         self.current_bytes()[0]
     }
 
+    /// Hot-path read of the byte at the current `pc`, with the slice
+    /// bounds check elided. Mirrors JSC LLInt's `loadb [PB, PC, 1], t0`
+    /// pattern: the bytecode validator guarantees that any opcode
+    /// reachable via `dispatch_next!` is followed by another valid
+    /// opcode byte (every script-completion path ends in `Return` /
+    /// `ReturnUndefined`, which exit via `Step::Done` rather than
+    /// `dispatch_next!`).
+    ///
+    /// # Safety
+    ///
+    /// Caller must guarantee `self.frame.instruction_offset() <
+    /// self.installed.function.instruction_bytes().len()`. The dispatch
+    /// path satisfies this via the bytecode-emitter invariant and
+    /// terminal-opcode semantics described above.
     #[inline]
     pub(crate) fn next_opcode_byte(&self) -> u8 {
-        self.current_bytes()[0]
+        let bytes = self.installed.function.instruction_bytes();
+        let pc = self.frame.instruction_offset() as usize;
+        debug_assert!(
+            pc < bytes.len(),
+            "dispatch_next! reached past end of bytecode — terminal opcode invariant violated"
+        );
+        // SAFETY: contract above — every dispatched opcode is followed
+        // by another opcode byte; terminal opcodes (Return /
+        // ReturnUndefined) exit via Step::Done, not dispatch_next!.
+        unsafe { *bytes.as_ptr().add(pc) }
     }
 
+    /// Hot-path register read, JSC-LLInt-aligned (no slice bounds check).
+    /// The bytecode validator guarantees `idx < window.len()`, and
+    /// `reserve_register_window` reserves the slot before the frame
+    /// executes. See `Vm::read_register_unchecked` for the safety
+    /// contract.
     #[inline]
     pub(crate) fn read_register(&self, idx: u16) -> Value {
-        self.vm.read_register(self.frame.registers(), idx)
+        self.vm.read_register_unchecked(self.frame.registers(), idx)
     }
 
+    /// Hot-path register write, JSC-LLInt-aligned. See
+    /// `Vm::write_register_unchecked` for the safety contract.
     #[inline]
     pub(crate) fn write_register(&mut self, idx: u16, value: Value) {
         let registers = self.frame.registers();
-        self.vm.write_register(registers, idx, value);
+        self.vm.write_register_unchecked(registers, idx, value);
     }
 
+    /// Hot-path PC advance, with the u32-overflow check elided.
+    /// Validated bytecode is bounded far below `u32::MAX`, so
+    /// `wrapping_add` is functionally equivalent to `checked_add` for
+    /// any in-spec bytecode. Mirrors JSC LLInt's `addp Imm, PC` pattern
+    /// (no overflow trap).
     #[inline]
     pub(crate) fn advance(&mut self, n: u32) {
-        let next = self
-            .frame
-            .instruction_offset()
-            .checked_add(n)
-            .expect("instruction offset should stay within u32");
+        let next = self.frame.instruction_offset().wrapping_add(n);
         self.frame.set_instruction_offset(next);
     }
 

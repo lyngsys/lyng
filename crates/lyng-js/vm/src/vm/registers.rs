@@ -28,6 +28,63 @@ impl Vm {
         self.register_stack[absolute] = value;
     }
 
+    /// Frame-register read with the slice bounds check elided.
+    ///
+    /// Matches JSC LLInt's `loadq [cfr, index, 8], value` pattern: the
+    /// bytecode validator guarantees `register < window.len()` at
+    /// compile time, and `reserve_register_window` reserves
+    /// `register_stack.len() >= absolute` before the frame executes. With
+    /// both invariants held, the slice bounds check is dead work the
+    /// hot dispatch path can shed.
+    ///
+    /// # Safety
+    ///
+    /// Caller must guarantee `register` came from a validated bytecode
+    /// operand for the active frame, and the active frame's register
+    /// window has been reserved via `reserve_register_window`. Both hold
+    /// for every operand decoded by the dispatch path because the
+    /// emitter and frame-entry helpers enforce them; in release builds
+    /// the `debug_assert!` in `absolute_register` plus the
+    /// `debug_assert!` here are the only remaining checks.
+    #[inline]
+    pub(in crate::vm) fn read_register_unchecked(
+        &self,
+        registers: RegisterWindow,
+        register: u16,
+    ) -> Value {
+        let absolute = absolute_register(registers, register);
+        debug_assert!(
+            absolute < self.register_stack_top(),
+            "validated register window should be reserved on the VM stack"
+        );
+        // SAFETY: contract above — bytecode validation + reserved window.
+        unsafe { *self.register_stack.get_unchecked(absolute) }
+    }
+
+    /// Frame-register write with the slice bounds check elided. See
+    /// [`read_register_unchecked`] for the safety contract.
+    ///
+    /// # Safety
+    ///
+    /// Same as [`read_register_unchecked`].
+    #[inline]
+    pub(in crate::vm) fn write_register_unchecked(
+        &mut self,
+        registers: RegisterWindow,
+        register: u16,
+        value: Value,
+    ) {
+        let absolute = absolute_register(registers, register);
+        debug_assert!(
+            absolute < self.register_stack_top(),
+            "validated register window should be reserved on the VM stack"
+        );
+        // SAFETY: contract above — bytecode validation + reserved window.
+        unsafe {
+            *self.register_stack.get_unchecked_mut(absolute) = value;
+        }
+    }
+
     pub(super) fn clear_active_resume(&mut self) {
         let frame = self
             .frames
