@@ -20,3 +20,6 @@ mod metadata_and_tail_calls;
 mod modules;
 mod promises;
 mod text;
+
+#[cfg(feature = "trampoline-dispatch")]
+mod trampoline_dispatch;

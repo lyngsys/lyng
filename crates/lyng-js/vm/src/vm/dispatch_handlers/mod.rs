@@ -24,7 +24,7 @@ pub mod loads;
 pub mod opcode_stubs;
 pub mod stub;
 
-pub use control_flow::{op_jump, op_jump8, op_loop_header};
+pub use control_flow::{op_jump, op_jump8, op_loop_header, op_return, op_return_undefined};
 pub use loads::{
     op_lda_false, op_lda_null, op_lda_one, op_lda_true, op_lda_undefined, op_lda_zero,
     op_load_false, op_load_null, op_load_one, op_load_true, op_load_undefined,
@@ -89,6 +89,8 @@ pub const fn build_dispatch_table() -> [Handler; DISPATCH_TABLE_LEN] {
     table[Opcode::Jump as u8 as usize] = op_jump;
     table[Opcode::Jump8 as u8 as usize] = op_jump8;
     table[Opcode::LoopHeader as u8 as usize] = op_loop_header;
+    table[Opcode::Return as u8 as usize] = op_return;
+    table[Opcode::ReturnUndefined as u8 as usize] = op_return_undefined;
 
     table
 }
