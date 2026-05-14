@@ -1,9 +1,9 @@
+use super::dispatch::arithmetic::{decode_smi_immediate, smi_mod_result, smi_mul_result};
 use super::registers::absolute_register;
 use super::values::decode_env_operand;
-use super::dispatch::arithmetic::{decode_smi_immediate, smi_mod_result, smi_mul_result};
 use super::{
-    code_index, Agent, CallRange, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry,
-    Opcode, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
+    code_index, Agent, CallRange, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode,
+    ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
 };
 use lyng_js_ops::{errors, read};
 use lyng_js_types::{AbruptCompletion, FeedbackSlotId, PropertyKey};
@@ -92,6 +92,38 @@ mod tests {
     }
 
     #[test]
+    fn dispatch_loop_folds_operand_decode_into_opcode_arms() {
+        let source = include_str!("dispatch.rs");
+        let run_loop = source
+            .split("\n    fn run_dispatch_loop")
+            .nth(1)
+            .expect("dispatch loop should stay in this module");
+
+        assert!(
+            run_loop.contains("match semantic_opcode"),
+            "hot dispatch should enter opcode arms with the encoded semantic opcode"
+        );
+        assert!(
+            !run_loop.contains("dispatch_operand_form("),
+            "operand layout should be selected inside opcode arms, not through a centralized form dispatch"
+        );
+    }
+
+    #[test]
+    fn dispatch_loop_avoids_unconditional_frame_active_check() {
+        let source = include_str!("dispatch.rs");
+        let run_loop = source
+            .split("\n    fn run_dispatch_loop")
+            .nth(1)
+            .expect("dispatch loop should stay in this module");
+
+        assert!(
+            !run_loop.contains("if !state.active_in(self)"),
+            "frame-stack validation should run only after frame-changing boundaries"
+        );
+    }
+
+    #[test]
     fn move_arm_uses_direct_register_window_access() {
         let source = include_str!("dispatch.rs");
         let run_loop = source
@@ -118,9 +150,9 @@ mod tests {
             .nth(1)
             .expect("dispatch loop should stay in this module");
         let load_const_arm = run_loop
-            .split("Opcode::LoadConst | Opcode::LoadConst8 => {")
+            .split("Opcode::LoadConst => {")
             .nth(1)
-            .and_then(|tail| tail.split("Opcode::LoadLocal0").next())
+            .and_then(|tail| tail.split("Opcode::LoadConst8").next())
             .expect("LoadConst arm should stay directly before local load arms");
 
         assert!(
@@ -135,6 +167,7 @@ pub(in crate::vm) struct DispatchState {
     frame_depth: usize,
     code: CodeRef,
     frame: FrameRecord,
+    frame_check_epoch: u32,
 }
 
 impl DispatchState {
@@ -149,6 +182,7 @@ impl DispatchState {
             frame_depth,
             code: frame.code(),
             frame,
+            frame_check_epoch: vm.dispatch_frame_check_epoch,
         }
     }
 
@@ -170,24 +204,19 @@ impl DispatchState {
     }
 }
 
-#[derive(Clone, Copy)]
-enum DispatchOperandForm {
-    Abc,
-    Abx,
-    Abx8,
-    Ax,
-    Ax8,
-    Local,
-    Accumulator,
-    AccumulatorByte,
-    AccumulatorRegister,
-    CallRange,
-}
-
 const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
     let sign = if bytes[2] & 0x80 == 0 { 0 } else { 0xff };
     i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
 }
+
+type DecodedCallRangeOperands = (
+    u16,
+    u16,
+    u16,
+    Option<CallRange>,
+    Option<FeedbackSlotId>,
+    u32,
+);
 
 #[inline]
 pub(in crate::vm) const fn advance_dispatch_frame(frame: &mut FrameRecord, encoded_len: u32) {
@@ -232,165 +261,280 @@ pub(in crate::vm) const fn next_dispatch_instruction_offset(
         .expect("instruction offset should stay within u32")
 }
 
-#[inline(always)]
-#[allow(
-    clippy::too_many_lines,
-    clippy::inline_always,
-    reason = "the dispatch decoder mirrors the bytecode operand layout table; inline(always) is required so the form match folds into the per-opcode dispatch in the hot loop"
-)]
-const fn dispatch_operand_form(opcode: Opcode) -> DispatchOperandForm {
-    match opcode {
-        Opcode::Nop
-        | Opcode::TypeOf
-        | Opcode::Jump
-        | Opcode::LoopHeader
-        | Opcode::Return
-        | Opcode::ReturnUndefined
-        | Opcode::PushClosureEnv
-        | Opcode::PopClosureEnv
-        | Opcode::PushWithEnv
-        | Opcode::PopWithEnv
-        | Opcode::Throw
-        | Opcode::EnterHandler
-        | Opcode::LeaveHandler
-        | Opcode::LoadException
-        | Opcode::SuspendGeneratorStart
-        | Opcode::Yield
-        | Opcode::Await
-        | Opcode::LoadResumeKind
-        | Opcode::LoadResumeValue => DispatchOperandForm::Ax,
-        Opcode::LoadUndefined
-        | Opcode::LoadUninitializedLexical
-        | Opcode::LoadNull
-        | Opcode::LoadTrue
-        | Opcode::LoadFalse
-        | Opcode::LoadZero
-        | Opcode::LoadOne
-        | Opcode::LoadSmi
-        | Opcode::LoadConst
-        | Opcode::LoadEnvSlot
-        | Opcode::StoreEnvSlot
-        | Opcode::AssignEnvSlot
-        | Opcode::LoadGlobal
-        | Opcode::StoreGlobal
-        | Opcode::AssignGlobal
-        | Opcode::DeleteGlobal
-        | Opcode::LoadName
-        | Opcode::ResolveName
-        | Opcode::ResolveGlobal
-        | Opcode::AssignName
-        | Opcode::AssignVariableName
-        | Opcode::DeleteName
-        | Opcode::CaptureName
-        | Opcode::LoadCapturedName
-        | Opcode::LoadCapturedNameThis
-        | Opcode::AssignCapturedName
-        | Opcode::LoadThis
-        | Opcode::LoadCallee
-        | Opcode::LoadNewTarget
-        | Opcode::EnterEnvScope
-        | Opcode::LeaveEnvScope
-        | Opcode::JumpIfTrue
-        | Opcode::JumpIfFalse
-        | Opcode::CreateObject
-        | Opcode::CreateArray
-        | Opcode::CheckObjectCoercible
-        | Opcode::ThrowIfUninitialized
-        | Opcode::CreateClosure
-        | Opcode::CloseForIn
-        | Opcode::CloseIterator => DispatchOperandForm::Abx,
-        Opcode::LoadSmi8 | Opcode::LoadConst8 | Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8 => {
-            DispatchOperandForm::Abx8
-        }
-        Opcode::Jump8 => DispatchOperandForm::Ax8,
-        Opcode::LoadLocal0
-        | Opcode::LoadLocal1
-        | Opcode::LoadLocal2
-        | Opcode::LoadLocal3
-        | Opcode::StoreLocal0
-        | Opcode::StoreLocal1
-        | Opcode::StoreLocal2
-        | Opcode::StoreLocal3 => DispatchOperandForm::Local,
-        Opcode::LdaUndefined
-        | Opcode::LdaNull
-        | Opcode::LdaTrue
-        | Opcode::LdaFalse
-        | Opcode::LdaZero
-        | Opcode::LdaOne
-        | Opcode::Star0
-        | Opcode::Star1
-        | Opcode::Star2
-        | Opcode::Star3
-        | Opcode::Star4
-        | Opcode::Star5
-        | Opcode::Star6
-        | Opcode::Star7 => DispatchOperandForm::Accumulator,
-        Opcode::LdaSmi8 | Opcode::LdaConst8 => DispatchOperandForm::AccumulatorByte,
-        Opcode::Ldar => DispatchOperandForm::AccumulatorRegister,
-        Opcode::Call | Opcode::TailCall | Opcode::Construct => DispatchOperandForm::CallRange,
-        Opcode::Move
-        | Opcode::Add
-        | Opcode::AddSmi
-        | Opcode::Sub
-        | Opcode::SubSmi
-        | Opcode::Mul
-        | Opcode::MulSmi
-        | Opcode::Div
-        | Opcode::Mod
-        | Opcode::DivSmi
-        | Opcode::ModSmi
-        | Opcode::Exp
-        | Opcode::BitOr
-        | Opcode::BitXor
-        | Opcode::BitAnd
-        | Opcode::BitAndSmi
-        | Opcode::BitNot
-        | Opcode::ShiftLeft
-        | Opcode::ShiftRight
-        | Opcode::UnsignedShiftRight
-        | Opcode::Negate
-        | Opcode::Increment
-        | Opcode::Decrement
-        | Opcode::Equal
-        | Opcode::StrictEqual
-        | Opcode::EqualZero
-        | Opcode::LessThan
-        | Opcode::LessEqual
-        | Opcode::GreaterThan
-        | Opcode::GreaterEqual
-        | Opcode::InstanceOf
-        | Opcode::In
-        | Opcode::DefineNamedProperty
-        | Opcode::DefineKeyedProperty
-        | Opcode::StoreDenseElement
-        | Opcode::LoadDenseElement
-        | Opcode::GetNamedProperty
-        | Opcode::SetNamedProperty
-        | Opcode::AssignNamedProperty
-        | Opcode::StrictAssignNamedProperty
-        | Opcode::GetKeyedProperty
-        | Opcode::SetKeyedProperty
-        | Opcode::AssignKeyedProperty
-        | Opcode::StrictAssignKeyedProperty
-        | Opcode::DeleteProperty
-        | Opcode::CopyDataProperties
-        | Opcode::SetFunctionName
-        | Opcode::ToPropertyKey
-        | Opcode::Call0
-        | Opcode::Call1
-        | Opcode::Call2
-        | Opcode::Call3
-        | Opcode::CallMethod
-        | Opcode::CreateForIn
-        | Opcode::AdvanceForIn
-        | Opcode::CreateIterator
-        | Opcode::AdvanceIterator
-        | Opcode::DelegateYield => DispatchOperandForm::Abc,
-        Opcode::Wide | Opcode::ExtraWide => {
-            panic!("prefix opcodes should decode their semantic opcode first")
-        }
-        _ => panic!("profiled opcodes should decode to their base opcode first"),
+#[inline]
+fn decode_feedback_slot_operand(
+    bytes: &[u8],
+    operand_end: usize,
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(Option<FeedbackSlotId>, u32)> {
+    if is_profiled {
+        let [slot_low, slot_high, ..] =
+            bytes
+                .get(operand_end..)
+                .ok_or(VmError::InstructionOutOfBounds {
+                    code,
+                    instruction_offset,
+                })?
+        else {
+            return Err(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            });
+        };
+        let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
+        let slot = FeedbackSlotId::from_raw(u32::from(raw_slot)).ok_or(
+            VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            },
+        )?;
+        let len = u32::try_from(operand_end + 2).map_err(|_| VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        })?;
+        Ok((Some(slot), len))
+    } else {
+        let len = u32::try_from(operand_end).map_err(|_| VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        })?;
+        Ok((None, len))
     }
+}
+
+#[inline]
+fn decode_abc_operands(
+    bytes: &[u8],
+    prefix: Option<Opcode>,
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, u16, u16, Option<FeedbackSlotId>, u32)> {
+    let (a, b, c, operand_end) = if prefix.is_some() {
+        let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] = bytes else {
+            return Err(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            });
+        };
+        (
+            u16::from_le_bytes([*a_low, *a_high]),
+            u16::from_le_bytes([*b_low, *b_high]),
+            u16::from_le_bytes([*c_low, *c_high]),
+            8usize,
+        )
+    } else {
+        let [_, ra, rb, rc, ..] = bytes else {
+            return Err(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            });
+        };
+        (u16::from(*ra), u16::from(*rb), u16::from(*rc), 4usize)
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, operand_end, is_profiled, code, instruction_offset)?;
+    Ok((a, b, c, feedback_slot, instruction_len))
+}
+
+#[inline]
+fn decode_abx_operands(
+    bytes: &[u8],
+    prefix: Option<Opcode>,
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, u32, Option<FeedbackSlotId>, u32)> {
+    let (a, bx, operand_end) = if let Some(prefix) = prefix {
+        let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
+            return Err(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            });
+        };
+        let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
+        (
+            u16::from_le_bytes([*a_low, *a_high]),
+            u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
+            8usize,
+        )
+    } else {
+        let [_, ra, bx_low, bx_high, ..] = bytes else {
+            return Err(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset,
+            });
+        };
+        (
+            u16::from(*ra),
+            u32::from(u16::from_le_bytes([*bx_low, *bx_high])),
+            4usize,
+        )
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, operand_end, is_profiled, code, instruction_offset)?;
+    Ok((a, bx, feedback_slot, instruction_len))
+}
+
+#[inline]
+fn decode_abx8_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, u32, Option<FeedbackSlotId>, u32)> {
+    let [_, ra, rbx, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 3usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from(*ra),
+        u32::from(*rbx),
+        feedback_slot,
+        instruction_len,
+    ))
+}
+
+#[inline]
+fn decode_ax_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(i32, Option<FeedbackSlotId>, u32)> {
+    let [_, first_byte, second, third, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 4usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        sign_extend_i24([*first_byte, *second, *third]),
+        feedback_slot,
+        instruction_len,
+    ))
+}
+
+#[inline]
+fn decode_ax8_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(i32, Option<FeedbackSlotId>, u32)> {
+    let [_, raw_ax, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        i32::from(i8::from_le_bytes([*raw_ax])),
+        feedback_slot,
+        instruction_len,
+    ))
+}
+
+#[inline]
+fn decode_local_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, Option<FeedbackSlotId>, u32)> {
+    let [_, register, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
+    Ok((u16::from(*register), feedback_slot, instruction_len))
+}
+
+#[inline]
+fn decode_accumulator_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(Option<FeedbackSlotId>, u32)> {
+    decode_feedback_slot_operand(bytes, 1usize, is_profiled, code, instruction_offset)
+}
+
+#[inline]
+fn decode_accumulator_byte_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u32, Option<FeedbackSlotId>, u32)> {
+    let [_, operand, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
+    Ok((u32::from(*operand), feedback_slot, instruction_len))
+}
+
+#[inline]
+fn decode_accumulator_register_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<(u16, Option<FeedbackSlotId>, u32)> {
+    let [_, register, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
+    Ok((u16::from(*register), feedback_slot, instruction_len))
+}
+
+#[inline]
+fn decode_call_range_operands(
+    bytes: &[u8],
+    is_profiled: bool,
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<DecodedCallRangeOperands> {
+    let [_, ra, rb, rc, count_low, count_high, base_low, base_high, ..] = bytes else {
+        return Err(VmError::InstructionOutOfBounds {
+            code,
+            instruction_offset,
+        });
+    };
+    let (feedback_slot, instruction_len) =
+        decode_feedback_slot_operand(bytes, 8usize, is_profiled, code, instruction_offset)?;
+    Ok((
+        u16::from(*ra),
+        u16::from(*rb),
+        u16::from(*rc),
+        Some(CallRange::new(
+            u16::from_le_bytes([*base_low, *base_high]),
+            u16::from_le_bytes([*count_low, *count_high]),
+        )),
+        feedback_slot,
+        instruction_len,
+    ))
 }
 
 impl Vm {
@@ -418,6 +562,16 @@ impl Vm {
         }
     }
 
+    #[inline]
+    pub(in crate::vm) const fn request_dispatch_frame_check(&mut self) {
+        self.dispatch_frame_check_epoch = self.dispatch_frame_check_epoch.wrapping_add(1);
+    }
+
+    #[inline]
+    const fn dispatch_frame_check_epoch(&self) -> u32 {
+        self.dispatch_frame_check_epoch
+    }
+
     pub(in crate::vm) fn handle_dispatch_result<T>(
         &mut self,
         agent: &mut Agent,
@@ -430,6 +584,7 @@ impl Vm {
             Err(VmError::Abrupt(AbruptCompletion::Throw(value))) => {
                 self.sync_dispatch_frame(frame_depth, *frame);
                 if self.transfer_to_exception_handler(agent, value)? {
+                    self.request_dispatch_frame_check();
                     self.refresh_dispatch_frame(frame_depth, frame);
                     Ok(None)
                 } else {
@@ -500,6 +655,10 @@ impl Vm {
         clippy::collapsible_if,
         reason = "SMI fast paths keep the outer SMI tag check and the inner overflow check on separate lines so the cold fallthrough is obvious"
     )]
+    #[allow(
+        unused_variables,
+        reason = "per-opcode operand helpers decode the full bytecode form; some opcodes intentionally ignore fields in that form"
+    )]
     fn run_dispatch_loop<const COUNT_OPCODES: bool, const DEBUG: bool>(
         &mut self,
         agent: &mut Agent,
@@ -517,9 +676,18 @@ impl Vm {
                 .ok_or(VmError::MissingInstalledCode(code))?;
 
             loop {
-                if !state.active_in(self) {
-                    break;
+                if state.frame_check_epoch != self.dispatch_frame_check_epoch() {
+                    state.frame_check_epoch = self.dispatch_frame_check_epoch();
+                    let active = state.active_in(self);
+                    if !active {
+                        break;
+                    }
                 }
+                #[cfg(debug_assertions)]
+                debug_assert!(
+                    state.active_in(self),
+                    "dispatch frame state should stay active until a boundary requests validation"
+                );
                 let instruction_offset = state.frame().instruction_offset();
 
                 // === Track A: Inline opcode + operand decode ===
@@ -545,27 +713,23 @@ impl Vm {
                     code,
                     instruction_offset,
                 })?;
-                let first = Opcode::from_byte(raw_first).ok_or(
-                    VmError::InstructionOutOfBounds {
+                let first =
+                    Opcode::from_byte(raw_first).ok_or(VmError::InstructionOutOfBounds {
                         code,
                         instruction_offset,
-                    },
-                )?;
+                    })?;
                 // Hot path: no prefix. Wide/ExtraWide are essentially zero share on real
                 // workloads; we still handle them via the same inline path.
                 let (prefix, semantic_opcode) = if first.is_prefix() {
-                    let raw_semantic = *bytes.get(1).ok_or(
-                        VmError::InstructionOutOfBounds {
+                    let raw_semantic = *bytes.get(1).ok_or(VmError::InstructionOutOfBounds {
+                        code,
+                        instruction_offset,
+                    })?;
+                    let semantic =
+                        Opcode::from_byte(raw_semantic).ok_or(VmError::InstructionOutOfBounds {
                             code,
                             instruction_offset,
-                        },
-                    )?;
-                    let semantic = Opcode::from_byte(raw_semantic).ok_or(
-                        VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        },
-                    )?;
+                        })?;
                     if semantic.is_prefix() {
                         return Err(VmError::InstructionOutOfBounds {
                             code,
@@ -585,204 +749,26 @@ impl Vm {
                 #[cfg(debug_assertions)]
                 self.assert_deopt_safepoint_state(agent, state.frame(), installed.as_ref());
 
-                // Decode operands inline by form. `dispatch_operand_form` is a const fn
-                // marked `#[inline(always)]` (see below); LLVM lowers it to a constant per
-                // arm of the outer opcode match because the opcode is known at this point.
-                let mut a: u16 = 0;
-                let mut b: u16 = 0;
-                let mut c: u16 = 0;
-                let mut bx: u32 = 0;
-                let mut ax: i32 = 0;
-                let mut call_range: Option<CallRange> = None;
-                let operand_end: usize;
-                #[allow(
-                    clippy::match_same_arms,
-                    reason = "operand-form arms stay grouped per semantic form even when bodies are byte-identical"
-                )]
-                match dispatch_operand_form(opcode) {
-                    DispatchOperandForm::Abc => {
-                        if prefix.is_some() {
-                            let [_, _, a_low, b_low, c_low, a_high, b_high, c_high, ..] =
-                                bytes
-                            else {
-                                return Err(VmError::InstructionOutOfBounds {
-                                    code,
-                                    instruction_offset,
-                                });
-                            };
-                            a = u16::from_le_bytes([*a_low, *a_high]);
-                            b = u16::from_le_bytes([*b_low, *b_high]);
-                            c = u16::from_le_bytes([*c_low, *c_high]);
-                            operand_end = 8;
-                        } else {
-                            let [_, ra, rb, rc, ..] = bytes else {
-                                return Err(VmError::InstructionOutOfBounds {
-                                    code,
-                                    instruction_offset,
-                                });
-                            };
-                            a = u16::from(*ra);
-                            b = u16::from(*rb);
-                            c = u16::from(*rc);
-                            operand_end = 4;
-                        }
-                    }
-                    DispatchOperandForm::Abx => {
-                        if let Some(prefix) = prefix {
-                            let [_, _, a_low, bx0, bx1, a_high, bx2, bx3, ..] = bytes else {
-                                return Err(VmError::InstructionOutOfBounds {
-                                    code,
-                                    instruction_offset,
-                                });
-                            };
-                            let bx3 = if prefix == Opcode::ExtraWide { *bx3 } else { 0 };
-                            a = u16::from_le_bytes([*a_low, *a_high]);
-                            bx = u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]);
-                            operand_end = 8;
-                        } else {
-                            let [_, ra, bx_low, bx_high, ..] = bytes else {
-                                return Err(VmError::InstructionOutOfBounds {
-                                    code,
-                                    instruction_offset,
-                                });
-                            };
-                            a = u16::from(*ra);
-                            bx = u32::from(u16::from_le_bytes([*bx_low, *bx_high]));
-                            operand_end = 4;
-                        }
-                    }
-                    DispatchOperandForm::Abx8 => {
-                        let [_, ra, rbx, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        a = u16::from(*ra);
-                        bx = u32::from(*rbx);
-                        operand_end = 3;
-                    }
-                    DispatchOperandForm::Ax => {
-                        let [_, first_byte, second, third, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        ax = sign_extend_i24([*first_byte, *second, *third]);
-                        operand_end = 4;
-                    }
-                    DispatchOperandForm::Ax8 => {
-                        let [_, raw_ax, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        ax = i32::from(i8::from_le_bytes([*raw_ax]));
-                        operand_end = 2;
-                    }
-                    DispatchOperandForm::Local => {
-                        let [_, register, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        a = u16::from(*register);
-                        operand_end = 2;
-                    }
-                    DispatchOperandForm::Accumulator => {
-                        operand_end = 1;
-                    }
-                    DispatchOperandForm::AccumulatorByte => {
-                        let [_, operand, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        bx = u32::from(*operand);
-                        operand_end = 2;
-                    }
-                    DispatchOperandForm::AccumulatorRegister => {
-                        let [_, register, ..] = bytes else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        a = u16::from(*register);
-                        operand_end = 2;
-                    }
-                    DispatchOperandForm::CallRange => {
-                        let [_, ra, rb, rc, count_low, count_high, base_low, base_high, ..] =
-                            bytes
-                        else {
-                            return Err(VmError::InstructionOutOfBounds {
-                                code,
-                                instruction_offset,
-                            });
-                        };
-                        a = u16::from(*ra);
-                        b = u16::from(*rb);
-                        c = u16::from(*rc);
-                        call_range = Some(CallRange::new(
-                            u16::from_le_bytes([*base_low, *base_high]),
-                            u16::from_le_bytes([*count_low, *count_high]),
-                        ));
-                        operand_end = 8;
-                    }
-                }
-                let (feedback_slot, instruction_len) = if is_profiled {
-                    let [slot_low, slot_high, ..] =
-                        bytes.get(operand_end..).ok_or(VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        })?
-                    else {
-                        return Err(VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        });
-                    };
-                    let raw_slot = u16::from_le_bytes([*slot_low, *slot_high]);
-                    let slot = FeedbackSlotId::from_raw(u32::from(raw_slot)).ok_or(
-                        VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        },
-                    )?;
-                    let len = u32::try_from(operand_end + 2).map_err(|_| {
-                        VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        }
-                    })?;
-                    (Some(slot), len)
-                } else {
-                    let len = u32::try_from(operand_end).map_err(|_| {
-                        VmError::InstructionOutOfBounds {
-                            code,
-                            instruction_offset,
-                        }
-                    })?;
-                    (None, len)
-                };
-
                 let frame_depth = state.frame_depth();
                 let frame = &mut state.frame;
 
-                // Flat dispatch on the dense `#[repr(u8)]` Opcode enum so LLVM can emit
-                // one indexed jump table for the entire opcode space. Each arm sees
-                // `a/b/c`, `bx`, or `ax` from the outer-scope locals above depending on
-                // which form it belongs to.
+                // Flat dispatch on the dense `#[repr(u8)]` Opcode enum. Each arm chooses
+                // its operand layout directly so there is no pre-dispatch operand-form
+                // branch in the hot loop.
                 #[allow(
                     clippy::match_same_arms,
                     reason = "opcode families stay grouped even when marker opcodes share dispatch behavior"
                 )]
-                match opcode {
+                match semantic_opcode {
                     Opcode::Move => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let source = absolute_register(registers, b);
                         let target = absolute_register(registers, a);
@@ -790,7 +776,15 @@ impl Vm {
                         self.register_stack[target] = value;
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::Add => {
+                    Opcode::Add | Opcode::AddProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let right = self.register_stack[absolute_register(registers, c)];
@@ -804,8 +798,7 @@ impl Vm {
                             }
                         }
                         // Cold path: ToPrimitive, BigInt, f64, etc.
-                        let result =
-                            self.execute_add_opcode(agent, host, registry, frame, b, c);
+                        let result = self.execute_add_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -816,7 +809,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::AddSmi => {
+                    Opcode::AddSmi | Opcode::AddSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let imm = i32::from(decode_smi_immediate(c));
@@ -842,7 +843,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Sub => {
+                    Opcode::Sub | Opcode::SubProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let right = self.register_stack[absolute_register(registers, c)];
@@ -856,8 +865,7 @@ impl Vm {
                             }
                         }
                         // Cold path: ToPrimitive, BigInt, f64, etc.
-                        let result =
-                            self.execute_sub_opcode(agent, host, registry, frame, b, c);
+                        let result = self.execute_sub_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -868,7 +876,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::SubSmi => {
+                    Opcode::SubSmi | Opcode::SubSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let imm = i32::from(decode_smi_immediate(c));
@@ -894,7 +910,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Mul => {
+                    Opcode::Mul | Opcode::MulProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let right = self.register_stack[absolute_register(registers, c)];
@@ -907,8 +931,7 @@ impl Vm {
                             }
                         }
                         // Cold path: ToPrimitive, BigInt, f64, etc.
-                        let result =
-                            self.execute_mul_opcode(agent, host, registry, frame, b, c);
+                        let result = self.execute_mul_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -919,7 +942,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::MulSmi => {
+                    Opcode::MulSmi | Opcode::MulSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let imm = i32::from(decode_smi_immediate(c));
@@ -944,7 +975,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Div => {
+                    Opcode::Div | Opcode::DivProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_div_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -956,7 +995,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::DivSmi => {
+                    Opcode::DivSmi | Opcode::DivSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_div_smi_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -969,7 +1016,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Mod => {
+                    Opcode::Mod | Opcode::ModProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let right = self.register_stack[absolute_register(registers, c)];
@@ -982,8 +1037,7 @@ impl Vm {
                             }
                         }
                         // Cold path: ToPrimitive, BigInt, f64, etc.
-                        let result =
-                            self.execute_mod_opcode(agent, host, registry, frame, b, c);
+                        let result = self.execute_mod_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -994,7 +1048,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ModSmi => {
+                    Opcode::ModSmi | Opcode::ModSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let imm = i32::from(decode_smi_immediate(c));
@@ -1019,7 +1081,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Exp => {
+                    Opcode::Exp | Opcode::ExpProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_exp_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -1031,7 +1101,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitOr => {
+                    Opcode::BitOr | Opcode::BitOrProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_bitor_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -1043,7 +1121,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitAnd => {
+                    Opcode::BitAnd | Opcode::BitAndProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let right = self.register_stack[absolute_register(registers, c)];
@@ -1056,8 +1142,7 @@ impl Vm {
                             continue;
                         }
                         // Cold path: ToPrimitive, BigInt, f64, etc.
-                        let result =
-                            self.execute_bitand_opcode(agent, host, registry, frame, b, c);
+                        let result = self.execute_bitand_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
                             frame_depth,
@@ -1068,7 +1153,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitAndSmi => {
+                    Opcode::BitAndSmi | Opcode::BitAndSmiProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let registers = frame.registers();
                         let left = self.register_stack[absolute_register(registers, b)];
                         let imm = i32::from(decode_smi_immediate(c));
@@ -1093,7 +1186,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::BitXor => {
+                    Opcode::BitXor | Opcode::BitXorProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_bitxor_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -1105,7 +1206,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ShiftLeft => {
+                    Opcode::ShiftLeft | Opcode::ShiftLeftProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_shift_left_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1118,7 +1227,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::ShiftRight => {
+                    Opcode::ShiftRight | Opcode::ShiftRightProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_shift_right_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1131,7 +1248,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::UnsignedShiftRight => {
+                    Opcode::UnsignedShiftRight | Opcode::UnsignedShiftRightProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_unsigned_shift_right_opcode(
                             agent, host, registry, frame, b, c,
                         );
@@ -1145,7 +1270,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::Equal => {
+                    Opcode::Equal | Opcode::EqualProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_equal_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -1157,7 +1290,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::StrictEqual => {
+                    Opcode::StrictEqual | Opcode::StrictEqualProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = self.execute_strict_equal_opcode(agent, frame, b, c);
                         self.finish_abc_value_result(
                             agent,
@@ -1169,7 +1310,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::EqualZero => {
+                    Opcode::EqualZero | Opcode::EqualZeroProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result = Ok(self.execute_equal_zero_opcode(frame, b));
                         self.finish_abc_value_result(
                             agent,
@@ -1181,7 +1330,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::LessThan => {
+                    Opcode::LessThan | Opcode::LessThanProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_less_than_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1194,7 +1351,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::LessEqual => {
+                    Opcode::LessEqual | Opcode::LessEqualProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_less_equal_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1207,7 +1372,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::GreaterThan => {
+                    Opcode::GreaterThan | Opcode::GreaterThanProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_greater_than_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1220,7 +1393,15 @@ impl Vm {
                             result,
                         )?;
                     }
-                    Opcode::GreaterEqual => {
+                    Opcode::GreaterEqual | Opcode::GreaterEqualProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let result =
                             self.execute_greater_equal_opcode(agent, host, registry, frame, b, c);
                         self.finish_abc_value_result(
@@ -1234,6 +1415,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::In => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_in_opcode(
                             agent,
                             host,
@@ -1246,7 +1435,15 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::Negate => {
+                    Opcode::Negate | Opcode::NegateProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let negate_result = self.negate_value(agent, host, registry, frame, b);
                         let Some(value) =
                             self.handle_dispatch_result(agent, frame_depth, frame, negate_result)?
@@ -1257,7 +1454,15 @@ impl Vm {
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::BitNot => {
+                    Opcode::BitNot | Opcode::BitNotProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let bit_not_result =
                             self.bitwise_not_value(agent, host, registry, frame, b);
                         let Some(value) =
@@ -1269,7 +1474,18 @@ impl Vm {
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::Increment | Opcode::Decrement => {
+                    Opcode::Increment
+                    | Opcode::IncrementProfiled
+                    | Opcode::Decrement
+                    | Opcode::DecrementProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let update_result = self.update_register_value(
                             agent,
                             host,
@@ -1288,7 +1504,15 @@ impl Vm {
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::GetNamedProperty => {
+                    Opcode::GetNamedProperty | Opcode::GetNamedPropertyProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_get_named_property_opcode(
                             agent,
                             host,
@@ -1303,8 +1527,19 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetNamedProperty
+                    | Opcode::SetNamedPropertyProfiled
                     | Opcode::AssignNamedProperty
-                    | Opcode::StrictAssignNamedProperty => {
+                    | Opcode::AssignNamedPropertyProfiled
+                    | Opcode::StrictAssignNamedProperty
+                    | Opcode::StrictAssignNamedPropertyProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_set_named_property_opcode(
                             agent,
                             host,
@@ -1320,6 +1555,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::DefineNamedProperty => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_define_named_property_opcode(
                             agent,
                             host,
@@ -1332,7 +1575,15 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::GetKeyedProperty => {
+                    Opcode::GetKeyedProperty | Opcode::GetKeyedPropertyProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_get_keyed_property_opcode(
                             agent,
                             host,
@@ -1347,8 +1598,19 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetKeyedProperty
+                    | Opcode::SetKeyedPropertyProfiled
                     | Opcode::AssignKeyedProperty
-                    | Opcode::StrictAssignKeyedProperty => {
+                    | Opcode::AssignKeyedPropertyProfiled
+                    | Opcode::StrictAssignKeyedProperty
+                    | Opcode::StrictAssignKeyedPropertyProfiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_set_keyed_property_opcode(
                             agent,
                             host,
@@ -1364,6 +1626,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::DefineKeyedProperty => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_define_keyed_property_opcode(
                             agent,
                             host,
@@ -1377,6 +1647,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::SetFunctionName => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let function = self.object_register(frame, a)?;
                         let name_value = self.read_register(frame.registers(), b);
                         let set_result = Self::set_function_name(agent, function, name_value);
@@ -1388,6 +1666,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::ToPropertyKey => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_to_property_key_opcode(
                             agent,
                             host,
@@ -1400,6 +1686,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::DeleteProperty => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_delete_property_opcode(
                             agent,
                             host,
@@ -1413,6 +1707,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::CopyDataProperties => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_copy_data_properties_opcode(
                             agent,
                             host,
@@ -1426,6 +1728,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::StoreDenseElement => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_store_dense_element_opcode(
                             agent,
                             host,
@@ -1439,6 +1749,14 @@ impl Vm {
                         )?;
                     }
                     Opcode::LoadDenseElement => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.execute_load_dense_element_opcode(
                             agent,
                             host,
@@ -1451,7 +1769,22 @@ impl Vm {
                             c,
                         )?;
                     }
-                    Opcode::Call0 | Opcode::Call1 | Opcode::Call2 | Opcode::Call3 => {
+                    Opcode::Call0
+                    | Opcode::Call0Profiled
+                    | Opcode::Call1
+                    | Opcode::Call1Profiled
+                    | Opcode::Call2
+                    | Opcode::Call2Profiled
+                    | Opcode::Call3
+                    | Opcode::Call3Profiled => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let call_result = self.call_value_small(
                             agent,
                             host,
@@ -1471,7 +1804,15 @@ impl Vm {
                             continue;
                         };
                     }
-                    Opcode::Call => {
+                    Opcode::Call | Opcode::CallProfiled => {
+                        let (a, b, c, call_range, feedback_slot, instruction_len) =
+                            decode_call_range_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
@@ -1500,7 +1841,15 @@ impl Vm {
                             continue;
                         };
                     }
-                    Opcode::TailCall => {
+                    Opcode::TailCall | Opcode::TailCallProfiled => {
+                        let (a, b, c, call_range, feedback_slot, instruction_len) =
+                            decode_call_range_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
@@ -1532,7 +1881,15 @@ impl Vm {
                         }
                         self.refresh_dispatch_frame(frame_depth, frame);
                     }
-                    Opcode::Construct => {
+                    Opcode::Construct | Opcode::ConstructProfiled => {
+                        let (a, b, c, call_range, feedback_slot, instruction_len) =
+                            decode_call_range_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let range = call_range.ok_or_else(|| VmError::MissingInlineCallRange {
                             code: frame.code(),
                             instruction_offset: frame.instruction_offset(),
@@ -1565,6 +1922,14 @@ impl Vm {
                         };
                     }
                     Opcode::CreateForIn => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = self.read_register(frame.registers(), b);
                         let enumerator_result = self.create_for_in_enumerator_for_value(
                             agent, host, registry, frame, value,
@@ -1583,6 +1948,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AdvanceForIn => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let next = self
                             .for_in_states
                             .advance(agent, frame.registers().base(), a);
@@ -1602,6 +1975,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CreateIterator => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = self.read_register(frame.registers(), b);
                         let iterator_result = self.create_iterator_for_value(
                             agent,
@@ -1625,6 +2006,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AdvanceIterator => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.sync_dispatch_frame(frame_depth, *frame);
                         let next = self.advance_iterator_state(
                             agent,
@@ -1649,6 +2038,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::DelegateYield => {
+                        let (a, b, c, feedback_slot, instruction_len) = decode_abc_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let delegate_result = self.delegate_yield(
                             agent,
                             host,
@@ -1671,30 +2068,80 @@ impl Vm {
                         };
                     }
                     Opcode::LdaUndefined => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::undefined());
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaNull => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::null());
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaTrue => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::from_bool(true));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaFalse => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::from_bool(false));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaZero => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::from_smi(0));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaOne => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), 0, Value::from_smi(1));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaSmi8 => {
+                        let (bx, feedback_slot, instruction_len) =
+                            decode_accumulator_byte_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
                         self.write_register(
                             frame.registers(),
@@ -1704,12 +2151,28 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LdaConst8 => {
+                        let (bx, feedback_slot, instruction_len) =
+                            decode_accumulator_byte_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let value = self.read_constant(agent, frame.code(), bx)?;
                         let target = absolute_register(frame.registers(), 0);
                         self.register_stack[target] = value;
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::Ldar => {
+                        let (a, feedback_slot, instruction_len) =
+                            decode_accumulator_register_operands(
+                                bytes,
+                                is_profiled,
+                                code,
+                                instruction_offset,
+                            )?;
+
                         let value = self.read_register(frame.registers(), a);
                         self.write_register(frame.registers(), 0, value);
                         advance_dispatch_frame(frame, instruction_len);
@@ -1722,6 +2185,13 @@ impl Vm {
                     | Opcode::Star5
                     | Opcode::Star6
                     | Opcode::Star7 => {
+                        let (feedback_slot, instruction_len) = decode_accumulator_operands(
+                            bytes,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let target = opcode
                             .accumulator_store_index()
                             .expect("store-accumulator opcode should have an index");
@@ -1731,34 +2201,98 @@ impl Vm {
                     }
                     // === Abx-form arms ===
                     Opcode::LoadUndefined => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::undefined());
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadUninitializedLexical => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::uninitialized_lexical());
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadNull => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::null());
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadTrue => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::from_bool(true));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadFalse => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::from_bool(false));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadZero => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::from_smi(0));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadOne => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.write_register(frame.registers(), a, Value::from_smi(1));
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadSmi => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let bytes = bx.to_le_bytes();
                         let value = i16::from_le_bytes([bytes[0], bytes[1]]);
                         self.write_register(
@@ -1769,6 +2303,9 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadSmi8 => {
+                        let (a, bx, feedback_slot, instruction_len) =
+                            decode_abx8_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
                         self.write_register(
                             frame.registers(),
@@ -1777,7 +2314,24 @@ impl Vm {
                         );
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::LoadConst | Opcode::LoadConst8 => {
+                    Opcode::LoadConst => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
+                        let value = self.read_constant(agent, frame.code(), bx)?;
+                        let target = absolute_register(frame.registers(), a);
+                        self.register_stack[target] = value;
+                        advance_dispatch_frame(frame, instruction_len);
+                    }
+                    Opcode::LoadConst8 => {
+                        let (a, bx, feedback_slot, instruction_len) =
+                            decode_abx8_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let value = self.read_constant(agent, frame.code(), bx)?;
                         let target = absolute_register(frame.registers(), a);
                         self.register_stack[target] = value;
@@ -1787,6 +2341,9 @@ impl Vm {
                     | Opcode::LoadLocal1
                     | Opcode::LoadLocal2
                     | Opcode::LoadLocal3 => {
+                        let (a, feedback_slot, instruction_len) =
+                            decode_local_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let local = opcode
                             .local_load_index()
                             .expect("load-local opcode should have an index");
@@ -1798,6 +2355,9 @@ impl Vm {
                     | Opcode::StoreLocal1
                     | Opcode::StoreLocal2
                     | Opcode::StoreLocal3 => {
+                        let (a, feedback_slot, instruction_len) =
+                            decode_local_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let local = opcode
                             .local_store_index()
                             .expect("store-local opcode should have an index");
@@ -1806,6 +2366,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadEnvSlot => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let (depth, slot) = decode_env_operand(bx);
                         let environment = self.environment_for_slot_access(
                             agent,
@@ -1823,6 +2391,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::StoreEnvSlot => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let (depth, slot) = decode_env_operand(bx);
                         let environment = self.environment_for_slot_access(
                             agent,
@@ -1841,6 +2417,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AssignEnvSlot => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let (depth, slot) = decode_env_operand(bx);
                         let environment = self.environment_for_slot_access(
                             agent,
@@ -1864,14 +2448,38 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::EnterEnvScope => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.enter_env_scope(agent, frame, a, bx)?;
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LeaveEnvScope => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         self.leave_env_scope(frame, a, bx);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::LoadGlobal => {
+                    Opcode::LoadGlobal | Opcode::LoadGlobalProfiled => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let load_result = self.load_global_with_feedback(
                             agent,
@@ -1891,6 +2499,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let load_result =
                             self.load_name_with_context(agent, host, registry, frame, atom);
@@ -1903,6 +2519,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::ResolveName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let resolve_result =
                             self.resolve_name_with_context(agent, host, registry, frame, atom);
@@ -1915,6 +2539,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::ResolveGlobal => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let resolve_result =
                             self.resolve_global(agent, host, registry, frame, atom);
@@ -1927,6 +2559,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AssignName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let assign_result = self
@@ -1939,6 +2579,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AssignVariableName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_variable_name_with_context(
@@ -1952,6 +2600,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::DeleteName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let delete_result =
                             self.delete_name_with_context(agent, host, registry, frame, atom);
@@ -1964,6 +2620,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CaptureName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let capture_result =
                             self.capture_name_with_context(agent, host, registry, frame, a, atom);
@@ -1975,6 +2639,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadCapturedName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let reference_register =
                             u16::try_from(bx).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -1996,6 +2668,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadCapturedNameThis => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let reference_register =
                             u16::try_from(bx).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2012,6 +2692,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::AssignCapturedName => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let reference_register =
                             u16::try_from(bx).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2033,7 +2721,15 @@ impl Vm {
                         };
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::StoreGlobal => {
+                    Opcode::StoreGlobal | Opcode::StoreGlobalProfiled => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let store_result = self.store_global_with_feedback(
@@ -2053,7 +2749,15 @@ impl Vm {
                         };
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::AssignGlobal => {
+                    Opcode::AssignGlobal | Opcode::AssignGlobalProfiled => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let value = self.read_register(frame.registers(), a);
                         let assign_result = self.assign_global_with_feedback(
@@ -2074,6 +2778,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::DeleteGlobal => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let atom = self.read_atom_constant(frame.code(), bx)?;
                         let delete_result = Self::delete_global(agent, frame, atom);
                         let Some(deleted) =
@@ -2085,6 +2797,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadThis => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let load_this = match agent.current_execution_context().map_or_else(
                             || ThisState::Value(frame.this_value()),
                             lyng_js_env::ExecutionContext::this_state,
@@ -2106,6 +2826,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadCallee => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = frame
                             .callee()
                             .map_or(Value::undefined(), Value::from_object_ref);
@@ -2113,16 +2841,29 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadNewTarget => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = frame
                             .new_target()
                             .map_or(Value::undefined(), Value::from_object_ref);
                         self.write_register(frame.registers(), a, value);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::JumpIfTrue
-                    | Opcode::JumpIfFalse
-                    | Opcode::JumpIfTrue8
-                    | Opcode::JumpIfFalse8 => {
+                    Opcode::JumpIfTrue | Opcode::JumpIfFalse => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let condition = self.read_register(frame.registers(), a);
                         let Some(truthy) = self.handle_dispatch_result(
                             agent,
@@ -2133,15 +2874,39 @@ impl Vm {
                         else {
                             continue;
                         };
-                        let delta = if matches!(opcode, Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8)
-                        {
-                            i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]]))
-                        } else {
-                            i32::from_le_bytes(bx.to_le_bytes())
-                        };
+                        let delta = i32::from_le_bytes(bx.to_le_bytes());
                         let should_jump = match opcode {
-                            Opcode::JumpIfTrue | Opcode::JumpIfTrue8 => truthy,
-                            Opcode::JumpIfFalse | Opcode::JumpIfFalse8 => !truthy,
+                            Opcode::JumpIfTrue => truthy,
+                            Opcode::JumpIfFalse => !truthy,
+                            _ => unreachable!("guarded by opcode match"),
+                        };
+                        if should_jump {
+                            if delta < 0 {
+                                Self::poll_incremental_mark_safepoint(agent);
+                            }
+                            jump_dispatch_frame(frame, instruction_len, delta)?;
+                        } else {
+                            advance_dispatch_frame(frame, instruction_len);
+                        }
+                    }
+                    Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8 => {
+                        let (a, bx, feedback_slot, instruction_len) =
+                            decode_abx8_operands(bytes, is_profiled, code, instruction_offset)?;
+
+                        let condition = self.read_register(frame.registers(), a);
+                        let Some(truthy) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            read::to_boolean_agent(agent, condition).map_err(VmError::Abrupt),
+                        )?
+                        else {
+                            continue;
+                        };
+                        let delta = i32::from(i8::from_le_bytes([bx.to_le_bytes()[0]]));
+                        let should_jump = match opcode {
+                            Opcode::JumpIfTrue8 => truthy,
+                            Opcode::JumpIfFalse8 => !truthy,
                             _ => unreachable!("guarded by opcode match"),
                         };
                         if should_jump {
@@ -2154,6 +2919,14 @@ impl Vm {
                         }
                     }
                     Opcode::CreateObject => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let object = Self::create_object(
                             agent,
                             frame.realm(),
@@ -2163,6 +2936,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CreateArray => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let length = usize::try_from(bx).unwrap_or(usize::MAX);
                         let object = Self::create_array(agent, frame.realm(), length)?;
                         let length = u32::try_from(length).unwrap_or(u32::MAX);
@@ -2173,6 +2954,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CheckObjectCoercible => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = self.read_register(frame.registers(), a);
                         let coercible = Self::check_object_coercible(agent, value);
                         let Some(()) =
@@ -2183,6 +2972,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::ThrowIfUninitialized => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let value = self.read_register(frame.registers(), a);
                         if value == Value::uninitialized_lexical() {
                             let result = Err(VmError::Abrupt(errors::throw_reference_error(agent)));
@@ -2195,6 +2992,14 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CreateClosure => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let closure_result = self.create_closure(agent, frame, bx);
                         let Some(closure) =
                             self.handle_dispatch_result(agent, frame_depth, frame, closure_result)?
@@ -2205,10 +3010,26 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CloseForIn => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let _ = self.for_in_states.remove(frame.registers().base(), a);
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::CloseIterator => {
+                        let (a, bx, feedback_slot, instruction_len) = decode_abx_operands(
+                            bytes,
+                            prefix,
+                            is_profiled,
+                            code,
+                            instruction_offset,
+                        )?;
+
                         let close_result = self.close_iterator_state(
                             agent,
                             host,
@@ -2226,8 +3047,15 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     // === Ax-form arms ===
-                    Opcode::Nop => advance_dispatch_frame(frame, instruction_len),
+                    Opcode::Nop => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+                        advance_dispatch_frame(frame, instruction_len);
+                    }
                     Opcode::LoopHeader => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         if DEBUG {
                             self.sync_dispatch_frame(frame_depth, *frame);
                             self.poll_debug_safepoint(agent, VmDebugSafepointKind::LoopHeader);
@@ -2237,7 +3065,20 @@ impl Vm {
                         Self::poll_incremental_mark_safepoint(agent);
                         advance_dispatch_frame(frame, instruction_len);
                     }
-                    Opcode::Jump | Opcode::Jump8 => {
+                    Opcode::Jump => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
+                        if ax < 0 {
+                            self.observe_tier_backedge_event(frame.code());
+                            Self::poll_incremental_mark_safepoint(agent);
+                        }
+                        jump_dispatch_frame(frame, instruction_len, ax)?;
+                    }
+                    Opcode::Jump8 => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax8_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         if ax < 0 {
                             self.observe_tier_backedge_event(frame.code());
                             Self::poll_incremental_mark_safepoint(agent);
@@ -2245,6 +3086,9 @@ impl Vm {
                         jump_dispatch_frame(frame, instruction_len, ax)?;
                     }
                     Opcode::PushClosureEnv => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let site = installed
                             .loop_iteration_environment_site(frame.instruction_offset())
                             .cloned();
@@ -2263,10 +3107,16 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::PopClosureEnv => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         self.pop_loop_iteration_environment();
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::PushWithEnv => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2282,10 +3132,16 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::PopWithEnv => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         self.pop_with_environment(frame);
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::TypeOf => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2297,6 +3153,9 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::Return => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2310,6 +3169,9 @@ impl Vm {
                         }
                     }
                     Opcode::ReturnUndefined => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         self.sync_dispatch_frame(frame_depth, *frame);
                         let _ = agent.pop_execution_context();
                         if let Some(result) = self.finish_frame(agent, Value::undefined())? {
@@ -2317,12 +3179,18 @@ impl Vm {
                         }
                     }
                     Opcode::SuspendGeneratorStart => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let resume_offset =
                             next_dispatch_instruction_offset(frame, instruction_len);
                         self.sync_dispatch_frame(frame_depth, *frame);
                         self.suspend_generator_start(agent, frame, resume_offset)?;
                     }
                     Opcode::Yield => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2339,6 +3207,9 @@ impl Vm {
                         )?;
                     }
                     Opcode::Await => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2355,6 +3226,9 @@ impl Vm {
                         )?;
                     }
                     Opcode::Throw => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2369,9 +3243,15 @@ impl Vm {
                         return Err(VmError::Abrupt(AbruptCompletion::Throw(value)));
                     }
                     Opcode::EnterHandler | Opcode::LeaveHandler => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadException => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2382,6 +3262,9 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadResumeKind => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),
@@ -2395,6 +3278,9 @@ impl Vm {
                         advance_dispatch_frame(frame, instruction_len);
                     }
                     Opcode::LoadResumeValue => {
+                        let (ax, feedback_slot, instruction_len) =
+                            decode_ax_operands(bytes, is_profiled, code, instruction_offset)?;
+
                         let register =
                             u16::try_from(ax).map_err(|_| VmError::RegisterOutOfBounds {
                                 code: frame.code(),

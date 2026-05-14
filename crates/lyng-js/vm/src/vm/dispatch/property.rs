@@ -65,6 +65,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
+    #[inline]
     pub(super) fn execute_get_named_property_opcode(
         &mut self,
         agent: &mut Agent,
@@ -275,6 +276,7 @@ impl Vm {
         clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
+    #[inline]
     pub(super) fn execute_get_keyed_property_opcode(
         &mut self,
         agent: &mut Agent,

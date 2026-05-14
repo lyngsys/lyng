@@ -789,6 +789,7 @@ impl Vm {
             .pop()
             .expect("generator suspension requires one active frame");
         debug_assert_eq!(active, *frame);
+        self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
@@ -812,6 +813,7 @@ impl Vm {
             .pop()
             .expect("generator start suspension requires one active frame");
         debug_assert_eq!(active, *frame);
+        self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
@@ -1590,6 +1592,7 @@ impl Vm {
         agent.push_execution_context(context);
         self.frames.push(frame);
         self.note_frame_depth();
+        self.request_dispatch_frame_check();
 
         if let Some(side_state) = side_state {
             self.iterator_states

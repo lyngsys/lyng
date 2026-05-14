@@ -1,0 +1,112 @@
+{
+  "engines": [
+    {
+      "executable": "target/release/lyng-js",
+      "name": "lyng-js",
+      "pre_args": []
+    },
+    {
+      "executable": "/usr/bin/false",
+      "name": "quickjs",
+      "pre_args": [
+        "--script"
+      ]
+    },
+    {
+      "executable": "/usr/bin/false",
+      "name": "boa",
+      "pre_args": []
+    }
+  ],
+  "results": [
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 17836.830958,
+      "median_ms": 17835.869708000002,
+      "median_score": 262.0,
+      "metric_kind": "score",
+      "min_ms": 17807.763790999998,
+      "quickjs_ratio": null,
+      "samples_ms": [
+        17807.763790999998,
+        17835.869708000002,
+        17836.830958
+      ],
+      "score_samples": [
+        262.0,
+        260.0,
+        263.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "completed",
+      "workload": "Crypto"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/usr/bin/false",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "quickjs",
+      "error": "external engine `quickjs` failed for workload `Crypto` with status exit status: 1\nstdout:\n\nstderr:\n",
+      "max_ms": null,
+      "median_ms": null,
+      "median_score": null,
+      "metric_kind": "score",
+      "min_ms": null,
+      "quickjs_ratio": null,
+      "samples_ms": [],
+      "score_samples": [],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "failed",
+      "workload": "Crypto"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/usr/bin/false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "boa",
+      "error": "external engine `boa` failed for workload `Crypto` with status exit status: 1\nstdout:\n\nstderr:\n",
+      "max_ms": null,
+      "median_ms": null,
+      "median_score": null,
+      "metric_kind": "score",
+      "min_ms": null,
+      "quickjs_ratio": null,
+      "samples_ms": [],
+      "score_samples": [],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "failed",
+      "workload": "Crypto"
+    }
+  ],
+  "schema_version": 1,
+  "settings": {
+    "corpus": "v8-v7",
+    "filter": "Crypto",
+    "full_suite": false,
+    "json_path": "reports/js/lyng-js/vm-dispatch-infra-followup-v8-v7-crypto-after.json",
+    "loop_trips": 2048,
+    "policy": {
+      "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere.",
+      "primary_baseline": "quickjs",
+      "secondary_reference": "boa"
+    },
+    "report_path": "reports/js/lyng-js/vm-dispatch-infra-followup-v8-v7-crypto-after.md",
+    "samples": 3,
+    "scripts_dir": "/tmp/lyng-js-bench-compare-scripts",
+    "timeout_ms": 30000,
+    "warmup_samples": 1
+  },
+  "suite": "external-engine-compare"
+}

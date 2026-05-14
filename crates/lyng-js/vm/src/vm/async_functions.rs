@@ -353,6 +353,7 @@ impl Vm {
             .pop()
             .expect("await suspension requires one active frame");
         debug_assert_eq!(active, *frame);
+        self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();

@@ -377,6 +377,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
+    #[inline]
     pub(super) fn call_value_small(
         &mut self,
         agent: &mut Agent,
