@@ -5,8 +5,8 @@ use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_js_gc::ValueStoreTarget;
 use lyng_js_objects::{
     FunctionEntryIdentity, NamedPropertyCacheEntry, NamedPropertyCachePath,
-    NamedPropertyCachePurpose, ObjectFlags, ObjectHeader, ObjectKind, PrimitiveWrapperKind,
-    PropertyCacheDependency,
+    NamedPropertyCachePurpose, NamedPropertyHandler, ObjectFlags, ObjectHeader, ObjectKind,
+    PrimitiveWrapperKind, PropertyCacheDependency,
 };
 use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::{cmp::Ordering, mem::size_of};
@@ -617,6 +617,11 @@ struct NamedPropertyFeedback {
     cache_state: InlineCacheState,
     entry_count: u8,
     entries: [Option<NamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+    /// Bit-packed handler derived from `entries[0]` whenever the cache is
+    /// monomorphic and the entry is OwnData. `NamedPropertyHandler::NONE` in
+    /// every other state. Lets the IC fast path skip the four-deep call chain
+    /// on the common case. Sidecar — `entries` remains the system of record.
+    monomorphic_fast: NamedPropertyHandler,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -773,7 +778,21 @@ impl NamedPropertyFeedback {
             cache_state: InlineCacheState::Uninitialized,
             entry_count: 0,
             entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+            monomorphic_fast: NamedPropertyHandler::NONE,
         }
+    }
+
+    /// Recompute `monomorphic_fast` from the current cache state. Called
+    /// after any mutation that may have changed the active monomorphic entry.
+    #[inline]
+    const fn refresh_monomorphic_fast(&mut self) {
+        self.monomorphic_fast = match self.cache_state {
+            InlineCacheState::Monomorphic => match self.entries[0] {
+                Some(entry) => NamedPropertyHandler::from_entry(entry),
+                None => NamedPropertyHandler::NONE,
+            },
+            _ => NamedPropertyHandler::NONE,
+        };
     }
 
     #[inline]
@@ -829,7 +848,12 @@ impl NamedPropertyFeedback {
             InlineCacheState::Uninitialized => self.install_first_entry(plan),
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
                 match self.search_entry_index(plan.receiver_shape()) {
-                    Ok(index) => self.entries[index] = Some(plan),
+                    Ok(index) => {
+                        self.entries[index] = Some(plan);
+                        if index == 0 {
+                            self.refresh_monomorphic_fast();
+                        }
+                    }
                     Err(index) => self.insert_entry_at(index, plan),
                 }
             }
@@ -849,6 +873,7 @@ impl NamedPropertyFeedback {
         self.entries[0] = Some(entry);
         self.entry_count = 1;
         self.cache_state = InlineCacheState::Monomorphic;
+        self.refresh_monomorphic_fast();
     }
 
     #[inline]
@@ -856,6 +881,7 @@ impl NamedPropertyFeedback {
         self.cache_state = InlineCacheState::Megamorphic;
         self.entry_count = 0;
         self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
+        self.monomorphic_fast = NamedPropertyHandler::NONE;
     }
 
     #[inline]
@@ -886,6 +912,7 @@ impl NamedPropertyFeedback {
         self.entries[index] = Some(entry);
         self.entry_count = self.entry_count.saturating_add(1);
         self.cache_state = InlineCacheState::Polymorphic;
+        self.monomorphic_fast = NamedPropertyHandler::NONE;
     }
 }
 

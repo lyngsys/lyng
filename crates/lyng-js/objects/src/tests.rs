@@ -270,6 +270,99 @@ fn named_property_cache_entries_track_shape_and_prototype_dependencies() {
     );
 }
 
+fn synthesize_own_data_entry(
+    receiver_shape: ShapeId,
+    slot_offset: u32,
+    dependency_count: u8,
+    holder_shape: Option<ShapeId>,
+) -> NamedPropertyCacheEntry {
+    let holder = ObjectRef::from_raw(7).unwrap();
+    let mut dependencies =
+        [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
+    if dependency_count >= 1 {
+        dependencies[0] = Some(PropertyCacheDependency::new(holder, receiver_shape, None));
+    }
+    if dependency_count >= 2 {
+        dependencies[1] = Some(PropertyCacheDependency::new(
+            holder,
+            holder_shape.unwrap_or(receiver_shape),
+            None,
+        ));
+    }
+    NamedPropertyCacheEntry::new(
+        receiver_shape,
+        holder,
+        holder_shape.unwrap_or(receiver_shape),
+        slot_offset,
+        DescriptorAttributes::empty(),
+        NamedPropertyCachePath::OwnData,
+        dependency_count,
+        dependencies,
+    )
+}
+
+#[test]
+fn named_property_handler_packs_inline_own_data_entry() {
+    let shape = ShapeId::from_raw(0x1234_5678).unwrap();
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(2).encode(), 1, None);
+    let handler = NamedPropertyHandler::from_entry(entry);
+    assert!(handler.is_valid());
+    assert_eq!(handler.receiver_shape(), Some(shape));
+    assert_eq!(handler.slot_location(), SlotLocation::Inline(2));
+}
+
+#[test]
+fn named_property_handler_packs_out_of_line_own_data_entry() {
+    let shape = ShapeId::from_raw(0x4242).unwrap();
+    let entry = synthesize_own_data_entry(shape, SlotLocation::OutOfLine(11).encode(), 1, None);
+    let handler = NamedPropertyHandler::from_entry(entry);
+    assert!(handler.is_valid());
+    assert_eq!(handler.receiver_shape(), Some(shape));
+    assert_eq!(handler.slot_location(), SlotLocation::OutOfLine(11));
+}
+
+#[test]
+fn named_property_handler_none_when_holder_shape_differs() {
+    let receiver = ShapeId::from_raw(101).unwrap();
+    let holder = ShapeId::from_raw(102).unwrap();
+    let entry = synthesize_own_data_entry(receiver, SlotLocation::Inline(0).encode(), 1, Some(holder));
+    assert!(!NamedPropertyHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_handler_none_for_multi_dependency_entry() {
+    let shape = ShapeId::from_raw(99).unwrap();
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(0).encode(), 2, None);
+    assert!(!NamedPropertyHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_handler_none_for_prototype_data_path() {
+    let shape = ShapeId::from_raw(77).unwrap();
+    let holder = ObjectRef::from_raw(7).unwrap();
+    let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
+    dependencies[0] = Some(PropertyCacheDependency::new(holder, shape, None));
+    dependencies[1] = Some(PropertyCacheDependency::new(holder, shape, None));
+    let entry = NamedPropertyCacheEntry::new(
+        shape,
+        holder,
+        shape,
+        SlotLocation::Inline(0).encode(),
+        DescriptorAttributes::empty(),
+        NamedPropertyCachePath::PrototypeData,
+        2,
+        dependencies,
+    );
+    assert!(!NamedPropertyHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_handler_none_sentinel_decodes_safely() {
+    let handler = NamedPropertyHandler::NONE;
+    assert!(!handler.is_valid());
+    assert_eq!(handler.receiver_shape(), None);
+}
+
 #[test]
 fn module_namespace_objects_read_live_bindings_and_reject_mutation() {
     let mut heap = PrimitiveHeap::new();

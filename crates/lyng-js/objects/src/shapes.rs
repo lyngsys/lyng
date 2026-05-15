@@ -184,6 +184,74 @@ impl NamedPropertyCacheEntry {
     }
 }
 
+/// Bit-packed monomorphic OwnData inline-cache handler.
+///
+/// Layout (LSB-first):
+///   bits  0..32: encoded slot_offset (matches `SlotLocation::encode` — the
+///                high bit picks Inline vs OutOfLine, the rest is the index)
+///   bits 32..64: receiver shape raw `u32` (NonZero — `0` in the high half
+///                means "no fast path available")
+///
+/// A whole-word value of `0` is the canonical "no fast path" sentinel, made
+/// possible by `ShapeId` being `NonZeroU32`. This matches V8's `LoadHandler`
+/// bit-field pattern and lets the IC fast path do a single 64-bit load +
+/// zero-check before unpacking.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct NamedPropertyHandler(u64);
+
+impl NamedPropertyHandler {
+    /// Sentinel value indicating "no fast handler available". Set when the
+    /// cache is uninitialized, polymorphic, megamorphic, or installed with a
+    /// `PrototypeData` entry that the inline fast path cannot service.
+    pub const NONE: Self = Self(0);
+
+    /// Build a fast handler from a cache entry. Returns [`Self::NONE`] for
+    /// entries that the inline fast path cannot service:
+    /// `PrototypeData` paths, multi-dependency entries, and any entry whose
+    /// `holder_shape` differs from its `receiver_shape`.
+    #[inline]
+    #[must_use]
+    pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
+        match entry.path() {
+            NamedPropertyCachePath::OwnData => {}
+            NamedPropertyCachePath::PrototypeData => return Self::NONE,
+        }
+        if entry.dependency_count() != 1 {
+            return Self::NONE;
+        }
+        let receiver_shape = entry.receiver_shape();
+        if entry.holder_shape().get() != receiver_shape.get() {
+            return Self::NONE;
+        }
+        let raw_shape = receiver_shape.get() as u64;
+        let slot_offset = entry.slot_offset() as u64;
+        Self((raw_shape << 32) | slot_offset)
+    }
+
+    /// Returns the cached receiver `ShapeId`, or `None` when this is the
+    /// sentinel [`Self::NONE`] value.
+    #[inline]
+    #[must_use]
+    pub const fn receiver_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw((self.0 >> 32) as u32)
+    }
+
+    /// Decoded slot location. Only meaningful when [`Self::is_valid`] is true.
+    #[inline]
+    #[must_use]
+    pub const fn slot_location(self) -> SlotLocation {
+        SlotLocation::decode(self.0 as u32)
+    }
+
+    /// `true` when this handler carries a valid monomorphic-OwnData fast
+    /// path. `false` for [`Self::NONE`].
+    #[inline]
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        self.0 != 0
+    }
+}
+
 /// Direct payload stored by one named-property dictionary entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NamedPropertyValue {
