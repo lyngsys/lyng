@@ -622,6 +622,12 @@ struct NamedPropertyFeedback {
     /// every other state. Lets the IC fast path skip the four-deep call chain
     /// on the common case. Sidecar — `entries` remains the system of record.
     monomorphic_fast: NamedPropertyHandler,
+    /// Raw `last_invalidation_epoch` u64 captured from the receiver at
+    /// cache-install time (0 = never invalidated). Paired with
+    /// `monomorphic_fast`; the IC fast path compares against the receiver's
+    /// current raw epoch to detect any invalidation event (prototype
+    /// mutation, property redefinition, etc.) that doesn't change the shape.
+    monomorphic_fast_dependency_epoch: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -779,20 +785,37 @@ impl NamedPropertyFeedback {
             entry_count: 0,
             entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
             monomorphic_fast: NamedPropertyHandler::NONE,
+            monomorphic_fast_dependency_epoch: 0,
         }
     }
 
-    /// Recompute `monomorphic_fast` from the current cache state. Called
-    /// after any mutation that may have changed the active monomorphic entry.
+    /// Recompute `monomorphic_fast` and the paired dependency epoch from
+    /// the current cache state. Called after any mutation that may have
+    /// changed the active monomorphic entry.
     #[inline]
     const fn refresh_monomorphic_fast(&mut self) {
-        self.monomorphic_fast = match self.cache_state {
+        match self.cache_state {
             InlineCacheState::Monomorphic => match self.entries[0] {
-                Some(entry) => NamedPropertyHandler::from_entry(entry),
-                None => NamedPropertyHandler::NONE,
+                Some(entry) => {
+                    self.monomorphic_fast = NamedPropertyHandler::from_entry(entry);
+                    self.monomorphic_fast_dependency_epoch = match entry.dependency(0) {
+                        Some(dependency) => match dependency.invalidation_epoch() {
+                            Some(epoch) => epoch,
+                            None => 0,
+                        },
+                        None => 0,
+                    };
+                }
+                None => {
+                    self.monomorphic_fast = NamedPropertyHandler::NONE;
+                    self.monomorphic_fast_dependency_epoch = 0;
+                }
             },
-            _ => NamedPropertyHandler::NONE,
-        };
+            _ => {
+                self.monomorphic_fast = NamedPropertyHandler::NONE;
+                self.monomorphic_fast_dependency_epoch = 0;
+            }
+        }
     }
 
     #[inline]
@@ -882,6 +905,7 @@ impl NamedPropertyFeedback {
         self.entry_count = 0;
         self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
         self.monomorphic_fast = NamedPropertyHandler::NONE;
+        self.monomorphic_fast_dependency_epoch = 0;
     }
 
     #[inline]
@@ -913,6 +937,7 @@ impl NamedPropertyFeedback {
         self.entry_count = self.entry_count.saturating_add(1);
         self.cache_state = InlineCacheState::Polymorphic;
         self.monomorphic_fast = NamedPropertyHandler::NONE;
+        self.monomorphic_fast_dependency_epoch = 0;
     }
 }
 
@@ -1881,6 +1906,52 @@ impl Vm {
                 feedback.observe_target(agent, constructor, created);
             }
         });
+    }
+
+    /// Read the bit-packed monomorphic OwnData IC handler plus its paired
+    /// dependency-invalidation epoch for one feedback slot. Returns `None`
+    /// when the slot is absent, the site isn't a named-property site, or the
+    /// cache is in any state other than monomorphic-OwnData. The caller
+    /// must check the epoch against the receiver's current raw epoch to
+    /// detect non-shape invalidations (prototype mutation, dictionary
+    /// transition, etc.) — see `record_matches_cache_dependency`. Phase 3
+    /// IC fast path entry point.
+    #[inline(always)]
+    pub(super) fn named_property_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+    ) -> Option<(NamedPropertyHandler, u64)> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        match site {
+            FeedbackSiteState::NamedProperty(feedback)
+                if feedback.monomorphic_fast.is_valid() =>
+            {
+                Some((
+                    feedback.monomorphic_fast,
+                    feedback.monomorphic_fast_dependency_epoch,
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    /// Side-effect helper for the inlined IC fast path: increment the
+    /// per-site execution counter and emit a tier feedback event. Mirrors
+    /// the trailing two lines of [`Self::try_named_property_load_inline_cache_hit`]
+    /// so the inline fast path stays semantically identical.
+    #[inline(always)]
+    pub(super) fn record_named_property_fast_hit(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) {
+        if let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) {
+            if let Some(site) = vector.site_mut(slot) {
+                site.record_execution();
+            }
+        }
+        self.observe_tier_feedback_event(code);
     }
 
     pub(super) fn try_named_property_load_inline_cache_hit(

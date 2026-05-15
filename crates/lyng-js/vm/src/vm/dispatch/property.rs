@@ -7,7 +7,7 @@ use lyng_js_bytecode::Opcode;
 use lyng_js_env::Agent;
 use lyng_js_gc::AllocationLifetime;
 use lyng_js_host::HostHooks;
-use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry};
+use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
 use lyng_js_ops::{errors, object};
 use lyng_js_types::{FeedbackSlotId, PropertyDescriptor, PropertyKey, Value};
 
@@ -86,6 +86,51 @@ impl Vm {
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
         let value = if let Some(object) = receiver.as_object_ref() {
+            // Phase 3 inline IC fast path: a single packed-handler load,
+            // one shape compare, one epoch compare, one slot read. Bypasses
+            // the 4-deep try_named_property_load_inline_cache_hit ->
+            // try_load -> load_from_named_property_cache -> validated_holder
+            // chain on the monomorphic OwnData hit. Polymorphic /
+            // PrototypeData / megamorphic still fall through to the existing
+            // chain below. The epoch compare mirrors
+            // `record_matches_cache_dependency` and is what catches
+            // non-shape invalidations like prototype mutation.
+            // Phase 3 inline IC fast path: a single packed-handler load,
+            // one shape compare, one epoch compare, one slot read. Bypasses
+            // the 4-deep try_named_property_load_inline_cache_hit ->
+            // try_load -> load_from_named_property_cache -> validated_holder
+            // chain on the monomorphic OwnData hit. Polymorphic /
+            // PrototypeData / megamorphic still fall through to the existing
+            // chain below. The epoch compare mirrors
+            // `record_matches_cache_dependency` and is what catches
+            // non-shape invalidations like prototype mutation.
+            if let Some((handler, cached_epoch)) =
+                self.named_property_fast_handler(frame.code(), feedback_slot)
+            {
+                let heap_view = agent.heap().view();
+                if let Some(record) = heap_view.object_ref(object) {
+                    if record.shape() == handler.receiver_shape()
+                        && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+                    {
+                        let fast_value = match handler.slot_location() {
+                            SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                            SlotLocation::OutOfLine(offset) => record
+                                .named_slots()
+                                .and_then(|slots| heap_view.object_slots(slots))
+                                .and_then(|slots| slots.get(offset as usize).copied()),
+                        };
+                        if let Some(value) = fast_value {
+                            if let Some(slot) = feedback_slot {
+                                self.record_named_property_fast_hit(frame.code(), slot);
+                            }
+                            self.register_stack[target_index] = value;
+                            advance_dispatch_frame(frame, instruction_len);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+            // Slow path: polymorphic / PrototypeData / megamorphic / miss.
             if let Some(value) = self.try_named_property_load_inline_cache_hit(
                 agent,
                 frame.code(),
