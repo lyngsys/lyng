@@ -285,12 +285,22 @@ impl Vm {
             .map(OpcodeDispatchCounterStore::snapshot)
     }
 
+    /// One-shot check used by `run_trampoline` to branch between the
+    /// uncounted hot path and the counted instrumented path. Cheap (single
+    /// load + nullness check); called once per script invocation, not per
+    /// dispatch.
+    #[inline]
+    pub(in crate::vm) fn opcode_counter_enabled(&self) -> bool {
+        self.opcode_dispatch_counts.is_some()
+    }
+
     /// Trampoline-side opcode counter: translates the raw byte to `Opcode`,
     /// skips `Wide` / `ExtraWide` prefixes (so the recorded total mirrors
     /// the legacy "semantic only" count), and records the dispatch. No-op
-    /// when counters are disabled. Called from `dispatch_next!` and
-    /// `run_trampoline`, so kept cheap on the hot path: the disabled case
-    /// is a single load + branch.
+    /// when counters are disabled. Called only from
+    /// `run_trampoline_counted`, so the hot dispatch path
+    /// (`run_trampoline_uncounted` + every `dispatch_next!` tail) never
+    /// pays the cost of the disabled-case load+branch.
     #[inline]
     pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
         let Some(counts) = &self.opcode_dispatch_counts else {

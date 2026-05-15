@@ -222,6 +222,13 @@ pub enum Step {
 /// ExtraWide is immediately followed by a prefix-aware semantic opcode).
 /// This keeps the narrow hot path free of a per-dispatch store.
 ///
+/// **Counter invariant (lyng-3uem T1):** opcode dispatch counting lives in
+/// `run_trampoline_counted`, never in this macro. The hot dispatch path stays
+/// free of the `state.vm.opcode_dispatch_counts.is_some()` check that used
+/// to inline here. `run_trampoline` branches once per script entry to pick
+/// between `run_trampoline_uncounted` (hot) and `run_trampoline_counted`
+/// (instrumented).
+///
 /// `dispatch_next!` is the *only* place in any handler body that should
 /// reference `DISPATCH_TABLE` — Phase 1's acceptance criteria grep for this
 /// invariant.
@@ -229,7 +236,6 @@ pub enum Step {
 macro_rules! dispatch_next {
     ($state:expr) => {{
         let byte = $state.next_opcode_byte();
-        $state.vm.maybe_record_opcode_dispatch(byte);
         #[cfg(debug_assertions)]
         $state
             .vm
@@ -262,16 +268,88 @@ pub const DISPATCH_TABLE_LEN: usize = 256;
 pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
     dispatch_handlers::build_dispatch_table();
 
-/// Central trampoline. One indirect call per opcode. The hot path is the
-/// `Step::Continue(next) => handler = next` arm; `Done` and `Error` are
-/// taken once per script.
+/// Central trampoline entry. Branches once per script invocation between the
+/// uncounted hot path and the counted instrumented path; the hot dispatch
+/// loop never re-checks. Per the post-spike asm audit (`lyng-3uem`,
+/// `reports/js/lyng-js/phase-1-diagnostics.md`), the previous design inlined
+/// `maybe_record_opcode_dispatch` into every `dispatch_next!` tail and cost
+/// ~4 instructions per dispatch even when counters were `None`.
 ///
-/// `#[inline(never)]` keeps this as a standalone symbol for `cargo asm`
-/// inspection across the family-conversion sub-issues. Once Phase 1 cuts
-/// over and the trampoline is the only dispatch path, this attribute can
-/// be revisited.
+/// Behavior change vs the pre-split trampoline: enabling/disabling counters
+/// mid-execution (via `Vm::enable_opcode_dispatch_counts` /
+/// `disable_opcode_dispatch_counts`) only takes effect on the next call to
+/// `run_trampoline`. The existing tests + `lyng-js-bench --count-opcodes`
+/// only toggle counters at script boundaries, so this is a no-op in
+/// practice; documented for future readers.
 #[inline(never)]
 pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
+    if state.vm.opcode_counter_enabled() {
+        run_trampoline_counted(state)
+    } else {
+        run_trampoline_uncounted(state)
+    }
+}
+
+/// Hot dispatch loop — counters disabled. The trampoline body has no
+/// reference to `maybe_record_opcode_dispatch`, so the per-iteration cost
+/// is just the indirect call + Step tag check + epoch check + loop back.
+///
+/// `state.vm` is hoisted into a raw pointer kept in a callee-saved register
+/// across the loop (lyng-3uem T2). Without this, LLVM re-loads `state.vm`
+/// every iteration because the indirect `blr handler` can clobber any state
+/// field under the extern "C" ABI; manually pinning it saves one load per
+/// dispatch. `local_epoch` mirrors `state.frame_check_epoch` in the same
+/// way — synced to `state` only on the cold (epoch-changed) arm.
+#[inline(never)]
+fn run_trampoline_uncounted(state: &mut DispatchState) -> VmResult<Value> {
+    #[cfg(debug_assertions)]
+    state
+        .vm
+        .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
+
+    // T2 hoist: cache vm address + frame_check_epoch in locals so LLVM keeps
+    // them in callee-saved registers across the indirect call. `vm_ptr`
+    // aliases `state.vm` for the lifetime of this function call; no handler
+    // reassigns `state.vm` (handlers receive `&mut DispatchState` only).
+    let vm_ptr: *mut Vm = &raw mut *state.vm;
+    let mut local_epoch = state.frame_check_epoch;
+
+    let mut handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
+    loop {
+        match (handler)(state) {
+            Step::Continue(next) => {
+                // SAFETY: `vm_ptr` is stable for the lifetime of this call —
+                // it was derived from `state.vm` at function entry and
+                // handlers cannot reassign `state.vm` under Rust's borrow
+                // rules. The handler call's extern "C" ABI clobbers caller-
+                // saved registers but cannot mutate the local `vm_ptr` /
+                // `local_epoch` slots.
+                let vm_epoch = unsafe { (*vm_ptr).dispatch_frame_check_epoch() };
+                if local_epoch != vm_epoch {
+                    local_epoch = vm_epoch;
+                    state.frame_check_epoch = vm_epoch;
+                    if !still_active(state) {
+                        state.refresh_from_active_frame()?;
+                        local_epoch = state.frame_check_epoch;
+                        handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
+                        continue;
+                    }
+                }
+                handler = next;
+            }
+            Step::Done(value) => return Ok(value),
+            Step::Error(error) => return Err(error),
+        }
+    }
+}
+
+/// Instrumented dispatch loop — counters enabled. Records every dispatched
+/// opcode by calling `maybe_record_opcode_dispatch` between handler
+/// returns. The cost lives here so the hot path
+/// (`run_trampoline_uncounted`) stays clean. Not size-budgeted; only run
+/// when something has explicitly enabled counters.
+#[inline(never)]
+fn run_trampoline_counted(state: &mut DispatchState) -> VmResult<Value> {
     let first_byte = state.first_opcode_byte();
     state.vm.maybe_record_opcode_dispatch(first_byte);
     #[cfg(debug_assertions)]
@@ -282,36 +360,16 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
     loop {
         match (handler)(state) {
             Step::Continue(next) => {
-                // Mirror legacy's inner-loop epoch check + `active_in` validation.
-                // The Vm bumps the epoch via `request_dispatch_frame_check`
-                // whenever frame state changes (function call/return, exception
-                // transfer). When that fires we have to decide: is `state.frame`
-                // still the active frame, or did the underlying frame stack
-                // change?
-                //
-                // - Property getter calls, builtin invocations, etc. bump the
-                //   epoch but leave `self.frames.last()` pointing at the same
-                //   caller frame. The handler-local pc advance in `state.frame`
-                //   is the source of truth (the legacy helpers don't write back
-                //   to `self.frames` on success). DON'T refresh — clobbering
-                //   pc with `self.frames.last()` would revert the advance and
-                //   re-dispatch the same opcode (the bug behind a 30 GB OOM in
-                //   nested-call hot paths).
-                //
-                // - Cross-frame exception transfer or a call's manual refresh
-                //   (handlers in `calls.rs`) bumps the epoch AND changes which
-                //   frame is on top. Frame depth / top-frame code differs from
-                //   `state`'s snapshot — refresh and re-dispatch from the new
-                //   active frame's pc.
+                // After the handler returns Continue, pc has been advanced
+                // to the next opcode byte. Record that byte before
+                // dispatching to its handler — same semantics as the
+                // pre-split macro that recorded inside `dispatch_next!`.
+                let next_byte = state.next_opcode_byte();
+                state.vm.maybe_record_opcode_dispatch(next_byte);
+
                 if state.frame_check_epoch != state.vm.dispatch_frame_check_epoch() {
                     state.frame_check_epoch = state.vm.dispatch_frame_check_epoch();
-                    let still_active = state.frame_depth == state.vm.frames().len()
-                        && state
-                            .vm
-                            .frames()
-                            .last()
-                            .is_some_and(|f| f.code() == state.frame.code());
-                    if !still_active {
+                    if !still_active(state) {
                         state.refresh_from_active_frame()?;
                         let byte = state.first_opcode_byte();
                         state.vm.maybe_record_opcode_dispatch(byte);
@@ -325,6 +383,34 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
             Step::Error(error) => return Err(error),
         }
     }
+}
+
+/// Frame-stack identity check shared by both trampoline variants.
+///
+/// The Vm bumps the epoch via `request_dispatch_frame_check` whenever frame
+/// state changes (function call/return, exception transfer). When that
+/// fires we have to decide: is `state.frame` still the active frame, or
+/// did the underlying frame stack change?
+///
+/// - Property getter calls, builtin invocations, etc. bump the epoch but
+///   leave `self.frames.last()` pointing at the same caller frame. The
+///   handler-local pc advance in `state.frame` is the source of truth (the
+///   legacy helpers don't write back to `self.frames` on success). DON'T
+///   refresh — clobbering pc with `self.frames.last()` would revert the
+///   advance and re-dispatch the same opcode (the bug behind a 30 GB OOM
+///   in nested-call hot paths fixed in `fbace3dd`).
+/// - Cross-frame exception transfer or a call's manual refresh (handlers
+///   in `calls.rs`) bumps the epoch AND changes which frame is on top.
+///   Frame depth / top-frame code differs from `state`'s snapshot —
+///   caller refreshes and re-dispatches from the new active frame's pc.
+#[inline]
+fn still_active(state: &DispatchState) -> bool {
+    state.frame_depth == state.vm.frames().len()
+        && state
+            .vm
+            .frames()
+            .last()
+            .is_some_and(|f| f.code() == state.frame.code())
 }
 
 impl Vm {

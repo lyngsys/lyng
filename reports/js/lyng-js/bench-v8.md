@@ -17,11 +17,11 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 | Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |
 | --- | ---: | ---: | ---: | ---: | :---: | ---: | --- |
-| `Richards` | `233` | `234` | `260` | `-0.4%` | ✗ | `15151.1` | 233, 233, 233, 231, 233 |
-| `DeltaBlue` | `257` | `277` | `310` | `-7.2%` | ✗ | `25726.8` | 258, 255, 258, 257, 257 |
-| `Crypto` | `257` | `236` | `265` | `+8.9%` | ✗ | `103572.4` | 257, 208, 258, 257, 248 |
-| `RayTrace` | `385` | `387` | `430` | `-0.5%` | ✗ | `192204.9` | 308, 399, 387, 385, 383 |
-| `NavierStokes` | `435` | `424` | `470` | `+2.6%` | ✗ | `341149.4` | 435, 437, 438, 433, 366 |
-| `Splay` | `1221` | `1198` | `1330` | `+1.9%` | ✗ | `6674.1` | 1213, 1211, 1222, 1226, 1221 |
+| `Richards` | `233` | `234` | `260` | `-0.4%` | ✗ | `15151.1` | 233, 234, 233, 233, 233 |
+| `DeltaBlue` | `276` | `277` | `310` | `-0.4%` | ✗ | `23955.8` | 276, 269, 277, 267, 276 |
+| `Crypto` | `262` | `236` | `265` | `+11.0%` | ✗ | `101595.8` | 259, 262, 261, 262, 262 |
+| `RayTrace` | `397` | `387` | `430` | `+2.6%` | ✗ | `186395.2` | 378, 395, 397, 398, 398 |
+| `NavierStokes` | `443` | `424` | `470` | `+4.5%` | ✗ | `334988.7` | 443, 442, 444, 440, 443 |
+| `Splay` | `1214` | `1198` | `1330` | `+1.3%` | ✗ | `6712.6` | 1211, 1252, 1217, 1205, 1214 |
 
 Baseline / target columns come from the Phase 1 exit-gate table in [jsc-aligned-engine-roadmap.md](jsc-aligned-engine-roadmap.md). Baseline = pre-Phase-1 score on the legacy match dispatcher; target = Phase 1 trampoline-cutover score gate (sub-9, `lyng-2wji`). `Δ vs baseline` is `(score − baseline) / baseline × 100%`; negative values are regressions.
