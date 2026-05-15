@@ -187,9 +187,12 @@ impl NamedPropertyCacheEntry {
 /// Bit-packed monomorphic OwnData inline-cache handler.
 ///
 /// Layout (LSB-first):
-///   bits  0..32: encoded slot_offset (matches `SlotLocation::encode` — the
-///                high bit picks Inline vs OutOfLine, the rest is the index)
-///   bits 32..64: receiver shape raw `u32` (NonZero — `0` in the high half
+///   bit   31     inline_slot flag (1 = Inline, 0 = OutOfLine — same convention as
+///                [`INLINE_SLOT_OFFSET_FLAG`])
+///   bit   30     writable flag (1 = property is writable, 0 = read-only).
+///                Stores short-circuit on read-only entries; loads ignore it.
+///   bits  0..30  slot_offset (30 bits — 1B values, well above any practical slot count)
+///   bits 32..64  receiver shape raw `u32` (NonZero — `0` in the high half
 ///                means "no fast path available")
 ///
 /// A whole-word value of `0` is the canonical "no fast path" sentinel, made
@@ -199,6 +202,9 @@ impl NamedPropertyCacheEntry {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NamedPropertyHandler(u64);
 
+const HANDLER_WRITABLE_FLAG: u32 = 0x4000_0000;
+const HANDLER_SLOT_OFFSET_MASK: u32 = 0x3FFF_FFFF;
+
 impl NamedPropertyHandler {
     /// Sentinel value indicating "no fast handler available". Set when the
     /// cache is uninitialized, polymorphic, megamorphic, or installed with a
@@ -207,8 +213,10 @@ impl NamedPropertyHandler {
 
     /// Build a fast handler from a cache entry. Returns [`Self::NONE`] for
     /// entries that the inline fast path cannot service:
-    /// `PrototypeData` paths, multi-dependency entries, and any entry whose
-    /// `holder_shape` differs from its `receiver_shape`.
+    /// `PrototypeData` paths, multi-dependency entries, any entry whose
+    /// `holder_shape` differs from its `receiver_shape`, and any entry whose
+    /// slot offset doesn't fit in 30 bits (defensive — never seen in
+    /// practice).
     #[inline]
     #[must_use]
     pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
@@ -224,8 +232,19 @@ impl NamedPropertyHandler {
             return Self::NONE;
         }
         let raw_shape = receiver_shape.get() as u64;
-        let slot_offset = entry.slot_offset() as u64;
-        Self((raw_shape << 32) | slot_offset)
+        let encoded_offset = entry.slot_offset();
+        let inline_bit = encoded_offset & INLINE_SLOT_OFFSET_FLAG;
+        let offset_bits = encoded_offset & INLINE_SLOT_OFFSET_MASK;
+        if offset_bits > HANDLER_SLOT_OFFSET_MASK {
+            return Self::NONE;
+        }
+        let writable_bit = if entry.attrs().writable() {
+            HANDLER_WRITABLE_FLAG
+        } else {
+            0
+        };
+        let low = inline_bit | writable_bit | offset_bits;
+        Self((raw_shape << 32) | (low as u64))
     }
 
     /// Returns the cached receiver `ShapeId`, or `None` when this is the
@@ -240,7 +259,23 @@ impl NamedPropertyHandler {
     #[inline]
     #[must_use]
     pub const fn slot_location(self) -> SlotLocation {
-        SlotLocation::decode(self.0 as u32)
+        let low = self.0 as u32;
+        let offset = low & HANDLER_SLOT_OFFSET_MASK;
+        if low & INLINE_SLOT_OFFSET_FLAG == 0 {
+            SlotLocation::OutOfLine(offset)
+        } else {
+            SlotLocation::Inline(offset)
+        }
+    }
+
+    /// `true` when the cached property is writable. Stores must check this
+    /// and treat a read-only hit as `stored = false` (semantics identical to
+    /// the slow chain's `store_to_named_property_cache → Ok(Some(false))`).
+    /// Loads ignore this bit.
+    #[inline]
+    #[must_use]
+    pub const fn writable(self) -> bool {
+        (self.0 as u32) & HANDLER_WRITABLE_FLAG != 0
     }
 
     /// `true` when this handler carries a valid monomorphic-OwnData fast

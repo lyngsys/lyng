@@ -5,7 +5,7 @@ use crate::vm::registers::absolute_register;
 use crate::{FrameRecord, Vm, VmError};
 use lyng_js_bytecode::Opcode;
 use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
+use lyng_js_gc::{AllocationLifetime, ValueStoreTarget};
 use lyng_js_host::HostHooks;
 use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
 use lyng_js_ops::{errors, object};
@@ -201,6 +201,72 @@ impl Vm {
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
         if let Some(object) = receiver.as_object_ref() {
+            // Phase 3b inline IC fast path (store side). Mirrors the Phase 3a
+            // load-side inlining: packed-handler load, shape compare, epoch
+            // compare, writable check, then a barrier-aware store via
+            // mut_store_value. Polymorphic / PrototypeData / megamorphic /
+            // proxy / miss continue through the existing chain below.
+            //
+            // Encodes the hit decision into Option<Option<ValueStoreTarget>>:
+            //   - Outer Some => take the fast path; stored = inner branch
+            //   - Outer None => fall through to slow chain
+            //   - Inner Some(target) => writable, do the store
+            //   - Inner None        => read-only (writable bit clear), no store
+            let fast_target = self
+                .named_property_fast_handler(frame.code(), feedback_slot)
+                .and_then(|(handler, cached_epoch)| {
+                    let view = agent.heap().view();
+                    let record = view.object_ref(object)?;
+                    if record.shape() != handler.receiver_shape()
+                        || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
+                    {
+                        return None;
+                    }
+                    if !handler.writable() {
+                        return Some(None);
+                    }
+                    let target = match handler.slot_location() {
+                        SlotLocation::Inline(index) => {
+                            ValueStoreTarget::InlineNamedSlot(object, index)
+                        }
+                        SlotLocation::OutOfLine(offset) => {
+                            // Cache invariant: named_slots is Some for any out-of-line
+                            // OwnData hit. If it isn't (corrupt state), bail to slow.
+                            let slots = record.named_slots()?;
+                            ValueStoreTarget::ObjectSlot(slots, offset)
+                        }
+                    };
+                    Some(Some(target))
+                });
+            if let Some(target_opt) = fast_target {
+                let stored = if let Some(target) = target_opt {
+                    agent.with_heap_and_objects(|heap, _objects| {
+                        let mut mutator = heap.mutator();
+                        mutator.mut_store_value(target, value)
+                    })
+                } else {
+                    // Non-writable own-data property: stored = false, no heap write.
+                    // Matches store_to_named_property_cache → Ok(Some(false)).
+                    false
+                };
+                if assignment {
+                    let assignment_result = self.check_property_assignment_result(
+                        agent,
+                        frame,
+                        stored,
+                        strict_assignment,
+                    );
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
+                        return Ok(());
+                    };
+                }
+                self.record_feedback_slot(frame.code(), feedback_slot);
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: polymorphic / PrototypeData / megamorphic / miss.
             if let Some(stored) = self.try_named_property_store_inline_cache(
                 agent,
                 frame.code(),

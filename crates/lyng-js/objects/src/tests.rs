@@ -275,6 +275,7 @@ fn synthesize_own_data_entry(
     slot_offset: u32,
     dependency_count: u8,
     holder_shape: Option<ShapeId>,
+    writable: bool,
 ) -> NamedPropertyCacheEntry {
     let holder = ObjectRef::from_raw(7).unwrap();
     let mut dependencies =
@@ -289,12 +290,14 @@ fn synthesize_own_data_entry(
             None,
         ));
     }
+    let mut attrs = DescriptorAttributes::empty();
+    attrs.set_writable(writable);
     NamedPropertyCacheEntry::new(
         receiver_shape,
         holder,
         holder_shape.unwrap_or(receiver_shape),
         slot_offset,
-        DescriptorAttributes::empty(),
+        attrs,
         NamedPropertyCachePath::OwnData,
         dependency_count,
         dependencies,
@@ -304,35 +307,76 @@ fn synthesize_own_data_entry(
 #[test]
 fn named_property_handler_packs_inline_own_data_entry() {
     let shape = ShapeId::from_raw(0x1234_5678).unwrap();
-    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(2).encode(), 1, None);
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(2).encode(), 1, None, true);
     let handler = NamedPropertyHandler::from_entry(entry);
     assert!(handler.is_valid());
     assert_eq!(handler.receiver_shape(), Some(shape));
     assert_eq!(handler.slot_location(), SlotLocation::Inline(2));
+    assert!(handler.writable());
 }
 
 #[test]
 fn named_property_handler_packs_out_of_line_own_data_entry() {
     let shape = ShapeId::from_raw(0x4242).unwrap();
-    let entry = synthesize_own_data_entry(shape, SlotLocation::OutOfLine(11).encode(), 1, None);
+    let entry =
+        synthesize_own_data_entry(shape, SlotLocation::OutOfLine(11).encode(), 1, None, true);
     let handler = NamedPropertyHandler::from_entry(entry);
     assert!(handler.is_valid());
     assert_eq!(handler.receiver_shape(), Some(shape));
     assert_eq!(handler.slot_location(), SlotLocation::OutOfLine(11));
+    assert!(handler.writable());
+}
+
+#[test]
+fn named_property_handler_packs_writable_bit_for_read_only_entry() {
+    let shape = ShapeId::from_raw(0x9009).unwrap();
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(1).encode(), 1, None, false);
+    let handler = NamedPropertyHandler::from_entry(entry);
+    assert!(handler.is_valid(), "non-writable own-data still gets a fast handler");
+    assert_eq!(handler.receiver_shape(), Some(shape));
+    assert_eq!(handler.slot_location(), SlotLocation::Inline(1));
+    assert!(
+        !handler.writable(),
+        "writable bit must reflect entry.attrs().writable()"
+    );
+}
+
+#[test]
+fn named_property_handler_writable_bit_does_not_alias_slot_offset() {
+    // Out-of-line offset 0x4242 — the writable bit (bit 30) overlaps the offset's
+    // bit-30 if we ever encode offsets above 0x3FFF_FFFF. Sanity-check that the
+    // decode masks correctly and the writable bit is independent.
+    let shape = ShapeId::from_raw(0xC0DE).unwrap();
+    let writable_entry =
+        synthesize_own_data_entry(shape, SlotLocation::OutOfLine(0x4242).encode(), 1, None, true);
+    let read_only_entry =
+        synthesize_own_data_entry(shape, SlotLocation::OutOfLine(0x4242).encode(), 1, None, false);
+    let w = NamedPropertyHandler::from_entry(writable_entry);
+    let r = NamedPropertyHandler::from_entry(read_only_entry);
+    assert_eq!(w.slot_location(), SlotLocation::OutOfLine(0x4242));
+    assert_eq!(r.slot_location(), SlotLocation::OutOfLine(0x4242));
+    assert!(w.writable());
+    assert!(!r.writable());
 }
 
 #[test]
 fn named_property_handler_none_when_holder_shape_differs() {
     let receiver = ShapeId::from_raw(101).unwrap();
     let holder = ShapeId::from_raw(102).unwrap();
-    let entry = synthesize_own_data_entry(receiver, SlotLocation::Inline(0).encode(), 1, Some(holder));
+    let entry = synthesize_own_data_entry(
+        receiver,
+        SlotLocation::Inline(0).encode(),
+        1,
+        Some(holder),
+        true,
+    );
     assert!(!NamedPropertyHandler::from_entry(entry).is_valid());
 }
 
 #[test]
 fn named_property_handler_none_for_multi_dependency_entry() {
     let shape = ShapeId::from_raw(99).unwrap();
-    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(0).encode(), 2, None);
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(0).encode(), 2, None, true);
     assert!(!NamedPropertyHandler::from_entry(entry).is_valid());
 }
 
@@ -361,6 +405,7 @@ fn named_property_handler_none_sentinel_decodes_safely() {
     let handler = NamedPropertyHandler::NONE;
     assert!(!handler.is_valid());
     assert_eq!(handler.receiver_shape(), None);
+    assert!(!handler.writable());
 }
 
 #[test]
