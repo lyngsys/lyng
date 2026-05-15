@@ -409,6 +409,37 @@ fn named_property_handler_none_sentinel_decodes_safely() {
 }
 
 #[test]
+fn keyed_dense_index_handler_round_trips_shape_and_flags() {
+    let shape = ShapeId::from_raw(0xABCD_1234).unwrap();
+    let flags = ObjectFlags::extensible()
+        .union(ObjectFlags::ENGINE_ARRAY);
+    let handler = KeyedDenseIndexHandler::new(shape, flags);
+    assert!(handler.is_valid());
+    assert_eq!(handler.receiver_shape(), Some(shape));
+    assert_eq!(handler.receiver_flags(), flags);
+}
+
+#[test]
+fn keyed_dense_index_handler_flags_and_shape_do_not_alias() {
+    // Use a small shape ID + flag bits that overlap if the low-half mask
+    // were wrong — verify the decode masks correctly.
+    let shape = ShapeId::from_raw(1).unwrap();
+    let flags = ObjectFlags::ENGINE_ARRAY.union(ObjectFlags::ARGUMENTS_OBJECT);
+    let handler = KeyedDenseIndexHandler::new(shape, flags);
+    assert_eq!(handler.receiver_shape(), Some(shape));
+    assert_eq!(handler.receiver_flags(), flags);
+    assert!(handler.is_valid());
+}
+
+#[test]
+fn keyed_dense_index_handler_none_sentinel_decodes_safely() {
+    let handler = KeyedDenseIndexHandler::NONE;
+    assert!(!handler.is_valid());
+    assert_eq!(handler.receiver_shape(), None);
+    assert_eq!(handler.receiver_flags(), ObjectFlags::empty());
+}
+
+#[test]
 fn module_namespace_objects_read_live_bindings_and_reject_mutation() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();

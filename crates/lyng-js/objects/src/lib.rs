@@ -74,12 +74,12 @@ pub use self::runtime::{
     NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD, SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
 };
 pub use self::shapes::{
-    ElementMode, InvalidationCause, InvalidationEvent, NamedPropertyCacheEntry,
-    NamedPropertyCachePath, NamedPropertyCachePurpose, NamedPropertyDictionaryEntry,
-    NamedPropertyHandler, NamedPropertyStorageMode, NamedPropertyValue, PropertyCacheDependency,
-    ShapeAllocation, ShapeProperty, ShapePropertyKind, ShapeRecord, ShapeTransitionKey,
-    SlotLocation, SparseElementEntry, INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG,
-    PROPERTY_CACHE_MAX_DEPENDENCIES,
+    ElementMode, InvalidationCause, InvalidationEvent, KeyedDenseIndexHandler,
+    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
+    NamedPropertyDictionaryEntry, NamedPropertyHandler, NamedPropertyStorageMode,
+    NamedPropertyValue, PropertyCacheDependency, ShapeAllocation, ShapeProperty,
+    ShapePropertyKind, ShapeRecord, ShapeTransitionKey, SlotLocation, SparseElementEntry,
+    INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 pub use self::temporal::{
     TemporalDurationObjectData, TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind,

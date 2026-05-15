@@ -4,9 +4,9 @@ use super::{
 use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_js_gc::ValueStoreTarget;
 use lyng_js_objects::{
-    FunctionEntryIdentity, NamedPropertyCacheEntry, NamedPropertyCachePath,
-    NamedPropertyCachePurpose, NamedPropertyHandler, ObjectFlags, ObjectHeader, ObjectKind,
-    PrimitiveWrapperKind, PropertyCacheDependency,
+    FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry,
+    NamedPropertyCachePath, NamedPropertyCachePurpose, NamedPropertyHandler, ObjectFlags,
+    ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency,
 };
 use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::{cmp::Ordering, mem::size_of};
@@ -671,6 +671,22 @@ struct KeyedPropertyFeedback {
     named_entries: [Option<KeyedNamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
     dense_entry_count: u8,
     dense_entries: [Option<DenseIndexCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+    /// Phase 3d named-atom fast handler — packed shape + slot_offset +
+    /// writable derived from `named_entries[0].entry` when the cache is
+    /// monomorphic and the family is `NamedAtom`. NONE otherwise.
+    monomorphic_named_fast: NamedPropertyHandler,
+    /// Raw `AtomId` (NonZeroU32) of `named_entries[0]` when fast-path
+    /// eligible; `0` otherwise. The fast path compares against the runtime
+    /// atom of the keyed access.
+    monomorphic_named_fast_atom: u32,
+    /// Raw `last_invalidation_epoch` u64 captured from the receiver at
+    /// named-atom cache install time. Same role as
+    /// `NamedPropertyFeedback::monomorphic_fast_dependency_epoch`.
+    monomorphic_named_fast_dependency_epoch: u64,
+    /// Phase 3d dense-index fast handler — packed shape + flags derived
+    /// from `dense_entries[0]` when the cache is monomorphic and the
+    /// family is `DenseIndex`. NONE otherwise.
+    monomorphic_dense_fast: KeyedDenseIndexHandler,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -952,6 +968,50 @@ impl KeyedPropertyFeedback {
             named_entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
             dense_entry_count: 0,
             dense_entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+            monomorphic_named_fast: NamedPropertyHandler::NONE,
+            monomorphic_named_fast_atom: 0,
+            monomorphic_named_fast_dependency_epoch: 0,
+            monomorphic_dense_fast: KeyedDenseIndexHandler::NONE,
+        }
+    }
+
+    /// Recompute the monomorphic fast handlers from the current cache
+    /// state. Called from every mutation that may change the active
+    /// monomorphic entry, the cache_state, or the family. Mirrors
+    /// [`NamedPropertyFeedback::refresh_monomorphic_fast`].
+    #[inline]
+    fn refresh_monomorphic_fast(&mut self) {
+        self.monomorphic_named_fast = NamedPropertyHandler::NONE;
+        self.monomorphic_named_fast_atom = 0;
+        self.monomorphic_named_fast_dependency_epoch = 0;
+        self.monomorphic_dense_fast = KeyedDenseIndexHandler::NONE;
+        if !matches!(self.cache_state, InlineCacheState::Monomorphic) {
+            return;
+        }
+        match self.family {
+            Some(KeyedPropertyFamily::NamedAtom) => {
+                if let Some(keyed_entry) = self.named_entries[0] {
+                    let handler = NamedPropertyHandler::from_entry(keyed_entry.entry);
+                    if handler.is_valid() {
+                        self.monomorphic_named_fast = handler;
+                        self.monomorphic_named_fast_atom = keyed_entry.atom.raw();
+                        self.monomorphic_named_fast_dependency_epoch = keyed_entry
+                            .entry
+                            .dependency(0)
+                            .and_then(|d| d.invalidation_epoch())
+                            .unwrap_or(0);
+                    }
+                }
+            }
+            Some(KeyedPropertyFamily::DenseIndex) => {
+                if let Some(dense) = self.dense_entries[0] {
+                    self.monomorphic_dense_fast = KeyedDenseIndexHandler::new(
+                        dense.receiver_shape,
+                        dense.receiver_flags,
+                    );
+                }
+            }
+            Some(KeyedPropertyFamily::Generic) | None => {}
         }
     }
 
@@ -1088,6 +1148,7 @@ impl KeyedPropertyFeedback {
                 self.promote_to_megamorphic(Some(KeyedPropertyFamily::Generic));
             }
         }
+        self.refresh_monomorphic_fast();
     }
 
     #[inline]
@@ -1095,43 +1156,49 @@ impl KeyedPropertyFeedback {
         let Some(plan) = plan else {
             return self.observe_uncacheable_dense_index();
         };
-        match self.family {
+        let changed = match self.family {
             None | Some(KeyedPropertyFamily::DenseIndex) => {
                 if self.family.is_none() {
                     self.install_first_dense_entry(plan);
-                    return true;
-                }
-                match self.cache_state {
-                    InlineCacheState::Megamorphic => false,
-                    InlineCacheState::Uninitialized => {
-                        self.install_first_dense_entry(plan);
-                        true
-                    }
-                    InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                        if let Some(index) = self.find_dense_entry_index(plan) {
-                            let changed = self.dense_entries[index] != Some(plan);
-                            self.dense_entries[index] = Some(plan);
-                            return changed;
+                    true
+                } else {
+                    match self.cache_state {
+                        InlineCacheState::Megamorphic => false,
+                        InlineCacheState::Uninitialized => {
+                            self.install_first_dense_entry(plan);
+                            true
                         }
-                        if usize::from(self.dense_entry_count) >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
-                            self.promote_to_megamorphic(Some(KeyedPropertyFamily::DenseIndex));
-                            return true;
+                        InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
+                            if let Some(index) = self.find_dense_entry_index(plan) {
+                                let changed = self.dense_entries[index] != Some(plan);
+                                self.dense_entries[index] = Some(plan);
+                                changed
+                            } else if usize::from(self.dense_entry_count)
+                                >= POLYMORPHIC_PROPERTY_CACHE_LIMIT
+                            {
+                                self.promote_to_megamorphic(Some(KeyedPropertyFamily::DenseIndex));
+                                true
+                            } else {
+                                self.dense_entries[usize::from(self.dense_entry_count)] =
+                                    Some(plan);
+                                self.dense_entry_count = self.dense_entry_count.saturating_add(1);
+                                self.cache_state = if self.dense_entry_count <= 1 {
+                                    InlineCacheState::Monomorphic
+                                } else {
+                                    InlineCacheState::Polymorphic
+                                };
+                                true
+                            }
                         }
-                        self.dense_entries[usize::from(self.dense_entry_count)] = Some(plan);
-                        self.dense_entry_count = self.dense_entry_count.saturating_add(1);
-                        self.cache_state = if self.dense_entry_count <= 1 {
-                            InlineCacheState::Monomorphic
-                        } else {
-                            InlineCacheState::Polymorphic
-                        };
-                        true
                     }
                 }
             }
             Some(KeyedPropertyFamily::NamedAtom | KeyedPropertyFamily::Generic) => {
                 self.promote_mixed_keyed_family_to_generic()
             }
-        }
+        };
+        self.refresh_monomorphic_fast();
+        changed
     }
 
     #[inline]
@@ -1305,6 +1372,10 @@ impl KeyedPropertyFeedback {
         self.named_entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
         self.dense_entry_count = 0;
         self.dense_entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
+        self.monomorphic_named_fast = NamedPropertyHandler::NONE;
+        self.monomorphic_named_fast_atom = 0;
+        self.monomorphic_named_fast_dependency_epoch = 0;
+        self.monomorphic_dense_fast = KeyedDenseIndexHandler::NONE;
     }
 }
 
@@ -1952,6 +2023,53 @@ impl Vm {
             }
         }
         self.observe_tier_feedback_event(code);
+    }
+
+    /// Phase 3d named-keyed fast handler lookup. Returns the packed
+    /// `NamedPropertyHandler` and its dependency epoch only when:
+    ///   - the site is a `KeyedProperty` site,
+    ///   - cache state is monomorphic + family is `NamedAtom`,
+    ///   - the cached atom equals the runtime `atom`.
+    #[inline(always)]
+    pub(super) fn keyed_property_named_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+        atom: AtomId,
+    ) -> Option<(NamedPropertyHandler, u64)> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        match site {
+            FeedbackSiteState::KeyedProperty(feedback)
+                if feedback.monomorphic_named_fast_atom == atom.raw()
+                    && feedback.monomorphic_named_fast.is_valid() =>
+            {
+                Some((
+                    feedback.monomorphic_named_fast,
+                    feedback.monomorphic_named_fast_dependency_epoch,
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    /// Phase 3d dense-keyed fast handler lookup. Returns the packed
+    /// `KeyedDenseIndexHandler` only when the site is a `KeyedProperty`
+    /// site in the monomorphic `DenseIndex` family.
+    #[inline(always)]
+    pub(super) fn keyed_property_dense_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+    ) -> Option<KeyedDenseIndexHandler> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        match site {
+            FeedbackSiteState::KeyedProperty(feedback)
+                if feedback.monomorphic_dense_fast.is_valid() =>
+            {
+                Some(feedback.monomorphic_dense_fast)
+            }
+            _ => None,
+        }
     }
 
     pub(super) fn try_named_property_load_inline_cache_hit(

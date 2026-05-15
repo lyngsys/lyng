@@ -33,6 +33,21 @@ impl ObjectFlags {
         Self::EXTENSIBLE
     }
 
+    /// Returns the raw 16-bit packed representation. Used by the Phase 3d
+    /// `KeyedDenseIndexHandler` IC fast path to compare against a cached
+    /// flags snapshot in a single u32 cmp.
+    #[inline]
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
+
+    /// Construct from a raw 16-bit packed representation. Pairs with
+    /// [`Self::bits`].
+    #[inline]
+    pub const fn from_bits(bits: u16) -> Self {
+        Self(bits)
+    }
+
     #[inline]
     pub const fn contains(self, flags: Self) -> bool {
         self.0 & flags.0 == flags.0

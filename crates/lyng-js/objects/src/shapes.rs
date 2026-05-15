@@ -1,4 +1,4 @@
-use super::{DescriptorAttributes, ObjectRef, PropertyKey, ShapeId, Value};
+use super::{DescriptorAttributes, ObjectFlags, ObjectRef, PropertyKey, ShapeId, Value};
 
 pub const PROPERTY_CACHE_MAX_DEPENDENCIES: usize = 4;
 
@@ -284,6 +284,62 @@ impl NamedPropertyHandler {
     #[must_use]
     pub const fn is_valid(self) -> bool {
         self.0 != 0
+    }
+}
+
+/// Bit-packed monomorphic dense-index keyed IC handler.
+///
+/// Used by the Phase 3d keyed-property fast path for the dense-index family
+/// (numeric SMI keys against array-shaped receivers). Encodes the receiver
+/// shape and flag snapshot the IC needs to compare against — the slot
+/// offset is the runtime SMI index itself, not part of the handler.
+///
+/// Layout (LSB-first):
+///   bits  0..32  receiver shape raw `u32` (NonZeroU32; `0` in the low half
+///                ⇒ NONE sentinel)
+///   bits 32..48  receiver flags ([`ObjectFlags`] u16 bits)
+///   bits 48..64  reserved (always zero)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct KeyedDenseIndexHandler(u64);
+
+impl KeyedDenseIndexHandler {
+    /// Sentinel value indicating "no fast handler available".
+    pub const NONE: Self = Self(0);
+
+    /// Pack a `(receiver_shape, receiver_flags)` pair into a single 64-bit
+    /// handler word. Always returns a valid handler — there is no
+    /// equivalent of the [`NamedPropertyHandler`] eligibility filter, since
+    /// the dense IC only emits cache entries for receivers that already
+    /// pass the dense-index cacheability check.
+    #[inline]
+    #[must_use]
+    pub const fn new(receiver_shape: ShapeId, receiver_flags: ObjectFlags) -> Self {
+        let shape_raw = receiver_shape.get() as u64;
+        let flags_raw = receiver_flags.bits() as u64;
+        Self(shape_raw | (flags_raw << 32))
+    }
+
+    /// Returns the cached receiver `ShapeId`, or `None` when this is the
+    /// sentinel [`Self::NONE`] value.
+    #[inline]
+    #[must_use]
+    pub const fn receiver_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw(self.0 as u32)
+    }
+
+    /// Returns the cached receiver flag snapshot.
+    #[inline]
+    #[must_use]
+    pub const fn receiver_flags(self) -> ObjectFlags {
+        ObjectFlags::from_bits((self.0 >> 32) as u16)
+    }
+
+    /// `true` when this handler carries a valid monomorphic-DenseIndex fast
+    /// path. `false` for [`Self::NONE`].
+    #[inline]
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        (self.0 as u32) != 0
     }
 }
 
