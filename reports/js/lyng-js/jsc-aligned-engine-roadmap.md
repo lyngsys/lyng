@@ -16,9 +16,10 @@ function dispatch as the substrate, then a template-style Baseline
 JIT consuming the same bytecode and IC state.
 
 The interpreter targets are α-bounded — see "Dispatch Architecture
-(Decided)" below. The α-vs-β interpreter gap is ~5–10%; the JIT gap
-is ~5%. β/γ remain documented escape hatches if profiles later
-justify them.
+(Decided)" below. The α-vs-β interpreter gap is a **working target of
+~5–10% pending γ-swap measurement** (Phase 3g / lyng-28t2), not a
+measured fact; the JIT gap is ~5%. β/γ remain documented escape
+hatches if profiles later justify them.
 
 This roadmap explicitly rejects two prior framings:
 
@@ -41,7 +42,26 @@ roadmap is finishing the alignment, not starting from scratch:
   Matches `JSCJSValue.h`.
 - **Per-callsite FeedbackVector with Monomorphic/Polymorphic/Megamorphic
   state machine** ([crates/lyng-js/vm/src/vm/feedback.rs:770-797](../../../crates/lyng-js/vm/src/vm/feedback.rs)).
-  Matches JSC's `StructureStubInfo` / `InlineCacheHandler`.
+  This is the **LLInt-class metadata** analogue, not the JIT IC analogue.
+  JSC splits IC dispatch across three tiers and our interpreter targets
+  only the first:
+  - **LLInt (interpreter)** — compact mode metadata: `GetByIdModeMetadata`
+    with `Default` / `ProtoLoad` / `ArrayLength` / `Unset` variants
+    ([`bytecode/GetByIdMetadata.h`](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/bytecode/GetByIdMetadata.h),
+    lines 34–130). This is what Lyng's `FeedbackVector` corresponds to.
+  - **Baseline JIT / DFG** — `HandlerIC`: linked list of `InlineCacheHandler`
+    nodes, no machine-code patching
+    ([`bytecode/PropertyInlineCache.h:108`](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/bytecode/PropertyInlineCache.h#L108)).
+    Out of scope for the interpreter phases of this roadmap.
+  - **FTL** — `RepatchingPropertyInlineCache`: slab-patching dispatch in
+    JIT-compiled function bodies
+    ([`bytecode/PropertyInlineCache.h:615`](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/bytecode/PropertyInlineCache.h#L615)).
+    Out of scope until at least Phase 6.
+
+  The consequence is load-bearing: the interpreter-side IC state must
+  stay compact and metadata-shaped. We do not add handler chains, repatch
+  trampolines, or other JIT-prep machinery on the interpreter path —
+  there is no JIT to amortize that cost.
 - **Shape transition tree with inline + out-of-object slots**
   ([crates/lyng-js/objects/src/object_metadata.rs:333-397](../../../crates/lyng-js/objects/src/object_metadata.rs)).
   Matches `Structure.h`.
@@ -115,14 +135,24 @@ handler body.
 
 - Nightly Rust is too operationally risky to depend on for the
   production dispatch loop. The user explicitly rejected nightly.
-- α delivers ~85–90% of β's interpreter ceiling. The remaining 5–10%
-  is recoverable via the macro swap if profiles justify it later.
+- α is **projected** to deliver 85–90% of β's interpreter ceiling.
+  This is the working target, not a measured result — the remaining
+  5–10% is a hypothesis pending γ-swap measurement (Phase 3g /
+  lyng-28t2). The macro swap is recoverable later if measurement
+  justifies it.
 - The major perf wins in this roadmap — **inline IC fast path
   (Phase 3) and Baseline JIT (Phase 6) — are orthogonal to the
   dispatch mechanism.** They land equally on α. The α-vs-β gap is
   bounded to the per-dispatch overhead (3–4 instructions) and the
   per-handler-BTB-prediction quality (a few percent on
   dispatch-bound workloads).
+- **Verification gate for any future dispatch substrate change**
+  (α → γ or α → β): freeze `cargo asm` snapshots of `run_trampoline`,
+  `op_move`, `op_add`, and `op_get_named_property` before the swap;
+  re-snapshot after; require the diff to show the expected fewer
+  instructions per dispatch and no regression in the IC hit path.
+  Substrate changes that cannot be defended at the asm level do not
+  ship.
 
 ### Why this abstraction matters
 
@@ -538,6 +568,13 @@ Matches JSC's `performGetByIDHelper`.
    entries). Move that check to the slow path or to a watchpoint /
    invalidation event.
 
+   The PrototypeData inline fast path — JSC's `GetByIdMode::ProtoLoad`
+   variant ([`GetByIdMetadata.h`](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/bytecode/GetByIdMetadata.h))
+   — is tracked separately as **lyng-22al (Phase 3e)**: prototype-chain
+   loads need their own packed entry shape (`(structureID, cachedOffset,
+   cachedSlot)`) so they can hit inline without falling back to the slow
+   chain.
+
 4. **Apply to all 10 IC-shaped property/global opcodes**, plus the
    inverse path for stores (`SetNamedProperty` / `StoreGlobal` /
    `AssignNamedProperty` / strict variants).
@@ -588,7 +625,8 @@ QuickJS — near-JSC-LLInt territory. β/γ would add another ~10% on top.
 - Geomean gain over Phase 0 is ≥ 35%.
 - Test262 baseline preserved.
 
-**γ-swap evaluation** (gated, after Phase 3 lands):
+**γ-swap evaluation** (gated, after Phase 3 lands) — tracked as
+**lyng-28t2 (Phase 3g)**:
 
 After Phase 3, the IC-shaped handlers are much leaner — the inline IC
 collapses to a few inline loads + one branch + dispatch. At that
@@ -616,7 +654,9 @@ move to Phase 4.
   polymorphic falls to the slow path. JSC's `PolymorphicAccess`
   handler is more complex than the monomorphic case; we may need a
   layered structure where monomorphic is bit-packed inline and
-  polymorphic is a pointer to a sibling array.
+  polymorphic is a pointer to a sibling array. Landed in
+  **lyng-5nju (Phase 3f)**: the monomorphic-inline +
+  polymorphic-sibling layered design described here is what shipped.
 - **Watchpoint integration** — currently `named_property_cache_entry_valid`
   re-checks dependencies inline. Moving the dependency check to a
   watchpoint event requires a watchpoint system; if absent, the
@@ -624,6 +664,26 @@ move to Phase 4.
   free).
 
 **Estimated effort:** 3–4 weeks.
+
+### Phase 3h — ArrayLength named-property mode (stub)
+
+Forward-looking stub for the LLInt `ArrayLength` mode. JSC specializes
+`array.length` as its own `GetByIdMode` variant
+(`GetByIdModeMetadataArrayLength`,
+[`GetByIdMetadata.h:55-60`](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/bytecode/GetByIdMetadata.h#L55-L60))
+that reads the length word directly off the array cell and skips the
+property cache entirely — no shape compare, no slot decode.
+
+Not covered by lyng-22al (PrototypeData) or lyng-5nju (polymorphic
+compaction). Distinct from `Default` (own data slot) and `ProtoLoad`
+(prototype slot): there is no slot at all, just a fixed offset into
+the array header.
+
+Action: open a child ticket under lyng-49qk before any further
+interpreter-side IC mode rework lands. Implementation detail and
+estimated gain are deferred to that ticket — this stub exists only to
+prevent the mode from being rediscovered late or rolled into the
+generic named-property path.
 
 ---
 
@@ -635,6 +695,9 @@ that pair well with the new dispatch shape.
 
 ### 4a — Direct argument lowering (real Track C)
 
+**Status: landed** — commit `835c19f6`. See
+[`reports/js/lyng-js/phase-4a-status.md`](phase-4a-status.md).
+
 `crates/lyng-js/compiler/src/script/calls.rs` `materialize_argument_block` +
 `crates/lyng-js/compiler/src/script/expr.rs` `lower_call_target`.
 
@@ -645,8 +708,14 @@ register block first, then `lower_expr_into(arg, target_slot)` directly
 into final slots.
 
 Estimated gain: **+8–12%** by reducing Move dispatches by ~half.
+Realized: bytecode density −1.27% (4553 → 4495 unit bytes); runtime
+bench improved on 10/12 workloads (strongest: array-indexed −20%,
+string-heavy.concat −16%, typed-array −15%, class-heavy −10%).
 
 ### 4b — Star fusion lookahead
+
+**Status: landed** — commit `631ec709`. See
+[`reports/js/lyng-js/phase-4b-status.md`](phase-4b-status.md).
 
 V8 Ignition pattern (`src/interpreter/interpreter-assembler.cc:1324-1380`):
 when a handler that produces a value is followed by `StarN` in the
@@ -659,9 +728,20 @@ of each value-producing handler, check if the next opcode byte is
 advance the PC past the Star before dispatching.
 
 Estimated gain: **+3–5%** on benchmark code with many expression
-statements.
+statements. Realized: 10/12 workloads improved on top of 4a
+(string-heavy.concat −10.1%, array-indexed −9.7%, typed-array −5.2%,
+class-heavy −3.9%). Bytecode density unchanged — fusion is
+runtime-only.
+
+Shipped scope: fusion applies to the nine `Lda*` opcodes (the only
+producers that always write to register 0). Extension to other
+value-producing handlers (`Add`, `GetNamedProperty`, etc.) is gated on
+Phase 4c producing enough accumulator-routed bytecode to justify the
+per-dispatch `a == 0` runtime branch.
 
 ### 4c — Compact accumulator-based bytecode
+
+**Status: deferred** — commit `d9243123` records the rationale.
 
 Audit which opcodes have an obvious accumulator-based variant. Today
 we have `Ldar` / `Star0..7` / `LdaSmi8` etc. but the compiler uses
@@ -669,6 +749,20 @@ them inconsistently. Audit + bias compiler emission toward accumulator
 forms where lifetime analysis allows.
 
 Estimated gain: **+2–3%** on bytecode size / icache footprint.
+
+**Deferral rationale.** Post-Phase-4b dispatch counts show Move still
+dominates 25–40% of dispatches, but `Star*` opcodes appear only in
+class-heavy.runtime (~258k/run) and `Lda*` are similarly rare in
+compiler-emitted bytecode. The compiler treats r0 as a regular
+register, so the natural peephole conversion of `LoadX+Move` →
+`LdaX+StarN` almost never fires. The two paths that would make 4c
+productive are both significant: (1) reserve r0 as a scratch slot in
+the register allocator (invasive — parameters/locals shift), or
+(2) add a multi-instruction post-emission peephole that elides
+single-use temp+Move chains with jump-target updates. Phase 4a (~10/12
+workloads, −5 to −20%) and Phase 4b (~10/12 on top, −3 to −10%) already
+exceed the roadmap's per-phase target; the roadmap explicitly permits
+deferring 4c when measurement does not justify the cost.
 
 **Files:**
 - `crates/lyng-js/compiler/src/script/calls.rs`
