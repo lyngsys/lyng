@@ -13,9 +13,11 @@
       ]
     },
     {
-      "executable": "/opt/homebrew/bin/boa",
-      "name": "boa",
-      "pre_args": []
+      "executable": "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+      "name": "jsc-llint",
+      "pre_args": [
+        "--useJIT=false"
+      ]
     }
   ],
   "results": [
@@ -28,17 +30,21 @@
       ],
       "engine": "lyng-js",
       "error": null,
-      "max_ms": 2360.4192089999997,
-      "median_ms": 2360.4192089999997,
-      "median_score": 237.0,
+      "max_ms": 2026.593208,
+      "median_ms": 2023.50225,
+      "median_score": 318.0,
       "metric_kind": "score",
-      "min_ms": 2360.4192089999997,
-      "quickjs_ratio": 4.067510548523207,
+      "min_ms": 2019.3084579999997,
+      "quickjs_ratio": 2.8836477987421385,
       "samples_ms": [
-        2360.4192089999997
+        2019.3084579999997,
+        2023.50225,
+        2026.593208
       ],
       "score_samples": [
-        237.0
+        314.0,
+        318.0,
+        319.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -53,17 +59,21 @@
       ],
       "engine": "quickjs",
       "error": null,
-      "max_ms": 2018.9467909999998,
-      "median_ms": 2018.9467909999998,
-      "median_score": 964.0,
+      "max_ms": 2010.3551670000002,
+      "median_ms": 2009.7188749999998,
+      "median_score": 917.0,
       "metric_kind": "score",
-      "min_ms": 2018.9467909999998,
+      "min_ms": 2008.686542,
       "quickjs_ratio": 1.0,
       "samples_ms": [
-        2018.9467909999998
+        2008.686542,
+        2009.7188749999998,
+        2010.3551670000002
       ],
       "score_samples": [
-        964.0
+        917.0,
+        911.0,
+        949.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
@@ -72,45 +82,659 @@
     {
       "category": "v8-v7",
       "command": [
-        "/opt/homebrew/bin/boa",
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
         "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
       ],
-      "engine": "boa",
+      "engine": "jsc-llint",
       "error": null,
-      "max_ms": 2077.518333,
-      "median_ms": 2077.518333,
-      "median_score": 178.0,
+      "max_ms": 2015.0005840000001,
+      "median_ms": 2012.8100830000003,
+      "median_score": 1871.0,
       "metric_kind": "score",
-      "min_ms": 2077.518333,
-      "quickjs_ratio": 5.415730337078652,
+      "min_ms": 2010.6521659999999,
+      "quickjs_ratio": 0.4901122394441475,
       "samples_ms": [
-        2077.518333
+        2015.0005840000001,
+        2012.8100830000003,
+        2010.6521659999999
       ],
       "score_samples": [
-        178.0
+        1855.0,
+        1871.0,
+        1883.0
       ],
       "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
       "workload": "Richards"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 2048.702417,
+      "median_ms": 2045.3583750000003,
+      "median_score": 360.0,
+      "metric_kind": "score",
+      "min_ms": 2041.606458,
+      "quickjs_ratio": 2.838888888888889,
+      "samples_ms": [
+        2048.702417,
+        2041.606458,
+        2045.3583750000003
+      ],
+      "score_samples": [
+        360.0,
+        361.0,
+        345.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "status": "completed",
+      "workload": "DeltaBlue"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 2018.106042,
+      "median_ms": 2013.618417,
+      "median_score": 1022.0,
+      "metric_kind": "score",
+      "min_ms": 2009.3375,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        2018.106042,
+        2013.618417,
+        2009.3375
+      ],
+      "score_samples": [
+        1022.0,
+        1022.0,
+        983.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "status": "completed",
+      "workload": "DeltaBlue"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 2016.28675,
+      "median_ms": 2013.349833,
+      "median_score": 1684.0,
+      "metric_kind": "score",
+      "min_ms": 2013.074167,
+      "quickjs_ratio": 0.6068883610451307,
+      "samples_ms": [
+        2013.074167,
+        2013.349833,
+        2016.28675
+      ],
+      "score_samples": [
+        1684.0,
+        1712.0,
+        1633.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "status": "completed",
+      "workload": "DeltaBlue"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 17532.699875,
+      "median_ms": 17396.332625,
+      "median_score": 269.0,
+      "metric_kind": "score",
+      "min_ms": 17114.127291999997,
+      "quickjs_ratio": 2.9814126394052045,
+      "samples_ms": [
+        17396.332625,
+        17532.699875,
+        17114.127291999997
+      ],
+      "score_samples": [
+        269.0,
+        267.0,
+        270.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "completed",
+      "workload": "Crypto"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 8560.11325,
+      "median_ms": 8349.039665999999,
+      "median_score": 802.0,
+      "metric_kind": "score",
+      "min_ms": 7557.580083999999,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        8349.039665999999,
+        8560.11325,
+        7557.580083999999
+      ],
+      "score_samples": [
+        800.0,
+        802.0,
+        804.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "completed",
+      "workload": "Crypto"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 5102.453791,
+      "median_ms": 5080.513167,
+      "median_score": 2119.0,
+      "metric_kind": "score",
+      "min_ms": 5074.988834,
+      "quickjs_ratio": 0.37848041529023124,
+      "samples_ms": [
+        5102.453791,
+        5080.513167,
+        5074.988834
+      ],
+      "score_samples": [
+        2113.0,
+        2119.0,
+        2124.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "status": "completed",
+      "workload": "Crypto"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 7608.57475,
+      "median_ms": 7575.0845,
+      "median_score": 427.0,
+      "metric_kind": "score",
+      "min_ms": 7480.3724999999995,
+      "quickjs_ratio": 2.3536299765807964,
+      "samples_ms": [
+        7575.0845,
+        7608.57475,
+        7480.3724999999995
+      ],
+      "score_samples": [
+        427.0,
+        424.0,
+        433.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "status": "completed",
+      "workload": "RayTrace"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 4150.589542,
+      "median_ms": 4127.588292,
+      "median_score": 1005.0,
+      "metric_kind": "score",
+      "min_ms": 4122.699375,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        4127.588292,
+        4122.699375,
+        4150.589542
+      ],
+      "score_samples": [
+        1005.0,
+        1009.0,
+        1000.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "status": "completed",
+      "workload": "RayTrace"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 2034.307708,
+      "median_ms": 2032.73925,
+      "median_score": 4547.0,
+      "metric_kind": "score",
+      "min_ms": 2015.282,
+      "quickjs_ratio": 0.22102485155047283,
+      "samples_ms": [
+        2032.73925,
+        2034.307708,
+        2015.282
+      ],
+      "score_samples": [
+        4525.0,
+        4547.0,
+        4574.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "status": "completed",
+      "workload": "RayTrace"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 22062.889417000002,
+      "median_ms": 21860.17725,
+      "median_score": 519.0,
+      "metric_kind": "score",
+      "min_ms": 21614.350375,
+      "quickjs_ratio": 3.69364161849711,
+      "samples_ms": [
+        22062.889417000002,
+        21860.17725,
+        21614.350375
+      ],
+      "score_samples": [
+        519.0,
+        518.0,
+        523.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "status": "completed",
+      "workload": "EarleyBoyer"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 7169.907375,
+      "median_ms": 7147.024667000001,
+      "median_score": 1917.0,
+      "metric_kind": "score",
+      "min_ms": 7135.864417,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        7147.024667000001,
+        7135.864417,
+        7169.907375
+      ],
+      "score_samples": [
+        1917.0,
+        1927.0,
+        1903.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "status": "completed",
+      "workload": "EarleyBoyer"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 5123.791708,
+      "median_ms": 5064.745542,
+      "median_score": 6084.0,
+      "metric_kind": "score",
+      "min_ms": 5043.541458,
+      "quickjs_ratio": 0.3150887573964497,
+      "samples_ms": [
+        5043.541458,
+        5064.745542,
+        5123.791708
+      ],
+      "score_samples": [
+        6090.0,
+        6084.0,
+        5853.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "status": "completed",
+      "workload": "EarleyBoyer"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 32083.1005,
+      "median_ms": 32063.137417,
+      "median_score": 101.0,
+      "metric_kind": "score",
+      "min_ms": 32039.7405,
+      "quickjs_ratio": 2.603960396039604,
+      "samples_ms": [
+        32063.137417,
+        32083.1005,
+        32039.7405
+      ],
+      "score_samples": [
+        101.0,
+        101.0,
+        101.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "status": "completed",
+      "workload": "RegExp"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 12943.497792,
+      "median_ms": 12818.774208,
+      "median_score": 263.0,
+      "metric_kind": "score",
+      "min_ms": 12790.489459,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        12818.774208,
+        12943.497792,
+        12790.489459
+      ],
+      "score_samples": [
+        263.0,
+        261.0,
+        264.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "status": "completed",
+      "workload": "RegExp"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 4257.577249999999,
+      "median_ms": 4203.551708,
+      "median_score": 1071.0,
+      "metric_kind": "score",
+      "min_ms": 4197.034624999999,
+      "quickjs_ratio": 0.24556489262371614,
+      "samples_ms": [
+        4203.551708,
+        4197.034624999999,
+        4257.577249999999
+      ],
+      "score_samples": [
+        1071.0,
+        1071.0,
+        1047.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "status": "completed",
+      "workload": "RegExp"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 2647.921833,
+      "median_ms": 2646.73475,
+      "median_score": 1372.0,
+      "metric_kind": "score",
+      "min_ms": 2616.9289999999996,
+      "quickjs_ratio": 1.6034985422740524,
+      "samples_ms": [
+        2647.921833,
+        2616.9289999999996,
+        2646.73475
+      ],
+      "score_samples": [
+        1378.0,
+        1361.0,
+        1372.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "status": "completed",
+      "workload": "Splay"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 2474.1793749999997,
+      "median_ms": 2459.814375,
+      "median_score": 2200.0,
+      "metric_kind": "score",
+      "min_ms": 2450.012084,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        2450.012084,
+        2474.1793749999997,
+        2459.814375
+      ],
+      "score_samples": [
+        2192.0,
+        2263.0,
+        2200.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "status": "completed",
+      "workload": "Splay"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 2077.703583,
+      "median_ms": 2077.654625,
+      "median_score": 9893.0,
+      "metric_kind": "score",
+      "min_ms": 2075.3135,
+      "quickjs_ratio": 0.22237946022440108,
+      "samples_ms": [
+        2077.703583,
+        2077.654625,
+        2075.3135
+      ],
+      "score_samples": [
+        9893.0,
+        9869.0,
+        10300.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "status": "completed",
+      "workload": "Splay"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "target/release/lyng-js",
+        "--shell",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+      ],
+      "engine": "lyng-js",
+      "error": null,
+      "max_ms": 13010.566334,
+      "median_ms": 12350.631083,
+      "median_score": 448.0,
+      "metric_kind": "score",
+      "min_ms": 11775.556292,
+      "quickjs_ratio": 2.9575892857142856,
+      "samples_ms": [
+        11775.556292,
+        12350.631083,
+        13010.566334
+      ],
+      "score_samples": [
+        445.0,
+        449.0,
+        448.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "status": "completed",
+      "workload": "NavierStokes"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/opt/homebrew/bin/qjs",
+        "--script",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+      ],
+      "engine": "quickjs",
+      "error": null,
+      "max_ms": 5295.269458,
+      "median_ms": 5168.7766249999995,
+      "median_score": 1325.0,
+      "metric_kind": "score",
+      "min_ms": 5049.3135,
+      "quickjs_ratio": 1.0,
+      "samples_ms": [
+        5168.7766249999995,
+        5049.3135,
+        5295.269458
+      ],
+      "score_samples": [
+        1325.0,
+        1325.0,
+        1325.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "status": "completed",
+      "workload": "NavierStokes"
+    },
+    {
+      "category": "v8-v7",
+      "command": [
+        "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
+        "--useJIT=false",
+        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+      ],
+      "engine": "jsc-llint",
+      "error": null,
+      "max_ms": 3053.55225,
+      "median_ms": 3047.213041,
+      "median_score": 2931.0,
+      "metric_kind": "score",
+      "min_ms": 3039.0609170000002,
+      "quickjs_ratio": 0.4520641419310815,
+      "samples_ms": [
+        3053.55225,
+        3047.213041,
+        3039.0609170000002
+      ],
+      "score_samples": [
+        2924.0,
+        2943.0,
+        2931.0
+      ],
+      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "status": "completed",
+      "workload": "NavierStokes"
     }
   ],
   "schema_version": 1,
   "settings": {
     "corpus": "v8-v7",
-    "filter": "richards",
+    "filter": null,
     "full_suite": false,
     "json_path": "reports/js/lyng-js/external-engine-compare.json",
-    "loop_trips": 1024,
+    "loop_trips": 2048,
     "policy": {
       "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere.",
       "primary_baseline": "quickjs",
-      "secondary_reference": "boa"
+      "secondary_reference": "jsc-llint"
     },
     "report_path": "reports/js/lyng-js/external-engine-compare.md",
-    "samples": 1,
+    "samples": 3,
     "scripts_dir": "/tmp/lyng-js-bench-compare-scripts",
-    "timeout_ms": 5000,
-    "warmup_samples": 0
+    "timeout_ms": 60000,
+    "warmup_samples": 1
   },
   "suite": "external-engine-compare"
 }

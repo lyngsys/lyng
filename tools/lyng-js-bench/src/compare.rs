@@ -248,8 +248,12 @@ fn parse_options(args: &[String]) -> CompareResult<Options> {
             "--qjs" => {
                 set_engine_executable(&mut options, "quickjs", next_string("--qjs", args.next())?);
             }
-            "--boa" => {
-                set_engine_executable(&mut options, "boa", next_string("--boa", args.next())?);
+            "--jsc" => {
+                set_engine_executable(
+                    &mut options,
+                    "jsc-llint",
+                    next_string("--jsc", args.next())?,
+                );
             }
             "--help" | "-h" => return Err(usage()),
             unknown => return Err(format!("Unknown argument: {unknown}")),
@@ -332,7 +336,7 @@ fn apply_preset(options: &mut Options, preset: &str) -> CompareResult<()> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench compare [--corpus <synthetic|v8-v7>] [--filter <name>] [--full-suite] [--preset <smoke|baseline|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--warmup-samples <n>] [--loop-trips <n>] [--timeout-ms <n>] [--scripts-dir <path>] [--lyng-js <path>] [--qjs <path>] [--boa <path>]"
+    "Usage: lyng-js-bench compare [--corpus <synthetic|v8-v7>] [--filter <name>] [--full-suite] [--preset <smoke|baseline|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--warmup-samples <n>] [--loop-trips <n>] [--timeout-ms <n>] [--scripts-dir <path>] [--lyng-js <path>] [--qjs <path>] [--jsc <path>]"
         .to_string()
 }
 
@@ -350,7 +354,7 @@ fn default_engines() -> Vec<EngineConfig> {
     vec![
         EngineConfig::new("lyng-js", "target/release/lyng-js", []),
         EngineConfig::new("quickjs", default_homebrew_or_path("qjs"), ["--script"]),
-        EngineConfig::new("boa", default_homebrew_or_path("boa"), []),
+        EngineConfig::new("jsc-llint", default_jsc_path(), ["--useJIT=false"]),
     ]
 }
 
@@ -360,6 +364,17 @@ fn default_homebrew_or_path(binary: &str) -> String {
         homebrew_path.display().to_string()
     } else {
         binary.to_string()
+    }
+}
+
+const SYSTEM_JSC_PATH: &str =
+    "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc";
+
+fn default_jsc_path() -> String {
+    if Path::new(SYSTEM_JSC_PATH).exists() {
+        SYSTEM_JSC_PATH.to_string()
+    } else {
+        "jsc".to_string()
     }
 }
 
@@ -935,7 +950,7 @@ fn render_report(options: &Options, reports: &[EngineWorkloadReport]) -> String 
     );
     let _ = writeln!(
         out,
-        "It runs the same standalone JavaScript workload files through Lyng JS, QuickJS, and Boa."
+        "It runs the same standalone JavaScript workload files through Lyng JS, QuickJS, and JSC (LLInt-only, `--useJIT=false`)."
     );
     let _ = writeln!(out);
     let _ = writeln!(out, "## Settings");
@@ -960,7 +975,10 @@ fn render_report(options: &Options, reports: &[EngineWorkloadReport]) -> String 
     let _ = writeln!(out, "## Comparison Policy");
     let _ = writeln!(out);
     let _ = writeln!(out, "- QuickJS is the primary interpreter baseline.");
-    let _ = writeln!(out, "- Boa is a Rust-engine reference point.");
+    let _ = writeln!(
+        out,
+        "- JSC LLInt (`--useJIT=false`) is the WebKit interpreter reference \u{2014} no Baseline/DFG/FTL tiers, comparable shape to a polymorphic-IC-driven interpreter."
+    );
     let _ = writeln!(
         out,
         "- Treat parity as a workload-family measurement, not exact equality across every script."
@@ -1113,7 +1131,7 @@ fn render_json_report(options: &Options, reports: &[EngineWorkloadReport]) -> Va
             "scripts_dir": options.scripts_dir.display().to_string(),
             "policy": {
                 "primary_baseline": "quickjs",
-                "secondary_reference": "boa",
+                "secondary_reference": "jsc-llint",
                 "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere."
             }
         },
@@ -1286,8 +1304,8 @@ mod tests {
             "/tmp/lyng-js".to_string(),
             "--qjs".to_string(),
             "/tmp/qjs".to_string(),
-            "--boa".to_string(),
-            "/tmp/boa".to_string(),
+            "--jsc".to_string(),
+            "/tmp/jsc".to_string(),
             "--scripts-dir".to_string(),
             "/tmp/compare-scripts".to_string(),
         ])
@@ -1305,8 +1323,9 @@ mod tests {
         assert_eq!(options.engines[1].name, "quickjs");
         assert_eq!(options.engines[1].executable, "/tmp/qjs");
         assert_eq!(options.engines[1].pre_args, ["--script"]);
-        assert_eq!(options.engines[2].name, "boa");
-        assert_eq!(options.engines[2].executable, "/tmp/boa");
+        assert_eq!(options.engines[2].name, "jsc-llint");
+        assert_eq!(options.engines[2].executable, "/tmp/jsc");
+        assert_eq!(options.engines[2].pre_args, ["--useJIT=false"]);
     }
 
     #[test]
@@ -1428,7 +1447,7 @@ mod tests {
             scripts_dir: PathBuf::from("/tmp/compare-scripts"),
             engines: vec![
                 EngineConfig::new("quickjs", "qjs", ["--script"]),
-                EngineConfig::new("boa", "boa", []),
+                EngineConfig::new("jsc-llint", "jsc", ["--useJIT=false"]),
             ],
             corpus: Corpus::Synthetic,
             filter: None,
@@ -1461,9 +1480,10 @@ mod tests {
                 workload_name: "arithmetic-loop".to_string(),
                 workload_category: "arithmetic-control-flow".to_string(),
                 script_path: PathBuf::from("/tmp/compare-scripts/arithmetic-loop.js"),
-                engine_name: "boa".to_string(),
+                engine_name: "jsc-llint".to_string(),
                 command: vec![
-                    "boa".to_string(),
+                    "jsc".to_string(),
+                    "--useJIT=false".to_string(),
                     "/tmp/compare-scripts/arithmetic-loop.js".to_string(),
                 ],
                 samples: Vec::new(),
@@ -1484,8 +1504,9 @@ mod tests {
         assert!(markdown.contains(
             "| `arithmetic-loop` | `arithmetic-control-flow` | `quickjs` | `completed` |"
         ));
-        assert!(markdown
-            .contains("| `arithmetic-loop` | `arithmetic-control-flow` | `boa` | `timed_out` |"));
+        assert!(markdown.contains(
+            "| `arithmetic-loop` | `arithmetic-control-flow` | `jsc-llint` | `timed_out` |"
+        ));
         assert!(markdown.contains("timed out after 10ms"));
 
         let json = render_json_report(&options, &reports);
@@ -1672,7 +1693,7 @@ mod tests {
             engines: vec![
                 EngineConfig::new("lyng-js", "target/release/lyng-js", []),
                 EngineConfig::new("quickjs", "qjs", ["--script"]),
-                EngineConfig::new("boa", "boa", []),
+                EngineConfig::new("jsc-llint", "jsc", ["--useJIT=false"]),
             ],
             corpus: Corpus::Synthetic,
             filter: None,
@@ -1684,12 +1705,12 @@ mod tests {
         let markdown = render_report(&options, &reports);
 
         assert!(markdown.contains("QuickJS is the primary interpreter baseline."));
-        assert!(markdown.contains("Boa is a Rust-engine reference point."));
+        assert!(markdown.contains("JSC LLInt"));
         assert!(markdown.contains("| `arithmetic-loop` | `arithmetic-control-flow` | `lyng-js` |"));
         assert!(markdown.contains("2.00x"));
         assert!(markdown.contains("target/release/lyng-js /tmp/compare-scripts/arithmetic-loop.js"));
         assert!(markdown.contains("qjs --script /tmp/compare-scripts/arithmetic-loop.js"));
-        assert!(markdown.contains("boa /tmp/compare-scripts/arithmetic-loop.js"));
+        assert!(markdown.contains("jsc --useJIT=false /tmp/compare-scripts/arithmetic-loop.js"));
         assert!(markdown.contains(
             "sample \"$pid\" 10 -file /tmp/lyng-js-compare-lyng-js-arithmetic-loop.sample.txt"
         ));
@@ -1716,7 +1737,7 @@ mod tests {
         };
         let reports = synthetic_reports()
             .into_iter()
-            .filter(|report| report.engine_name != "boa")
+            .filter(|report| report.engine_name != "jsc-llint")
             .collect::<Vec<_>>();
 
         let json = render_json_report(&options, &reports);
@@ -1780,9 +1801,10 @@ mod tests {
                 workload_name: "arithmetic-loop".to_string(),
                 workload_category: "arithmetic-control-flow".to_string(),
                 script_path: PathBuf::from("/tmp/compare-scripts/arithmetic-loop.js"),
-                engine_name: "boa".to_string(),
+                engine_name: "jsc-llint".to_string(),
                 command: vec![
-                    "boa".to_string(),
+                    "jsc".to_string(),
+                    "--useJIT=false".to_string(),
                     "/tmp/compare-scripts/arithmetic-loop.js".to_string(),
                 ],
                 samples: vec![Duration::from_millis(30)],
