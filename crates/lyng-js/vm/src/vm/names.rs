@@ -566,6 +566,14 @@ impl Vm {
                 }
             }
         }
+        // Phase 3f polymorphic OwnData fast path on the global object.
+        // Same packed-handler walk as the named-property load above, just
+        // applied to the global object's IC site.
+        if let Some(value) =
+            self.try_named_property_polymorphic_fast_load(agent, code, feedback_slot, global_object)
+        {
+            return Ok(value);
+        }
         // Phase 3e one-hop PrototypeData inline fast path. Globals frequently
         // resolve through the global object's prototype chain (e.g.
         // `Math` accessed via the window proto), so this is the second
@@ -575,7 +583,8 @@ impl Vm {
         {
             return Ok(value);
         }
-        // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / miss.
+        // Slow path: entries[POLY_LIMIT..] / multi-hop PrototypeData /
+        // megamorphic / miss.
         if let Some(value) =
             self.try_named_property_load_inline_cache_hit(agent, code, feedback_slot, global_object)
         {
@@ -662,7 +671,23 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
+        // Phase 3f polymorphic OwnData store fast path on the global object.
+        // The inner `Option<bool>` matches the slow-chain semantics —
+        // `Some(true|false)` is a writable hit; `None` is non-writable.
+        // For SetGlobal the result is discarded (silent no-op on miss),
+        // matching the Phase 3c monomorphic branch above.
+        if let Some(target_opt) = self.try_named_property_polymorphic_fast_store(
+            agent,
+            code,
+            feedback_slot,
+            global_object,
+            value,
+        ) {
+            let _ = target_opt;
+            self.record_feedback_slot(code, feedback_slot);
+            return Ok(());
+        }
+        // Slow path: entries[POLY_LIMIT..] / PrototypeData / megamorphic / miss.
         if self
             .try_named_property_store_inline_cache(agent, code, feedback_slot, global_object, value)
             .is_some()
@@ -762,7 +787,26 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
+        // Phase 3f polymorphic OwnData assign fast path on the global object.
+        // Same Option<Option<bool>> encoding as the monomorphic branch
+        // above: outer Some = take fast path; inner Some(true|false) = stored
+        // bool from the writable hit; inner None = non-writable hit. Strict
+        // mode throws TypeError when stored=false.
+        if let Some(target_opt) = self.try_named_property_polymorphic_fast_store(
+            agent,
+            code,
+            feedback_slot,
+            global_object,
+            value,
+        ) {
+            let stored = target_opt.unwrap_or(false);
+            if !stored && self.frame_is_strict(frame) {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            self.record_feedback_slot(code, feedback_slot);
+            return Ok(());
+        }
+        // Slow path: entries[POLY_LIMIT..] / PrototypeData / megamorphic / miss.
         if let Some(stored) = self.try_named_property_store_inline_cache(
             agent,
             code,

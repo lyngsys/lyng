@@ -131,6 +131,22 @@ impl Vm {
                     }
                 }
             }
+            // Phase 3f polymorphic OwnData fast path. Walks the inline
+            // [NamedPropertyHandler; POLY_LIMIT] sidecar for a shape match
+            // before falling to the proto-fast / slow chain below. This is
+            // the 2..POLY_LIMIT cached-shape equivalent of the Phase 3a
+            // monomorphic check above — same packed-handler decode, but
+            // chosen from a small fixed-size lookup rather than a single word.
+            if let Some(value) = self.try_named_property_polymorphic_fast_load(
+                agent,
+                frame.code(),
+                feedback_slot,
+                object,
+            ) {
+                self.register_stack[target_index] = value;
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
             // Phase 3e one-hop PrototypeData inline fast path. Class method
             // dispatch and Object.prototype lookups are PrototypeData with
             // dependency_count==2 — the OwnData handler above rejected them,
@@ -145,7 +161,8 @@ impl Vm {
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / miss.
+            // Slow path: entries[POLY_LIMIT..entry_count] / multi-hop
+            // PrototypeData / megamorphic / miss.
             if let Some(value) = self.try_named_property_load_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -281,7 +298,41 @@ impl Vm {
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Slow path: polymorphic / PrototypeData / megamorphic / miss.
+            // Phase 3f polymorphic OwnData store fast path. Walks the inline
+            // sidecar for a shape match across the same Option<Option<bool>>
+            // encoding as the monomorphic branch above:
+            //   Some(Some(true|false)) -> writable hit, store completed; the
+            //     inner bool is the stored-ness reported back to the
+            //     assignment-result check.
+            //   Some(None)             -> non-writable hit, stored=false.
+            //   None                   -> fall through to slow chain.
+            if let Some(target_opt) = self.try_named_property_polymorphic_fast_store(
+                agent,
+                frame.code(),
+                feedback_slot,
+                object,
+                value,
+            ) {
+                let stored = target_opt.unwrap_or(false);
+                if assignment {
+                    let assignment_result = self.check_property_assignment_result(
+                        agent,
+                        frame,
+                        stored,
+                        strict_assignment,
+                    );
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
+                        return Ok(());
+                    };
+                }
+                self.record_feedback_slot(frame.code(), feedback_slot);
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: entries[POLY_LIMIT..entry_count] / PrototypeData /
+            // megamorphic / miss.
             if let Some(stored) = self.try_named_property_store_inline_cache(
                 agent,
                 frame.code(),
@@ -436,7 +487,19 @@ impl Vm {
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Slow path: polymorphic / Generic / megamorphic / miss.
+            // Phase 3f polymorphic dense-index OwnData fast path.
+            if let Some(value) = self.try_keyed_dense_polymorphic_fast_load(
+                agent,
+                frame.code(),
+                feedback_slot,
+                object,
+                index,
+            ) {
+                self.write_register(frame.registers(), target, value);
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
             if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -485,7 +548,19 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Slow path: polymorphic / Generic / megamorphic / miss.
+                // Phase 3f polymorphic dense-index OwnData fast path.
+                if let Some(value) = self.try_keyed_dense_polymorphic_fast_load(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    index,
+                ) {
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
                 if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                     agent,
                     frame.code(),
@@ -531,6 +606,20 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
+                // Phase 3f polymorphic named-keyed (atom) OwnData fast path.
+                // Same inline-sidecar walk as the non-keyed variant, but with
+                // an extra atom-equality check inside the lookup.
+                if let Some(value) = self.try_keyed_named_polymorphic_fast_load(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    atom,
+                ) {
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
                 // Phase 3e named-keyed (atom) one-hop PrototypeData fast path.
                 if let Some(value) = self.try_keyed_named_proto_fast_load(
                     agent,
@@ -543,7 +632,8 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / Generic / miss.
+                // Slow path: named_entries[POLY_LIMIT..] / multi-hop
+                // PrototypeData / megamorphic / Generic / miss.
                 if let Some(value) = self.try_keyed_property_load_inline_cache(
                     agent,
                     frame.code(),
@@ -660,7 +750,32 @@ impl Vm {
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Slow path: polymorphic / Generic / megamorphic / miss.
+            // Phase 3f polymorphic dense-index OwnData store fast path.
+            if let Some(stored) = self.try_keyed_dense_polymorphic_fast_store(
+                agent,
+                frame.code(),
+                feedback_slot,
+                object,
+                index,
+                value,
+            ) {
+                if assignment {
+                    let assignment_result = self.check_property_assignment_result(
+                        agent,
+                        frame,
+                        stored,
+                        strict_assignment,
+                    );
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
+                        return Ok(());
+                    };
+                }
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
             if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -789,7 +904,36 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Slow path: polymorphic / Generic / megamorphic / miss.
+                // Phase 3f polymorphic dense-index OwnData store fast path.
+                if let Some(stored) = self.try_keyed_dense_polymorphic_fast_store(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    index,
+                    value,
+                ) {
+                    if assignment {
+                        let assignment_result = self.check_property_assignment_result(
+                            agent,
+                            frame,
+                            stored,
+                            strict_assignment,
+                        );
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
+                            return Ok(());
+                        };
+                    }
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
                 if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                     agent,
                     frame.code(),
@@ -932,7 +1076,39 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Slow path: polymorphic / megamorphic / Generic / miss.
+                // Phase 3f polymorphic named-keyed (atom) OwnData store fast
+                // path. Walks the inline sidecar for a shape+atom match
+                // before falling to the slow chain.
+                if let Some(stored) = self.try_keyed_named_polymorphic_fast_store(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    atom,
+                    value,
+                ) {
+                    if assignment {
+                        let assignment_result = self.check_property_assignment_result(
+                            agent,
+                            frame,
+                            stored,
+                            strict_assignment,
+                        );
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
+                            return Ok(());
+                        };
+                    }
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: named_entries[POLY_LIMIT..] / megamorphic /
+                // Generic / miss.
                 if let Some(stored) = self.try_keyed_property_store_inline_cache(
                     agent,
                     frame.code(),
@@ -1599,6 +1775,260 @@ impl Vm {
         if !shape_match {
             return None;
         }
+        let stored = if handler.writable() {
+            let target = match handler.slot_location() {
+                SlotLocation::Inline(i) => ValueStoreTarget::InlineNamedSlot(receiver, i),
+                SlotLocation::OutOfLine(off) => ValueStoreTarget::ObjectSlot(named_slots?, off),
+            };
+            agent.with_heap_and_objects(|heap, _objects| {
+                let mut mutator = heap.mutator();
+                mutator.mut_store_value(target, value)
+            })
+        } else {
+            false
+        };
+        self.record_feedback_slot(code, feedback_slot);
+        Some(stored)
+    }
+
+    /// Phase 3f named-property (non-keyed) polymorphic OwnData fast path.
+    /// Walks the receiver shape through the inline polymorphic sidecar
+    /// (up to `POLY_LIMIT` cached shapes), returning the slot value on
+    /// hit. Returns `None` on any miss — shape not in the sidecar,
+    /// epoch mismatch, or unloadable slot — so the caller can fall
+    /// through to the proto-fast path or the slow chain. The receiver
+    /// shape is loaded once and reused for the inline walk + slot read.
+    #[inline(always)]
+    pub(in crate::vm) fn try_named_property_polymorphic_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+    ) -> Option<Value> {
+        let view = agent.heap().view();
+        let record = view.object_ref(receiver)?;
+        let shape = record.shape()?;
+        let (handler, cached_epoch) =
+            self.named_property_polymorphic_fast_handler(code, feedback_slot, shape)?;
+        if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
+            return None;
+        }
+        let value = match handler.slot_location() {
+            SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
+            SlotLocation::OutOfLine(off) => view
+                .object_slots(record.named_slots()?)?
+                .get(off as usize)
+                .copied()?,
+        };
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(value)
+    }
+
+    /// Phase 3f named-property (non-keyed) polymorphic OwnData store fast
+    /// path. Mirrors [`Self::try_named_property_polymorphic_fast_load`]
+    /// for the Set / Assign / StrictAssign / StoreGlobal / AssignGlobal
+    /// opcode family.
+    ///
+    /// Encodes the hit decision into `Option<Option<bool>>` to match the
+    /// Phase 3a–3c store-side pattern:
+    /// - `None` — fall through to the slow chain.
+    /// - `Some(Some(true))` — writable hit, value stored.
+    /// - `Some(Some(false))` — writable hit, but the heap write barrier
+    ///   declined the store (e.g. immutable target).
+    /// - `Some(None)` — non-writable hit; slow-chain analog returns
+    ///   `Ok(Some(false))` and the caller handles the strict-mode error.
+    #[inline(always)]
+    pub(in crate::vm) fn try_named_property_polymorphic_fast_store(
+        &self,
+        agent: &mut Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        value: Value,
+    ) -> Option<Option<bool>> {
+        let (handler, named_slots) = {
+            let view = agent.heap().view();
+            let record = view.object_ref(receiver)?;
+            let shape = record.shape()?;
+            let (handler, cached_epoch) =
+                self.named_property_polymorphic_fast_handler(code, feedback_slot, shape)?;
+            if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
+                return None;
+            }
+            (handler, record.named_slots())
+        };
+        if !handler.writable() {
+            return Some(None);
+        }
+        let target = match handler.slot_location() {
+            SlotLocation::Inline(i) => ValueStoreTarget::InlineNamedSlot(receiver, i),
+            SlotLocation::OutOfLine(off) => ValueStoreTarget::ObjectSlot(named_slots?, off),
+        };
+        let stored = agent.with_heap_and_objects(|heap, _objects| {
+            let mut mutator = heap.mutator();
+            mutator.mut_store_value(target, value)
+        });
+        Some(Some(stored))
+    }
+
+    /// Phase 3f named-keyed (atom) polymorphic OwnData load fast path.
+    /// Walks the keyed-atom polymorphic sidecar matching both the atom
+    /// and the receiver shape. Mirrors
+    /// [`Self::try_named_property_polymorphic_fast_load`] for the keyed
+    /// IC family.
+    #[inline(always)]
+    fn try_keyed_named_polymorphic_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        atom: AtomId,
+    ) -> Option<Value> {
+        let view = agent.heap().view();
+        let record = view.object_ref(receiver)?;
+        let shape = record.shape()?;
+        let (handler, cached_epoch) =
+            self.keyed_property_named_polymorphic_fast_handler(code, feedback_slot, atom, shape)?;
+        if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
+            return None;
+        }
+        let value = match handler.slot_location() {
+            SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
+            SlotLocation::OutOfLine(off) => view
+                .object_slots(record.named_slots()?)?
+                .get(off as usize)
+                .copied()?,
+        };
+        self.record_feedback_slot(code, feedback_slot);
+        Some(value)
+    }
+
+    /// Phase 3f dense-keyed polymorphic fast load. Walks the inline
+    /// `[KeyedDenseIndexHandler; POLY_LIMIT]` sidecar for a shape+flags
+    /// match before falling to the slow chain. Mirrors
+    /// [`Self::try_keyed_dense_fast_load`] for shapes 2..POLY_LIMIT.
+    #[inline(always)]
+    fn try_keyed_dense_polymorphic_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        index: u32,
+    ) -> Option<Value> {
+        let handlers = self.keyed_property_dense_polymorphic_fast_handler(code, feedback_slot)?;
+        let view = agent.heap().view();
+        let header = agent.objects().object_header(view, receiver)?;
+        let target_shape = Some(header.shape());
+        let target_flags = header.flags();
+        let matched = handlers.iter().any(|handler| {
+            handler.is_valid()
+                && handler.receiver_shape() == target_shape
+                && handler.receiver_flags() == target_flags
+        });
+        if !matched {
+            return None;
+        }
+        let elements = header.elements()?;
+        let value = view
+            .object_slots(elements.raw())?
+            .get(index as usize)
+            .copied()?;
+        if value == Value::array_hole() {
+            return None;
+        }
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(value)
+    }
+
+    /// Phase 3f dense-keyed polymorphic fast store. Mirrors
+    /// [`Self::try_keyed_dense_fast_store`] for shapes 2..POLY_LIMIT.
+    #[inline(always)]
+    fn try_keyed_dense_polymorphic_fast_store(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> Option<bool> {
+        if value == Value::array_hole() {
+            return None;
+        }
+        let (elements, current) = {
+            let handlers =
+                self.keyed_property_dense_polymorphic_fast_handler(code, feedback_slot)?;
+            let view = agent.heap().view();
+            let header = agent.objects().object_header(view, receiver)?;
+            let target_shape = Some(header.shape());
+            let target_flags = header.flags();
+            let matched = handlers.iter().any(|handler| {
+                handler.is_valid()
+                    && handler.receiver_shape() == target_shape
+                    && handler.receiver_flags() == target_flags
+            });
+            if !matched {
+                return None;
+            }
+            let elements = header.elements()?;
+            let current = view
+                .object_slots(elements.raw())?
+                .get(index as usize)
+                .copied()
+                .unwrap_or(Value::array_hole());
+            (elements, current)
+        };
+        if current == Value::array_hole() {
+            return None;
+        }
+        let stored = agent.with_heap_and_objects(|heap, _objects| {
+            let mut mutator = heap.mutator();
+            mutator.mut_store_value(ValueStoreTarget::ObjectSlot(elements.raw(), index), value)
+        });
+        if !stored {
+            return None;
+        }
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(true)
+    }
+
+    /// Phase 3f named-keyed (atom) polymorphic OwnData store fast path.
+    /// Mirrors [`Self::try_keyed_named_fast_store`] for shapes
+    /// 2..POLY_LIMIT.
+    #[inline(always)]
+    fn try_keyed_named_polymorphic_fast_store(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        atom: AtomId,
+        value: Value,
+    ) -> Option<bool> {
+        let (handler, named_slots) = {
+            let view = agent.heap().view();
+            let record = view.object_ref(receiver)?;
+            let shape = record.shape()?;
+            let (handler, cached_epoch) = self.keyed_property_named_polymorphic_fast_handler(
+                code,
+                feedback_slot,
+                atom,
+                shape,
+            )?;
+            if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
+                return None;
+            }
+            (handler, record.named_slots())
+        };
         let stored = if handler.writable() {
             let target = match handler.slot_location() {
                 SlotLocation::Inline(i) => ValueStoreTarget::InlineNamedSlot(receiver, i),

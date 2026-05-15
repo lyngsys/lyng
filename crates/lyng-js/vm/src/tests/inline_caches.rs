@@ -1517,3 +1517,435 @@ fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
         );
     }
 }
+
+// -----------------------------------------------------------------------------
+// Phase 3f: polymorphic-OwnData inline IC fast path
+// -----------------------------------------------------------------------------
+
+fn make_object_with_value(
+    agent: &mut lyng_js_env::Agent,
+    root_shape: lyng_js_types::ShapeId,
+    extra_atoms: &[u32],
+    value_atom: AtomId,
+    value: Value,
+) -> ObjectRef {
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    for &raw_atom in extra_atoms {
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(AtomId::from_raw(raw_atom)),
+            Value::from_smi(0),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    }
+    assert!(ordinary_create_data_property(
+        agent,
+        object,
+        PropertyKey::from_atom(value_atom),
+        value,
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    object
+}
+
+#[test]
+fn named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
+    // After the polymorphic transition the inline fast path walks the
+    // `polymorphic_fast` sidecar (Phase 3f). Two distinct shapes both
+    // resolve to `.value`; each evaluation must return its receiver's
+    // value, not the other shape's.
+    let unit = compile_test_unit(540, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let shape_a = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(10));
+    let shape_b = make_object_with_value(
+        agent,
+        root_shape,
+        &[26_000],
+        value_name,
+        Value::from_smi(20),
+    );
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Prime: install A then B to bring the IC to Polymorphic-2.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(10)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(20)
+    );
+    // Re-evaluate both shapes after the polymorphic transition: each
+    // must come out of the inline sidecar with the right value, not the
+    // other shape's value.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(10)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(20)
+    );
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            2,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn named_property_load_ic_polymorphic_fast_load_falls_through_beyond_poly_limit() {
+    // With POLY_LIMIT=4, six distinct shapes leave entries 4..6 reachable
+    // only via the slow chain. Semantic correctness must hold regardless
+    // of which path serves each evaluation. This is a tighter version of
+    // `named_property_load_ic_keeps_six_shape_polymorphic_cache` that
+    // also probes each shape after the cache reaches its final state.
+    let unit = compile_test_unit(541, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let sources: Vec<_> = (0..6)
+        .map(|index| {
+            let extras: Vec<u32> = (0..index).map(|extra| 26_500 + extra).collect();
+            let object = make_object_with_value(
+                agent,
+                root_shape,
+                &extras,
+                value_name,
+                Value::from_smi(i32::try_from(index).expect("test index fits i32") + 100),
+            );
+            (object, index)
+        })
+        .collect();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    // Prime the cache with all six shapes.
+    for (object, index) in &sources {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(*index).expect("test index fits i32") + 100)
+        );
+    }
+    // Re-evaluate in the same order: half come through the inline
+    // sidecar, half through the slow-chain binary search. Both must
+    // return the correct value.
+    for (object, index) in &sources {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::from_smi(i32::try_from(*index).expect("test index fits i32") + 100)
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            6,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn named_property_store_ic_polymorphic_fast_store_writes_correct_slot() {
+    // Phase 3f store-side polymorphic fast path: two distinct shapes
+    // both have a writable `.value` slot. After the polymorphic
+    // transition, writes through each shape must land in that shape's
+    // slot (not the other shape's). The load that follows must read the
+    // freshly written value, not a stale cached one.
+    let unit = compile_test_unit(542, "source.value = 99; source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let store_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let shape_a = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(1));
+    let shape_b =
+        make_object_with_value(agent, root_shape, &[27_000], value_name, Value::from_smi(2));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Prime polymorphic-2.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), store_slot),
+        Some((
+            "Polymorphic",
+            2,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    // Both shapes still hit their own slot after the polymorphic
+    // transition. Each shape's `.value` should reflect the most recent
+    // store performed against that shape.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+}
+
+#[test]
+fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() {
+    // After the polymorphic transition, mutating a cached receiver's
+    // prototype bumps that receiver's invalidation_epoch even though
+    // the shape ID stays the same. The polymorphic_fast hit must miss
+    // on the affected receiver and fall through to the slow chain,
+    // which re-resolves the own-data slot (still correct, just no
+    // longer eligible for the fast hit until the cache refreshes).
+    let unit = compile_test_unit(543, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let shape_a = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(10));
+    let shape_b = make_object_with_value(
+        agent,
+        root_shape,
+        &[27_500],
+        value_name,
+        Value::from_smi(20),
+    );
+    let new_prototype = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(10)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(20)
+    );
+
+    // Swap shape_a's prototype. This bumps shape_a's invalidation
+    // epoch with cause = PrototypeMutation. The polymorphic_fast hit
+    // for shape_a must now miss the epoch check and fall through.
+    agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects
+            .set_prototype_of(&mut mutator, shape_a, Some(new_prototype))
+            .unwrap()
+    });
+
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(10),
+        "own-data slot still resolves correctly through slow chain after epoch bump"
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(20),
+        "shape_b's polymorphic_fast hit is unaffected by shape_a's epoch bump"
+    );
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            2,
+            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+}
+
+#[test]
+fn keyed_named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
+    // Phase 3f keyed-named polymorphic fast path: a keyed access
+    // `source[key]` (with key = "value") on two distinct receiver
+    // shapes. After the polymorphic transition the keyed sidecar walk
+    // must match both atom AND receiver shape per entry.
+    let unit = compile_test_unit(544, "source['value'];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-property access site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let shape_a = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(70));
+    let shape_b = make_object_with_value(
+        agent,
+        root_shape,
+        &[28_000],
+        value_name,
+        Value::from_smi(80),
+    );
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(70)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(80)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(70)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(80)
+    );
+
+    assert_eq!(
+        vm.keyed_property_cache_snapshot(installed.code(), slot),
+        Some(("Polymorphic", Some("NamedAtom"), 2))
+    );
+}

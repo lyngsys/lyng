@@ -15,6 +15,16 @@ const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
 const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;
 
+/// Phase 3f polymorphic IC fast-path sidecar capacity. The first `POLY_LIMIT`
+/// `entries` are mirrored into a flat `[NamedPropertyHandler; POLY_LIMIT]`
+/// array on the feedback site so the inline check can walk shapes 2..N
+/// without entering the binary-search slow chain. Entries beyond
+/// `POLY_LIMIT` (up to `POLYMORPHIC_PROPERTY_CACHE_LIMIT`) still live in
+/// `entries` and are reached via the slow path; mega-poly transition is
+/// unchanged. Value chosen by bench evidence on V8 v7 — see
+/// `reports/js/lyng-js/phase-3f-bench.md`.
+pub(in crate::vm) const POLY_LIMIT: usize = 2;
+
 #[inline]
 pub(super) fn call_feedback_builtin_is_frame_safe(entry: BuiltinFunctionId) -> bool {
     // Keep this whitelist narrow: these direct-call targets do not inspect caller
@@ -645,6 +655,21 @@ struct NamedPropertyFeedback {
     /// at proto-cache install time. Catches mutations on the prototype
     /// itself (property redefinition, property deletion).
     monomorphic_proto_fast_prototype_epoch: u64,
+    /// Phase 3f polymorphic-OwnData sidecar — mirrors the first `POLY_LIMIT`
+    /// `entries` whenever the cache is polymorphic and the entry is
+    /// fast-path eligible (`NamedPropertyHandler::from_entry` returns a
+    /// valid handler). Each slot is `NamedPropertyHandler::NONE` when the
+    /// matching entry is absent, is a `PrototypeData` path, or fails any
+    /// other packing eligibility check. The inline fast path walks
+    /// `polymorphic_fast` after the monomorphic word miss and before the
+    /// proto-fast path, skipping the slow chain on shapes 2..POLY_LIMIT.
+    /// Mega-poly transition leaves this array zeroed. Sidecar — `entries`
+    /// remains the system of record.
+    polymorphic_fast: [NamedPropertyHandler; POLY_LIMIT],
+    /// Raw `last_invalidation_epoch` u64 paired with each
+    /// `polymorphic_fast[i]` — captured at the time the entry was packed
+    /// into the sidecar. Zero when the slot is `NamedPropertyHandler::NONE`.
+    polymorphic_fast_dependency_epochs: [u64; POLY_LIMIT],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -717,6 +742,26 @@ struct KeyedPropertyFeedback {
     /// from `dense_entries[0]` when the cache is monomorphic and the
     /// family is `DenseIndex`. NONE otherwise.
     monomorphic_dense_fast: KeyedDenseIndexHandler,
+    /// Phase 3f polymorphic named-atom OwnData sidecar — mirrors the first
+    /// `POLY_LIMIT` `named_entries` whenever the cache is polymorphic, the
+    /// family is `NamedAtom`, and the underlying entry packs into a valid
+    /// `NamedPropertyHandler`. Each slot is `NamedPropertyHandler::NONE`
+    /// for the corresponding miss conditions (absent entry, PrototypeData
+    /// path, or unpackable handler).
+    polymorphic_named_fast: [NamedPropertyHandler; POLY_LIMIT],
+    /// Raw `AtomId` (NonZeroU32) paired with each `polymorphic_named_fast[i]`.
+    /// Zero when the slot is empty. The inline fast path matches both the
+    /// receiver shape (carried in the handler) and the atom against the
+    /// runtime keyed access.
+    polymorphic_named_fast_atoms: [u32; POLY_LIMIT],
+    /// Raw `last_invalidation_epoch` u64 paired with each
+    /// `polymorphic_named_fast[i]`. Zero when the slot is empty.
+    polymorphic_named_fast_dependency_epochs: [u64; POLY_LIMIT],
+    /// Phase 3f polymorphic dense-index sidecar — mirrors the first
+    /// `POLY_LIMIT` `dense_entries` whenever the cache is polymorphic and
+    /// the family is `DenseIndex`. Each slot is `KeyedDenseIndexHandler::NONE`
+    /// for empty / unpackable entries.
+    polymorphic_dense_fast: [KeyedDenseIndexHandler; POLY_LIMIT],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -835,12 +880,26 @@ impl NamedPropertyFeedback {
             monomorphic_proto_fast: NamedPropertyProtoHandler::NONE,
             monomorphic_proto_fast_receiver_epoch: 0,
             monomorphic_proto_fast_prototype_epoch: 0,
+            polymorphic_fast: [NamedPropertyHandler::NONE; POLY_LIMIT],
+            polymorphic_fast_dependency_epochs: [0; POLY_LIMIT],
         }
     }
 
-    /// Recompute `monomorphic_fast` / `monomorphic_proto_fast` and the
-    /// paired epoch snapshots from the current cache state. Called after
-    /// any mutation that may have changed the active monomorphic entry.
+    /// Recompute every fast-path sidecar (`monomorphic_fast`,
+    /// `monomorphic_proto_fast`, `polymorphic_fast`, and their paired
+    /// invalidation-epoch snapshots) from the current cache state. Called
+    /// after any mutation that may have changed an active entry, the
+    /// cache_state, or the entry_count.
+    ///
+    /// State semantics:
+    /// - `Uninitialized` / `Megamorphic` — all sidecars cleared.
+    /// - `Monomorphic` — populate `monomorphic_fast` (OwnData) or
+    ///   `monomorphic_proto_fast` (one-hop PrototypeData) from `entries[0]`.
+    /// - `Polymorphic` (Phase 3f) — pack the first `POLY_LIMIT` `entries`
+    ///   into `polymorphic_fast` via `NamedPropertyHandler::from_entry`;
+    ///   non-OwnData entries and unpackable handlers leave a `NONE` slot
+    ///   that the inline walk skips. Entries `[POLY_LIMIT..entry_count]`
+    ///   remain reachable only via the binary-search slow chain.
     #[inline]
     const fn refresh_monomorphic_fast(&mut self) {
         self.monomorphic_fast = NamedPropertyHandler::NONE;
@@ -848,44 +907,69 @@ impl NamedPropertyFeedback {
         self.monomorphic_proto_fast = NamedPropertyProtoHandler::NONE;
         self.monomorphic_proto_fast_receiver_epoch = 0;
         self.monomorphic_proto_fast_prototype_epoch = 0;
-        match self.cache_state {
-            InlineCacheState::Monomorphic => {}
-            _ => return,
+        let mut i = 0;
+        while i < POLY_LIMIT {
+            self.polymorphic_fast[i] = NamedPropertyHandler::NONE;
+            self.polymorphic_fast_dependency_epochs[i] = 0;
+            i += 1;
         }
-        let Some(entry) = self.entries[0] else {
-            return;
-        };
-        match entry.path() {
-            NamedPropertyCachePath::OwnData => {
-                self.monomorphic_fast = NamedPropertyHandler::from_entry(entry);
-                self.monomorphic_fast_dependency_epoch = match entry.dependency(0) {
-                    Some(dependency) => match dependency.invalidation_epoch() {
-                        Some(epoch) => epoch,
-                        None => 0,
-                    },
-                    None => 0,
+        match self.cache_state {
+            InlineCacheState::Monomorphic => {
+                let Some(entry) = self.entries[0] else {
+                    return;
                 };
-            }
-            NamedPropertyCachePath::PrototypeData => {
-                let handler = NamedPropertyProtoHandler::from_entry(entry);
-                if handler.is_valid() {
-                    self.monomorphic_proto_fast = handler;
-                    self.monomorphic_proto_fast_receiver_epoch = match entry.dependency(0) {
-                        Some(dependency) => match dependency.invalidation_epoch() {
-                            Some(epoch) => epoch,
-                            None => 0,
-                        },
-                        None => 0,
-                    };
-                    self.monomorphic_proto_fast_prototype_epoch = match entry.dependency(1) {
-                        Some(dependency) => match dependency.invalidation_epoch() {
-                            Some(epoch) => epoch,
-                            None => 0,
-                        },
-                        None => 0,
-                    };
+                match entry.path() {
+                    NamedPropertyCachePath::OwnData => {
+                        self.monomorphic_fast = NamedPropertyHandler::from_entry(entry);
+                        self.monomorphic_fast_dependency_epoch =
+                            Self::entry_dependency_epoch(entry, 0);
+                    }
+                    NamedPropertyCachePath::PrototypeData => {
+                        let handler = NamedPropertyProtoHandler::from_entry(entry);
+                        if handler.is_valid() {
+                            self.monomorphic_proto_fast = handler;
+                            self.monomorphic_proto_fast_receiver_epoch =
+                                Self::entry_dependency_epoch(entry, 0);
+                            self.monomorphic_proto_fast_prototype_epoch =
+                                Self::entry_dependency_epoch(entry, 1);
+                        }
+                    }
                 }
             }
+            InlineCacheState::Polymorphic => {
+                let active = self.entry_count as usize;
+                let limit = if active < POLY_LIMIT {
+                    active
+                } else {
+                    POLY_LIMIT
+                };
+                let mut idx = 0;
+                while idx < limit {
+                    if let Some(entry) = self.entries[idx] {
+                        let handler = NamedPropertyHandler::from_entry(entry);
+                        if handler.is_valid() {
+                            self.polymorphic_fast[idx] = handler;
+                            self.polymorphic_fast_dependency_epochs[idx] =
+                                Self::entry_dependency_epoch(entry, 0);
+                        }
+                    }
+                    idx += 1;
+                }
+            }
+            InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => {}
+        }
+    }
+
+    /// Helper: extract `entry.dependency(index).invalidation_epoch()`,
+    /// returning 0 for absent dependency or unset epoch. Const-fn friendly.
+    #[inline]
+    const fn entry_dependency_epoch(entry: NamedPropertyCacheEntry, index: usize) -> u64 {
+        match entry.dependency(index) {
+            Some(dependency) => match dependency.invalidation_epoch() {
+                Some(epoch) => epoch,
+                None => 0,
+            },
+            None => 0,
         }
     }
 
@@ -944,7 +1028,10 @@ impl NamedPropertyFeedback {
                 match self.search_entry_index(plan.receiver_shape()) {
                     Ok(index) => {
                         self.entries[index] = Some(plan);
-                        if index == 0 {
+                        // Any update to entries[0..POLY_LIMIT] may invalidate
+                        // the inline sidecar (handler word, slot location, or
+                        // dependency epoch all derive from the entry).
+                        if index < POLY_LIMIT {
                             self.refresh_monomorphic_fast();
                         }
                     }
@@ -975,11 +1062,7 @@ impl NamedPropertyFeedback {
         self.cache_state = InlineCacheState::Megamorphic;
         self.entry_count = 0;
         self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
-        self.monomorphic_fast = NamedPropertyHandler::NONE;
-        self.monomorphic_fast_dependency_epoch = 0;
-        self.monomorphic_proto_fast = NamedPropertyProtoHandler::NONE;
-        self.monomorphic_proto_fast_receiver_epoch = 0;
-        self.monomorphic_proto_fast_prototype_epoch = 0;
+        self.refresh_monomorphic_fast();
     }
 
     #[inline]
@@ -1010,11 +1093,9 @@ impl NamedPropertyFeedback {
         self.entries[index] = Some(entry);
         self.entry_count = self.entry_count.saturating_add(1);
         self.cache_state = InlineCacheState::Polymorphic;
-        self.monomorphic_fast = NamedPropertyHandler::NONE;
-        self.monomorphic_fast_dependency_epoch = 0;
-        self.monomorphic_proto_fast = NamedPropertyProtoHandler::NONE;
-        self.monomorphic_proto_fast_receiver_epoch = 0;
-        self.monomorphic_proto_fast_prototype_epoch = 0;
+        // `refresh_monomorphic_fast` clears the monomorphic words and
+        // repopulates the polymorphic sidecar from the just-grown `entries`.
+        self.refresh_monomorphic_fast();
     }
 }
 
@@ -1036,13 +1117,21 @@ impl KeyedPropertyFeedback {
             monomorphic_named_proto_fast_receiver_epoch: 0,
             monomorphic_named_proto_fast_prototype_epoch: 0,
             monomorphic_dense_fast: KeyedDenseIndexHandler::NONE,
+            polymorphic_named_fast: [NamedPropertyHandler::NONE; POLY_LIMIT],
+            polymorphic_named_fast_atoms: [0; POLY_LIMIT],
+            polymorphic_named_fast_dependency_epochs: [0; POLY_LIMIT],
+            polymorphic_dense_fast: [KeyedDenseIndexHandler::NONE; POLY_LIMIT],
         }
     }
 
-    /// Recompute the monomorphic fast handlers from the current cache
-    /// state. Called from every mutation that may change the active
-    /// monomorphic entry, the cache_state, or the family. Mirrors
-    /// [`NamedPropertyFeedback::refresh_monomorphic_fast`].
+    /// Recompute every keyed fast-path sidecar (`monomorphic_named_fast`,
+    /// `monomorphic_named_proto_fast`, `monomorphic_dense_fast`,
+    /// `polymorphic_named_fast`, `polymorphic_dense_fast`, plus paired
+    /// atom / epoch snapshots) from the current cache state. Called from
+    /// every mutation that may change an active entry, the cache_state,
+    /// or the family. Mirrors
+    /// [`NamedPropertyFeedback::refresh_monomorphic_fast`] but covers both
+    /// the named-atom and dense-index families.
     #[inline]
     fn refresh_monomorphic_fast(&mut self) {
         self.monomorphic_named_fast = NamedPropertyHandler::NONE;
@@ -1052,52 +1141,111 @@ impl KeyedPropertyFeedback {
         self.monomorphic_named_proto_fast_receiver_epoch = 0;
         self.monomorphic_named_proto_fast_prototype_epoch = 0;
         self.monomorphic_dense_fast = KeyedDenseIndexHandler::NONE;
-        if !matches!(self.cache_state, InlineCacheState::Monomorphic) {
-            return;
+        for slot in 0..POLY_LIMIT {
+            self.polymorphic_named_fast[slot] = NamedPropertyHandler::NONE;
+            self.polymorphic_named_fast_atoms[slot] = 0;
+            self.polymorphic_named_fast_dependency_epochs[slot] = 0;
+            self.polymorphic_dense_fast[slot] = KeyedDenseIndexHandler::NONE;
         }
-        match self.family {
-            Some(KeyedPropertyFamily::NamedAtom) => {
+        match (self.cache_state, self.family) {
+            (InlineCacheState::Monomorphic, Some(KeyedPropertyFamily::NamedAtom)) => {
                 if let Some(keyed_entry) = self.named_entries[0] {
-                    match keyed_entry.entry.path() {
-                        NamedPropertyCachePath::OwnData => {
-                            let handler = NamedPropertyHandler::from_entry(keyed_entry.entry);
-                            if handler.is_valid() {
-                                self.monomorphic_named_fast = handler;
-                                self.monomorphic_named_fast_atom = keyed_entry.atom.raw();
-                                self.monomorphic_named_fast_dependency_epoch = keyed_entry
-                                    .entry
-                                    .dependency(0)
-                                    .and_then(|d| d.invalidation_epoch())
-                                    .unwrap_or(0);
-                            }
-                        }
-                        NamedPropertyCachePath::PrototypeData => {
-                            let handler = NamedPropertyProtoHandler::from_entry(keyed_entry.entry);
-                            if handler.is_valid() {
-                                self.monomorphic_named_proto_fast = handler;
-                                self.monomorphic_named_fast_atom = keyed_entry.atom.raw();
-                                self.monomorphic_named_proto_fast_receiver_epoch = keyed_entry
-                                    .entry
-                                    .dependency(0)
-                                    .and_then(|d| d.invalidation_epoch())
-                                    .unwrap_or(0);
-                                self.monomorphic_named_proto_fast_prototype_epoch = keyed_entry
-                                    .entry
-                                    .dependency(1)
-                                    .and_then(|d| d.invalidation_epoch())
-                                    .unwrap_or(0);
-                            }
-                        }
-                    }
+                    Self::populate_named_atom_monomorphic(
+                        keyed_entry,
+                        &mut self.monomorphic_named_fast,
+                        &mut self.monomorphic_named_fast_atom,
+                        &mut self.monomorphic_named_fast_dependency_epoch,
+                        &mut self.monomorphic_named_proto_fast,
+                        &mut self.monomorphic_named_proto_fast_receiver_epoch,
+                        &mut self.monomorphic_named_proto_fast_prototype_epoch,
+                    );
                 }
             }
-            Some(KeyedPropertyFamily::DenseIndex) => {
+            (InlineCacheState::Monomorphic, Some(KeyedPropertyFamily::DenseIndex)) => {
                 if let Some(dense) = self.dense_entries[0] {
                     self.monomorphic_dense_fast =
                         KeyedDenseIndexHandler::new(dense.receiver_shape, dense.receiver_flags);
                 }
             }
-            Some(KeyedPropertyFamily::Generic) | None => {}
+            (InlineCacheState::Polymorphic, Some(KeyedPropertyFamily::NamedAtom)) => {
+                let active = usize::from(self.named_entry_count).min(POLY_LIMIT);
+                for slot in 0..active {
+                    let Some(keyed_entry) = self.named_entries[slot] else {
+                        continue;
+                    };
+                    if !matches!(keyed_entry.entry.path(), NamedPropertyCachePath::OwnData) {
+                        continue;
+                    }
+                    let handler = NamedPropertyHandler::from_entry(keyed_entry.entry);
+                    if handler.is_valid() {
+                        self.polymorphic_named_fast[slot] = handler;
+                        self.polymorphic_named_fast_atoms[slot] = keyed_entry.atom.raw();
+                        self.polymorphic_named_fast_dependency_epochs[slot] = keyed_entry
+                            .entry
+                            .dependency(0)
+                            .and_then(|d| d.invalidation_epoch())
+                            .unwrap_or(0);
+                    }
+                }
+            }
+            (InlineCacheState::Polymorphic, Some(KeyedPropertyFamily::DenseIndex)) => {
+                let active = usize::from(self.dense_entry_count).min(POLY_LIMIT);
+                for slot in 0..active {
+                    if let Some(dense) = self.dense_entries[slot] {
+                        self.polymorphic_dense_fast[slot] =
+                            KeyedDenseIndexHandler::new(dense.receiver_shape, dense.receiver_flags);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Helper that packs the monomorphic-NamedAtom path into the supplied
+    /// sidecar fields. Extracted so `refresh_monomorphic_fast` can share
+    /// the OwnData/PrototypeData branching with the polymorphic walk
+    /// without duplicating the `dependency(0..1).invalidation_epoch()`
+    /// extraction logic.
+    #[inline]
+    fn populate_named_atom_monomorphic(
+        keyed_entry: KeyedNamedPropertyCacheEntry,
+        mono_handler: &mut NamedPropertyHandler,
+        mono_atom: &mut u32,
+        mono_epoch: &mut u64,
+        proto_handler: &mut NamedPropertyProtoHandler,
+        proto_receiver_epoch: &mut u64,
+        proto_prototype_epoch: &mut u64,
+    ) {
+        match keyed_entry.entry.path() {
+            NamedPropertyCachePath::OwnData => {
+                let handler = NamedPropertyHandler::from_entry(keyed_entry.entry);
+                if handler.is_valid() {
+                    *mono_handler = handler;
+                    *mono_atom = keyed_entry.atom.raw();
+                    *mono_epoch = keyed_entry
+                        .entry
+                        .dependency(0)
+                        .and_then(|d| d.invalidation_epoch())
+                        .unwrap_or(0);
+                }
+            }
+            NamedPropertyCachePath::PrototypeData => {
+                let handler = NamedPropertyProtoHandler::from_entry(keyed_entry.entry);
+                if handler.is_valid() {
+                    *proto_handler = handler;
+                    *mono_atom = keyed_entry.atom.raw();
+                    *proto_receiver_epoch = keyed_entry
+                        .entry
+                        .dependency(0)
+                        .and_then(|d| d.invalidation_epoch())
+                        .unwrap_or(0);
+                    *proto_prototype_epoch = keyed_entry
+                        .entry
+                        .dependency(1)
+                        .and_then(|d| d.invalidation_epoch())
+                        .unwrap_or(0);
+                }
+            }
         }
     }
 
@@ -1465,6 +1613,10 @@ impl KeyedPropertyFeedback {
         self.monomorphic_named_proto_fast_receiver_epoch = 0;
         self.monomorphic_named_proto_fast_prototype_epoch = 0;
         self.monomorphic_dense_fast = KeyedDenseIndexHandler::NONE;
+        self.polymorphic_named_fast = [NamedPropertyHandler::NONE; POLY_LIMIT];
+        self.polymorphic_named_fast_atoms = [0; POLY_LIMIT];
+        self.polymorphic_named_fast_dependency_epochs = [0; POLY_LIMIT];
+        self.polymorphic_dense_fast = [KeyedDenseIndexHandler::NONE; POLY_LIMIT];
     }
 }
 
@@ -2208,6 +2360,94 @@ impl Vm {
                 if feedback.monomorphic_dense_fast.is_valid() =>
             {
                 Some(feedback.monomorphic_dense_fast)
+            }
+            _ => None,
+        }
+    }
+
+    /// Phase 3f polymorphic-OwnData IC fast-path lookup. Walks the
+    /// `[NamedPropertyHandler; POLY_LIMIT]` sidecar for a shape match,
+    /// returning the matching packed handler and its dependency epoch on
+    /// hit. Returns `None` when the slot is absent, the site isn't a
+    /// named-property site, the cache isn't polymorphic, or no cached
+    /// shape matches. Sibling to [`Self::named_property_fast_handler`]
+    /// for shapes 2..POLY_LIMIT; the inline call site checks the
+    /// monomorphic word first, then walks here on miss.
+    #[inline(always)]
+    pub(super) fn named_property_polymorphic_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+        receiver_shape: ShapeId,
+    ) -> Option<(NamedPropertyHandler, u64)> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        let FeedbackSiteState::NamedProperty(feedback) = site else {
+            return None;
+        };
+        let target = Some(receiver_shape);
+        for slot_index in 0..POLY_LIMIT {
+            let handler = feedback.polymorphic_fast[slot_index];
+            if handler.is_valid() && handler.receiver_shape() == target {
+                return Some((
+                    handler,
+                    feedback.polymorphic_fast_dependency_epochs[slot_index],
+                ));
+            }
+        }
+        None
+    }
+
+    /// Phase 3f polymorphic-OwnData keyed-named IC fast-path lookup.
+    /// Walks the named-atom polymorphic sidecar matching both the runtime
+    /// `atom` and the receiver shape. Sibling to
+    /// [`Self::keyed_property_named_fast_handler`] for shapes 2..POLY_LIMIT
+    /// of a keyed-atom site.
+    #[inline(always)]
+    pub(super) fn keyed_property_named_polymorphic_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+        atom: AtomId,
+        receiver_shape: ShapeId,
+    ) -> Option<(NamedPropertyHandler, u64)> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        let FeedbackSiteState::KeyedProperty(feedback) = site else {
+            return None;
+        };
+        let target = Some(receiver_shape);
+        let atom_raw = atom.raw();
+        for slot_index in 0..POLY_LIMIT {
+            let handler = feedback.polymorphic_named_fast[slot_index];
+            if handler.is_valid()
+                && feedback.polymorphic_named_fast_atoms[slot_index] == atom_raw
+                && handler.receiver_shape() == target
+            {
+                return Some((
+                    handler,
+                    feedback.polymorphic_named_fast_dependency_epochs[slot_index],
+                ));
+            }
+        }
+        None
+    }
+
+    /// Phase 3f polymorphic dense-index keyed IC fast-path lookup. Walks
+    /// the `[KeyedDenseIndexHandler; POLY_LIMIT]` sidecar for a shape+flags
+    /// match. Mirrors `keyed_property_dense_fast_handler` for shapes
+    /// 2..POLY_LIMIT.
+    #[inline(always)]
+    pub(super) fn keyed_property_dense_polymorphic_fast_handler(
+        &self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+    ) -> Option<&[KeyedDenseIndexHandler; POLY_LIMIT]> {
+        let site = self.feedback_site_for_slot(code, slot?)?;
+        match site {
+            FeedbackSiteState::KeyedProperty(feedback)
+                if matches!(feedback.cache_state, InlineCacheState::Polymorphic)
+                    && feedback.family == Some(KeyedPropertyFamily::DenseIndex) =>
+            {
+                Some(&feedback.polymorphic_dense_fast)
             }
             _ => None,
         }

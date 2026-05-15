@@ -1,0 +1,153 @@
+{
+  "benchmarks": [
+    {
+      "error": null,
+      "file": "richards.js",
+      "median_score": 318.0,
+      "median_us_per_iter": 11101.25786163522,
+      "name": "Richards",
+      "phase1_baseline": 234,
+      "phase1_gate_met": true,
+      "phase1_target": 260,
+      "reference_us": 35302,
+      "samples": [
+        313.0,
+        317.0,
+        313.0,
+        319.0,
+        319.0,
+        318.0,
+        319.0,
+        321.0,
+        318.0,
+        319.0,
+        317.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "deltablue.js",
+      "median_score": 362.0,
+      "median_us_per_iter": 18264.6408839779,
+      "name": "DeltaBlue",
+      "phase1_baseline": 277,
+      "phase1_gate_met": true,
+      "phase1_target": 310,
+      "reference_us": 66118,
+      "samples": [
+        367.0,
+        363.0,
+        364.0,
+        363.0,
+        359.0,
+        363.0,
+        358.0,
+        362.0,
+        361.0,
+        360.0,
+        361.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "crypto.js",
+      "median_score": 274.0,
+      "median_us_per_iter": 97146.35036496351,
+      "name": "Crypto",
+      "phase1_baseline": 236,
+      "phase1_gate_met": true,
+      "phase1_target": 265,
+      "reference_us": 266181,
+      "samples": [
+        272.0,
+        276.0,
+        275.0,
+        275.0,
+        273.0,
+        274.0,
+        271.0,
+        275.0,
+        275.0,
+        274.0,
+        274.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "raytrace.js",
+      "median_score": 428.0,
+      "median_us_per_iter": 172894.6261682243,
+      "name": "RayTrace",
+      "phase1_baseline": 387,
+      "phase1_gate_met": false,
+      "phase1_target": 430,
+      "reference_us": 739989,
+      "samples": [
+        421.0,
+        427.0,
+        430.0,
+        428.0,
+        429.0,
+        426.0,
+        426.0,
+        424.0,
+        429.0,
+        432.0,
+        429.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "navier-stokes.js",
+      "median_score": 460.0,
+      "median_us_per_iter": 322608.6956521739,
+      "name": "NavierStokes",
+      "phase1_baseline": 424,
+      "phase1_gate_met": false,
+      "phase1_target": 470,
+      "reference_us": 1484000,
+      "samples": [
+        459.0,
+        459.0,
+        460.0,
+        461.0,
+        459.0,
+        462.0,
+        460.0,
+        460.0,
+        460.0,
+        460.0,
+        457.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "splay.js",
+      "median_score": 1374.0,
+      "median_us_per_iter": 5930.931586608443,
+      "name": "Splay",
+      "phase1_baseline": 1198,
+      "phase1_gate_met": true,
+      "phase1_target": 1330,
+      "reference_us": 81491,
+      "samples": [
+        1300.0,
+        1282.0,
+        1311.0,
+        1389.0,
+        1376.0,
+        1368.0,
+        1385.0,
+        1391.0,
+        1374.0,
+        1374.0,
+        1369.0
+      ]
+    }
+  ],
+  "lyng_bin": "target/release/lyng-js",
+  "per_sample_timeout_secs": 120,
+  "samples_per_benchmark": 11,
+  "schema": "lyng-js-bench/v8suite/v1",
+  "v8_root": "testdata/js-benchmarks/v8-v7"
+}
