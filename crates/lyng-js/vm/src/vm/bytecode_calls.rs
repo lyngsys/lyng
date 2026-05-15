@@ -365,6 +365,142 @@ impl Vm {
                 *slot = arguments.get(index).copied().unwrap_or(Value::undefined());
             }
         }
+        self.record_argument_frame_copies(u64::from(parameter_count));
+    }
+
+    /// Bytecode-to-bytecode call entry that consumes the caller's
+    /// contiguous argument window directly. Gated on the caller having
+    /// verified eligibility via
+    /// [`Vm::ordinary_bytecode_call_eligibility`] — generator/async/
+    /// class-constructor/bound/arguments-object/rest-parameter callees
+    /// must take [`enter_bytecode_call`] instead.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter and call-site state explicitly to mirror the slow-path entry"
+    )]
+    pub(super) fn enter_bytecode_call_from_caller_registers(
+        &mut self,
+        agent: &mut Agent,
+        caller_frame: &FrameRecord,
+        result_register: u16,
+        callee_object: ObjectRef,
+        this_value: Value,
+        caller_arg_base: u32,
+        arg_count: u16,
+    ) -> VmResult<()> {
+        let prepared =
+            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
+        debug_assert_eq!(prepared.arguments_mode, ArgumentsMode::None);
+        debug_assert!(!prepared.has_rest_parameter);
+        let register_base = u32::try_from(self.register_stack_top())
+            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        self.install_prepared_bytecode_call_from_registers(
+            agent,
+            prepared,
+            caller_arg_base,
+            arg_count,
+            register_base,
+            Some(result_register),
+        )
+    }
+
+    /// Mirror of [`Self::install_prepared_bytecode_call`] for the fast
+    /// path: copies arguments directly from caller register slots into
+    /// the callee frame instead of consuming a `&[Value]` slice. Only
+    /// safe when the prepared call has `arguments_mode == None` and no
+    /// rest parameter, since `initialize_activation_objects` would
+    /// otherwise need a materialized slice.
+    fn install_prepared_bytecode_call_from_registers(
+        &mut self,
+        agent: &mut Agent,
+        prepared: PreparedBytecodeCall,
+        caller_arg_base: u32,
+        arg_count: u16,
+        register_base: u32,
+        return_register: Option<u16>,
+    ) -> VmResult<()> {
+        if self.frames.len() >= MAX_BYTECODE_CALL_DEPTH {
+            return Err(VmError::Abrupt(errors::throw_range_error(agent)));
+        }
+        let register_len = prepared
+            .register_count
+            .checked_add(prepared.hidden_register_count)
+            .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        self.reserve_register_window(register_base, register_len);
+        self.copy_arguments_from_caller_registers(
+            register_base,
+            prepared.parameter_count,
+            caller_arg_base,
+            arg_count,
+        );
+
+        let script_or_module_referrer = agent
+            .current_execution_context()
+            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+        let context = ExecutionContext::bytecode(
+            prepared.realm,
+            prepared.code,
+            prepared.lexical_env,
+            prepared.variable_env,
+        )
+        .with_private_env(prepared.private_env)
+        .with_this_state(prepared.execution_this_state)
+        .with_script_or_module_referrer(script_or_module_referrer)
+        .with_new_target(prepared.new_target);
+        let frame = FrameRecord::new(
+            prepared.code,
+            0,
+            RegisterWindow::new(register_base, register_len),
+            return_register,
+            prepared.realm,
+            prepared.lexical_env,
+            prepared.variable_env,
+            context.kind(),
+        )
+        .with_this_value(prepared.this_value)
+        .with_parameter_initializer_end_offset(prepared.parameter_initializer_end_offset)
+        .with_new_target(prepared.new_target)
+        .with_callee(Some(prepared.callee))
+        .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
+        agent.push_execution_context(context);
+        self.frames.push(frame);
+        self.note_frame_depth();
+        self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
+        self.request_dispatch_frame_check();
+        Ok(())
+    }
+
+    fn copy_arguments_from_caller_registers(
+        &mut self,
+        register_base: u32,
+        parameter_count: u16,
+        caller_arg_base: u32,
+        arg_count: u16,
+    ) {
+        let Ok(dest_start) = usize::try_from(register_base) else {
+            debug_assert!(false, "register base should fit usize");
+            return;
+        };
+        let Ok(src_start) = usize::try_from(caller_arg_base) else {
+            debug_assert!(false, "caller arg base should fit usize");
+            return;
+        };
+        let copy_count = usize::from(parameter_count.min(arg_count));
+        if copy_count == 0 {
+            return;
+        }
+        let Some(src_end) = src_start.checked_add(copy_count) else {
+            debug_assert!(false, "caller arg range should fit usize");
+            return;
+        };
+        debug_assert!(
+            dest_start >= src_end,
+            "fast-path caller arg window must sit entirely before the callee frame"
+        );
+        self.register_stack
+            .copy_within(src_start..src_end, dest_start);
+        let copy_count_u64 = u64::try_from(copy_count).unwrap_or(u64::MAX);
+        self.record_argument_frame_copies(copy_count_u64);
     }
 
     pub(super) fn bytecode_entry(agent: &Agent, callee_object: ObjectRef) -> Option<CodeRef> {

@@ -36,7 +36,9 @@ pub use frame::{
 };
 pub use installed::InstalledCode;
 #[cfg(feature = "opcode-counters")]
-pub use opcode_counts::{OpcodeDispatchCount, OpcodeDispatchCounts};
+pub use opcode_counts::{
+    CallArgumentCopyCounts, OpcodeDispatchCount, OpcodeDispatchCounts,
+};
 pub use vm::{
     CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
     ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,

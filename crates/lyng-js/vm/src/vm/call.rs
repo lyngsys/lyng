@@ -1,7 +1,7 @@
 use super::dispatch::advance_dispatch_frame;
 use super::{
-    Agent, CallRange, FrameFlags, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef,
-    RealmRef, Value, Vm, VmResult,
+    Agent, ArgumentsMode, CallRange, CodeRef, FrameFlags, FrameRecord, HostHooks,
+    NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm, VmResult,
 };
 use crate::vm::property_access::VmProxyBridge;
 use crate::VmError;
@@ -342,6 +342,29 @@ impl Vm {
         spread_mask: Option<u64>,
     ) -> VmResult<()> {
         let callee_value = self.read_register(frame.registers(), callee_register);
+
+        let no_spread = spread_mask.is_none_or(|mask| mask == 0);
+        if no_spread
+            && let Some(callee_object) = callee_value.as_object_ref()
+            && self
+                .ordinary_bytecode_call_eligibility(agent, callee_object)
+                .is_some()
+        {
+            let this_value = self.read_register(frame.registers(), this_register);
+            return self.invoke_bytecode_call_from_caller_arg_window(
+                agent,
+                frame_depth,
+                frame,
+                instruction_len,
+                feedback_slot,
+                result_register,
+                callee_object,
+                this_value,
+                arguments.argument_base(),
+                arguments.argument_count(),
+            );
+        }
+
         let this_value = self.read_register(frame.registers(), this_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
@@ -393,6 +416,25 @@ impl Vm {
         argument_count: u8,
     ) -> VmResult<()> {
         let callee_value = self.read_register(frame.registers(), callee_register);
+
+        if let Some(callee_object) = callee_value.as_object_ref()
+            && self
+                .ordinary_bytecode_call_eligibility(agent, callee_object)
+                .is_some()
+        {
+            return self.call_value_small_bytecode_fast(
+                agent,
+                frame_depth,
+                frame,
+                instruction_len,
+                feedback_slot,
+                result_register,
+                callee_object,
+                call_base_register,
+                argument_count,
+            );
+        }
+
         let this_value = self.read_register(frame.registers(), call_base_register);
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
@@ -403,6 +445,7 @@ impl Vm {
                 call_base_register + 1 + u16::from(offset),
             ));
         }
+        self.record_argument_scratch_pushes(u64::from(argument_count));
         let result = self.invoke_collected_call_value(
             agent,
             host,
@@ -418,6 +461,120 @@ impl Vm {
         );
         self.argument_scratch = collected_arguments;
         result
+    }
+
+    /// Returns `Some(code)` when `callee_object` is an ordinary bytecode
+    /// callee for which the fast call path can seed the callee frame
+    /// directly from the caller's register window — skipping
+    /// `argument_scratch` materialization entirely.
+    ///
+    /// Returns `None` (forcing the slow Vec-materializing path) for:
+    /// bound functions, native functions, class constructors,
+    /// generator/async bodies, and any function that needs an
+    /// `arguments` object or a rest parameter. Those cases either
+    /// require argument prepending, materialized argument storage, or
+    /// resolve through builtin dispatch — all of which expect a
+    /// `&[Value]`.
+    #[inline]
+    pub(in crate::vm) fn ordinary_bytecode_call_eligibility(
+        &self,
+        agent: &Agent,
+        callee_object: ObjectRef,
+    ) -> Option<CodeRef> {
+        if Self::bound_function_record(agent, callee_object).is_some() {
+            return None;
+        }
+        let code = Self::bytecode_entry(agent, callee_object)?;
+        let function = self.installed_function(code)?;
+        let flags = function.flags();
+        if flags.generator() || flags.async_function() || flags.class_constructor() {
+            return None;
+        }
+        if function.arguments_mode() != ArgumentsMode::None || function.has_rest_parameter() {
+            return None;
+        }
+        Some(code)
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[inline]
+    fn call_value_small_bytecode_fast(
+        &mut self,
+        agent: &mut Agent,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+        result_register: u16,
+        callee_object: ObjectRef,
+        call_base_register: u16,
+        argument_count: u8,
+    ) -> VmResult<()> {
+        let this_value = self.read_register(frame.registers(), call_base_register);
+        self.invoke_bytecode_call_from_caller_arg_window(
+            agent,
+            frame_depth,
+            frame,
+            instruction_len,
+            feedback_slot,
+            result_register,
+            callee_object,
+            this_value,
+            call_base_register + 1,
+            u16::from(argument_count),
+        )
+    }
+
+    /// Shared fast-path entry for `Call0..3` and ordinary non-spread
+    /// generic `Call` opcodes. Translates the caller-frame-relative
+    /// argument base into an absolute register-stack index, advances
+    /// the caller dispatch frame, and then hands off to
+    /// [`Self::enter_bytecode_call_from_caller_registers`] which seeds
+    /// the callee parameter slots via `register_stack.copy_within` —
+    /// no `argument_scratch` materialization, no per-arg
+    /// `read_register` loop.
+    ///
+    /// Callers MUST verify eligibility via
+    /// [`Self::ordinary_bytecode_call_eligibility`] first.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[inline]
+    pub(in crate::vm) fn invoke_bytecode_call_from_caller_arg_window(
+        &mut self,
+        agent: &mut Agent,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+        result_register: u16,
+        callee_object: ObjectRef,
+        this_value: Value,
+        caller_arg_base_local: u16,
+        arg_count: u16,
+    ) -> VmResult<()> {
+        let caller_arg_base = frame
+            .registers()
+            .base()
+            .checked_add(u32::from(caller_arg_base_local))
+            .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        advance_dispatch_frame(frame, instruction_len);
+        self.sync_dispatch_frame(frame_depth, *frame);
+        self.enter_bytecode_call_from_caller_registers(
+            agent,
+            frame,
+            result_register,
+            callee_object,
+            this_value,
+            caller_arg_base,
+            arg_count,
+        )?;
+        self.observe_call_target(agent, frame.code(), feedback_slot, callee_object);
+        Ok(())
     }
 
     #[expect(
@@ -748,6 +905,7 @@ impl Vm {
             }
             self.append_spread_argument(agent, host, registry, frame, value, arguments)?;
         }
+        self.record_argument_scratch_pushes(u64::try_from(arguments.len()).unwrap_or(u64::MAX));
         Ok(())
     }
 

@@ -30,7 +30,10 @@ use crate::error::VmResult;
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
 use crate::name_refs::CapturedNameReferenceTable;
 #[cfg(feature = "opcode-counters")]
-use crate::opcode_counts::{OpcodeDispatchCounterStore, OpcodeDispatchCounts};
+use crate::opcode_counts::{
+    CallArgumentCopyCounterStore, CallArgumentCopyCounts, OpcodeDispatchCounterStore,
+    OpcodeDispatchCounts,
+};
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
 mod activation_objects;
@@ -152,6 +155,8 @@ pub struct Vm {
     current_exception: Option<Value>,
     #[cfg(feature = "opcode-counters")]
     opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
+    #[cfg(feature = "opcode-counters")]
+    call_argument_copy_counts: Option<CallArgumentCopyCounterStore>,
     debug_hook: Option<Box<dyn VmDebugHook>>,
     debug_state: VmDebugState,
     atom_texts: HashMap<AtomId, Box<str>>,
@@ -217,6 +222,8 @@ impl Vm {
             current_exception: None,
             #[cfg(feature = "opcode-counters")]
             opcode_dispatch_counts: None,
+            #[cfg(feature = "opcode-counters")]
+            call_argument_copy_counts: None,
             debug_hook: None,
             debug_state: VmDebugState::default(),
             atom_texts: HashMap::new(),
@@ -323,6 +330,69 @@ impl Vm {
         }
         counts.increment(opcode);
     }
+
+    /// Opt-in counter tracking how many argument values are pushed into
+    /// the VM's `argument_scratch` Vec during call setup. Off by default;
+    /// enable for tests/benches that want to verify the no-Vec hot path
+    /// for ordinary bytecode-to-bytecode calls.
+    #[cfg(feature = "opcode-counters")]
+    pub fn enable_call_argument_copy_counts(&mut self) {
+        if self.call_argument_copy_counts.is_none() {
+            self.call_argument_copy_counts = Some(CallArgumentCopyCounterStore::new());
+        }
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn disable_call_argument_copy_counts(&mut self) {
+        self.call_argument_copy_counts = None;
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn reset_call_argument_copy_counts(&mut self) {
+        if let Some(counts) = &self.call_argument_copy_counts {
+            counts.reset();
+        }
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    #[inline]
+    pub fn call_argument_copy_counts(&self) -> Option<CallArgumentCopyCounts> {
+        self.call_argument_copy_counts
+            .as_ref()
+            .map(CallArgumentCopyCounterStore::snapshot)
+    }
+
+    /// Records `count` argument values pushed into `argument_scratch`. No-op
+    /// when the counter is disabled (the default in production builds and
+    /// when the `opcode-counters` feature is off). Inlined so the disabled
+    /// case compiles to a single load+branch.
+    #[cfg(feature = "opcode-counters")]
+    #[inline]
+    pub(in crate::vm) fn record_argument_scratch_pushes(&self, count: u64) {
+        if let Some(counts) = &self.call_argument_copy_counts {
+            counts.record_scratch_pushes(count);
+        }
+    }
+
+    #[cfg(not(feature = "opcode-counters"))]
+    #[inline]
+    pub(in crate::vm) fn record_argument_scratch_pushes(&self, _count: u64) {}
+
+    /// Records `count` argument values copied into a callee bytecode frame.
+    /// Symmetric with `record_argument_scratch_pushes` — together they let
+    /// tests verify that ordinary calls copy each argument exactly once
+    /// (frame_copies == n, scratch_pushes == 0) instead of twice.
+    #[cfg(feature = "opcode-counters")]
+    #[inline]
+    pub(in crate::vm) fn record_argument_frame_copies(&self, count: u64) {
+        if let Some(counts) = &self.call_argument_copy_counts {
+            counts.record_frame_copies(count);
+        }
+    }
+
+    #[cfg(not(feature = "opcode-counters"))]
+    #[inline]
+    pub(in crate::vm) fn record_argument_frame_copies(&self, _count: u64) {}
 
     pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
         self.debug_hook = Some(Box::new(hook));

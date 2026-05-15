@@ -127,3 +127,75 @@ impl OpcodeDispatchCount {
         self.count
     }
 }
+
+/// Per-VM counters for argument-vector materialization on the call path.
+///
+/// `scratch_pushes` increments every time the VM pushes a single argument
+/// value into its reusable `argument_scratch` Vec during call setup. A
+/// well-shaped ordinary bytecode-to-bytecode call with no spread, no
+/// bound chain, and no arguments-object usage should not require any
+/// pushes — the value can be copied directly from the caller's register
+/// window into the callee's frame.
+pub struct CallArgumentCopyCounterStore {
+    scratch_pushes: Cell<u64>,
+    frame_copies: Cell<u64>,
+}
+
+impl CallArgumentCopyCounterStore {
+    pub fn new() -> Self {
+        Self {
+            scratch_pushes: Cell::new(0),
+            frame_copies: Cell::new(0),
+        }
+    }
+
+    #[inline]
+    pub fn record_scratch_pushes(&self, count: u64) {
+        self.scratch_pushes
+            .set(self.scratch_pushes.get().saturating_add(count));
+    }
+
+    #[inline]
+    pub fn record_frame_copies(&self, count: u64) {
+        self.frame_copies
+            .set(self.frame_copies.get().saturating_add(count));
+    }
+
+    pub fn reset(&self) {
+        self.scratch_pushes.set(0);
+        self.frame_copies.set(0);
+    }
+
+    pub fn snapshot(&self) -> CallArgumentCopyCounts {
+        CallArgumentCopyCounts {
+            scratch_pushes: self.scratch_pushes.get(),
+            frame_copies: self.frame_copies.get(),
+        }
+    }
+}
+
+impl Default for CallArgumentCopyCounterStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CallArgumentCopyCounts {
+    scratch_pushes: u64,
+    frame_copies: u64,
+}
+
+impl CallArgumentCopyCounts {
+    #[must_use]
+    #[inline]
+    pub const fn scratch_pushes(self) -> u64 {
+        self.scratch_pushes
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn frame_copies(self) -> u64 {
+        self.frame_copies
+    }
+}

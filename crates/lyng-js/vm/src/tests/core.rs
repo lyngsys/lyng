@@ -329,6 +329,300 @@ fn vm_star_fusion_elides_star_dispatch_after_lda() {
     );
 }
 
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
+    let unit = compile_test_unit(
+        153,
+        r"
+        var add5 = (a, b, c, d, e) => a + b + c + d + e;
+        var total = 0;
+        for (var i = 0; i < 8; i = i + 1) {
+            total = total + add5(i, i, i, i, i);
+        }
+        total;
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    // 5 * sum(0..7) = 5 * 28 = 140
+    assert_eq!(result, Value::from_smi(140));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert_eq!(
+        counts.scratch_pushes(),
+        0,
+        "ordinary non-spread bytecode-to-bytecode `Call` should not push into argument_scratch \
+         even when argument_count > 3"
+    );
+    assert_eq!(
+        counts.frame_copies(),
+        40,
+        "each ordinary Call5 should copy exactly its 5 arguments into the callee frame"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn spread_call_still_materializes_into_argument_scratch() {
+    let unit = compile_test_unit(
+        154,
+        r"
+        var add3 = (a, b, c) => a + b + c;
+        var args = [1, 2, 3];
+        add3(...args);
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(6));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert!(
+        counts.scratch_pushes() > 0,
+        "spread calls must materialize into argument_scratch; the fast path does not handle spread"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn bound_function_call_still_materializes_into_argument_scratch() {
+    let unit = compile_test_unit(
+        155,
+        r"
+        function plus(a, b, c) { return this.base + a + b + c; }
+        var bound = plus.bind({ base: 10 }, 1);
+        bound(2, 3);
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(16));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert!(
+        counts.scratch_pushes() > 0,
+        "bound function calls need argument prepending and must stay on the Vec path"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
+    let unit = compile_test_unit(
+        156,
+        r"
+        function variadic(a, b, c) {
+            // Reference `arguments` to force ArgumentsMode != None
+            return arguments.length * 100 + a + b + c;
+        }
+        variadic(1, 2, 3);
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(306));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert!(
+        counts.scratch_pushes() > 0,
+        "functions that materialize an `arguments` object must stay on the slow path"
+    );
+}
+
+#[test]
+fn fast_path_handles_iife_closure_helpers_calling_each_other() {
+    // Repro for Test262 harness deepEqual failure: tight pattern of small
+    // arrow + named helpers calling each other through `||` short-circuit
+    // chains. All eligible for the call-arg fast path.
+    let unit = compile_test_unit(
+        158,
+        r"
+        (function() {
+          var EQUAL = 1;
+          var NOT_EQUAL = -1;
+          var UNKNOWN = 0;
+
+          function compareEquality(a, b, cache) {
+            return compareIf(a, b, isOptional, compareOptionality)
+              || compareIf(a, b, isPrimitiveEquatable, comparePrimitiveEquality)
+              || NOT_EQUAL;
+          }
+
+          function compareIf(a, b, test, compare, cache) {
+            return !test(a)
+              ? !test(b) ? UNKNOWN : NOT_EQUAL
+              : !test(b) ? NOT_EQUAL : compare(a, b, cache);
+          }
+
+          function tryCompareStrictEquality(a, b) {
+            return a === b ? EQUAL : UNKNOWN;
+          }
+
+          function isOptional(value) {
+            return value === undefined || value === null;
+          }
+
+          function compareOptionality(a, b) {
+            return tryCompareStrictEquality(a, b) || NOT_EQUAL;
+          }
+
+          function isPrimitiveEquatable(value) {
+            return typeof value === 'number' || typeof value === 'string';
+          }
+
+          function comparePrimitiveEquality(a, b) {
+            return tryCompareStrictEquality(a, b) || NOT_EQUAL;
+          }
+
+          var results = [
+            compareEquality(1, 1),
+            compareEquality(1, 2),
+            compareEquality('a', 'a'),
+            compareEquality('a', 'b'),
+            compareEquality(undefined, undefined),
+          ];
+          // r1=1, r2=-1, r3=1, r4=-1, r5=1 → total = 1
+          return results.reduce(function (acc, x) { return acc + x; }, 0);
+        })();
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    assert_eq!(result, Value::from_smi(1));
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn rest_parameter_function_stays_on_slow_path() {
+    let unit = compile_test_unit(
+        157,
+        r"
+        var sumRest = (head, ...tail) => {
+            var sum = head;
+            for (var i = 0; i < tail.length; i = i + 1) {
+                sum = sum + tail[i];
+            }
+            return sum;
+        };
+        sumRest(1, 2, 3, 4);
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(10));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert!(
+        counts.scratch_pushes() > 0,
+        "rest-parameter functions need a materialized argument slice"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn ordinary_bytecode_calls_avoid_argument_scratch_pushes() {
+    let unit = compile_test_unit(
+        152,
+        r"
+        var add3 = (a, b, c) => a + b + c;
+        var total = 0;
+        for (var i = 0; i < 10; i = i + 1) {
+            total = total + add3(i, i + 1, i + 2);
+        }
+        total;
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.enable_call_argument_copy_counts();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    // sum over i in 0..10 of (i + (i+1) + (i+2)) = 3*(0+1+...+9) + 30 = 135 + 30 = 165
+    assert_eq!(result, Value::from_smi(165));
+
+    let counts = vm
+        .call_argument_copy_counts()
+        .expect("enabled call argument copy counters should produce a snapshot");
+    assert_eq!(
+        counts.scratch_pushes(),
+        0,
+        "ordinary bytecode-to-bytecode Call3 (arrow, non-spread, non-bound, no `arguments`) \
+         should not push into argument_scratch"
+    );
+    // Each iteration: 3 args copied into callee frame, 10 iterations = 30.
+    assert_eq!(
+        counts.frame_copies(),
+        30,
+        "each ordinary Call3 should copy exactly its 3 arguments into the callee frame"
+    );
+}
+
 #[test]
 fn vm_loop_backedges_poll_active_incremental_major_mark() {
     let unit = compile_test_unit(
