@@ -3,6 +3,22 @@ name = "lyng-js-vm"
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+# Opt-in dispatch instrumentation. Adds per-Vm opcode counters
+# (`Vm::enable_opcode_dispatch_counts` and friends) plus a counted
+# variant of `run_trampoline` that records each dispatched opcode.
+# Production builds (`lyng-js-cli`) leave this off so the binary
+# carries no counter code in `.text`; dev tools (`lyng-js-bench`) enable
+# it via their Cargo.toml dep spec.
+#
+# Build-time isolation note: Cargo features unify across the dep graph.
+# Build the production binary with `-p lyng-js-cli` (no feature) and
+# the bench tool with `-p lyng-js-bench` (which pulls the feature
+# transitively). Avoid bare `cargo build --release` if you need the
+# counter-free production binary in the same `target/` cache.
+opcode-counters = []
+
 [dependencies]
 lyng-js-builtins = { workspace = true }
 lyng-js-common = { workspace = true }

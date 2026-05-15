@@ -19,6 +19,7 @@ mod extensions;
 mod frame;
 mod installed;
 mod name_refs;
+#[cfg(feature = "opcode-counters")]
 mod opcode_counts;
 mod vm;
 
@@ -34,6 +35,7 @@ pub use frame::{
     seed_registers, FrameFlags, FrameMetadata, FrameRecord, FrameState, RegisterWindow,
 };
 pub use installed::InstalledCode;
+#[cfg(feature = "opcode-counters")]
 pub use opcode_counts::{OpcodeDispatchCount, OpcodeDispatchCounts};
 pub use vm::{
     CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,

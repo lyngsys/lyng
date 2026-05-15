@@ -203,6 +203,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     assert!(agent.current_execution_context().is_none());
 }
 
+#[cfg(feature = "opcode-counters")]
 #[test]
 fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
     let mut builder = BytecodeBuilder::new(

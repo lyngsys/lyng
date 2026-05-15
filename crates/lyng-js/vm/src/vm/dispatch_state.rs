@@ -268,26 +268,34 @@ pub const DISPATCH_TABLE_LEN: usize = 256;
 pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
     dispatch_handlers::build_dispatch_table();
 
-/// Central trampoline entry. Branches once per script invocation between the
-/// uncounted hot path and the counted instrumented path; the hot dispatch
-/// loop never re-checks. Per the post-spike asm audit (`lyng-3uem`,
-/// `reports/js/lyng-js/phase-1-diagnostics.md`), the previous design inlined
-/// `maybe_record_opcode_dispatch` into every `dispatch_next!` tail and cost
-/// ~4 instructions per dispatch even when counters were `None`.
+/// Central trampoline entry.
 ///
-/// Behavior change vs the pre-split trampoline: enabling/disabling counters
-/// mid-execution (via `Vm::enable_opcode_dispatch_counts` /
-/// `disable_opcode_dispatch_counts`) only takes effect on the next call to
+/// With the `opcode-counters` feature off (production), this is a thin
+/// wrapper that tail-calls `run_trampoline_uncounted`. With the feature on
+/// (the `lyng-js-bench` build), it branches once per script invocation
+/// between the uncounted hot path and the counted instrumented path; the
+/// hot dispatch loop never re-checks.
+///
+/// Per the post-spike asm audit (`lyng-3uem`,
+/// `reports/js/lyng-js/phase-1-diagnostics.md`), the previous design
+/// inlined `maybe_record_opcode_dispatch` into every `dispatch_next!` tail
+/// and cost ~4 instructions per dispatch even when counters were `None`.
+/// Phase 1 follow-up `lyng-3lqp` then moved the entire counter machinery
+/// behind the feature so the production binary's `.text` carries no
+/// counter code at all.
+///
+/// Behavior note (feature on): enabling/disabling counters mid-execution
+/// via `Vm::enable_opcode_dispatch_counts` /
+/// `disable_opcode_dispatch_counts` only takes effect on the next call to
 /// `run_trampoline`. The existing tests + `lyng-js-bench --count-opcodes`
-/// only toggle counters at script boundaries, so this is a no-op in
-/// practice; documented for future readers.
+/// only toggle counters at script boundaries.
 #[inline(never)]
 pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
+    #[cfg(feature = "opcode-counters")]
     if state.vm.opcode_counter_enabled() {
-        run_trampoline_counted(state)
-    } else {
-        run_trampoline_uncounted(state)
+        return run_trampoline_counted(state);
     }
+    run_trampoline_uncounted(state)
 }
 
 /// Hot dispatch loop — counters disabled. The trampoline body has no
@@ -348,6 +356,10 @@ fn run_trampoline_uncounted(state: &mut DispatchState) -> VmResult<Value> {
 /// returns. The cost lives here so the hot path
 /// (`run_trampoline_uncounted`) stays clean. Not size-budgeted; only run
 /// when something has explicitly enabled counters.
+///
+/// Gated behind the `opcode-counters` Cargo feature; absent from the
+/// production binary entirely (`lyng-3lqp`).
+#[cfg(feature = "opcode-counters")]
 #[inline(never)]
 fn run_trampoline_counted(state: &mut DispatchState) -> VmResult<Value> {
     let first_byte = state.first_opcode_byte();

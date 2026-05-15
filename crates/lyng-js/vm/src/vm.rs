@@ -29,6 +29,7 @@ use crate::enumeration::{ForInStateTable, IteratorStateTable};
 use crate::error::VmResult;
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
 use crate::name_refs::CapturedNameReferenceTable;
+#[cfg(feature = "opcode-counters")]
 use crate::opcode_counts::{OpcodeDispatchCounterStore, OpcodeDispatchCounts};
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
@@ -149,6 +150,7 @@ pub struct Vm {
     dispatch_frame_check_epoch: u32,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
+    #[cfg(feature = "opcode-counters")]
     opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
     debug_hook: Option<Box<dyn VmDebugHook>>,
     debug_state: VmDebugState,
@@ -213,6 +215,7 @@ impl Vm {
             dispatch_frame_check_epoch: 0,
             installed: Vec::new(),
             current_exception: None,
+            #[cfg(feature = "opcode-counters")]
             opcode_dispatch_counts: None,
             debug_hook: None,
             debug_state: VmDebugState::default(),
@@ -262,22 +265,26 @@ impl Vm {
         }
     }
 
+    #[cfg(feature = "opcode-counters")]
     pub fn enable_opcode_dispatch_counts(&mut self) {
         if self.opcode_dispatch_counts.is_none() {
             self.opcode_dispatch_counts = Some(OpcodeDispatchCounterStore::new());
         }
     }
 
+    #[cfg(feature = "opcode-counters")]
     pub fn disable_opcode_dispatch_counts(&mut self) {
         self.opcode_dispatch_counts = None;
     }
 
+    #[cfg(feature = "opcode-counters")]
     pub fn reset_opcode_dispatch_counts(&mut self) {
         if let Some(counts) = &self.opcode_dispatch_counts {
             counts.reset();
         }
     }
 
+    #[cfg(feature = "opcode-counters")]
     #[inline]
     pub fn opcode_dispatch_counts(&self) -> Option<OpcodeDispatchCounts> {
         self.opcode_dispatch_counts
@@ -289,6 +296,7 @@ impl Vm {
     /// uncounted hot path and the counted instrumented path. Cheap (single
     /// load + nullness check); called once per script invocation, not per
     /// dispatch.
+    #[cfg(feature = "opcode-counters")]
     #[inline]
     pub(in crate::vm) fn opcode_counter_enabled(&self) -> bool {
         self.opcode_dispatch_counts.is_some()
@@ -301,6 +309,7 @@ impl Vm {
     /// `run_trampoline_counted`, so the hot dispatch path
     /// (`run_trampoline_uncounted` + every `dispatch_next!` tail) never
     /// pays the cost of the disabled-case load+branch.
+    #[cfg(feature = "opcode-counters")]
     #[inline]
     pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
         let Some(counts) = &self.opcode_dispatch_counts else {
