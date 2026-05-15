@@ -602,6 +602,11 @@ impl PrimitiveHeap {
     }
 
     #[inline]
+    pub(crate) fn object_ref(&self, id: ObjectRef) -> Option<&RuntimeObjectRecord> {
+        self.objects.get_ref(id)
+    }
+
+    #[inline]
     pub(crate) fn function_payload(&self, id: FunctionPayloadRef) -> Option<RuntimeFunctionRecord> {
         self.function_payloads.get(id)
     }

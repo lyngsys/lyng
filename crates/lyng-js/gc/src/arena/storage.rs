@@ -173,7 +173,7 @@ impl ArenaHandle for SuspendedRegistersRef {
 }
 
 pub(super) struct SlotArena<Record, Handle> {
-    pages: Vec<SlotPage<Record>>,
+    pages: Vec<Box<SlotPage<Record>>>,
     pages_with_available_slots: usize,
     first_page_with_available_slot: Option<usize>,
     marker: PhantomData<Handle>,
@@ -213,7 +213,7 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
             return make_handle::<Handle>(page_index, slot_index);
         }
 
-        let mut page = SlotPage::new();
+        let mut page = Box::new(SlotPage::new());
         let slot_index = page
             .allocate(record, lifetime, generation)
             .expect("fresh primitive page must accept its first record");
@@ -232,6 +232,11 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
     pub(super) fn get(&self, handle: Handle) -> Option<Record> {
         let (page_index, slot_index) = locate::<Handle>(handle)?;
         self.pages.get(page_index)?.get(slot_index)
+    }
+
+    pub(super) fn get_ref(&self, handle: Handle) -> Option<&Record> {
+        let (page_index, slot_index) = locate::<Handle>(handle)?;
+        self.pages.get(page_index)?.get_ref(slot_index)
     }
 
     pub(super) fn free(&mut self, handle: Handle) -> Option<Record> {
@@ -466,6 +471,10 @@ impl<Record: Copy> SlotPage<Record> {
 
     fn get(&self, slot_index: usize) -> Option<Record> {
         self.slots.get(slot_index).copied().flatten()
+    }
+
+    fn get_ref(&self, slot_index: usize) -> Option<&Record> {
+        self.slots.get(slot_index)?.as_ref()
     }
 
     fn update(&mut self, slot_index: usize, update: &mut impl FnMut(&mut Record)) -> bool {

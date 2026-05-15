@@ -196,6 +196,11 @@ impl<'a> PrimitiveHeapView<'a> {
     }
 
     #[inline]
+    pub fn object_ref(self, id: ObjectRef) -> Option<&'a RuntimeObjectRecord> {
+        self.heap.object_ref(id)
+    }
+
+    #[inline]
     pub fn function_payload(self, id: FunctionPayloadRef) -> Option<RuntimeFunctionRecord> {
         self.heap.function_payload(id)
     }
