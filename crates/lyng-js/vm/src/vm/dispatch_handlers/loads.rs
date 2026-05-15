@@ -24,7 +24,7 @@ use crate::vm::dispatch::{
     decode_accumulator_register_operands, decode_local_operands,
 };
 use crate::vm::dispatch_state::{DispatchState, Step};
-use crate::{dispatch_next, try_step};
+use crate::{dispatch_next, dispatch_next_with_value, try_step};
 
 // =====================================================================
 // Move (Abc form, no feedback slot)
@@ -64,10 +64,11 @@ macro_rules! op_lda_constant {
                 code,
                 pc,
             ));
+            let value = $value;
             let registers = state.frame.registers();
-            state.vm.write_register_unchecked(registers, 0, $value);
+            state.vm.write_register_unchecked(registers, 0, value);
             state.advance(instruction_len);
-            dispatch_next!(state);
+            dispatch_next_with_value!(state, value);
         }
     };
 }
@@ -158,13 +159,12 @@ pub extern "C" fn op_lda_smi8(state: &mut DispatchState) -> Step {
         code,
         pc,
     ));
-    let value = i8::from_le_bytes([bx.to_le_bytes()[0]]);
+    let raw = i8::from_le_bytes([bx.to_le_bytes()[0]]);
+    let value = Value::from_smi(i32::from(raw));
     let registers = state.frame.registers();
-    state
-        .vm
-        .write_register(registers, 0, Value::from_smi(i32::from(value)));
+    state.vm.write_register(registers, 0, value);
     state.advance(instruction_len);
-    dispatch_next!(state);
+    dispatch_next_with_value!(state, value);
 }
 
 pub extern "C" fn op_lda_const8(state: &mut DispatchState) -> Step {
@@ -180,7 +180,7 @@ pub extern "C" fn op_lda_const8(state: &mut DispatchState) -> Step {
     let registers = state.frame.registers();
     state.vm.write_register_unchecked(registers, 0, value);
     state.advance(instruction_len);
-    dispatch_next!(state);
+    dispatch_next_with_value!(state, value);
 }
 
 pub extern "C" fn op_ldar(state: &mut DispatchState) -> Step {
@@ -196,7 +196,7 @@ pub extern "C" fn op_ldar(state: &mut DispatchState) -> Step {
     let value = state.vm.read_register_unchecked(registers, a);
     state.vm.write_register_unchecked(registers, 0, value);
     state.advance(instruction_len);
-    dispatch_next!(state);
+    dispatch_next_with_value!(state, value);
 }
 
 // =====================================================================

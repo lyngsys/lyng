@@ -265,6 +265,70 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
     }
 }
 
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn vm_star_fusion_elides_star_dispatch_after_lda() {
+    // Phase 4b regression: `LdaX; StarN` pairs should produce one dispatch,
+    // not two — the Lda* handler tail folds the Star inline before
+    // dispatching to the instruction after the Star.
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(17).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    // `LoadOne r0` compacts to `LdaOne` (1-byte, accumulator target).
+    builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    // `Move r2 ← r0` compacts to `Star2` (1-byte, accumulator → r2).
+    builder
+        .emit_abc(Opcode::Move, 2, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 2)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(17), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    vm.enable_opcode_dispatch_counts();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(1));
+
+    let counts = vm
+        .opcode_dispatch_counts()
+        .expect("enabled opcode counters should produce a snapshot");
+    assert_eq!(
+        counts.count(Opcode::LdaOne),
+        1,
+        "LdaOne should dispatch once"
+    );
+    assert_eq!(
+        counts.count(Opcode::Star2),
+        0,
+        "Star2 dispatch should be fused into the LdaOne handler tail"
+    );
+    assert_eq!(
+        counts.count(Opcode::Return),
+        1,
+        "Return should still dispatch"
+    );
+    assert_eq!(
+        counts.total(),
+        2,
+        "fused pair yields one dispatch (LdaOne) plus Return"
+    );
+}
+
 #[test]
 fn vm_loop_backedges_poll_active_incremental_major_mark() {
     let unit = compile_test_unit(

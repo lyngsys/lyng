@@ -246,6 +246,55 @@ macro_rules! dispatch_next {
     }};
 }
 
+/// Star-fusion variant of `dispatch_next!` for value-producing handlers
+/// whose target register is the accumulator (`r0`).
+///
+/// Matches V8 Ignition's writer-side Star-fusion peephole
+/// (`src/interpreter/interpreter-assembler.cc`): if the next byte is a
+/// `StarN` opcode, the handler writes the just-produced value to register
+/// `N` inline and advances past the `Star` byte before dispatching to the
+/// instruction *after* it — eliminating one dispatch per fused pair.
+///
+/// Callers must have already written `value` to register 0; this macro
+/// only performs the extra write to register `N`. Pass the value in a
+/// local variable (not a side-effecting expression) — the macro evaluates
+/// `$value` once on the fast path and not at all on the no-fusion path.
+///
+/// The SAFETY contract on `next_opcode_byte()` is satisfied transitively:
+/// every `StarN` is followed by another valid opcode (Stars never appear
+/// as a terminal instruction), so the second `next_opcode_byte()` after
+/// `advance(1)` is also in-bounds.
+#[macro_export]
+macro_rules! dispatch_next_with_value {
+    ($state:expr, $value:expr) => {{
+        let byte = $state.next_opcode_byte();
+        if let Some(target) =
+            ::lyng_js_bytecode::Opcode::accumulator_store_index_for_byte(byte)
+        {
+            let registers = $state.frame.registers();
+            $state.vm.write_register_unchecked(registers, target, $value);
+            $state.advance(1);
+            let next_byte = $state.next_opcode_byte();
+            #[cfg(debug_assertions)]
+            $state.vm.assert_deopt_safepoint_state(
+                $state.agent,
+                &$state.frame,
+                &$state.installed,
+            );
+            return $crate::vm::dispatch_state::Step::Continue(
+                $crate::vm::dispatch_state::DISPATCH_TABLE[next_byte as usize],
+            );
+        }
+        #[cfg(debug_assertions)]
+        $state
+            .vm
+            .assert_deopt_safepoint_state($state.agent, &$state.frame, &$state.installed);
+        return $crate::vm::dispatch_state::Step::Continue(
+            $crate::vm::dispatch_state::DISPATCH_TABLE[byte as usize],
+        );
+    }};
+}
+
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
 /// `return Step::Error(e)` on Err.
 #[macro_export]

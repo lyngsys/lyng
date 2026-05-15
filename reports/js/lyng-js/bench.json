@@ -347,15 +347,15 @@
       "label": "runtime.nursery-minor-gc",
       "live_bytes": 800,
       "major_gc": {
-        "last_background_sweep_apply_pause_ns": 417,
+        "last_background_sweep_apply_pause_ns": 500,
         "last_background_sweep_candidates": 63,
         "last_background_sweep_completed": true,
-        "last_background_sweep_duration_ns": 1,
+        "last_background_sweep_duration_ns": 42,
         "last_background_sweep_reclaimed": 63,
         "last_background_sweep_started": true,
         "last_background_sweep_worker_thread_id": 15803403730818557393,
         "last_gray_work_items_after_finish": 0,
-        "last_mark_finish_pause_ns": 83,
+        "last_mark_finish_pause_ns": 42,
         "last_mark_finish_work_items": 1,
         "last_mark_slice_budget": 64,
         "last_mark_slices": 0,
@@ -380,7 +380,7 @@
         "capacity_bytes": 1048576,
         "last_minor_cards_dirtied": 1,
         "last_minor_cards_scanned": 1,
-        "last_minor_pause_ns": 792,
+        "last_minor_pause_ns": 1291,
         "last_minor_reclaimed": 10,
         "last_minor_survivors": 1,
         "last_minor_tenured": 1,
@@ -428,10 +428,10 @@
       "label": "runtime.major-gc-mark-slices",
       "live_bytes": 376,
       "major_gc": {
-        "last_background_sweep_apply_pause_ns": 1833,
+        "last_background_sweep_apply_pause_ns": 1667,
         "last_background_sweep_candidates": 35,
         "last_background_sweep_completed": true,
-        "last_background_sweep_duration_ns": 41,
+        "last_background_sweep_duration_ns": 42,
         "last_background_sweep_reclaimed": 35,
         "last_background_sweep_started": true,
         "last_background_sweep_worker_thread_id": 8390724546948265409,
@@ -441,9 +441,9 @@
         "last_mark_slice_budget": 1,
         "last_mark_slices": 2,
         "last_mark_work_items": 2,
-        "last_max_mark_pause_ns": 41,
+        "last_max_mark_pause_ns": 84,
         "last_max_mark_slice_work_items": 1,
-        "last_total_mark_pause_ns": 41
+        "last_total_mark_pause_ns": 84
       },
       "module_caches": {
         "live_bytes": 0,
@@ -494,7 +494,7 @@
     "frontend_repetitions": 24,
     "json_path": "reports/js/lyng-js/bench.json",
     "loop_trip_count": 2048,
-    "report_path": "/tmp/lyng-js-bench-phase-4a.md",
+    "report_path": "/tmp/lyng-js-bench-phase-4b.md",
     "runs_per_sample": 9,
     "samples": 7,
     "warmup_runs": 2
@@ -504,7 +504,7 @@
   "workloads": [
     {
       "delta": {
-        "median_ns_per_operation": -172.44466145833212
+        "median_ns_per_operation": -308.61637369791606
       },
       "memory": {
         "allocated_feedback_bytes": 41864,
@@ -532,9 +532,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 9582.146538628473,
-        "median_total_ns": 176618125,
-        "median_us_per_run": 19624.23611111111,
+        "median_ns_per_operation": 9419.083224826389,
+        "median_total_ns": 173612542,
+        "median_us_per_run": 19290.282444444445,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -542,7 +542,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -150.32503255208337
+        "median_ns_per_operation": -63.625759548611086
       },
       "memory": {
         "allocated_feedback_bytes": 24912,
@@ -570,9 +570,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 603.6309136284722,
-        "median_total_ns": 11126125,
-        "median_us_per_run": 1236.236111111111,
+        "median_ns_per_operation": 592.73046875,
+        "median_total_ns": 10925208,
+        "median_us_per_run": 1213.912,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -580,7 +580,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 31.638888888889596
+        "median_ns_per_operation": 89.11574074074042
       },
       "memory": {
         "allocated_feedback_bytes": null,
@@ -608,9 +608,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.frontend",
       "throughput": {
-        "median_ns_per_operation": 3788.5833333333335,
-        "median_total_ns": 818334,
-        "median_us_per_run": 90.92599999999999,
+        "median_ns_per_operation": 3738.2314814814813,
+        "median_total_ns": 807458,
+        "median_us_per_run": 89.71755555555556,
         "operations_per_run": 24,
         "runs_per_sample": 9,
         "samples": 7
@@ -618,7 +618,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -243.9484592013887
+        "median_ns_per_operation": -93.02886284722217
       },
       "memory": {
         "allocated_feedback_bytes": 69064,
@@ -646,9 +646,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 2247.8728298611113,
-        "median_total_ns": 41432792,
-        "median_us_per_run": 4603.643555555555,
+        "median_ns_per_operation": 2271.7940538194443,
+        "median_total_ns": 41873708,
+        "median_us_per_run": 4652.634222222223,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -656,7 +656,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -34.916666666666515
+        "median_ns_per_operation": 81.98148148148175
       },
       "memory": {
         "allocated_feedback_bytes": null,
@@ -684,9 +684,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "module.compile",
       "throughput": {
-        "median_ns_per_operation": 3120.7546296296296,
-        "median_total_ns": 674083,
-        "median_us_per_run": 74.8981111111111,
+        "median_ns_per_operation": 3236.1111111111113,
+        "median_total_ns": 699000,
+        "median_us_per_run": 77.66666666666667,
         "operations_per_run": 24,
         "runs_per_sample": 9,
         "samples": 7
@@ -694,7 +694,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -11.53792317708303
+        "median_ns_per_operation": -53.9325086805552
       },
       "memory": {
         "allocated_feedback_bytes": 19272,
@@ -722,9 +722,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 3804.3212890625,
-        "median_total_ns": 70121250,
-        "median_us_per_run": 7791.25,
+        "median_ns_per_operation": 3845.1311848958335,
+        "median_total_ns": 70873458,
+        "median_us_per_run": 7874.828666666666,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -732,7 +732,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -1949.6437717013905
+        "median_ns_per_operation": -1138.5723741319453
       },
       "memory": {
         "allocated_feedback_bytes": 38448,
@@ -760,9 +760,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 45482.92822265625,
-        "median_total_ns": 838341333,
-        "median_us_per_run": 93149.037,
+        "median_ns_per_operation": 45221.141710069445,
+        "median_total_ns": 833516084,
+        "median_us_per_run": 92612.89822222223,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -770,7 +770,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -59.07980685763869
+        "median_ns_per_operation": 18.06640625
       },
       "memory": {
         "allocated_feedback_bytes": 21528,
@@ -798,9 +798,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 2078.3894856770835,
-        "median_total_ns": 38308875,
-        "median_us_per_run": 4256.541666666667,
+        "median_ns_per_operation": 2103.3505859375,
+        "median_total_ns": 38768958,
+        "median_us_per_run": 4307.662,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -808,7 +808,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": 145.54622395833212
+        "median_ns_per_operation": -552.9061414930547
       },
       "memory": {
         "allocated_feedback_bytes": 10248,
@@ -836,9 +836,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 12773.740397135416,
-        "median_total_ns": 235445583,
-        "median_us_per_run": 26160.620333333336,
+        "median_ns_per_operation": 12548.385091145834,
+        "median_total_ns": 231291834,
+        "median_us_per_run": 25699.092666666667,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -846,7 +846,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -349.0419921875
+        "median_ns_per_operation": 137.0510525173595
       },
       "memory": {
         "allocated_feedback_bytes": 44088,
@@ -874,9 +874,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 34609.61008029514,
-        "median_total_ns": 637924333,
-        "median_us_per_run": 70880.48144444445,
+        "median_ns_per_operation": 34224.39914279514,
+        "median_total_ns": 630824125,
+        "median_us_per_run": 70091.56944444444,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -884,7 +884,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -28.966796875
+        "median_ns_per_operation": -17.471842447916686
       },
       "memory": {
         "allocated_feedback_bytes": 7992,
@@ -912,9 +912,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 154.86203342013889,
-        "median_total_ns": 2854417,
-        "median_us_per_run": 317.1574444444445,
+        "median_ns_per_operation": 157.71940104166666,
+        "median_total_ns": 2907084,
+        "median_us_per_run": 323.0093333333333,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7
@@ -922,7 +922,7 @@
     },
     {
       "delta": {
-        "median_ns_per_operation": -120.6845703125
+        "median_ns_per_operation": -39.01502821180554
       },
       "memory": {
         "allocated_feedback_bytes": 37320,
@@ -950,9 +950,9 @@
       "opcode_dispatch_counts": null,
       "pipeline": "script.runtime",
       "throughput": {
-        "median_ns_per_operation": 707.6167534722222,
-        "median_total_ns": 13042792,
-        "median_us_per_run": 1449.199111111111,
+        "median_ns_per_operation": 708.5706922743055,
+        "median_total_ns": 13060375,
+        "median_us_per_run": 1451.1527777777778,
         "operations_per_run": 2048,
         "runs_per_sample": 9,
         "samples": 7

@@ -665,6 +665,18 @@ impl Opcode {
             _ => None,
         }
     }
+
+    /// `Some(N)` if the byte decodes to a `StarN` opcode, else `None`.
+    /// Used by the dispatch-loop Star-fusion peephole to avoid materializing
+    /// a full `Opcode` enum value on the hot path. Bytecode-emitter
+    /// invariant: the byte after any value-producing handler is a valid
+    /// opcode byte; callers must still verify `next_opcode_byte()`'s
+    /// SAFETY contract (`PC < instruction_bytes.len()`) at the producer.
+    #[inline]
+    #[must_use]
+    pub fn accumulator_store_index_for_byte(byte: u8) -> Option<u16> {
+        Self::from_byte(byte).and_then(Self::accumulator_store_index)
+    }
 }
 
 #[cfg(test)]

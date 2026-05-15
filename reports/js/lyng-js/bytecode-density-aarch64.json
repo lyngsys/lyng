@@ -13,7 +13,7 @@
     "evals_per_sample": 15,
     "json_path": "reports/js/lyng-js/bytecode-density-aarch64.json",
     "loop_trip_count": 2048,
-    "report_path": "/tmp/lyng-js-bytecode-density-phase-4a.md",
+    "report_path": "/tmp/lyng-js-bytecode-density-phase-4b-take2.md",
     "samples": 7,
     "target_arch": "aarch64"
   },
@@ -22,7 +22,7 @@
   "workloads": [
     {
       "delta": {
-        "median_us_per_eval": -249.20833333333326,
+        "median_us_per_eval": -77.91113333333328,
         "unit_bytes": 0
       },
       "density": {
@@ -42,15 +42,15 @@
       "throughput": {
         "checksum": 9189595297426270208,
         "evals_per_sample": 15,
-        "median_total_ns": 29623583,
-        "median_us_per_eval": 1974.9055333333333,
+        "median_total_ns": 30157208,
+        "median_us_per_eval": 2010.4805333333336,
         "samples": 7
       }
     },
     {
       "delta": {
-        "median_us_per_eval": -155.5193999999999,
-        "unit_bytes": -16
+        "median_us_per_eval": 47.27506666666682,
+        "unit_bytes": 0
       },
       "density": {
         "base_words": 41,
@@ -69,15 +69,15 @@
       "throughput": {
         "checksum": 9189595297379191808,
         "evals_per_sample": 15,
-        "median_total_ns": 26919792,
-        "median_us_per_eval": 1794.6528,
+        "median_total_ns": 27934417,
+        "median_us_per_eval": 1862.2944666666667,
         "samples": 7
       }
     },
     {
       "delta": {
-        "median_us_per_eval": -346.01106666666647,
-        "unit_bytes": -36
+        "median_us_per_eval": -106.36660000000029,
+        "unit_bytes": 0
       },
       "density": {
         "base_words": 115,
@@ -96,15 +96,15 @@
       "throughput": {
         "checksum": 9189595297347765248,
         "evals_per_sample": 15,
-        "median_total_ns": 53175167,
-        "median_us_per_eval": 3545.0111333333334,
+        "median_total_ns": 54681917,
+        "median_us_per_eval": 3645.461133333333,
         "samples": 7
       }
     },
     {
       "delta": {
-        "median_us_per_eval": -81.99439999999981,
-        "unit_bytes": 2
+        "median_us_per_eval": 3.00553333333346,
+        "unit_bytes": 0
       },
       "density": {
         "base_words": 85,
@@ -123,15 +123,15 @@
       "throughput": {
         "checksum": 9189595297347580928,
         "evals_per_sample": 15,
-        "median_total_ns": 21589209,
-        "median_us_per_eval": 1439.2806000000003,
+        "median_total_ns": 22217916,
+        "median_us_per_eval": 1481.1944,
         "samples": 7
       }
     },
     {
       "delta": {
-        "median_us_per_eval": 14.516666666666652,
-        "unit_bytes": -8
+        "median_us_per_eval": -21.691733333333104,
+        "unit_bytes": 0
       },
       "density": {
         "base_words": 678,
@@ -150,8 +150,8 @@
       "throughput": {
         "checksum": 9189595297349980928,
         "evals_per_sample": 15,
-        "median_total_ns": 22771625,
-        "median_us_per_eval": 1518.1083333333333,
+        "median_total_ns": 23371208,
+        "median_us_per_eval": 1558.0805333333335,
         "samples": 7
       }
     }
