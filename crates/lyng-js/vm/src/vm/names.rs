@@ -9,10 +9,11 @@ use crate::vm::property_access::VmProxyBridge;
 use lyng_js_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
 };
+use lyng_js_gc::ValueStoreTarget;
 use lyng_js_host::HostHooks;
 #[cfg(test)]
 use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::{NativeFunctionRegistry, ObjectKind};
+use lyng_js_objects::{NativeFunctionRegistry, ObjectKind, SlotLocation};
 use lyng_js_ops::{errors, object, proxy, read};
 use lyng_js_types::{FeedbackSlotId, PropertyKey};
 
@@ -538,6 +539,35 @@ impl Vm {
         let global_object = agent
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
+        // Phase 3c inline IC fast path (mirrors Phase 3a's load-side inlining):
+        // packed-handler load, shape compare, epoch compare, slot read. Bypasses
+        // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
+        // PrototypeData / megamorphic still fall through to the chain below.
+        if let Some((handler, cached_epoch)) =
+            self.named_property_fast_handler(code, feedback_slot)
+        {
+            let view = agent.heap().view();
+            if let Some(record) = view.object_ref(global_object) {
+                if record.shape() == handler.receiver_shape()
+                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+                {
+                    let fast_value = match handler.slot_location() {
+                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                        SlotLocation::OutOfLine(offset) => record
+                            .named_slots()
+                            .and_then(|slots| view.object_slots(slots))
+                            .and_then(|slots| slots.get(offset as usize).copied()),
+                    };
+                    if let Some(value) = fast_value {
+                        if let Some(slot) = feedback_slot {
+                            self.record_named_property_fast_hit(code, slot);
+                        }
+                        return Ok(value);
+                    }
+                }
+            }
+        }
+        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
         if let Some(value) =
             self.try_named_property_load_inline_cache_hit(agent, code, feedback_slot, global_object)
         {
@@ -587,6 +617,44 @@ impl Vm {
             return self.write_environment_slot(agent, environment, binding.slot(), value);
         }
         let global_object = global.global_object();
+        // Phase 3c inline IC fast path (store side, mirrors Phase 3b). Non-writable
+        // own-data hit short-circuits to stored=false; for SetNamedProperty this
+        // is a silent no-op (just like the slow chain).
+        if let Some(target_opt) = self
+            .named_property_fast_handler(code, feedback_slot)
+            .and_then(|(handler, cached_epoch)| {
+                let view = agent.heap().view();
+                let record = view.object_ref(global_object)?;
+                if record.shape() != handler.receiver_shape()
+                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
+                {
+                    return None;
+                }
+                if !handler.writable() {
+                    return Some(None);
+                }
+                let target = match handler.slot_location() {
+                    SlotLocation::Inline(index) => {
+                        ValueStoreTarget::InlineNamedSlot(global_object, index)
+                    }
+                    SlotLocation::OutOfLine(offset) => {
+                        let slots = record.named_slots()?;
+                        ValueStoreTarget::ObjectSlot(slots, offset)
+                    }
+                };
+                Some(Some(target))
+            })
+        {
+            if let Some(target) = target_opt {
+                agent.with_heap_and_objects(|heap, _objects| {
+                    let mut mutator = heap.mutator();
+                    mutator.mut_store_value(target, value)
+                });
+            }
+            self.record_feedback_slot(code, feedback_slot);
+            return Ok(());
+        }
+        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
         if self
             .try_named_property_store_inline_cache(agent, code, feedback_slot, global_object, value)
             .is_some()
@@ -644,6 +712,49 @@ impl Vm {
 
         let key = PropertyKey::from_atom(name);
         let global_object = global.global_object();
+        // Phase 3c inline IC fast path (assign side). Same as store, but on
+        // !stored in strict mode we throw a TypeError (sloppy mode silently
+        // ignores the failed store) — preserving the slow chain's behavior.
+        if let Some(target_opt) = self
+            .named_property_fast_handler(code, feedback_slot)
+            .and_then(|(handler, cached_epoch)| {
+                let view = agent.heap().view();
+                let record = view.object_ref(global_object)?;
+                if record.shape() != handler.receiver_shape()
+                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
+                {
+                    return None;
+                }
+                if !handler.writable() {
+                    return Some(None);
+                }
+                let target = match handler.slot_location() {
+                    SlotLocation::Inline(index) => {
+                        ValueStoreTarget::InlineNamedSlot(global_object, index)
+                    }
+                    SlotLocation::OutOfLine(offset) => {
+                        let slots = record.named_slots()?;
+                        ValueStoreTarget::ObjectSlot(slots, offset)
+                    }
+                };
+                Some(Some(target))
+            })
+        {
+            let stored = if let Some(target) = target_opt {
+                agent.with_heap_and_objects(|heap, _objects| {
+                    let mut mutator = heap.mutator();
+                    mutator.mut_store_value(target, value)
+                })
+            } else {
+                false
+            };
+            if !stored && self.frame_is_strict(frame) {
+                return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+            }
+            self.record_feedback_slot(code, feedback_slot);
+            return Ok(());
+        }
+        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
         if let Some(stored) = self.try_named_property_store_inline_cache(
             agent,
             code,
