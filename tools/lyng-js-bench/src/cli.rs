@@ -5,6 +5,7 @@ pub enum Command {
     Density(Vec<String>),
     Test262(Vec<String>),
     Compare(Vec<String>),
+    V8Suite(Vec<String>),
 }
 
 /// Parse the top-level benchmark suite selector.
@@ -20,6 +21,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
         Some("density") => Ok(Command::Density(args[2..].to_vec())),
         Some("test262") => Ok(Command::Test262(args[2..].to_vec())),
         Some("compare") => Ok(Command::Compare(args[2..].to_vec())),
+        Some("v8suite") => Ok(Command::V8Suite(args[2..].to_vec())),
         Some(other) => Err(format!(
             "Unknown benchmark suite: {other}\n\n{}",
             help_text()
@@ -30,13 +32,15 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench [runtime|density|test262|compare] [suite-options]",
+        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite] [suite-options]",
         "",
         "Suites:",
         "  runtime  Lyng JS runtime, frontend, and memory benchmark report",
         "  density  Lyng JS bytecode-density and instruction-cache proxy report",
         "  test262  Test262 performance diagnostics for agents",
         "  compare  External QuickJS and Boa comparison report",
+        "  v8suite  V8 v7 benchmarks (Richards, DeltaBlue, Crypto, RayTrace,",
+        "           NavierStokes, Splay) — Phase 1 exit-gate scoring",
         "",
         "Run `lyng-js-bench <suite> --help` for suite-specific options.",
     ]
@@ -92,9 +96,26 @@ mod tests {
     #[test]
     fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare]"));
+        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite]"));
         assert!(help.contains("test262  Test262 performance diagnostics for agents"));
         assert!(help.contains("compare  External QuickJS and Boa comparison report"));
+        assert!(help.contains("v8suite  V8 v7 benchmarks"));
         assert!(!help.contains("phase"));
+    }
+
+    #[test]
+    fn parses_v8suite_subcommand_with_passthrough_args() {
+        assert_eq!(
+            parse_command(&args(&["lyng-js-bench", "v8suite", "--samples", "5"])).unwrap(),
+            Command::V8Suite(vec!["--samples".to_string(), "5".to_string()])
+        );
+    }
+
+    #[test]
+    fn parses_v8suite_subcommand_with_no_args() {
+        assert_eq!(
+            parse_command(&args(&["lyng-js-bench", "v8suite"])).unwrap(),
+            Command::V8Suite(vec![])
+        );
     }
 }
