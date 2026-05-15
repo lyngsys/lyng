@@ -9,7 +9,8 @@ use lyng_js_gc::{AllocationLifetime, ValueStoreTarget};
 use lyng_js_host::HostHooks;
 use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
 use lyng_js_ops::{errors, object};
-use lyng_js_types::{FeedbackSlotId, PropertyDescriptor, PropertyKey, Value};
+use lyng_js_common::AtomId;
+use lyng_js_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 impl Vm {
     #[expect(
@@ -413,6 +414,15 @@ impl Vm {
                 .as_smi()
                 .and_then(|index| u32::try_from(index).ok())
         {
+            // Phase 3d dense-index inline IC fast path (SMI key).
+            if let Some(value) =
+                self.try_keyed_dense_fast_load(agent, frame.code(), feedback_slot, object, index)
+            {
+                self.write_register(frame.registers(), target, value);
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: polymorphic / Generic / megamorphic / miss.
             if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -449,6 +459,15 @@ impl Vm {
         };
         let value = if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
+                // Phase 3d dense-index inline IC fast path (post-coercion index).
+                if let Some(value) =
+                    self.try_keyed_dense_fast_load(agent, frame.code(), feedback_slot, object, index)
+                {
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: polymorphic / Generic / megamorphic / miss.
                 if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
                     agent,
                     frame.code(),
@@ -486,6 +505,15 @@ impl Vm {
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 value
             } else if let Some(atom) = key.as_atom() {
+                // Phase 3d named-keyed (atom) inline IC fast path.
+                if let Some(value) =
+                    self.try_keyed_named_fast_load(agent, frame.code(), feedback_slot, object, atom)
+                {
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: polymorphic / megamorphic / Generic / miss.
                 if let Some(value) = self.try_keyed_property_load_inline_cache(
                     agent,
                     frame.code(),
@@ -577,6 +605,32 @@ impl Vm {
                 .as_smi()
                 .and_then(|index| u32::try_from(index).ok())
         {
+            // Phase 3d dense-index inline IC fast path (SMI key, store side).
+            if let Some(stored) = self.try_keyed_dense_fast_store(
+                agent,
+                frame.code(),
+                feedback_slot,
+                object,
+                index,
+                value,
+            ) {
+                if assignment {
+                    let assignment_result = self.check_property_assignment_result(
+                        agent,
+                        frame,
+                        stored,
+                        strict_assignment,
+                    );
+                    let Some(()) =
+                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
+                    else {
+                        return Ok(());
+                    };
+                }
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: polymorphic / Generic / megamorphic / miss.
             if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -676,6 +730,36 @@ impl Vm {
         };
         if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
+                // Phase 3d dense-index inline IC fast path (post-coercion index, store side).
+                if let Some(stored) = self.try_keyed_dense_fast_store(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    index,
+                    value,
+                ) {
+                    if assignment {
+                        let assignment_result = self.check_property_assignment_result(
+                            agent,
+                            frame,
+                            stored,
+                            strict_assignment,
+                        );
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
+                            return Ok(());
+                        };
+                    }
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: polymorphic / Generic / megamorphic / miss.
                 if let Some(stored) = self.try_keyed_dense_index_store_inline_cache_hit(
                     agent,
                     frame.code(),
@@ -789,6 +873,36 @@ impl Vm {
                 }
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
             } else if let Some(atom) = key.as_atom() {
+                // Phase 3d named-keyed (atom) inline IC fast path (store side).
+                if let Some(stored) = self.try_keyed_named_fast_store(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    atom,
+                    value,
+                ) {
+                    if assignment {
+                        let assignment_result = self.check_property_assignment_result(
+                            agent,
+                            frame,
+                            stored,
+                            strict_assignment,
+                        );
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
+                            return Ok(());
+                        };
+                    }
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: polymorphic / megamorphic / Generic / miss.
                 if let Some(stored) = self.try_keyed_property_store_inline_cache(
                     agent,
                     frame.code(),
@@ -1222,5 +1336,167 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(())
+    }
+
+    /// Phase 3d dense-keyed load fast path. Returns the cached element
+    /// value on a monomorphic-DenseIndex hit, falling through to `None`
+    /// on shape/flags miss, hole, or any cache state other than monomorphic.
+    /// Records tier bookkeeping on hit. Mirrors the trailing two lines of
+    /// `try_keyed_dense_index_load_inline_cache_hit`.
+    #[inline(always)]
+    fn try_keyed_dense_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        index: u32,
+    ) -> Option<Value> {
+        let handler = self.keyed_property_dense_fast_handler(code, feedback_slot)?;
+        let view = agent.heap().view();
+        let header = agent.objects().object_header(view, receiver)?;
+        if handler.receiver_shape() != Some(header.shape())
+            || handler.receiver_flags() != header.flags()
+        {
+            return None;
+        }
+        let elements = header.elements()?;
+        let value = view
+            .object_slots(elements.raw())?
+            .get(index as usize)
+            .copied()?;
+        if value == Value::array_hole() {
+            return None;
+        }
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(value)
+    }
+
+    /// Phase 3d dense-keyed store fast path. Returns `Some(true)` on a
+    /// successful barrier-aware write, `None` on miss / hole / shape
+    /// mismatch / out-of-bounds. Mirrors the guards in
+    /// `KeyedPropertyFeedback::try_dense_index_store`.
+    #[inline(always)]
+    fn try_keyed_dense_fast_store(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        index: u32,
+        value: Value,
+    ) -> Option<bool> {
+        if value == Value::array_hole() {
+            return None;
+        }
+        let handler = self.keyed_property_dense_fast_handler(code, feedback_slot)?;
+        let (elements, current) = {
+            let view = agent.heap().view();
+            let header = agent.objects().object_header(view, receiver)?;
+            if handler.receiver_shape() != Some(header.shape())
+                || handler.receiver_flags() != header.flags()
+            {
+                return None;
+            }
+            let elements = header.elements()?;
+            let current = view
+                .object_slots(elements.raw())?
+                .get(index as usize)
+                .copied()
+                .unwrap_or(Value::array_hole());
+            (elements, current)
+        };
+        if current == Value::array_hole() {
+            return None;
+        }
+        let stored = agent.with_heap_and_objects(|heap, _objects| {
+            let mut mutator = heap.mutator();
+            mutator.mut_store_value(ValueStoreTarget::ObjectSlot(elements.raw(), index), value)
+        });
+        if !stored {
+            return None;
+        }
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(true)
+    }
+
+    /// Phase 3d named-keyed (atom) load fast path. Returns the cached
+    /// slot value on a monomorphic-NamedAtom hit, `None` on miss.
+    /// Records the slot via `record_feedback_slot` (matching the slow
+    /// chain's bookkeeping on atom hit).
+    #[inline(always)]
+    fn try_keyed_named_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        atom: AtomId,
+    ) -> Option<Value> {
+        let (handler, cached_epoch) =
+            self.keyed_property_named_fast_handler(code, feedback_slot, atom)?;
+        let view = agent.heap().view();
+        let record = view.object_ref(receiver)?;
+        if record.shape() != handler.receiver_shape()
+            || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
+        {
+            return None;
+        }
+        let value = match handler.slot_location() {
+            SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
+            SlotLocation::OutOfLine(off) => view
+                .object_slots(record.named_slots()?)?
+                .get(off as usize)
+                .copied()?,
+        };
+        self.record_feedback_slot(code, feedback_slot);
+        Some(value)
+    }
+
+    /// Phase 3d named-keyed (atom) store fast path. Returns `Some(stored)`
+    /// on a monomorphic-NamedAtom hit, `None` on miss. Non-writable
+    /// hits return `Some(false)` (matching slow-chain semantics — the
+    /// caller's `assignment` logic converts this to a TypeError in
+    /// strict mode).
+    #[inline(always)]
+    fn try_keyed_named_fast_store(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        atom: AtomId,
+        value: Value,
+    ) -> Option<bool> {
+        let (handler, cached_epoch) =
+            self.keyed_property_named_fast_handler(code, feedback_slot, atom)?;
+        let (named_slots, shape_match) = {
+            let view = agent.heap().view();
+            let record = view.object_ref(receiver)?;
+            let shape_match = record.shape() == handler.receiver_shape()
+                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch;
+            (record.named_slots(), shape_match)
+        };
+        if !shape_match {
+            return None;
+        }
+        let stored = if handler.writable() {
+            let target = match handler.slot_location() {
+                SlotLocation::Inline(i) => ValueStoreTarget::InlineNamedSlot(receiver, i),
+                SlotLocation::OutOfLine(off) => ValueStoreTarget::ObjectSlot(named_slots?, off),
+            };
+            agent.with_heap_and_objects(|heap, _objects| {
+                let mut mutator = heap.mutator();
+                mutator.mut_store_value(target, value)
+            })
+        } else {
+            false
+        };
+        self.record_feedback_slot(code, feedback_slot);
+        Some(stored)
     }
 }
