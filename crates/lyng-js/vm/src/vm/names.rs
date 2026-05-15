@@ -543,8 +543,7 @@ impl Vm {
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
         // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
         // PrototypeData / megamorphic still fall through to the chain below.
-        if let Some((handler, cached_epoch)) =
-            self.named_property_fast_handler(code, feedback_slot)
+        if let Some((handler, cached_epoch)) = self.named_property_fast_handler(code, feedback_slot)
         {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object) {
@@ -567,7 +566,16 @@ impl Vm {
                 }
             }
         }
-        // Slow path: polymorphic / PrototypeData / megamorphic / miss.
+        // Phase 3e one-hop PrototypeData inline fast path. Globals frequently
+        // resolve through the global object's prototype chain (e.g.
+        // `Math` accessed via the window proto), so this is the second
+        // tier before the slow chain.
+        if let Some(value) =
+            self.try_named_property_proto_fast_load(agent, code, feedback_slot, global_object)
+        {
+            return Ok(value);
+        }
+        // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / miss.
         if let Some(value) =
             self.try_named_property_load_inline_cache_hit(agent, code, feedback_slot, global_object)
         {

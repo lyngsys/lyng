@@ -287,6 +287,142 @@ impl NamedPropertyHandler {
     }
 }
 
+/// Bit-packed monomorphic one-hop PrototypeData inline-cache handler.
+///
+/// Phase 3e extension of [`NamedPropertyHandler`] for `PrototypeData` cache
+/// entries with `dependency_count == 2` — receiver → one prototype object
+/// (the dominant class-method-dispatch / `Object.prototype` pattern). The
+/// inline fast path validates receiver shape + receiver epoch + prototype
+/// shape + prototype epoch, then reads the cached slot from the prototype
+/// without touching the slow chain.
+///
+/// Layout — two 64-bit words, both required for a valid handler:
+///   `receiver_word`: receiver shape in the low 32 bits (NonZeroU32; `0` ⇒
+///   NONE sentinel). High 32 bits reserved (currently always zero).
+///   `proto_word`: mirrors [`NamedPropertyHandler`]'s u64 layout — prototype
+///   shape in the high 32 bits, slot offset / inline / writable flags in the
+///   low 32 bits.
+///
+/// The whole-handler `NONE` sentinel is `(0, 0)`. Because both shape IDs
+/// are NonZeroU32, a non-zero `receiver_word` implies a populated handler.
+///
+/// Receiver-epoch invalidation covers prototype swaps: `set_prototype()`
+/// bumps the receiver's `invalidation_epoch` with cause
+/// `PrototypeMutation`, so the receiver-epoch compare catches a swap before
+/// the prototype object is even examined — no need to store the prototype's
+/// `ObjectRef` in the handler.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct NamedPropertyProtoHandler {
+    receiver_word: u64,
+    proto_word: u64,
+}
+
+impl NamedPropertyProtoHandler {
+    /// Sentinel value indicating "no proto fast handler available". Set when
+    /// the cache is uninitialized, polymorphic, megamorphic, an `OwnData`
+    /// entry (Phase 3a–3d covers those), or a `PrototypeData` entry whose
+    /// dependency chain isn't exactly the one-hop case.
+    pub const NONE: Self = Self {
+        receiver_word: 0,
+        proto_word: 0,
+    };
+
+    /// Build a fast handler from a cache entry. Returns [`Self::NONE`] for
+    /// entries the one-hop proto fast path cannot service:
+    /// `OwnData` paths (Phase 3a–3d's [`NamedPropertyHandler`] handles
+    /// these), any `PrototypeData` entry with `dependency_count != 2`
+    /// (multi-hop chains fall through to the slow path), entries missing
+    /// either dependency record, and any entry whose slot offset doesn't
+    /// fit in 30 bits.
+    #[inline]
+    #[must_use]
+    pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
+        match entry.path() {
+            NamedPropertyCachePath::OwnData => return Self::NONE,
+            NamedPropertyCachePath::PrototypeData => {}
+        }
+        if entry.dependency_count() != 2 {
+            return Self::NONE;
+        }
+        let Some(receiver_dep) = entry.dependency(0) else {
+            return Self::NONE;
+        };
+        let Some(proto_dep) = entry.dependency(1) else {
+            return Self::NONE;
+        };
+        let receiver_shape = entry.receiver_shape();
+        if receiver_dep.shape().get() != receiver_shape.get() {
+            return Self::NONE;
+        }
+        if proto_dep.shape().get() != entry.holder_shape().get() {
+            return Self::NONE;
+        }
+        let encoded_offset = entry.slot_offset();
+        let inline_bit = encoded_offset & INLINE_SLOT_OFFSET_FLAG;
+        let offset_bits = encoded_offset & INLINE_SLOT_OFFSET_MASK;
+        if offset_bits > HANDLER_SLOT_OFFSET_MASK {
+            return Self::NONE;
+        }
+        let writable_bit = if entry.attrs().writable() {
+            HANDLER_WRITABLE_FLAG
+        } else {
+            0
+        };
+        let low = inline_bit | writable_bit | offset_bits;
+        let proto_shape_raw = entry.holder_shape().get() as u64;
+        Self {
+            receiver_word: receiver_shape.get() as u64,
+            proto_word: (proto_shape_raw << 32) | (low as u64),
+        }
+    }
+
+    /// Returns the cached receiver `ShapeId`, or `None` when this is the
+    /// sentinel [`Self::NONE`] value.
+    #[inline]
+    #[must_use]
+    pub const fn receiver_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw(self.receiver_word as u32)
+    }
+
+    /// Returns the cached prototype `ShapeId`, or `None` when this is the
+    /// sentinel [`Self::NONE`] value.
+    #[inline]
+    #[must_use]
+    pub const fn prototype_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw((self.proto_word >> 32) as u32)
+    }
+
+    /// Decoded slot location on the prototype holder. Only meaningful when
+    /// [`Self::is_valid`] is true.
+    #[inline]
+    #[must_use]
+    pub const fn slot_location(self) -> SlotLocation {
+        let low = self.proto_word as u32;
+        let offset = low & HANDLER_SLOT_OFFSET_MASK;
+        if low & INLINE_SLOT_OFFSET_FLAG == 0 {
+            SlotLocation::OutOfLine(offset)
+        } else {
+            SlotLocation::Inline(offset)
+        }
+    }
+
+    /// `true` when the cached property is writable. Loads ignore this bit;
+    /// it's reserved for a potential future setter-aware store fast path.
+    #[inline]
+    #[must_use]
+    pub const fn writable(self) -> bool {
+        (self.proto_word as u32) & HANDLER_WRITABLE_FLAG != 0
+    }
+
+    /// `true` when this handler carries a valid one-hop PrototypeData fast
+    /// path. `false` for [`Self::NONE`].
+    #[inline]
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        self.receiver_word != 0
+    }
+}
+
 /// Bit-packed monomorphic dense-index keyed IC handler.
 ///
 /// Used by the Phase 3d keyed-property fast path for the dense-index family

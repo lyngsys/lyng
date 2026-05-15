@@ -4,12 +4,12 @@ use crate::vm::property_access::VmProxyBridge;
 use crate::vm::registers::absolute_register;
 use crate::{FrameRecord, Vm, VmError};
 use lyng_js_bytecode::Opcode;
+use lyng_js_common::AtomId;
 use lyng_js_env::Agent;
 use lyng_js_gc::{AllocationLifetime, ValueStoreTarget};
 use lyng_js_host::HostHooks;
 use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
 use lyng_js_ops::{errors, object};
-use lyng_js_common::AtomId;
 use lyng_js_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 impl Vm {
@@ -131,7 +131,21 @@ impl Vm {
                     }
                 }
             }
-            // Slow path: polymorphic / PrototypeData / megamorphic / miss.
+            // Phase 3e one-hop PrototypeData inline fast path. Class method
+            // dispatch and Object.prototype lookups are PrototypeData with
+            // dependency_count==2 — the OwnData handler above rejected them,
+            // but this branch validates receiver shape+epoch and prototype
+            // shape+epoch in straight-line code before reading the cached
+            // slot off the prototype. Multi-hop PrototypeData and any other
+            // shape still fall through to the slow chain below.
+            if let Some(value) =
+                self.try_named_property_proto_fast_load(agent, frame.code(), feedback_slot, object)
+            {
+                self.register_stack[target_index] = value;
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / miss.
             if let Some(value) = self.try_named_property_load_inline_cache_hit(
                 agent,
                 frame.code(),
@@ -460,9 +474,13 @@ impl Vm {
         let value = if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
                 // Phase 3d dense-index inline IC fast path (post-coercion index).
-                if let Some(value) =
-                    self.try_keyed_dense_fast_load(agent, frame.code(), feedback_slot, object, index)
-                {
+                if let Some(value) = self.try_keyed_dense_fast_load(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    index,
+                ) {
                     self.write_register(frame.registers(), target, value);
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
@@ -513,7 +531,19 @@ impl Vm {
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Slow path: polymorphic / megamorphic / Generic / miss.
+                // Phase 3e named-keyed (atom) one-hop PrototypeData fast path.
+                if let Some(value) = self.try_keyed_named_proto_fast_load(
+                    agent,
+                    frame.code(),
+                    feedback_slot,
+                    object,
+                    atom,
+                ) {
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                // Slow path: polymorphic / multi-hop PrototypeData / megamorphic / Generic / miss.
                 if let Some(value) = self.try_keyed_property_load_inline_cache(
                     agent,
                     frame.code(),
@@ -1450,6 +1480,91 @@ impl Vm {
             SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
             SlotLocation::OutOfLine(off) => view
                 .object_slots(record.named_slots()?)?
+                .get(off as usize)
+                .copied()?,
+        };
+        self.record_feedback_slot(code, feedback_slot);
+        Some(value)
+    }
+
+    /// Phase 3e named-property (non-keyed) one-hop PrototypeData fast
+    /// path. Returns the cached slot value from the prototype holder on a
+    /// monomorphic + one-hop PrototypeData hit, `None` on any miss
+    /// (shape/epoch mismatch on receiver or prototype, missing prototype,
+    /// etc.). Bypasses the slow chain on the dominant class-method-
+    /// dispatch / `Object.prototype` lookup pattern.
+    #[inline(always)]
+    pub(in crate::vm) fn try_named_property_proto_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+    ) -> Option<Value> {
+        let (handler, receiver_epoch, prototype_epoch) =
+            self.named_property_proto_fast_handler(code, feedback_slot)?;
+        let view = agent.heap().view();
+        let record = view.object_ref(receiver)?;
+        if record.shape() != handler.receiver_shape()
+            || record.last_invalidation_epoch().unwrap_or(0) != receiver_epoch
+        {
+            return None;
+        }
+        let prototype_id = record.prototype()?;
+        let prototype_record = view.object_ref(prototype_id)?;
+        if prototype_record.shape() != handler.prototype_shape()
+            || prototype_record.last_invalidation_epoch().unwrap_or(0) != prototype_epoch
+        {
+            return None;
+        }
+        let value = match handler.slot_location() {
+            SlotLocation::Inline(i) => prototype_record.inline_named_slot(i as usize)?,
+            SlotLocation::OutOfLine(off) => view
+                .object_slots(prototype_record.named_slots()?)?
+                .get(off as usize)
+                .copied()?,
+        };
+        if let Some(slot) = feedback_slot {
+            self.record_named_property_fast_hit(code, slot);
+        }
+        Some(value)
+    }
+
+    /// Phase 3e named-keyed (atom) one-hop PrototypeData fast path.
+    /// Returns the cached slot value from the prototype holder on a
+    /// monomorphic + NamedAtom + one-hop PrototypeData hit, `None` on
+    /// miss (shape/epoch mismatch on receiver or prototype, missing
+    /// prototype, etc.). Records the slot via `record_feedback_slot`
+    /// matching the OwnData sibling.
+    #[inline(always)]
+    fn try_keyed_named_proto_fast_load(
+        &mut self,
+        agent: &Agent,
+        code: CodeRef,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver: ObjectRef,
+        atom: AtomId,
+    ) -> Option<Value> {
+        let (handler, receiver_epoch, prototype_epoch) =
+            self.keyed_property_named_proto_fast_handler(code, feedback_slot, atom)?;
+        let view = agent.heap().view();
+        let record = view.object_ref(receiver)?;
+        if record.shape() != handler.receiver_shape()
+            || record.last_invalidation_epoch().unwrap_or(0) != receiver_epoch
+        {
+            return None;
+        }
+        let prototype_id = record.prototype()?;
+        let prototype_record = view.object_ref(prototype_id)?;
+        if prototype_record.shape() != handler.prototype_shape()
+            || prototype_record.last_invalidation_epoch().unwrap_or(0) != prototype_epoch
+        {
+            return None;
+        }
+        let value = match handler.slot_location() {
+            SlotLocation::Inline(i) => prototype_record.inline_named_slot(i as usize)?,
+            SlotLocation::OutOfLine(off) => view
+                .object_slots(prototype_record.named_slots()?)?
                 .get(off as usize)
                 .copied()?,
         };

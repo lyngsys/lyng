@@ -155,6 +155,310 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
 }
 
 #[test]
+fn named_property_load_ic_caches_prototype_data_one_hop() {
+    let unit = compile_test_unit(150, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let prototype = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(42),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+}
+
+#[test]
+fn named_property_load_ic_invalidates_proto_fast_on_prototype_swap() {
+    let unit = compile_test_unit(151, "source.value;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let prototype_a = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype_a,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(11),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    let prototype_b = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype_b,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(22),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype_a)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+
+    // Swap the prototype to one with a different value at the same shape.
+    // The receiver epoch bump (cause = PrototypeMutation) must invalidate
+    // the proto fast path so the next access observes the new value.
+    agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects
+            .set_prototype_of(&mut mutator, object, Some(prototype_b))
+            .unwrap()
+    });
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(22)
+    );
+}
+
+#[test]
+fn keyed_named_property_load_ic_caches_prototype_data_one_hop() {
+    let unit = compile_test_unit(152, "var k = \"value\"; source[k];");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::KeyedPropertyAccess)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a keyed-load site");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    let prototype = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(99),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(99)
+    );
+    let snapshot = vm
+        .keyed_property_cache_snapshot(installed.code(), slot)
+        .expect("keyed cache snapshot should be populated");
+    assert_eq!(snapshot.0, "Monomorphic");
+    assert_eq!(snapshot.1, Some("NamedAtom"));
+}
+
+#[test]
+fn named_property_load_ic_does_not_engage_proto_fast_path_for_three_hop_chain() {
+    let unit = compile_test_unit(153, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let great_grandparent = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        great_grandparent,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(77),
+        AllocationLifetime::Default,
+    )
+    .unwrap());
+    let grandparent = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(great_grandparent)),
+            AllocationLifetime::Default,
+        )
+    });
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(grandparent)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(77)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(77)
+    );
+    // The IC still records the entry as PrototypeData — but with three
+    // dependencies, the proto fast handler stays NONE and the slow chain
+    // services the access.
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+}
+
+#[test]
 fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property() {
     let unit = compile_test_unit(36, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();

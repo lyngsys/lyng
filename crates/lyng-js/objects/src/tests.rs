@@ -278,8 +278,7 @@ fn synthesize_own_data_entry(
     writable: bool,
 ) -> NamedPropertyCacheEntry {
     let holder = ObjectRef::from_raw(7).unwrap();
-    let mut dependencies =
-        [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
+    let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
     if dependency_count >= 1 {
         dependencies[0] = Some(PropertyCacheDependency::new(holder, receiver_shape, None));
     }
@@ -332,7 +331,10 @@ fn named_property_handler_packs_writable_bit_for_read_only_entry() {
     let shape = ShapeId::from_raw(0x9009).unwrap();
     let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(1).encode(), 1, None, false);
     let handler = NamedPropertyHandler::from_entry(entry);
-    assert!(handler.is_valid(), "non-writable own-data still gets a fast handler");
+    assert!(
+        handler.is_valid(),
+        "non-writable own-data still gets a fast handler"
+    );
     assert_eq!(handler.receiver_shape(), Some(shape));
     assert_eq!(handler.slot_location(), SlotLocation::Inline(1));
     assert!(
@@ -347,10 +349,20 @@ fn named_property_handler_writable_bit_does_not_alias_slot_offset() {
     // bit-30 if we ever encode offsets above 0x3FFF_FFFF. Sanity-check that the
     // decode masks correctly and the writable bit is independent.
     let shape = ShapeId::from_raw(0xC0DE).unwrap();
-    let writable_entry =
-        synthesize_own_data_entry(shape, SlotLocation::OutOfLine(0x4242).encode(), 1, None, true);
-    let read_only_entry =
-        synthesize_own_data_entry(shape, SlotLocation::OutOfLine(0x4242).encode(), 1, None, false);
+    let writable_entry = synthesize_own_data_entry(
+        shape,
+        SlotLocation::OutOfLine(0x4242).encode(),
+        1,
+        None,
+        true,
+    );
+    let read_only_entry = synthesize_own_data_entry(
+        shape,
+        SlotLocation::OutOfLine(0x4242).encode(),
+        1,
+        None,
+        false,
+    );
     let w = NamedPropertyHandler::from_entry(writable_entry);
     let r = NamedPropertyHandler::from_entry(read_only_entry);
     assert_eq!(w.slot_location(), SlotLocation::OutOfLine(0x4242));
@@ -408,11 +420,110 @@ fn named_property_handler_none_sentinel_decodes_safely() {
     assert!(!handler.writable());
 }
 
+fn synthesize_proto_data_entry(
+    receiver_shape: ShapeId,
+    holder_shape: ShapeId,
+    slot_offset: u32,
+    dependency_count: u8,
+    writable: bool,
+) -> NamedPropertyCacheEntry {
+    let receiver = ObjectRef::from_raw(7).unwrap();
+    let holder = ObjectRef::from_raw(11).unwrap();
+    let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
+    if dependency_count >= 1 {
+        dependencies[0] = Some(PropertyCacheDependency::new(receiver, receiver_shape, None));
+    }
+    if dependency_count >= 2 {
+        dependencies[1] = Some(PropertyCacheDependency::new(holder, holder_shape, None));
+    }
+    if dependency_count >= 3 {
+        dependencies[2] = Some(PropertyCacheDependency::new(holder, holder_shape, None));
+    }
+    let mut attrs = DescriptorAttributes::empty();
+    attrs.set_writable(writable);
+    NamedPropertyCacheEntry::new(
+        receiver_shape,
+        holder,
+        holder_shape,
+        slot_offset,
+        attrs,
+        NamedPropertyCachePath::PrototypeData,
+        dependency_count,
+        dependencies,
+    )
+}
+
+#[test]
+fn named_property_proto_handler_packs_one_hop_inline_entry() {
+    let receiver = ShapeId::from_raw(0x1234_5678).unwrap();
+    let holder = ShapeId::from_raw(0x0000_4242).unwrap();
+    let entry =
+        synthesize_proto_data_entry(receiver, holder, SlotLocation::Inline(3).encode(), 2, true);
+    let handler = NamedPropertyProtoHandler::from_entry(entry);
+    assert!(handler.is_valid());
+    assert_eq!(handler.receiver_shape(), Some(receiver));
+    assert_eq!(handler.prototype_shape(), Some(holder));
+    assert_eq!(handler.slot_location(), SlotLocation::Inline(3));
+    assert!(handler.writable());
+}
+
+#[test]
+fn named_property_proto_handler_packs_one_hop_out_of_line_entry() {
+    let receiver = ShapeId::from_raw(0xCAFE).unwrap();
+    let holder = ShapeId::from_raw(0xC0DE).unwrap();
+    let entry = synthesize_proto_data_entry(
+        receiver,
+        holder,
+        SlotLocation::OutOfLine(17).encode(),
+        2,
+        false,
+    );
+    let handler = NamedPropertyProtoHandler::from_entry(entry);
+    assert!(handler.is_valid());
+    assert_eq!(handler.receiver_shape(), Some(receiver));
+    assert_eq!(handler.prototype_shape(), Some(holder));
+    assert_eq!(handler.slot_location(), SlotLocation::OutOfLine(17));
+    assert!(!handler.writable());
+}
+
+#[test]
+fn named_property_proto_handler_none_for_own_data_path() {
+    let shape = ShapeId::from_raw(99).unwrap();
+    let entry = synthesize_own_data_entry(shape, SlotLocation::Inline(0).encode(), 1, None, true);
+    assert!(!NamedPropertyProtoHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_proto_handler_none_for_three_hop_chain() {
+    let receiver = ShapeId::from_raw(11).unwrap();
+    let holder = ShapeId::from_raw(22).unwrap();
+    let entry =
+        synthesize_proto_data_entry(receiver, holder, SlotLocation::Inline(0).encode(), 3, true);
+    assert!(!NamedPropertyProtoHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_proto_handler_none_for_single_dependency_entry() {
+    let receiver = ShapeId::from_raw(33).unwrap();
+    let holder = ShapeId::from_raw(44).unwrap();
+    let entry =
+        synthesize_proto_data_entry(receiver, holder, SlotLocation::Inline(0).encode(), 1, true);
+    assert!(!NamedPropertyProtoHandler::from_entry(entry).is_valid());
+}
+
+#[test]
+fn named_property_proto_handler_none_sentinel_decodes_safely() {
+    let handler = NamedPropertyProtoHandler::NONE;
+    assert!(!handler.is_valid());
+    assert_eq!(handler.receiver_shape(), None);
+    assert_eq!(handler.prototype_shape(), None);
+    assert!(!handler.writable());
+}
+
 #[test]
 fn keyed_dense_index_handler_round_trips_shape_and_flags() {
     let shape = ShapeId::from_raw(0xABCD_1234).unwrap();
-    let flags = ObjectFlags::extensible()
-        .union(ObjectFlags::ENGINE_ARRAY);
+    let flags = ObjectFlags::extensible().union(ObjectFlags::ENGINE_ARRAY);
     let handler = KeyedDenseIndexHandler::new(shape, flags);
     assert!(handler.is_valid());
     assert_eq!(handler.receiver_shape(), Some(shape));
