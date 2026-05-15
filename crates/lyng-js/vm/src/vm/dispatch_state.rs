@@ -268,39 +268,9 @@ pub const DISPATCH_TABLE_LEN: usize = 256;
 pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
     dispatch_handlers::build_dispatch_table();
 
-/// Central trampoline entry.
-///
-/// With the `opcode-counters` feature off (production), this is a thin
-/// wrapper that tail-calls `run_trampoline_uncounted`. With the feature on
-/// (the `lyng-js-bench` build), it branches once per script invocation
-/// between the uncounted hot path and the counted instrumented path; the
-/// hot dispatch loop never re-checks.
-///
-/// Per the post-spike asm audit (`lyng-3uem`,
-/// `reports/js/lyng-js/phase-1-diagnostics.md`), the previous design
-/// inlined `maybe_record_opcode_dispatch` into every `dispatch_next!` tail
-/// and cost ~4 instructions per dispatch even when counters were `None`.
-/// Phase 1 follow-up `lyng-3lqp` then moved the entire counter machinery
-/// behind the feature so the production binary's `.text` carries no
-/// counter code at all.
-///
-/// Behavior note (feature on): enabling/disabling counters mid-execution
-/// via `Vm::enable_opcode_dispatch_counts` /
-/// `disable_opcode_dispatch_counts` only takes effect on the next call to
-/// `run_trampoline`. The existing tests + `lyng-js-bench --count-opcodes`
-/// only toggle counters at script boundaries.
-#[inline(never)]
-pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
-    #[cfg(feature = "opcode-counters")]
-    if state.vm.opcode_counter_enabled() {
-        return run_trampoline_counted(state);
-    }
-    run_trampoline_uncounted(state)
-}
-
-/// Hot dispatch loop — counters disabled. The trampoline body has no
-/// reference to `maybe_record_opcode_dispatch`, so the per-iteration cost
-/// is just the indirect call + Step tag check + epoch check + loop back.
+/// Central trampoline — the production dispatch loop. One indirect call
+/// per opcode. The hot path is the `Step::Continue(next) => handler = next`
+/// arm; `Done` and `Error` are taken once per script.
 ///
 /// `state.vm` is hoisted into a raw pointer kept in a callee-saved register
 /// across the loop (lyng-3uem T2). Without this, LLVM re-loads `state.vm`
@@ -308,8 +278,19 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
 /// field under the extern "C" ABI; manually pinning it saves one load per
 /// dispatch. `local_epoch` mirrors `state.frame_check_epoch` in the same
 /// way — synced to `state` only on the cold (epoch-changed) arm.
+///
+/// The opcode dispatch counter lives on a sibling path: when the
+/// `opcode-counters` feature is enabled AND counters are turned on at
+/// runtime, `Vm::run_via_trampoline` routes to `run_trampoline_counted`
+/// instead. The hot path here never checks for it (lyng-3lqp).
+///
+/// Per the post-spike asm audit (`lyng-3uem`,
+/// `reports/js/lyng-js/phase-1-diagnostics.md`), an earlier design inlined
+/// `maybe_record_opcode_dispatch` into every `dispatch_next!` tail and cost
+/// ~4 instructions per dispatch even when counters were `None`. The
+/// current shape has zero counter cost on this path.
 #[inline(never)]
-fn run_trampoline_uncounted(state: &mut DispatchState) -> VmResult<Value> {
+pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
     #[cfg(debug_assertions)]
     state
         .vm
@@ -353,12 +334,13 @@ fn run_trampoline_uncounted(state: &mut DispatchState) -> VmResult<Value> {
 
 /// Instrumented dispatch loop — counters enabled. Records every dispatched
 /// opcode by calling `maybe_record_opcode_dispatch` between handler
-/// returns. The cost lives here so the hot path
-/// (`run_trampoline_uncounted`) stays clean. Not size-budgeted; only run
-/// when something has explicitly enabled counters.
+/// returns. The cost lives here so the hot path (`run_trampoline`) stays
+/// clean. Not size-budgeted; only run when something has explicitly
+/// enabled counters.
 ///
 /// Gated behind the `opcode-counters` Cargo feature; absent from the
-/// production binary entirely (`lyng-3lqp`).
+/// production binary entirely (`lyng-3lqp`). The runtime routing happens
+/// in `Vm::run_via_trampoline`, not in a wrapper next to `run_trampoline`.
 #[cfg(feature = "opcode-counters")]
 #[inline(never)]
 fn run_trampoline_counted(state: &mut DispatchState) -> VmResult<Value> {
@@ -485,11 +467,11 @@ impl Vm {
 
     /// Bridge from the live `Vm::run` entrypoint into the trampoline
     /// dispatch path. Constructs a `DispatchState` from the current active
-    /// frame, then hands control to `run_trampoline`.
-    ///
-    /// Reachable only with `--features trampoline-dispatch`. Until
-    /// sub-3..sub-7 land real handlers for every opcode family, most
-    /// programs hit `op_stub` and return `Step::Error(VmError::MissingActiveFrame)`.
+    /// frame, then hands control to `run_trampoline` (the production hot
+    /// path) — or, when the `opcode-counters` feature is enabled AND the
+    /// runtime counter is on, to `run_trampoline_counted` instead. The
+    /// branch happens here, once per script invocation, so the hot dispatch
+    /// loop never re-checks (lyng-3lqp).
     ///
     /// Frame transitions (Call*, Construct, TailCall) are handled by the
     /// family handlers themselves in sub-6; this entry point only sets up
@@ -527,6 +509,10 @@ impl Vm {
             prefix: None,
         };
 
+        #[cfg(feature = "opcode-counters")]
+        if state.vm.opcode_counter_enabled() {
+            return run_trampoline_counted(&mut state);
+        }
         run_trampoline(&mut state)
     }
 }
