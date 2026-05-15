@@ -2,8 +2,8 @@ use super::{
     eval_builtin, internal_construct_super_builtin, internal_direct_eval_builtin,
     internal_private_field_get_builtin, internal_super_constructor_builtin, CallBridgeRegisters,
     CallRange, Expr, ExprId, FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler,
-    FunctionKind, LoweredCallArguments, LoweringError, LoweringResult, Opcode, ResolutionKind,
-    SafepointKind, WellKnownAtom,
+    FunctionKind, LoweringError, LoweringResult, Opcode, ResolutionKind, SafepointKind, Span,
+    WellKnownAtom,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -87,18 +87,22 @@ impl FunctionCompiler<'_, '_> {
         } else {
             None
         };
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let callee_register = self.lower_direct_eval_callee(callee)?;
-        let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
-        direct_eval_arguments.push(callee_register);
-        direct_eval_arguments.extend(argument_values.registers.iter().copied());
-        let instruction_offset = self.emit_internal_builtin_call_into_with_offset_and_this(
-            internal_direct_eval_builtin(),
-            &direct_eval_arguments,
-            self.ast().get_expr(expr_id).span(),
-            dest,
-            this_override,
-        )?;
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let argument_count = argument_plan.len();
+        let total_count = u16::try_from(argument_count + 1)
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let argument_range = self.reserve_argument_block(total_count)?;
+        let base = argument_range.argument_base();
+        self.lower_call_arguments_into(&argument_plan, base + 1)?;
+        self.lower_direct_eval_callee_into(callee, base)?;
+        let instruction_offset = self
+            .emit_internal_builtin_call_into_with_offset_and_this_from_range(
+                internal_direct_eval_builtin(),
+                argument_range,
+                self.ast().get_expr(expr_id).span(),
+                dest,
+                this_override,
+            )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
         let annex_b_catch_names = self.active_direct_eval_annex_b_catch_names();
@@ -116,7 +120,11 @@ impl FunctionCompiler<'_, '_> {
                 parameter_names,
             );
         }
-        self.add_direct_eval_spread_feedback_site(instruction_offset, &argument_values)?;
+        self.add_direct_eval_spread_feedback_site(
+            instruction_offset,
+            argument_plan.spread_mask,
+            argument_count,
+        )?;
         Ok(true)
     }
 
@@ -137,8 +145,18 @@ impl FunctionCompiler<'_, '_> {
         } else {
             None
         };
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let callee_register = self.lower_direct_eval_callee(callee)?;
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let argument_count = argument_plan.len();
+        let arg_count_u16 = u16::try_from(argument_count)
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let total_count = arg_count_u16
+            .checked_add(1)
+            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let full_range = self.reserve_argument_block(total_count)?;
+        let base = full_range.argument_base();
+        let callee_register = base;
+        self.lower_call_arguments_into(&argument_plan, base + 1)?;
+        self.lower_direct_eval_callee_into(callee, callee_register)?;
         let builtin_eval = self.alloc_temp()?;
         self.emit_load_builtin(builtin_eval, eval_builtin())?;
         let is_builtin_eval = self.alloc_temp()?;
@@ -154,16 +172,14 @@ impl FunctionCompiler<'_, '_> {
         )?;
 
         let direct_eval_result = self.alloc_temp()?;
-        let mut direct_eval_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
-        direct_eval_arguments.push(callee_register);
-        direct_eval_arguments.extend(argument_values.registers.iter().copied());
-        let instruction_offset = self.emit_internal_builtin_call_into_with_offset_and_this(
-            internal_direct_eval_builtin(),
-            &direct_eval_arguments,
-            self.ast().get_expr(expr_id).span(),
-            direct_eval_result,
-            this_override,
-        )?;
+        let instruction_offset = self
+            .emit_internal_builtin_call_into_with_offset_and_this_from_range(
+                internal_direct_eval_builtin(),
+                full_range,
+                self.ast().get_expr(expr_id).span(),
+                direct_eval_result,
+                this_override,
+            )?;
         let lexical_scopes = self.active_direct_eval_lexical_scopes();
         let flags = self.active_direct_eval_site_flags();
         let annex_b_catch_names = self.active_direct_eval_annex_b_catch_names();
@@ -181,7 +197,11 @@ impl FunctionCompiler<'_, '_> {
                 parameter_names,
             );
         }
-        self.add_direct_eval_spread_feedback_site(instruction_offset, &argument_values)?;
+        self.add_direct_eval_spread_feedback_site(
+            instruction_offset,
+            argument_plan.spread_mask,
+            argument_count,
+        )?;
         self.builder
             .emit_ax(Opcode::Return, i32::from(direct_eval_result))?;
 
@@ -190,7 +210,7 @@ impl FunctionCompiler<'_, '_> {
             .patch_jump_to(non_eval_branch, non_eval_offset)?;
         let this_register = self.alloc_temp()?;
         self.emit_load_undefined(this_register)?;
-        let argument_range = self.materialize_argument_block(&argument_values.registers)?;
+        let argument_range = CallRange::new(base + 1, arg_count_u16);
         let (tail_callee, tail_this) =
             self.bridge_tail_call_registers(callee_register, this_register)?;
         let instruction_offset = self.builder.emit_tail_call(
@@ -203,10 +223,7 @@ impl FunctionCompiler<'_, '_> {
         self.builder.add_feedback_site(
             instruction_offset,
             FeedbackSiteKind::Call,
-            self.call_feedback_metadata(
-                argument_range.argument_count(),
-                argument_values.spread_mask,
-            ),
+            self.call_feedback_metadata(argument_range.argument_count(), argument_plan.spread_mask),
         )?;
 
         Ok(true)
@@ -225,19 +242,17 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    fn lower_direct_eval_callee(&mut self, callee: ExprId) -> LoweringResult<u16> {
+    fn lower_direct_eval_callee_into(&mut self, callee: ExprId, target: u16) -> LoweringResult<()> {
         let mut current = callee;
         while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
             current = *expression;
         }
         let Expr::Identifier { name, .. } = self.ast().get_expr(current) else {
-            return self.lower_expr_to_temp(callee);
+            return self.lower_expr_into(callee, target);
         };
         let name = *name;
         debug_assert_eq!(name, WellKnownAtom::eval.id());
-        let callee_register = self.alloc_temp()?;
-        self.emit_load_name(callee_register, name)?;
-        Ok(callee_register)
+        self.emit_load_name(target, name)
     }
 
     pub(super) fn bridge_call_registers(
@@ -755,54 +770,30 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    pub(super) fn lower_call_arguments(
-        &mut self,
-        arguments: lyng_js_ast::NodeList<ExprId>,
-    ) -> LoweringResult<LoweredCallArguments> {
-        let mut lowered = LoweredCallArguments::default();
-        for (index, argument) in self
-            .ast()
-            .get_expr_list(arguments)
-            .to_vec()
-            .into_iter()
-            .enumerate()
-        {
-            let register = if let Expr::SpreadElement { argument, .. } =
-                self.ast().get_expr(argument).clone()
-            {
-                if index >= u64::BITS as usize {
-                    return Err(LoweringError::UnsupportedExpression { expr: argument });
-                }
-                lowered.spread_mask |= 1_u64 << index;
-                self.lower_expr_to_temp(argument)?
-            } else {
-                self.lower_expr_to_temp(argument)?
-            };
-            lowered.registers.push(register);
+    pub(super) fn reserve_argument_block(&mut self, count: u16) -> LoweringResult<CallRange> {
+        if count == 0 {
+            return Ok(CallRange::new(0, 0));
         }
-        Ok(lowered)
+        let base = self
+            .builder
+            .try_alloc_registers(count)
+            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        Ok(CallRange::new(base, count))
     }
 
     pub(super) fn materialize_argument_block(
         &mut self,
         arguments: &[u16],
     ) -> LoweringResult<CallRange> {
-        if arguments.is_empty() {
-            return Ok(CallRange::new(0, 0));
-        }
-
         let count = u16::try_from(arguments.len())
             .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
-        let base = self
-            .builder
-            .try_alloc_registers(count)
-            .ok_or(LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let argument_range = self.reserve_argument_block(count)?;
+        let base = argument_range.argument_base();
         for (index, source) in arguments.iter().enumerate() {
             let target = base + u16::try_from(index).unwrap_or(u16::MAX);
             self.emit_move(target, *source)?;
         }
-
-        Ok(CallRange::new(base, count))
+        Ok(argument_range)
     }
 
     #[allow(
@@ -827,16 +818,17 @@ impl FunctionCompiler<'_, '_> {
     fn add_direct_eval_spread_feedback_site(
         &mut self,
         instruction_offset: u32,
-        argument_values: &LoweredCallArguments,
+        spread_mask: u64,
+        argument_count: usize,
     ) -> LoweringResult<()> {
-        if argument_values.spread_mask == 0 {
+        if spread_mask == 0 {
             return Ok(());
         }
-        if argument_values.spread_mask & (1_u64 << 63) != 0 {
+        if spread_mask & (1_u64 << 63) != 0 {
             return Err(LoweringError::RegisterOverflow { register: u16::MAX });
         }
-        let shifted_spread_mask = argument_values.spread_mask << 1;
-        let expected_arity = u16::try_from(argument_values.registers.len() + 1)
+        let shifted_spread_mask = spread_mask << 1;
+        let expected_arity = u16::try_from(argument_count + 1)
             .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
         self.builder.add_feedback_site(
             instruction_offset,
@@ -858,40 +850,11 @@ impl FunctionCompiler<'_, '_> {
                 FunctionKind::Arrow | FunctionKind::AsyncArrow
             )
         });
+        let span = self.ast().get_expr(expr_id).span();
         if self.state.sema.direct_eval_allows_super
             && (self.current_function.is_none() || current_direct_eval_arrow)
         {
-            let span = self.ast().get_expr(expr_id).span();
-            let super_constructor = self.alloc_temp()?;
-            self.emit_internal_builtin_call_into(
-                internal_super_constructor_builtin(),
-                &[],
-                span,
-                super_constructor,
-            )?;
-            let argument_values = self.lower_call_arguments(arguments)?;
-            let mut super_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
-            super_arguments.push(super_constructor);
-            super_arguments.extend(argument_values.registers.iter().copied());
-            let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
-                internal_construct_super_builtin(),
-                &super_arguments,
-                span,
-                dest,
-            )?;
-            if argument_values.spread_mask != 0 {
-                if argument_values.spread_mask & (1_u64 << 63) != 0 {
-                    return Err(LoweringError::RegisterOverflow { register: u16::MAX });
-                }
-                let expected_arity = u16::try_from(super_arguments.len())
-                    .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
-                self.builder.add_feedback_site(
-                    instruction_offset,
-                    FeedbackSiteKind::Call,
-                    self.call_feedback_metadata(expected_arity, argument_values.spread_mask << 1),
-                )?;
-            }
-            return Ok(());
+            return self.emit_super_construct_call_into(span, arguments, dest);
         }
 
         let Some(current_function) = self.current_function else {
@@ -908,36 +871,48 @@ impl FunctionCompiler<'_, '_> {
             return Err(LoweringError::UnsupportedExpression { expr: expr_id });
         }
 
-        let span = self.ast().get_expr(expr_id).span();
-        let super_constructor = self.alloc_temp()?;
+        self.emit_super_construct_call_into(span, arguments, dest)?;
+        self.emit_derived_class_super_call_epilogue(dest)
+    }
+
+    fn emit_super_construct_call_into(
+        &mut self,
+        span: Span,
+        arguments: lyng_js_ast::NodeList<ExprId>,
+        dest: u16,
+    ) -> LoweringResult<()> {
+        let argument_plan = self.collect_call_argument_plan(arguments)?;
+        let total_count = u16::try_from(argument_plan.len() + 1)
+            .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
+        let argument_range = self.reserve_argument_block(total_count)?;
+        let base = argument_range.argument_base();
         self.emit_internal_builtin_call_into(
             internal_super_constructor_builtin(),
             &[],
             span,
-            super_constructor,
+            base,
         )?;
-        let argument_values = self.lower_call_arguments(arguments)?;
-        let mut super_arguments = Vec::with_capacity(argument_values.registers.len() + 1);
-        super_arguments.push(super_constructor);
-        super_arguments.extend(argument_values.registers.iter().copied());
-        let instruction_offset = self.emit_internal_builtin_call_into_with_offset(
-            internal_construct_super_builtin(),
-            &super_arguments,
-            span,
-            dest,
-        )?;
-        if argument_values.spread_mask != 0 {
-            if argument_values.spread_mask & (1_u64 << 63) != 0 {
+        self.lower_call_arguments_into(&argument_plan, base + 1)?;
+        let instruction_offset = self
+            .emit_internal_builtin_call_into_with_offset_and_this_from_range(
+                internal_construct_super_builtin(),
+                argument_range,
+                span,
+                dest,
+                None,
+            )?;
+        if argument_plan.spread_mask != 0 {
+            if argument_plan.spread_mask & (1_u64 << 63) != 0 {
                 return Err(LoweringError::RegisterOverflow { register: u16::MAX });
             }
-            let expected_arity = u16::try_from(super_arguments.len())
+            let expected_arity = u16::try_from(argument_plan.len() + 1)
                 .map_err(|_| LoweringError::RegisterOverflow { register: u16::MAX })?;
             self.builder.add_feedback_site(
                 instruction_offset,
                 FeedbackSiteKind::Call,
-                self.call_feedback_metadata(expected_arity, argument_values.spread_mask << 1),
+                self.call_feedback_metadata(expected_arity, argument_plan.spread_mask << 1),
             )?;
         }
-        self.emit_derived_class_super_call_epilogue(dest)
+        Ok(())
     }
 }

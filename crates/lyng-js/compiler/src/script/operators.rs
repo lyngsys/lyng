@@ -206,10 +206,10 @@ impl FunctionCompiler<'_, '_> {
         self.emit_load_builtin(callee, builtin)?;
         let this_value = self.alloc_temp()?;
         self.emit_load_undefined(this_value)?;
-        let left = self.lower_expr_to_temp(left_expr)?;
-        let right = self.lower_expr_to_temp(right_expr)?;
-        let arguments = [left, right];
-        let argument_range = self.materialize_argument_block(&arguments)?;
+        let argument_range = self.reserve_argument_block(2)?;
+        let base = argument_range.argument_base();
+        self.lower_expr_into(left_expr, base)?;
+        self.lower_expr_into(right_expr, base + 1)?;
         let (call_result, call_callee, call_this, move_back) =
             self.bridge_call_registers(dest, callee, this_value)?;
         let instruction_offset = self.builder.emit_call(

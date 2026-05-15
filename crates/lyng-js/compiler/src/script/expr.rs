@@ -505,13 +505,11 @@ impl FunctionCompiler<'_, '_> {
         let this_value = self.alloc_temp()?;
         self.emit_load_undefined(this_value)?;
 
-        let argument = self.alloc_temp()?;
+        let argument_range = self.reserve_argument_block(1)?;
         let text = self.ast().literals().get_bigint(value).to_owned();
         let text_atom = self.state.atoms.intern(&text);
-        self.emit_load_atom_string(argument, text_atom)?;
+        self.emit_load_atom_string(argument_range.argument_base(), text_atom)?;
 
-        let arguments = [argument];
-        let argument_range = self.materialize_argument_block(&arguments)?;
         let (call_result, call_callee, call_this, move_back) =
             self.bridge_call_registers(dest, callee, this_value)?;
         let instruction_offset = self.builder.emit_call(

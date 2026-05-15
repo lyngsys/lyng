@@ -1512,12 +1512,6 @@ pub(super) struct ActiveDisposalScope {
     pub(super) kind: lyng_js_env::DisposalCapabilityKind,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) struct LoweredCallArguments {
-    pub(super) registers: Vec<u16>,
-    pub(super) spread_mask: u64,
-}
-
 fn scope_environment_bindings(
     sema: ProgramSemaView<'_>,
     scope: &lyng_js_sema::ScopeRecord,

@@ -2412,3 +2412,113 @@ fn compile_script_records_class_name_scope_for_field_initializer_eval() {
         "static direct eval and the arrow eval should both carry C's class-name scope"
     );
 }
+
+#[test]
+fn compile_script_lowers_bigint_literal_argument_directly_into_call_slot() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(4_001), "1n;");
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let argument_range = instructions
+        .iter()
+        .copied()
+        .find_map(generic_call_argument_range)
+        .expect("bigint literal should lower through an internal builtin Call");
+
+    assert_eq!(argument_range.argument_count(), 1, "{disassembly}");
+    let slot = argument_range.argument_base();
+    assert!(
+        has_writer_with_opcode(
+            &instructions,
+            slot,
+            &[Opcode::LoadConst, Opcode::LoadConst8]
+        ),
+        "bigint argument should be loaded into the call slot via LoadConst:\n{disassembly}"
+    );
+    assert!(
+        !has_move_to_register(&instructions, slot),
+        "bigint argument slot r{slot} should not be written by Move:\n{disassembly}"
+    );
+}
+
+#[test]
+fn compile_script_lowers_tagged_template_arguments_directly_into_call_slots() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(4_003),
+        "function tag(parts, value) { return parts.length + value; } tag`prefix ${42} suffix`;",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+
+    // Tagged templates lower through two generic Call instructions: the inner
+    // internal_get_template_object_builtin call (5-arg: site + 2*quasi
+    // cooked/raw), and the outer two-argument tag call. The outer call's
+    // argument slots should be written directly — slot 0 by the inner Call's
+    // result and slot 1 by a value-producing opcode — not by Move.
+    let outer_range = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| {
+            let range = generic_call_argument_range(instruction)?;
+            (range.argument_count() == 2).then_some(range)
+        })
+        .expect("two-argument tag call should be present");
+    for offset in 0..outer_range.argument_count() {
+        let slot = outer_range.argument_base() + offset;
+        assert!(
+            !has_move_to_register(&instructions, slot),
+            "tag call argument slot r{slot} should not be written by Move:\n{disassembly}"
+        );
+    }
+}
+
+#[test]
+fn compile_script_lowers_direct_eval_call_arguments_directly_into_call_slots() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_js_common::SourceId::new(4_004),
+        r#"eval("x + 1");"#,
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let entry = unit.function(unit.entry()).unwrap();
+    let instructions = entry.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let argument_range = instructions
+        .iter()
+        .copied()
+        .find_map(generic_call_argument_range)
+        .expect("direct eval should lower through a generic internal builtin Call");
+
+    // internal_direct_eval takes [eval_callee, ...user_args]: a 1-user-arg
+    // direct eval expands to a 2-slot contiguous block where slot 0 is the
+    // direct-eval callee (loaded via LoadName) and slot 1 is the user
+    // argument (a constant string here, written by LoadConst). Neither slot
+    // should be reached through Move.
+    assert_eq!(argument_range.argument_count(), 2, "{disassembly}");
+    for offset in 0..argument_range.argument_count() {
+        let slot = argument_range.argument_base() + offset;
+        assert!(
+            !has_move_to_register(&instructions, slot),
+            "direct-eval call slot r{slot} should not be written by Move:\n{disassembly}"
+        );
+    }
+}

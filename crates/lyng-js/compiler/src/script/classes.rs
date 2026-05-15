@@ -1979,6 +1979,24 @@ impl FunctionCompiler<'_, '_> {
         dest: u16,
         this_override: Option<u16>,
     ) -> LoweringResult<u32> {
+        let argument_range = self.materialize_argument_block(arguments)?;
+        self.emit_internal_builtin_call_into_with_offset_and_this_from_range(
+            builtin,
+            argument_range,
+            span,
+            dest,
+            this_override,
+        )
+    }
+
+    pub(super) fn emit_internal_builtin_call_into_with_offset_and_this_from_range(
+        &mut self,
+        builtin: BuiltinFunctionId,
+        arguments: CallRange,
+        span: Span,
+        dest: u16,
+        this_override: Option<u16>,
+    ) -> LoweringResult<u32> {
         let callee = self.alloc_temp()?;
         self.emit_load_builtin(callee, builtin)?;
         let this_value = if let Some(this_override) = this_override {
@@ -1988,14 +2006,13 @@ impl FunctionCompiler<'_, '_> {
             self.emit_load_undefined(this_value)?;
             this_value
         };
-        let argument_range = self.materialize_argument_block(arguments)?;
         let (call_result, call_callee, call_this, move_back) =
             self.bridge_call_registers(dest, callee, this_value)?;
         let instruction_offset = self.builder.emit_call(
             self.encode_register(call_result)?,
             self.encode_register(call_callee)?,
             self.encode_register(call_this)?,
-            argument_range,
+            arguments,
         )?;
         self.attach_safepoint(instruction_offset, span, SafepointKind::Allocation)?;
         if let Some(dest) = move_back {

@@ -1,19 +1,19 @@
 {
   "aggregate": {
-    "base_words": 995,
-    "max_entry_bytes": 3262,
-    "max_unit_bytes": 3267,
-    "unit_bytes": 4553,
-    "wide_share_percent": 14.957264957264957,
-    "wide_words": 175
+    "base_words": 979,
+    "max_entry_bytes": 3254,
+    "max_unit_bytes": 3259,
+    "unit_bytes": 4495,
+    "wide_share_percent": 15.091066782307024,
+    "wide_words": 174
   },
-  "has_previous": false,
+  "has_previous": true,
   "schema_version": 1,
   "settings": {
     "evals_per_sample": 15,
     "json_path": "reports/js/lyng-js/bytecode-density-aarch64.json",
     "loop_trip_count": 2048,
-    "report_path": "reports/js/lyng-js/bytecode-density-aarch64.md",
+    "report_path": "/tmp/lyng-js-bytecode-density-phase-4a.md",
     "samples": 7,
     "target_arch": "aarch64"
   },
@@ -21,7 +21,10 @@
   "tool": "lyng-js-bench density",
   "workloads": [
     {
-      "delta": null,
+      "delta": {
+        "median_us_per_eval": -249.20833333333326,
+        "unit_bytes": 0
+      },
       "density": {
         "base_words": 60,
         "entry_bytes": 244,
@@ -39,22 +42,25 @@
       "throughput": {
         "checksum": 9189595297426270208,
         "evals_per_sample": 15,
-        "median_total_ns": 33361708,
-        "median_us_per_eval": 2224.1138666666666,
+        "median_total_ns": 29623583,
+        "median_us_per_eval": 1974.9055333333333,
         "samples": 7
       }
     },
     {
-      "delta": null,
+      "delta": {
+        "median_us_per_eval": -155.5193999999999,
+        "unit_bytes": -16
+      },
       "density": {
-        "base_words": 45,
-        "entry_bytes": 150,
-        "entry_words": 36,
+        "base_words": 41,
+        "entry_bytes": 134,
+        "entry_words": 32,
         "functions": 3,
-        "max_registers": 26,
+        "max_registers": 22,
         "metadata_records": 25,
-        "unit_bytes": 184,
-        "unit_words": 45,
+        "unit_bytes": 168,
+        "unit_words": 41,
         "wide_share_percent": 0.0,
         "wide_words": 0
       },
@@ -63,22 +69,25 @@
       "throughput": {
         "checksum": 9189595297379191808,
         "evals_per_sample": 15,
-        "median_total_ns": 29252583,
-        "median_us_per_eval": 1950.1722,
+        "median_total_ns": 26919792,
+        "median_us_per_eval": 1794.6528,
         "samples": 7
       }
     },
     {
-      "delta": null,
+      "delta": {
+        "median_us_per_eval": -346.01106666666647,
+        "unit_bytes": -36
+      },
       "density": {
-        "base_words": 124,
-        "entry_bytes": 283,
-        "entry_words": 67,
+        "base_words": 115,
+        "entry_bytes": 247,
+        "entry_words": 58,
         "functions": 4,
-        "max_registers": 48,
+        "max_registers": 39,
         "metadata_records": 55,
-        "unit_bytes": 527,
-        "unit_words": 124,
+        "unit_bytes": 491,
+        "unit_words": 115,
         "wide_share_percent": 0.0,
         "wide_words": 0
       },
@@ -87,22 +96,25 @@
       "throughput": {
         "checksum": 9189595297347765248,
         "evals_per_sample": 15,
-        "median_total_ns": 58365333,
-        "median_us_per_eval": 3891.0222,
+        "median_total_ns": 53175167,
+        "median_us_per_eval": 3545.0111333333334,
         "samples": 7
       }
     },
     {
-      "delta": null,
+      "delta": {
+        "median_us_per_eval": -81.99439999999981,
+        "unit_bytes": 2
+      },
       "density": {
-        "base_words": 87,
-        "entry_bytes": 142,
-        "entry_words": 35,
+        "base_words": 85,
+        "entry_bytes": 134,
+        "entry_words": 33,
         "functions": 2,
         "max_registers": 30,
-        "metadata_records": 26,
-        "unit_bytes": 331,
-        "unit_words": 87,
+        "metadata_records": 31,
+        "unit_bytes": 333,
+        "unit_words": 85,
         "wide_share_percent": 0.0,
         "wide_words": 0
       },
@@ -111,32 +123,35 @@
       "throughput": {
         "checksum": 9189595297347580928,
         "evals_per_sample": 15,
-        "median_total_ns": 22819125,
-        "median_us_per_eval": 1521.275,
+        "median_total_ns": 21589209,
+        "median_us_per_eval": 1439.2806000000003,
         "samples": 7
       }
     },
     {
-      "delta": null,
+      "delta": {
+        "median_us_per_eval": 14.516666666666652,
+        "unit_bytes": -8
+      },
       "density": {
-        "base_words": 679,
-        "entry_bytes": 3262,
-        "entry_words": 677,
+        "base_words": 678,
+        "entry_bytes": 3254,
+        "entry_words": 676,
         "functions": 2,
-        "max_registers": 343,
+        "max_registers": 342,
         "metadata_records": 17,
-        "unit_bytes": 3267,
-        "unit_words": 679,
-        "wide_share_percent": 20.491803278688526,
-        "wide_words": 175
+        "unit_bytes": 3259,
+        "unit_words": 678,
+        "wide_share_percent": 20.422535211267608,
+        "wide_words": 174
       },
       "name": "wide.large-register-function",
       "note": "Large-register stress case that forces wide operands without changing the default 4-byte base layout.",
       "throughput": {
         "checksum": 9189595297349980928,
         "evals_per_sample": 15,
-        "median_total_ns": 22553875,
-        "median_us_per_eval": 1503.5916666666667,
+        "median_total_ns": 22771625,
+        "median_us_per_eval": 1518.1083333333333,
         "samples": 7
       }
     }

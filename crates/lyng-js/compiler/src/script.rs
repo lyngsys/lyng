@@ -88,5 +88,5 @@ use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
 pub use state::CompilationState;
 use state::{
     ActiveClassContext, CallBridgeRegisters, CompletionKind, CompletionRegisters, ControlTarget,
-    ControlTargetKind, FinallyContext, FunctionCompiler, LoweredCallArguments, ParameterSource,
+    ControlTargetKind, FinallyContext, FunctionCompiler, ParameterSource,
 };
