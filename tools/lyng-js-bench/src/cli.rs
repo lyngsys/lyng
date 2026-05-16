@@ -105,10 +105,16 @@ mod tests {
     #[test]
     fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff]"));
-        assert!(help.contains("test262  Test262 performance diagnostics for agents"));
-        assert!(help.contains("compare  External QuickJS and JSC (LLInt) comparison report"));
-        assert!(help.contains("v8suite  V8 v7 benchmarks"));
+        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint]"));
+        assert!(help.contains("test262"));
+        assert!(help.contains("Test262 performance diagnostics for agents"));
+        assert!(help.contains("compare"));
+        assert!(help.contains("External QuickJS and JSC (LLInt) comparison report"));
+        assert!(help.contains("v8suite"));
+        assert!(help.contains("V8 v7 benchmarks"));
+        assert!(help.contains("asm-diff"));
+        assert!(help.contains("microbench"));
+        assert!(help.contains("capture-llint"));
         assert!(!help.contains("phase"));
     }
 
