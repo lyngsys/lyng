@@ -21,6 +21,8 @@ mod installed;
 mod name_refs;
 #[cfg(feature = "opcode-counters")]
 mod opcode_counts;
+#[cfg(feature = "opcode-counters")]
+mod slow_path_counts;
 mod vm;
 
 #[cfg(test)]
@@ -39,6 +41,8 @@ pub use installed::InstalledCode;
 pub use opcode_counts::{
     CallArgumentCopyCounts, OpcodeDispatchCount, OpcodeDispatchCounts,
 };
+#[cfg(feature = "opcode-counters")]
+pub use slow_path_counts::{SlowPathCounterStore, SlowPathCounts};
 pub use vm::{
     CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
     ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,

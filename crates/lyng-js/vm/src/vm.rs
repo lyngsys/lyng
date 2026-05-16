@@ -157,6 +157,8 @@ pub struct Vm {
     opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
     #[cfg(feature = "opcode-counters")]
     call_argument_copy_counts: Option<CallArgumentCopyCounterStore>,
+    #[cfg(feature = "opcode-counters")]
+    slow_path_counts: Option<crate::slow_path_counts::SlowPathCounterStore>,
     debug_hook: Option<Box<dyn VmDebugHook>>,
     debug_state: VmDebugState,
     atom_texts: HashMap<AtomId, Box<str>>,
@@ -224,6 +226,8 @@ impl Vm {
             opcode_dispatch_counts: None,
             #[cfg(feature = "opcode-counters")]
             call_argument_copy_counts: None,
+            #[cfg(feature = "opcode-counters")]
+            slow_path_counts: None,
             debug_hook: None,
             debug_state: VmDebugState::default(),
             atom_texts: HashMap::new(),
@@ -393,6 +397,35 @@ impl Vm {
     #[cfg(not(feature = "opcode-counters"))]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, _count: u64) {}
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn enable_slow_path_counts(&mut self) {
+        if self.slow_path_counts.is_none() {
+            self.slow_path_counts = Some(crate::slow_path_counts::SlowPathCounterStore::new());
+        }
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn disable_slow_path_counts(&mut self) {
+        self.slow_path_counts = None;
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn reset_slow_path_counts(&mut self) {
+        if let Some(store) = &self.slow_path_counts {
+            store.reset();
+        }
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn slow_path_counts(&self) -> Option<crate::slow_path_counts::SlowPathCounts> {
+        self.slow_path_counts.as_ref().map(|store| store.snapshot())
+    }
+
+    #[cfg(feature = "opcode-counters")]
+    pub fn slow_path_counts_enabled(&self) -> bool {
+        self.slow_path_counts.is_some()
+    }
 
     pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
         self.debug_hook = Some(Box::new(hook));
