@@ -1,0 +1,199 @@
+# Hot-opcode configuration for the asm-DSL substrate.
+#
+# The `hot` list is the top-30 opcodes by measured dispatch share on the
+# V8 v7 benchmark suite (see reports/js/lyng-js/r0/v8-v7-top30.tsv for
+# the source data; refresh when the compiler emits a major new pattern).
+#
+# `target_slow_path_share` is the DSL-1 invariant: each hot opcode must
+# measure < this fraction of slow-path-semantic share on V8 v7 workloads.
+# Default 0.20; per-opcode overrides are allowed with justification.
+#
+# `aarch64_max_instructions` and `x86_64_max_instructions` are the
+# asm-diff per-handler budgets (instructions, not bytes) used by
+# `lyng-js-bench asm-diff`. Calibrated in DSL-0b from real measurements.
+# Placeholder values here (0 = no enforcement); update during DSL-0b.
+
+[meta]
+source_data = "reports/js/lyng-js/r0/v8-v7-top30.tsv"
+refresh_command = "cargo run --release -p lyng-js-bench --features lyng-js-vm/opcode-counters -- v8suite --count-opcodes --counts-json /tmp/r0-opcode-counts.json"
+default_target_slow_path_share = 0.20
+
+[[opcodes]]
+name = "Move"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Add"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "GetKeyedProperty"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Mul"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Increment"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "GetNamedProperty"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadSmi8"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadLocal1"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadLocal3"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "ShiftRight"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadLocal0"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadThis"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "AssignKeyedProperty"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "JumpIfFalse"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Jump"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadZero"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "JumpIfFalse8"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadLocal2"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadEnvSlot"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "GreaterEqual"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadConst8"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "StoreLocal3"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Decrement"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "BitAnd"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "ShiftLeft"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Ldar"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LessEqual"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "AssignNamedProperty"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "Sub"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadGlobal"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0

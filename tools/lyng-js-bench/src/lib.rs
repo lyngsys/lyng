@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod hot_opcodes;
 pub mod compare;
 pub mod density;
 pub mod runtime;
