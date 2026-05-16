@@ -68,6 +68,15 @@ or host hooks live outside the VM.
 - Test262 harness extensions such as `$262` are embedding behavior, not default realm
   bootstrap behavior.
 
+## Upcoming substrate work
+
+The dispatch substrate is moving from today's α (extern "C" handlers
+returning `Step`) to an asm-DSL substrate documented in
+[docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
+R-0 (tooling and evidence reports) is the first milestone; see
+[reports/js/lyng-js/r0/status.md](../../reports/js/lyng-js/r0/status.md)
+for current progress.
+
 ## Runtime Pipeline
 
 1. `lyng-js-lexer` tokenizes source text into compact tokens with spans and contextual flags.
