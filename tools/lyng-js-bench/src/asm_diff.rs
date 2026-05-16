@@ -1,6 +1,7 @@
 //! `lyng-js-bench asm-diff` — capture, normalize, and diff handler asm
 //! against committed per-arch baselines.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -253,6 +254,93 @@ fn extract_symbol_body(asm: &str, symbol: &str) -> Result<String, String> {
     Ok(body.join("\n"))
 }
 
+/// Normalize raw asm output per the rules in
+/// `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`.
+#[must_use]
+pub fn normalize(raw: &str) -> String {
+    let mut label_map: HashMap<String, String> = HashMap::new();
+    let mut next_label_idx = 0_usize;
+    let mut out: Vec<String> = Vec::new();
+
+    for line in raw.lines() {
+        let trimmed = line.trim_end();
+        let stripped = trimmed.trim_start();
+
+        // Rule 1-3: drop CFI / section / alignment / debug-source-comment lines.
+        if stripped.is_empty()
+            || stripped.starts_with(".cfi_")
+            || stripped.starts_with(".section")
+            || stripped.starts_with(".p2align")
+            || stripped.starts_with(".globl")
+            || stripped.starts_with(".private_extern")
+            || stripped.starts_with(".subsections_via_symbols")
+            || stripped.starts_with("# /")
+        {
+            continue;
+        }
+
+        // Rule 5: rename positional labels.
+        let renamed = rename_labels(trimmed, &mut label_map, &mut next_label_idx);
+        out.push(renamed);
+    }
+
+    out.join("\n") + "\n"
+}
+
+fn rename_labels(
+    line: &str,
+    map: &mut HashMap<String, String>,
+    next_idx: &mut usize,
+) -> String {
+    // Pattern: `LBB<digits>_<digits>` or `L<word>_<digits>` (compiler-generated).
+    // Replace with sequential L0, L1, ...
+    let mut result = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(idx) = find_compiler_label(rest) {
+        let (prefix, label_start) = rest.split_at(idx);
+        result.push_str(prefix);
+        let label_len = label_token_length(label_start);
+        let label = &label_start[..label_len];
+        let alias = map.entry(label.to_string()).or_insert_with(|| {
+            let alias = format!("L{}", *next_idx);
+            *next_idx += 1;
+            alias
+        });
+        result.push_str(alias);
+        rest = &label_start[label_len..];
+    }
+    result.push_str(rest);
+    result
+}
+
+fn find_compiler_label(s: &str) -> Option<usize> {
+    // Look for "L" followed by a letter/underscore, then digits.
+    // Matches LBB123_4, Lfunc_end42, etc. — but NOT plain "Lvalue" without digits.
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'L' && i + 1 < bytes.len() {
+            let token = &s[i..];
+            let len = label_token_length(token);
+            if len > 1 {
+                // Must contain at least one digit to be considered compiler-generated.
+                let mid = &token[1..len];
+                if mid.bytes().any(|b| b.is_ascii_digit()) {
+                    return Some(i);
+                }
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn label_token_length(s: &str) -> usize {
+    s.bytes()
+        .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,5 +399,41 @@ mod tests {
                 panic!("capture failed: {msg}");
             }
         }
+    }
+
+    #[test]
+    fn normalize_strips_cfi_directives() {
+        let raw = "foo:\n\t.cfi_startproc\n\tret\n\t.cfi_endproc\n";
+        let normalized = normalize(raw);
+        assert!(!normalized.contains(".cfi_"));
+        assert!(normalized.contains("ret"));
+    }
+
+    #[test]
+    fn normalize_strips_section_metadata() {
+        let raw = ".section __TEXT,__text\n\t.p2align 2\nfoo:\n\tret\n";
+        let normalized = normalize(raw);
+        assert!(!normalized.contains(".section"));
+        assert!(!normalized.contains(".p2align"));
+        assert!(normalized.contains("foo:"));
+    }
+
+    #[test]
+    fn normalize_renames_labels_positionally() {
+        let raw = "foo:\n\tb LBB42_3\nLBB42_3:\n\tret\n";
+        let normalized = normalize(raw);
+        assert!(!normalized.contains("LBB42_3"));
+        assert!(normalized.contains("L0"));
+        // The branch and the label both reference the same alias.
+        let l0_count = normalized.matches("L0").count();
+        assert!(l0_count >= 2, "expected branch + label, got: {normalized}");
+    }
+
+    #[test]
+    fn normalize_is_deterministic() {
+        let raw = "foo:\n\t.cfi_startproc\n\tldr x0, [x1]\n\tret\n";
+        let first = normalize(raw);
+        let second = normalize(raw);
+        assert_eq!(first, second);
     }
 }
