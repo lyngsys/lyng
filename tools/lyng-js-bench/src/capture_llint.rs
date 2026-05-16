@@ -161,13 +161,93 @@ fn capture_from_source(source_root: &std::path::Path, opcode: &str) -> Result<St
         source_root.join("Source/JavaScriptCore/llint/LowLevelInterpreter64.asm"),
         source_root.join("Source/JavaScriptCore/llint/LowLevelInterpreter.asm"),
     ];
-    let pattern = format!("llintOp(") + opcode + ",";
-    let pattern_meta = format!("llintOpWithMetadata(") + opcode + ",";
+
+    // Build search patterns. JSC wraps opcodes through several macro variants:
+    //   - llintOp(name, ...)              basic
+    //   - llintOpWithReturn(name, ...)    return-value form
+    //   - llintOpWithMetadata(name, ...)  IC metadata form
+    //   - llintOpWithJump(name, ...)      jump form
+    //   - llintOpWithProfile(name, ...)   value-profile form
+    // In addition, many opcodes are defined via per-family helper macros that
+    // strip the `op_` prefix from the name, e.g.
+    //   - binaryOp(add, OpAdd, ...)          → op_add
+    //   - binaryOpCustomStore(mul, OpMul, ...)→ op_mul
+    //   - bitOp(bitand, OpBitand, ...)       → op_bitand
+    //   - preOp(inc, OpInc, ...)             → op_inc
+    //   - compareJumpOp(jless, OpJless, ...) → op_jless
+    //   - equalityJumpOp(jeq, OpJeq, ...)    → op_jeq
+    //   - llintJumpTrueOrFalseOp(jtrue, ...) → op_jtrue
+    //   - strictEqOp / strictEqualityJumpOp / compareOp / compareUnsignedJumpOp / equalityComparisonOp
+    //   - commonCallOp(op_call, ...)         → op_call (full name kept)
+    //   - commonOp(llint_op_catch, ...)      → op_catch (prefix `llint_` stripped)
+    // We try each pattern in order; the first hit wins. For each match we
+    // capture up to 80 lines (a generous handler-sized window).
+
+    let direct_macros = [
+        "llintOp(",
+        "llintOpWithReturn(",
+        "llintOpWithMetadata(",
+        "llintOpWithJump(",
+        "llintOpWithProfile(",
+    ];
+
+    // Strip leading "op_" for helper-macro shorthand names.
+    let stripped: Option<&str> = opcode.strip_prefix("op_");
+
+    // (macro_name, name_to_use). For direct macros the `op_` prefix is kept.
+    // For helper macros the prefix is stripped (or kept for commonCallOp).
+    let mut needles: Vec<String> = Vec::new();
+    for macro_name in &direct_macros {
+        needles.push(format!("{macro_name}{opcode},"));
+    }
+    if let Some(short) = stripped {
+        for helper in [
+            "binaryOp(",
+            "binaryOpCustomStore(",
+            "bitOp(",
+            "preOp(",
+            "compareOp(",
+            "compareJumpOp(",
+            "compareUnsignedJumpOp(",
+            "equalityJumpOp(",
+            "equalityComparisonOp(",
+            "llintJumpTrueOrFalseOp(",
+            "strictEqOp(",
+            "strictEqualityJumpOp(",
+            "putByValOp(",
+        ] {
+            needles.push(format!("{helper}{short},"));
+            // Some helper macros are called with leading whitespace + name on
+            // the next line; account for the trailing newline form by also
+            // trying `(<short>,` with a newline. (Currently uniform: name is on
+            // same line in JSC, but `compareJumpOp(\n    jless, ...)` happens
+            // — we handle this by also searching for `\n    <short>,`.)
+            needles.push(format!("\n    {short},"));
+        }
+        // commonCallOp keeps the `op_` prefix.
+        needles.push(format!("commonCallOp({opcode},"));
+        needles.push(format!("commonOp(llint_{opcode},"));
+    }
 
     for file in &candidates {
         let Ok(text) = std::fs::read_to_string(file) else { continue; };
-        for needle in [&pattern, &pattern_meta] {
+        for needle in &needles {
             if let Some(start) = text.find(needle.as_str()) {
+                // For the `\n    <short>,` form, back up to the start of the
+                // preceding macro-callsite line so the captured excerpt
+                // includes the macro name (e.g. `compareJumpOp(`).
+                let start = if needle.starts_with('\n') {
+                    text[..start]
+                        .rfind('\n')
+                        .map(|i| {
+                            // Find the start of the line *before* the one we
+                            // just located: that's the macro-name line.
+                            text[..i].rfind('\n').map_or(0, |j| j + 1)
+                        })
+                        .unwrap_or(start)
+                } else {
+                    start
+                };
                 let body: String = text[start..].lines().take(80).collect::<Vec<_>>().join("\n");
                 return Ok(body);
             }
