@@ -1,4 +1,5 @@
 pub mod asm_diff;
+pub mod capture_llint;
 pub mod cli;
 pub mod hot_opcodes;
 pub mod compare;
@@ -26,5 +27,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
         cli::Command::V8Suite(command_args) => v8suite::run(&command_args),
         cli::Command::AsmDiff(command_args) => asm_diff::run(&command_args),
         cli::Command::Microbench(command_args) => microbench::run(&command_args),
+        cli::Command::CaptureLlint(command_args) => capture_llint::run(&command_args),
     }
 }
