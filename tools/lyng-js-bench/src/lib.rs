@@ -1,3 +1,4 @@
+pub mod asm_diff;
 pub mod cli;
 pub mod hot_opcodes;
 pub mod compare;
@@ -22,5 +23,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
         cli::Command::Test262(command_args) => test262::run(&command_args),
         cli::Command::Compare(command_args) => compare::run(&command_args),
         cli::Command::V8Suite(command_args) => v8suite::run(&command_args),
+        cli::Command::AsmDiff(command_args) => asm_diff::run(&command_args),
     }
 }

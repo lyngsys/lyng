@@ -6,6 +6,7 @@ pub enum Command {
     Test262(Vec<String>),
     Compare(Vec<String>),
     V8Suite(Vec<String>),
+    AsmDiff(Vec<String>),
 }
 
 /// Parse the top-level benchmark suite selector.
@@ -22,6 +23,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
         Some("test262") => Ok(Command::Test262(args[2..].to_vec())),
         Some("compare") => Ok(Command::Compare(args[2..].to_vec())),
         Some("v8suite") => Ok(Command::V8Suite(args[2..].to_vec())),
+        Some("asm-diff") => Ok(Command::AsmDiff(args[2..].to_vec())),
         Some(other) => Err(format!(
             "Unknown benchmark suite: {other}\n\n{}",
             help_text()
@@ -32,7 +34,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite] [suite-options]",
+        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff] [suite-options]",
         "",
         "Suites:",
         "  runtime  Lyng JS runtime, frontend, and memory benchmark report",
@@ -41,6 +43,7 @@ pub fn help_text() -> String {
         "  compare  External QuickJS and JSC (LLInt) comparison report",
         "  v8suite  V8 v7 benchmarks (Richards, DeltaBlue, Crypto, RayTrace,",
         "           NavierStokes, Splay) — Phase 1 exit-gate scoring",
+        "  asm-diff Capture, normalize, and diff handler asm against baselines",
         "",
         "Run `lyng-js-bench <suite> --help` for suite-specific options.",
     ]
@@ -96,7 +99,7 @@ mod tests {
     #[test]
     fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite]"));
+        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff]"));
         assert!(help.contains("test262  Test262 performance diagnostics for agents"));
         assert!(help.contains("compare  External QuickJS and JSC (LLInt) comparison report"));
         assert!(help.contains("v8suite  V8 v7 benchmarks"));
