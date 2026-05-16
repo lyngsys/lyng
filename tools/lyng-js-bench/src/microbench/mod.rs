@@ -6,6 +6,9 @@
 
 use std::path::PathBuf;
 
+mod snippets;
+pub use snippets::{Snippet, all_snippets, for_opcode};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MicrobenchOptions {
     pub opcodes_config: PathBuf,
@@ -150,5 +153,23 @@ mod tests {
     fn rejects_missing_samples_value() {
         let err = parse_args(&["--samples".into()]).unwrap_err();
         assert!(err.contains("requires a number"));
+    }
+
+    #[test]
+    fn snippets_cover_hot_opcodes_or_emit_warning() {
+        let config = crate::hot_opcodes::HotOpcodesConfig::load(
+            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/hot-opcodes.toml")),
+        ).expect("load");
+        let snippets = snippets::all_snippets();
+        let mut missing: Vec<&str> = Vec::new();
+        for entry in &config.opcodes {
+            if !snippets.contains_key(entry.name.as_str()) {
+                missing.push(entry.name.as_str());
+            }
+        }
+        // R-0 ships with snippets for the top ~4 by frequency; the rest
+        // emit "no snippet" warnings until DSL-0b coverage.
+        println!("opcodes without microbench snippet: {missing:?}");
+        // No assertion failure: partial coverage is acceptable at R-0.
     }
 }
