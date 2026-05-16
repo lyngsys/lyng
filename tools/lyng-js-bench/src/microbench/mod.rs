@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 mod snippets;
+mod timing;
 pub use snippets::{Snippet, all_snippets, for_opcode};
 
 #[derive(Debug, Clone, PartialEq)]
