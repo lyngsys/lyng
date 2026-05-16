@@ -139,7 +139,14 @@ behavior, memory reporting, or bytecode density.
 ## Memory And Safety
 
 - Rooting and tracing must be explicit around allocation paths.
-- Do not use `unsafe` code in Lyng JS crates.
+- `unsafe` code is permitted only in the DSL substrate modules listed below, and
+  only behind macro-generated code with audited invariants:
+  - `crates/lyng-js-vm-dsl/` (proc-macro crate; not yet created)
+  - `crates/lyng-js/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
+  - Existing narrow unsafe blocks in `crates/lyng-js/vm/src/vm/dispatch_state.rs` and
+    `crates/lyng-js/types/src/value.rs` (bounds-check elision, NaN-box construction).
+  Hand-written `unsafe` outside these locations is forbidden. Every `unsafe` block
+  must carry a `// SAFETY:` comment naming the invariant the caller must uphold.
 - Preserve compact handle and value representations unless the task explicitly requires a
   layout change.
 - Represent sentinels explicitly and prevent them from escaping as guest values.
