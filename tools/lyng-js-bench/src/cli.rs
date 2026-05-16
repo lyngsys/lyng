@@ -7,6 +7,7 @@ pub enum Command {
     Compare(Vec<String>),
     V8Suite(Vec<String>),
     AsmDiff(Vec<String>),
+    Microbench(Vec<String>),
 }
 
 /// Parse the top-level benchmark suite selector.
@@ -24,6 +25,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
         Some("compare") => Ok(Command::Compare(args[2..].to_vec())),
         Some("v8suite") => Ok(Command::V8Suite(args[2..].to_vec())),
         Some("asm-diff") => Ok(Command::AsmDiff(args[2..].to_vec())),
+        Some("microbench") => Ok(Command::Microbench(args[2..].to_vec())),
         Some(other) => Err(format!(
             "Unknown benchmark suite: {other}\n\n{}",
             help_text()
@@ -34,16 +36,17 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff] [suite-options]",
+        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench] [suite-options]",
         "",
         "Suites:",
-        "  runtime  Lyng JS runtime, frontend, and memory benchmark report",
-        "  density  Lyng JS bytecode-density and instruction-cache proxy report",
-        "  test262  Test262 performance diagnostics for agents",
-        "  compare  External QuickJS and JSC (LLInt) comparison report",
-        "  v8suite  V8 v7 benchmarks (Richards, DeltaBlue, Crypto, RayTrace,",
-        "           NavierStokes, Splay) — Phase 1 exit-gate scoring",
-        "  asm-diff Capture, normalize, and diff handler asm against baselines",
+        "  runtime    Lyng JS runtime, frontend, and memory benchmark report",
+        "  density    Lyng JS bytecode-density and instruction-cache proxy report",
+        "  test262    Test262 performance diagnostics for agents",
+        "  compare    External QuickJS and JSC (LLInt) comparison report",
+        "  v8suite    V8 v7 benchmarks (Richards, DeltaBlue, Crypto, RayTrace,",
+        "             NavierStokes, Splay) — Phase 1 exit-gate scoring",
+        "  asm-diff   Capture, normalize, and diff handler asm against baselines",
+        "  microbench Per-opcode ns/dispatch with confidence interval (R-0 Phase 4)",
         "",
         "Run `lyng-js-bench <suite> --help` for suite-specific options.",
     ]

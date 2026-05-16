@@ -6,6 +6,7 @@ pub mod density;
 pub mod runtime;
 pub mod test262;
 pub mod v8suite;
+pub mod microbench;
 
 /// Dispatch the requested benchmark suite.
 ///
@@ -24,5 +25,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
         cli::Command::Compare(command_args) => compare::run(&command_args),
         cli::Command::V8Suite(command_args) => v8suite::run(&command_args),
         cli::Command::AsmDiff(command_args) => asm_diff::run(&command_args),
+        cli::Command::Microbench(command_args) => microbench::run(&command_args),
     }
 }
