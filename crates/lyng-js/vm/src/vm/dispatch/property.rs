@@ -96,15 +96,6 @@ impl Vm {
             // chain below. The epoch compare mirrors
             // `record_matches_cache_dependency` and is what catches
             // non-shape invalidations like prototype mutation.
-            // Phase 3 inline IC fast path: a single packed-handler load,
-            // one shape compare, one epoch compare, one slot read. Bypasses
-            // the 4-deep try_named_property_load_inline_cache_hit ->
-            // try_load -> load_from_named_property_cache -> validated_holder
-            // chain on the monomorphic OwnData hit. Polymorphic /
-            // PrototypeData / megamorphic still fall through to the existing
-            // chain below. The epoch compare mirrors
-            // `record_matches_cache_dependency` and is what catches
-            // non-shape invalidations like prototype mutation.
             if let Some((handler, cached_epoch)) =
                 self.named_property_fast_handler(frame.code(), feedback_slot)
             {

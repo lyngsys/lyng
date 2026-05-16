@@ -1269,6 +1269,16 @@ impl Vm {
                     .and_then(ModuleRequestRecord::resolved_key)
                     .cloned()
                     .ok_or(VmError::MissingModuleResolution)?;
+                // A star-exported dependency may not yet have been linked
+                // when we land here via a sibling's compute_resolved_exports
+                // — link_module_graph siblings are walked in declaration order,
+                // so resolving `foo` from `a` while linking `b` (which
+                // re-imports from `a`) can reach `a`'s third sibling `c`
+                // before its environment has been allocated. Force the
+                // dependency's link so its environment exists before we
+                // recurse. link_module_graph is idempotent on Linked /
+                // Linking states.
+                let _ = self.link_module_graph(agent, realm, &resolved_key)?;
                 let Some(candidate) = self.resolve_module_export(
                     agent,
                     realm,

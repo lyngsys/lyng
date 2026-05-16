@@ -41,9 +41,17 @@ impl ObjectRuntime {
             return Ok(None);
         }
 
-        if !receiver_header.flags().uses_named_property_dictionary()
-            && let Some(property) = self.shape_property(receiver_header.shape(), key)
-        {
+        // Receivers that store their own properties in a dictionary may
+        // shadow inherited values with own accessor / writable / configurable
+        // entries that the shape table doesn't reflect. Walking the
+        // prototype chain past such a receiver would record a
+        // `PrototypeData` plan for a property that's actually overridden
+        // on the receiver — see classes with `static get name()` on top
+        // of `Function.prototype.name`. Bail rather than risk a stale plan.
+        if receiver_header.flags().uses_named_property_dictionary() {
+            return Ok(None);
+        }
+        if let Some(property) = self.shape_property(receiver_header.shape(), key) {
             return Ok(Self::build_named_property_cache_entry(
                 purpose,
                 receiver_header.shape(),

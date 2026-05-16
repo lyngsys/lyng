@@ -1321,6 +1321,26 @@ impl Vm {
         mut value: Value,
     ) -> VmResult<bool> {
         if agent.objects().is_module_namespace_object(object) {
+            // Module namespace refuses every Set, but the spec still
+            // requires `GetOwnProperty` to run on the namespace receiver —
+            // deferred imports use that to trigger EvaluateSync, and
+            // uninitialized lexical bindings use it to surface a
+            // ReferenceError.
+            self.evaluate_deferred_module_namespace(
+                agent, host, registry, caller, object, key,
+            )?;
+            let descriptor_result = object::get_own_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller,
+                },
+                object,
+                key,
+            );
+            descriptor_result?;
             return Ok(false);
         }
         if agent.objects().typed_array(object).is_some()
@@ -1458,6 +1478,26 @@ impl Vm {
             return Ok(false);
         };
         if agent.objects().is_module_namespace_object(receiver) {
+            // Spec §9.4.6 OrdinarySetWithOwnDescriptor reaches
+            // `Receiver.[[GetOwnProperty]](P)` even when the Set will fail —
+            // its side effects (deferred-module EvaluateSync, lexical
+            // binding TDZ check via Get) must run before we report back
+            // that the assignment was refused.
+            self.evaluate_deferred_module_namespace(
+                agent, host, registry, caller, receiver, key,
+            )?;
+            let descriptor_result = object::get_own_property_in_context(
+                &mut VmProxyBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    frame: caller,
+                },
+                receiver,
+                key,
+            );
+            descriptor_result?;
             return Ok(false);
         }
         if Self::is_engine_array_length_property(agent, receiver, key) {
