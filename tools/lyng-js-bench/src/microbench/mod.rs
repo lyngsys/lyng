@@ -4,7 +4,18 @@
 //! exercises the opcode in a tight inner loop; the harness compiles it,
 //! runs it for N iterations, and divides total time by dispatch count.
 
+use std::hint::black_box;
 use std::path::PathBuf;
+
+use lyng_js_builtins::BootstrapMode;
+use lyng_js_common::{AtomTable, SourceId};
+use lyng_js_compiler::compile_script;
+use lyng_js_env::Runtime;
+use lyng_js_host::NoopHostHooks;
+use lyng_js_parser::parse_script;
+use lyng_js_sema::analyze_script;
+use lyng_js_vm::{Vm, VmError};
+use lyng_js_types::Value;
 
 mod snippets;
 mod timing;
@@ -31,8 +42,154 @@ pub fn run(args: &[String]) -> Result<(), String> {
     if options.require_isolation {
         gate_on_loadavg()?;
     }
-    println!("microbench: options = {options:?}");
-    Err("microbench: not yet implemented (R-0 Task 13+)".into())
+
+    let config = crate::hot_opcodes::HotOpcodesConfig::load(&options.opcodes_config)?;
+    let snippet_table = snippets::all_snippets();
+
+    let mut report_lines: Vec<String> = Vec::new();
+    report_lines.push("# Microbench Baseline".to_string());
+    report_lines.push(String::new());
+    report_lines.push(format!("Samples per opcode: {}", options.samples));
+    report_lines.push(format!("Inner iters per sample: {}", options.iters));
+    report_lines.push(String::new());
+    report_lines.push(
+        "| Opcode | Samples | Median ns/dispatch | Min | Max | CI95 half-width | Snippet ratio |"
+            .to_string(),
+    );
+    report_lines.push("|---|---:|---:|---:|---:|---:|---|".to_string());
+
+    for entry in &config.opcodes {
+        let Some(snippet) = snippet_table.get(entry.name.as_str()) else {
+            report_lines.push(format!(
+                "| `{}` | — | no snippet | — | — | — | — |",
+                entry.name
+            ));
+            continue;
+        };
+
+        let samples = match run_snippet(snippet, options.iters, options.samples) {
+            Ok(s) => s,
+            Err(err) => {
+                report_lines.push(format!(
+                    "| `{}` | — | error: {err} | — | — | — | — |",
+                    entry.name
+                ));
+                continue;
+            }
+        };
+        let stats = timing::SampleStats::from_samples(samples);
+
+        report_lines.push(format!(
+            "| `{}` | {} | {:.2} | {:.2} | {:.2} | ±{:.2} | {} ops/iter |",
+            entry.name,
+            stats.samples.len(),
+            stats.median_ns_per_dispatch,
+            stats.min_ns_per_dispatch,
+            stats.max_ns_per_dispatch,
+            stats.ci95_half_width_ns,
+            snippet.opcodes_per_iter,
+        ));
+    }
+
+    let body = report_lines.join("\n") + "\n";
+    if let Some(out) = options.output.as_ref() {
+        std::fs::write(out, &body).map_err(|err| format!("write {}: {err}", out.display()))?;
+        println!("microbench: wrote {}", out.display());
+    } else {
+        println!("{body}");
+    }
+    Ok(())
+}
+
+/// Compile a snippet and run it `samples` times for `iters` inner-loop
+/// iterations each, returning a timing sample per run. One warm-up sample
+/// is executed first and discarded so the recorded samples measure steady
+/// state, not the first-eval install cost.
+///
+/// The script source is the snippet's `bench` function declaration followed
+/// by a script-level `bench(iters)` call so that re-evaluating the same
+/// installed unit drives real opcode dispatches. Each call to this function
+/// uses a fresh `Runtime` + `Vm` so feedback caches, shape state, and tier
+/// transitions don't bleed across opcodes.
+fn run_snippet(
+    snippet: &snippets::Snippet,
+    iters: u64,
+    samples: usize,
+) -> Result<Vec<timing::Sample>, String> {
+    let src = format!("{}\nbench({});\n", snippet.source, iters);
+
+    let mut atoms = AtomTable::new();
+    let source_id = SourceId::new(1);
+    let parsed = parse_script(&mut atoms, source_id, &src);
+    if parsed.diagnostics.has_errors() {
+        return Err(format!(
+            "parse errors compiling {}: {:?}",
+            snippet.opcode,
+            parsed.diagnostics.as_slice()
+        ));
+    }
+    let sema = analyze_script(&parsed, &atoms);
+    if sema.diagnostics.has_errors() {
+        return Err(format!(
+            "sema errors compiling {}: {:?}",
+            snippet.opcode,
+            sema.diagnostics.as_slice()
+        ));
+    }
+    let unit = compile_script(&parsed, &sema, &mut atoms)
+        .map_err(|err| format!("lowering failed for {}: {err:?}", snippet.opcode))?;
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent
+        .default_realm()
+        .ok_or_else(|| "default realm should exist for microbench".to_string())?;
+    let realm_id = realm.id();
+    let mut vm = Vm::new();
+    let _ = vm
+        .bootstrap_realm(agent, realm_id, BootstrapMode::SpecOnly)
+        .map_err(|err| format!("spec bootstrap failed: {err:?}"))?;
+    let installed = vm
+        .install_script(agent, realm_id, &unit)
+        .map_err(|err| format!("install_script failed for {}: {err:?}", snippet.opcode))?;
+    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).map_err(|err| {
+        format!(
+            "instantiate_global_script failed for {}: {err:?}",
+            snippet.opcode
+        )
+    })?;
+
+    // Warm-up sample: discard timing so we measure steady-state dispatch
+    // cost, not the first-eval install + initial-jit overhead.
+    let value = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .map_err(|err| format!("warmup eval failed for {}: {err:?}", snippet.opcode))?;
+    black_box(value.bits());
+
+    let dispatches_per_sample = iters
+        .checked_mul(u64::from(snippet.opcodes_per_iter))
+        .ok_or_else(|| format!("dispatch count overflow for {}", snippet.opcode))?;
+
+    let mut out = Vec::with_capacity(samples);
+    for sample_index in 0..samples {
+        let mut eval_result: Option<Result<Value, VmError>> = None;
+        let sample = timing::time_once(dispatches_per_sample, || {
+            eval_result =
+                Some(vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env()));
+        });
+        let value = eval_result
+            .expect("time_once closure always assigns eval_result")
+            .map_err(|err| {
+                format!(
+                    "sample {} eval failed for {}: {err:?}",
+                    sample_index + 1,
+                    snippet.opcode
+                )
+            })?;
+        black_box(value.bits());
+        out.push(sample);
+    }
+    Ok(out)
 }
 
 /// Abort if 1-min loadavg > 2.0.
