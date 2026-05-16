@@ -18,13 +18,14 @@
 //! that the parent driver parses.
 
 use lyng_js_builtins::BootstrapMode;
+use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::compile_script;
 use lyng_js_env::Runtime;
 use lyng_js_host::NoopHostHooks;
 use lyng_js_parser::parse_script;
 use lyng_js_sema::analyze_script;
-use lyng_js_vm::{OpcodeDispatchCounts, Vm};
+use lyng_js_vm::{OpcodeDispatchCounts, SlowPathCounts, Vm};
 use serde_json::{json, Value};
 use std::fs;
 use std::hint::black_box;
@@ -113,6 +114,7 @@ pub(crate) struct Options {
     pub per_sample_timeout: Duration,
     pub filter: Option<String>,
     pub count_opcodes: bool,
+    pub count_slow_path_share: bool,
     pub counts_json_path: Option<String>,
 }
 
@@ -176,6 +178,49 @@ pub fn run(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// Per-workload sum of `SlowPathCounts` over every counted sample. Mirrors the
+/// shape of `SlowPathCounts` but indexes by raw opcode discriminant so we can
+/// accumulate without round-tripping through the per-`Vm` counter store.
+#[derive(Clone)]
+struct SlowPathCountTotals {
+    semantic: Vec<u64>,
+    safepoint: Vec<u64>,
+}
+
+impl SlowPathCountTotals {
+    fn zeroed() -> Self {
+        Self {
+            semantic: vec![0; OPCODE_COUNT as usize],
+            safepoint: vec![0; OPCODE_COUNT as usize],
+        }
+    }
+
+    fn add_sample(&mut self, counts: &SlowPathCounts) {
+        for raw in 0..OPCODE_COUNT {
+            let Some(opcode) = Opcode::from_byte(raw) else {
+                continue;
+            };
+            let index = usize::from(raw);
+            self.semantic[index] = self.semantic[index].saturating_add(counts.semantic(opcode));
+            self.safepoint[index] = self.safepoint[index].saturating_add(counts.safepoint(opcode));
+        }
+    }
+
+    fn semantic(&self, opcode: Opcode) -> u64 {
+        self.semantic
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    fn safepoint(&self, opcode: Opcode) -> u64 {
+        self.safepoint
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
+    }
+}
+
 /// In-process driver that runs each V8 v7 workload with opcode dispatch
 /// counters enabled and emits per-workload per-opcode counts as JSON. Used by
 /// the R-0 hot-opcode measurement (lyng-5obc) — the regular score path runs
@@ -213,9 +258,14 @@ fn run_opcode_counts(options: &Options) -> Result<(), String> {
             u32::try_from(index + 1)
                 .map_err(|_| "v8suite workload count exceeds SourceId range".to_string())?,
         );
-        let counts =
-            run_workload_opcode_counts(workload, &harness_source, source_id, options.samples)?;
-        entries.push((**workload, counts));
+        let (counts, slow_path) = run_workload_opcode_counts(
+            workload,
+            &harness_source,
+            source_id,
+            options.samples,
+            options.count_slow_path_share,
+        )?;
+        entries.push((**workload, counts, slow_path));
     }
 
     let json = render_opcode_counts_json(options, &entries);
@@ -243,6 +293,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
         per_sample_timeout: Duration::from_secs(DEFAULT_PER_SAMPLE_TIMEOUT_SECS),
         filter: None,
         count_opcodes: false,
+        count_slow_path_share: false,
         counts_json_path: None,
     };
 
@@ -277,6 +328,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             }
             "--count-opcodes" | "--counter-opcodes" => {
                 options.count_opcodes = true;
+            }
+            "--count-slow-path-share" => {
+                options.count_slow_path_share = true;
             }
             "--counts-json" => {
                 options.counts_json_path = Some(take_string_arg(&mut args, "--counts-json")?);
@@ -343,6 +397,12 @@ pub fn help_text() -> String {
         "  --count-opcodes     Run each workload in-process with opcode dispatch",
         "                      counters enabled, emitting per-workload per-opcode",
         "                      counts (skips the normal subprocess score run).",
+        "  --count-slow-path-share",
+        "                      Also collect per-opcode semantic and safepoint",
+        "                      slow-path entries. Requires --count-opcodes; counts",
+        "                      join into the same JSON output. All values are zero",
+        "                      until DSL-0b adds record_semantic / record_safepoint",
+        "                      call sites — the flag wires the infrastructure.",
         "  --counts-json PATH  Path for the opcode-counts JSON output when",
         "                      --count-opcodes is on (default:",
         "                      reports/js/lyng-js/bench-v8-opcode-counts.json).",
@@ -734,12 +794,18 @@ if (__lyng_v8_count_error !== null) {
 /// enabled. Uses a fresh `Runtime` + `Vm` per sample (mirroring the
 /// subprocess-isolation discipline of the score path) so feedback caches,
 /// shape state, and any tier transitions don't leak across samples.
+///
+/// When `collect_slow_path` is set the per-sample `SlowPathCounts` snapshots
+/// are summed into a `SlowPathCountTotals` and returned alongside the
+/// opcode-dispatch totals. The slow-path counters are zero today — DSL-0b is
+/// the first task to call `record_semantic` / `record_safepoint`.
 fn run_workload_opcode_counts(
     workload: &V8Workload,
     harness_source: &str,
     source_id: SourceId,
     samples: usize,
-) -> Result<OpcodeDispatchCounts, String> {
+    collect_slow_path: bool,
+) -> Result<(OpcodeDispatchCounts, Option<SlowPathCountTotals>), String> {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(&mut atoms, source_id, harness_source);
     if parsed.diagnostics.has_errors() {
@@ -765,8 +831,14 @@ fn run_workload_opcode_counts(
     })?;
 
     let mut aggregate_pairs: Vec<(lyng_js_bytecode::Opcode, u64)> = Vec::new();
+    let mut slow_path_totals = collect_slow_path.then(SlowPathCountTotals::zeroed);
     for sample_index in 0..samples {
-        let counts = run_workload_opcode_counts_once(workload, &unit).map_err(|error| {
+        let (counts, slow_path_sample) = run_workload_opcode_counts_once(
+            workload,
+            &unit,
+            collect_slow_path,
+        )
+        .map_err(|error| {
             format!(
                 "sample {idx} failed for {name}: {error}",
                 idx = sample_index + 1,
@@ -779,14 +851,22 @@ fn run_workload_opcode_counts(
             }
             aggregate_pairs.push((entry.opcode(), entry.count()));
         }
+        if let (Some(totals), Some(sample)) = (slow_path_totals.as_mut(), slow_path_sample.as_ref())
+        {
+            totals.add_sample(sample);
+        }
     }
-    Ok(OpcodeDispatchCounts::from_counts(aggregate_pairs))
+    Ok((
+        OpcodeDispatchCounts::from_counts(aggregate_pairs),
+        slow_path_totals,
+    ))
 }
 
 fn run_workload_opcode_counts_once(
     workload: &V8Workload,
     unit: &lyng_js_bytecode::CompiledScriptUnit,
-) -> Result<OpcodeDispatchCounts, String> {
+    collect_slow_path: bool,
+) -> Result<(OpcodeDispatchCounts, Option<SlowPathCounts>), String> {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = agent
@@ -817,6 +897,10 @@ fn run_workload_opcode_counts_once(
 
     vm.enable_opcode_dispatch_counts();
     vm.reset_opcode_dispatch_counts();
+    if collect_slow_path {
+        vm.enable_slow_path_counts();
+        vm.reset_slow_path_counts();
+    }
 
     let value = vm
         .evaluate_installed(agent, installed, realm_record.global_env(), realm_record.global_env())
@@ -828,16 +912,18 @@ fn run_workload_opcode_counts_once(
         })?;
     black_box(value.bits());
 
-    Ok(vm.opcode_dispatch_counts().unwrap_or_default())
+    let dispatch = vm.opcode_dispatch_counts().unwrap_or_default();
+    let slow_path = collect_slow_path.then(|| vm.slow_path_counts().unwrap_or_default());
+    Ok((dispatch, slow_path))
 }
 
 fn render_opcode_counts_json(
     options: &Options,
-    entries: &[(V8Workload, OpcodeDispatchCounts)],
+    entries: &[(V8Workload, OpcodeDispatchCounts, Option<SlowPathCountTotals>)],
 ) -> Value {
     let workloads: Vec<Value> = entries
         .iter()
-        .map(|(workload, counts)| {
+        .map(|(workload, counts, slow_path)| {
             let mut by_opcode: Vec<(&'static str, u64)> = counts
                 .iter()
                 .filter(|entry| entry.count() != 0)
@@ -850,11 +936,16 @@ fn render_opcode_counts_json(
                 .iter()
                 .map(|(name, count)| ((*name).to_string(), json!(*count)))
                 .collect();
+            let slow_path_share = slow_path
+                .as_ref()
+                .map(|totals| slow_path_workload_json(counts, totals))
+                .unwrap_or(Value::Null);
             json!({
                 "name": workload.name,
                 "file": workload.file,
                 "total_dispatches": counts.total(),
                 "opcode_counts": Value::Object(opcode_counts),
+                "slow_path_counts": slow_path_share,
             })
         })
         .collect();
@@ -864,7 +955,7 @@ fn render_opcode_counts_json(
     // from cumulative dispatch share across the whole V8 v7 suite, not from
     // any single workload.
     let mut totals_pairs: Vec<(lyng_js_bytecode::Opcode, u64)> = Vec::new();
-    for (_, counts) in entries {
+    for (_, counts, _) in entries {
         for entry in counts.iter() {
             if entry.count() == 0 {
                 continue;
@@ -886,6 +977,27 @@ fn render_opcode_counts_json(
         .map(|(name, count)| ((*name).to_string(), json!(*count)))
         .collect();
 
+    // Aggregate slow-path totals across workloads when --count-slow-path-share
+    // is on. Mirrors the per-opcode aggregate above so downstream consumers
+    // can compute a single suite-wide semantic slow-path share.
+    let slow_path_totals_payload = if entries.iter().any(|(_, _, slow)| slow.is_some()) {
+        let mut aggregate_totals = SlowPathCountTotals::zeroed();
+        for (_, _, slow) in entries {
+            if let Some(totals) = slow.as_ref() {
+                for raw in 0..OPCODE_COUNT {
+                    let index = usize::from(raw);
+                    aggregate_totals.semantic[index] = aggregate_totals.semantic[index]
+                        .saturating_add(totals.semantic[index]);
+                    aggregate_totals.safepoint[index] = aggregate_totals.safepoint[index]
+                        .saturating_add(totals.safepoint[index]);
+                }
+            }
+        }
+        slow_path_workload_json(&aggregate, &aggregate_totals)
+    } else {
+        Value::Null
+    };
+
     json!({
         "schema": "lyng-js-bench/v8suite/opcode-counts/v1",
         "samples_per_benchmark": options.samples,
@@ -894,14 +1006,72 @@ fn render_opcode_counts_json(
         "totals": {
             "total_dispatches": aggregate.total(),
             "opcode_counts": Value::Object(totals_object),
+            "slow_path_counts": slow_path_totals_payload,
         },
     })
 }
 
-fn print_opcode_counts_summary(entries: &[(V8Workload, OpcodeDispatchCounts)], output_path: &str) {
+fn slow_path_workload_json(
+    dispatch: &OpcodeDispatchCounts,
+    slow_path: &SlowPathCountTotals,
+) -> Value {
+    let mut entries: Vec<(Opcode, u64, u64, u64)> = dispatch
+        .iter()
+        .filter(|entry| entry.count() > 0)
+        .map(|entry| {
+            let opcode = entry.opcode();
+            (
+                opcode,
+                entry.count(),
+                slow_path.semantic(opcode),
+                slow_path.safepoint(opcode),
+            )
+        })
+        .collect();
+    entries.sort_unstable_by(|left, right| {
+        right
+            .1
+            .cmp(&left.1)
+            .then_with(|| left.0.name().cmp(right.0.name()))
+    });
+    let mut total_semantic = 0_u64;
+    let mut total_safepoint = 0_u64;
+    let mut total_dispatches = 0_u64;
+    let rows: Vec<Value> = entries
+        .into_iter()
+        .map(|(opcode, dispatches, semantic, safepoint)| {
+            let share = if dispatches > 0 {
+                (semantic as f64) / (dispatches as f64) * 100.0
+            } else {
+                0.0
+            };
+            total_semantic = total_semantic.saturating_add(semantic);
+            total_safepoint = total_safepoint.saturating_add(safepoint);
+            total_dispatches = total_dispatches.saturating_add(dispatches);
+            json!({
+                "opcode": opcode.name(),
+                "dispatches": dispatches,
+                "semantic_slow_path": semantic,
+                "safepoint_slow_path": safepoint,
+                "semantic_share_percent": share,
+            })
+        })
+        .collect();
+    json!({
+        "total_dispatches": total_dispatches,
+        "total_semantic_slow_path": total_semantic,
+        "total_safepoint_slow_path": total_safepoint,
+        "per_opcode": rows,
+    })
+}
+
+fn print_opcode_counts_summary(
+    entries: &[(V8Workload, OpcodeDispatchCounts, Option<SlowPathCountTotals>)],
+    output_path: &str,
+) {
     println!("\n========== V8 v7 Opcode Counts ==========");
     println!("wrote {output_path}");
-    for (workload, counts) in entries {
+    for (workload, counts, _) in entries {
         println!(
             "{name:<14} total={total}",
             name = workload.name,

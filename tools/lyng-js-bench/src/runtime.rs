@@ -1,6 +1,5 @@
 use lyng_js_builtins::BootstrapMode;
-#[cfg(test)]
-use lyng_js_bytecode::Opcode;
+use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_js_common::{AtomTable, SourceId};
 use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
@@ -10,7 +9,9 @@ use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_js_parser::{parse_module, parse_script};
 use lyng_js_sema::{analyze_module, analyze_script};
 use lyng_js_types::{CodeRef, Value as JsValue};
-use lyng_js_vm::{FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, Vm};
+use lyng_js_vm::{
+    FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, SlowPathCounts, Vm,
+};
 use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
@@ -40,6 +41,7 @@ struct Options {
     loop_trip_count: usize,
     frontend_repetitions: usize,
     count_opcodes: bool,
+    count_slow_path_share: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,6 +79,50 @@ struct ThroughputResult {
     median_us_per_run: f64,
     median_ns_per_operation: f64,
     opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
+    slow_path_counts: Option<SlowPathCountTotals>,
+}
+
+/// Per-workload sum of `SlowPathCounts` over every timed sample. Mirrors the
+/// shape of `SlowPathCounts` but indexes by raw opcode discriminant so we can
+/// accumulate without round-tripping through the per-`Vm` counter store.
+#[derive(Clone)]
+struct SlowPathCountTotals {
+    semantic: Vec<u64>,
+    safepoint: Vec<u64>,
+}
+
+impl SlowPathCountTotals {
+    fn zeroed() -> Self {
+        Self {
+            semantic: vec![0; OPCODE_COUNT as usize],
+            safepoint: vec![0; OPCODE_COUNT as usize],
+        }
+    }
+
+    fn add_sample(&mut self, counts: &SlowPathCounts) {
+        for raw in 0..OPCODE_COUNT {
+            let Some(opcode) = Opcode::from_byte(raw) else {
+                continue;
+            };
+            let index = usize::from(raw);
+            self.semantic[index] = self.semantic[index].saturating_add(counts.semantic(opcode));
+            self.safepoint[index] = self.safepoint[index].saturating_add(counts.safepoint(opcode));
+        }
+    }
+
+    fn semantic(&self, opcode: Opcode) -> u64 {
+        self.semantic
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    fn safepoint(&self, opcode: Opcode) -> u64 {
+        self.safepoint
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -113,6 +159,7 @@ struct WorkloadReport {
 struct SampleResult {
     elapsed: Duration,
     opcode_dispatch_counts: Option<OpcodeDispatchCounts>,
+    slow_path_counts: Option<SlowPathCounts>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -189,6 +236,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
         loop_trip_count: DEFAULT_LOOP_TRIPS,
         frontend_repetitions: DEFAULT_FRONTEND_REPETITIONS,
         count_opcodes: false,
+        count_slow_path_share: false,
     };
 
     let mut args = args.iter();
@@ -232,6 +280,9 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
             "--count-opcodes" | "--counter-opcodes" => {
                 options.count_opcodes = true;
             }
+            "--count-slow-path-share" => {
+                options.count_slow_path_share = true;
+            }
             "--help" | "-h" => {
                 return Err(usage());
             }
@@ -259,7 +310,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes]".to_string()
+    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes] [--count-slow-path-share]".to_string()
 }
 
 fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
@@ -480,6 +531,10 @@ fn measure_script_runtime_sample(
         vm.enable_opcode_dispatch_counts();
         vm.reset_opcode_dispatch_counts();
     }
+    if options.count_slow_path_share {
+        vm.enable_slow_path_counts();
+        vm.reset_slow_path_counts();
+    }
 
     let start = Instant::now();
     let mut checksum = 0_u64;
@@ -498,6 +553,9 @@ fn measure_script_runtime_sample(
         opcode_dispatch_counts: options
             .count_opcodes
             .then(|| vm.opcode_dispatch_counts().unwrap_or_default()),
+        slow_path_counts: options
+            .count_slow_path_share
+            .then(|| vm.slow_path_counts().unwrap_or_default()),
     })
 }
 
@@ -519,6 +577,7 @@ fn measure_script_frontend_samples(
         samples.push(SampleResult {
             elapsed: start.elapsed(),
             opcode_dispatch_counts: None,
+            slow_path_counts: None,
         });
     }
     Ok(samples)
@@ -567,6 +626,7 @@ fn measure_module_compile_samples(
         samples.push(SampleResult {
             elapsed: start.elapsed(),
             opcode_dispatch_counts: None,
+            slow_path_counts: None,
         });
     }
     Ok(samples)
@@ -599,6 +659,7 @@ fn throughput_result(
         median_us_per_run,
         median_ns_per_operation,
         opcode_dispatch_counts: merge_opcode_dispatch_counts(samples),
+        slow_path_counts: merge_slow_path_counts(samples),
     })
 }
 
@@ -614,6 +675,18 @@ fn merge_opcode_dispatch_counts(samples: &[SampleResult]) -> Option<OpcodeDispat
         });
     let merged = OpcodeDispatchCounts::from_counts(counts);
     (merged.total() != 0).then_some(merged)
+}
+
+fn merge_slow_path_counts(samples: &[SampleResult]) -> Option<SlowPathCountTotals> {
+    let mut any = false;
+    let mut totals = SlowPathCountTotals::zeroed();
+    for sample in samples {
+        if let Some(counts) = sample.slow_path_counts.as_ref() {
+            any = true;
+            totals.add_sample(counts);
+        }
+    }
+    any.then_some(totals)
 }
 
 fn capture_memory(
@@ -1203,10 +1276,14 @@ fn render_report(
     if options.count_opcodes {
         command.push_str(" --count-opcodes");
     }
+    if options.count_slow_path_share {
+        command.push_str(" --count-slow-path-share");
+    }
 
     write_runtime_report_intro(&mut output, options, &command);
     write_workload_throughput_section(&mut output, reports, previous);
     write_opcode_dispatch_counts_section(&mut output, reports);
+    write_slow_path_share_section(&mut output, reports);
     write_template_feedback_section(&mut output, reports);
     write_runtime_accounting_section(&mut output, snapshots);
     if let Ok(watch_items) = RuntimeWatchItems::collect(reports, snapshots) {
@@ -1257,6 +1334,15 @@ fn write_runtime_report_intro(output: &mut String, options: &Options, command: &
         output,
         "- Opcode dispatch counters: `{}`",
         if options.count_opcodes {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
+    let _ = writeln!(
+        output,
+        "- Slow-path-share counters: `{}`",
+        if options.count_slow_path_share {
             "enabled"
         } else {
             "disabled"
@@ -1371,6 +1457,86 @@ fn format_opcode_top_counts(counts: &OpcodeDispatchCounts, limit: usize) -> Stri
         let _ = write!(output, "`{}`: `{}`", entry.opcode().name(), entry.count());
     }
     output
+}
+
+fn write_slow_path_share_section(output: &mut String, reports: &[WorkloadReport]) {
+    let has_slow_path = reports.iter().any(|report| {
+        report.throughput.opcode_dispatch_counts.is_some()
+            && report.throughput.slow_path_counts.is_some()
+    });
+    if !has_slow_path {
+        return;
+    }
+
+    let _ = writeln!(output, "## Slow-Path Share");
+    output.push('\n');
+    let _ = writeln!(
+        output,
+        "Joins each opcode's dispatch count (from `--count-opcodes`) with the semantic and"
+    );
+    let _ = writeln!(
+        output,
+        "safepoint slow-path counters recorded by the VM. Zero rows are expected today: the"
+    );
+    let _ = writeln!(
+        output,
+        "`record_semantic` / `record_safepoint` call sites land in DSL-0b. Each section is one"
+    );
+    let _ = writeln!(output, "workload's totals summed across timed samples.");
+    output.push('\n');
+
+    for report in reports {
+        let (Some(dispatch), Some(slow_path)) = (
+            report.throughput.opcode_dispatch_counts.as_ref(),
+            report.throughput.slow_path_counts.as_ref(),
+        ) else {
+            continue;
+        };
+
+        let _ = writeln!(output, "### `{}`", report.workload.name);
+        output.push('\n');
+        let _ = writeln!(
+            output,
+            "| Opcode | Dispatches | Semantic slow-path | Safepoint slow-path | Semantic share |"
+        );
+        let _ = writeln!(output, "|---|---:|---:|---:|---:|");
+        let mut rows: Vec<(Opcode, u64, u64, u64)> = dispatch
+            .iter()
+            .filter(|entry| entry.count() > 0)
+            .map(|entry| {
+                let opcode = entry.opcode();
+                (
+                    opcode,
+                    entry.count(),
+                    slow_path.semantic(opcode),
+                    slow_path.safepoint(opcode),
+                )
+            })
+            .collect();
+        rows.sort_unstable_by(|left, right| {
+            right
+                .1
+                .cmp(&left.1)
+                .then_with(|| left.0.name().cmp(right.0.name()))
+        });
+        for (opcode, dispatches, semantic, safepoint) in rows {
+            let share = if dispatches > 0 {
+                (semantic as f64) / (dispatches as f64) * 100.0
+            } else {
+                0.0
+            };
+            let _ = writeln!(
+                output,
+                "| `{}` | {} | {} | {} | {:.2}% |",
+                opcode.name(),
+                dispatches,
+                semantic,
+                safepoint,
+                share,
+            );
+        }
+        output.push('\n');
+    }
 }
 
 fn write_template_feedback_section(output: &mut String, reports: &[WorkloadReport]) {
@@ -1553,6 +1719,7 @@ fn render_json_report(
             "loop_trip_count": options.loop_trip_count,
             "frontend_repetitions": options.frontend_repetitions,
             "count_opcodes": options.count_opcodes,
+            "count_slow_path_share": options.count_slow_path_share,
         },
         "has_previous": previous.is_some(),
         "workloads": reports
@@ -1613,7 +1780,66 @@ fn runtime_workload_json(report: &WorkloadReport, previous: Option<&Value>) -> V
             .opcode_dispatch_counts
             .as_ref()
             .map(opcode_dispatch_counts_json),
+        "slow_path_counts": slow_path_share_json(
+            report.throughput.opcode_dispatch_counts.as_ref(),
+            report.throughput.slow_path_counts.as_ref(),
+        ),
         "delta": delta,
+    })
+}
+
+fn slow_path_share_json(
+    dispatch: Option<&OpcodeDispatchCounts>,
+    slow_path: Option<&SlowPathCountTotals>,
+) -> Value {
+    let (Some(dispatch), Some(slow_path)) = (dispatch, slow_path) else {
+        return Value::Null;
+    };
+    let mut rows: Vec<Value> = Vec::new();
+    let mut total_semantic = 0_u64;
+    let mut total_safepoint = 0_u64;
+    let mut total_dispatches = 0_u64;
+    let mut entries: Vec<(Opcode, u64, u64, u64)> = dispatch
+        .iter()
+        .filter(|entry| entry.count() > 0)
+        .map(|entry| {
+            let opcode = entry.opcode();
+            (
+                opcode,
+                entry.count(),
+                slow_path.semantic(opcode),
+                slow_path.safepoint(opcode),
+            )
+        })
+        .collect();
+    entries.sort_unstable_by(|left, right| {
+        right
+            .1
+            .cmp(&left.1)
+            .then_with(|| left.0.name().cmp(right.0.name()))
+    });
+    for (opcode, dispatches, semantic, safepoint) in entries {
+        let share = if dispatches > 0 {
+            (semantic as f64) / (dispatches as f64) * 100.0
+        } else {
+            0.0
+        };
+        total_semantic = total_semantic.saturating_add(semantic);
+        total_safepoint = total_safepoint.saturating_add(safepoint);
+        total_dispatches = total_dispatches.saturating_add(dispatches);
+        rows.push(json!({
+            "opcode": opcode.name(),
+            "dispatches": dispatches,
+            "semantic_slow_path": semantic,
+            "safepoint_slow_path": safepoint,
+            "semantic_share_percent": share,
+        }));
+    }
+    json!({
+        "total_dispatches": total_dispatches,
+        "total_semantic_slow_path": total_semantic,
+        "total_safepoint_slow_path": total_safepoint,
+        "per_opcode": rows,
     })
 }
 
@@ -2173,6 +2399,7 @@ mod tests {
             loop_trip_count: 16,
             frontend_repetitions: 4,
             count_opcodes: false,
+            count_slow_path_share: false,
         };
         let baseline_atom_payload = AtomTable::new().payload_bytes();
 
@@ -2353,6 +2580,34 @@ mod tests {
         assert!(options.count_opcodes);
     }
 
+    #[test]
+    fn count_slow_path_share_flag_parses() {
+        let baseline = parse_options(&["--preset".to_string(), "smoke".to_string()])
+            .expect("runtime smoke preset should parse without the slow-path flag");
+        assert!(!baseline.count_slow_path_share);
+
+        let options = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--count-slow-path-share".to_string(),
+        ])
+        .expect("runtime smoke preset should parse with the slow-path-share flag");
+        assert!(options.count_slow_path_share);
+        // The slow-path flag is independent of `--count-opcodes`. The bench
+        // joins the two at render time, but the parser must not couple them.
+        assert!(!options.count_opcodes);
+
+        let combined = parse_options(&[
+            "--preset".to_string(),
+            "smoke".to_string(),
+            "--count-opcodes".to_string(),
+            "--count-slow-path-share".to_string(),
+        ])
+        .expect("runtime smoke preset should parse with both opcode and slow-path flags");
+        assert!(combined.count_opcodes);
+        assert!(combined.count_slow_path_share);
+    }
+
     fn synthetic_delta_workload_report() -> WorkloadReport {
         let workload = Workload {
             name: "delta-runtime",
@@ -2374,6 +2629,7 @@ mod tests {
                     (Opcode::AddSmi, 12),
                     (Opcode::LoopHeader, 3),
                 ])),
+                slow_path_counts: None,
             },
             memory: MemoryResult {
                 functions: Some(1),
@@ -2417,6 +2673,7 @@ mod tests {
             loop_trip_count: 10,
             frontend_repetitions: 4,
             count_opcodes,
+            count_slow_path_share: false,
         }
     }
 
