@@ -35,14 +35,123 @@ pub enum CaptureMode {
 /// failure, or — in `Check` mode — any per-opcode regression.
 pub fn run(args: &[String]) -> Result<(), String> {
     let options = parse_args(args)?;
-    // Placeholder: real implementation lands in later tasks.
-    // For now, just print what we would do.
-    println!("asm-diff: opcodes_config={}", options.opcodes_config.display());
-    println!("asm-diff: baseline_dir={}", options.baseline_dir.display());
-    println!("asm-diff: output_dir={}", options.output_dir.display());
-    println!("asm-diff: mode={:?}", options.mode);
-    println!("asm-diff: capture_mode={:?}", options.capture_mode);
-    Err("asm-diff: not yet implemented (R-0 Task 9+)".into())
+    let config = crate::hot_opcodes::HotOpcodesConfig::load(&options.opcodes_config)?;
+
+    let mut failures: Vec<String> = Vec::new();
+    let mut matches = 0_usize;
+    let mut diffs = 0_usize;
+
+    for entry in &config.opcodes {
+        let symbol = symbol_name_for(&entry.name);
+        let asm = match capture_symbol("lyng-js-vm", &symbol, options.capture_mode) {
+            Ok(text) => text,
+            Err(err) => {
+                failures.push(format!("{}: capture failed: {err}", entry.name));
+                continue;
+            }
+        };
+
+        match options.mode {
+            Mode::Check => match check_one_symbol(
+                &entry.name,
+                &asm,
+                &options.baseline_dir,
+                entry.aarch64_max_instructions,
+            ) {
+                Ok(CheckOutcome::Match) => matches += 1,
+                Ok(CheckOutcome::Differs { diff, current_instr_count, baseline_instr_count }) => {
+                    diffs += 1;
+                    println!("=== {} (instr count: baseline {} -> current {}) ===",
+                        entry.name, baseline_instr_count, current_instr_count);
+                    println!("{diff}");
+                }
+                Err(err) => failures.push(format!("{}: {err}", entry.name)),
+            },
+            Mode::Update => {
+                if let Err(err) = update_one_baseline(&entry.name, &asm, &options.baseline_dir) {
+                    failures.push(format!("{}: {err}", entry.name));
+                }
+            }
+        }
+    }
+
+    println!("asm-diff: {matches} match, {diffs} differ, {} failures", failures.len());
+    if !failures.is_empty() {
+        return Err(failures.join("\n"));
+    }
+    if options.mode == Mode::Check && diffs > 0 {
+        return Err(format!("{diffs} handlers differ from baseline"));
+    }
+    Ok(())
+}
+
+fn symbol_name_for(opcode_name: &str) -> String {
+    // Map PascalCase opcode names to current handler symbol paths.
+    // During R-0 the handlers live under `dispatch_handlers::<submodule>::`;
+    // this lookup handles the common cases. Opcodes not in the table fall
+    // through to a best-guess path that may not resolve — failures are
+    // reported per-opcode and don't abort the run. DSL-0b will refine this
+    // once the handlers move to the DSL.
+    let snake = pascal_to_snake(opcode_name);
+    let (submodule, fn_name) = handler_submodule_and_fn(opcode_name, &snake);
+    format!("lyng_js_vm::vm::dispatch_handlers::{submodule}::{fn_name}")
+}
+
+fn handler_submodule_and_fn(opcode_name: &str, snake: &str) -> (&'static str, String) {
+    // (opcode PascalCase) -> (submodule, fn-name)
+    // The fn-name often differs from the naive snake_case (e.g. LoadLocal0
+    // is `op_load_local_0` not `op_load_local0`). Anything not in the
+    // table falls back to the naive `op_<snake>` in the `arithmetic`
+    // submodule; those mostly fail capture and get reported.
+    match opcode_name {
+        // arithmetic
+        "Add" | "Sub" | "Mul" | "Increment" | "Decrement"
+        | "BitAnd" | "ShiftLeft" | "ShiftRight"
+        | "GreaterEqual" | "LessEqual" => ("arithmetic", format!("op_{snake}")),
+        // loads
+        "Move" => ("loads", "op_move".to_string()),
+        "Ldar" => ("loads", "op_ldar".to_string()),
+        "LoadSmi8" => ("loads", "op_load_smi8".to_string()),
+        "LoadConst8" => ("loads", "op_load_const8".to_string()),
+        "LoadZero" => ("loads", "op_load_zero".to_string()),
+        "LoadLocal0" => ("loads", "op_load_local_0".to_string()),
+        "LoadLocal1" => ("loads", "op_load_local_1".to_string()),
+        "LoadLocal2" => ("loads", "op_load_local_2".to_string()),
+        "LoadLocal3" => ("loads", "op_load_local_3".to_string()),
+        "StoreLocal3" => ("loads", "op_store_local_3".to_string()),
+        // control flow
+        "Jump" => ("control_flow", "op_jump".to_string()),
+        "JumpIfFalse" => ("control_flow", "op_jump_if_false".to_string()),
+        "JumpIfFalse8" => ("control_flow", "op_jump_if_false8".to_string()),
+        // property
+        "GetNamedProperty" => ("property", "op_get_named_property".to_string()),
+        "AssignNamedProperty" => ("property", "op_assign_named_property".to_string()),
+        "GetKeyedProperty" => ("property", "op_get_keyed_property".to_string()),
+        "AssignKeyedProperty" => ("property", "op_assign_keyed_property".to_string()),
+        // names
+        "LoadThis" => ("names", "op_load_this".to_string()),
+        "LoadGlobal" => ("names", "op_load_global".to_string()),
+        // scope
+        "LoadEnvSlot" => ("scope", "op_load_env_slot".to_string()),
+        // Anything else — best-guess; will likely fail capture and get
+        // reported per-opcode (acceptable for R-0).
+        _ => ("arithmetic", format!("op_{snake}")),
+    }
+}
+
+fn pascal_to_snake(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_ascii_uppercase() {
+            if i != 0 {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
@@ -224,15 +333,25 @@ fn capture_via_rustc_emit(crate_name: &str, symbol: &str) -> Result<String, Stri
 }
 
 fn extract_symbol_body(asm: &str, symbol: &str) -> Result<String, String> {
-    // Mach-O symbol names get a leading underscore in some compilers.
-    let candidates = [symbol.to_string(), format!("_{symbol}")];
-    let label_pattern: Vec<String> = candidates.iter().map(|c| format!("{c}:")).collect();
+    // Build candidate label patterns that should appear on the line that
+    // introduces the symbol. rustc emits legacy-mangled `_ZN...E:` symbols
+    // on aarch64 Mach-O; we also accept the demangled form for resilience.
+    let mut candidates: Vec<String> = Vec::new();
+    candidates.push(format!("{symbol}:"));
+    candidates.push(format!("_{symbol}:"));
+    // Legacy Rust mangling: `_ZN<len1><seg1><len2><seg2>...<lenN><opN>17h<hash>E`.
+    // We anchor on the unique `<lenN>op_<name>17h` suffix (without the trailing
+    // hash, which varies per build). Mach-O prefixes with an extra `_`.
+    if let Some(mangled_suffix) = legacy_mangled_suffix(symbol) {
+        candidates.push(mangled_suffix);
+    }
+
     let mut iter = asm.lines();
     let mut found = false;
     let mut body = Vec::new();
     while let Some(line) = iter.next() {
         if !found {
-            if label_pattern.iter().any(|p| line.contains(p)) {
+            if candidates.iter().any(|p| line.contains(p)) {
                 found = true;
                 body.push(line.to_string());
             }
@@ -252,6 +371,30 @@ fn extract_symbol_body(asm: &str, symbol: &str) -> Result<String, String> {
         return Err(format!("symbol {symbol} not found in asm"));
     }
     Ok(body.join("\n"))
+}
+
+/// Build a suffix-style match pattern that matches the legacy-mangled form
+/// of a `::`-separated Rust path. For `foo::bar::baz` we return the string
+/// `3foo3bar3baz17h` so it can be searched as a substring in mangled
+/// symbol names (the trailing hash + `E:` are intentionally omitted because
+/// they vary across builds).
+fn legacy_mangled_suffix(symbol: &str) -> Option<String> {
+    let segments: Vec<&str> = symbol.split("::").collect();
+    if segments.is_empty() {
+        return None;
+    }
+    let mut out = String::new();
+    for seg in &segments {
+        if seg.is_empty() {
+            return None;
+        }
+        out.push_str(&seg.len().to_string());
+        out.push_str(seg);
+    }
+    // Trailing `17h` introduces the per-build hash; we anchor on it but
+    // stop short of the hash itself so the match survives recompiles.
+    out.push_str("17h");
+    Some(out)
 }
 
 /// Normalize raw asm output per the rules in
@@ -339,6 +482,109 @@ fn label_token_length(s: &str) -> usize {
     s.bytes()
         .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
         .count()
+}
+
+use std::path::Path;
+
+/// Per-symbol outcome from a `--mode check` pass.
+#[derive(Debug, PartialEq)]
+pub enum CheckOutcome {
+    Match,
+    Differs { diff: String, current_instr_count: usize, baseline_instr_count: usize },
+}
+
+/// Check one symbol against its baseline. Returns Ok(outcome) on success;
+/// Err(message) if the baseline file is missing or the current asm exceeds
+/// the instruction budget.
+///
+/// # Errors
+///
+/// - Baseline file does not exist.
+/// - Current asm's instruction count exceeds `max_instructions` budget.
+pub fn check_one_symbol(
+    symbol: &str,
+    current_asm: &str,
+    baseline_dir: &Path,
+    max_instructions: Option<u32>,
+) -> Result<CheckOutcome, String> {
+    let baseline_path = baseline_dir.join(format!("{symbol}.asm"));
+    let baseline = std::fs::read_to_string(&baseline_path)
+        .map_err(|err| format!("baseline missing for {symbol}: {} ({err})", baseline_path.display()))?;
+
+    let normalized_current = normalize(current_asm);
+    let normalized_baseline = normalize(&baseline);
+
+    let current_instr_count = count_instructions(&normalized_current);
+    if let Some(budget) = max_instructions {
+        if budget > 0 && current_instr_count > budget as usize {
+            return Err(format!(
+                "{symbol}: {current_instr_count} instructions exceeds budget of {budget}"
+            ));
+        }
+    }
+
+    if normalized_current == normalized_baseline {
+        Ok(CheckOutcome::Match)
+    } else {
+        let baseline_instr_count = count_instructions(&normalized_baseline);
+        Ok(CheckOutcome::Differs {
+            diff: textual_diff(&normalized_baseline, &normalized_current),
+            current_instr_count,
+            baseline_instr_count,
+        })
+    }
+}
+
+fn count_instructions(normalized: &str) -> usize {
+    normalized
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            // Instruction lines start with whitespace + mnemonic.
+            // Skip labels (end with :) and directives (start with .).
+            !trimmed.is_empty()
+                && !trimmed.ends_with(':')
+                && !trimmed.starts_with('.')
+                && !trimmed.starts_with('#')
+        })
+        .count()
+}
+
+fn textual_diff(baseline: &str, current: &str) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+    let baseline_lines: Vec<&str> = baseline.lines().collect();
+    let current_lines: Vec<&str> = current.lines().collect();
+    let max_len = baseline_lines.len().max(current_lines.len());
+    for i in 0..max_len {
+        let b = baseline_lines.get(i).copied().unwrap_or("");
+        let c = current_lines.get(i).copied().unwrap_or("");
+        if b == c {
+            writeln!(out, "  {b}").ok();
+        } else {
+            writeln!(out, "- {b}").ok();
+            writeln!(out, "+ {c}").ok();
+        }
+    }
+    out
+}
+
+/// Update one baseline file in place.
+///
+/// # Errors
+///
+/// Returns Err if the baseline file cannot be written.
+pub fn update_one_baseline(
+    symbol: &str,
+    current_asm: &str,
+    baseline_dir: &Path,
+) -> Result<(), String> {
+    std::fs::create_dir_all(baseline_dir)
+        .map_err(|err| format!("create {}: {err}", baseline_dir.display()))?;
+    let normalized = normalize(current_asm);
+    let path = baseline_dir.join(format!("{symbol}.asm"));
+    std::fs::write(&path, normalized)
+        .map_err(|err| format!("write {}: {err}", path.display()))
 }
 
 #[cfg(test)]
@@ -435,5 +681,30 @@ mod tests {
         let first = normalize(raw);
         let second = normalize(raw);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn check_mode_fails_when_baseline_missing() {
+        let result = check_one_symbol(
+            "fake_op",
+            /* current */ "fake_op:\n\tret\n",
+            /* baseline_dir */ &std::path::PathBuf::from("/nonexistent"),
+            /* max_instructions */ Some(100),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn check_mode_succeeds_when_within_budget() {
+        let tmp = tempdir::TempDir::new("asm").expect("tmp");
+        let baseline_path = tmp.path().join("fake_op.asm");
+        std::fs::write(&baseline_path, "fake_op:\n\tret\n").unwrap();
+        let result = check_one_symbol(
+            "fake_op",
+            "fake_op:\n\tret\n",
+            tmp.path(),
+            Some(100),
+        );
+        assert!(result.is_ok(), "{:?}", result);
     }
 }
