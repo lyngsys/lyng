@@ -571,10 +571,18 @@ impl Vm {
             debug_assert!(false, "register window end should fit into usize");
             return;
         };
+        // `release_register_stack_to` only moves the cursor; it does not
+        // truncate the Vec. So `register_stack.len()` can sit anywhere in
+        // `[start..]` with stale values from past frames in `[start..len)`.
+        // Reset that range to `undefined` before extending so a re-entered
+        // window starts clean — callers (especially the fast call path)
+        // may not rewrite every slot.
+        if self.register_stack.len() > start {
+            let reset_end = end.min(self.register_stack.len());
+            self.register_stack[start..reset_end].fill(Value::undefined());
+        }
         if self.register_stack.len() < end {
             self.register_stack.resize(end, Value::undefined());
-        } else {
-            self.register_stack[start..end].fill(Value::undefined());
         }
         self.register_stack_top = end;
     }
