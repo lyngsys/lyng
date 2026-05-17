@@ -10,7 +10,7 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     call_slow, decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
-    dispatch_prefixed, poll_safepoint,
+    poll_safepoint,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -201,27 +201,116 @@ pub extern "C" fn op_jump_if_false8_slow_rs(
 }
 
 // =====================================================================
-// op_wide (B45) — None layout, length = 1. Prefix opcode that sets
-// state.prefix = Wide and tail-jumps to the next handler.
+// op_wide / op_extra_wide (DSL-0c) — None layout, length = 1.
+//
+// The DSL-0b plan punted wide-form operand decoding for cold opcodes
+// to "Batch 7" — the narrow `decode_ab!` / `decode_abc!` /
+// `decode_abx!` fragments only ldrb / ldrh operands, so a Wide-prefixed
+// instruction whose operands are u16 / u32 would be decoded with
+// truncated bytes and an underadvanced PC, cascading PC misalignment
+// through the rest of the bytecode stream.
+//
+// To unblock DSL-0c without re-authoring 152 wide-form decoders, the
+// prefix handlers delegate the WHOLE wide-form instruction to the α
+// dispatch path: the slow-path shim sets `state.prefix`, looks up the
+// α handler for the byte at `PC+1`, invokes it (which decodes
+// wide-form + executes the semantic + advances the frame's
+// instruction_offset), then returns `Refresh` so the asm trampoline
+// reloads PC from `state.frame_pc_offset`.
+//
+// This is a temporary bridge. Removing α (Tasks C2–C5) requires
+// authoring wide-form decoders for every opcode — that's a future
+// batch's work. Until then, the α dispatch table stays linked
+// specifically for this delegation.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_wide, layout = None, length = 1, || {
-        dispatch_prefixed!(kind = 1);
+        call_slow!(op_wide_via_alpha_rs, args = []);
+        dispatch_after_slow!();
     }
 }
-
-// =====================================================================
-// op_extra_wide (B45) — None layout, length = 1. Prefix opcode that
-// sets state.prefix = ExtraWide and tail-jumps to the next handler.
-// =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_extra_wide, layout = None, length = 1, || {
-        dispatch_prefixed!(kind = 2);
+        call_slow!(op_extra_wide_via_alpha_rs, args = []);
+        dispatch_after_slow!();
     }
+}
+
+/// Slow-path delegate for `op_wide`. Invokes the corresponding α
+/// handler at the byte following the prefix; that handler will read
+/// `state.prefix`, decode wide-form operands, execute, and advance
+/// `state.frame.instruction_offset` accordingly. Returns
+/// [`SlowPathReturn`] with the `Refresh` tag so the asm bridge
+/// reloads PC / REGS / FV from `state.frame_*`.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_wide_via_alpha_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    op_prefix_via_alpha(state, lyng_js_bytecode::Opcode::Wide)
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_extra_wide_via_alpha_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    op_prefix_via_alpha(state, lyng_js_bytecode::Opcode::ExtraWide)
+}
+
+/// Shared body of `op_wide_via_alpha_rs` /
+/// `op_extra_wide_via_alpha_rs`. Set the prefix, look up the α
+/// handler for the byte at PC+1, invoke it, translate its `Step`
+/// into a `SemanticOutcome`, return Refresh / Exit as appropriate.
+#[cfg(target_arch = "aarch64")]
+fn op_prefix_via_alpha(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    prefix_opcode: lyng_js_bytecode::Opcode,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
+    use crate::vm::dispatch_state::{Step, DISPATCH_TABLE};
+
+    let mut dispatch = unsafe { LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let outcome = {
+        let dstate = dispatch.dispatch_state();
+        // The α handler for the prefix opcode reads bytes[pc+1] to
+        // pick the semantic opcode and bytes[pc+1..] to decode
+        // wide-form operands. The prefix-α handler also handles
+        // double-prefix rejection via `VmError::DoublePrefix`.
+        let pc = dstate.frame.instruction_offset() as usize;
+        let bytes = dstate.installed.function().instruction_bytes();
+        if pc >= bytes.len() {
+            SemanticOutcome::ExitError {
+                error: crate::error::VmError::InstructionOutOfBounds {
+                    code: dstate.frame.code(),
+                    instruction_offset: dstate.frame.instruction_offset(),
+                },
+            }
+        } else {
+            let prefix_handler = DISPATCH_TABLE[prefix_opcode as u8 as usize];
+            match prefix_handler(dstate) {
+                Step::Continue(semantic_handler) => {
+                    // The prefix α handler set state.prefix and
+                    // returned the α handler for the semantic
+                    // opcode. Invoke it — it decodes wide-form
+                    // operands, executes, advances PC.
+                    match semantic_handler(dstate) {
+                        Step::Continue(_) => SemanticOutcome::Refresh,
+                        Step::Done(value) => SemanticOutcome::ExitDone { value },
+                        Step::Error(error) => SemanticOutcome::ExitError { error },
+                    }
+                }
+                Step::Done(value) => SemanticOutcome::ExitDone { value },
+                Step::Error(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+    };
+    dispatch.translate_outcome(outcome)
 }
 
 /// Non-aarch64 stubs.

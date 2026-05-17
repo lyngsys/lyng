@@ -1,16 +1,10 @@
 //! asm-visible state record + Rust-only context per design §5.
 
-use std::sync::Arc;
-
-use lyng_js_env::Agent;
-use lyng_js_host::HostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_types::Value;
 
 use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
-use crate::vm::install::InstalledFunction;
-use crate::FrameRecord;
+use crate::vm::dispatch_state::DispatchState;
 
 /// Opaque marker for the Rust-side context pointer in [`LlIntState`].
 /// The asm layer never reads through this pointer — it round-trips
@@ -46,21 +40,20 @@ pub struct LlIntState {
 /// `LlIntState::rust_context` (an opaque pointer), and only via the
 /// reconstruction in `LlIntDispatchState::from_raw`.
 ///
+/// DSL-0c restructure: the per-call Rust state lives inside a
+/// [`DispatchState`] held here, rather than as flat fields on the
+/// context. This lets the asm-path slow-path bridge call
+/// [`crate::dsl::slow_path::LlIntDispatchState::dispatch_state`]
+/// uniformly across α and asm — the semantic bodies under
+/// `crate::vm::semantics::` all consume `DispatchState` directly,
+/// so threading the same type through both dispatch paths keeps the
+/// single-implementation invariant intact.
+///
 /// The lifetime `'vm` is the borrow on `Vm`/`Agent`/`HostHooks`/`Registry`
-/// taken by `run_via_dsl` for the duration of one trampoline invocation.
-//
-// Most fields are read by the slow-path bridge / semantic bodies in
-// later DSL-0b batches; the dead_code allow keeps the warning quiet
-// until those wires land.
-#[allow(dead_code)]
+/// taken by `crate::dsl::entry::run_via_dsl` for the duration of one
+/// trampoline invocation.
 pub struct LlIntRustContext<'vm> {
-    pub(crate) vm: &'vm mut crate::vm::Vm,
-    pub(crate) agent: &'vm mut Agent,
-    pub(crate) host: &'vm dyn HostHooks,
-    pub(crate) registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
-    pub(crate) installed: Arc<InstalledFunction>,
-    pub(crate) frame: FrameRecord,
-    pub(crate) frame_depth: usize,
+    pub(crate) dispatch: DispatchState<'vm>,
     pub(crate) exit: LlIntExitSlot,
 }
 

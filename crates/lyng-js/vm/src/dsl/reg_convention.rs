@@ -42,10 +42,16 @@ pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs
 pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 
-// VM_POLL_PENDING_OFFSET / VM_OPCODE_COUNTER_OFFSET / VM_HEAP_POOL_OFFSET
-// stay as placeholders until the `Vm` struct gains explicit fields
-// (Tasks B41, B27, B23). The asm bridge never reads through these in
-// DSL-0b; they're declared here so backend macros can name them.
-pub const VM_POLL_PENDING_OFFSET: usize = 0;
+// VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
+// added in DSL-0c to give `poll_safepoint!` a known-zero byte to
+// dereference on the warm path (`op_loop_header`, conditional
+// backward jumps). The field is initialized to 0 in `Vm::new` and
+// never written during DSL-0; B41 will give it real semantics.
+//
+// VM_OPCODE_COUNTER_OFFSET / VM_HEAP_POOL_OFFSET stay as placeholders
+// until Tasks B27 / B23 land their respective `Vm` fields. The asm
+// bridge never reads through these in DSL-0c; they're declared here
+// so backend macros can name them.
+pub const VM_POLL_PENDING_OFFSET: usize = offset_of!(crate::vm::Vm, dsl_poll_pending);
 pub const VM_OPCODE_COUNTER_OFFSET: usize = 0;
 pub const VM_HEAP_POOL_OFFSET: usize = 0;

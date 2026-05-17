@@ -85,19 +85,15 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         }
     }
 
-    /// Mutable access to the underlying `DispatchState`. Semantic
-    /// bodies use this for now; the DSL-0b refactor replaces this with
-    /// typed accessors that operate uniformly across α and asm paths.
+    /// Mutable access to the underlying `DispatchState`. Works on both
+    /// dispatch variants: α handlers borrow the existing
+    /// `DispatchState`; asm-path shims unpack the same shape from
+    /// `LlIntRustContext::dispatch`. Semantic bodies under
+    /// `crate::vm::semantics::` consume this uniformly.
     pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
             LlIntDispatchInner::Alpha(state) => *state,
-            LlIntDispatchInner::Asm { .. } => {
-                // The asm path uses typed accessors landed in later
-                // DSL-0b tasks. Hitting this branch means an α-only
-                // call site mis-fired on an asm-constructed dispatch
-                // state.
-                panic!("LlIntDispatchState::dispatch_state called on asm variant");
-            }
+            LlIntDispatchInner::Asm { rust, .. } => &mut rust.dispatch,
         }
     }
 
@@ -105,18 +101,17 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// both α (legacy `DispatchState`) and asm-constructed dispatch
     /// states — design §6 invariant: after [`Self::sync_from_asm`]
     /// the asm side's `state.frame_pc_offset` and the Rust side's
-    /// `rust.frame.instruction_offset()` are in sync, so reading
-    /// either is correct.
+    /// `rust.dispatch.frame.instruction_offset()` are in sync, so
+    /// reading either is correct.
     ///
-    /// This is the first of the typed accessors that replace
-    /// `dispatch_state()` for asm-path semantic bodies. Used by the
-    /// DSL-0b validation cases (B32 PC-sync) and by future ports
-    /// that need PC inspection without crashing on the asm variant.
+    /// Used by the DSL-0b validation cases (B32 PC-sync) and by
+    /// callers that need PC inspection without going through
+    /// `dispatch_state()`.
     #[inline]
     pub fn current_instruction_offset(&self) -> u32 {
         match &self.inner {
             LlIntDispatchInner::Alpha(state) => state.frame.instruction_offset(),
-            LlIntDispatchInner::Asm { rust, .. } => rust.frame.instruction_offset(),
+            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.frame.instruction_offset(),
         }
     }
 
@@ -124,19 +119,22 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// snapshot before semantic code observes the frame. See design §6.
     ///
     /// Idempotent on the α variant (asm mirrors do not exist there;
-    /// `rust.frame` is already authoritative).
+    /// `rust.dispatch.frame` is already authoritative).
     pub fn sync_from_asm(&mut self) {
         if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
             // SAFETY: `state` is valid by `from_raw`'s contract; we
             // only read scalar fields here.
             unsafe {
-                rust.frame.set_instruction_offset((**state).frame_pc_offset);
+                rust.dispatch
+                    .frame
+                    .set_instruction_offset((**state).frame_pc_offset);
             }
             // registers_base / fv_base are mirrored back via the
             // `Refresh` path in `translate_outcome`; semantic bodies
-            // read those through `rust.installed.feedback_flat` and
-            // the register window, both of which are still authoritative
-            // on entry (the asm side has not relocated them).
+            // read those through `rust.dispatch.installed.feedback_flat`
+            // and the register window, both of which are still
+            // authoritative on entry (the asm side has not relocated
+            // them).
         }
     }
 
@@ -151,35 +149,79 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
+                let mut new_offset_u64: u64 = 0;
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
                     let new_offset = rust
+                        .dispatch
                         .frame
                         .instruction_offset()
                         .wrapping_add(pc_advance);
+                    new_offset_u64 = u64::from(new_offset);
                     // SAFETY: state is valid by from_raw's contract;
-                    // we hold a unique borrow through `self`.
+                    // we hold a unique borrow through `self`. Mirror
+                    // the new PC back into `state.frame_pc_offset` so
+                    // a subsequent slow-path Refresh — or the test
+                    // harness, which reads via state — sees the
+                    // authoritative value.
                     unsafe {
                         (**state).frame_pc_offset = new_offset;
                     }
                 }
+                // The asm bridge's `dispatch_after_slow!` Continue
+                // arm reads the new pc_offset from `x1` (`payload`)
+                // directly to skip the memory round-trip on the fast
+                // path. Mirror it here for the asm side. (The α
+                // variant ignores `payload`.)
                 SlowPathReturn {
                     tag: SlowPathTag::Continue as u64,
-                    payload: 0,
+                    payload: new_offset_u64,
                 }
             }
             SemanticOutcome::Refresh => {
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
+                    // After a frame switch (call / return / cross-frame
+                    // catch), the active frame may have changed. Detect
+                    // by comparing vm.frames().len() to the cached
+                    // frame_depth — if different, pull the new active
+                    // frame from `vm.frames().last()`. Otherwise the
+                    // semantic body did an in-frame advance and
+                    // `rust.dispatch.frame` is the authoritative state.
+                    let current_depth = rust.dispatch.vm.frames().len();
+                    let frame_switched = current_depth != rust.dispatch.frame_depth;
+                    if frame_switched {
+                        if let Some(active) = rust.dispatch.vm.frames().last().copied() {
+                            rust.dispatch.frame = active;
+                        }
+                        rust.dispatch.frame_depth = current_depth;
+                        // Different InstalledFunction: refresh
+                        // `installed`, `pb_base`, `fv_base`.
+                        let installed = rust
+                            .dispatch
+                            .vm
+                            .installed_for_dsl_runtime(rust.dispatch.frame.code())
+                            .unwrap_or_else(|| rust.dispatch.installed.clone());
+                        rust.dispatch.installed = installed;
+                    }
+                    let active_frame = rust.dispatch.frame;
+                    let regs_base_ptr = {
+                        let base = active_frame.registers().base() as usize;
+                        // SAFETY: register window is reserved on the
+                        // active frame; one-past-the-end is well-defined.
+                        unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
+                    };
+                    let pb_base = rust.dispatch.installed.function().instruction_bytes().as_ptr();
+                    let fv_base = {
+                        let index =
+                            crate::vm::code_index_for_dsl(active_frame.code());
+                        rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
+                            as *mut crate::dsl::feedback_flat::FeedbackEntry
+                    };
                     // SAFETY: state is valid by from_raw's contract.
                     unsafe {
-                        (**state).frame_pc_offset = rust.frame.instruction_offset();
-                        // frame_regs_base / frame_fv_base remain
-                        // authoritative as established at entry —
-                        // FrameRecord's RegisterWindow does not move
-                        // during one trampoline call, and the FV pin
-                        // is pinned to `installed.feedback_flat`.
-                        // Batch 3 (Task B16) wires these to live
-                        // pointer accessors on FrameRecord /
-                        // InstalledFunction.
+                        (**state).frame_pc_offset = active_frame.instruction_offset();
+                        (**state).frame_pb_base = pb_base;
+                        (**state).frame_regs_base = regs_base_ptr;
+                        (**state).frame_fv_base = fv_base;
                     }
                 }
                 SlowPathReturn {

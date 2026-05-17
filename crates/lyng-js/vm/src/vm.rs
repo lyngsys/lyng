@@ -190,6 +190,14 @@ pub struct Vm {
     /// See `crate::dsl::feedback_flat` for the storage rationale.
     pub(crate) feedback_flat_storage:
         Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
+    /// DSL-0c placeholder for the safepoint poll-pending byte read by
+    /// `poll_safepoint!` (warm `op_loop_header` / conditional backward
+    /// jumps). The asm reads `[x22, VM_POLL_PENDING_OFFSET]` where
+    /// `x22 = *mut Vm`; the offset is derived from
+    /// `offset_of!(Vm, dsl_poll_pending)` in
+    /// `crate::dsl::reg_convention`. Always 0 during DSL-0; B41 will
+    /// give it real semantics (GC step / debugger pause bits).
+    pub(crate) dsl_poll_pending: u8,
     tiering: Vec<Option<TieringState>>,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
@@ -255,6 +263,7 @@ impl Vm {
             source_texts: HashMap::new(),
             feedback_vectors: Vec::new(),
             feedback_flat_storage: Vec::new(),
+            dsl_poll_pending: 0,
             tiering: Vec::new(),
             activation_tables: ActivationSideTables::default(),
             for_in_states: ForInStateTable::default(),
@@ -543,6 +552,33 @@ impl Vm {
     #[inline]
     pub(crate) const fn register_stack_storage_len_for_tests(&self) -> usize {
         self.register_stack.len()
+    }
+
+    /// DSL-0c: raw mutable pointer to the start of the register-stack
+    /// storage, used by [`crate::dsl::entry::run_via_dsl`] to compute
+    /// the active frame's `REGS` pin (`*mut Value` at
+    /// `register_stack.as_mut_ptr().add(frame.registers().base())`).
+    ///
+    /// Callers must respect Rust's aliasing rules — the returned
+    /// pointer aliases the `Vec`'s backing buffer; concurrent
+    /// reborrows of `&mut self.register_stack` would be UB. The
+    /// trampoline's contract is that the pointer is only used while
+    /// `run_via_dsl` holds `&mut Vm`, and the buffer is not grown
+    /// during a single trampoline invocation (window reservation
+    /// happens before entry, release happens after return).
+    #[inline]
+    pub(crate) fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
+        self.register_stack.as_mut_ptr()
+    }
+
+    /// DSL-0c: crate-visible accessor for the dispatch frame-check
+    /// epoch used by [`crate::dsl::entry::run_via_dsl`] when seeding
+    /// the entry `DispatchState`. The α path reads the same value
+    /// through `Vm::dispatch_frame_check_epoch` which is
+    /// `pub(in crate::vm)`-scoped.
+    #[inline]
+    pub(crate) const fn dispatch_frame_check_epoch_for_dsl(&self) -> u32 {
+        self.dispatch_frame_check_epoch
     }
 
     #[cfg(test)]
@@ -1612,19 +1648,34 @@ impl Vm {
         }
     }
 
-    /// Thin wrapper that delegates to the DSL entry shim in
-    /// `crate::dsl::entry::run_via_dsl`. Not wired into `Vm::run` yet —
-    /// `Vm::run` continues to route through `run_via_trampoline`. Task
-    /// C1 flips the switch.
-    #[allow(dead_code)]
+    /// DSL-0c: dispatch entrypoint that routes through
+    /// `crate::dsl::entry::run_via_dsl` (asm-DSL trampoline).
+    ///
+    /// Pulls the active frame + installed function the same way
+    /// `run_via_trampoline` did (sub-8 invariant), then hands off to
+    /// the DSL entry shim. `Vm::run` (in `vm/dispatch.rs`) calls this
+    /// after C1 flips the dispatch route; the trampoline machinery
+    /// (`run_via_trampoline`, `run_trampoline`, `DISPATCH_TABLE`,
+    /// `dispatch_handlers/`) survives the flip for one commit so the
+    /// rollback diff is small. Tasks C2–C5 delete it.
     pub(crate) fn run_via_dsl(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        installed: Arc<InstalledFunction>,
-        frame: FrameRecord,
     ) -> VmResult<Value> {
+        let frame = self
+            .frames
+            .last()
+            .copied()
+            .expect("evaluation should install one active frame");
+        let code = frame.code();
+        let installed = self
+            .installed
+            .get(crate::vm::code_index_for_dsl(code))
+            .and_then(Option::as_ref)
+            .cloned()
+            .ok_or(VmError::MissingInstalledCode(code))?;
         crate::dsl::entry::run_via_dsl(self, agent, host, registry, installed, frame)
     }
 }

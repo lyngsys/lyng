@@ -88,6 +88,37 @@ impl<'vm> DispatchState<'vm> {
         }
     }
 
+    /// DSL-0c entry helper: construct a `DispatchState` for the
+    /// [`crate::dsl::entry::run_via_dsl`] path. The DSL entry shim
+    /// then wraps it in an [`crate::dsl::llint_state::LlIntRustContext`]
+    /// so the asm-path slow-path bridge can call
+    /// [`crate::dsl::slow_path::LlIntDispatchState::dispatch_state`]
+    /// and reach the same `DispatchState` α handlers see.
+    #[doc(hidden)]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_for_dsl_entry(
+        vm: &'vm mut Vm,
+        agent: &'vm mut Agent,
+        host: &'vm dyn HostHooks,
+        registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
+        installed: Arc<InstalledFunction>,
+        frame: FrameRecord,
+        frame_depth: usize,
+        frame_check_epoch: u32,
+    ) -> Self {
+        Self {
+            vm,
+            agent,
+            host,
+            registry,
+            installed,
+            frame,
+            frame_depth,
+            frame_check_epoch,
+            prefix: None,
+        }
+    }
+
     /// Bytes from the active PC to the end of the function's instruction
     /// stream. Handlers slice this to decode their operands and look up the
     /// next opcode byte for `dispatch_next!`.
@@ -504,6 +535,20 @@ impl Vm {
     #[doc(hidden)]
     #[inline]
     pub(crate) fn installed_for_dsl_harness(
+        &self,
+        code: CodeRef,
+    ) -> Option<Arc<InstalledFunction>> {
+        self.installed_for_code(code)
+    }
+
+    /// DSL-0c: crate-visible wrapper around
+    /// [`Vm::installed_for_code`] for the slow-path `Refresh`
+    /// machinery in [`crate::dsl::slow_path`]. Returns the
+    /// `Arc<InstalledFunction>` for the post-frame-switch active
+    /// frame so the asm bridge can recompute `pb_base` /
+    /// `frame_fv_base` from a single source of truth.
+    #[inline]
+    pub(crate) fn installed_for_dsl_runtime(
         &self,
         code: CodeRef,
     ) -> Option<Arc<InstalledFunction>> {

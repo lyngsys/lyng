@@ -228,14 +228,18 @@ impl DslHarness {
         let installed = Arc::clone(&self.installed);
         let frame = self.frame;
         let frame_depth = 0usize;
-        let mut rust_ctx = LlIntRustContext {
-            vm: &mut self.vm,
+        let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
+            &mut self.vm,
             agent,
             host,
-            registry: &mut self.registry,
+            &mut self.registry,
             installed,
             frame,
             frame_depth,
+            0,
+        );
+        let mut rust_ctx = LlIntRustContext {
+            dispatch,
             exit: LlIntExitSlot::default(),
         };
 

@@ -5,11 +5,13 @@
 //! The trampoline runs the DSL handler chain until a cold stub writes
 //! `rust_ctx.exit` and the chain unwinds back to [`_interpreter_exit`].
 //!
-//! For DSL-0b Batch 2 the trampoline + exit shim are stubs (single
-//! `ret`), and `run_via_dsl` is not wired into `Vm::run`. Calling it at
-//! runtime is currently UB — there's no real handler chain. The
-//! symbols exist so backend code and the proc-macro can link against
-//! them. Batch 4 fills in the asm body; C1 flips dispatch.
+//! DSL-0c (Task C1) replaces the DSL-0b `naked_asm!("ret")` stub with a
+//! real trampoline body: save callee-saved registers, load the pinned
+//! registers from `state` + the trailing args, and tail-jump to the
+//! first handler. `_interpreter_exit` is the symmetric epilogue: when
+//! a slow-path shim returns `SlowPathTag::Exit` and the backend's
+//! `dispatch_after_slow!` does `b {exit}`, we land here, restore the
+//! saved callee-saved regs, and return to `run_via_dsl`.
 
 use std::sync::Arc;
 
@@ -18,6 +20,7 @@ use lyng_js_host::HostHooks;
 use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_types::Value;
 
+use crate::dsl::handlers::{DslHandler, DSL_DISPATCH_TABLE};
 use crate::dsl::llint_state::{
     ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
 };
@@ -27,12 +30,11 @@ use crate::{FrameRecord, Vm};
 
 /// New entry point used after DSL-0c flips dispatch.
 ///
-/// During DSL-0b this is callable but not the default — `Vm::run`
-/// continues to route through the α trampoline. Task C1 swaps the
-/// route. Calling it at runtime in DSL-0b is currently UB because
-/// `run_dsl_trampoline` is a single-`ret` stub; the symbol exists so
-/// the proc-macro and backend code can link.
-#[allow(dead_code)]
+/// Sets up an [`LlIntState`] and an [`LlIntRustContext`] capturing the
+/// current frame's PC / register window / feedback vector base, then
+/// hands control to the asm trampoline. The trampoline runs the
+/// dispatch chain until a slow-path shim sets `rust_ctx.exit` and the
+/// chain unwinds back to [`_interpreter_exit`].
 pub(crate) fn run_via_dsl(
     vm: &mut Vm,
     agent: &mut Agent,
@@ -68,7 +70,35 @@ pub(crate) fn run_via_dsl(
             as *mut crate::dsl::feedback_flat::FeedbackEntry
     };
 
-    let mut rust_ctx = LlIntRustContext {
+    // DSL-0c: REGS pin must point at the active frame's register
+    // window base. Handler bodies (e.g. `op_move`, `op_add`) load
+    // through `[x20, x_idx, lsl #3]` where `x_idx` is a validated
+    // bytecode register index; the trampoline never dereferences past
+    // `register_stack[base + window.len()]`. Computed BEFORE we move
+    // `vm` into `rust_ctx` because the `&mut Vm` is consumed by the
+    // borrow; `as_mut_ptr().add(base)` is well-defined even when
+    // base == register_stack.len() (one-past-the-end is valid to
+    // compute, just not to deref — which the handlers don't do for
+    // out-of-window indices).
+    let regs_base = {
+        let base = frame.registers().base() as usize;
+        // SAFETY: `register_stack` is grown to cover the active
+        // frame's window before run_via_dsl is invoked (window
+        // reservation happens at install / call entry). `add(base)`
+        // is in-range (or one-past-the-end, which is well-defined).
+        unsafe { vm.register_stack_storage_mut_ptr().add(base) }
+    };
+
+    let vm_ptr: *mut Vm = vm as *mut Vm;
+    let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
+
+    // Build a DispatchState directly so the asm-path slow-path bridge
+    // can call `LlIntDispatchState::dispatch_state()` and get the same
+    // shape the α handlers use. Semantic bodies under
+    // `crate::vm::semantics::` all consume `DispatchState`; threading
+    // it through both dispatch paths keeps the single-implementation
+    // invariant.
+    let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
         vm,
         agent,
         host,
@@ -76,18 +106,18 @@ pub(crate) fn run_via_dsl(
         installed,
         frame,
         frame_depth,
+        frame_check_epoch,
+    );
+    let mut rust_ctx = LlIntRustContext {
+        dispatch,
         exit: LlIntExitSlot::default(),
     };
 
-    // frame_regs_base is a placeholder null pointer in DSL-0b Batch 3.
-    // The register-window pin lands later in DSL-0b once Batch 4+ wires
-    // the handler chain; until then the asm trampoline is a stub and
-    // never dereferences it.
     let mut state = LlIntState {
         frame_pc_offset,
         _pad1: 0,
         frame_pb_base: pb_base,
-        frame_regs_base: core::ptr::null_mut::<Value>(),
+        frame_regs_base: regs_base,
         frame_fv_base: fv_base,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
@@ -99,8 +129,19 @@ pub(crate) fn run_via_dsl(
 
     // SAFETY: `state` is a valid mutable pointer to a stack-local
     // LlIntState; the asm trampoline only reads through it on the
-    // current thread for the duration of this call.
-    unsafe { run_dsl_trampoline(&mut state as *mut LlIntState) };
+    // current thread for the duration of this call. `vm_ptr` aliases
+    // `rust_ctx.vm` but the trampoline only dereferences `vm_ptr` via
+    // the VM pin (`x22`) for the immutable `dsl_poll_pending` byte —
+    // it never writes through it. `DSL_DISPATCH_TABLE` is a `pub
+    // static [DslHandler; 256]` with stable storage for the entire
+    // program lifetime.
+    unsafe {
+        run_dsl_trampoline(
+            &mut state as *mut LlIntState,
+            vm_ptr,
+            DSL_DISPATCH_TABLE.as_ptr(),
+        )
+    };
 
     match rust_ctx.exit.kind {
         ExitKind::Done => Ok(rust_ctx.exit.done_value),
@@ -109,33 +150,109 @@ pub(crate) fn run_via_dsl(
     }
 }
 
-/// Asm-side trampoline entry. Loads pinned registers + tail-jumps to
-/// the first handler. The handler chain runs until `_interpreter_exit`
-/// is hit.
+// =============================================================
+// The asm trampoline + exit shim.
+//
+// Both functions share a 96-byte stack frame:
+//   [sp + 0]  x19, x20   ← PC, REGS
+//   [sp + 16] x21, x22   ← FV, VM
+//   [sp + 32] x23, x24   ← TABLE, STATE
+//   [sp + 48] x25, x26   ← reserved (handler scratch, currently
+//                          unused by the substrate but saved per
+//                          AAPCS64 so callees can use them)
+//   [sp + 64] x27, x28   ← ditto
+//   [sp + 80] x29, x30   ← saved FP, LR (caller's return address)
+//
+// `run_dsl_trampoline` writes this frame on entry; `_interpreter_exit`
+// reverses it on exit. The handler chain in between maintains
+// `sp == frame-from-entry` (handlers may use the red zone but must
+// not move sp). Slow-path shims (Rust `extern "C"` fns called via
+// `bl` inside handlers) get a fresh AAPCS64-compliant stack frame
+// from rustc's own prologue/epilogue, so they don't disturb ours.
+// =============================================================
+
+/// Asm trampoline entry. Saves callee-saveds, loads pinned registers
+/// from `state` / `vm` / `table`, then tail-dispatches to the handler
+/// at `DSL_DISPATCH_TABLE[bytes[pc]]`.
 ///
-/// In DSL-0b Batch 2 the body is a single `ret` stub. Batch 4 fills
-/// the body in using the AArch64 backend macros once the handler chain
-/// exists. The stub means `run_via_dsl` is currently UB at runtime —
-/// it returns with `rust_ctx.exit.kind == None` and surfaces as
-/// `VmError::TrampolineExitedWithoutSetting`. No caller exists yet.
+/// Arguments (AAPCS64):
+/// - `x0` = `*mut LlIntState`
+/// - `x1` = `*mut Vm` (used to pin `VM` for `poll_safepoint!` reads;
+///   the trampoline does not deref it itself)
+/// - `x2` = `*const DslHandler` (`DSL_DISPATCH_TABLE` base)
+///
+/// Pinned registers (design §5):
+/// | Pin | Reg | Holds |
+/// |---|---|---|
+/// | PC | x19 | `pb_base + pc_offset` (live byte in bytecode) |
+/// | REGS | x20 | `*mut Value` (register-file base) |
+/// | FV | x21 | `*mut FeedbackEntry` (feedback-vector base) |
+/// | VM | x22 | `*mut Vm` |
+/// | TABLE | x23 | `*const DslHandler` |
+/// | STATE | x24 | `*mut LlIntState` |
 #[unsafe(naked)]
-pub unsafe extern "C" fn run_dsl_trampoline(_state: *mut LlIntState) {
-    // x0 = state. The full version sets up pinned regs from state.frame_*
-    // fields, loads VM/TABLE, then tail-jumps to the first handler.
-    // Stub: just return; rust_ctx.exit.kind stays None and run_via_dsl
-    // surfaces TrampolineExitedWithoutSetting.
-    core::arch::naked_asm!("ret");
+pub unsafe extern "C" fn run_dsl_trampoline(
+    _state: *mut LlIntState,
+    _vm: *mut Vm,
+    _table: *const DslHandler,
+) {
+    core::arch::naked_asm!(
+        // Build a 96-byte frame on the stack; save FP, LR, and
+        // callee-saved regs we're about to clobber for pins.
+        "sub    sp, sp, #96",
+        "stp    x19, x20, [sp, #0]",
+        "stp    x21, x22, [sp, #16]",
+        "stp    x23, x24, [sp, #32]",
+        "stp    x25, x26, [sp, #48]",
+        "stp    x27, x28, [sp, #64]",
+        "stp    x29, x30, [sp, #80]",
+        "mov    x29, sp",
+        // Pin assignment.
+        "mov    x24, x0",                       // STATE = state
+        "mov    x22, x1",                       // VM    = vm
+        "mov    x23, x2",                       // TABLE = table
+        "ldr    x9,  [x24, {state_pb}]",        // x9 = pb_base
+        "ldr    w10, [x24, {state_pc}]",        // w10 = pc_offset (u32)
+        "add    x19, x9, x10",                  // PC = pb_base + pc_offset
+        "ldr    x20, [x24, {state_regs}]",      // REGS = state.frame_regs_base
+        "ldr    x21, [x24, {state_fv}]",        // FV   = state.frame_fv_base
+        // Tail-dispatch to the first handler.
+        "ldrb   w8, [x19]",                     // w8 = opcode byte
+        "ldr    x16, [x23, x8, lsl #3]",        // x16 = TABLE[opcode]
+        "br     x16",
+        // Note: control does not return here from a handler. The
+        // handler chain ends via a `b {exit}` to `_interpreter_exit`
+        // (issued by `dispatch_after_slow!`), which restores the
+        // stack frame this function built and `ret`s.
+        state_pb = const crate::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
+        state_pc = const crate::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
+        state_regs = const crate::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
+        state_fv = const crate::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+    );
 }
 
-/// `_interpreter_exit` is the symbolic target the slow-path bridge
-/// uses to escape the trampoline. The asm `b {exit}` branches here;
-/// the function reads `rust_context.exit` and returns to the caller of
-/// `run_via_dsl` via a normal Rust return.
+/// Exit shim. Reached via `b {exit}` from `dispatch_after_slow!`
+/// inside a handler. Restores the callee-saved registers the
+/// trampoline saved on entry and returns to the caller of
+/// `run_dsl_trampoline` (`run_via_dsl`).
 ///
-/// `run_dsl_trampoline` sets up a normal stack frame, so
-/// `_interpreter_exit` can be a normal `extern "C"` that pops back to
-/// `run_via_dsl`. Empty body = single `ret` generated by rustc.
+/// `_interpreter_exit` is naked because the branch into it is a tail
+/// (`b`), not a call (`bl`) — there's no fresh return slot to write
+/// into, and rustc-generated prologues/epilogues would corrupt the
+/// trampoline's frame. The asm here mirrors `run_dsl_trampoline`'s
+/// entry sequence in reverse.
 #[unsafe(no_mangle)]
-pub extern "C" fn _interpreter_exit() {
-    // Intentionally empty.
+#[unsafe(naked)]
+pub unsafe extern "C" fn _interpreter_exit() {
+    core::arch::naked_asm!(
+        // Restore callee-saved regs from the trampoline's frame.
+        "ldp    x29, x30, [sp, #80]",
+        "ldp    x27, x28, [sp, #64]",
+        "ldp    x25, x26, [sp, #48]",
+        "ldp    x23, x24, [sp, #32]",
+        "ldp    x21, x22, [sp, #16]",
+        "ldp    x19, x20, [sp, #0]",
+        "add    sp, sp, #96",
+        "ret",
+    );
 }

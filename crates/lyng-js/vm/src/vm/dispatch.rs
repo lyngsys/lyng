@@ -558,26 +558,20 @@ impl Vm {
         Ok(())
     }
 
-    /// Sole VM dispatch entry point post-`lyng-9gyk` (Phase 1 sub-8 cutover).
+    /// Sole VM dispatch entry point.
     ///
-    /// All bytecode dispatch routes through `run_via_trampoline`, which sets
-    /// up a `DispatchState` snapshot from the active frame and hands control
-    /// to `run_trampoline`. The per-handler `extern "C" fn` table is in
-    /// `vm::dispatch_state::DISPATCH_TABLE`; family handlers live under
-    /// `vm::dispatch_handlers::`.
-    ///
-    /// Opcode-dispatch counters and the debugger safepoint poll are now
-    /// wired into the trampoline directly (via `dispatch_next!` /
-    /// `maybe_record_opcode_dispatch` and `op_loop_header` respectively),
-    /// replacing the legacy `const COUNT_OPCODES, const DEBUG` const-generic
-    /// switch.
+    /// DSL-0c (Task C1) flipped this from `run_via_trampoline` (α path
+    /// using `DispatchState` + `DISPATCH_TABLE` + `dispatch_handlers/`)
+    /// to `run_via_dsl` (asm-DSL trampoline + `DSL_DISPATCH_TABLE`).
+    /// The α machinery is still linked in for one commit so the
+    /// rollback diff is small; Tasks C2–C5 delete it.
     pub(super) fn run(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
-        self.run_via_trampoline(agent, host, registry)
+        self.run_via_dsl(agent, host, registry)
     }
 
 }
