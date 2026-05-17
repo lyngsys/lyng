@@ -13,6 +13,7 @@
 )]
 
 mod activation;
+pub mod dsl;
 mod enumeration;
 mod error;
 mod extensions;
