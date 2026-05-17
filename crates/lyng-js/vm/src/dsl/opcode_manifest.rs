@@ -839,6 +839,43 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_closure_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A15 — iterators family (6 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::CreateForIn,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_create_for_in_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_for_in_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AdvanceForIn,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_advance_for_in_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_advance_for_in_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CloseForIn,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_close_for_in_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_close_for_in_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CreateIterator,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_create_iterator_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_iterator_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AdvanceIterator,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_advance_iterator_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_advance_iterator_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CloseIterator,
+        semantic_symbol: "lyng_js_vm::vm::semantics::iterators::op_close_iterator_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_close_iterator_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
