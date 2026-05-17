@@ -27,6 +27,7 @@ members = [
     # Tools
     "tools/html5lib_runner",
     "tools/lyng-js-bench",
+    "tools/lyng-js-dsl-codegen",
     "tools/lyng-js-test262",
 ]
 
