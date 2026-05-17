@@ -176,10 +176,12 @@ macro_rules! call_slow {
 ///   from `state.frame_*` (a frame switch happened) and tail-jump.
 /// - `0x2` (Exit) → branch to `{exit}` symbol.
 ///
-/// Labels `Lunusual` / `Lexit` use the Mach-O / ELF `L*`
-/// assembler-local naming convention (no leading dot). They're scoped
-/// to the enclosing `naked_asm!` block so multiple handlers may emit
-/// the same name without colliding.
+/// Uses AArch64 numeric local labels (`1:` / `1f` / `2:` / `2f`)
+/// rather than named `L*` labels. Numeric locals are per-block-of-asm
+/// scoped on Apple's assembler, so multiple handlers in the same
+/// translation unit don't collide on label names. Named labels
+/// (`Lname`) coalesce across `naked_asm!` blocks in the same crate's
+/// `.s` output and trip the assembler with "symbol already defined".
 ///
 /// Bindings: `{exit}`, `{state_pb}`, `{state_pc}`, `{state_regs}`,
 /// `{state_fv}`.
@@ -188,16 +190,16 @@ macro_rules! dispatch_after_slow {
     () => {
         concat!(
             // Common case first: tag == Continue (0).
-            "cbnz   x0, Lunusual\n",
+            "cbnz   x0, 1f\n",          // → "unusual" handling
             // Continue path: PC = pb_base + new_offset (low 32 of x1).
             "ldr    x16, [x24, {state_pb}]\n",
             "add    x19, x16, x1\n",
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "Lunusual:\n",
+            "1:\n",                      // unusual:
             "cmp    x0, #2\n",
-            "b.eq   Lexit\n",
+            "b.eq   2f\n",               // → exit
             // Refresh path: reload PC / REGS / FV from state.frame_*.
             "ldr    w16, [x24, {state_pc}]\n",
             "ldr    x17, [x24, {state_pb}]\n",
@@ -207,7 +209,7 @@ macro_rules! dispatch_after_slow {
             "ldrb   w8,  [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "Lexit:\n",
+            "2:\n",                      // exit:
             "b      {exit}\n",
         )
     };
@@ -278,7 +280,7 @@ macro_rules! dispatch_prefixed {
         concat!(
             // Reject doubled prefix.
             "ldrb   w16, [x24, {state_prefix}]\n",
-            "cbnz   w16, Ldouble_prefix\n",
+            "cbnz   w16, 1f\n",         // → double-prefix slow path
             // Stash prefix discriminator.
             "mov    w16, #", stringify!($kind), "\n",
             "strb   w16, [x24, {state_prefix}]\n",
@@ -287,7 +289,7 @@ macro_rules! dispatch_prefixed {
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "Ldouble_prefix:\n",
+            "1:\n",                      // double-prefix:
             // TODO: call op_double_prefix_slow_rs once Batch 7 lands.
             "brk    #0\n",
         )

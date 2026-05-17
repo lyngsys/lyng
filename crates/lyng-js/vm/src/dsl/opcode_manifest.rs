@@ -440,8 +440,8 @@ pub const OPCODES: &[OpcodeEntry] = &[
     OpcodeEntry {
         opcode: Opcode::Jump,
         semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::hot::op_jump",
+        category: OpcodeCategory::Hot,
     },
     OpcodeEntry {
         opcode: Opcode::Jump8,
@@ -476,14 +476,14 @@ pub const OPCODES: &[OpcodeEntry] = &[
     OpcodeEntry {
         opcode: Opcode::LoopHeader,
         semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_loop_header_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_loop_header_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::warm::op_loop_header",
+        category: OpcodeCategory::Warm,
     },
     OpcodeEntry {
         opcode: Opcode::Return,
         semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_return_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_return_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::hot::op_return",
+        category: OpcodeCategory::Hot,
     },
     OpcodeEntry {
         opcode: Opcode::ReturnUndefined,

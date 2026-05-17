@@ -15,6 +15,7 @@ pub mod feedback_flat;
 pub mod handlers;
 pub mod llint_state;
 pub mod opcode_manifest;
+pub mod poll;
 pub mod reg_convention;
 pub mod slow_path;
 

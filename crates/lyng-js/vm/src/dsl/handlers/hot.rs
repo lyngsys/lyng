@@ -93,6 +93,75 @@ pub extern "C" fn op_add_slow_rs(
     dispatch.translate_outcome(outcome)
 }
 
+// =====================================================================
+// op_jump (B41) — Ax layout, length = 5. The semantic body in
+// op_jump_semantic handles backward-edge polling and PC arithmetic; the
+// DSL handler delegates to it via call_slow.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump, layout = Ax, length = 5, |offset| {
+        call_slow!(op_jump_slow_rs, args = [offset]);
+        dispatch_after_slow!();
+    }
+}
+
+/// Slow-path shim for `op_jump`. Adapts the u32 raw operand from asm
+/// (a sign-extended i32 encoded as a 4-byte payload at PC+1) into the
+/// `OpJumpArgs` shape that `op_jump_semantic` expects.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let args = crate::vm::semantics::control_flow::OpJumpArgs {
+        delta: offset_raw as i32,
+        instruction_len: 5,
+    };
+    let outcome = crate::vm::semantics::control_flow::op_jump_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+// =====================================================================
+// op_return (B42) — A layout, length = 2. Frame-transitioning; always
+// returns Refresh / ExitDone / ExitError. The DSL body is a thin
+// call_slow + dispatch_after_slow shim.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_return, layout = A, length = 2, |src| {
+        call_slow!(op_return_slow_rs, args = [src]);
+        dispatch_after_slow!();
+    }
+}
+
+/// Slow-path shim for `op_return`. Adapts the single u32 raw operand
+/// from asm into the `OpReturnArgs` shape `op_return_semantic` expects.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_return_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    src: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let args = crate::vm::semantics::control_flow::OpReturnArgs {
+        register: src as u16,
+    };
+    let outcome = crate::vm::semantics::control_flow::op_return_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+#[cfg(target_arch = "aarch64")]
+use crate::decode_a;
+#[cfg(target_arch = "aarch64")]
+use crate::decode_ax;
+
 /// Non-aarch64 stubs. The DSL handler family is aarch64-only in DSL-0b
 /// per design §3; on other hosts we emit placeholders so the dispatch
 /// table can still be assembled.
@@ -103,5 +172,15 @@ pub unsafe extern "C" fn op_move() -> ! {
 
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe extern "C" fn op_add() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_return() -> ! {
     loop {}
 }

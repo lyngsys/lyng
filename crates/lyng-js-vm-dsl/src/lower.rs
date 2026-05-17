@@ -101,30 +101,29 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     // yields invalid asm like `wdst, wsrc`. Substitute the operand idents
     // here so the prologue sees `9, 10, ...` register-number literals
     // just like the body does.
-    let prologue = substitute_idents(prologue_raw, &mut scratch)?;
+    let label_prefix_for_prologue = format!("L{name}__");
+    let prologue = substitute_idents(prologue_raw, &mut scratch, &label_prefix_for_prologue)?;
 
     // Substitute operand/t-scratch idents in the body, and harvest
     // call_slow! shim names for sym bindings.
+    //
+    // Label prefix: `L<handler_name>__` — namespaces every body label
+    // (e.g. `.slow` → `Lop_add__slow`) so multiple `naked_asm!` blocks
+    // in the same translation unit can't collide. `L*` keeps the
+    // label assembler-local; the handler-name infix makes them
+    // unique across handlers.
+    let label_prefix = format!("L{name}__");
     let mut shim_names: BTreeSet<String> = BTreeSet::new();
     let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
     for stmt in &ast.body {
         match stmt {
             BodyStmt::MacroCall(tokens) => {
-                let rewritten = substitute_idents(tokens.clone(), &mut scratch)?;
+                let rewritten = substitute_idents(tokens.clone(), &mut scratch, &label_prefix)?;
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
             }
             BodyStmt::Label(name) => {
-                // Emit `Lname:\n` as a string-literal template entry.
-                // The `L` prefix is required for Mach-O / ELF
-                // assembler-local labels — without it the label is
-                // emitted as a global symbol and the assembler
-                // rejects conditional branches that target it
-                // ("conditional branch requires assembler-local
-                // label"). `substitute_idents` also rewrites the
-                // matching reference inside macro args so both sides
-                // agree on the prefixed name.
-                let asm = format!("L{name}:\n");
+                let asm = format!("{label_prefix}{name}:\n");
                 body_tokens.push(quote! { #asm });
             }
         }
@@ -175,32 +174,30 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
 /// Walk `tokens` and:
 ///
 /// 1. Rewrite `.label` references (the DSL's label-reference syntax)
-///    into `Llabel` — an assembler-local label identifier. The
-///    leading `L` prefix is required by Mach-O / ELF for local
-///    labels; without it the assembler treats the symbol as global
-///    and rejects local conditional branches.
+///    into `<label_prefix><label>` — an assembler-local label
+///    identifier scoped to the current handler. The `label_prefix`
+///    is built from the handler name so labels never collide across
+///    `naked_asm!` blocks in the same translation unit.
 /// 2. Replace recognized scratch idents (operands + `t0..t6`) with
 ///    their assigned scratch register numbers.
 ///
 /// Other tokens pass through unchanged. Recurses into groups so macro
 /// arguments inside `(..)` / `[..]` / `{..}` are rewritten too.
-fn substitute_idents(tokens: TokenStream, scratch: &mut ScratchAllocator) -> Result<TokenStream> {
+fn substitute_idents(
+    tokens: TokenStream,
+    scratch: &mut ScratchAllocator,
+    label_prefix: &str,
+) -> Result<TokenStream> {
     let mut out = Vec::new();
     let mut iter = tokens.into_iter().peekable();
     while let Some(tt) = iter.next() {
         match tt {
             TokenTree::Punct(ref p) if p.as_char() == '.' => {
-                // `.label` → `Llabel`. The proc-macro lowerer consumes
-                // the leading dot here and prefixes the following ident
-                // with `L` (the asm-local-label convention). The
-                // matching label declaration site (`BodyStmt::Label`)
-                // emits `Llabel:` with the same prefix.
                 if let Some(TokenTree::Ident(id)) = iter.peek().cloned() {
                     iter.next();
-                    let prefixed = Ident::new(&format!("L{id}"), id.span());
+                    let prefixed = Ident::new(&format!("{label_prefix}{id}"), id.span());
                     out.push(TokenTree::Ident(prefixed));
                 } else {
-                    // Stray `.` — keep it for forward compatibility.
                     out.push(TokenTree::Punct(proc_macro2::Punct::new('.', Spacing::Alone)));
                 }
             }
@@ -212,7 +209,7 @@ fn substitute_idents(tokens: TokenStream, scratch: &mut ScratchAllocator) -> Res
                 }
             }
             TokenTree::Group(g) => {
-                let inner = substitute_idents(g.stream(), scratch)?;
+                let inner = substitute_idents(g.stream(), scratch, label_prefix)?;
                 out.push(TokenTree::Group(Group::new(g.delimiter(), inner)));
             }
             other => out.push(other),
