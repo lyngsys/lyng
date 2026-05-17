@@ -40,3 +40,52 @@ pub const OPCODES: &[OpcodeEntry] = &[
 pub fn by_category(category: OpcodeCategory) -> impl Iterator<Item = &'static OpcodeEntry> {
     OPCODES.iter().filter(move |entry| entry.category == category)
 }
+
+#[cfg(test)]
+mod manifest_tests {
+    use super::*;
+    use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
+    use std::collections::HashSet;
+
+    /// Test 1 from design §10 DSL-0a: every `Opcode` variant appears in
+    /// `OPCODES` exactly once.
+    #[test]
+    #[ignore = "Enabled by Task A18 once all family extractions are complete"]
+    fn opcodes_manifest_is_exhaustive() {
+        let count = OPCODE_COUNT as usize;
+        assert_eq!(
+            OPCODES.len(),
+            count,
+            "OPCODES has {} entries, expected {} (OPCODE_COUNT)",
+            OPCODES.len(),
+            count,
+        );
+
+        let mut seen: HashSet<u8> = HashSet::new();
+        for entry in OPCODES {
+            let byte = entry.opcode as u8;
+            assert!(
+                byte < OPCODE_COUNT,
+                "OPCODES entry for {:?} has byte {} outside [0, {})",
+                entry.opcode,
+                byte,
+                OPCODE_COUNT,
+            );
+            assert!(
+                seen.insert(byte),
+                "OPCODES has duplicate entry for opcode byte {} ({:?})",
+                byte,
+                entry.opcode,
+            );
+        }
+
+        for byte in 0..OPCODE_COUNT {
+            assert!(
+                seen.contains(&byte),
+                "OPCODES missing entry for opcode byte {}: {:?}",
+                byte,
+                Opcode::from_byte(byte),
+            );
+        }
+    }
+}
