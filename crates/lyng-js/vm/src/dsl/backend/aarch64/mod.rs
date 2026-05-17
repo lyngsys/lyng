@@ -15,6 +15,7 @@
 
 pub mod arithmetic;
 pub mod control;
+pub mod counters;
 pub mod feedback;
 pub mod memory;
 pub mod objects;
@@ -22,8 +23,6 @@ pub mod operands;
 pub mod prelude;
 pub mod safepoint;
 pub mod values;
-// Other backend submodules are declared in subsequent Batch 4 commits:
-// pub mod counters;   (B27)
 
 /// Top-level body builder invoked by the proc-macro. Concatenates the
 /// operand-decode prologue, the body fragments, and the dispatch
