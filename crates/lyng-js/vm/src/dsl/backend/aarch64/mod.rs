@@ -15,8 +15,8 @@
 
 pub mod operands;
 pub mod prelude;
+pub mod values;
 // Other backend submodules are declared in subsequent Batch 4 commits:
-// pub mod values;     (B22)
 // pub mod objects;    (B23)
 // pub mod arithmetic; (B24)
 // pub mod control;    (B25)
