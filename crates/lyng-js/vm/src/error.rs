@@ -44,6 +44,15 @@ pub enum VmError {
         code: CodeRef,
         instruction_offset: u32,
     },
+    /// Two `Wide` / `ExtraWide` prefix bytes in a row. The bytecode
+    /// emitter never produces this — accepting it would silently mask
+    /// a corrupted instruction stream. Surfaced by the prefix semantic
+    /// bodies (`op_wide_semantic` / `op_extra_wide_semantic`) when
+    /// `state.prefix` is already `Some(...)` on entry.
+    DoublePrefix {
+        code: CodeRef,
+        instruction_offset: u32,
+    },
     RegisterOutOfBounds {
         code: CodeRef,
         register: u16,

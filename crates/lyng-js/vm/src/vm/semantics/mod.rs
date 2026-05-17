@@ -17,6 +17,8 @@ pub(crate) mod exceptions;
 pub(crate) mod generators;
 pub(crate) mod iterators;
 pub(crate) mod loads;
+pub(crate) mod misc;
 pub(crate) mod names;
+pub(crate) mod prefix;
 pub(crate) mod property;
 pub(crate) mod scope;

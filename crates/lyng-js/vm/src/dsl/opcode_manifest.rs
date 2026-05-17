@@ -938,6 +938,40 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_exception_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A18 — prefix family (2 opcodes). Promoted to `Warm` in DSL-0b
+    // because their dispatch tail is "same-PC, peek next byte" — the
+    // safepoint-poll-friendly tier-up site lives on the semantic
+    // opcode they prefix, not on the prefix itself.
+    OpcodeEntry {
+        opcode: Opcode::Wide,
+        semantic_symbol: "lyng_js_vm::vm::semantics::prefix::op_wide_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_wide_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ExtraWide,
+        semantic_symbol: "lyng_js_vm::vm::semantics::prefix::op_extra_wide_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_extra_wide_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    // Task A18 — misc / orphan opcodes (2). Today these route through
+    // `op_unimplemented` in the dispatch table; their semantic bodies
+    // are stubs that return `ExitError { UnsupportedOpcode }` to
+    // preserve the manifest invariant. When real handlers land, the
+    // stubs are replaced in place and `build_dispatch_table` is
+    // updated to install the α handler — no manifest change required.
+    OpcodeEntry {
+        opcode: Opcode::InstanceOf,
+        semantic_symbol: "lyng_js_vm::vm::semantics::misc::op_instance_of_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_instance_of_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CallMethod,
+        semantic_symbol: "lyng_js_vm::vm::semantics::misc::op_call_method_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call_method_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
@@ -954,7 +988,6 @@ mod manifest_tests {
     /// Test 1 from design §10 DSL-0a: every `Opcode` variant appears in
     /// `OPCODES` exactly once.
     #[test]
-    #[ignore = "Enabled by Task A18 once all family extractions are complete"]
     fn opcodes_manifest_is_exhaustive() {
         let count = OPCODE_COUNT as usize;
         assert_eq!(

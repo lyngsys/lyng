@@ -24,7 +24,6 @@ fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[test]
-#[ignore = "Enabled by Task A18 once all family extractions are complete"]
 fn no_op_functions_outside_semantics_and_handlers() {
     let mut files = Vec::new();
     collect_rs(Path::new(VM_SRC), &mut files);
