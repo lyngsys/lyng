@@ -762,6 +762,23 @@ impl Vm {
             self.feedback_vectors
                 .resize_with(index + 1, FeedbackVector::default);
         }
+        // DSL-0b (B15): eagerly allocate the flat-array feedback
+        // storage to `function.feedback_slot_count()` entries. Every
+        // slot starts as `FeedbackEntry::default()` (state == None);
+        // dual-write from `record_*` paths (B17) populates entries to
+        // mirror the legacy `Vec<Option<FeedbackSiteState>>`. Storage
+        // is pointer-stable thereafter — the slow path never grows it.
+        if self.feedback_flat_storage.len() <= index {
+            self.feedback_flat_storage
+                .resize_with(index + 1, || Vec::<crate::dsl::feedback_flat::FeedbackEntry>::new().into_boxed_slice());
+        }
+        let slot_count = usize::try_from(installed.function.feedback_slot_count())
+            .unwrap_or(usize::MAX);
+        let flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]> = (0..slot_count)
+            .map(|_| crate::dsl::feedback_flat::FeedbackEntry::default())
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        self.feedback_flat_storage[index] = flat;
         self.ensure_tiering_capacity(code);
         self.tiering[index] = Some(TieringState::default());
         self.installed[index] = Some(Arc::new(installed));

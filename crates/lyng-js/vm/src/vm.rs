@@ -176,6 +176,16 @@ pub struct Vm {
     /// IC-bearing opcodes drop one Option discriminant on the hot path. The warmup counter
     /// lives inside the vector itself, replacing the older parallel `feedback_warmup: Vec<u16>`.
     feedback_vectors: Vec<FeedbackVector>,
+    /// DSL-0b flat-array feedback storage, parallel to `feedback_vectors`,
+    /// keyed by `code_index(code_ref)`. The asm-DSL substrate's `FV` pin
+    /// (`LlIntState::frame_fv_base`) points at the first entry of the
+    /// corresponding `Box<[FeedbackEntry]>` slot. Eagerly allocated to
+    /// `function.feedback_slot_count()` entries at install (B15) and
+    /// never grown thereafter — the slow path neither widens nor
+    /// reallocates the flat array, only mutates per-entry content.
+    /// See `crate::dsl::feedback_flat` for the storage rationale.
+    pub(crate) feedback_flat_storage:
+        Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
     tiering: Vec<Option<TieringState>>,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
@@ -240,6 +250,7 @@ impl Vm {
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
             feedback_vectors: Vec::new(),
+            feedback_flat_storage: Vec::new(),
             tiering: Vec::new(),
             activation_tables: ActivationSideTables::default(),
             for_in_states: ForInStateTable::default(),
