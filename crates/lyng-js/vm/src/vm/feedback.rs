@@ -612,17 +612,17 @@ impl From<KeyedPropertyFamily> for FeedbackKeyedPropertyFamily {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ArithmeticFeedback {
+pub(crate) struct ArithmeticFeedback {
     execution_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ComparisonFeedback {
+pub(crate) struct ComparisonFeedback {
     execution_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct NamedPropertyFeedback {
+pub(crate) struct NamedPropertyFeedback {
     execution_count: u32,
     cache_state: InlineCacheState,
     entry_count: u8,
@@ -705,7 +705,7 @@ impl DenseIndexCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct KeyedPropertyFeedback {
+pub(crate) struct KeyedPropertyFeedback {
     execution_count: u32,
     family: Option<KeyedPropertyFamily>,
     cache_state: InlineCacheState,
@@ -797,7 +797,7 @@ impl CallCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct CallFeedback {
+pub(crate) struct CallFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
     cache_state: InlineCacheState,
@@ -849,7 +849,7 @@ impl ConstructCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct ConstructFeedback {
+pub(crate) struct ConstructFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
     cache_state: InlineCacheState,
@@ -857,8 +857,12 @@ struct ConstructFeedback {
     entries: [Option<ConstructCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
 }
 
+// Per-site feedback content. Promoted to `pub(crate)` so the DSL-0b
+// flat-array storage (`crate::dsl::feedback_flat`) can wrap it inside a
+// `FeedbackEntry`. The enum variants are still constructed only through
+// the methods on this file; outside this module the type is opaque.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum FeedbackSiteState {
+pub(crate) enum FeedbackSiteState {
     Arithmetic(ArithmeticFeedback),
     Comparison(ComparisonFeedback),
     NamedProperty(NamedPropertyFeedback),

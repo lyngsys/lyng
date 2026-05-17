@@ -69,6 +69,11 @@ mod with_env;
 use call::RejectingNativeRegistry;
 use debugger::{VmDebugPauseRequest, VmDebugState};
 use feedback::FeedbackVector;
+// Re-export `FeedbackSiteState` for the DSL-0b flat-array storage in
+// `crate::dsl::feedback_flat`. The enum itself remains `pub(crate)` so
+// the rest of the crate (and `feedback_flat::FeedbackEntry`) can wrap
+// it without exposing internals to embedders.
+pub(crate) use feedback::FeedbackSiteState;
 use install::InstalledFunction;
 use state::{
     ActiveEnvScopeRange, ActiveVmRoots, AsyncFrameState, AsyncGeneratorFrameState,

@@ -1,24 +1,65 @@
-//! Flat-array feedback storage placeholder for the DSL `FV` pin.
+//! Flat-array feedback storage for the DSL `FV` pin per design §9.
 //!
-//! This file is a **placeholder** for DSL-0b Batch 2. The real
-//! `FeedbackEntry` layout (mirroring today's per-site IC state) lands
-//! in Batch 3 (Task B14). The forward declaration here keeps
-//! `LlIntState`'s `*mut FeedbackEntry` field-type compile cleanly so
-//! the ABI layout is stable across the two batches.
+//! Each [`FeedbackEntry`] is a fixed-size, pointer-stable IC slot whose
+//! content mirrors today's [`FeedbackSiteState`] (including all Phase 3f
+//! packed sidecars). Only the *vector storage* changes from
+//! `Vec<Option<FeedbackSiteState>>` to `Box<[FeedbackEntry]>` so the
+//! asm `FV` pin can be a single pointer with computed offset.
 //!
-//! The placeholder is a zero-sized opaque struct so the pointer width
-//! matches whatever the eventual flat-array entry type ends up being —
-//! `*mut FeedbackEntryStub` and `*mut FeedbackEntry` are interchangeable
-//! at the ABI level.
+//! Storage placement decision (Task B17):
+//!
+//!   The flat-array storage lives on `Vm` in a sibling `Vec<...>`
+//!   parallel to `Vm::feedback_vectors`, **not** inside the
+//!   `Arc<InstalledFunction>`. Rationale:
+//!
+//!     1. `InstalledFunction` is wrapped in `Arc` (shared, immutable
+//!        through normal references). Mutating a `Box<[FeedbackEntry]>`
+//!        inside an `Arc<InstalledFunction>` would require either
+//!        `Arc<RwLock<...>>` (heavyweight) or `UnsafeCell<...>` with
+//!        documented single-threaded invariants. The sibling-map
+//!        approach reuses the exact same indexing scheme as the legacy
+//!        `feedback_vectors` (keyed by `code_index(code)`) and the
+//!        dual-write paths only need `&mut Vm`.
+//!     2. Eager allocation at install matches the existing
+//!        `feedback_vectors` resize logic — there is exactly one slot
+//!        per `code_index(code)`, allocated to
+//!        `function.feedback_slot_count()` entries at install time and
+//!        never grown thereafter.
+//!     3. The asm `FV` pin reads through a `*const FeedbackEntry`
+//!        (cast to `*mut`) for the trampoline; the sibling-map slot is
+//!        pointer-stable for the lifetime of the `InstalledFunction`
+//!        because `Box<[T]>` owns a heap allocation that is never
+//!        reallocated (the outer `Vec<Box<[FeedbackEntry]>>` may
+//!        reallocate, but that only moves the `Box` smart pointer, not
+//!        the heap buffer it owns).
+//!
+//! Per-entry layout: `state: Option<FeedbackSiteState>` mirrors the
+//! legacy `Vec<Option<FeedbackSiteState>>` element type exactly — an
+//! unallocated/unused slot is `None`, and the same
+//! `FeedbackSiteState::for_descriptor` factory populates `Some(...)`
+//! at warmup. Dual-write at every legacy record site keeps the two
+//! storages bit-identical during DSL-0b; DSL-0c removes the legacy
+//! vector after every reader migrates to the flat array.
 
-/// Forward-declared placeholder for `FeedbackEntry`. The real layout
-/// lands in Batch 3 (Task B14); see plan for the migration.
-#[doc(hidden)]
+pub(crate) use crate::vm::FeedbackSiteState;
+
+/// Single feedback entry. Pointer-stable for the lifetime of the
+/// owning `InstalledFunction`. The `state` field is `None` for
+/// unallocated / descriptor-absent slots — matching the legacy
+/// `Vec<Option<FeedbackSiteState>>` per-element type.
 #[repr(C)]
-pub struct FeedbackEntryStub {
-    _private: [u8; 0],
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FeedbackEntry {
+    pub(crate) state: Option<FeedbackSiteState>,
 }
 
-/// Alias used by `LlIntState` and any other Batch 2 code. Batch 3
-/// replaces the placeholder with the real `FeedbackEntry` struct.
-pub type FeedbackEntry = FeedbackEntryStub;
+impl FeedbackEntry {
+    /// Returns the inner [`FeedbackSiteState`] when the slot is
+    /// populated. Used by the dual-write invariant test to compare
+    /// against the legacy vector slot.
+    #[inline]
+    #[allow(dead_code)] // exercised by `feedback_flat_consistency` test.
+    pub(crate) fn state(&self) -> Option<&FeedbackSiteState> {
+        self.state.as_ref()
+    }
+}
