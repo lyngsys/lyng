@@ -27,6 +27,7 @@ pub enum SemanticOutcome {
     ExitError { error: VmError },
 }
 
+use crate::dsl::llint_state::{LlIntRustContext, LlIntState};
 use crate::vm::dispatch_state::DispatchState;
 
 /// Safe wrapper around a per-frame dispatch state.
@@ -45,7 +46,14 @@ pub struct LlIntDispatchState<'vm, 'borrow> {
 pub(crate) enum LlIntDispatchInner<'vm, 'borrow> {
     /// Borrowed from a live `DispatchState` (alpha path, transitional).
     Alpha(&'borrow mut DispatchState<'vm>),
-    // Asm(...) variant lands in DSL-0b.
+    /// Reconstructed from a raw `*mut LlIntState` passed by the asm
+    /// trampoline + an opaque-cast `&mut LlIntRustContext<'vm>`. The
+    /// asm side never reads through `state.rust_context`; the slow-path
+    /// shim casts it back to the Rust context borrow.
+    Asm {
+        state: *mut LlIntState,
+        rust: &'borrow mut LlIntRustContext<'vm>,
+    },
 }
 
 impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
@@ -55,12 +63,60 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         Self { inner: LlIntDispatchInner::Alpha(state) }
     }
 
+    /// Construct from a raw `*mut LlIntState` passed by the asm shim.
+    ///
+    /// # Safety
+    ///
+    /// Caller (the asm bridge) guarantees:
+    /// - `state` is a valid `*mut LlIntState` for the lifetime of the
+    ///   slow-path call.
+    /// - `state.rust_context` was established by the entry shim
+    ///   (`Vm::run_via_dsl`) and points to a valid
+    ///   `LlIntRustContext<'vm>` whose `'vm` outlives `'borrow`.
+    /// - No other live `&mut LlIntRustContext` aliases the same
+    ///   pointer for the duration of the returned wrapper.
+    pub unsafe fn from_raw(state: *mut LlIntState) -> Self {
+        let rust = unsafe {
+            &mut *((*state).rust_context as *mut LlIntRustContext<'vm>)
+        };
+        Self {
+            inner: LlIntDispatchInner::Asm { state, rust },
+        }
+    }
+
     /// Mutable access to the underlying `DispatchState`. Semantic
     /// bodies use this for now; the DSL-0b refactor replaces this with
     /// typed accessors that operate uniformly across α and asm paths.
     pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
             LlIntDispatchInner::Alpha(state) => *state,
+            LlIntDispatchInner::Asm { .. } => {
+                // The asm path uses typed accessors landed in later
+                // DSL-0b tasks. Hitting this branch means an α-only
+                // call site mis-fired on an asm-constructed dispatch
+                // state.
+                panic!("LlIntDispatchState::dispatch_state called on asm variant");
+            }
+        }
+    }
+
+    /// Pre-slow-path sync — copy asm-side mirrors into the Rust-side
+    /// snapshot before semantic code observes the frame. See design §6.
+    ///
+    /// Idempotent on the α variant (asm mirrors do not exist there;
+    /// `rust.frame` is already authoritative).
+    pub fn sync_from_asm(&mut self) {
+        if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
+            // SAFETY: `state` is valid by `from_raw`'s contract; we
+            // only read scalar fields here.
+            unsafe {
+                rust.frame.set_instruction_offset((**state).frame_pc_offset);
+            }
+            // registers_base / fv_base are mirrored back via the
+            // `Refresh` path in `translate_outcome`; semantic bodies
+            // read those through `rust.installed.feedback_flat` and
+            // the register window, both of which are still authoritative
+            // on entry (the asm side has not relocated them).
         }
     }
 }
