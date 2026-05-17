@@ -17,3 +17,11 @@ pub mod llint_state;
 pub mod opcode_manifest;
 pub mod reg_convention;
 pub mod slow_path;
+
+// DSL-0b validation harness shared by tasks B31–B38. The module is
+// `#[doc(hidden)] pub` rather than `#[cfg(test)]` because the
+// `tests/dsl_validation_*.rs` integration tests live in separate
+// crates and only see `pub` items. Production paths never touch this
+// module; the symbols compile in but optimize out of release builds.
+#[doc(hidden)]
+pub mod test_helpers;

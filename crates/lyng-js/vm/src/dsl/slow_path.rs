@@ -11,6 +11,7 @@ use crate::error::VmError;
 
 /// Logical outcome of a semantic-body invocation. The α handler maps
 /// this to `Step`; the DSL cold-stub shim maps it to `SlowPathReturn`.
+#[derive(Debug)]
 pub enum SemanticOutcome {
     /// Dispatch continues at the post-instruction PC. `pc_advance` is
     /// the number of bytes the semantic body consumed (i.e. the
@@ -97,6 +98,25 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                 // state.
                 panic!("LlIntDispatchState::dispatch_state called on asm variant");
             }
+        }
+    }
+
+    /// Typed accessor for the current instruction offset. Works on
+    /// both α (legacy `DispatchState`) and asm-constructed dispatch
+    /// states — design §6 invariant: after [`Self::sync_from_asm`]
+    /// the asm side's `state.frame_pc_offset` and the Rust side's
+    /// `rust.frame.instruction_offset()` are in sync, so reading
+    /// either is correct.
+    ///
+    /// This is the first of the typed accessors that replace
+    /// `dispatch_state()` for asm-path semantic bodies. Used by the
+    /// DSL-0b validation cases (B32 PC-sync) and by future ports
+    /// that need PC inspection without crashing on the asm variant.
+    #[inline]
+    pub fn current_instruction_offset(&self) -> u32 {
+        match &self.inner {
+            LlIntDispatchInner::Alpha(state) => state.frame.instruction_offset(),
+            LlIntDispatchInner::Asm { rust, .. } => rust.frame.instruction_offset(),
         }
     }
 

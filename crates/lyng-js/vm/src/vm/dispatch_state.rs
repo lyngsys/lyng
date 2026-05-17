@@ -58,6 +58,36 @@ pub struct DispatchState<'vm> {
 }
 
 impl<'vm> DispatchState<'vm> {
+    /// DSL-0b validation-case helper: construct a `DispatchState` from
+    /// pre-built components for the `crate::dsl::test_helpers`
+    /// harness. Production code builds `DispatchState` inline inside
+    /// [`Vm::run_via_trampoline`]; the harness needs a public path
+    /// because [`crate::dsl::test_helpers::DslHarness::with_alpha_dispatch`]
+    /// lives in a module that the integration tests can see.
+    #[doc(hidden)]
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new_for_dsl_harness(
+        vm: &'vm mut Vm,
+        agent: &'vm mut Agent,
+        host: &'vm dyn HostHooks,
+        registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
+        installed: Arc<InstalledFunction>,
+        frame: FrameRecord,
+        init_prefix: Option<Opcode>,
+    ) -> Self {
+        Self {
+            vm,
+            agent,
+            host,
+            registry,
+            installed,
+            frame,
+            frame_depth: 0,
+            frame_check_epoch: 0,
+            prefix: init_prefix,
+        }
+    }
+
     /// Bytes from the active PC to the end of the function's instruction
     /// stream. Handlers slice this to decode their operands and look up the
     /// next opcode byte for `dispatch_next!`.
@@ -465,6 +495,19 @@ impl Vm {
             .get(code_index(code))
             .and_then(Option::as_ref)
             .cloned()
+    }
+
+    /// DSL-0b validation-case helper: same lookup as
+    /// [`Vm::installed_for_code`] but visible from the
+    /// `crate::dsl::test_helpers` module (which is `pub` for
+    /// integration-test consumption).
+    #[doc(hidden)]
+    #[inline]
+    pub(crate) fn installed_for_dsl_harness(
+        &self,
+        code: CodeRef,
+    ) -> Option<Arc<InstalledFunction>> {
+        self.installed_for_code(code)
     }
 
     /// Read the for-in enumerator slot off the side table. Mirrors the
