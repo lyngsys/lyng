@@ -8,7 +8,9 @@
 //! optimizer + dispatch table organization later in DSL-1).
 
 #[cfg(target_arch = "aarch64")]
-use crate::{call_slow, decode_ax, dispatch, dispatch_after_slow, poll_safepoint};
+use crate::{
+    call_slow, decode_ax, dispatch, dispatch_after_slow, dispatch_prefixed, poll_safepoint,
+};
 
 #[cfg(target_arch = "aarch64")]
 use lyng_js_vm_dsl::llint_handler;
@@ -45,8 +47,42 @@ pub extern "C" fn op_loop_header_poll_rs(
     dispatch.translate_outcome(outcome)
 }
 
-/// Non-aarch64 stub.
+// =====================================================================
+// op_wide (B45) — None layout, length = 1. Prefix opcode that sets
+// state.prefix = Wide and tail-jumps to the next handler.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_wide, layout = None, length = 1, || {
+        dispatch_prefixed!(kind = 1);
+    }
+}
+
+// =====================================================================
+// op_extra_wide (B45) — None layout, length = 1. Prefix opcode that
+// sets state.prefix = ExtraWide and tail-jumps to the next handler.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_extra_wide, layout = None, length = 1, || {
+        dispatch_prefixed!(kind = 2);
+    }
+}
+
+/// Non-aarch64 stubs.
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe extern "C" fn op_loop_header() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_wide() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_extra_wide() -> ! {
     loop {}
 }

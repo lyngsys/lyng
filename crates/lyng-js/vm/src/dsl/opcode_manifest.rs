@@ -947,14 +947,14 @@ pub const OPCODES: &[OpcodeEntry] = &[
     OpcodeEntry {
         opcode: Opcode::Wide,
         semantic_symbol: "lyng_js_vm::vm::semantics::prefix::op_wide_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_wide_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::warm::op_wide",
+        category: OpcodeCategory::Warm,
     },
     OpcodeEntry {
         opcode: Opcode::ExtraWide,
         semantic_symbol: "lyng_js_vm::vm::semantics::prefix::op_extra_wide_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_extra_wide_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::warm::op_extra_wide",
+        category: OpcodeCategory::Warm,
     },
     // Task A18 — misc / orphan opcodes (2). Today these route through
     // `op_unimplemented` in the dispatch table; their semantic bodies
