@@ -18,7 +18,6 @@ use lyng_js_host::HostHooks;
 use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_types::Value;
 
-use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::dsl::llint_state::{
     ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
 };
@@ -45,6 +44,29 @@ pub(crate) fn run_via_dsl(
     let frame_depth = vm.frames().len();
     let pb_base = installed.function().instruction_bytes().as_ptr();
     let frame_pc_offset = frame.instruction_offset();
+    // DSL-0b (B16): wire the `FV` pin to the eagerly-allocated flat
+    // feedback storage on `Vm::feedback_flat_storage`. The slot is
+    // keyed by `code_index(frame.code())` and was populated to
+    // `function.feedback_slot_count()` default entries at install
+    // (B15). Storage is pointer-stable for the lifetime of the
+    // `InstalledFunction`, so the raw pointer captured here is safe
+    // to hand to the asm trampoline until `run_via_dsl` returns. Cast
+    // the `*const FeedbackEntry` from `.as_ptr()` to `*mut` because
+    // the asm-DSL ABI types `frame_fv_base` as `*mut FeedbackEntry`;
+    // the trampoline reads/writes through it on the current thread
+    // only (no aliasing UB during the trampoline's single-threaded
+    // execution).
+    let fv_base = {
+        let index = crate::vm::code_index_for_dsl(frame.code());
+        // The slot is guaranteed to exist because `store_installed`
+        // populates `feedback_flat_storage[index]` to the correct
+        // length before any code at `code` can be invoked. An empty
+        // boxed slice's `as_ptr()` is still a valid (non-dangling)
+        // pointer; the asm trampoline never dereferences past the
+        // slot count anyway.
+        vm.feedback_flat_storage[index].as_ptr()
+            as *mut crate::dsl::feedback_flat::FeedbackEntry
+    };
 
     let mut rust_ctx = LlIntRustContext {
         vm,
@@ -57,16 +79,16 @@ pub(crate) fn run_via_dsl(
         exit: LlIntExitSlot::default(),
     };
 
-    // frame_regs_base / frame_fv_base are placeholder null pointers in
-    // DSL-0b Batch 2. Batch 3 (Task B16) wires them to live FV /
-    // register-window accessors. Until then, the asm trampoline is a
-    // stub and never dereferences them.
+    // frame_regs_base is a placeholder null pointer in DSL-0b Batch 3.
+    // The register-window pin lands later in DSL-0b once Batch 4+ wires
+    // the handler chain; until then the asm trampoline is a stub and
+    // never dereferences it.
     let mut state = LlIntState {
         frame_pc_offset,
         _pad1: 0,
         frame_pb_base: pb_base,
         frame_regs_base: core::ptr::null_mut::<Value>(),
-        frame_fv_base: core::ptr::null_mut::<FeedbackEntry>(),
+        frame_fv_base: fv_base,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
         rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>

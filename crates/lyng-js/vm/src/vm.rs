@@ -83,6 +83,10 @@ use state::{
 };
 use tiering::TieringState;
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
+// Re-export `code_index` for the DSL-0b entry shim so it can resolve
+// the `feedback_flat_storage` slot for a frame's `CodeRef` without
+// re-implementing the (id - 1) → usize indexing.
+pub(crate) use values::code_index as code_index_for_dsl;
 
 pub use modules::LoadedModuleRoot;
 
