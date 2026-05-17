@@ -26,3 +26,41 @@ pub enum SemanticOutcome {
     /// returns `Err(error)`.
     ExitError { error: VmError },
 }
+
+use crate::vm::dispatch_state::DispatchState;
+
+/// Safe wrapper around a per-frame dispatch state.
+///
+/// During DSL-0a this holds a `&mut DispatchState<'vm>` directly — the
+/// asm bridge does not exist yet, so semantic bodies reach VM state via
+/// the legacy `DispatchState` accessors re-exposed here. In DSL-0b the
+/// wrapper is also reachable through `LlIntDispatchState::from_raw`,
+/// which reconstructs it from a `*mut LlIntState` passed by the asm
+/// shim. The semantic body sees identical method signatures in both
+/// paths — that's the single-implementation invariant in action.
+pub struct LlIntDispatchState<'vm, 'borrow> {
+    pub(crate) inner: LlIntDispatchInner<'vm, 'borrow>,
+}
+
+pub(crate) enum LlIntDispatchInner<'vm, 'borrow> {
+    /// Borrowed from a live `DispatchState` (alpha path, transitional).
+    Alpha(&'borrow mut DispatchState<'vm>),
+    // Asm(...) variant lands in DSL-0b.
+}
+
+impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
+    /// Construct from a live α `DispatchState`. The α handler in
+    /// `dispatch_handlers/` calls this to forward into `op_xxx_semantic`.
+    pub fn from_alpha(state: &'borrow mut DispatchState<'vm>) -> Self {
+        Self { inner: LlIntDispatchInner::Alpha(state) }
+    }
+
+    /// Mutable access to the underlying `DispatchState`. Semantic
+    /// bodies use this for now; the DSL-0b refactor replaces this with
+    /// typed accessors that operate uniformly across α and asm paths.
+    pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
+        match &mut self.inner {
+            LlIntDispatchInner::Alpha(state) => *state,
+        }
+    }
+}

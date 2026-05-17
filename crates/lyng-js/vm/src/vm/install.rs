@@ -11,7 +11,7 @@ use lyng_js_gc::{CodeHandleStoreTarget, RuntimeCodeRecord, ValueStoreTarget};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct InstalledFunction {
+pub(crate) struct InstalledFunction {
     pub(super) function: BytecodeFunction,
     pub(super) child_codes: Vec<CodeRef>,
     canonical_atoms: Arc<[Option<AtomId>]>,

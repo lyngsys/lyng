@@ -45,7 +45,7 @@ mod debugger;
 mod direct_eval_env;
 mod dispatch;
 mod dispatch_handlers;
-mod dispatch_state;
+pub(crate) mod dispatch_state;
 mod dynamic_compilation;
 mod exceptions;
 mod feedback;

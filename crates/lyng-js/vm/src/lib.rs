@@ -24,7 +24,7 @@ mod name_refs;
 mod opcode_counts;
 #[cfg(feature = "opcode-counters")]
 mod slow_path_counts;
-mod vm;
+pub(crate) mod vm;
 
 #[cfg(test)]
 mod tests;
