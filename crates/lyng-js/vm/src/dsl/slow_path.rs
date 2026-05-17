@@ -119,6 +119,76 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             // on entry (the asm side has not relocated them).
         }
     }
+
+    /// Translate a [`SemanticOutcome`] into the asm-facing
+    /// [`SlowPathReturn`]. Used by every asm-facing cold-stub shim.
+    ///
+    /// On the α variant this is a no-op (returns `Continue, 0`) — the
+    /// alpha path uses `translate_outcome_to_step` in
+    /// `dispatch_handlers/` and never calls this translator. Hitting
+    /// the no-op branch is not an error; callers may invoke it
+    /// uniformly across both variants.
+    pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
+        match outcome {
+            SemanticOutcome::Continue { pc_advance } => {
+                if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
+                    let new_offset = rust
+                        .frame
+                        .instruction_offset()
+                        .wrapping_add(pc_advance);
+                    // SAFETY: state is valid by from_raw's contract;
+                    // we hold a unique borrow through `self`.
+                    unsafe {
+                        (**state).frame_pc_offset = new_offset;
+                    }
+                }
+                SlowPathReturn {
+                    tag: SlowPathTag::Continue as u64,
+                    payload: 0,
+                }
+            }
+            SemanticOutcome::Refresh => {
+                if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
+                    // SAFETY: state is valid by from_raw's contract.
+                    unsafe {
+                        (**state).frame_pc_offset = rust.frame.instruction_offset();
+                        // frame_regs_base / frame_fv_base remain
+                        // authoritative as established at entry —
+                        // FrameRecord's RegisterWindow does not move
+                        // during one trampoline call, and the FV pin
+                        // is pinned to `installed.feedback_flat`.
+                        // Batch 3 (Task B16) wires these to live
+                        // pointer accessors on FrameRecord /
+                        // InstalledFunction.
+                    }
+                }
+                SlowPathReturn {
+                    tag: SlowPathTag::Refresh as u64,
+                    payload: 0,
+                }
+            }
+            SemanticOutcome::ExitDone { value } => {
+                if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
+                    rust.exit.kind = crate::dsl::llint_state::ExitKind::Done;
+                    rust.exit.done_value = value;
+                }
+                SlowPathReturn {
+                    tag: SlowPathTag::Exit as u64,
+                    payload: 0,
+                }
+            }
+            SemanticOutcome::ExitError { error } => {
+                if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
+                    rust.exit.kind = crate::dsl::llint_state::ExitKind::Error;
+                    rust.exit.error = Some(Box::new(error));
+                }
+                SlowPathReturn {
+                    tag: SlowPathTag::Exit as u64,
+                    payload: 0,
+                }
+            }
+        }
+    }
 }
 
 /// asm-facing return ABI for cold-stub shims. The asm bridge reads
