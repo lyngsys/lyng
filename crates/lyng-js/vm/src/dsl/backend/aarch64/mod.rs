@@ -13,9 +13,9 @@
 //! - [`counters`] — feature-gated opcode counters.
 //! - [`prelude`]  — NaN-tag mask constants + layout helpers.
 
+pub mod operands;
 pub mod prelude;
 // Other backend submodules are declared in subsequent Batch 4 commits:
-// pub mod operands;   (B21)
 // pub mod values;     (B22)
 // pub mod objects;    (B23)
 // pub mod arithmetic; (B24)
