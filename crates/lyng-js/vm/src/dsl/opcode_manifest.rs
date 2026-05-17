@@ -7,6 +7,8 @@
 
 use lyng_js_bytecode::Opcode;
 
+use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpcodeCategory {
     /// Full DSL body with inline fast paths (5 opcodes from DSL-0b plus
@@ -974,6 +976,512 @@ pub const OPCODES: &[OpcodeEntry] = &[
     },
 ];
 
+/// Type-erased semantic function pointer. Each opcode has a unique
+/// concrete signature but the linker-resolution test only needs to
+/// know the pointer is non-null.
+///
+/// Wrapped in a `#[repr(transparent)]` newtype so the `SEMANTIC_FN_PTRS`
+/// slice can be a `&'static [_]` — raw `*const ()` is not `Sync`, but
+/// function-pointer addresses are inherently thread-safe to read (they
+/// point at immutable code).
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct SemanticFnPtr(pub *const ());
+
+// SAFETY: `SemanticFnPtr` only ever holds the address of a real Rust
+// function from this crate. The pointer is read-only (immutable code
+// segment) and never dereferenced — Test 2 only checks `is_null()`. No
+// shared mutable state is exposed.
+unsafe impl Sync for SemanticFnPtr {}
+
+impl SemanticFnPtr {
+    /// Returns `true` if the wrapped pointer is null. The
+    /// linker-resolution test asserts this is always `false` for every
+    /// entry in `SEMANTIC_FN_PTRS`.
+    #[inline]
+    pub fn is_null(self) -> bool {
+        self.0.is_null()
+    }
+}
+
+/// Parallel slice to `OPCODES` holding the type-erased function pointer
+/// for each `op_xxx_semantic`. Maintained by family-extraction tasks
+/// (A8–A18) — adding an `OpcodeEntry` without adding the corresponding
+/// fn-ptr fails the length-equality assertion in Test 2.
+///
+/// SAFETY: each pointer is derived from a real Rust function via `as
+/// *const ()`; the linker resolves it at build time.
+pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
+    // Task A8 — loads family (35 opcodes).
+    SemanticFnPtr(crate::vm::semantics::loads::op_move_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpMoveArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_undefined_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_null_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_true_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_false_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_zero_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_one_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_undefined_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_null_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_true_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_false_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_zero_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_one_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_uninitialized_lexical_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstantArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_0_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_1_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_2_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_3_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_4_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_5_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_6_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_star_7_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_smi8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaSmi8Args) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_lda_const8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdaConst8Args) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_ldar_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLdarArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadSmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_smi8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadSmi8Args) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_const_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConstArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_const8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadConst8Args) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_local_0_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_local_1_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_local_2_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_load_local_3_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpLoadLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_store_local_0_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStoreLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_store_local_1_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStoreLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_store_local_2_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStoreLocalArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::loads::op_store_local_3_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::loads::OpStoreLocalArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A9 — arithmetic family (29 opcodes).
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_add_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_add_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_sub_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_sub_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_mul_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_mul_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_div_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_div_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_mod_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_mod_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_exp_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_bit_or_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_bit_xor_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_bit_and_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_bit_and_smi_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinarySmiArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_bit_not_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpUnaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_shift_left_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_shift_right_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_unsigned_shift_right_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_negate_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpUnaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_increment_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpUpdateArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_decrement_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpUpdateArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_equal_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_strict_equal_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_equal_zero_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpEqualZeroArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_less_than_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_less_equal_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_greater_than_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::arithmetic::op_greater_equal_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::arithmetic::OpBinaryArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A10 — control_flow family (10 opcodes).
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump_if_true_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpIfArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump_if_true8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpIfArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump_if_false_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpIfArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_jump_if_false8_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpJumpIfArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_loop_header_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpLoopHeaderArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_return_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpReturnArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_return_undefined_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpReturnUndefinedArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::control_flow::op_nop_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::control_flow::OpNopArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A11 — property family (21 opcodes).
+    SemanticFnPtr(crate::vm::semantics::property::op_get_named_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_set_named_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_assign_named_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_strict_assign_named_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_get_keyed_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_set_keyed_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_assign_keyed_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_strict_assign_keyed_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAccessArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_define_named_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_define_keyed_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_create_object_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_create_array_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_store_dense_element_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_load_dense_element_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_delete_property_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_in_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_to_property_key_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_copy_data_properties_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_set_function_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_check_object_coercible_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::property::op_throw_if_uninitialized_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::property::OpPropertyAbxArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A12 — names family (17 opcodes).
+    SemanticFnPtr(crate::vm::semantics::names::op_load_global_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_store_global_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_assign_global_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_delete_global_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_resolve_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_resolve_global_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_assign_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_assign_variable_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_delete_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_capture_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_captured_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpCapturedNameArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_captured_name_this_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpCapturedNameArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_assign_captured_name_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpCapturedNameArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_this_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_callee_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::names::op_load_new_target_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::names::OpAtomArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A13 — scope family (10 opcodes).
+    SemanticFnPtr(crate::vm::semantics::scope::op_load_env_slot_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_store_env_slot_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_assign_env_slot_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_enter_env_scope_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_leave_env_scope_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_push_closure_env_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_pop_closure_env_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_push_with_env_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_pop_with_env_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::scope::op_type_of_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::scope::OpScopeAxArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A14 — calls family (8 opcodes).
+    SemanticFnPtr(crate::vm::semantics::calls::op_call0_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallSmallArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_call1_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallSmallArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_call2_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallSmallArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_call3_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallSmallArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_call_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallRangeArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_tail_call_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpTailCallArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_construct_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCallRangeArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::calls::op_create_closure_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::calls::OpCreateClosureArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A15 — iterators family (6 opcodes).
+    SemanticFnPtr(crate::vm::semantics::iterators::op_create_for_in_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::iterators::op_advance_for_in_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::iterators::op_close_for_in_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::iterators::op_create_iterator_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::iterators::op_advance_iterator_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbcArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::iterators::op_close_iterator_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::iterators::OpIteratorAbxArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A16 — generators / async family (6 opcodes).
+    SemanticFnPtr(crate::vm::semantics::generators::op_suspend_generator_start_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpSuspendGeneratorStartArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::generators::op_yield_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpGeneratorsAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::generators::op_delegate_yield_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpDelegateYieldArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::generators::op_await_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpGeneratorsAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::generators::op_load_resume_kind_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpGeneratorsAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::generators::op_load_resume_value_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::generators::OpGeneratorsAxArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A17 — exceptions family (4 opcodes).
+    SemanticFnPtr(crate::vm::semantics::exceptions::op_throw_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::exceptions::OpExceptionsAxArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::exceptions::op_enter_handler_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::exceptions::OpHandlerMarkerArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::exceptions::op_leave_handler_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::exceptions::OpHandlerMarkerArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::exceptions::op_load_exception_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::exceptions::OpExceptionsAxArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A18 — prefix family (2 opcodes).
+    SemanticFnPtr(crate::vm::semantics::prefix::op_wide_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::prefix::OpPrefixArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::prefix::op_extra_wide_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::prefix::OpPrefixArgs) -> SemanticOutcome
+        as *const ()),
+    // Task A18 — misc / orphan opcodes (2).
+    SemanticFnPtr(crate::vm::semantics::misc::op_instance_of_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::misc::OpMiscStubArgs) -> SemanticOutcome
+        as *const ()),
+    SemanticFnPtr(crate::vm::semantics::misc::op_call_method_semantic
+        as fn(&mut LlIntDispatchState<'_, '_>, crate::vm::semantics::misc::OpMiscStubArgs) -> SemanticOutcome
+        as *const ()),
+];
+
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
 pub fn by_category(category: OpcodeCategory) -> impl Iterator<Item = &'static OpcodeEntry> {
     OPCODES.iter().filter(move |entry| entry.category == category)
@@ -1022,6 +1530,31 @@ mod manifest_tests {
                 "OPCODES missing entry for opcode byte {}: {:?}",
                 byte,
                 Opcode::from_byte(byte),
+            );
+        }
+    }
+
+    /// Test 2 from design §10 DSL-0a: every `OpcodeEntry.semantic_symbol`
+    /// names a real Rust function — the parallel `SEMANTIC_FN_PTRS` slice
+    /// holds the linker-resolved function pointer for each opcode in the
+    /// same order. Adding an entry to `OPCODES` without extending the
+    /// fn-ptr slice fails the length-equality assertion; renaming or
+    /// removing a referenced semantic function fails the build before
+    /// the test runs.
+    #[test]
+    fn semantic_fn_ptrs_resolve() {
+        assert_eq!(
+            SEMANTIC_FN_PTRS.len(),
+            OPCODES.len(),
+            "SEMANTIC_FN_PTRS has {} entries, OPCODES has {}",
+            SEMANTIC_FN_PTRS.len(),
+            OPCODES.len(),
+        );
+        for (idx, ptr) in SEMANTIC_FN_PTRS.iter().enumerate() {
+            assert!(
+                !ptr.is_null(),
+                "SEMANTIC_FN_PTRS[{idx}] is null (opcode = {:?})",
+                OPCODES[idx].opcode,
             );
         }
     }

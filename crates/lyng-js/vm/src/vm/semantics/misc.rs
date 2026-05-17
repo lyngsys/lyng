@@ -8,15 +8,13 @@
 //! that surface the existing `VmError::UnsupportedOpcode` outcome,
 //! exactly matching what `op_unimplemented` produces today.
 //!
-//! Until A19 lands the `SEMANTIC_FN_PTRS` parallel slice (which takes
-//! `&op_xxx_semantic as fn ptr` for each entry, making these functions
-//! live from the linker's point of view), these symbols are only
-//! referenced as static strings in `OPCODES[*].semantic_symbol`. The
-//! `#[allow(dead_code)]` attributes silence the build warnings;
-//! removing them is the natural way A19's test detects a missing
-//! function-pointer entry.
+//! These functions are reached from two places:
+//! 1. The `SEMANTIC_FN_PTRS` parallel slice in `opcode_manifest.rs`
+//!    (A19), which type-erases each `op_xxx_semantic` to `*const ()`
+//!    so the linker resolves it at build time.
+//! 2. The DSL-0b cold-stub shim once that lands.
 //!
-//! When real implementations land (post-DSL-0a) they replace these
+//! When real implementations arrive (post-DSL-0a), they replace these
 //! stubs in place and `build_dispatch_table` is updated to install the
 //! α handler — no manifest change required.
 
@@ -29,14 +27,12 @@ use crate::error::VmError;
 /// semantic-body level — the α handler path is `op_unimplemented`, so
 /// these are reached only by the DSL-0b cold-stub shim or by future
 /// real-handler extractions that re-shape the args struct in place.
-#[allow(dead_code, reason = "Referenced via string symbol from OPCODES; A19 wires up function-pointer linkage.")]
 pub struct OpMiscStubArgs;
 
 /// `InstanceOf`: `x instanceof Constructor`. Today routed through
 /// `op_unimplemented` in the dispatch table; the semantic stub returns
 /// `ExitError { UnsupportedOpcode { ..., opcode: InstanceOf } }`,
 /// matching the α path exactly.
-#[allow(dead_code, reason = "Referenced via string symbol from OPCODES; A19 wires up function-pointer linkage.")]
 pub(crate) fn op_instance_of_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpMiscStubArgs,
@@ -55,7 +51,6 @@ pub(crate) fn op_instance_of_semantic(
 /// `Call`). A14 deferred this opcode because the bytecode emitter does
 /// not yet target it; today it routes through `op_unimplemented`. The
 /// semantic stub mirrors the α path by returning `UnsupportedOpcode`.
-#[allow(dead_code, reason = "Referenced via string symbol from OPCODES; A19 wires up function-pointer linkage.")]
 pub(crate) fn op_call_method_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpMiscStubArgs,
