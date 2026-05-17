@@ -51,7 +51,7 @@ mod exceptions;
 mod feedback;
 mod generators;
 mod global_script;
-mod install;
+pub(crate) mod install;
 mod internal_calls;
 mod jobs;
 mod loop_iteration;

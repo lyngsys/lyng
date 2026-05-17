@@ -1,8 +1,16 @@
 //! asm-visible state record + Rust-only context per design §5.
 
+use std::sync::Arc;
+
+use lyng_js_env::Agent;
+use lyng_js_host::HostHooks;
+use lyng_js_objects::NativeFunctionRegistry;
 use lyng_js_types::Value;
 
 use crate::dsl::feedback_flat::FeedbackEntry;
+use crate::error::VmError;
+use crate::vm::install::InstalledFunction;
+use crate::FrameRecord;
 
 /// Opaque marker for the Rust-side context pointer in [`LlIntState`].
 /// The asm layer never reads through this pointer — it round-trips
@@ -31,6 +39,50 @@ pub struct LlIntState {
     pub rust_context: *mut LlIntRustContextOpaque,
     pub prefix: u8,
     pub _pad2: [u8; 7],
+}
+
+/// Rust-only per-call context the asm trampoline cannot observe
+/// directly. The asm bridge gets to this struct through
+/// `LlIntState::rust_context` (an opaque pointer), and only via the
+/// reconstruction in `LlIntDispatchState::from_raw`.
+///
+/// The lifetime `'vm` is the borrow on `Vm`/`Agent`/`HostHooks`/`Registry`
+/// taken by `run_via_dsl` for the duration of one trampoline invocation.
+pub struct LlIntRustContext<'vm> {
+    pub(crate) vm: &'vm mut crate::vm::Vm,
+    pub(crate) agent: &'vm mut Agent,
+    pub(crate) host: &'vm dyn HostHooks,
+    pub(crate) registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
+    pub(crate) installed: Arc<InstalledFunction>,
+    pub(crate) frame: FrameRecord,
+    pub(crate) frame_depth: usize,
+    pub(crate) exit: LlIntExitSlot,
+}
+
+/// Slot the slow-path bridge writes when a semantic body chooses to
+/// exit the trampoline. Read by `run_via_dsl` after the trampoline
+/// returns; the discriminant maps directly to `VmResult<Value>`.
+pub struct LlIntExitSlot {
+    pub kind: ExitKind,
+    pub done_value: Value,
+    pub error: Option<Box<VmError>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ExitKind {
+    None,
+    Done,
+    Error,
+}
+
+impl Default for LlIntExitSlot {
+    fn default() -> Self {
+        Self {
+            kind: ExitKind::None,
+            done_value: Value::undefined(),
+            error: None,
+        }
+    }
 }
 
 #[cfg(test)]
