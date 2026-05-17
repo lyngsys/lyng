@@ -495,6 +495,135 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_nop_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A11 — property family (21 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::GetNamedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_get_named_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_get_named_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::SetNamedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_set_named_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_set_named_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignNamedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_assign_named_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_named_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::StrictAssignNamedProperty,
+        semantic_symbol:
+            "lyng_js_vm::vm::semantics::property::op_strict_assign_named_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_strict_assign_named_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::GetKeyedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_get_keyed_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_get_keyed_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::SetKeyedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_set_keyed_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_set_keyed_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignKeyedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_assign_keyed_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_keyed_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::StrictAssignKeyedProperty,
+        semantic_symbol:
+            "lyng_js_vm::vm::semantics::property::op_strict_assign_keyed_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_strict_assign_keyed_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DefineNamedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_define_named_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_define_named_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DefineKeyedProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_define_keyed_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_define_keyed_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CreateObject,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_create_object_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_object_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CreateArray,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_create_array_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_array_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::StoreDenseElement,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_store_dense_element_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_store_dense_element_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadDenseElement,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_load_dense_element_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_dense_element_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DeleteProperty,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_delete_property_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_delete_property_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::In,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_in_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_in_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ToPropertyKey,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_to_property_key_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_to_property_key_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CopyDataProperties,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_copy_data_properties_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_copy_data_properties_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::SetFunctionName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_set_function_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_set_function_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CheckObjectCoercible,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_check_object_coercible_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_check_object_coercible_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ThrowIfUninitialized,
+        semantic_symbol: "lyng_js_vm::vm::semantics::property::op_throw_if_uninitialized_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_throw_if_uninitialized_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.

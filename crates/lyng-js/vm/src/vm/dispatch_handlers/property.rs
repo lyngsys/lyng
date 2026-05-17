@@ -1,32 +1,35 @@
 //! Property access handlers for the trampoline dispatch path (lyng-5mqv).
 //!
-//! Named-property and keyed-property opcodes delegate entirely to the
-//! existing `Vm::execute_*_opcode` helpers; those helpers carry the
-//! receiver-shape inline-cache fast paths, the ToObject coercion, the
-//! property-descriptor walk, and the exception transfer in one place.
-//! Each trampoline handler:
+//! Post-A11: each α handler in this file is a thin shim that
+//!   1. decodes the instruction's operands,
+//!   2. constructs `OpXxxArgs` and calls into
+//!      `crate::vm::semantics::property::op_xxx_semantic`,
+//!   3. translates the returned `SemanticOutcome` to `Step` via
+//!      `translate_outcome_to_step`.
 //!
-//! 1. Decodes Abc operands via `decode_abc_operands` (with `state.prefix`
-//!    consumed via `.take()`). Every property opcode has a feedback slot,
-//!    so `is_profiled = true`.
-//! 2. Splits the vm/agent/host/registry/frame_depth/frame borrow.
-//! 3. Calls the Vm helper, which advances `pc` on success or rewrites it
-//!    via the exception handler.
-//! 4. `dispatch_next!` continues at the new pc.
+//! The IC fast-path/slow-path layout is unchanged — DSL-0a's job is only
+//! to lift the call site out of the α handler. The Phase 3a/3e/3f IC
+//! machinery still lives in `Vm::execute_*_opcode` in
+//! `vm/dispatch/property.rs`; DSL-1 lands the IC mode-byte refactor and
+//! DSL-0b the flat-array refactor.
 //!
-//! The Set/Assign variants pass the active semantic `Opcode` so the helper
-//! can dispatch the strict-mode / assignment / property-define semantics
-//! the spec assigns to each form.
+//! The Set/Assign variants split into separate semantic functions
+//! (`op_set_named_property_semantic`, `op_assign_named_property_semantic`,
+//! `op_strict_assign_named_property_semantic`, and their keyed twins)
+//! that internally thread the appropriate `Opcode` into the shared helper
+//! — preserving the existing strict-mode / assignment / property-define
+//! semantics fan-out without exposing it through the operand struct.
 
-use lyng_js_bytecode::Opcode;
-use lyng_js_ops::errors;
-use lyng_js_types::Value;
-
-use crate::error::VmError;
+use crate::dsl::slow_path::LlIntDispatchState;
 use crate::vm::dispatch::{decode_abc_operands, decode_abx_operands};
+use crate::vm::dispatch_handlers::translate_outcome_to_step;
 use crate::vm::dispatch_state::{DispatchState, Step};
-use crate::vm::Vm;
-use crate::{dispatch_next, try_step};
+use crate::vm::semantics::property;
+use crate::try_step;
+
+// =====================================================================
+// Named property reads — `GetNamedProperty`.
+// =====================================================================
 
 pub extern "C" fn op_get_named_property(state: &mut DispatchState) -> Step {
     let code = state.code();
@@ -39,608 +42,215 @@ pub extern "C" fn op_get_named_property(state: &mut DispatchState) -> Step {
         code,
         pc,
     ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_get_named_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = property::op_get_named_property_semantic(
+        &mut ll_state,
+        property::OpPropertyAccessArgs {
+            a,
+            b,
+            c,
             feedback_slot,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-#[inline]
-fn op_set_named_property_common(state: &mut DispatchState, semantic: Opcode) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        true,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_set_named_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
             instruction_len,
-            feedback_slot,
-            semantic,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_set_named_property(state: &mut DispatchState) -> Step {
-    op_set_named_property_common(state, Opcode::SetNamedProperty)
-}
-
-pub extern "C" fn op_assign_named_property(state: &mut DispatchState) -> Step {
-    op_set_named_property_common(state, Opcode::AssignNamedProperty)
-}
-
-pub extern "C" fn op_strict_assign_named_property(state: &mut DispatchState) -> Step {
-    op_set_named_property_common(state, Opcode::StrictAssignNamedProperty)
-}
-
-pub extern "C" fn op_get_keyed_property(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        true,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_get_keyed_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            feedback_slot,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-#[inline]
-fn op_set_keyed_property_common(state: &mut DispatchState, semantic: Opcode) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        true,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_set_keyed_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            feedback_slot,
-            semantic,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_set_keyed_property(state: &mut DispatchState) -> Step {
-    op_set_keyed_property_common(state, Opcode::SetKeyedProperty)
-}
-
-pub extern "C" fn op_assign_keyed_property(state: &mut DispatchState) -> Step {
-    op_set_keyed_property_common(state, Opcode::AssignKeyedProperty)
-}
-
-pub extern "C" fn op_strict_assign_keyed_property(state: &mut DispatchState) -> Step {
-    op_set_keyed_property_common(state, Opcode::StrictAssignKeyedProperty)
-}
-
-pub extern "C" fn op_define_named_property(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_define_named_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 // =====================================================================
-// CreateObject / CreateArray — object/array literal allocation.
-// Strictly speaking part of the runtime-objects family, but in the
-// compiler's emission they always precede property loads/stores, so
-// pulling them into sub-5 unlocks the property parity tests.
+// Named property writes — `SetNamedProperty`, `AssignNamedProperty`,
+// `StrictAssignNamedProperty`. All three share the Abc operand decode
+// (with feedback slot); the semantic body picks the strict-mode /
+// assignment / property-define variant.
 // =====================================================================
 
-// =====================================================================
-// Delete / In / ToPropertyKey / CopyDataProperties / SetFunctionName /
-// CheckObjectCoercible / ThrowIfUninitialized — round 3 of sub-5.
-// =====================================================================
-
-pub extern "C" fn op_delete_property(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_delete_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_in(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_in_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_to_property_key(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_to_property_key_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_copy_data_properties(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_copy_data_properties_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_set_function_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let function = try_step!(state.vm.object_register(&state.frame, a));
-    let name_value = state.vm.read_register_unchecked(state.frame.registers(), b);
-    let set_result = {
-        let DispatchState { agent, .. } = &mut *state;
-        Vm::set_function_name(agent, function, name_value)
-    };
-    if try_step!(state.handle_dispatch_result(set_result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_check_object_coercible(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
-    let result = {
-        let DispatchState { agent, .. } = &mut *state;
-        Vm::check_object_coercible(agent, value)
-    };
-    if try_step!(state.handle_dispatch_result(result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_throw_if_uninitialized(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
-    if value == Value::uninitialized_lexical() {
-        let result: Result<(), VmError> = {
-            let DispatchState { agent, .. } = &mut *state;
-            Err(VmError::Abrupt(errors::throw_reference_error(agent)))
-        };
-        if try_step!(state.handle_dispatch_result(result)).is_none() {
-            dispatch_next!(state);
+macro_rules! op_property_set_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, b, c, feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+                state.current_bytes(),
+                prefix,
+                true,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                property::OpPropertyAccessArgs {
+                    a,
+                    b,
+                    c,
+                    feedback_slot,
+                    instruction_len,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
         }
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
+    };
 }
 
-pub extern "C" fn op_store_dense_element(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_store_dense_element_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
+op_property_set_handler!(op_set_named_property, property::op_set_named_property_semantic);
+op_property_set_handler!(
+    op_assign_named_property,
+    property::op_assign_named_property_semantic
+);
+op_property_set_handler!(
+    op_strict_assign_named_property,
+    property::op_strict_assign_named_property_semantic
+);
+
+// =====================================================================
+// Keyed property reads + writes — `GetKeyedProperty`, `SetKeyedProperty`,
+// `AssignKeyedProperty`, `StrictAssignKeyedProperty`. Same Abc-with-
+// feedback decode as the named family.
+// =====================================================================
+
+op_property_set_handler!(op_get_keyed_property, property::op_get_keyed_property_semantic);
+op_property_set_handler!(op_set_keyed_property, property::op_set_keyed_property_semantic);
+op_property_set_handler!(
+    op_assign_keyed_property,
+    property::op_assign_keyed_property_semantic
+);
+op_property_set_handler!(
+    op_strict_assign_keyed_property,
+    property::op_strict_assign_keyed_property_semantic
+);
+
+// =====================================================================
+// Define-data + misc Abc-without-feedback opcodes —
+// `DefineNamedProperty`, `DefineKeyedProperty`, `DeleteProperty`, `In`,
+// `CopyDataProperties`, `StoreDenseElement`, `LoadDenseElement`. All
+// share Abc operand decode with `is_profiled = false`.
+// =====================================================================
+
+macro_rules! op_property_abc_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+                state.current_bytes(),
+                prefix,
+                false,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                property::OpPropertyAbcArgs {
+                    a,
+                    b,
+                    c,
+                    instruction_len,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
+        }
     };
-    try_step!(result);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_load_dense_element(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_load_dense_element_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
+op_property_abc_handler!(
+    op_define_named_property,
+    property::op_define_named_property_semantic
+);
+op_property_abc_handler!(
+    op_define_keyed_property,
+    property::op_define_keyed_property_semantic
+);
+op_property_abc_handler!(op_delete_property, property::op_delete_property_semantic);
+op_property_abc_handler!(op_in, property::op_in_semantic);
+op_property_abc_handler!(
+    op_copy_data_properties,
+    property::op_copy_data_properties_semantic
+);
+op_property_abc_handler!(
+    op_store_dense_element,
+    property::op_store_dense_element_semantic
+);
+op_property_abc_handler!(
+    op_load_dense_element,
+    property::op_load_dense_element_semantic
+);
+
+// =====================================================================
+// `ToPropertyKey` and `SetFunctionName` — Abc decode, `c` operand unused.
+// =====================================================================
+
+macro_rules! op_property_ab_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, b, _c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
+                state.current_bytes(),
+                prefix,
+                false,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                property::OpPropertyAbArgs {
+                    a,
+                    b,
+                    instruction_len,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
+        }
     };
-    try_step!(result);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_create_object(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let realm = state.frame.realm();
-    let object = {
-        let DispatchState { agent, .. } = &mut *state;
-        try_step!(Vm::create_object(
-            agent,
-            realm,
-            usize::try_from(bx).unwrap_or(usize::MAX),
-        ))
+op_property_ab_handler!(op_to_property_key, property::op_to_property_key_semantic);
+op_property_ab_handler!(op_set_function_name, property::op_set_function_name_semantic);
+
+// =====================================================================
+// `CreateObject`, `CreateArray`, `CheckObjectCoercible`,
+// `ThrowIfUninitialized` — Abx decode (one register operand + a 16-bit
+// extended operand).
+// =====================================================================
+
+macro_rules! op_property_abx_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+                state.current_bytes(),
+                prefix,
+                false,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                property::OpPropertyAbxArgs {
+                    a,
+                    bx,
+                    instruction_len,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
+        }
     };
-    let registers = state.frame.registers();
-    state
-        .vm
-        .write_register_unchecked(registers, a, Value::from_object_ref(object));
-    state.advance(instruction_len);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_create_array(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let realm = state.frame.realm();
-    let length = usize::try_from(bx).unwrap_or(usize::MAX);
-    let object = {
-        let DispatchState { agent, .. } = &mut *state;
-        try_step!(Vm::create_array(agent, realm, length))
-    };
-    let length_u32 = u32::try_from(length).unwrap_or(u32::MAX);
-    if length_u32 != 0 {
-        let DispatchState { agent, .. } = &mut *state;
-        try_step!(Vm::define_length_property(agent, object, length_u32, false));
-    }
-    let registers = state.frame.registers();
-    state
-        .vm
-        .write_register_unchecked(registers, a, Value::from_object_ref(object));
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_define_keyed_property(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, b, c, _feedback_slot, instruction_len) = try_step!(decode_abc_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.execute_define_keyed_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
-            a,
-            b,
-            c,
-        )
-    };
-    try_step!(result);
-    dispatch_next!(state);
-}
+op_property_abx_handler!(op_create_object, property::op_create_object_semantic);
+op_property_abx_handler!(op_create_array, property::op_create_array_semantic);
+op_property_abx_handler!(
+    op_check_object_coercible,
+    property::op_check_object_coercible_semantic
+);
+op_property_abx_handler!(
+    op_throw_if_uninitialized,
+    property::op_throw_if_uninitialized_semantic
+);

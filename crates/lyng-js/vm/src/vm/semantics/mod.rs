@@ -13,3 +13,4 @@
 pub(crate) mod arithmetic;
 pub(crate) mod control_flow;
 pub(crate) mod loads;
+pub(crate) mod property;
