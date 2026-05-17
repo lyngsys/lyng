@@ -209,3 +209,46 @@ pub enum SlowPathTag {
     Refresh = 1,
     Exit = 2,
 }
+
+/// Generate an asm-facing cold-stub shim from a semantic body. Keeps
+/// every cold stub's wrapper to one declaration site. Emits a
+/// `#[no_mangle] pub extern "C" fn` that reconstructs an
+/// `LlIntDispatchState` from the raw `*mut LlIntState`, mirrors asm
+/// state into the Rust context, dispatches to the semantic body, and
+/// translates the outcome back into a `SlowPathReturn`.
+///
+/// Example:
+/// ```ignore
+/// dsl_cold_shim! {
+///     op_load_constant_slow_rs,
+///     semantic: op_load_constant_semantic,
+///     args: OpLoadConstantArgs,
+///     operands: { dst: u16, constant_index: u32 },
+/// }
+/// ```
+#[macro_export]
+macro_rules! dsl_cold_shim {
+    (
+        $shim_name:ident,
+        semantic: $semantic:path,
+        args: $args_ty:ty,
+        operands: { $($field:ident: $field_ty:ty),* $(,)? } $(,)?
+    ) => {
+        #[no_mangle]
+        pub extern "C" fn $shim_name(
+            state: *mut $crate::dsl::llint_state::LlIntState,
+            $($field: $field_ty),*
+        ) -> $crate::dsl::slow_path::SlowPathReturn {
+            // SAFETY: `state` is a valid `*mut LlIntState` for the
+            // duration of this call; the asm bridge upholds the
+            // contract documented on `LlIntDispatchState::from_raw`.
+            let mut dispatch = unsafe {
+                $crate::dsl::slow_path::LlIntDispatchState::from_raw(state)
+            };
+            dispatch.sync_from_asm();
+            let args = <$args_ty> { $($field),* };
+            let outcome = $semantic(&mut dispatch, args);
+            dispatch.translate_outcome(outcome)
+        }
+    };
+}
