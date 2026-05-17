@@ -11,4 +11,5 @@
 
 // Family submodules are added by tasks A8–A18.
 pub(crate) mod arithmetic;
+pub(crate) mod control_flow;
 pub(crate) mod loads;

@@ -149,29 +149,6 @@ pub(in crate::vm) const fn advance_dispatch_frame(frame: &mut FrameRecord, encod
 }
 
 #[inline]
-pub(in crate::vm) fn jump_dispatch_frame(
-    frame: &mut FrameRecord,
-    encoded_len: u32,
-    delta: i32,
-) -> VmResult<()> {
-    let instruction_offset = frame.instruction_offset();
-    let next = i64::from(instruction_offset) + i64::from(encoded_len) + i64::from(delta);
-    if next < 0 {
-        return Err(VmError::InvalidJumpTarget {
-            code: frame.code(),
-            instruction_offset,
-            target_offset: next,
-        });
-    }
-    frame.set_instruction_offset(u32::try_from(next).map_err(|_| VmError::InvalidJumpTarget {
-        code: frame.code(),
-        instruction_offset,
-        target_offset: next,
-    })?);
-    Ok(())
-}
-
-#[inline]
 pub(in crate::vm) const fn next_dispatch_instruction_offset(
     frame: &FrameRecord,
     encoded_len: u32,

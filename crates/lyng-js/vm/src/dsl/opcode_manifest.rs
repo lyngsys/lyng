@@ -432,6 +432,69 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_greater_equal_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A10 — control_flow family (10 opcodes). `Jump` and `Return` are
+    // upgraded to `Hot` in DSL-0b tasks B41 / B42; `LoopHeader` to `Warm` in
+    // B43. DSL-0a registers all ten as `Cold`.
+    OpcodeEntry {
+        opcode: Opcode::Jump,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Jump8,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump8_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump8_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::JumpIfTrue,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_if_true_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_if_true_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::JumpIfTrue8,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_if_true8_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_if_true8_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::JumpIfFalse,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_if_false_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_if_false_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::JumpIfFalse8,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_jump_if_false8_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_jump_if_false8_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoopHeader,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_loop_header_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_loop_header_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Return,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_return_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_return_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ReturnUndefined,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_return_undefined_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_return_undefined_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Nop,
+        semantic_symbol: "lyng_js_vm::vm::semantics::control_flow::op_nop_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_nop_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
