@@ -1,563 +1,167 @@
 //! Global + name resolution handlers for the trampoline dispatch path
 //! (lyng-5mqv).
 //!
-//! All Abx-encoded; operand `bx` is an atom-constant-pool index. The
-//! handler reads the atom and delegates to the `Vm::*_with_context` or
-//! `Vm::*_with_feedback` helper, which carries the realm + lexical-env
-//! walk plus the inline cache. Exception transfer goes through
-//! `handle_dispatch_result`.
+//! Post-A12: each α handler in this file is a thin shim that
+//!   1. decodes the instruction's operands,
+//!   2. constructs `OpAtomArgs` / `OpCapturedNameArgs` and calls into
+//!      `crate::vm::semantics::names::op_xxx_semantic`,
+//!   3. translates the returned `SemanticOutcome` to `Step` via
+//!      `translate_outcome_to_step`.
+//!
+//! All Abx-encoded; operand `bx` is either an atom-constant-pool index
+//! (globals, names, `CaptureName`) or a captured-name reference register
+//! index (`LoadCapturedName`, `LoadCapturedNameThis`,
+//! `AssignCapturedName`). The semantic body interprets it accordingly.
 //!
 //! Also hosts LoadThis / LoadCallee / LoadNewTarget — they read frame
 //! state directly without an atom operand, but they live in the
 //! "name & global" family from the spec's perspective.
+//!
+//! The IC fast-path/slow-path layout for the globals-with-feedback opcodes
+//! is unchanged — DSL-0a's job is only to lift the call site out of the α
+//! handler. The Phase 3 IC machinery still lives in
+//! `Vm::*_with_feedback` in `vm/names.rs`; DSL-1 lands the IC mode-byte
+//! refactor and DSL-0b the flat-array refactor.
 
-use lyng_js_env::ThisState;
-use lyng_js_ops::errors;
-use lyng_js_types::{AbruptCompletion, Value};
-
-use crate::error::VmError;
+use crate::dsl::slow_path::LlIntDispatchState;
 use crate::vm::dispatch::decode_abx_operands;
+use crate::vm::dispatch_handlers::translate_outcome_to_step;
 use crate::vm::dispatch_state::{DispatchState, Step};
-use crate::vm::Vm;
-use crate::{dispatch_next, try_step};
+use crate::vm::semantics::names;
+use crate::try_step;
 
 // ---- Globals (with feedback) ----
 
-pub extern "C" fn op_load_global(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        true,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let load_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.load_global_with_feedback(
-            agent,
-            *host,
-            &mut **registry,
-            frame,
-            atom,
-            code,
-            feedback_slot,
-        )
-    };
-    let value = match try_step!(state.handle_dispatch_result(load_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-#[inline]
-fn op_store_or_assign_global(state: &mut DispatchState, assign: bool) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        true,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        if assign {
-            vm.assign_global_with_feedback(
-                agent,
-                *host,
-                &mut **registry,
-                frame,
-                atom,
-                value,
+macro_rules! op_names_profiled_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, bx, feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+                state.current_bytes(),
+                prefix,
+                true,
                 code,
-                feedback_slot,
-            )
-        } else {
-            vm.store_global_with_feedback(
-                agent,
-                *host,
-                &mut **registry,
-                frame,
-                atom,
-                value,
-                code,
-                feedback_slot,
-            )
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                names::OpAtomArgs {
+                    a,
+                    bx,
+                    instruction_len,
+                    feedback_slot,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
         }
     };
-    if try_step!(state.handle_dispatch_result(result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_store_global(state: &mut DispatchState) -> Step {
-    op_store_or_assign_global(state, false)
-}
+op_names_profiled_handler!(op_load_global, names::op_load_global_semantic);
+op_names_profiled_handler!(op_store_global, names::op_store_global_semantic);
+op_names_profiled_handler!(op_assign_global, names::op_assign_global_semantic);
 
-pub extern "C" fn op_assign_global(state: &mut DispatchState) -> Step {
-    op_store_or_assign_global(state, true)
-}
+// ---- Names (lexical scope walk) and DeleteGlobal — Abx without feedback ----
+//
+// These share the unprofiled Abx decode (the α form passes `is_profiled =
+// false` to `decode_abx_operands`). LoadThis / LoadCallee / LoadNewTarget
+// also use this decode but discard `bx`; they reuse the same handler
+// macro and ignore `args.bx` in their semantic body.
 
-pub extern "C" fn op_delete_global(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let delete_result = {
-        let DispatchState { agent, frame, .. } = &mut *state;
-        Vm::delete_global(agent, frame, atom)
-    };
-    let deleted = match try_step!(state.handle_dispatch_result(delete_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state
-        .vm
-        .write_register_unchecked(registers, a, Value::from_bool(deleted));
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-// ---- Names (lexical scope walk) ----
-
-pub extern "C" fn op_load_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let load_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.load_name_with_context(agent, *host, &mut **registry, frame, atom)
-    };
-    let value = match try_step!(state.handle_dispatch_result(load_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_resolve_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let resolve_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.resolve_name_with_context(agent, *host, &mut **registry, frame, atom)
-    };
-    let value = match try_step!(state.handle_dispatch_result(resolve_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_resolve_global(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let resolve_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.resolve_global(agent, *host, &mut **registry, frame, atom)
-    };
-    let value = match try_step!(state.handle_dispatch_result(resolve_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-#[inline]
-fn op_assign_name_common(state: &mut DispatchState, variable_form: bool) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
-    let assign_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        if variable_form {
-            vm.assign_variable_name_with_context(agent, *host, &mut **registry, frame, atom, value)
-        } else {
-            vm.assign_name_with_context(agent, *host, &mut **registry, frame, atom, value)
+macro_rules! op_names_atom_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+                state.current_bytes(),
+                prefix,
+                false,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                names::OpAtomArgs {
+                    a,
+                    bx,
+                    instruction_len,
+                    feedback_slot: None,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
         }
     };
-    if try_step!(state.handle_dispatch_result(assign_result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_assign_name(state: &mut DispatchState) -> Step {
-    op_assign_name_common(state, false)
-}
-
-pub extern "C" fn op_assign_variable_name(state: &mut DispatchState) -> Step {
-    op_assign_name_common(state, true)
-}
-
-pub extern "C" fn op_delete_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let delete_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.delete_name_with_context(agent, *host, &mut **registry, frame, atom)
-    };
-    let deleted = match try_step!(state.handle_dispatch_result(delete_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state
-        .vm
-        .write_register_unchecked(registers, a, Value::from_bool(deleted));
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-// ---- Captured names (closures) ----
-
-pub extern "C" fn op_capture_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let atom = try_step!(state.vm.read_atom_constant(code, bx));
-    let capture_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.capture_name_with_context(agent, *host, &mut **registry, frame, a, atom)
-    };
-    if try_step!(state.handle_dispatch_result(capture_result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-#[inline]
-fn captured_name_register(state: &DispatchState, bx: u32) -> Result<u16, Step> {
-    u16::try_from(bx).map_err(|_| {
-        Step::Error(VmError::RegisterOutOfBounds {
-            code: state.frame.code(),
-            register: u16::MAX,
-        })
-    })
-}
-
-pub extern "C" fn op_load_captured_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let reference_register = match captured_name_register(state, bx) {
-        Ok(r) => r,
-        Err(step) => return step,
-    };
-    let load_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.load_captured_name_with_context(agent, *host, &mut **registry, frame, reference_register)
-    };
-    let value = match try_step!(state.handle_dispatch_result(load_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_load_captured_name_this(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let reference_register = match captured_name_register(state, bx) {
-        Ok(r) => r,
-        Err(step) => return step,
-    };
-    let load_result = state
-        .vm
-        .load_captured_name_this_with_context(&state.frame, reference_register);
-    let value = match try_step!(state.handle_dispatch_result(load_result)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_assign_captured_name(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let reference_register = match captured_name_register(state, bx) {
-        Ok(r) => r,
-        Err(step) => return step,
-    };
-    let value = state.vm.read_register_unchecked(state.frame.registers(), a);
-    let assign_result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            ..
-        } = &mut *state;
-        vm.assign_captured_name_with_context(
-            agent,
-            *host,
-            &mut **registry,
-            frame,
-            reference_register,
-            value,
-        )
-    };
-    if try_step!(state.handle_dispatch_result(assign_result)).is_none() {
-        dispatch_next!(state);
-    }
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
+op_names_atom_handler!(op_delete_global, names::op_delete_global_semantic);
+op_names_atom_handler!(op_load_name, names::op_load_name_semantic);
+op_names_atom_handler!(op_resolve_name, names::op_resolve_name_semantic);
+op_names_atom_handler!(op_resolve_global, names::op_resolve_global_semantic);
+op_names_atom_handler!(op_assign_name, names::op_assign_name_semantic);
+op_names_atom_handler!(
+    op_assign_variable_name,
+    names::op_assign_variable_name_semantic
+);
+op_names_atom_handler!(op_delete_name, names::op_delete_name_semantic);
+op_names_atom_handler!(op_capture_name, names::op_capture_name_semantic);
 
 // ---- Frame-state loads: This / Callee / NewTarget ----
+//
+// Same Abx-without-feedback decode; `bx` is ignored. We pipe it through
+// the same handler macro for uniformity.
 
-pub extern "C" fn op_load_this(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let load_this = {
-        let DispatchState { agent, frame, .. } = &mut *state;
-        let this_state = agent
-            .current_execution_context()
-            .map_or_else(|| ThisState::Value(frame.this_value()), |ec| ec.this_state());
-        match this_state {
-            ThisState::Value(value) => Ok(value),
-            ThisState::Uninitialized => Err(VmError::Abrupt(errors::throw_reference_error(agent))),
-            ThisState::Lexical => Vm::resolve_this_binding(agent, frame.lexical_env(), frame),
+op_names_atom_handler!(op_load_this, names::op_load_this_semantic);
+op_names_atom_handler!(op_load_callee, names::op_load_callee_semantic);
+op_names_atom_handler!(op_load_new_target, names::op_load_new_target_semantic);
+
+// ---- Captured names (closures) ----
+//
+// `bx` is a captured-name reference register index (bounds-checked in the
+// semantic body). `CaptureName` instead reads `bx` as an atom-constant
+// index, so it uses `op_names_atom_handler` above.
+
+macro_rules! op_captured_name_handler {
+    ($name:ident, $semantic:path) => {
+        pub extern "C" fn $name(state: &mut DispatchState) -> Step {
+            let code = state.code();
+            let pc = state.frame.instruction_offset();
+            let prefix = state.prefix.take();
+            let (a, bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
+                state.current_bytes(),
+                prefix,
+                false,
+                code,
+                pc,
+            ));
+            let mut ll_state = LlIntDispatchState::from_alpha(state);
+            let outcome = $semantic(
+                &mut ll_state,
+                names::OpCapturedNameArgs {
+                    a,
+                    bx,
+                    instruction_len,
+                },
+            );
+            translate_outcome_to_step(state, outcome)
         }
     };
-    let value = match try_step!(state.handle_dispatch_result(load_this)) {
-        Some(v) => v,
-        None => dispatch_next!(state),
-    };
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
 }
 
-pub extern "C" fn op_load_callee(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let value = state
-        .frame
-        .callee()
-        .map_or(Value::undefined(), Value::from_object_ref);
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-pub extern "C" fn op_load_new_target(state: &mut DispatchState) -> Step {
-    let code = state.code();
-    let pc = state.frame.instruction_offset();
-    let prefix = state.prefix.take();
-    let (a, _bx, _feedback_slot, instruction_len) = try_step!(decode_abx_operands(
-        state.current_bytes(),
-        prefix,
-        false,
-        code,
-        pc,
-    ));
-    let value = state
-        .frame
-        .new_target()
-        .map_or(Value::undefined(), Value::from_object_ref);
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, a, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
-}
-
-// Suppress unused-import warning when AbruptCompletion is only needed
-// for the throw_reference_error trip through VmError::Abrupt.
-#[allow(dead_code)]
-const _: Option<AbruptCompletion> = None;
+op_captured_name_handler!(
+    op_load_captured_name,
+    names::op_load_captured_name_semantic
+);
+op_captured_name_handler!(
+    op_load_captured_name_this,
+    names::op_load_captured_name_this_semantic
+);
+op_captured_name_handler!(
+    op_assign_captured_name,
+    names::op_assign_captured_name_semantic
+);

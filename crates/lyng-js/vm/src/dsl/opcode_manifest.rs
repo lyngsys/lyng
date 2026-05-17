@@ -624,6 +624,109 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_throw_if_uninitialized_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A12 — names family (17 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::LoadGlobal,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_global_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_global_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::StoreGlobal,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_store_global_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_store_global_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignGlobal,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_assign_global_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_global_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DeleteGlobal,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_delete_global_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_delete_global_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ResolveName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_resolve_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_resolve_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::ResolveGlobal,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_resolve_global_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_resolve_global_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_assign_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignVariableName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_assign_variable_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_variable_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DeleteName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_delete_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_delete_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CaptureName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_capture_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_capture_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadCapturedName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_captured_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_captured_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadCapturedNameThis,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_captured_name_this_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_captured_name_this_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignCapturedName,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_assign_captured_name_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_captured_name_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadThis,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_this_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_this_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadCallee,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_callee_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_callee_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadNewTarget,
+        semantic_symbol: "lyng_js_vm::vm::semantics::names::op_load_new_target_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_new_target_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
