@@ -64,3 +64,22 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         }
     }
 }
+
+/// asm-facing return ABI for cold-stub shims. The asm bridge reads
+/// `tag` and dispatches on it (`Continue` / `Refresh` / `Exit`).
+/// `payload` is reserved for future single-word returns (e.g. a packed
+/// PC delta); DSL-0b leaves it zero.
+#[repr(C)]
+pub struct SlowPathReturn {
+    pub tag: u64,
+    pub payload: u64,
+}
+
+/// Tag values used by [`SlowPathReturn::tag`]. The integers are part of
+/// the asm-DSL ABI — backend code may hard-code the constants.
+#[repr(u64)]
+pub enum SlowPathTag {
+    Continue = 0,
+    Refresh = 1,
+    Exit = 2,
+}
