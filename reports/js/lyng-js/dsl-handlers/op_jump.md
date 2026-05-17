@@ -6,12 +6,17 @@
 
 ```rust
 llint_handler! {
-    op_jump, layout = Ax, length = 5, |offset| {
+    op_jump, layout = Ax, length = 4, |offset| {
         call_slow!(op_jump_slow_rs, args = [offset]);
         dispatch_after_slow!();
     }
 }
 ```
+
+Note: `Jump` is the 4-byte form (opcode + i24 sign-extended delta).
+The DSL's `decode_ax!` reads a 4-byte word at PC+1 which pulls in
+one trailing byte from the next opcode; the slow-path shim masks
+to the low 24 bits and sign-extends explicitly.
 
 The plan's optimized version inlines PC computation and a backward-poll
 fast path, but `dispatch!(jump_to = ...)` isn't supported by the

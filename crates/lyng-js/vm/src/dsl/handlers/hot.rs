@@ -99,17 +99,24 @@ pub extern "C" fn op_add_slow_rs(
 // DSL handler delegates to it via call_slow.
 // =====================================================================
 
+// `Jump` uses the Ax instruction form: 1 byte opcode + 3 bytes
+// sign-extended i24 delta. Encoded length is 4 bytes. The DSL's
+// `decode_ax!` reads a 4-byte word at PC+1 — that pulls in the
+// adjacent opcode byte, but the slow-path shim masks and sign-extends
+// the low 24 bits before computing the actual delta, so the extra
+// byte is harmless.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump, layout = Ax, length = 5, |offset| {
+    op_jump, layout = Ax, length = 4, |offset| {
         call_slow!(op_jump_slow_rs, args = [offset]);
         dispatch_after_slow!();
     }
 }
 
-/// Slow-path shim for `op_jump`. Adapts the u32 raw operand from asm
-/// (a sign-extended i32 encoded as a 4-byte payload at PC+1) into the
-/// `OpJumpArgs` shape that `op_jump_semantic` expects.
+/// Slow-path shim for `op_jump`. The 4-byte `decode_ax!` load reads
+/// 3 bytes of i24 delta + 1 byte of the next opcode (or padding).
+/// We mask off the top byte and sign-extend the low 24 bits to
+/// recover the i24 delta semantic_body expects.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_jump_slow_rs(
@@ -118,30 +125,34 @@ pub extern "C" fn op_jump_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    // sign-extend the low 24 bits of offset_raw
+    let delta = (((offset_raw & 0x00ff_ffff) as i32) << 8) >> 8;
     let args = crate::vm::semantics::control_flow::OpJumpArgs {
-        delta: offset_raw as i32,
-        instruction_len: 5,
+        delta,
+        instruction_len: 4,
     };
     let outcome = crate::vm::semantics::control_flow::op_jump_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
-// op_return (B42) — A layout, length = 2. Frame-transitioning; always
-// returns Refresh / ExitDone / ExitError. The DSL body is a thin
-// call_slow + dispatch_after_slow shim.
+// op_return (B42) — Ax layout, length = 4. The 24-bit operand encodes
+// the register holding the return value. Frame-transitioning; always
+// returns Refresh / ExitDone / ExitError.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_return, layout = A, length = 2, |src| {
+    op_return, layout = Ax, length = 4, |src| {
         call_slow!(op_return_slow_rs, args = [src]);
         dispatch_after_slow!();
     }
 }
 
-/// Slow-path shim for `op_return`. Adapts the single u32 raw operand
-/// from asm into the `OpReturnArgs` shape `op_return_semantic` expects.
+/// Slow-path shim for `op_return`. The 4-byte `decode_ax!` load reads
+/// 3 bytes of i24 register-id + 1 byte of the next opcode (or padding).
+/// Mask the low 24 bits; the result is a non-negative u16 register id
+/// in practice, so no sign-extension is needed.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_return_slow_rs(
@@ -151,14 +162,12 @@ pub extern "C" fn op_return_slow_rs(
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::control_flow::OpReturnArgs {
-        register: src as u16,
+        register: (src & 0x00ff_ffff) as u16,
     };
     let outcome = crate::vm::semantics::control_flow::op_return_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
 }
 
-#[cfg(target_arch = "aarch64")]
-use crate::decode_a;
 #[cfg(target_arch = "aarch64")]
 use crate::decode_ax;
 

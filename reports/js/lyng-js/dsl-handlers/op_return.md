@@ -6,12 +6,18 @@
 
 ```rust
 llint_handler! {
-    op_return, layout = A, length = 2, |src| {
+    op_return, layout = Ax, length = 4, |src| {
         call_slow!(op_return_slow_rs, args = [src]);
         dispatch_after_slow!();
     }
 }
 ```
+
+Note: `Return` uses the 4-byte Ax form (opcode + 24-bit register
+operand). The plan's original example specified `layout = A, length =
+2`, but the actual bytecode encoding is `Ax`/`length = 4`. The slow-
+path shim masks to the low 24 bits before passing to
+`op_return_semantic`.
 
 `op_return` is frame-transitioning — every invocation returns
 `Refresh` (nested return), `ExitDone` (root frame returned), or

@@ -9,7 +9,8 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    call_slow, decode_ax, dispatch, dispatch_after_slow, dispatch_prefixed, poll_safepoint,
+    call_slow, decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    dispatch_prefixed, poll_safepoint,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -44,6 +45,158 @@ pub extern "C" fn op_loop_header_poll_rs(
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
     let outcome = crate::dsl::poll::run_poll(&mut dispatch, crate::dsl::poll::PollArgs);
+    dispatch.translate_outcome(outcome)
+}
+
+// =====================================================================
+// op_jump8 (B44) — 1-byte i8 delta variant. Layout A in the DSL
+// (single byte at PC+1), length = 2.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump8, layout = A, length = 2, |offset| {
+        call_slow!(op_jump8_slow_rs, args = [offset]);
+        dispatch_after_slow!();
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump8_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let delta = (offset_raw as i8) as i32;
+    let args = crate::vm::semantics::control_flow::OpJumpArgs {
+        delta,
+        instruction_len: 2,
+    };
+    let outcome = crate::vm::semantics::control_flow::op_jump8_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+// =====================================================================
+// op_jump_if_true / op_jump_if_false — Abx layout (1-byte reg + 2-byte
+// i16 delta), length = 4.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump_if_true, layout = Abx, length = 4, |condition, offset| {
+        call_slow!(op_jump_if_true_slow_rs, args = [condition, offset]);
+        dispatch_after_slow!();
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump_if_true_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    condition: u32,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let delta = (offset_raw as i16) as i32;
+    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+        condition_register: condition as u16,
+        delta,
+        instruction_len: 4,
+    };
+    let outcome =
+        crate::vm::semantics::control_flow::op_jump_if_true_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump_if_false, layout = Abx, length = 4, |condition, offset| {
+        call_slow!(op_jump_if_false_slow_rs, args = [condition, offset]);
+        dispatch_after_slow!();
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump_if_false_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    condition: u32,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let delta = (offset_raw as i16) as i32;
+    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+        condition_register: condition as u16,
+        delta,
+        instruction_len: 4,
+    };
+    let outcome =
+        crate::vm::semantics::control_flow::op_jump_if_false_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+// =====================================================================
+// op_jump_if_true8 / op_jump_if_false8 — Ab layout in the DSL (1-byte
+// reg + 1-byte i8 delta), length = 3.
+// =====================================================================
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump_if_true8, layout = Ab, length = 3, |condition, offset| {
+        call_slow!(op_jump_if_true8_slow_rs, args = [condition, offset]);
+        dispatch_after_slow!();
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump_if_true8_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    condition: u32,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let delta = (offset_raw as i8) as i32;
+    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+        condition_register: condition as u16,
+        delta,
+        instruction_len: 3,
+    };
+    let outcome =
+        crate::vm::semantics::control_flow::op_jump_if_true8_semantic(&mut dispatch, args);
+    dispatch.translate_outcome(outcome)
+}
+
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_jump_if_false8, layout = Ab, length = 3, |condition, offset| {
+        call_slow!(op_jump_if_false8_slow_rs, args = [condition, offset]);
+        dispatch_after_slow!();
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump_if_false8_slow_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    condition: u32,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let delta = (offset_raw as i8) as i32;
+    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+        condition_register: condition as u16,
+        delta,
+        instruction_len: 3,
+    };
+    let outcome =
+        crate::vm::semantics::control_flow::op_jump_if_false8_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
 }
 
@@ -84,5 +237,30 @@ pub unsafe extern "C" fn op_wide() -> ! {
 
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe extern "C" fn op_extra_wide() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump8() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump_if_true() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump_if_true8() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump_if_false() -> ! {
+    loop {}
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+pub unsafe extern "C" fn op_jump_if_false8() -> ! {
     loop {}
 }
