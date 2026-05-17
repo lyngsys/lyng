@@ -788,6 +788,57 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_type_of_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A14 — calls family (8 opcodes; `CallMethod` is not in the
+    // `dispatch_handlers/mod.rs` re-export list and remains an
+    // `op_unimplemented` stub for now).
+    OpcodeEntry {
+        opcode: Opcode::Call0,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_call0_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call0_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Call1,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_call1_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call1_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Call2,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_call2_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call2_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Call3,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_call3_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call3_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Call,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_call_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_call_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::TailCall,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_tail_call_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_tail_call_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Construct,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_construct_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_construct_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::CreateClosure,
+        semantic_symbol: "lyng_js_vm::vm::semantics::calls::op_create_closure_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_create_closure_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
