@@ -62,6 +62,13 @@ impl ScratchAllocator {
     }
 
     /// Look up a previously-assigned scratch register without allocating.
+    ///
+    /// Reserved for future use by lowering passes that need to consult
+    /// the operand→register map after `assign` has run (e.g. emitting
+    /// a structured operand-decode prologue once Batch 4 backend macros
+    /// land). Not on a hot path; kept on the API surface even though
+    /// the current lowerer doesn't call it.
+    #[allow(dead_code, reason = "consumed by lowering passes added in Batch 4")]
     pub(crate) fn lookup(&self, name: &str) -> Option<u8> {
         self.map.get(name).copied()
     }
