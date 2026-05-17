@@ -2,33 +2,37 @@
 //! (lyng-59e6 round 4). All `#[cold]` — rare opcodes per JSC's hot/cold
 //! analysis.
 //!
-//! Yield / Await / SuspendGeneratorStart suspend the active frame via the
-//! existing Vm helpers, which return `VmResult<()>` whose error variant
-//! carries the abrupt completion (GeneratorYield, AsyncSuspend). The
-//! trampoline propagates that via `Step::Error`.
+//! Post-A16: each α handler in this file is a thin shim that
+//!   1. decodes the instruction's operands,
+//!   2. constructs `OpGeneratorsXxxArgs` and calls into
+//!      `crate::vm::semantics::generators::op_xxx_semantic`,
+//!   3. translates the returned `SemanticOutcome` to `Step` via
+//!      `translate_outcome_to_step`.
 //!
-//! DelegateYield is a full opcode that orchestrates yield-from semantics
-//! and may also suspend; same flow.
+//! Suspension routing — `Yield`, `Await`, `SuspendGeneratorStart`,
+//! `DelegateYield` (Suspend outcome) — flows through
+//! `SemanticOutcome::ExitError { error }` where `error` carries the
+//! special suspension variant (`VmError::GeneratorYield`,
+//! `VmError::GeneratorStart`, `VmError::AsyncSuspend`). The caller of
+//! `Vm::run` distinguishes those from genuine abrupt completions per the
+//! existing trampoline contract.
 //!
-//! LoadResumeKind / LoadResumeValue read frame state populated by the
-//! resume entry path and clear the resume slot; no suspension.
+//! `LoadResumeKind` / `LoadResumeValue` are register-only opcodes; they
+//! read the per-frame resume slot populated by
+//! `Vm::restore_suspended_execution` at resume entry and produce a
+//! `SemanticOutcome::Continue { pc_advance: instruction_len }` outcome.
 
-use lyng_js_types::Value;
-
-use crate::error::VmError;
+use crate::dsl::slow_path::LlIntDispatchState;
+use crate::try_step;
 use crate::vm::dispatch::{decode_abc_operands, decode_ax_operands};
-use crate::vm::dispatch::next_dispatch_instruction_offset;
+use crate::vm::dispatch_handlers::translate_outcome_to_step;
 use crate::vm::dispatch_state::{DispatchState, Step};
-use crate::{dispatch_next, try_step};
+use crate::vm::semantics::generators;
 
 #[inline]
 fn ax_to_register(state: &DispatchState, ax: i32) -> Result<u16, Step> {
-    u16::try_from(ax).map_err(|_| {
-        Step::Error(VmError::RegisterOutOfBounds {
-            code: state.frame.code(),
-            register: 0,
-        })
-    })
+    u16::try_from(ax)
+        .map_err(|_| Step::Error(generators::ax_register_out_of_bounds_error(state)))
 }
 
 #[cold]
@@ -37,15 +41,12 @@ pub extern "C" fn op_suspend_generator_start(state: &mut DispatchState) -> Step 
     let pc = state.frame.instruction_offset();
     let (_ax, _feedback_slot, instruction_len) =
         try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
-    let resume_offset = next_dispatch_instruction_offset(&state.frame, instruction_len);
-    state.sync_active_frame();
-    {
-        let DispatchState {
-            vm, agent, frame, ..
-        } = &mut *state;
-        try_step!(vm.suspend_generator_start(agent, frame, resume_offset));
-    }
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_suspend_generator_start_semantic(
+        &mut ll_state,
+        generators::OpSuspendGeneratorStartArgs { instruction_len },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 #[cold]
@@ -58,16 +59,15 @@ pub extern "C" fn op_yield(state: &mut DispatchState) -> Step {
         Ok(r) => r,
         Err(step) => return step,
     };
-    let value = state.vm.read_register_unchecked(state.frame.registers(), register);
-    let resume_offset = next_dispatch_instruction_offset(&state.frame, instruction_len);
-    state.sync_active_frame();
-    {
-        let DispatchState {
-            vm, agent, frame, ..
-        } = &mut *state;
-        try_step!(vm.suspend_current_generator_frame(agent, frame, value, resume_offset, false));
-    }
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_yield_semantic(
+        &mut ll_state,
+        generators::OpGeneratorsAxArgs {
+            register,
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 #[cold]
@@ -82,32 +82,17 @@ pub extern "C" fn op_delegate_yield(state: &mut DispatchState) -> Step {
         code,
         pc,
     ));
-    let result = {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        vm.delegate_yield(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_delegate_yield_semantic(
+        &mut ll_state,
+        generators::OpDelegateYieldArgs {
             a,
             b,
             c,
-        )
-    };
-    if try_step!(state.handle_dispatch_result(result)).is_none() {
-        dispatch_next!(state);
-    }
-    dispatch_next!(state);
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 #[cold]
@@ -120,27 +105,15 @@ pub extern "C" fn op_await(state: &mut DispatchState) -> Step {
         Ok(r) => r,
         Err(step) => return step,
     };
-    {
-        let DispatchState {
-            vm,
-            agent,
-            host,
-            registry,
-            frame,
-            frame_depth,
-            ..
-        } = &mut *state;
-        try_step!(vm.await_value(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            instruction_len,
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_await_semantic(
+        &mut ll_state,
+        generators::OpGeneratorsAxArgs {
             register,
-        ));
-    }
-    dispatch_next!(state);
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 pub extern "C" fn op_load_resume_kind(state: &mut DispatchState) -> Step {
@@ -152,13 +125,15 @@ pub extern "C" fn op_load_resume_kind(state: &mut DispatchState) -> Step {
         Ok(r) => r,
         Err(step) => return step,
     };
-    let kind = state.frame.resume_kind().raw();
-    let registers = state.frame.registers();
-    state
-        .vm
-        .write_register_unchecked(registers, register, Value::from_smi(i32::from(kind)));
-    state.advance(instruction_len);
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_load_resume_kind_semantic(
+        &mut ll_state,
+        generators::OpGeneratorsAxArgs {
+            register,
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 pub extern "C" fn op_load_resume_value(state: &mut DispatchState) -> Step {
@@ -170,10 +145,13 @@ pub extern "C" fn op_load_resume_value(state: &mut DispatchState) -> Step {
         Ok(r) => r,
         Err(step) => return step,
     };
-    let value = state.frame.resume_value();
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, register, value);
-    state.frame.clear_resume();
-    state.advance(instruction_len);
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = generators::op_load_resume_value_semantic(
+        &mut ll_state,
+        generators::OpGeneratorsAxArgs {
+            register,
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }

@@ -876,6 +876,43 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_close_iterator_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A16 — generators / async family (6 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::SuspendGeneratorStart,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_suspend_generator_start_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_suspend_generator_start_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Yield,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_yield_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_yield_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::DelegateYield,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_delegate_yield_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_delegate_yield_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::Await,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_await_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_await_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadResumeKind,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_load_resume_kind_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_resume_kind_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadResumeValue,
+        semantic_symbol: "lyng_js_vm::vm::semantics::generators::op_load_resume_value_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_resume_value_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
