@@ -23,6 +23,7 @@ members = [
     "crates/lyng-js/cli",
     "crates/lyng-js/test262-harness",
     "crates/lyng-js/tests",
+    "crates/lyng-js-vm-dsl",
     # Tools
     "tools/html5lib_runner",
     "tools/lyng-js-bench",
@@ -62,6 +63,7 @@ lyng-js-env = { path = "crates/lyng-js/env" }
 lyng-js-bytecode = { path = "crates/lyng-js/bytecode" }
 lyng-js-compiler = { path = "crates/lyng-js/compiler" }
 lyng-js-vm = { path = "crates/lyng-js/vm" }
+lyng-js-vm-dsl = { path = "crates/lyng-js-vm-dsl" }
 lyng-js-builtins = { path = "crates/lyng-js/builtins" }
 lyng-js-cli = { path = "crates/lyng-js/cli" }
 lyng-js-test262-harness = { path = "crates/lyng-js/test262-harness" }
