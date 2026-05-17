@@ -14,12 +14,12 @@
 //! - [`prelude`]  — NaN-tag mask constants + layout helpers.
 
 pub mod arithmetic;
+pub mod control;
 pub mod objects;
 pub mod operands;
 pub mod prelude;
 pub mod values;
 // Other backend submodules are declared in subsequent Batch 4 commits:
-// pub mod control;    (B25)
 // pub mod feedback;   (B26)
 // pub mod safepoint;  (B26)
 // pub mod memory;     (B26)
