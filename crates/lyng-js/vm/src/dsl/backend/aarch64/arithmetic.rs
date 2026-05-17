@@ -24,7 +24,7 @@
 /// sign-extended i64.
 #[macro_export]
 macro_rules! add_smi_overflow {
-    ($lhs:ident, $rhs:ident => $dst:ident, $label:tt) => {
+    ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
             "adds   w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
             "b.vs   ", stringify!($label), "\n",
@@ -37,7 +37,7 @@ macro_rules! add_smi_overflow {
 /// 32-bit signed subtract with overflow detection.
 #[macro_export]
 macro_rules! sub_smi_overflow {
-    ($lhs:ident, $rhs:ident => $dst:ident, $label:tt) => {
+    ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
             "subs   w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
             "b.vs   ", stringify!($label), "\n",
@@ -53,14 +53,14 @@ macro_rules! sub_smi_overflow {
 /// that the 64-bit result equals its sign-extended 32-bit form.
 #[macro_export]
 macro_rules! mul_smi_overflow {
-    ($lhs:ident, $rhs:ident => $dst:ident, $label:tt) => {
+    ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
             // x_dst = (i64) lhs * (i64) rhs  (signed widening multiply)
             "smull  x", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            // x9 = sxtw(x_dst[31:0])
-            "sxtw   x9, w", stringify!($dst), "\n",
+            // x16 = sxtw(x_dst[31:0])
+            "sxtw   x16, w", stringify!($dst), "\n",
             // Overflow if sign-extended low 32 bits != full 64-bit product.
-            "cmp    x", stringify!($dst), ", x9\n",
+            "cmp    x", stringify!($dst), ", x16\n",
             "b.ne   ", stringify!($label), "\n",
         )
     };
@@ -69,7 +69,7 @@ macro_rules! mul_smi_overflow {
 /// 32-bit bitwise AND on SMI payloads (no overflow possible).
 #[macro_export]
 macro_rules! bit_and_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
             "and    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
             "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
@@ -80,7 +80,7 @@ macro_rules! bit_and_smi {
 /// 32-bit bitwise OR on SMI payloads.
 #[macro_export]
 macro_rules! bit_or_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
             "orr    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
             "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
@@ -91,7 +91,7 @@ macro_rules! bit_or_smi {
 /// 32-bit bitwise XOR on SMI payloads.
 #[macro_export]
 macro_rules! bit_xor_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
             "eor    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
             "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
@@ -104,11 +104,11 @@ macro_rules! bit_xor_smi {
 /// branch).
 #[macro_export]
 macro_rules! shift_left_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
             // Mask shift count to 5 bits (ECMAScript ToUint32 + & 31).
-            "and    w9, w", stringify!($rhs), ", #0x1f\n",
-            "lsl    w", stringify!($dst), ", w", stringify!($lhs), ", w9\n",
+            "and    w16, w", stringify!($rhs), ", #0x1f\n",
+            "lsl    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
             "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
         )
     };
@@ -117,10 +117,10 @@ macro_rules! shift_left_smi {
 /// Arithmetic right shift (sign-preserving) by low 5 bits of `$rhs`.
 #[macro_export]
 macro_rules! shift_right_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "and    w9, w", stringify!($rhs), ", #0x1f\n",
-            "asr    w", stringify!($dst), ", w", stringify!($lhs), ", w9\n",
+            "and    w16, w", stringify!($rhs), ", #0x1f\n",
+            "asr    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
             "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
         )
     };
@@ -135,10 +135,10 @@ macro_rules! shift_right_smi {
 /// caller-emitted (typically `tbnz wDst, #31, slow`).
 #[macro_export]
 macro_rules! ushift_right_smi {
-    ($lhs:ident, $rhs:ident => $dst:ident) => {
+    ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "and    w9, w", stringify!($rhs), ", #0x1f\n",
-            "lsr    w", stringify!($dst), ", w", stringify!($lhs), ", w9\n",
+            "and    w16, w", stringify!($rhs), ", #0x1f\n",
+            "lsr    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
             // Zero-extend (don't sign-extend) — high bit stays the LSR result.
             "uxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
         )
@@ -149,7 +149,7 @@ macro_rules! ushift_right_smi {
 /// `i32::MIN` overflows — its negation isn't representable as i32).
 #[macro_export]
 macro_rules! neg_smi_overflow {
-    ($reg:ident, $label:tt) => {
+    ($reg:tt, $label:tt) => {
         concat!(
             "negs   w", stringify!($reg), ", w", stringify!($reg), "\n",
             "b.vs   ", stringify!($label), "\n",
@@ -161,7 +161,7 @@ macro_rules! neg_smi_overflow {
 /// Bitwise NOT on an SMI (no overflow possible).
 #[macro_export]
 macro_rules! bit_not_smi {
-    ($reg:ident) => {
+    ($reg:tt) => {
         concat!(
             "mvn    w", stringify!($reg), ", w", stringify!($reg), "\n",
             "sxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",

@@ -19,8 +19,8 @@
 macro_rules! poll_safepoint {
     ($label_pending:tt) => {
         concat!(
-            "ldrb   w9, [x22, {vm_poll}]\n",
-            "cbnz   w9, ", stringify!($label_pending), "\n",
+            "ldrb   w16, [x22, {vm_poll}]\n",
+            "cbnz   w16, ", stringify!($label_pending), "\n",
         )
     };
 }

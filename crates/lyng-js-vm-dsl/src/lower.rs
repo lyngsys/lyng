@@ -61,6 +61,7 @@
 //! the body actually uses.
 
 use proc_macro2::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
+use proc_macro2::Spacing;
 use quote::quote;
 use std::collections::BTreeSet;
 use syn::Result;
@@ -113,6 +114,19 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
             }
+            BodyStmt::Label(name) => {
+                // Emit `Lname:\n` as a string-literal template entry.
+                // The `L` prefix is required for Mach-O / ELF
+                // assembler-local labels — without it the label is
+                // emitted as a global symbol and the assembler
+                // rejects conditional branches that target it
+                // ("conditional branch requires assembler-local
+                // label"). `substitute_idents` also rewrites the
+                // matching reference inside macro args so both sides
+                // agree on the prefixed name.
+                let asm = format!("L{name}:\n");
+                body_tokens.push(quote! { #asm });
+            }
         }
     }
 
@@ -158,14 +172,38 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     })
 }
 
-/// Walk `tokens` and replace recognized scratch idents (operands +
-/// `t0..t6`) with their assigned scratch register numbers. Other idents
-/// pass through unchanged. Recursively descends into groups so macro
-/// arguments are rewritten too.
+/// Walk `tokens` and:
+///
+/// 1. Rewrite `.label` references (the DSL's label-reference syntax)
+///    into `Llabel` — an assembler-local label identifier. The
+///    leading `L` prefix is required by Mach-O / ELF for local
+///    labels; without it the assembler treats the symbol as global
+///    and rejects local conditional branches.
+/// 2. Replace recognized scratch idents (operands + `t0..t6`) with
+///    their assigned scratch register numbers.
+///
+/// Other tokens pass through unchanged. Recurses into groups so macro
+/// arguments inside `(..)` / `[..]` / `{..}` are rewritten too.
 fn substitute_idents(tokens: TokenStream, scratch: &mut ScratchAllocator) -> Result<TokenStream> {
     let mut out = Vec::new();
-    for tt in tokens {
+    let mut iter = tokens.into_iter().peekable();
+    while let Some(tt) = iter.next() {
         match tt {
+            TokenTree::Punct(ref p) if p.as_char() == '.' => {
+                // `.label` → `Llabel`. The proc-macro lowerer consumes
+                // the leading dot here and prefixes the following ident
+                // with `L` (the asm-local-label convention). The
+                // matching label declaration site (`BodyStmt::Label`)
+                // emits `Llabel:` with the same prefix.
+                if let Some(TokenTree::Ident(id)) = iter.peek().cloned() {
+                    iter.next();
+                    let prefixed = Ident::new(&format!("L{id}"), id.span());
+                    out.push(TokenTree::Ident(prefixed));
+                } else {
+                    // Stray `.` — keep it for forward compatibility.
+                    out.push(TokenTree::Punct(proc_macro2::Punct::new('.', Spacing::Alone)));
+                }
+            }
             TokenTree::Ident(id) => {
                 if let Some(reg) = scratch.substitute(&id)? {
                     out.push(TokenTree::Literal(Literal::u8_unsuffixed(reg)));

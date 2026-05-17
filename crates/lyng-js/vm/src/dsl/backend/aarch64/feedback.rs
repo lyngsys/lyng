@@ -5,6 +5,9 @@
 //! index multiplied by the entry stride yields a `*mut FeedbackEntry`
 //! the macros can read / write.
 //!
+//! All internal scratch use is on `x16` / `x17` (see
+//! `values.rs` for the rationale).
+//!
 //! Bindings expected from the proc-macro lowerer:
 //!
 //! - `{entry_stride_shift}` — log2 of `size_of::<FeedbackEntry>()`.
@@ -20,10 +23,10 @@
 /// it into `$dst`. Compiles to 2 instructions.
 #[macro_export]
 macro_rules! load_feedback_site {
-    ($slot:ident => $dst:ident) => {
+    ($slot:tt => $dst:tt) => {
         concat!(
-            "lsl    x9, x", stringify!($slot), ", {entry_stride_shift}\n",
-            "add    x", stringify!($dst), ", x21, x9\n",
+            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "add    x", stringify!($dst), ", x21, x16\n",
         )
     };
 }
@@ -32,13 +35,13 @@ macro_rules! load_feedback_site {
 /// of the observed-types word). Used by warmup recording handlers.
 #[macro_export]
 macro_rules! record_smi {
-    ($slot:ident) => {
+    ($slot:tt) => {
         concat!(
-            "lsl    x9, x", stringify!($slot), ", {entry_stride_shift}\n",
-            "add    x9, x21, x9\n",
-            "ldr    w10, [x9, {entry_observed}]\n",
-            "orr    w10, w10, #0x1\n",
-            "str    w10, [x9, {entry_observed}]\n",
+            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "add    x16, x21, x16\n",
+            "ldr    w17, [x16, {entry_observed}]\n",
+            "orr    w17, w17, #0x1\n",
+            "str    w17, [x16, {entry_observed}]\n",
         )
     };
 }
@@ -46,13 +49,13 @@ macro_rules! record_smi {
 /// Record an Object observation. SMI bit 0; Object bit 1.
 #[macro_export]
 macro_rules! record_object {
-    ($slot:ident) => {
+    ($slot:tt) => {
         concat!(
-            "lsl    x9, x", stringify!($slot), ", {entry_stride_shift}\n",
-            "add    x9, x21, x9\n",
-            "ldr    w10, [x9, {entry_observed}]\n",
-            "orr    w10, w10, #0x2\n",
-            "str    w10, [x9, {entry_observed}]\n",
+            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "add    x16, x21, x16\n",
+            "ldr    w17, [x16, {entry_observed}]\n",
+            "orr    w17, w17, #0x2\n",
+            "str    w17, [x16, {entry_observed}]\n",
         )
     };
 }
@@ -60,13 +63,13 @@ macro_rules! record_object {
 /// Record a Double observation (bit 2 of observed types).
 #[macro_export]
 macro_rules! record_double {
-    ($slot:ident) => {
+    ($slot:tt) => {
         concat!(
-            "lsl    x9, x", stringify!($slot), ", {entry_stride_shift}\n",
-            "add    x9, x21, x9\n",
-            "ldr    w10, [x9, {entry_observed}]\n",
-            "orr    w10, w10, #0x4\n",
-            "str    w10, [x9, {entry_observed}]\n",
+            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "add    x16, x21, x16\n",
+            "ldr    w17, [x16, {entry_observed}]\n",
+            "orr    w17, w17, #0x4\n",
+            "str    w17, [x16, {entry_observed}]\n",
         )
     };
 }

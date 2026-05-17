@@ -6,15 +6,24 @@
 //!
 //! AArch64 mapping:
 //!
-//! | Pin     | Reg | Type                       |
-//! | ------- | --- | -------------------------- |
-//! | PC      | x19 | *const u8                  |
-//! | REGS    | x20 | *mut Value                 |
-//! | FV      | x21 | *mut FeedbackEntry         |
-//! | VM      | x22 | *mut Vm                    |
-//! | TABLE   | x23 | *const DslHandler          |
-//! | STATE   | x24 | *mut LlIntState            |
-//! | t0..t6  | x9..x15 | scratch (caller-saved) |
+//! | Pin           | Reg     | Type                            |
+//! | ------------- | ------- | ------------------------------- |
+//! | PC            | x19     | *const u8                       |
+//! | REGS          | x20     | *mut Value                      |
+//! | FV            | x21     | *mut FeedbackEntry              |
+//! | VM            | x22     | *mut Vm                         |
+//! | TABLE         | x23     | *const DslHandler               |
+//! | STATE         | x24     | *mut LlIntState                 |
+//! | t0..t6        | x9..x15 | scratch (caller-saved) — live operand slots |
+//! | macro scratch | x16/x17 | AAPCS64 IP0/IP1 — macro-internal only       |
+//!
+//! Backend macros (`check_smi!`, `tag_smi!`, `dispatch!`,
+//! `call_slow!`, `record_smi!`, `poll_safepoint!`, ...) only use
+//! `x16`/`x17` (and the call-clobbered `x8`/`w8`) as internal scratch.
+//! The proc-macro lowerer's scratch allocator covers `x9..x15`, so the
+//! macro-internal `x16`/`x17` never overlap with live operand slots —
+//! handlers can `tag_smi!` a result whose destination is still in
+//! `x15` without losing operand `a` in `x9`.
 //!
 //! Refresh discipline (slow-path call):
 //!   PRE:   state.frame_pc_offset <- PC - pb_base

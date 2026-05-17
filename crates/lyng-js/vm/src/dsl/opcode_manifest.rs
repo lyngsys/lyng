@@ -263,8 +263,8 @@ pub const OPCODES: &[OpcodeEntry] = &[
     OpcodeEntry {
         opcode: Opcode::Add,
         semantic_symbol: "lyng_js_vm::vm::semantics::arithmetic::op_add_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_add_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::hot::op_add",
+        category: OpcodeCategory::Hot,
     },
     OpcodeEntry {
         opcode: Opcode::AddSmi,

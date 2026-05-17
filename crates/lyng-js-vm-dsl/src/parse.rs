@@ -8,12 +8,13 @@
 //! ```
 //!
 //! `<body>` is a sequence of DSL-op macro invocations, each terminated by
-//! `;`. The parser splits the body into one [`BodyStmt`] per macro call;
-//! the lowerer emits each as a comma-separated argument to the enclosing
+//! `;`, optionally interleaved with `.label:` declarations. The parser
+//! splits the body into one [`BodyStmt`] per macro call or label; the
+//! lowerer emits each as a comma-separated argument to the enclosing
 //! `naked_asm!`. Backend macros expand to `concat!(...)`-produced
 //! `&'static str` fragments, which `naked_asm!` consumes as its template.
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use syn::{
     braced,
     parse::{Parse, ParseStream},
@@ -21,14 +22,23 @@ use syn::{
     Ident, LitInt, Result, Token,
 };
 
-/// A single statement of a handler body — either a macro call (`name!(args)`)
-/// or a bare label (`.label:`). The lowerer renders each as a string
-/// fragment passed positionally to the enclosing `naked_asm!`.
+/// A single statement of a handler body.
 pub(crate) enum BodyStmt {
     /// `dispatch!(...)`, `check_smi!(...)`, etc. The tokens are
     /// re-emitted verbatim; the backend `macro_rules!` macro expands at
     /// the `naked_asm!` call site.
     MacroCall(TokenStream),
+    /// `.name:` — a local label inside the handler's asm. The lowerer
+    /// emits the literal string `"name:\n"` so the assembler picks it
+    /// up as a local label inside the enclosing `naked_asm!`.
+    ///
+    /// We strip the leading `.` because AArch64/macOS local-label
+    /// conventions don't require the period — `slow:` and `.slow:`
+    /// both work as far as in-block branches go, and the simpler form
+    /// keeps the asm easier to read. The branch sites (e.g.
+    /// `check_smi!(t0, .slow)`) include the leading dot, so the
+    /// emitted asm matches at the `b.ne .slow` / `slow:` level.
+    Label(String),
 }
 
 pub(crate) struct HandlerAst {
@@ -42,7 +52,8 @@ pub(crate) struct HandlerAst {
     /// Named operand bindings (e.g. `a, b, c, slot`). May be empty for
     /// `layout = None` handlers (the input then looks like `|| { ... }`).
     pub(crate) operand_idents: Punctuated<Ident, Token![,]>,
-    /// Parsed body statements — one entry per `<macro_call>;` line.
+    /// Parsed body statements — one entry per `<macro_call>;` line or
+    /// `.label:` declaration.
     pub(crate) body: Vec<BodyStmt>,
 }
 
@@ -81,8 +92,17 @@ impl Parse for HandlerAst {
         // unsuitable — parse manually instead.
         input.parse::<Token![|]>()?;
         let mut operand_idents: Punctuated<Ident, Token![,]> = Punctuated::new();
+        // Allow leading underscore in operand bindings (`_unused_offset`).
+        // Skip if vertical bar comes first (empty operand list).
         while !input.peek(Token![|]) {
-            let ident: Ident = input.parse()?;
+            // `_` alone is not a valid Ident; we accept `_foo` etc. via
+            // `Ident::parse_any` to be permissive about ignored bindings.
+            let ident: Ident = if input.peek(Token![_]) {
+                let underscore: Token![_] = input.parse()?;
+                Ident::new("_unused", underscore.span)
+            } else {
+                input.parse()?
+            };
             operand_idents.push_value(ident);
             if input.peek(Token![|]) {
                 break;
@@ -106,16 +126,24 @@ impl Parse for HandlerAst {
     }
 }
 
-/// Parse a handler body as a sequence of `<macro_call>;` statements.
+/// Parse a handler body as a sequence of `<macro_call>;` statements
+/// interleaved with `.label:` declarations.
 ///
-/// The body is intentionally a restricted DSL: each line is a single
-/// `name!(...)` invocation followed by `;`. The parser does **not**
+/// The body is intentionally a restricted DSL. The parser does **not**
 /// pre-expand the macros — it preserves the raw tokens of each call so
 /// the backend `macro_rules!` macros expand at the consumer crate's
 /// call site (where they're in scope).
 fn parse_body(input: ParseStream) -> Result<Vec<BodyStmt>> {
     let mut stmts = Vec::new();
     while !input.is_empty() {
+        // `.label:` — a local label inside the handler body.
+        if input.peek(Token![.]) {
+            input.parse::<Token![.]>()?;
+            let lbl: Ident = input.parse()?;
+            input.parse::<Token![:]>()?;
+            stmts.push(BodyStmt::Label(lbl.to_string()));
+            continue;
+        }
         // Each statement is `<ident>!(<args>)` followed by `;`. Use
         // `syn::Macro` to parse the call shape; that gives us the path
         // (just an ident here) and the delimited args, which we re-
@@ -135,4 +163,11 @@ fn parse_body(input: ParseStream) -> Result<Vec<BodyStmt>> {
 
 pub(crate) fn parse_handler(input: TokenStream) -> Result<HandlerAst> {
     syn::parse2(input)
+}
+
+// Suppress the unused-import warning emitted on stable when the optional
+// Ident::parse_any path isn't reached.
+#[allow(dead_code)]
+fn _span_witness() -> Span {
+    Span::call_site()
 }
