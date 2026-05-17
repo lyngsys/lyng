@@ -1,0 +1,117 @@
+{
+  "benchmarks": [
+    {
+      "error": null,
+      "file": "richards.js",
+      "median_score": 317.0,
+      "median_us_per_iter": 11136.27760252366,
+      "name": "Richards",
+      "phase1_baseline": 234,
+      "phase1_gate_met": true,
+      "phase1_target": 260,
+      "reference_us": 35302,
+      "samples": [
+        315.0,
+        316.0,
+        319.0,
+        317.0,
+        317.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "deltablue.js",
+      "median_score": 360.0,
+      "median_us_per_iter": 18366.11111111111,
+      "name": "DeltaBlue",
+      "phase1_baseline": 277,
+      "phase1_gate_met": true,
+      "phase1_target": 310,
+      "reference_us": 66118,
+      "samples": [
+        359.0,
+        358.0,
+        361.0,
+        360.0,
+        361.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "crypto.js",
+      "median_score": 256.0,
+      "median_us_per_iter": 103976.953125,
+      "name": "Crypto",
+      "phase1_baseline": 236,
+      "phase1_gate_met": false,
+      "phase1_target": 265,
+      "reference_us": 266181,
+      "samples": [
+        256.0,
+        273.0,
+        255.0,
+        274.0,
+        256.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "raytrace.js",
+      "median_score": 417.0,
+      "median_us_per_iter": 177455.39568345324,
+      "name": "RayTrace",
+      "phase1_baseline": 387,
+      "phase1_gate_met": false,
+      "phase1_target": 430,
+      "reference_us": 739989,
+      "samples": [
+        416.0,
+        426.0,
+        337.0,
+        423.0,
+        417.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "navier-stokes.js",
+      "median_score": 457.0,
+      "median_us_per_iter": 324726.47702407005,
+      "name": "NavierStokes",
+      "phase1_baseline": 424,
+      "phase1_gate_met": false,
+      "phase1_target": 470,
+      "reference_us": 1484000,
+      "samples": [
+        457.0,
+        396.0,
+        464.0,
+        406.0,
+        460.0
+      ]
+    },
+    {
+      "error": null,
+      "file": "splay.js",
+      "median_score": 1342.0,
+      "median_us_per_iter": 6072.354694485842,
+      "name": "Splay",
+      "phase1_baseline": 1198,
+      "phase1_gate_met": true,
+      "phase1_target": 1330,
+      "reference_us": 81491,
+      "samples": [
+        1339.0,
+        1342.0,
+        1369.0,
+        1309.0,
+        1360.0
+      ]
+    }
+  ],
+  "lyng_bin": "target/release/lyng-js",
+  "per_sample_timeout_secs": 120,
+  "samples_per_benchmark": 5,
+  "schema": "lyng-js-bench/v8suite/v1",
+  "v8_root": "testdata/js-benchmarks/v8-v7"
+}
