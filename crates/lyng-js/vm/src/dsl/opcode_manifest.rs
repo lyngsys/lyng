@@ -727,6 +727,67 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_new_target_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A13 — scope family (10 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::LoadEnvSlot,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_load_env_slot_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_env_slot_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::StoreEnvSlot,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_store_env_slot_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_store_env_slot_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::AssignEnvSlot,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_assign_env_slot_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_assign_env_slot_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::EnterEnvScope,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_enter_env_scope_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_enter_env_scope_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LeaveEnvScope,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_leave_env_scope_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_leave_env_scope_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::PushClosureEnv,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_push_closure_env_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_push_closure_env_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::PopClosureEnv,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_pop_closure_env_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_pop_closure_env_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::PushWithEnv,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_push_with_env_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_push_with_env_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::PopWithEnv,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_pop_with_env_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_pop_with_env_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::TypeOf,
+        semantic_symbol: "lyng_js_vm::vm::semantics::scope::op_type_of_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_type_of_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.

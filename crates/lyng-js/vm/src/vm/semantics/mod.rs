@@ -15,3 +15,4 @@ pub(crate) mod control_flow;
 pub(crate) mod loads;
 pub(crate) mod names;
 pub(crate) mod property;
+pub(crate) mod scope;
