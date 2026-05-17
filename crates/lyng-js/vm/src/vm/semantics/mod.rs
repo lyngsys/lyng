@@ -13,6 +13,7 @@
 pub(crate) mod arithmetic;
 pub(crate) mod calls;
 pub(crate) mod control_flow;
+pub(crate) mod exceptions;
 pub(crate) mod generators;
 pub(crate) mod iterators;
 pub(crate) mod loads;

@@ -1,64 +1,76 @@
 //! Exception handlers for the trampoline dispatch path (lyng-59e6 round 3).
 //!
-//! Throw routes through `Vm::transfer_to_exception_handler`. EnterHandler /
-//! LeaveHandler are dispatch markers that just advance pc — the bytecode
-//! emitter encodes the active try-stack via metadata that the helper reads
-//! at throw time, not via runtime state managed by the dispatch loop.
-//! LoadException reads `Vm::current_exception` and writes it to a register.
+//! Post-A17: each α handler in this file is a thin shim that
+//!   1. decodes the instruction's operands,
+//!   2. constructs `OpExceptionsXxxArgs` and calls into
+//!      `crate::vm::semantics::exceptions::op_xxx_semantic`,
+//!   3. translates the returned `SemanticOutcome` to `Step` via
+//!      `translate_outcome_to_step`.
+//!
+//! Throw routing flows through
+//! `SemanticOutcome::Refresh` (caught — same or cross-frame) or
+//! `SemanticOutcome::ExitError { error: VmError::Abrupt(Throw(value)) }`
+//! (uncaught). EnterHandler / LeaveHandler are dispatch markers that
+//! just advance PC. LoadException reads `Vm::current_exception` and
+//! writes it to a register.
 
-use lyng_js_types::AbruptCompletion;
-
-use crate::error::VmError;
+use crate::dsl::slow_path::LlIntDispatchState;
+use crate::try_step;
 use crate::vm::dispatch::decode_ax_operands;
+use crate::vm::dispatch_handlers::translate_outcome_to_step;
 use crate::vm::dispatch_state::{DispatchState, Step};
-use crate::{dispatch_next, try_step};
+use crate::vm::semantics::exceptions;
+
+#[inline]
+fn ax_to_register(state: &DispatchState, ax: i32) -> Result<u16, Step> {
+    u16::try_from(ax)
+        .map_err(|_| Step::Error(exceptions::ax_register_out_of_bounds_error(state)))
+}
 
 pub extern "C" fn op_throw(state: &mut DispatchState) -> Step {
     let code = state.code();
     let pc = state.frame.instruction_offset();
-    let (ax, _feedback_slot, _instruction_len) =
+    let (ax, _feedback_slot, instruction_len) =
         try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
-    let register = match u16::try_from(ax) {
+    let register = match ax_to_register(state, ax) {
         Ok(r) => r,
-        Err(_) => {
-            return Step::Error(VmError::RegisterOutOfBounds {
-                code: state.frame.code(),
-                register: 0,
-            });
-        }
+        Err(step) => return step,
     };
-    let value = state.vm.read_register_unchecked(state.frame.registers(), register);
-    state.sync_active_frame();
-    let transferred = {
-        let DispatchState { vm, agent, .. } = &mut *state;
-        vm.transfer_to_exception_handler(agent, value)
-    };
-    match transferred {
-        Ok(true) => {
-            try_step!(state.refresh_from_active_frame());
-            dispatch_next!(state);
-        }
-        Ok(false) => Step::Error(VmError::Abrupt(AbruptCompletion::Throw(value))),
-        Err(e) => Step::Error(e),
-    }
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = exceptions::op_throw_semantic(
+        &mut ll_state,
+        exceptions::OpExceptionsAxArgs {
+            register,
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 pub extern "C" fn op_enter_handler(state: &mut DispatchState) -> Step {
-    op_handler_marker(state)
-}
-
-pub extern "C" fn op_leave_handler(state: &mut DispatchState) -> Step {
-    op_handler_marker(state)
-}
-
-#[inline]
-fn op_handler_marker(state: &mut DispatchState) -> Step {
     let code = state.code();
     let pc = state.frame.instruction_offset();
     let (_ax, _feedback_slot, instruction_len) =
         try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
-    state.advance(instruction_len);
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = exceptions::op_enter_handler_semantic(
+        &mut ll_state,
+        exceptions::OpHandlerMarkerArgs { instruction_len },
+    );
+    translate_outcome_to_step(state, outcome)
+}
+
+pub extern "C" fn op_leave_handler(state: &mut DispatchState) -> Step {
+    let code = state.code();
+    let pc = state.frame.instruction_offset();
+    let (_ax, _feedback_slot, instruction_len) =
+        try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = exceptions::op_leave_handler_semantic(
+        &mut ll_state,
+        exceptions::OpHandlerMarkerArgs { instruction_len },
+    );
+    translate_outcome_to_step(state, outcome)
 }
 
 pub extern "C" fn op_load_exception(state: &mut DispatchState) -> Step {
@@ -66,18 +78,17 @@ pub extern "C" fn op_load_exception(state: &mut DispatchState) -> Step {
     let pc = state.frame.instruction_offset();
     let (ax, _feedback_slot, instruction_len) =
         try_step!(decode_ax_operands(state.current_bytes(), false, code, pc));
-    let register = match u16::try_from(ax) {
+    let register = match ax_to_register(state, ax) {
         Ok(r) => r,
-        Err(_) => {
-            return Step::Error(VmError::RegisterOutOfBounds {
-                code: state.frame.code(),
-                register: 0,
-            });
-        }
+        Err(step) => return step,
     };
-    let value = state.vm.current_exception_value();
-    let registers = state.frame.registers();
-    state.vm.write_register_unchecked(registers, register, value);
-    state.advance(instruction_len);
-    dispatch_next!(state);
+    let mut ll_state = LlIntDispatchState::from_alpha(state);
+    let outcome = exceptions::op_load_exception_semantic(
+        &mut ll_state,
+        exceptions::OpExceptionsAxArgs {
+            register,
+            instruction_len,
+        },
+    );
+    translate_outcome_to_step(state, outcome)
 }

@@ -913,6 +913,31 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_resume_value_dsl",
         category: OpcodeCategory::Cold,
     },
+    // Task A17 — exceptions family (4 opcodes).
+    OpcodeEntry {
+        opcode: Opcode::Throw,
+        semantic_symbol: "lyng_js_vm::vm::semantics::exceptions::op_throw_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_throw_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::EnterHandler,
+        semantic_symbol: "lyng_js_vm::vm::semantics::exceptions::op_enter_handler_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_enter_handler_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LeaveHandler,
+        semantic_symbol: "lyng_js_vm::vm::semantics::exceptions::op_leave_handler_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_leave_handler_dsl",
+        category: OpcodeCategory::Cold,
+    },
+    OpcodeEntry {
+        opcode: Opcode::LoadException,
+        semantic_symbol: "lyng_js_vm::vm::semantics::exceptions::op_load_exception_semantic",
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_load_exception_dsl",
+        category: OpcodeCategory::Cold,
+    },
 ];
 
 /// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
