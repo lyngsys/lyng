@@ -7,12 +7,11 @@
 //! }
 //! ```
 //!
-//! `<body>` is captured as a raw `TokenStream` and forwarded to the
-//! lowerer. The proc-macro deliberately does NOT pre-expand body macros;
-//! the per-arch DSL-op `macro_rules!` macros (defined under
-//! `crates/lyng-js/vm/src/dsl/backend/aarch64/` in later tasks) emit asm
-//! string fragments that get concatenated by `naked_asm!` at the call
-//! site.
+//! `<body>` is a sequence of DSL-op macro invocations, each terminated by
+//! `;`. The parser splits the body into one [`BodyStmt`] per macro call;
+//! the lowerer emits each as a comma-separated argument to the enclosing
+//! `naked_asm!`. Backend macros expand to `concat!(...)`-produced
+//! `&'static str` fragments, which `naked_asm!` consumes as its template.
 
 use proc_macro2::TokenStream;
 use syn::{
@@ -21,6 +20,16 @@ use syn::{
     punctuated::Punctuated,
     Ident, LitInt, Result, Token,
 };
+
+/// A single statement of a handler body — either a macro call (`name!(args)`)
+/// or a bare label (`.label:`). The lowerer renders each as a string
+/// fragment passed positionally to the enclosing `naked_asm!`.
+pub(crate) enum BodyStmt {
+    /// `dispatch!(...)`, `check_smi!(...)`, etc. The tokens are
+    /// re-emitted verbatim; the backend `macro_rules!` macro expands at
+    /// the `naked_asm!` call site.
+    MacroCall(TokenStream),
+}
 
 pub(crate) struct HandlerAst {
     /// Function name (e.g. `op_add`).
@@ -33,9 +42,8 @@ pub(crate) struct HandlerAst {
     /// Named operand bindings (e.g. `a, b, c, slot`). May be empty for
     /// `layout = None` handlers (the input then looks like `|| { ... }`).
     pub(crate) operand_idents: Punctuated<Ident, Token![,]>,
-    /// Raw handler body — passed through to `naked_asm!` so backend
-    /// `macro_rules!` macros expand at the call site.
-    pub(crate) body: TokenStream,
+    /// Parsed body statements — one entry per `<macro_call>;` line.
+    pub(crate) body: Vec<BodyStmt>,
 }
 
 impl Parse for HandlerAst {
@@ -86,7 +94,7 @@ impl Parse for HandlerAst {
 
         let body_content;
         braced!(body_content in input);
-        let body: TokenStream = body_content.parse()?;
+        let body = parse_body(&body_content)?;
 
         Ok(HandlerAst {
             name,
@@ -96,6 +104,33 @@ impl Parse for HandlerAst {
             body,
         })
     }
+}
+
+/// Parse a handler body as a sequence of `<macro_call>;` statements.
+///
+/// The body is intentionally a restricted DSL: each line is a single
+/// `name!(...)` invocation followed by `;`. The parser does **not**
+/// pre-expand the macros — it preserves the raw tokens of each call so
+/// the backend `macro_rules!` macros expand at the consumer crate's
+/// call site (where they're in scope).
+fn parse_body(input: ParseStream) -> Result<Vec<BodyStmt>> {
+    let mut stmts = Vec::new();
+    while !input.is_empty() {
+        // Each statement is `<ident>!(<args>)` followed by `;`. Use
+        // `syn::Macro` to parse the call shape; that gives us the path
+        // (just an ident here) and the delimited args, which we re-
+        // serialize as a `TokenStream` for the lowerer to splice.
+        let mac: syn::Macro = input.parse()?;
+        input.parse::<Token![;]>()?;
+        // Re-serialize as `<path>!(<tokens>)`. We use `quote!` to
+        // preserve hygiene of the macro path so backend macros resolve
+        // at the call site.
+        let path = &mac.path;
+        let tokens = &mac.tokens;
+        let call = quote::quote! { #path!(#tokens) };
+        stmts.push(BodyStmt::MacroCall(call));
+    }
+    Ok(stmts)
 }
 
 pub(crate) fn parse_handler(input: TokenStream) -> Result<HandlerAst> {

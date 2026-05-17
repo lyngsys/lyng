@@ -2,28 +2,64 @@
 //!
 //! The lowerer is where the design's "DSL surface ≈ asm shape" decision
 //! pays out: each body statement is one DSL-op invocation, and the
-//! lowerer simply wraps the body in `naked_asm!`. The body tokens are
-//! interpolated as-is so that per-arch DSL-op `macro_rules!` macros
-//! (under `crates/lyng-js/vm/src/dsl/backend/aarch64/`, added in Batch
-//! 4 / tasks B20–B28) expand at the call site into `concat!`-produced
-//! string literals consumed by `naked_asm!`.
+//! lowerer composes them all into a single `naked_asm!` template. Each
+//! per-arch DSL-op `macro_rules!` macro (under
+//! `crates/lyng-js/vm/src/dsl/backend/aarch64/`, added in Batch 4 /
+//! tasks B20–B28) expands at the *consumer crate's* call site into a
+//! `concat!`-produced `&'static str` fragment.
 //!
-//! ## Risk acknowledged (load-bearing question of the spike)
+//! ## Emission shape
 //!
-//! Whether `naked_asm!` cleanly accepts the macro-string composition
-//! described above is the load-bearing question of DSL-0b. Validation
-//! case B30 is the first call site that exercises this. If `naked_asm!`
-//! rejects the macro-string composition, the lowerer here must instead
-//! expand DSL macros into a single string at proc-macro time and emit
-//! that as the `naked_asm!` template. That refactor is internal to
-//! `lower.rs`; the public DSL surface stays the same.
+//! For a handler `op_xxx, layout = L, length = N, |args| { m1!(...); m2!(...); }`:
+//!
+//! ```ignore
+//! #[unsafe(naked)]
+//! pub extern "C" fn op_xxx() -> ! {
+//!     ::core::arch::naked_asm!(
+//!         "/* len={length} */\n",    // unconditional reference to {length}
+//!         "<L decode prologue>\n",   // string literal from `Layout::decode_prologue_asm`
+//!         m1!(...),                  // macro call returning &'static str (via concat!)
+//!         m2!(...),                  // ditto
+//!         length = const N as u32,
+//!     )
+//! }
+//! ```
+//!
+//! `naked_asm!` accepts a comma-separated list of string-expression
+//! fragments for its template (per the inline-assembly reference). Each
+//! macro call in the list expands to a `concat!(...)`-produced literal,
+//! which is exactly what the template syntax wants — no outer `concat!`
+//! wrapper is needed.
+//!
+//! ## `noreturn` and `length`
+//!
+//! `naked_asm!` *implicitly* requires `noreturn` (it's the only valid
+//! mode for a naked-function body); passing `options(noreturn)`
+//! explicitly is a hard rustc error. So the emission carries no
+//! `options(...)` clause.
+//!
+//! The `length = const N as u32` binding is referenced by the bare
+//! `dispatch!()` macro (which auto-advances PC by `{length}`). For
+//! handlers that only use `dispatch!(advance = N)` (literal advance)
+//! the named arg would be unused — rustc rejects that. We sidestep the
+//! issue by emitting a fixed `"/* len={length} */\n"` comment line
+//! that always references `{length}`; asm comments are stripped by
+//! the assembler so this costs nothing at runtime.
+//!
+//! ## Why the body is parsed (not raw-spliced)
+//!
+//! The earlier Batch-1 lowerer interpolated the body as a raw
+//! `TokenStream`. That carries the trailing `;` from each statement
+//! straight into `naked_asm!`, which rejects it (`expected token: ,`).
+//! B30 forced us to parse the body into `BodyStmt::MacroCall` entries
+//! and splice them comma-separated — see [`crate::parse::parse_body`].
 
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Result;
 
 use crate::layouts::Layout;
-use crate::parse::HandlerAst;
+use crate::parse::{BodyStmt, HandlerAst};
 use crate::scratch::ScratchAllocator;
 
 pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
@@ -54,18 +90,42 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let name = &ast.name;
     let length = &ast.length;
     let prologue = layout.decode_prologue_asm(&operands);
-    let body = &ast.body;
+    let body_calls = ast.body.iter().map(|stmt| match stmt {
+        BodyStmt::MacroCall(tokens) => tokens.clone(),
+    });
+
+    // Compose the template list: prologue first, then one entry per
+    // body macro call. Emit each followed by `,` so an empty body
+    // produces no stray comma.
+    let template_entries = std::iter::once(quote! { #prologue })
+        .chain(body_calls)
+        .map(|tokens| quote! { #tokens, });
 
     Ok(quote! {
         #[unsafe(naked)]
         pub extern "C" fn #name() -> ! {
+            // `naked_asm!` implies `noreturn` (it's the only valid mode
+            // for a naked function body) — explicitly passing
+            // `options(noreturn)` is a hard error. The body is a
+            // comma-separated list of string-typed template expressions
+            // followed by named-binding entries.
+            //
+            // The leading `"/* len={length} */"` comment fragment
+            // unconditionally references the `{length}` named binding
+            // so rustc never complains about an unused named arg, even
+            // for handlers that only use `dispatch!(advance = N)` and
+            // never the bare `dispatch!()` that consumes `{length}`.
+            // Asm comments are stripped by the assembler, so this is
+            // free at runtime.
             ::core::arch::naked_asm!(
-                #prologue,
-                // The body is interpolated as a sequence of `concat!`-string
-                // expressions. Each backend `macro_rules!` macro expands to
-                // a string literal usable inside `naked_asm!`.
-                #body
-                options(noreturn),
+                "/* len={length} */\n",
+                // Each body fragment is a backend `macro_rules!` call
+                // (e.g. `dispatch!(advance = 0)`) that expands to a
+                // `concat!(...)`-produced `&'static str`. `naked_asm!`
+                // accepts a comma-separated list of such string-typed
+                // expressions as its template — no outer `concat!`
+                // wrapper needed.
+                #(#template_entries)*
                 length = const #length as u32,
             )
         }
