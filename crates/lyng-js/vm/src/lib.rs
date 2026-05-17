@@ -12,6 +12,15 @@
     reason = "VM public API keeps execution-domain names and lightweight snapshot accessors explicit for embedders"
 )]
 
+// `extern crate self as ...` lets the proc-macro lowerer in
+// `lyng-js-vm-dsl::lower` emit absolute paths like
+// `::lyng_js_vm::dsl::reg_convention::...` that resolve correctly even
+// when the macro is invoked from inside `lyng_js_vm` itself. Without
+// this, the path can only be found from external test crates that
+// have `lyng-js-vm` as a Cargo dep — the proc-macro can't tell the
+// difference at lower time.
+extern crate self as lyng_js_vm;
+
 mod activation;
 pub mod dsl;
 mod enumeration;

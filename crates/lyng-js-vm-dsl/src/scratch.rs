@@ -62,14 +62,36 @@ impl ScratchAllocator {
     }
 
     /// Look up a previously-assigned scratch register without allocating.
-    ///
-    /// Reserved for future use by lowering passes that need to consult
-    /// the operand→register map after `assign` has run (e.g. emitting
-    /// a structured operand-decode prologue once Batch 4 backend macros
-    /// land). Not on a hot path; kept on the API surface even though
-    /// the current lowerer doesn't call it.
-    #[allow(dead_code, reason = "consumed by lowering passes added in Batch 4")]
     pub(crate) fn lookup(&self, name: &str) -> Option<u8> {
         self.map.get(name).copied()
+    }
+
+    /// Assign or look up an identifier *only if* it's a known scratch
+    /// name shape — operand bindings (already pre-assigned) or one of the
+    /// reserved `t0..t6` internal scratch names. Returns `Some(reg)` if a
+    /// substitution should happen, `None` if the identifier should pass
+    /// through unchanged (e.g. a label name, a macro name, or an unrelated
+    /// Rust ident inside a macro body).
+    ///
+    /// This is the substitution-eligibility test the lowerer uses when
+    /// walking the body TokenStream. Operand idents (`a`, `b`, `c`,
+    /// `slot`, `src`, `dst`, etc.) are recognized via the pre-assignment
+    /// path (`lookup` hits); `t0..t6` are recognized via the reserved
+    /// prefix and allocated on first use.
+    pub(crate) fn substitute(&mut self, name: &Ident) -> Result<Option<u8>> {
+        let s = name.to_string();
+        if let Some(reg) = self.lookup(&s) {
+            return Ok(Some(reg));
+        }
+        // Reserved internal-scratch slots t0..t6.
+        if let Some(rest) = s.strip_prefix('t') {
+            if let Ok(idx) = rest.parse::<u8>() {
+                if idx < Self::BUDGET {
+                    let reg = self.assign(name)?;
+                    return Ok(Some(reg));
+                }
+            }
+        }
+        Ok(None)
     }
 }

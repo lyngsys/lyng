@@ -6,11 +6,16 @@
 //! the layout to (a) validate the operand binding count and (b) emit the
 //! per-handler decode prologue.
 //!
-//! For DSL-0b Batch 1 the decode-prologue strings are placeholders. The
-//! real asm fragments are produced by the per-arch DSL-op macros under
-//! `crates/lyng-js/vm/src/dsl/backend/aarch64/` (Batch 4, tasks B20–B28),
-//! which compose via `concat!` inside `naked_asm!`.
+//! The decode prologue is emitted as a TokenStream that the consumer
+//! crate's backend macros (`decode_abc!`, `decode_ab!`, `decode_ax!`,
+//! etc., under `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs`)
+//! expand into a `concat!(...)`-produced asm fragment. The operand
+//! identifiers passed here are first substituted to their scratch-register
+//! numbers by `lower::substitute_idents`, so the asm comes out with real
+//! `w9`, `w10`, ... register names.
 
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{Error, Ident, Result};
 
 #[derive(Clone, Copy)]
@@ -52,30 +57,36 @@ impl Layout {
     pub(crate) fn operand_arity(self) -> usize {
         match self {
             Self::None => 0,
-            Self::A => 1,
-            Self::Ab => 2,
-            Self::Abc | Self::Abx | Self::Ax => 3,
+            // `Ax` is the extended (u32-immediate) jump-target form —
+            // a single operand binding mapped to a 4-byte read at PC+1.
+            Self::A | Self::Ax => 1,
+            Self::Ab | Self::Abx => 2,
+            Self::Abc => 3,
             Self::AbcSlot => 4,
         }
     }
 
-    /// Emit the operand-decode asm fragment that runs at handler entry.
-    ///
-    /// For Batch 1 each variant returns a placeholder comment. The real
-    /// asm — which reads operand bytes from the PC pin and materializes
-    /// them into scratch registers — is filled in once the backend
-    /// `macro_rules!` macros land (Batch 4). The lowerer composes this
-    /// string with the user-provided body inside `naked_asm!`, so this
-    /// becomes a no-op once the backend takes over the decode work.
-    pub(crate) fn decode_prologue_asm(self, _operands: &[Ident]) -> String {
-        match self {
-            Self::Abc => "// decode_abc prologue placeholder\n".to_string(),
-            Self::AbcSlot => "// decode_abc_slot prologue placeholder\n".to_string(),
-            Self::Abx => "// decode_abx prologue placeholder\n".to_string(),
-            Self::Ax => "// decode_ax prologue placeholder\n".to_string(),
-            Self::Ab => "// decode_ab prologue placeholder\n".to_string(),
-            Self::A => "// decode_a prologue placeholder\n".to_string(),
-            Self::None => "// decode_none prologue placeholder\n".to_string(),
+    /// Emit the operand-decode prologue as a backend-macro invocation
+    /// token stream. The lowerer splices this into `naked_asm!`'s
+    /// template list. Operand identifiers are passed through the
+    /// scratch-substitution pass before reaching the asm; the macros
+    /// themselves stringify their arguments to build `wN`/`xN` operands.
+    pub(crate) fn decode_prologue_tokens(self, operands: &[Ident]) -> TokenStream {
+        match (self, operands) {
+            (Self::None, _) => quote! { "" },
+            (Self::A, [a]) => quote! { decode_a!(#a) },
+            (Self::Ab, [a, b]) => quote! { decode_ab!(#a, #b) },
+            (Self::Abc, [a, b, c]) => quote! { decode_abc!(#a, #b, #c) },
+            (Self::AbcSlot, [a, b, c, slot]) => {
+                quote! { decode_abc_slot!(#a, #b, #c, #slot) }
+            }
+            (Self::Abx, [a, bx]) => quote! { decode_abx!(#a, #bx) },
+            (Self::Ax, [ax]) => quote! { decode_ax!(#ax) },
+            _ => {
+                // Arity is enforced upstream by `lower_handler`; this
+                // arm is unreachable in practice.
+                quote! { "" }
+            }
         }
     }
 }

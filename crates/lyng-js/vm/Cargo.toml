@@ -32,6 +32,4 @@ lyng-js-bytecode = { workspace = true }
 lyng-js-parser = { workspace = true }
 lyng-js-sema = { workspace = true }
 lyng-js-compiler = { workspace = true }
-
-[dev-dependencies]
 lyng-js-vm-dsl = { workspace = true }

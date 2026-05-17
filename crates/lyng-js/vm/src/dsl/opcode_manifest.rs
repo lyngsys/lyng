@@ -39,8 +39,8 @@ pub const OPCODES: &[OpcodeEntry] = &[
     OpcodeEntry {
         opcode: Opcode::Move,
         semantic_symbol: "lyng_js_vm::vm::semantics::loads::op_move_semantic",
-        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_move_dsl",
-        category: OpcodeCategory::Cold,
+        dsl_handler_symbol: "lyng_js_vm::dsl::handlers::hot::op_move",
+        category: OpcodeCategory::Hot,
     },
     OpcodeEntry {
         opcode: Opcode::LdaUndefined,

@@ -16,46 +16,53 @@
 //! #[unsafe(naked)]
 //! pub extern "C" fn op_xxx() -> ! {
 //!     ::core::arch::naked_asm!(
-//!         "/* len={length} */\n",    // unconditional reference to {length}
-//!         "<L decode prologue>\n",   // string literal from `Layout::decode_prologue_asm`
+//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_prefix}{vm_poll}{entry_stride_shift}{entry_observed} */\n",
+//!         decode_<layout>!(<operand idents as scratch regs>),
 //!         m1!(...),                  // macro call returning &'static str (via concat!)
 //!         m2!(...),                  // ditto
 //!         length = const N as u32,
+//!         state_pc = const ...,
+//!         state_pb = const ...,
+//!         /* etc. */
+//!         <shim_name> = sym <shim_path>,  // per call_slow! reference
 //!     )
 //! }
 //! ```
 //!
-//! `naked_asm!` accepts a comma-separated list of string-expression
-//! fragments for its template (per the inline-assembly reference). Each
-//! macro call in the list expands to a `concat!(...)`-produced literal,
-//! which is exactly what the template syntax wants — no outer `concat!`
-//! wrapper is needed.
+//! ## Substitution
 //!
-//! ## `noreturn` and `length`
+//! The DSL body references operand idents (`a`, `b`, `c`, `slot`,
+//! `src`, `dst`, ...) and internal scratch idents (`t0..t6`). The
+//! backend macros uniformly `stringify!` their arguments to build
+//! AArch64 register operands like `w9, x10`. If the proc-macro spliced
+//! the raw idents into `naked_asm!`, the assembler would see `w<a>` —
+//! invalid asm. The lowerer therefore walks the body TokenStream and
+//! rewrites every recognized scratch-name ident into its allocated
+//! register number literal *before* splicing into `naked_asm!`.
 //!
-//! `naked_asm!` *implicitly* requires `noreturn` (it's the only valid
-//! mode for a naked-function body); passing `options(noreturn)`
-//! explicitly is a hard rustc error. So the emission carries no
-//! `options(...)` clause.
+//! Recognized scratch names:
+//! - Operand bindings declared in the handler signature.
+//! - Internal scratch slots `t0..t6` (allocated lazily on first use).
 //!
-//! The `length = const N as u32` binding is referenced by the bare
-//! `dispatch!()` macro (which auto-advances PC by `{length}`). For
-//! handlers that only use `dispatch!(advance = N)` (literal advance)
-//! the named arg would be unused — rustc rejects that. We sidestep the
-//! issue by emitting a fixed `"/* len={length} */\n"` comment line
-//! that always references `{length}`; asm comments are stripped by
-//! the assembler so this costs nothing at runtime.
+//! Other idents (label names like `.slow`, macro names like
+//! `dispatch`, Rust paths like `op_add_slow_rs`) pass through verbatim.
 //!
-//! ## Why the body is parsed (not raw-spliced)
+//! ## Standard named bindings
 //!
-//! The earlier Batch-1 lowerer interpolated the body as a raw
-//! `TokenStream`. That carries the trailing `;` from each statement
-//! straight into `naked_asm!`, which rejects it (`expected token: ,`).
-//! B30 forced us to parse the body into `BodyStmt::MacroCall` entries
-//! and splice them comma-separated — see [`crate::parse::parse_body`].
+//! Backend macros reference a fixed set of `{name}` placeholders for
+//! `LlIntState` field offsets, the VM polling flag, and the shim
+//! symbol. The lowerer always supplies the layout-stable bindings; the
+//! per-call-site `{shim}` binding is collected by scanning the body
+//! for `call_slow!(shim_name, ...)` invocations.
+//!
+//! An "unused" comment fragment at the top of the asm template
+//! unconditionally references every named binding, keeping rustc
+//! quiet about unused named args regardless of which backend macros
+//! the body actually uses.
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
 use quote::quote;
+use std::collections::BTreeSet;
 use syn::Result;
 
 use crate::layouts::Layout;
@@ -77,11 +84,9 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
         ));
     }
 
-    // Pre-assign operand identifiers to scratch registers. The DSL-op
-    // backend macros (Batch 4) consult the allocator's mapping via
-    // their own lookup tables; for Batch 1 we surface budget overruns
-    // at proc-macro expand time even though the body still uses
-    // placeholder strings.
+    // Pre-assign operand identifiers to scratch registers. Internal
+    // scratch names `t0..t6` are allocated lazily inside
+    // `substitute_idents` as they're encountered in the body.
     let mut scratch = ScratchAllocator::new();
     for name in &operands {
         scratch.assign(name)?;
@@ -89,45 +94,128 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
 
     let name = &ast.name;
     let length = &ast.length;
-    let prologue = layout.decode_prologue_asm(&operands);
-    let body_calls = ast.body.iter().map(|stmt| match stmt {
-        BodyStmt::MacroCall(tokens) => tokens.clone(),
-    });
+    let prologue_raw = layout.decode_prologue_tokens(&operands);
+    // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
+    // macros stringify their args verbatim — feeding them `dst, src`
+    // yields invalid asm like `wdst, wsrc`. Substitute the operand idents
+    // here so the prologue sees `9, 10, ...` register-number literals
+    // just like the body does.
+    let prologue = substitute_idents(prologue_raw, &mut scratch)?;
 
-    // Compose the template list: prologue first, then one entry per
-    // body macro call. Emit each followed by `,` so an empty body
-    // produces no stray comma.
-    let template_entries = std::iter::once(quote! { #prologue })
-        .chain(body_calls)
+    // Substitute operand/t-scratch idents in the body, and harvest
+    // call_slow! shim names for sym bindings.
+    let mut shim_names: BTreeSet<String> = BTreeSet::new();
+    let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
+    for stmt in &ast.body {
+        match stmt {
+            BodyStmt::MacroCall(tokens) => {
+                let rewritten = substitute_idents(tokens.clone(), &mut scratch)?;
+                collect_shim_names(&rewritten, &mut shim_names);
+                body_tokens.push(rewritten);
+            }
+        }
+    }
+
+    let template_entries = std::iter::once(prologue)
+        .chain(body_tokens)
         .map(|tokens| quote! { #tokens, });
+
+    // Per-shim `<name> = sym <path>` bindings. The body author writes
+    // `call_slow!(op_add_slow_rs, args = [a, b, c, slot])`; the lowerer
+    // turns that into `bl {op_add_slow_rs}` in asm, then supplies the
+    // binding `op_add_slow_rs = sym op_add_slow_rs` so the asm references
+    // the linker symbol.
+    let shim_bindings = shim_names.iter().map(|name| {
+        let ident = Ident::new(name, Span::call_site());
+        quote! { #ident = sym #ident, }
+    });
 
     Ok(quote! {
         #[unsafe(naked)]
         pub extern "C" fn #name() -> ! {
-            // `naked_asm!` implies `noreturn` (it's the only valid mode
-            // for a naked function body) — explicitly passing
-            // `options(noreturn)` is a hard error. The body is a
-            // comma-separated list of string-typed template expressions
-            // followed by named-binding entries.
-            //
-            // The leading `"/* len={length} */"` comment fragment
-            // unconditionally references the `{length}` named binding
-            // so rustc never complains about an unused named arg, even
-            // for handlers that only use `dispatch!(advance = N)` and
-            // never the bare `dispatch!()` that consumes `{length}`.
-            // Asm comments are stripped by the assembler, so this is
-            // free at runtime.
+            // `naked_asm!` implies `noreturn`; explicit `options(noreturn)`
+            // is rejected. The leading "/* len={length} ... */" comment
+            // fragment references every named binding so rustc never
+            // complains about an unused named arg, regardless of which
+            // backend macros the body uses. Asm comments are stripped
+            // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} */\n",
-                // Each body fragment is a backend `macro_rules!` call
-                // (e.g. `dispatch!(advance = 0)`) that expands to a
-                // `concat!(...)`-produced `&'static str`. `naked_asm!`
-                // accepts a comma-separated list of such string-typed
-                // expressions as its template — no outer `concat!`
-                // wrapper needed.
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
+                state_pc = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
+                state_pb = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
+                state_regs = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
+                state_fv = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+                state_prefix = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
+                vm_poll = const ::lyng_js_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
+                entry_stride_shift = const 6_u32,
+                entry_observed = const 0_u32,
+                exit = sym ::lyng_js_vm::dsl::entry::_interpreter_exit,
+                #(#shim_bindings)*
             )
         }
     })
+}
+
+/// Walk `tokens` and replace recognized scratch idents (operands +
+/// `t0..t6`) with their assigned scratch register numbers. Other idents
+/// pass through unchanged. Recursively descends into groups so macro
+/// arguments are rewritten too.
+fn substitute_idents(tokens: TokenStream, scratch: &mut ScratchAllocator) -> Result<TokenStream> {
+    let mut out = Vec::new();
+    for tt in tokens {
+        match tt {
+            TokenTree::Ident(id) => {
+                if let Some(reg) = scratch.substitute(&id)? {
+                    out.push(TokenTree::Literal(Literal::u8_unsuffixed(reg)));
+                } else {
+                    out.push(TokenTree::Ident(id));
+                }
+            }
+            TokenTree::Group(g) => {
+                let inner = substitute_idents(g.stream(), scratch)?;
+                out.push(TokenTree::Group(Group::new(g.delimiter(), inner)));
+            }
+            other => out.push(other),
+        }
+    }
+    Ok(out.into_iter().collect())
+}
+
+/// Scan `tokens` for `call_slow!(<shim_name>, args = [...])` invocations
+/// and collect the shim name. The shim name is a bare ident; we treat it
+/// as a linker symbol that must be supplied as `<name> = sym <name>` to
+/// `naked_asm!`.
+fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
+    // Heuristic: walk the stream looking for `call_slow ! ( IDENT , ...)`.
+    let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
+    for i in 0..trees.len() {
+        let TokenTree::Ident(id) = &trees[i] else { continue };
+        if id != "call_slow" {
+            continue;
+        }
+        // Followed by `!`?
+        let Some(TokenTree::Punct(p)) = trees.get(i + 1) else { continue };
+        if p.as_char() != '!' {
+            continue;
+        }
+        // Followed by a delimited group `(...)`.
+        let Some(TokenTree::Group(g)) = trees.get(i + 2) else { continue };
+        if g.delimiter() != Delimiter::Parenthesis {
+            continue;
+        }
+        // Read the first ident inside the group — that's the shim name.
+        let inner: Vec<TokenTree> = g.stream().into_iter().collect();
+        if let Some(TokenTree::Ident(name)) = inner.first() {
+            out.insert(name.to_string());
+        }
+    }
+    // Recurse into groups so call_slow! inside nested macro args is found
+    // too (rare but defensive).
+    for tt in tokens.clone() {
+        if let TokenTree::Group(g) = tt {
+            collect_shim_names(&g.stream(), out);
+        }
+    }
 }
