@@ -10,3 +10,4 @@
 //! `OpXxxArgs` structs live alongside their semantic body.
 
 // Family submodules are added by tasks A8–A18.
+pub(crate) mod loads;

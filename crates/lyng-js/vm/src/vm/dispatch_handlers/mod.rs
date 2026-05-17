@@ -12,7 +12,108 @@
 
 use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 
-use super::dispatch_state::{Handler, DISPATCH_TABLE_LEN};
+use crate::dsl::slow_path::SemanticOutcome;
+
+use super::dispatch_state::{DispatchState, Handler, Step, DISPATCH_TABLE, DISPATCH_TABLE_LEN};
+
+/// Translate a `SemanticOutcome` returned by an `op_xxx_semantic` function
+/// into the `Step` value the α handler returns to the trampoline.
+///
+/// Per design §10 DSL-0a, this is the single point at which a semantic
+/// body's logical outcome is mapped to α-specific dispatch state. The same
+/// `SemanticOutcome` values are mapped to `SlowPathReturn` in DSL-0b via a
+/// sibling helper in `dsl/handlers/cold/`.
+///
+/// The match arms build `Step::Continue` explicitly (rather than going
+/// through the `dispatch_next!` macro) because the macro `return`s; using
+/// it inside `match` arms creates divergent expression types that the
+/// borrow checker has to special-case. The explicit form keeps the helper
+/// uniform across arms and matches the asm-DSL bridge's translation shape.
+pub(crate) fn translate_outcome_to_step(
+    state: &mut DispatchState<'_>,
+    outcome: SemanticOutcome,
+) -> Step {
+    match outcome {
+        SemanticOutcome::Continue { pc_advance } => {
+            state.advance(pc_advance);
+            #[cfg(debug_assertions)]
+            state
+                .vm
+                .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
+            let byte = state.next_opcode_byte();
+            Step::Continue(DISPATCH_TABLE[byte as usize])
+        }
+        SemanticOutcome::Refresh => {
+            if let Err(err) = state.refresh_from_active_frame() {
+                return Step::Error(err);
+            }
+            #[cfg(debug_assertions)]
+            state
+                .vm
+                .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
+            let byte = state.next_opcode_byte();
+            Step::Continue(DISPATCH_TABLE[byte as usize])
+        }
+        SemanticOutcome::ExitDone { value } => Step::Done(value),
+        SemanticOutcome::ExitError { error } => Step::Error(error),
+    }
+}
+
+/// Accumulator-producing variant of `translate_outcome_to_step` for
+/// handlers whose α form used `dispatch_next_with_value!` for V8 Ignition's
+/// Star-fusion peephole. The semantic body writes the produced value to
+/// register 0 before returning `Continue`; this helper reads r0 back and
+/// performs the writer-side Star-fusion check, eliminating one dispatch
+/// per fused Lda+Star pair.
+///
+/// Used by the Lda* family (`op_lda_undefined..one`, `op_lda_smi8`,
+/// `op_lda_const8`, `op_ldar`). Behaviorally equivalent to the prior
+/// `dispatch_next_with_value!(state, value)` tail of those handlers.
+pub(crate) fn translate_outcome_to_step_with_acc_fusion(
+    state: &mut DispatchState<'_>,
+    outcome: SemanticOutcome,
+) -> Step {
+    match outcome {
+        SemanticOutcome::Continue { pc_advance } => {
+            state.advance(pc_advance);
+            let byte = state.next_opcode_byte();
+            if let Some(target) =
+                lyng_js_bytecode::Opcode::accumulator_store_index_for_byte(byte)
+            {
+                let registers = state.frame.registers();
+                let value = state.vm.read_register_unchecked(registers, 0);
+                state.vm.write_register_unchecked(registers, target, value);
+                state.advance(1);
+                #[cfg(debug_assertions)]
+                state.vm.assert_deopt_safepoint_state(
+                    state.agent,
+                    &state.frame,
+                    &state.installed,
+                );
+                let next_byte = state.next_opcode_byte();
+                return Step::Continue(DISPATCH_TABLE[next_byte as usize]);
+            }
+            #[cfg(debug_assertions)]
+            state
+                .vm
+                .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
+            Step::Continue(DISPATCH_TABLE[byte as usize])
+        }
+        SemanticOutcome::Refresh => {
+            if let Err(err) = state.refresh_from_active_frame() {
+                return Step::Error(err);
+            }
+            #[cfg(debug_assertions)]
+            state
+                .vm
+                .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
+            let byte = state.next_opcode_byte();
+            Step::Continue(DISPATCH_TABLE[byte as usize])
+        }
+        SemanticOutcome::ExitDone { value } => Step::Done(value),
+        SemanticOutcome::ExitError { error } => Step::Error(error),
+    }
+}
 
 pub mod arithmetic;
 pub mod calls;
