@@ -9,6 +9,8 @@
 //! transitional `LlIntDispatchState` wrapper in `slow_path`. DSL-0b adds
 //! every other module.
 
+pub mod feedback_flat;
+pub mod llint_state;
 pub mod opcode_manifest;
 pub mod reg_convention;
 pub mod slow_path;

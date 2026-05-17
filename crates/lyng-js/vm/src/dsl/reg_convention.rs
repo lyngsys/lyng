@@ -20,14 +20,19 @@
 //!   PRE:   state.frame_pc_offset <- PC - pb_base
 //!   POST:  if Refresh: PC/REGS/FV reloaded from state.frame_*
 //!
-//! Const offsets below are populated by Task B7 using `offset_of!`.
+//! Const offsets below are derived from [`LlIntState`] via `offset_of!`
+//! and locked in by `tests::ll_int_state_offsets_stable`.
 
-// Placeholders; resolved to concrete values in Task B7.
-pub const LLINT_STATE_FRAME_PC_OFFSET: usize = 0;
-pub const LLINT_STATE_FRAME_PB_BASE: usize = 0;
-pub const LLINT_STATE_FRAME_REGS_BASE: usize = 0;
-pub const LLINT_STATE_FRAME_FV_BASE: usize = 0;
-pub const LLINT_STATE_PREFIX: usize = 0;
+use core::mem::offset_of;
+
+use crate::dsl::llint_state::LlIntState;
+
+pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_offset);
+pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
+pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs_base);
+pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
+pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
+
 // VM_POLL_PENDING_OFFSET / VM_OPCODE_COUNTER_OFFSET / VM_HEAP_POOL_OFFSET
 // stay as placeholders until the `Vm` struct gains explicit fields
 // (Tasks B41, B27, B23). The asm bridge never reads through these in
