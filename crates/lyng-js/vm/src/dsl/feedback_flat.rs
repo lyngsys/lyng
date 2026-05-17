@@ -8,30 +8,30 @@
 //!
 //! Storage placement decision (Task B17):
 //!
-//!   The flat-array storage lives on `Vm` in a sibling `Vec<...>`
-//!   parallel to `Vm::feedback_vectors`, **not** inside the
-//!   `Arc<InstalledFunction>`. Rationale:
+//! The flat-array storage lives on `Vm` in a sibling `Vec<...>`
+//! parallel to `Vm::feedback_vectors`, **not** inside the
+//! `Arc<InstalledFunction>`. Rationale:
 //!
-//!     1. `InstalledFunction` is wrapped in `Arc` (shared, immutable
-//!        through normal references). Mutating a `Box<[FeedbackEntry]>`
-//!        inside an `Arc<InstalledFunction>` would require either
-//!        `Arc<RwLock<...>>` (heavyweight) or `UnsafeCell<...>` with
-//!        documented single-threaded invariants. The sibling-map
-//!        approach reuses the exact same indexing scheme as the legacy
-//!        `feedback_vectors` (keyed by `code_index(code)`) and the
-//!        dual-write paths only need `&mut Vm`.
-//!     2. Eager allocation at install matches the existing
-//!        `feedback_vectors` resize logic — there is exactly one slot
-//!        per `code_index(code)`, allocated to
-//!        `function.feedback_slot_count()` entries at install time and
-//!        never grown thereafter.
-//!     3. The asm `FV` pin reads through a `*const FeedbackEntry`
-//!        (cast to `*mut`) for the trampoline; the sibling-map slot is
-//!        pointer-stable for the lifetime of the `InstalledFunction`
-//!        because `Box<[T]>` owns a heap allocation that is never
-//!        reallocated (the outer `Vec<Box<[FeedbackEntry]>>` may
-//!        reallocate, but that only moves the `Box` smart pointer, not
-//!        the heap buffer it owns).
+//! - `InstalledFunction` is wrapped in `Arc` (shared, immutable
+//!   through normal references). Mutating a `Box<[FeedbackEntry]>`
+//!   inside an `Arc<InstalledFunction>` would require either
+//!   `Arc<RwLock<...>>` (heavyweight) or `UnsafeCell<...>` with
+//!   documented single-threaded invariants. The sibling-map
+//!   approach reuses the exact same indexing scheme as the legacy
+//!   `feedback_vectors` (keyed by `code_index(code)`) and the
+//!   dual-write paths only need `&mut Vm`.
+//! - Eager allocation at install matches the existing
+//!   `feedback_vectors` resize logic — there is exactly one slot
+//!   per `code_index(code)`, allocated to
+//!   `function.feedback_slot_count()` entries at install time and
+//!   never grown thereafter.
+//! - The asm `FV` pin reads through a `*const FeedbackEntry`
+//!   (cast to `*mut`) for the trampoline; the sibling-map slot is
+//!   pointer-stable for the lifetime of the `InstalledFunction`
+//!   because `Box<[T]>` owns a heap allocation that is never
+//!   reallocated (the outer `Vec<Box<[FeedbackEntry]>>` may
+//!   reallocate, but that only moves the `Box` smart pointer, not
+//!   the heap buffer it owns).
 //!
 //! Per-entry layout: `state: Option<FeedbackSiteState>` mirrors the
 //! legacy `Vec<Option<FeedbackSiteState>>` element type exactly — an
