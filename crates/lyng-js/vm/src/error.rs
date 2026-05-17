@@ -101,4 +101,10 @@ pub enum VmError {
         instruction_offset: u32,
         value: Value,
     },
+    /// The asm-DSL trampoline returned without any cold-stub having set
+    /// `LlIntRustContext.exit`. Surfaced by `Vm::run_via_dsl` when
+    /// `LlIntExitSlot.kind == ExitKind::None` after the trampoline call
+    /// — only reachable if the handler chain ran to fall-through (a bug
+    /// in the DSL backend, not the bytecode).
+    TrampolineExitedWithoutSetting,
 }

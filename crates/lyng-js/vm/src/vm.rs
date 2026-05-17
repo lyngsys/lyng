@@ -1591,4 +1591,20 @@ impl Vm {
             }
         }
     }
+
+    /// Thin wrapper that delegates to the DSL entry shim in
+    /// `crate::dsl::entry::run_via_dsl`. Not wired into `Vm::run` yet —
+    /// `Vm::run` continues to route through `run_via_trampoline`. Task
+    /// C1 flips the switch.
+    #[allow(dead_code)]
+    pub(crate) fn run_via_dsl(
+        &mut self,
+        agent: &mut Agent,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+        installed: Arc<InstalledFunction>,
+        frame: FrameRecord,
+    ) -> VmResult<Value> {
+        crate::dsl::entry::run_via_dsl(self, agent, host, registry, installed, frame)
+    }
 }

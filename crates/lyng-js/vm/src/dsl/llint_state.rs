@@ -48,6 +48,11 @@ pub struct LlIntState {
 ///
 /// The lifetime `'vm` is the borrow on `Vm`/`Agent`/`HostHooks`/`Registry`
 /// taken by `run_via_dsl` for the duration of one trampoline invocation.
+//
+// Most fields are read by the slow-path bridge / semantic bodies in
+// later DSL-0b batches; the dead_code allow keeps the warning quiet
+// until those wires land.
+#[allow(dead_code)]
 pub struct LlIntRustContext<'vm> {
     pub(crate) vm: &'vm mut crate::vm::Vm,
     pub(crate) agent: &'vm mut Agent,

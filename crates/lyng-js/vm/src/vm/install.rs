@@ -53,6 +53,15 @@ impl InstalledFunction {
         }
     }
 
+    /// Crate-level accessor for the underlying `BytecodeFunction`.
+    /// Used by the DSL substrate (`crate::dsl::*`) to derive the
+    /// trampoline's `frame_pb_base` pointer and to expose feedback /
+    /// constant tables to semantic bodies.
+    #[inline]
+    pub(crate) fn function(&self) -> &BytecodeFunction {
+        &self.function
+    }
+
     #[inline]
     pub(super) fn instruction_at(&self, instruction_offset: u32) -> Option<Instruction> {
         decode_instruction_bytes(
