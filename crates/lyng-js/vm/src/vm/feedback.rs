@@ -2080,10 +2080,45 @@ impl Vm {
         slot: FeedbackSlotId,
         f: impl FnOnce(&mut FeedbackSiteState) -> R,
     ) -> Option<R> {
-        self.feedback_vectors
+        let result = self
+            .feedback_vectors
             .get_mut(code_index(code))?
             .site_mut(slot)
-            .map(f)
+            .map(f);
+        // DSL-0b (B17): dual-write — after every legacy mutation,
+        // mirror the slot into the flat-array storage so the asm
+        // `FV` pin sees identical IC state. The mirror is a single
+        // clone of the Option<FeedbackSiteState> and runs only when
+        // the legacy write actually happened (Some(R) path).
+        if result.is_some() {
+            self.mirror_flat_slot(code, slot);
+        }
+        result
+    }
+
+    /// DSL-0b (B17): mirror a single feedback slot from the legacy
+    /// `Vec<Option<FeedbackSiteState>>` into the flat
+    /// `Box<[FeedbackEntry]>` so the asm `FV` pin observes identical
+    /// IC state during DSL-0b's dual-storage period. Called after
+    /// every legacy write site. DSL-0c removes the legacy vector and
+    /// this mirror once readers migrate.
+    #[inline]
+    fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        let index = code_index(code);
+        let legacy_state = self
+            .feedback_vectors
+            .get(index)
+            .and_then(|vector| vector.site(slot))
+            .cloned();
+        let Some(flat) = self.feedback_flat_storage.get_mut(index) else {
+            return;
+        };
+        let Ok(slot_idx) = usize::try_from(slot.get().saturating_sub(1)) else {
+            return;
+        };
+        if let Some(entry) = flat.get_mut(slot_idx) {
+            entry.state = legacy_state;
+        }
     }
 
     fn ensure_feedback_slot_execution(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
@@ -2113,8 +2148,13 @@ impl Vm {
             }
         }
 
+        let mut mirrored = false;
         if let Some(site) = self.feedback_vectors[index].site_mut(slot) {
             site.record_execution();
+            mirrored = true;
+        }
+        if mirrored {
+            self.mirror_flat_slot(code, slot);
         }
         self.observe_tier_feedback_event(code);
         true
@@ -2132,6 +2172,7 @@ impl Vm {
             return false;
         };
         site.record_execution();
+        self.mirror_flat_slot(code, slot);
         self.observe_tier_feedback_event(code);
         true
     }
@@ -2164,6 +2205,8 @@ impl Vm {
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_call_target(agent, callee);
+            // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
+            self.mirror_flat_slot(code, slot);
             self.observe_tier_feedback_event(code);
             return;
         }
@@ -2210,6 +2253,8 @@ impl Vm {
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_construct_target(agent, constructor, created);
+            // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
+            self.mirror_flat_slot(code, slot);
             self.observe_tier_feedback_event(code);
             return;
         }
@@ -2284,10 +2329,15 @@ impl Vm {
     /// so the inline fast path stays semantically identical.
     #[inline(always)]
     pub(super) fn record_named_property_fast_hit(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        let mut wrote = false;
         if let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) {
             if let Some(site) = vector.site_mut(slot) {
                 site.record_execution();
+                wrote = true;
             }
+        }
+        if wrote {
+            self.mirror_flat_slot(code, slot);
         }
         self.observe_tier_feedback_event(code);
     }
@@ -2577,6 +2627,9 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
+        // DSL-0b (B17) dual-write — borrow on `site` is dropped after
+        // `record_execution()` so `mirror_flat_slot` can re-borrow.
+        self.mirror_flat_slot(code, slot);
         self.observe_tier_feedback_event(code);
         Some(value)
     }
@@ -2602,6 +2655,8 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
+        // DSL-0b (B17) dual-write — see paired load helper.
+        self.mirror_flat_slot(code, slot);
         self.observe_tier_feedback_event(code);
         Some(stored)
     }
@@ -2754,6 +2809,75 @@ impl Vm {
         self.feedback_vectors
             .get(code_index(code))
             .map(FeedbackVector::warmup_counter)
+    }
+
+    /// DSL-0b (B17 invariant): assert per-slot structural equality
+    /// between the legacy `Vec<Option<FeedbackSiteState>>` and the flat
+    /// `Box<[FeedbackEntry]>`. Returns `Ok(())` on full match, or
+    /// `Err((slot_index, diff_string))` describing the first divergence.
+    ///
+    /// This is the only externally-visible probe of the dual-storage
+    /// invariant during DSL-0b — it returns a `String` diff rather
+    /// than exposing the `pub(crate)` `FeedbackSiteState` enum.
+    /// Removed in DSL-0c when the legacy vector is retired.
+    #[doc(hidden)]
+    pub fn feedback_flat_matches_legacy(
+        &self,
+        code: CodeRef,
+    ) -> Result<(), (usize, String)> {
+        let index = code_index(code);
+        let legacy_sites: &[Option<FeedbackSiteState>] = self
+            .feedback_vectors
+            .get(index)
+            .map(|vector| vector.sites.as_slice())
+            .unwrap_or(&[]);
+        let empty_flat: &[crate::dsl::feedback_flat::FeedbackEntry] = &[];
+        let flat: &[crate::dsl::feedback_flat::FeedbackEntry] = self
+            .feedback_flat_storage
+            .get(index)
+            .map(std::ops::Deref::deref)
+            .unwrap_or(empty_flat);
+        // Both storages may differ in length only when the legacy
+        // vector is still unallocated (sites.len() == 0) and the flat
+        // array carries its install-time capacity. In that case every
+        // flat entry must have `state == None`.
+        if legacy_sites.is_empty() {
+            for (i, entry) in flat.iter().enumerate() {
+                if entry.state.is_some() {
+                    return Err((
+                        i,
+                        format!(
+                            "flat slot {i} populated while legacy vector is unallocated: {:?}",
+                            entry.state
+                        ),
+                    ));
+                }
+            }
+            return Ok(());
+        }
+        // Once allocated, lengths must match.
+        if legacy_sites.len() != flat.len() {
+            return Err((
+                0,
+                format!(
+                    "length mismatch: legacy={} flat={}",
+                    legacy_sites.len(),
+                    flat.len()
+                ),
+            ));
+        }
+        for (i, (legacy, flat_entry)) in legacy_sites.iter().zip(flat.iter()).enumerate() {
+            if legacy != &flat_entry.state {
+                return Err((
+                    i,
+                    format!(
+                        "slot {i} diverges: legacy={:?} flat={:?}",
+                        legacy, flat_entry.state
+                    ),
+                ));
+            }
+        }
+        Ok(())
     }
 
     #[cfg(test)]
