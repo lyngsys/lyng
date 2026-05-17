@@ -40,6 +40,21 @@
 //! at warmup. Dual-write at every legacy record site keeps the two
 //! storages bit-identical during DSL-0b; DSL-0c removes the legacy
 //! vector after every reader migrates to the flat array.
+//!
+//! **Phase 3f sidecar parity (B18):** the design §9 invariant says
+//! "the flattening is about vector storage, not entry content —
+//! Phase 3f's packed sidecars stay inside each entry". This holds by
+//! construction because the per-entry payload is the *same*
+//! `FeedbackSiteState`. All Phase 3f sidecars
+//! (`monomorphic_fast`, `monomorphic_fast_dependency_epoch`,
+//! `monomorphic_proto_fast`, `monomorphic_proto_fast_*_epoch`,
+//! `polymorphic_fast`, `polymorphic_fast_dependency_epochs`, and the
+//! keyed-property equivalents) are inline fields of
+//! `NamedPropertyFeedback` / `KeyedPropertyFeedback` — variants of
+//! `FeedbackSiteState`. `#[derive(Clone)]` on those structs carries
+//! every sidecar through `mirror_flat_slot`; no per-sidecar
+//! plumbing is needed. The polymorphic-property test in
+//! `tests/feedback_flat_consistency.rs` exercises this end-to-end.
 
 pub(crate) use crate::vm::FeedbackSiteState;
 
