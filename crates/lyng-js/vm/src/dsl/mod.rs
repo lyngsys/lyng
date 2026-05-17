@@ -10,3 +10,4 @@
 //! every other module.
 
 pub mod opcode_manifest;
+pub mod slow_path;
