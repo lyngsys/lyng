@@ -10,4 +10,5 @@
 //! every other module.
 
 pub mod opcode_manifest;
+pub mod reg_convention;
 pub mod slow_path;
