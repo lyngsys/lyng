@@ -179,29 +179,41 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             }
             SemanticOutcome::Refresh => {
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-                    // After a frame switch (call / return / cross-frame
-                    // catch), the active frame may have changed. Detect
-                    // by comparing vm.frames().len() to the cached
-                    // frame_depth — if different, pull the new active
-                    // frame from `vm.frames().last()`. Otherwise the
-                    // semantic body did an in-frame advance and
-                    // `rust.dispatch.frame` is the authoritative state.
+                    // Always pull the active frame from `vm.frames().last()`
+                    // — mirrors α's `refresh_from_active_frame()`. This
+                    // covers all three Refresh callers uniformly:
+                    //   - call/return: frame stack depth changed, the new
+                    //     top frame is the callee/caller.
+                    //   - cross-frame catch: depth decreased, top frame
+                    //     was rewritten to the handler PC.
+                    //   - same-frame catch: depth unchanged, but
+                    //     `transfer_to_exception_handler` rewrote
+                    //     `vm.frames.last_mut().instruction_offset` to the
+                    //     handler target. `rust.dispatch.frame` is a
+                    //     `Copy` snapshot of the pre-throw frame and is
+                    //     stale; only `vm.frames().last()` has the
+                    //     authoritative post-catch PC.
                     let current_depth = rust.dispatch.vm.frames().len();
-                    let frame_switched = current_depth != rust.dispatch.frame_depth;
-                    if frame_switched {
-                        if let Some(active) = rust.dispatch.vm.frames().last().copied() {
-                            rust.dispatch.frame = active;
-                        }
-                        rust.dispatch.frame_depth = current_depth;
-                        // Different InstalledFunction: refresh
-                        // `installed`, `pb_base`, `fv_base`.
-                        let installed = rust
-                            .dispatch
-                            .vm
-                            .installed_for_dsl_runtime(rust.dispatch.frame.code())
-                            .unwrap_or_else(|| rust.dispatch.installed.clone());
-                        rust.dispatch.installed = installed;
+                    if let Some(active) = rust.dispatch.vm.frames().last().copied() {
+                        rust.dispatch.frame = active;
                     }
+                    rust.dispatch.frame_depth = current_depth;
+                    // Refresh `installed` unconditionally as well — even
+                    // for same-frame catch the code identity is the same,
+                    // but `installed_for_dsl_runtime` is a cheap lookup
+                    // and matches α's `refresh_from_active_frame()`
+                    // unconditional reinstall.
+                    let installed = rust
+                        .dispatch
+                        .vm
+                        .installed_for_dsl_runtime(rust.dispatch.frame.code())
+                        .unwrap_or_else(|| rust.dispatch.installed.clone());
+                    rust.dispatch.installed = installed;
+                    // Sync the frame-check epoch — α does this in
+                    // `refresh_from_active_frame`. Keeps the DSL Refresh
+                    // path observationally identical to α.
+                    rust.dispatch.frame_check_epoch =
+                        rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
                     let active_frame = rust.dispatch.frame;
                     let regs_base_ptr = {
                         let base = active_frame.registers().base() as usize;
