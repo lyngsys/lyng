@@ -1,29 +1,52 @@
-//! Opcode-counter increment, gated by `--features opcode-counters`.
+//! Opcode-counter increments, gated by `--features opcode-counters`.
 //!
-//! When the feature is off, the macro expands to an empty string —
-//! zero per-dispatch cost. When on, emits 4 instructions to bump the
-//! per-opcode counter slot in the VM's `opcode_counters` array:
+//! When the feature is off, the macros expand to empty strings — zero
+//! per-dispatch cost. When on, each emits 4 instructions to bump the
+//! per-opcode counter slot in the relevant `DispatchCounters` bank.
+//!
+//! ## How the asm path reaches the counter array
+//!
+//! `OpcodeDispatchCounterStore { counters: Box<DispatchCounters> }` has
+//! a single `Box<T>` field. `Box<T>` is layout-equivalent to a raw
+//! pointer (8 bytes on 64-bit), so:
+//!
+//! - `offset_of!(Vm, dispatch_counters)` = offset to the Box (which IS
+//!   the `*mut DispatchCounters` pointer).
+//! - `ldr xR, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` directly reads
+//!   the pointer to `DispatchCounters`.
+//!
+//! From there, bank offsets (0, 2048, 4096) index into the three
+//! `[u64; 256]` banks. All bank offsets are 8-byte-aligned and within
+//! the AArch64 LDR/STR `#imm` range.
+//!
+//! Emitted shape (4 instructions per increment):
 //!
 //! ```text
-//!     ldr  x9, [x22, {vm_counter_base}]
-//!     ldr  x10, [x9, #<op*8>]
+//!     ldr  x9, [x22, {vm_counter_base}]              ; x9 = *DispatchCounters
+//!     ldr  x10, [x9, #<bank_offset + op*8>]          ; x10 = current count
 //!     add  x10, x10, #1
-//!     str  x10, [x9, #<op*8>]
+//!     str  x10, [x9, #<bank_offset + op*8>]          ; store back
 //! ```
 //!
-//! Bindings expected (only when feature is on):
+//! ## Bindings expected from the proc-macro lowerer (when feature is on)
 //!
-//! - `{vm_counter_base}` — `const VM_OPCODE_COUNTER_OFFSET` (placeholder
-//!   until the `Vm` struct gains the field).
+//! - `{vm_counter_base}` — `const VM_DISPATCH_COUNTERS_PTR_OFFSET`.
 //!
-//! `$opcode_byte` is the opcode discriminator (`u8`) baked at lower
-//! time. We materialize `opcode_byte * 8` as a literal so the offset
-//! is encodable as an immediate for narrow indices and the compiler
-//! synthesizes the appropriate addressing mode for wider ones.
+//! ## Bank-offset encoding
+//!
+//! - Dispatch bank: literal `<op>*8`. For op < 256, max offset = 2040 (≤ 32760 scaled-immediate range).
+//! - Slow_semantic bank: literal `<op>*8 + 2048`. Max = 4088.
+//! - Slow_safepoint bank: literal `<op>*8 + 4096`. Max = 6136.
+//!
+//! All within AArch64's `LDR Xt, [Xn, #imm]` scaled-u64 immediate range (#0..#32760).
+
+// =============================================================================
+// Opcode-counters feature ON: emit real counter increments.
+// =============================================================================
 
 #[cfg(feature = "opcode-counters")]
 #[macro_export]
-macro_rules! inc_counter {
+macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => {
         concat!(
             "ldr    x9, [x22, {vm_counter_base}]\n",
@@ -34,8 +57,50 @@ macro_rules! inc_counter {
     };
 }
 
+#[cfg(feature = "opcode-counters")]
+#[macro_export]
+macro_rules! inc_slow_semantic_counter {
+    ($opcode_byte:literal) => {
+        concat!(
+            "ldr    x9, [x22, {vm_counter_base}]\n",
+            "ldr    x10, [x9, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+            "add    x10, x10, #1\n",
+            "str    x10, [x9, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+        )
+    };
+}
+
+#[cfg(feature = "opcode-counters")]
+#[macro_export]
+macro_rules! inc_slow_safepoint_counter {
+    ($opcode_byte:literal) => {
+        concat!(
+            "ldr    x9, [x22, {vm_counter_base}]\n",
+            "ldr    x10, [x9, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+            "add    x10, x10, #1\n",
+            "str    x10, [x9, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+        )
+    };
+}
+
+// =============================================================================
+// Opcode-counters feature OFF: empty strings (zero per-dispatch cost).
+// =============================================================================
+
 #[cfg(not(feature = "opcode-counters"))]
 #[macro_export]
-macro_rules! inc_counter {
+macro_rules! inc_dispatch_counter {
+    ($opcode_byte:literal) => { "" };
+}
+
+#[cfg(not(feature = "opcode-counters"))]
+#[macro_export]
+macro_rules! inc_slow_semantic_counter {
+    ($opcode_byte:literal) => { "" };
+}
+
+#[cfg(not(feature = "opcode-counters"))]
+#[macro_export]
+macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => { "" };
 }
