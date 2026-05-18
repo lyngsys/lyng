@@ -229,3 +229,23 @@ macro_rules! tag_bool_const {
         )
     };
 }
+
+/// Tag a compile-time SMI literal payload into `$reg`. Produces a fully
+/// tagged `Value` carrying the SMI variant + the literal payload. The
+/// SMI tag kind is `0x4`; the payload occupies the low 32 bits, the kind
+/// 16 bits, and the NaN-tag header bits 48-63. 3 instructions: movz
+/// payload, movk kind, movk header.
+///
+/// Used by `op_load_zero` (payload = 0), `op_load_one` (payload = 1),
+/// and similar SMI constant-loader opcodes. Distinct from `tag_smi!`,
+/// which assumes the payload is already in the register's low word.
+#[macro_export]
+macro_rules! tag_smi_const {
+    ($reg:tt, $payload:literal) => {
+        concat!(
+            "movz   x", stringify!($reg), ", #", stringify!($payload), "\n",
+            "movk   x", stringify!($reg), ", #0x4, lsl #32\n",
+            "movk   x", stringify!($reg), ", #0x7ff8, lsl #48\n",
+        )
+    };
+}

@@ -119,6 +119,7 @@ Per
 | `tag_undefined!`      | Materialize `0x7ff8_0001_0000_0000`                 | mov + movk                   |
 | `tag_null!`           | Materialize `0x7ff8_0002_0000_0000`                 | mov + movk                   |
 | `tag_bool_const!`     | Materialize a constant true/false bit pattern       | mov + movk + movk            |
+| `tag_smi_const!`      | Materialize a tagged SMI carrying a literal payload | mov + movk + movk            |
 
 ## Object-record access (two-load indirection)
 
