@@ -27,7 +27,7 @@ use lyng_js_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_move, layout = Ab, length = 3, |dst, src| {
+    op_move, layout = Ab, length = 4, |dst, src| {
         load_reg!(src => t0);
         store_reg!(dst, t0);
         dispatch!();
