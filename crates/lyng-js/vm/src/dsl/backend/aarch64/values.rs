@@ -249,3 +249,31 @@ macro_rules! tag_smi_const {
         )
     };
 }
+
+/// Tag a signed-byte payload (already in `$reg` as the low byte of a
+/// w-register, zero-extended by the decode prologue's `ldrb`) into a
+/// tagged SMI Value in `$reg`. Sign-extends w-byte → w-word with `sxtb`,
+/// zero-extends w-word → x-word with `uxtw` (clears bits 32-63 so the
+/// subsequent OR composes cleanly), materializes the SMI tag pattern
+/// (kind=0x4, header=0x7ff8) in scratch `x16`, then OR-s the tag into
+/// `$reg`.
+///
+/// 5 instructions: sxtb + uxtw + movz + movk + orr. Used by
+/// `op_load_smi8` (i8 payload) and similar narrow-SMI loaders that
+/// need sign-extension before tagging.
+///
+/// Distinct from `tag_smi!` (assumes payload is already an i32 in
+/// `$reg`'s low word — no sign-extension) and `tag_smi_const!` (folds
+/// a compile-time literal payload into the materialized constant).
+#[macro_export]
+macro_rules! tag_smi_from_signed_byte {
+    ($reg:tt) => {
+        concat!(
+            "sxtb   w", stringify!($reg), ", w", stringify!($reg), "\n",
+            "uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
+            "movz   x16, #0x4, lsl #32\n",
+            "movk   x16, #0x7ff8, lsl #48\n",
+            "orr    x", stringify!($reg), ", x16, x", stringify!($reg), "\n",
+        )
+    };
+}

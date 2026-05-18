@@ -18,7 +18,7 @@
 use crate::{
     call_slow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
     decode_ax, dispatch, dispatch_after_slow, store_reg, tag_bool_const, tag_null,
-    tag_smi_const, tag_undefined,
+    tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -4157,34 +4157,22 @@ pub extern "C" fn op_star_7_slow_rs(
 }
 
 // =====================================================================
-// LoadSmi8
+// LoadSmi8 — inline DSL fast path (DSL-1 Phase 1.A, Task 7).
+//
+// Top-30 dispatch share: #7 — highest-volume opcode in Phase 1.A. The
+// `b` operand carries a signed i8 payload; the decode prologue's `ldrb`
+// zero-extends it, then tag_smi_from_signed_byte! sign-extends and tags.
+// Reuses the `b` register as the destination of the tag (saves a move).
+// Layout = Ab, length = 3.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_smi8_dsl, layout = Ab, length = 3, |a, b| {
-        call_slow!(op_load_smi8_slow_rs, args = [a, b]);
-        dispatch_after_slow!();
+        tag_smi_from_signed_byte!(b);
+        store_reg!(a, b);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_smi8_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    b: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadSmi8Args {
-        a: a as u16,
-        bx: b,
-        instruction_len: 3u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_smi8_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================

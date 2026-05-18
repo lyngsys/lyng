@@ -120,6 +120,7 @@ Per
 | `tag_null!`           | Materialize `0x7ff8_0002_0000_0000`                 | mov + movk                   |
 | `tag_bool_const!`     | Materialize a constant true/false bit pattern       | mov + movk + movk            |
 | `tag_smi_const!`      | Materialize a tagged SMI carrying a literal payload | mov + movk + movk            |
+| `tag_smi_from_signed_byte!` | Sign-extend an i8 (low byte of `$reg`, zero-extended by `ldrb`) to i32, then tag as SMI. Used by `op_load_smi8`. Distinct from `tag_smi!` (in-register i32 payload) and `tag_smi_const!` (compile-time literal payload). | sxtb + uxtw + movz + movk + orr (5 instr) |
 
 ## Object-record access (two-load indirection)
 
