@@ -254,33 +254,20 @@ llint_handler! {
 }
 
 // =====================================================================
-// LoadOne
+// LoadOne — inline DSL fast path (DSL-1 Phase 1.A, Task 6).
+//
+// Writes Value::from_smi(1) to register `a`. Mirror of Task 5
+// (op_load_zero) with payload = 1 instead of 0. Reuses tag_smi_const!
+// macro added in Task 5.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_one_dsl, layout = Abx, length = 4, |a, bx| {
-        call_slow!(op_load_one_slow_rs, args = [a, bx]);
-        dispatch_after_slow!();
+    op_load_one_dsl, layout = Abx, length = 4, |a, _bx| {
+        tag_smi_const!(t0, 1);
+        store_reg!(a, t0);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_one_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
-        a: a as u16,
-        instruction_len: 4u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_one_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
