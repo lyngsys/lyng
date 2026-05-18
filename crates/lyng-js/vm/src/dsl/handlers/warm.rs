@@ -300,7 +300,19 @@ fn op_prefix_via_alpha(
                     // opcode. Invoke it — it decodes wide-form
                     // operands, executes, advances PC.
                     match semantic_handler(dstate) {
-                        Step::Continue(_) => SemanticOutcome::Refresh,
+                        Step::Continue(_) => {
+                            // The α semantic handler advanced
+                            // `dstate.frame.instruction_offset`. Sync
+                            // it back to `vm.frames.last_mut()` so
+                            // the subsequent `Refresh` arm reloads
+                            // the updated PC (instead of resetting
+                            // to the pre-prefix PC stored on the
+                            // canonical frame at the last sync —
+                            // typically the call-entry PC for the
+                            // active frame).
+                            dstate.sync_active_frame();
+                            SemanticOutcome::Refresh
+                        }
                         Step::Done(value) => SemanticOutcome::ExitDone { value },
                         Step::Error(error) => SemanticOutcome::ExitError { error },
                     }

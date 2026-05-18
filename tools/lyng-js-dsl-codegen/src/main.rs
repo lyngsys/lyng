@@ -1864,19 +1864,28 @@ const COLD_STUBS: &[Stub] = &[
         args: "OpCallRangeArgs",
         layout: Layout::Abc,
         length: 10,
-        // CallRange + spread_mask + feedback_slot are stubbed — the asm
-        // trampoline can't reach Call/Construct/TailCall in DSL-0b. The
-        // shim never runs at runtime; it just needs to link.
+        // Bytecode layout (10 bytes): [op][a][b][c][count_lo][count_hi]
+        // [base_lo][base_hi][slot_lo][slot_hi]. The asm prologue can
+        // only forward three u32 operands (a/b/c), so the shim re-reads
+        // CallRange (bytes 4..8) and feedback slot (bytes 8..10) from
+        // PC — mirroring α's `decode_call_range_operands` path. The
+        // shim is the live cold path post-DSL-0c.
         fields: &[
             f("a", "a as u16"),
             f("b", "b as u16"),
             f("c", "c as u16"),
             f(
                 "range",
-                "lyng_js_bytecode::CallRange::new(0, 0)",
+                "Self::call_range_from_pc(state, 4)",
             ),
-            f("spread_mask", "None"),
-            f("feedback_slot", "None"),
+            f(
+                "feedback_slot",
+                "Self::feedback_slot_from_pc(state, 8)",
+            ),
+            f(
+                "spread_mask",
+                "Self::spread_mask_from_pc(state, 8)",
+            ),
             f("instruction_len", "10u32"),
         ],
     },
@@ -1893,10 +1902,16 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "range",
-                "lyng_js_bytecode::CallRange::new(0, 0)",
+                "Self::call_range_from_pc(state, 4)",
             ),
-            f("spread_mask", "None"),
-            f("feedback_slot", "None"),
+            f(
+                "feedback_slot",
+                "Self::feedback_slot_from_pc(state, 8)",
+            ),
+            f(
+                "spread_mask",
+                "Self::spread_mask_from_pc(state, 8)",
+            ),
             f("instruction_len", "10u32"),
         ],
     },
@@ -1912,10 +1927,16 @@ const COLD_STUBS: &[Stub] = &[
             f("b", "b as u16"),
             f(
                 "range",
-                "lyng_js_bytecode::CallRange::new(0, 0)",
+                "Self::call_range_from_pc(state, 4)",
             ),
-            f("spread_mask", "None"),
-            f("feedback_slot", "None"),
+            f(
+                "feedback_slot",
+                "Self::feedback_slot_from_pc(state, 8)",
+            ),
+            f(
+                "spread_mask",
+                "Self::spread_mask_from_pc(state, 8)",
+            ),
         ],
     },
     Stub {
@@ -2298,6 +2319,57 @@ fn write_header(out: &mut String) {
     out.push_str("        let hi = bytes.get((pc + offset + 1) as usize).copied()? as u32;\n");
     out.push_str("        let raw = lo | (hi << 8);\n");
     out.push_str("        lyng_js_types::FeedbackSlotId::from_raw(raw)\n");
+    out.push_str("    }\n");
+    out.push('\n');
+    out.push_str("    /// Read the inline `CallRange` (4 bytes — count, base) from the\n");
+    out.push_str("    /// current instruction at `[PC + offset]`. Used by the variable-arity\n");
+    out.push_str("    /// `Call` / `TailCall` / `Construct` cold shims to mirror the α\n");
+    out.push_str("    /// handler's `decode_call_range_operands` path. Layout per\n");
+    out.push_str("    /// `decode_call_range_operands`: bytes 4,5 = count_lo/hi; bytes 6,7 =\n");
+    out.push_str("    /// base_lo/hi. The slot operand follows at bytes 8,9.\n");
+    out.push_str("    #[inline]\n");
+    out.push_str("    fn call_range_from_pc(\n");
+    out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
+    out.push_str("        offset: u32,\n");
+    out.push_str("    ) -> lyng_js_bytecode::CallRange {\n");
+    out.push_str("        let inner = state.dispatch_state();\n");
+    out.push_str("        let pc = inner.frame.instruction_offset();\n");
+    out.push_str("        let bytes = inner.installed.function().instruction_bytes();\n");
+    out.push_str("        let count_lo = bytes.get((pc + offset) as usize).copied().unwrap_or(0);\n");
+    out.push_str("        let count_hi = bytes.get((pc + offset + 1) as usize).copied().unwrap_or(0);\n");
+    out.push_str("        let base_lo = bytes.get((pc + offset + 2) as usize).copied().unwrap_or(0);\n");
+    out.push_str("        let base_hi = bytes.get((pc + offset + 3) as usize).copied().unwrap_or(0);\n");
+    out.push_str("        let count = u16::from_le_bytes([count_lo, count_hi]);\n");
+    out.push_str("        let base = u16::from_le_bytes([base_lo, base_hi]);\n");
+    out.push_str("        lyng_js_bytecode::CallRange::new(base, count)\n");
+    out.push_str("    }\n");
+    out.push('\n');
+    out.push_str("    /// Look up the `spread_mask` metadata for an optional feedback slot.\n");
+    out.push_str("    /// Mirrors `calls::spread_mask_for_semantic` in the α path: returns\n");
+    out.push_str("    /// `None` when there's no slot or no spread metadata.\n");
+    out.push_str("    #[inline]\n");
+    out.push_str("    fn spread_mask_for(\n");
+    out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
+    out.push_str("        feedback_slot: Option<lyng_js_types::FeedbackSlotId>,\n");
+    out.push_str("    ) -> Option<u64> {\n");
+    out.push_str("        let slot = feedback_slot?;\n");
+    out.push_str("        let inner = state.dispatch_state();\n");
+    out.push_str("        let descriptor = inner.installed.feedback_descriptor_for_slot(slot)?;\n");
+    out.push_str("        descriptor.metadata().spread_mask()\n");
+    out.push_str("    }\n");
+    out.push('\n');
+    out.push_str("    /// Convenience: look up `spread_mask` directly from the feedback\n");
+    out.push_str("    /// slot at `[PC + offset]`. Combines `feedback_slot_from_pc` with\n");
+    out.push_str("    /// `spread_mask_for` so the cold shim can express the lookup as a\n");
+    out.push_str("    /// single field expression in the args struct literal (without\n");
+    out.push_str("    /// needing a let-binding for the intermediate slot).\n");
+    out.push_str("    #[inline]\n");
+    out.push_str("    fn spread_mask_from_pc(\n");
+    out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
+    out.push_str("        offset: u32,\n");
+    out.push_str("    ) -> Option<u64> {\n");
+    out.push_str("        let feedback_slot = Self::feedback_slot_from_pc(state, offset);\n");
+    out.push_str("        Self::spread_mask_for(state, feedback_slot)\n");
     out.push_str("    }\n");
     out.push_str("}\n");
     out.push('\n');

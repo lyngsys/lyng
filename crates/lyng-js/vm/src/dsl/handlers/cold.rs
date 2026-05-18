@@ -56,6 +56,57 @@ impl ColdShimHelpers {
         let raw = lo | (hi << 8);
         lyng_js_types::FeedbackSlotId::from_raw(raw)
     }
+
+    /// Read the inline `CallRange` (4 bytes — count, base) from the
+    /// current instruction at `[PC + offset]`. Used by the variable-arity
+    /// `Call` / `TailCall` / `Construct` cold shims to mirror the α
+    /// handler's `decode_call_range_operands` path. Layout per
+    /// `decode_call_range_operands`: bytes 4,5 = count_lo/hi; bytes 6,7 =
+    /// base_lo/hi. The slot operand follows at bytes 8,9.
+    #[inline]
+    fn call_range_from_pc(
+        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+        offset: u32,
+    ) -> lyng_js_bytecode::CallRange {
+        let inner = state.dispatch_state();
+        let pc = inner.frame.instruction_offset();
+        let bytes = inner.installed.function().instruction_bytes();
+        let count_lo = bytes.get((pc + offset) as usize).copied().unwrap_or(0);
+        let count_hi = bytes.get((pc + offset + 1) as usize).copied().unwrap_or(0);
+        let base_lo = bytes.get((pc + offset + 2) as usize).copied().unwrap_or(0);
+        let base_hi = bytes.get((pc + offset + 3) as usize).copied().unwrap_or(0);
+        let count = u16::from_le_bytes([count_lo, count_hi]);
+        let base = u16::from_le_bytes([base_lo, base_hi]);
+        lyng_js_bytecode::CallRange::new(base, count)
+    }
+
+    /// Look up the `spread_mask` metadata for an optional feedback slot.
+    /// Mirrors `calls::spread_mask_for_semantic` in the α path: returns
+    /// `None` when there's no slot or no spread metadata.
+    #[inline]
+    fn spread_mask_for(
+        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+        feedback_slot: Option<lyng_js_types::FeedbackSlotId>,
+    ) -> Option<u64> {
+        let slot = feedback_slot?;
+        let inner = state.dispatch_state();
+        let descriptor = inner.installed.feedback_descriptor_for_slot(slot)?;
+        descriptor.metadata().spread_mask()
+    }
+
+    /// Convenience: look up `spread_mask` directly from the feedback
+    /// slot at `[PC + offset]`. Combines `feedback_slot_from_pc` with
+    /// `spread_mask_for` so the cold shim can express the lookup as a
+    /// single field expression in the args struct literal (without
+    /// needing a let-binding for the intermediate slot).
+    #[inline]
+    fn spread_mask_from_pc(
+        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+        offset: u32,
+    ) -> Option<u64> {
+        let feedback_slot = Self::feedback_slot_from_pc(state, offset);
+        Self::spread_mask_for(state, feedback_slot)
+    }
 }
 
 // =====================================================================
@@ -2918,9 +2969,9 @@ pub extern "C" fn op_call_slow_rs(
         a: a as u16,
         b: b as u16,
         c: c as u16,
-        range: lyng_js_bytecode::CallRange::new(0, 0),
-        spread_mask: None,
-        feedback_slot: None,
+        range: ColdShimHelpers::call_range_from_pc(&mut dispatch, 4),
+        feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 8),
+        spread_mask: ColdShimHelpers::spread_mask_from_pc(&mut dispatch, 8),
         instruction_len: 10u32,
     };
     let outcome = crate::vm::semantics::calls::op_call_semantic(&mut dispatch, args);
@@ -2979,9 +3030,9 @@ pub extern "C" fn op_tail_call_slow_rs(
     let args = crate::vm::semantics::calls::OpTailCallArgs {
         a: a as u16,
         b: b as u16,
-        range: lyng_js_bytecode::CallRange::new(0, 0),
-        spread_mask: None,
-        feedback_slot: None,
+        range: ColdShimHelpers::call_range_from_pc(&mut dispatch, 4),
+        feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 8),
+        spread_mask: ColdShimHelpers::spread_mask_from_pc(&mut dispatch, 8),
     };
     let outcome = crate::vm::semantics::calls::op_tail_call_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
@@ -3014,9 +3065,9 @@ pub extern "C" fn op_construct_slow_rs(
         a: a as u16,
         b: b as u16,
         c: c as u16,
-        range: lyng_js_bytecode::CallRange::new(0, 0),
-        spread_mask: None,
-        feedback_slot: None,
+        range: ColdShimHelpers::call_range_from_pc(&mut dispatch, 4),
+        feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 8),
+        spread_mask: ColdShimHelpers::spread_mask_from_pc(&mut dispatch, 8),
         instruction_len: 10u32,
     };
     let outcome = crate::vm::semantics::calls::op_construct_semantic(&mut dispatch, args);
