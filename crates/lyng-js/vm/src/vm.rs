@@ -163,7 +163,7 @@ pub struct Vm {
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
     #[cfg(feature = "opcode-counters")]
-    opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
+    pub(crate) dispatch_counters: OpcodeDispatchCounterStore,
     #[cfg(feature = "opcode-counters")]
     call_argument_copy_counts: Option<CallArgumentCopyCounterStore>,
     #[cfg(feature = "opcode-counters")]
@@ -250,7 +250,7 @@ impl Vm {
             installed: Vec::new(),
             current_exception: None,
             #[cfg(feature = "opcode-counters")]
-            opcode_dispatch_counts: None,
+            dispatch_counters: OpcodeDispatchCounterStore::new(),
             #[cfg(feature = "opcode-counters")]
             call_argument_copy_counts: None,
             #[cfg(feature = "opcode-counters")]
@@ -307,64 +307,31 @@ impl Vm {
 
     #[cfg(feature = "opcode-counters")]
     pub fn enable_opcode_dispatch_counts(&mut self) {
-        if self.opcode_dispatch_counts.is_none() {
-            self.opcode_dispatch_counts = Some(OpcodeDispatchCounterStore::new());
-        }
+        // No-op when counters are always allocated. Kept for backward
+        // compatibility with tests that called this method.
     }
 
     #[cfg(feature = "opcode-counters")]
     pub fn disable_opcode_dispatch_counts(&mut self) {
-        self.opcode_dispatch_counts = None;
+        // Reset to zero so subsequent runs start fresh. No deallocation —
+        // the counter array stays for the asm path.
+        self.dispatch_counters.reset();
     }
 
     #[cfg(feature = "opcode-counters")]
     pub fn reset_opcode_dispatch_counts(&mut self) {
-        if let Some(counts) = &self.opcode_dispatch_counts {
-            counts.reset();
-        }
+        self.dispatch_counters.reset();
     }
 
     #[cfg(feature = "opcode-counters")]
     #[inline]
     pub fn opcode_dispatch_counts(&self) -> Option<OpcodeDispatchCounts> {
-        self.opcode_dispatch_counts
-            .as_ref()
-            .map(OpcodeDispatchCounterStore::snapshot)
+        Some(self.dispatch_counters.snapshot())
     }
 
-    // DSL-0c C5: opcode_counter_enabled deleted with run_trampoline*.
-    // The runtime branch from `run_via_trampoline` between
-    // `run_trampoline_counted` and `run_trampoline_uncounted` no longer
-    // exists; if/when DSL grows an opcode-dispatch counting tail, it
-    // will re-introduce the necessary branch in its own dispatch macro.
-
-    /// Trampoline-side opcode counter: translates the raw byte to `Opcode`,
-    /// skips `Wide` / `ExtraWide` prefixes (so the recorded total mirrors
-    /// the legacy "semantic only" count), and records the dispatch. No-op
-    /// when counters are disabled.
-    ///
-    /// DSL-0c C5: kept compiled (feature-gated) for future re-wiring into
-    /// a DSL dispatch macro, but unreferenced as of DSL-0c. The
-    /// `opcode-counters` feature's behavioral tests (`tests/core.rs`)
-    /// no longer pass with the feature enabled — flipping the
-    /// counter on now records zero dispatches because the α
-    /// trampoline that called this helper is gone. Restoring
-    /// counter functionality is a follow-up to wire `record_dispatch`
-    /// into the DSL `dispatch!` tail.
     #[cfg(feature = "opcode-counters")]
-    #[inline]
-    #[allow(dead_code)]
-    pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
-        let Some(counts) = &self.opcode_dispatch_counts else {
-            return;
-        };
-        let Some(opcode) = Opcode::from_byte(byte) else {
-            return;
-        };
-        if opcode.is_prefix() {
-            return;
-        }
-        counts.increment(opcode);
+    pub fn dispatch_counters(&self) -> &OpcodeDispatchCounterStore {
+        &self.dispatch_counters
     }
 
     /// Opt-in counter tracking how many argument values are pushed into

@@ -4,36 +4,131 @@ use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 
+/// Flat counter banks for the asm-driven counter increments.
+///
+/// Layout is `#[repr(C)]` with three sequential `[u64; 256]` banks:
+/// - `dispatch[op]`        — bumped at handler entry by `inc_dispatch_counter!`
+/// - `slow_semantic[op]`   — bumped at `call_slow!` invocation site
+/// - `slow_safepoint[op]`  — bumped at `poll_safepoint!` pending branch
+///
+/// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
+/// space for the full byte range even though Lyng uses ~157 opcodes,
+/// to keep offset math fast (compile-time bank offsets are 0, 2048,
+/// 4096 — all encodable as AArch64 LDR/STR immediates).
+///
+/// Box-allocated so the Vm pointer stays stable across struct moves
+/// (Vm itself isn't pinned; the asm-side `[VM, #offset]` access reads
+/// the pointer first, then indexes into the heap-allocated array).
+#[repr(C)]
+pub struct DispatchCounters {
+    pub dispatch: [u64; 256],
+    pub slow_semantic: [u64; 256],
+    pub slow_safepoint: [u64; 256],
+}
+
+impl DispatchCounters {
+    pub fn new() -> Box<Self> {
+        // `Box::new(Self { ... })` with a 6 KB struct literal would
+        // build the struct on the stack first, then copy to the heap.
+        // In debug builds that's a 6 KB stack frame which is fine here,
+        // but allocate via a zeroed Vec → Box conversion to keep the
+        // hot path cheap and predictable across opt levels.
+        let zeros: Vec<u64> = vec![0; 3 * 256];
+        let boxed_slice: Box<[u64]> = zeros.into_boxed_slice();
+        // SAFETY: `Box<[u64; 3 * 256]>` has identical layout to
+        // `Box<DispatchCounters>` because both are `#[repr(C)]`-ish
+        // contiguous 6144-byte allocations with 8-byte alignment.
+        // We verify size + offsets in
+        // `tests/dispatch_counters_layout.rs`.
+        let raw: *mut u64 = Box::into_raw(boxed_slice) as *mut u64;
+        unsafe { Box::from_raw(raw as *mut Self) }
+    }
+
+    pub fn reset(&mut self) {
+        self.dispatch.fill(0);
+        self.slow_semantic.fill(0);
+        self.slow_safepoint.fill(0);
+    }
+
+    /// Snapshot the dispatch bank into an `OpcodeDispatchCounts`.
+    pub fn snapshot_dispatch(&self) -> OpcodeDispatchCounts {
+        OpcodeDispatchCounts::from_dispatch_array(&self.dispatch)
+    }
+
+    pub fn slow_semantic_count(&self, opcode: Opcode) -> u64 {
+        self.slow_semantic[opcode as u8 as usize]
+    }
+
+    pub fn slow_safepoint_count(&self, opcode: Opcode) -> u64 {
+        self.slow_safepoint[opcode as u8 as usize]
+    }
+}
+
+impl Default for DispatchCounters {
+    fn default() -> Self {
+        Self {
+            dispatch: [0; 256],
+            slow_semantic: [0; 256],
+            slow_safepoint: [0; 256],
+        }
+    }
+}
+
 pub struct OpcodeDispatchCounterStore {
-    counts: Box<[Cell<u64>]>,
+    counters: Box<DispatchCounters>,
 }
 
 impl OpcodeDispatchCounterStore {
     pub fn new() -> Self {
         Self {
-            counts: (0..OPCODE_COUNT_LEN)
-                .map(|_| Cell::new(0))
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
+            counters: DispatchCounters::new(),
         }
+    }
+
+    pub fn counters(&self) -> &DispatchCounters {
+        &self.counters
+    }
+
+    pub fn counters_mut(&mut self) -> &mut DispatchCounters {
+        &mut self.counters
+    }
+
+    /// Raw pointer to the inner `DispatchCounters`, for asm-side reads.
+    /// The asm path reads `[VM, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` to
+    /// get the `OpcodeDispatchCounterStore` pointer (or its inner Box —
+    /// depending on the chosen offset binding strategy).
+    pub fn counters_ptr(&self) -> *const DispatchCounters {
+        &*self.counters as *const _
     }
 
     #[inline]
     pub fn increment(&self, opcode: Opcode) {
-        let slot = &self.counts[usize::from(opcode as u8)];
-        slot.set(slot.get().saturating_add(1));
+        // SAFETY: single-threaded VM; counter writes are tear-free on
+        // aligned u64. The asm path uses non-atomic `add x10, x10, #1`
+        // with the same single-threaded guarantee.
+        unsafe {
+            let counters = &mut *(self.counters_ptr() as *mut DispatchCounters);
+            counters.dispatch[opcode as u8 as usize] =
+                counters.dispatch[opcode as u8 as usize].saturating_add(1);
+        }
     }
 
     pub fn reset(&self) {
-        for slot in &self.counts {
-            slot.set(0);
+        // SAFETY: same as `increment` — single-threaded VM.
+        unsafe {
+            let counters = &mut *(self.counters_ptr() as *mut DispatchCounters);
+            counters.reset();
         }
     }
 
     pub fn snapshot(&self) -> OpcodeDispatchCounts {
-        OpcodeDispatchCounts {
-            counts: self.counts.iter().map(Cell::get).collect(),
-        }
+        self.counters.snapshot_dispatch()
+    }
+}
+
+impl Default for OpcodeDispatchCounterStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -43,6 +138,15 @@ pub struct OpcodeDispatchCounts {
 }
 
 impl OpcodeDispatchCounts {
+    /// Snapshot the first `OPCODE_COUNT_LEN` entries of a flat 256-bank
+    /// dispatch array (the layout used by `DispatchCounters::dispatch`).
+    /// Entries past the variant count are padding.
+    pub(crate) fn from_dispatch_array(arr: &[u64; 256]) -> Self {
+        Self {
+            counts: arr[..OPCODE_COUNT_LEN].to_vec(),
+        }
+    }
+
     #[must_use]
     pub fn from_counts<I>(counts: I) -> Self
     where

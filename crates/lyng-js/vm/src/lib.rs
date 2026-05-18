@@ -49,7 +49,8 @@ pub use frame::{
 pub use installed::InstalledCode;
 #[cfg(feature = "opcode-counters")]
 pub use opcode_counts::{
-    CallArgumentCopyCounts, OpcodeDispatchCount, OpcodeDispatchCounts,
+    CallArgumentCopyCounts, DispatchCounters, OpcodeDispatchCount, OpcodeDispatchCounts,
+    OpcodeDispatchCounterStore,
 };
 #[cfg(feature = "opcode-counters")]
 pub use slow_path_counts::{SlowPathCounterStore, SlowPathCounts};

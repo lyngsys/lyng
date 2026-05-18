@@ -235,12 +235,18 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         let mut vm = Vm::new();
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
-        assert!(vm.opcode_dispatch_counts().is_none());
+        // DSL-1 Phase 1.B.0 Task 1: counters are now always allocated;
+        // `opcode_dispatch_counts()` returns `Some` even before the
+        // first dispatch. Total starts at 0.
+        assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
         let result = vm
             .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .unwrap();
         assert_eq!(result, Value::from_smi(42));
-        assert!(vm.opcode_dispatch_counts().is_none());
+        // Until Task 4 wires the asm-side increment, the dispatch
+        // bank stays at zero across runs. Reset to be explicit before
+        // the enable/run round.
+        vm.reset_opcode_dispatch_counts();
 
         vm.enable_opcode_dispatch_counts();
         let result = vm
@@ -261,7 +267,9 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         vm.reset_opcode_dispatch_counts();
         assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
         vm.disable_opcode_dispatch_counts();
-        assert!(vm.opcode_dispatch_counts().is_none());
+        // After `disable_opcode_dispatch_counts`, counters are reset
+        // to zero but the storage remains allocated for the asm path.
+        assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
     }
 }
 
