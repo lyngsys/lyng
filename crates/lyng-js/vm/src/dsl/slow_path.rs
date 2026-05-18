@@ -149,6 +149,34 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
+                // Epoch check — mirrors α's `run_trampoline` loop body
+                // (see `vm::dispatch_state::run_trampoline`). When a
+                // semantic body calls `handle_dispatch_result` and a
+                // throw was caught in a higher frame (cross-frame
+                // catch), the helper unwinds frames and bumps the
+                // dispatch-frame-check epoch via
+                // `request_dispatch_frame_check`. The caller frame's
+                // `rust.dispatch.frame` is now stale (it's still the
+                // pre-throw frame), but the active frame is whichever
+                // frame caught the throw — its PC was rewritten by
+                // `transfer_to_exception_handler`. We must promote
+                // this `Continue` into a `Refresh` so the bridge
+                // reloads PC/REGS/FV from `vm.frames().last()`.
+                //
+                // Under α, the trampoline loop does this check between
+                // every handler call. Under DSL, the asm bridge does
+                // NOT — so we do it here in the slow-path egress.
+                if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
+                    let vm_epoch = rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                    if rust.dispatch.frame_check_epoch != vm_epoch
+                        && rust.dispatch.vm.frames().len() != rust.dispatch.frame_depth
+                    {
+                        // Cross-frame catch — recurse into the Refresh
+                        // arm so we share the frame-reload logic.
+                        return self.translate_outcome(SemanticOutcome::Refresh);
+                    }
+                    rust.dispatch.frame_check_epoch = vm_epoch;
+                }
                 let mut new_offset_u64: u64 = 0;
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
                     let new_offset = rust
