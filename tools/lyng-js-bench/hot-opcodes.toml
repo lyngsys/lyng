@@ -207,3 +207,37 @@ name = "LoadGlobal"
 target_slow_path_share = 0.20
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
+
+# DSL-1 Phase 1.B.0 Tasks 7+8: Phase-1.A constant-loader anchors added for
+# microbench coverage. These are not strictly in the hot-30 by v8 v7 share
+# (see source_data above) but ship with snippets so the per-opcode gates
+# are armed when Phase 1.B.3 ports land.
+[[opcodes]]
+name = "LoadUndefined"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadNull"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadTrue"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadFalse"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "LoadOne"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0

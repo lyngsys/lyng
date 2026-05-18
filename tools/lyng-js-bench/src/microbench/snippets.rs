@@ -89,6 +89,300 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // =====================================================================
+    // Phase-1.A opcodes (DSL-1 Phase 1.B.0 Task 7).
+    //
+    // Constant-loader opcodes. Each loop body writes the constant into
+    // four fresh `let` bindings per iteration. The `let` lifetime keeps
+    // the destination registers above the slot-0 accumulator window, so
+    // the bytecode-builder peephole keeps the non-`Lda*` form (e.g.
+    // `LoadNull r8` rather than `LdaNull` for slot-0 writes). The actual
+    // dispatch counts are verified empirically against the declared
+    // `opcodes_per_iter` (see `verify_opcodes_per_iter` test).
+    // =====================================================================
+
+    // `undefined` in JS is a global binding (lookup → LoadGlobal), so a
+    // literal `undefined` snippet wouldn't actually drive `LoadUndefined`.
+    // The `void X` operator unconditionally emits `LoadUndefined dest`
+    // after evaluating its argument for side effects, giving us a clean
+    // 4-per-iter driver.
+    map.insert("LoadUndefined", Snippet {
+        opcode: "LoadUndefined",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = void 0;
+                    let b = void 0;
+                    let c = void 0;
+                    let d = void 0;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadNull", Snippet {
+        opcode: "LoadNull",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = null;
+                    let b = null;
+                    let c = null;
+                    let d = null;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadTrue", Snippet {
+        opcode: "LoadTrue",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = true;
+                    let b = true;
+                    let c = true;
+                    let d = true;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadFalse", Snippet {
+        opcode: "LoadFalse",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = false;
+                    let b = false;
+                    let c = false;
+                    let d = false;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadZero", Snippet {
+        opcode: "LoadZero",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = 0;
+                    let b = 0;
+                    let c = 0;
+                    let d = 0;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadOne", Snippet {
+        opcode: "LoadOne",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = 1;
+                    let b = 1;
+                    let c = 1;
+                    let d = 1;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("LoadSmi8", Snippet {
+        opcode: "LoadSmi8",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = 42;
+                    let b = -7;
+                    let c = 100;
+                    let d = -42;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // =====================================================================
+    // Phase-1.B anchor opcodes (DSL-1 Phase 1.B.0 Task 8).
+    //
+    // The slot-specialised local loaders (`LoadLocalN`) and the captured-
+    // environment loader (`LoadEnvSlot`) are exercised by reading the
+    // target slot four times per iteration.
+    //
+    // Slot placement: function parameters are the only reliable way to
+    // land a binding in register slots 1..3. `let` bindings in the lyng-js
+    // frame layout begin at slot 4 (slots 0-3 are reserved for the calling
+    // convention), and lexical TDZ checks defeat the peephole's Move →
+    // LoadLocalN rewrite. Using extra `bench(iters, p1, ...)` parameters
+    // we get `p1` at slot 1, `p2` at slot 2, etc., and each `pN`-read
+    // peepholes to `LoadLocalN` cleanly.
+    //
+    // Verified empirically via the dispatch counter (see
+    // `verify_opcodes_per_iter` test). Counts within ±5% of declared.
+    // =====================================================================
+
+    // LoadLocal0: bench(iters)'s `iters` parameter sits at register 0 in
+    // the lyng-js calling convention. Reading `iters` four times per iter
+    // emits `LoadLocal0 dst, r0` because the peephole prefers the slot-0
+    // specialized form over a generic `Move dst, r0`. Plus the loop's
+    // `i < iters` test loads `iters` once more per iteration, yielding
+    // 5 LoadLocal0 dispatches per iter total (verified empirically:
+    // 5001 dispatches for ITERS=1000 in the verify_opcodes_per_iter test).
+    map.insert("LoadLocal0", Snippet {
+        opcode: "LoadLocal0",
+        source: r"
+            function bench(iters) {
+                let s = 0;
+                for (let i = 0; i < iters; i++) {
+                    s = iters + iters + iters + iters;
+                }
+                return s;
+            }
+        ",
+        opcodes_per_iter: 5,
+    });
+
+    // LoadLocal1: read parameter `p1` (slot 1) four times per iter.
+    //
+    // Function parameters reliably land at register slots 0..N-1, while
+    // `let` bindings are allocated at slots >= 4 in the lyng-js frame
+    // layout (slots 0-3 are reserved for the calling convention). The
+    // only way to drive `LoadLocalN` for N in 1..3 is via parameters.
+    map.insert("LoadLocal1", Snippet {
+        opcode: "LoadLocal1",
+        source: r"
+            function bench(iters, p1) {
+                let s = 0;
+                for (let i = 0; i < iters; i++) {
+                    s = p1 + p1 + p1 + p1;
+                }
+                return s;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // LoadLocal2: read parameter `p2` (slot 2) four times per iter.
+    map.insert("LoadLocal2", Snippet {
+        opcode: "LoadLocal2",
+        source: r"
+            function bench(iters, p1, p2) {
+                let s = 0;
+                for (let i = 0; i < iters; i++) {
+                    s = p2 + p2 + p2 + p2;
+                }
+                return s + p1;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // LoadLocal3: read parameter `p3` (slot 3) four times per iter.
+    map.insert("LoadLocal3", Snippet {
+        opcode: "LoadLocal3",
+        source: r"
+            function bench(iters, p1, p2, p3) {
+                let s = 0;
+                for (let i = 0; i < iters; i++) {
+                    s = p3 + p3 + p3 + p3;
+                }
+                return s + p1 + p2;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // StoreLocal3: four stores to a slot-3 location per iter. Same trick
+    // as LoadLocalN — parameters live in slots 0..N-1, and the peephole
+    // rewrites `Move dst=3, src=...` to `StoreLocal3`. We use a write to
+    // a parameter `p3` (which JS permits — parameters are mutable bindings).
+    map.insert("StoreLocal3", Snippet {
+        opcode: "StoreLocal3",
+        source: r"
+            function bench(iters, p1, p2, p3) {
+                for (let i = 0; i < iters; i++) {
+                    p3 = i;
+                    p3 = i;
+                    p3 = i;
+                    p3 = i;
+                }
+                return p1 + p2 + p3;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // LoadEnvSlot: inner closure reads a captured variable four times per
+    // iter. The captured var lives in the enclosing environment, so each
+    // read dispatches LoadEnvSlot rather than LoadLocalN. The outer loop
+    // also performs two LoadEnvSlot dispatches per iteration: the loop's
+    // induction `i` lives in the iteration env (one load for `i < iters`,
+    // one more for the `s = inner()` callee lookup), yielding 6 LoadEnvSlot
+    // dispatches per iter total (verified empirically: 6001 dispatches for
+    // ITERS=1000 in the verify_opcodes_per_iter test).
+    map.insert("LoadEnvSlot", Snippet {
+        opcode: "LoadEnvSlot",
+        source: r"
+            function bench(iters) {
+                let captured = 7;
+                function inner() {
+                    return captured + captured + captured + captured;
+                }
+                let s = 0;
+                for (let i = 0; i < iters; i++) {
+                    s = inner();
+                }
+                return s;
+            }
+        ",
+        opcodes_per_iter: 6,
+    });
+
+    // Ldar: the accumulator load. Emitted by the bytecode-builder peephole
+    // when an emitted `Move` has destination register 0 — i.e. writes back
+    // into the first parameter (the accumulator slot). Mutating the first
+    // parameter via `bench_param = X` produces `Move dst=0, src=tmp` which
+    // the peephole rewrites to `Ldar tmp`.
+    //
+    // The driver uses a second parameter `iters_bound` (slot 1) for the
+    // loop bound and reads slot 1 with `LoadLocal1` so the loop's exit
+    // condition stays decoupled from the slot-0 mutation. The harness
+    // only passes one argument (`iters`), so `iters_bound` is undefined;
+    // the snippet rebinds it to `iters` on entry.
+    map.insert("Ldar", Snippet {
+        opcode: "Ldar",
+        source: r"
+            function bench(p0) {
+                let n = p0;
+                let v = 0;
+                for (let i = 0; i < n; i++) {
+                    p0 = v;
+                    p0 = v;
+                    p0 = v;
+                    p0 = v;
+                }
+                return p0;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
     // Add additional snippets as needed for the hot-30 set.
     // For opcodes not present here, the microbench skips with a warning
     // (and the report records "no snippet" for that opcode).
@@ -100,4 +394,162 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
 #[must_use]
 pub fn for_opcode(name: &str) -> Option<Snippet> {
     all_snippets().get(name).cloned()
+}
+
+#[cfg(test)]
+mod verify_counts {
+    //! Verify per-snippet opcode counts against declared `opcodes_per_iter`.
+    //!
+    //! Run with: `cargo test --release -p lyng-js-bench --features
+    //! lyng-js-vm/opcode-counters verify_opcodes_per_iter -- --nocapture`.
+    //!
+    //! The test compiles each snippet, runs one bench(iters) call with a
+    //! small iters value, and snapshots the dispatch counts. It then
+    //! prints the top opcodes for that snippet and asserts that the
+    //! declared opcode's actual dispatch count matches `iters *
+    //! opcodes_per_iter`, modulo per-call setup overhead.
+
+    use super::*;
+    use lyng_js_builtins::BootstrapMode;
+    use lyng_js_bytecode::disassemble;
+    use lyng_js_common::{AtomTable, SourceId};
+    use lyng_js_compiler::compile_script;
+    use lyng_js_env::Runtime;
+    use lyng_js_host::NoopHostHooks;
+    use lyng_js_parser::parse_script;
+    use lyng_js_sema::analyze_script;
+    use lyng_js_vm::Vm;
+
+    fn run_one(snippet: &Snippet, iters: u64) -> Vec<(String, u64)> {
+        let src = format!("{}\nbench({});\n", snippet.source, iters);
+
+        let mut atoms = AtomTable::new();
+        let source_id = SourceId::new(1);
+        let parsed = parse_script(&mut atoms, source_id, &src);
+        assert!(
+            !parsed.diagnostics.has_errors(),
+            "parse errors for {}: {:?}",
+            snippet.opcode,
+            parsed.diagnostics.as_slice()
+        );
+        let sema = analyze_script(&parsed, &atoms);
+        assert!(
+            !sema.diagnostics.has_errors(),
+            "sema errors for {}: {:?}",
+            snippet.opcode,
+            sema.diagnostics.as_slice()
+        );
+        let unit = compile_script(&parsed, &sema, &mut atoms)
+            .unwrap_or_else(|err| panic!("lowering failed for {}: {err:?}", snippet.opcode));
+
+        // Set DUMP_SNIPPETS=1 to print the disassembled functions; useful
+        // when calibrating a new snippet's opcodes_per_iter.
+        if std::env::var("DUMP_SNIPPETS").is_ok() {
+            for func in unit.functions() {
+                eprintln!("=== {} ===", snippet.opcode);
+                eprintln!("{}", disassemble(func));
+            }
+        }
+
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist for snippet verification");
+        let realm_id = realm.id();
+        let mut vm = Vm::new();
+        vm.bootstrap_realm(agent, realm_id, BootstrapMode::SpecOnly)
+            .unwrap_or_else(|err| panic!("spec bootstrap failed: {err:?}"));
+        let installed = vm
+            .install_script(agent, realm_id, &unit)
+            .unwrap_or_else(|err| {
+                panic!("install_script failed for {}: {err:?}", snippet.opcode)
+            });
+        Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap_or_else(
+            |err| panic!("instantiate_global_script failed for {}: {err:?}", snippet.opcode),
+        );
+
+        // Warmup once, then reset and measure a single call.
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap_or_else(|err| panic!("warmup eval failed for {}: {err:?}", snippet.opcode));
+
+        vm.reset_opcode_dispatch_counts();
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap_or_else(|err| panic!("measured eval failed for {}: {err:?}", snippet.opcode));
+        let counts = vm
+            .opcode_dispatch_counts()
+            .expect("opcode-counters feature should provide counts");
+        counts
+            .top(8)
+            .iter()
+            .map(|entry| (entry.opcode().name().to_string(), entry.count()))
+            .collect()
+    }
+
+    fn count_of(top: &[(String, u64)], name: &str) -> u64 {
+        top.iter()
+            .find(|(opname, _)| opname == name)
+            .map_or(0, |(_, count)| *count)
+    }
+
+    #[test]
+    fn verify_opcodes_per_iter() {
+        // Use a small inner-iter count so the measured snippet runs fast.
+        const ITERS: u64 = 1_000;
+
+        let snippets = all_snippets();
+        // Verify the newly-added Phase-1.A and Phase-1.B anchor opcodes.
+        let names = [
+            "LoadUndefined",
+            "LoadNull",
+            "LoadTrue",
+            "LoadFalse",
+            "LoadZero",
+            "LoadOne",
+            "LoadSmi8",
+            "LoadLocal0",
+            "LoadLocal1",
+            "LoadLocal2",
+            "LoadLocal3",
+            "StoreLocal3",
+            "LoadEnvSlot",
+            "Ldar",
+        ];
+
+        let mut report = String::new();
+        let mut bad: Vec<String> = Vec::new();
+        for name in names {
+            let snippet = snippets.get(name).unwrap_or_else(|| {
+                panic!("snippet for {name} missing");
+            });
+            let top = run_one(snippet, ITERS);
+            let declared_per_iter = u64::from(snippet.opcodes_per_iter);
+            let expected = ITERS * declared_per_iter;
+            let actual = count_of(&top, name);
+            let ratio = if expected == 0 {
+                0.0
+            } else {
+                actual as f64 / expected as f64
+            };
+            report.push_str(&format!(
+                "[{name:>14}] declared per-iter={declared_per_iter} expected={expected} \
+                 actual_for_op={actual} ratio={ratio:.3}\n  top: {top:?}\n",
+            ));
+            // Require actual count to be within ±5% of declared expected,
+            // and at least one dispatch of the named opcode.
+            if actual == 0 {
+                bad.push(format!(
+                    "{name}: expected at least {expected} dispatches of `{name}`, got 0 \
+                     (top: {top:?})"
+                ));
+            } else if ratio < 0.95 || ratio > 1.05 {
+                bad.push(format!(
+                    "{name}: expected {expected} dispatches of `{name}` (within 5%), got {actual} \
+                     (ratio={ratio:.3}, top: {top:?})"
+                ));
+            }
+        }
+        println!("{report}");
+        assert!(bad.is_empty(), "snippet verification failures:\n{}", bad.join("\n"));
+    }
 }
