@@ -17,7 +17,8 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     call_slow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, store_reg, tag_null, tag_undefined,
+    decode_ax, dispatch, dispatch_after_slow, store_reg, tag_bool_const, tag_null,
+    tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -202,33 +203,21 @@ llint_handler! {
 }
 
 // =====================================================================
-// LoadTrue
+// LoadTrue — inline DSL fast path (DSL-1 Phase 1.A, Task 3).
+//
+// Writes Value::from_bool(true) to register `a`. The `bx` operand is
+// unused. No fail mode → no slow path. Uses tag_bool_const! which
+// produces 3 instructions (vs 2 for tag_undefined/tag_null because the
+// Bool tag carries an explicit payload bit).
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_true_dsl, layout = Abx, length = 4, |a, bx| {
-        call_slow!(op_load_true_slow_rs, args = [a, bx]);
-        dispatch_after_slow!();
+    op_load_true_dsl, layout = Abx, length = 4, |a, _bx| {
+        tag_bool_const!(t0, 1);
+        store_reg!(a, t0);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_true_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
-        a: a as u16,
-        instruction_len: 4u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_true_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
