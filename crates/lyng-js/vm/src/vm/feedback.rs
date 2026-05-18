@@ -2096,29 +2096,26 @@ impl Vm {
         result
     }
 
-    /// DSL-0b (B17): mirror a single feedback slot from the legacy
-    /// `Vec<Option<FeedbackSiteState>>` into the flat
-    /// `Box<[FeedbackEntry]>` so the asm `FV` pin observes identical
-    /// IC state during DSL-0b's dual-storage period. Called after
-    /// every legacy write site. DSL-0c removes the legacy vector and
-    /// this mirror once readers migrate.
+    /// DSL-0b (B17) originally mirrored each feedback slot from the
+    /// legacy `Vec<Option<FeedbackSiteState>>` into the flat
+    /// `Box<[FeedbackEntry]>` so the asm `FV` pin would observe
+    /// identical IC state. Profiling under DSL-0c (Phase C) revealed
+    /// that no production reader of `feedback_flat_storage` exists —
+    /// the flat array is allocated, pin-loaded into the asm `FV`
+    /// register at entry and after slow-path nested calls, but no DSL
+    /// handler dereferences it. The two large `FeedbackSiteState`
+    /// memcpys per record-site write accounted for ~30% of CPU on
+    /// V8 v7 Richards.
+    ///
+    /// As of Phase C, this function is a no-op. The flat array stays
+    /// allocated (so the `FV` pin has a valid pointer) but is never
+    /// written. DSL-1 will either: (a) introduce real inline IC
+    /// fast paths that read flat entries, at which point the mirror
+    /// re-lands as a smaller-payload write; or (b) delete the flat
+    /// array entirely if the inline path doesn't materialize.
     #[inline]
-    fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
-        let index = code_index(code);
-        let legacy_state = self
-            .feedback_vectors
-            .get(index)
-            .and_then(|vector| vector.site(slot))
-            .cloned();
-        let Some(flat) = self.feedback_flat_storage.get_mut(index) else {
-            return;
-        };
-        let Ok(slot_idx) = usize::try_from(slot.get().saturating_sub(1)) else {
-            return;
-        };
-        if let Some(entry) = flat.get_mut(slot_idx) {
-            entry.state = legacy_state;
-        }
+    fn mirror_flat_slot(&mut self, _code: CodeRef, _slot: FeedbackSlotId) {
+        // Intentionally no-op; see doc comment.
     }
 
     fn ensure_feedback_slot_execution(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
