@@ -459,33 +459,49 @@ impl Vm {
 
     pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
         self.debug_hook = Some(Box::new(hook));
+        self.refresh_dsl_poll_pending();
     }
 
     pub fn clear_debug_hook(&mut self) {
         self.debug_hook = None;
         self.debug_state.clear();
+        self.refresh_dsl_poll_pending();
     }
 
-    pub const fn request_debug_pause(&mut self) {
+    pub fn request_debug_pause(&mut self) {
         self.debug_state.request_pause(VmDebugPauseRequest::any());
+        self.refresh_dsl_poll_pending();
     }
 
-    pub const fn request_debug_pause_at(&mut self, code: CodeRef, instruction_offset: u32) {
+    pub fn request_debug_pause_at(&mut self, code: CodeRef, instruction_offset: u32) {
         self.debug_state
             .request_pause(VmDebugPauseRequest::at(code, instruction_offset));
+        self.refresh_dsl_poll_pending();
     }
 
-    pub const fn clear_debug_pause_request(&mut self) {
+    pub fn clear_debug_pause_request(&mut self) {
         self.debug_state.clear_pause_request();
+        self.refresh_dsl_poll_pending();
+    }
+
+    /// Sync `dsl_poll_pending` with the current debug state. The DSL
+    /// warm `op_loop_header` handler checks this byte on every backedge
+    /// and branches to the slow path when non-zero; the slow path then
+    /// invokes `run_poll`, which dispatches to `poll_debug_safepoint`.
+    /// Keeping the byte mirrored to `debug_poll_enabled()` is the
+    /// substrate's only signal that a pause/step is pending.
+    #[inline]
+    pub(crate) fn refresh_dsl_poll_pending(&mut self) {
+        self.dsl_poll_pending = u8::from(self.debug_poll_enabled());
     }
 
     #[inline]
-    pub(super) const fn debug_poll_enabled(&self) -> bool {
+    pub(crate) const fn debug_poll_enabled(&self) -> bool {
         self.debug_hook.is_some() && self.debug_state.should_poll()
     }
 
     #[inline]
-    pub(super) fn poll_debug_safepoint(&mut self, agent: &Agent, kind: VmDebugSafepointKind) {
+    pub(crate) fn poll_debug_safepoint(&mut self, agent: &Agent, kind: VmDebugSafepointKind) {
         if !self.debug_poll_enabled() {
             return;
         }
@@ -504,6 +520,7 @@ impl Vm {
         self.debug_hook = Some(hook);
         self.debug_state
             .apply_command(command, safepoint.frame_depth());
+        self.refresh_dsl_poll_pending();
     }
 
     #[inline]
