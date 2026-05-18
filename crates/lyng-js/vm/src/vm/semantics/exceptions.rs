@@ -172,16 +172,3 @@ pub(crate) fn op_load_exception_semantic(
     }
 }
 
-// =====================================================================
-// Helpers shared by the α handlers
-// =====================================================================
-
-/// Reject an out-of-range `ax` operand. Mirrors the α handler's
-/// `ax_to_register` failure case.
-#[inline]
-pub(crate) fn ax_register_out_of_bounds_error(state: &DispatchState<'_>) -> VmError {
-    VmError::RegisterOutOfBounds {
-        code: state.frame.code(),
-        register: 0,
-    }
-}

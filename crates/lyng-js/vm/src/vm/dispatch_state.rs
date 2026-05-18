@@ -1,28 +1,19 @@
-#![allow(
-    improper_ctypes_definitions,
-    reason = "extern \"C\" handlers carry Rust enums by value as an ABI-stability choice, not as a real FFI boundary"
-)]
-
-//! Phase 1 Option α dispatch primitives — the per-handler ABI specified in
-//! `reports/js/lyng-js/jsc-aligned-engine-roadmap.md` and verified by the
-//! `lyng-33i2` trampoline spike (see `reports/js/lyng-js/phase-1-spike.md`).
+//! Per-frame dispatch state shared by semantic bodies.
 //!
-//! `DispatchState<'vm>` bundles every reference a handler needs — the live
-//! `Vm`, `Agent`, host hooks, native-function registry, the active
+//! `DispatchState<'vm>` bundles every reference a semantic body needs — the
+//! live `Vm`, `Agent`, host hooks, native-function registry, the active
 //! `FrameRecord`, and the `Arc<InstalledFunction>` whose `instruction_bytes()`
-//! the handler is decoding. Handlers are `extern "C" fn`s receiving
-//! `&mut DispatchState` and returning `Step`.
+//! the handler is decoding.
 //!
-//! DSL-0c (Tasks C2–C5) deleted the α trampoline (`run_trampoline*`,
-//! `Vm::run_via_trampoline`, `still_active`) because `Vm::run` now routes
-//! through the asm-DSL path (`run_via_dsl`). The α `dispatch_handlers/`
-//! family modules + `DISPATCH_TABLE` + `Step` + `DispatchState` survive
-//! specifically for the wide-form prefix bridge in
-//! `crate::dsl::handlers::warm::op_prefix_via_alpha`, which delegates
-//! wide-form opcodes through the α DISPATCH_TABLE until proper wide-form
-//! DSL decoders land in a future batch (see the comment block on
-//! `dsl/handlers/warm.rs` `op_wide` / `op_extra_wide`). Semantic bodies
-//! in `vm/semantics/` also consume `DispatchState` directly.
+//! DSL-0c finished α deletion: the `run_trampoline*` / `Vm::run_via_trampoline`
+//! / `still_active` α trampoline, the per-handler `extern "C"` ABI (`Step` /
+//! `Handler` / `DISPATCH_TABLE`), and the `dispatch_handlers/` family modules
+//! were all removed. `DispatchState` survives because (a) every semantic body
+//! in `vm/semantics/` consumes it through
+//! `LlIntDispatchState::dispatch_state()`, (b) the
+//! `LlIntRustContext::dispatch` field on the asm side holds one, and (c) the
+//! wide-form prefix bridge passes one to the codegen-emitted
+//! `dispatch_wide_form` function.
 
 use std::sync::Arc;
 
@@ -38,21 +29,16 @@ use crate::FrameRecord;
 use super::install::InstalledFunction;
 use super::{code_index, Vm};
 
-/// Per-frame execution state threaded through every handler call.
+/// Per-frame execution state threaded through every semantic body.
 ///
 /// All references share the `'vm` lifetime — the state exists only for one
-/// dispatch invocation. Handlers split-borrow the fields when they
+/// dispatch invocation. Semantic bodies split-borrow the fields when they
 /// need both `&mut vm` and another `&mut` field at once:
 ///
 /// ```ignore
 /// let DispatchState { vm, agent, host, registry, frame, .. } = &mut *state;
 /// let result = vm.execute_add_opcode(agent, host, registry, frame, b, c);
 /// ```
-///
-/// DSL-0c kept `DispatchState` because (a) every semantic body in
-/// `vm/semantics/` consumes it through `LlIntDispatchState::dispatch_state()`,
-/// (b) the `LlIntRustContext::dispatch` field on the asm side holds one,
-/// and (c) the wide-form prefix bridge passes one to α handlers.
 pub struct DispatchState<'vm> {
     pub(crate) vm: &'vm mut Vm,
     pub(crate) agent: &'vm mut Agent,
@@ -131,57 +117,6 @@ impl<'vm> DispatchState<'vm> {
         }
     }
 
-    /// Bytes from the active PC to the end of the function's instruction
-    /// stream. Handlers slice this to decode their operands and look up the
-    /// next opcode byte for `dispatch_next!`.
-    #[inline]
-    pub(crate) fn current_bytes(&self) -> &[u8] {
-        let pc = self.frame.instruction_offset() as usize;
-        &self.installed.function.instruction_bytes()[pc..]
-    }
-
-    // DSL-0c C5: first_opcode_byte deleted with `run_trampoline*` — the
-    // only caller. α handlers reach the next opcode byte through
-    // `next_opcode_byte` instead.
-
-    /// Hot-path read of the byte at the current `pc`, with the slice
-    /// bounds check elided. Mirrors JSC LLInt's `loadb [PB, PC, 1], t0`
-    /// pattern: the bytecode validator guarantees that any opcode
-    /// reachable via dispatch is followed by another valid opcode byte
-    /// (every script-completion path ends in `Return` / `ReturnUndefined`,
-    /// which exit via `Step::Done` rather than continuing dispatch).
-    ///
-    /// # Safety
-    ///
-    /// Caller must guarantee `self.frame.instruction_offset() <
-    /// self.installed.function.instruction_bytes().len()`. The dispatch
-    /// path satisfies this via the bytecode-emitter invariant and
-    /// terminal-opcode semantics described above.
-    #[inline]
-    pub(crate) fn next_opcode_byte(&self) -> u8 {
-        let bytes = self.installed.function.instruction_bytes();
-        let pc = self.frame.instruction_offset() as usize;
-        debug_assert!(
-            pc < bytes.len(),
-            "dispatch_next! reached past end of bytecode — terminal opcode invariant violated"
-        );
-        // SAFETY: contract above — every dispatched opcode is followed
-        // by another opcode byte; terminal opcodes (Return /
-        // ReturnUndefined) exit via Step::Done, not dispatch_next!.
-        unsafe { *bytes.as_ptr().add(pc) }
-    }
-
-    /// Hot-path PC advance, with the u32-overflow check elided.
-    /// Validated bytecode is bounded far below `u32::MAX`, so
-    /// `wrapping_add` is functionally equivalent to `checked_add` for
-    /// any in-spec bytecode. Mirrors JSC LLInt's `addp Imm, PC` pattern
-    /// (no overflow trap).
-    #[inline]
-    pub(crate) fn advance(&mut self, n: u32) {
-        let next = self.frame.instruction_offset().wrapping_add(n);
-        self.frame.set_instruction_offset(next);
-    }
-
     #[inline]
     pub(crate) fn code(&self) -> CodeRef {
         self.frame.code()
@@ -225,13 +160,15 @@ impl<'vm> DispatchState<'vm> {
     /// Route a possibly-abrupt operation result through the exception
     /// transfer machinery. Returns `Ok(Some(value))` for success,
     /// `Ok(None)` if the abrupt completion was caught by an active handler
-    /// (the handler should `dispatch_next!` to continue at the new PC), or
+    /// (the semantic body should continue at the new PC), or
     /// `Err(error)` if the abrupt completion escapes the current code.
     ///
-    /// Frame-state refresh after a cross-frame catch happens in
-    /// `run_trampoline`'s epoch check, not here — `Vm::handle_dispatch_result`
-    /// bumps the dispatch-frame-check epoch via `request_dispatch_frame_check`,
-    /// so the trampoline picks up the unwind on the next iteration.
+    /// Frame-state refresh after a cross-frame catch happens in the asm
+    /// dispatch loop's epoch check (mirrored in
+    /// `LlIntDispatchState::translate_outcome`), not here —
+    /// `Vm::handle_dispatch_result` bumps the dispatch-frame-check epoch via
+    /// `request_dispatch_frame_check`, so the dispatcher picks up the unwind
+    /// on the next iteration.
     #[inline]
     pub(crate) fn handle_dispatch_result<T>(&mut self, result: VmResult<T>) -> VmResult<Option<T>> {
         let DispatchState {
@@ -267,52 +204,6 @@ impl<'vm> DispatchState<'vm> {
         Ok(())
     }
 }
-
-/// Per-opcode handler ABI. Each handler returns a `Step` describing what the
-/// trampoline should do next.
-pub type Handler = extern "C" fn(&mut DispatchState) -> Step;
-
-/// Trampoline control-flow value. The trampoline keeps the active handler in
-/// a local variable and only inspects this enum's discriminant.
-pub enum Step {
-    Continue(Handler),
-    Done(Value),
-    Error(VmError),
-}
-
-// DSL-0c C5: dispatch_next! and dispatch_next_with_value! macros deleted
-// with the α trampoline.
-//
-// DSL-0c C2: α `DISPATCH_TABLE` + `dispatch_handlers/` deleted alongside
-// `op_prefix_via_alpha`. Wide-form prefix dispatch is now driven entirely
-// by `crate::dsl::handlers::cold::dispatch_wide_form` — a centralized
-// Rust function whose match arms decode + execute each prefix-accepting
-// opcode's wide-form encoding.
-
-/// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
-/// `return Step::Error(e)` on Err.
-///
-/// Retained for the DSL test harness (`dsl/test_helpers.rs`), which still
-/// constructs a `DispatchState` directly and exercises semantic bodies
-/// outside the asm trampoline.
-#[macro_export]
-macro_rules! try_step {
-    ($e:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(error) => return $crate::vm::dispatch_state::Step::Error(error),
-        }
-    };
-}
-
-// DSL-0c C5: run_trampoline, run_trampoline_counted, still_active deleted.
-// The α trampoline was the production dispatch loop until DSL-0c (Task C1)
-// flipped `Vm::run` to `run_via_dsl`. The asm-DSL trampoline replaces
-// `run_trampoline`; the epoch-check + `still_active` logic is now in
-// `LlIntDispatchState::translate_outcome` in `dsl/slow_path.rs` (mirrors
-// the same policy: only refresh on a true frame-stack change, never on a
-// same-frame epoch bump). Wide-form prefix dispatch — formerly the last
-// α consumer — is now native Rust via `dispatch_wide_form`.
 
 impl Vm {
     /// Look up the `Arc<InstalledFunction>` for a given `CodeRef`. Used by

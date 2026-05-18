@@ -57,11 +57,10 @@
 //! on `Ok(Some(_))` we record the slot before deciding `ExitDone` vs
 //! `Refresh`; on `Ok(None)` we skip recording.
 
-use lyng_js_bytecode::{CallRange, Opcode};
+use lyng_js_bytecode::CallRange;
 use lyng_js_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
-use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
 
 // =====================================================================
@@ -120,26 +119,6 @@ pub struct OpCreateClosureArgs {
     pub a: u16,
     pub bx: u32,
     pub instruction_len: u32,
-}
-
-// =====================================================================
-// Helpers — `MissingInlineCallRange` extraction and spread-mask lookup
-// =====================================================================
-
-/// Build the `MissingInlineCallRange` error consistent with the α
-/// handler's `require_call_range` helper. The decoder returns
-/// `Option<CallRange>`, but `Call` / `TailCall` / `Construct` require
-/// the inline operand; missing it is a bytecode bug.
-#[inline]
-fn missing_inline_call_range_error(
-    inner: &DispatchState<'_>,
-    opcode: Opcode,
-) -> VmError {
-    VmError::MissingInlineCallRange {
-        code: inner.frame.code(),
-        instruction_offset: inner.frame.instruction_offset(),
-        opcode,
-    }
 }
 
 // =====================================================================
@@ -399,37 +378,3 @@ pub(crate) fn op_create_closure_semantic(
     }
 }
 
-// =====================================================================
-// Decode-time helpers used by the α handler. Kept here so the
-// `missing_inline_call_range_error` lookup stays adjacent to the
-// `OpCallRangeArgs` shape the α body builds.
-// =====================================================================
-
-/// α-handler helper: extract the inline `CallRange` from the
-/// `decode_call_range_operands` output, returning a `VmError` if it's
-/// missing (bytecode bug — the variable-arity call opcodes require an
-/// inline call range).
-#[inline]
-pub(crate) fn require_call_range_semantic(
-    state: &DispatchState<'_>,
-    range: Option<CallRange>,
-    opcode: Opcode,
-) -> Result<CallRange, VmError> {
-    range.ok_or_else(|| missing_inline_call_range_error(state, opcode))
-}
-
-/// α-handler helper: look up the spread-mask metadata for a feedback
-/// slot. Returns `None` if no feedback slot is bound (i.e. no spread
-/// arguments are possible) or if the feedback descriptor has no
-/// `spread_mask` metadata. Matches the α handler's `spread_mask_for`
-/// helper in `dispatch_handlers/calls.rs` so semantic and α paths
-/// observe identical spread-bit interpretation.
-#[inline]
-pub(crate) fn spread_mask_for_semantic(
-    state: &DispatchState<'_>,
-    feedback_slot: Option<FeedbackSlotId>,
-) -> Option<u64> {
-    let slot = feedback_slot?;
-    let descriptor = state.installed.feedback_descriptor_for_slot(slot)?;
-    descriptor.metadata().spread_mask()
-}

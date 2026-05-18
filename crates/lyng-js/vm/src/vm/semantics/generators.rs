@@ -82,7 +82,6 @@
 use lyng_js_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
-use crate::error::VmError;
 use crate::vm::dispatch::next_dispatch_instruction_offset;
 use crate::vm::dispatch_state::DispatchState;
 
@@ -326,16 +325,3 @@ pub(crate) fn op_load_resume_value_semantic(
     }
 }
 
-// =====================================================================
-// Helpers shared by the α handlers
-// =====================================================================
-
-/// Reject an out-of-range `ax` operand. Mirrors the α handler's
-/// `ax_to_register` failure case.
-#[inline]
-pub(crate) fn ax_register_out_of_bounds_error(state: &DispatchState<'_>) -> VmError {
-    VmError::RegisterOutOfBounds {
-        code: state.frame.code(),
-        register: 0,
-    }
-}

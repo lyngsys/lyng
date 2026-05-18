@@ -1,6 +1,6 @@
 use super::registers::absolute_register;
 use super::{
-    Agent, CallRange, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm,
+    Agent, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm,
     VmError, VmResult,
 };
 use lyng_js_types::{AbruptCompletion, FeedbackSlotId};
@@ -90,20 +90,6 @@ mod tests {
         );
     }
 }
-
-pub(in crate::vm) const fn sign_extend_i24(bytes: [u8; 3]) -> i32 {
-    let sign = if bytes[2] & 0x80 == 0 { 0 } else { 0xff };
-    i32::from_le_bytes([bytes[0], bytes[1], bytes[2], sign])
-}
-
-pub(in crate::vm) type DecodedCallRangeOperands = (
-    u16,
-    u16,
-    u16,
-    Option<CallRange>,
-    Option<FeedbackSlotId>,
-    u32,
-);
 
 #[inline]
 pub(in crate::vm) const fn advance_dispatch_frame(frame: &mut FrameRecord, encoded_len: u32) {
@@ -278,165 +264,6 @@ fn decode_abx_operands_wide(
     Ok((
         u16::from_le_bytes([*a_low, *a_high]),
         u32::from_le_bytes([*bx0, *bx1, *bx2, bx3]),
-        feedback_slot,
-        instruction_len,
-    ))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_abx8_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(u16, u32, Option<FeedbackSlotId>, u32)> {
-    let [_, ra, rbx, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 3usize, is_profiled, code, instruction_offset)?;
-    Ok((
-        u16::from(*ra),
-        u32::from(*rbx),
-        feedback_slot,
-        instruction_len,
-    ))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_ax_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(i32, Option<FeedbackSlotId>, u32)> {
-    let [_, first_byte, second, third, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 4usize, is_profiled, code, instruction_offset)?;
-    Ok((
-        sign_extend_i24([*first_byte, *second, *third]),
-        feedback_slot,
-        instruction_len,
-    ))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_ax8_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(i32, Option<FeedbackSlotId>, u32)> {
-    let [_, raw_ax, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
-    Ok((
-        i32::from(i8::from_le_bytes([*raw_ax])),
-        feedback_slot,
-        instruction_len,
-    ))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_local_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(u16, Option<FeedbackSlotId>, u32)> {
-    let [_, register, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
-    Ok((u16::from(*register), feedback_slot, instruction_len))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_accumulator_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(Option<FeedbackSlotId>, u32)> {
-    decode_feedback_slot_operand(bytes, 1usize, is_profiled, code, instruction_offset)
-}
-
-#[inline]
-pub(in crate::vm) fn decode_accumulator_byte_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(u32, Option<FeedbackSlotId>, u32)> {
-    let [_, operand, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
-    Ok((u32::from(*operand), feedback_slot, instruction_len))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_accumulator_register_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<(u16, Option<FeedbackSlotId>, u32)> {
-    let [_, register, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 2usize, is_profiled, code, instruction_offset)?;
-    Ok((u16::from(*register), feedback_slot, instruction_len))
-}
-
-#[inline]
-pub(in crate::vm) fn decode_call_range_operands(
-    bytes: &[u8],
-    is_profiled: bool,
-    code: CodeRef,
-    instruction_offset: u32,
-) -> VmResult<DecodedCallRangeOperands> {
-    let [_, ra, rb, rc, count_low, count_high, base_low, base_high, ..] = bytes else {
-        return Err(VmError::InstructionOutOfBounds {
-            code,
-            instruction_offset,
-        });
-    };
-    let (feedback_slot, instruction_len) =
-        decode_feedback_slot_operand(bytes, 8usize, is_profiled, code, instruction_offset)?;
-    Ok((
-        u16::from(*ra),
-        u16::from(*rb),
-        u16::from(*rc),
-        Some(CallRange::new(
-            u16::from_le_bytes([*base_low, *base_high]),
-            u16::from_le_bytes([*count_low, *count_high]),
-        )),
         feedback_slot,
         instruction_len,
     ))
