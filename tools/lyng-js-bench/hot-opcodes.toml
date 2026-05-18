@@ -57,7 +57,9 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "LoadSmi8"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.A: inline DSL port landed at commit 172d54ea (12 instr measured).
+# Budget = 14 (measured 12, +2 headroom for LLVM rewrite noise).
+aarch64_max_instructions = 14
 x86_64_max_instructions = 0
 
 [[opcodes]]
@@ -87,6 +89,9 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "LoadThis"
 target_slow_path_share = 0.20
+# DSL-1 Phase 1.A: deferred to Phase 1.B; budget unset.
+# See reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md for the
+# frame-context refactor that unblocks the inline port.
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
 
@@ -111,7 +116,9 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "LoadZero"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.A: inline DSL port landed at commit 9b8e8782 (10 instr measured).
+# Budget = 12 (measured 10, +2 headroom for LLVM rewrite noise).
+aarch64_max_instructions = 12
 x86_64_max_instructions = 0
 
 [[opcodes]]
@@ -141,6 +148,9 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "LoadConst8"
 target_slow_path_share = 0.20
+# DSL-1 Phase 1.A: deferred to Phase 1.B; budget unset.
+# See reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md for the
+# flat-Value constants refactor that unblocks the inline port.
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
 
