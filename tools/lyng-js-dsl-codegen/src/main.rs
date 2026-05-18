@@ -2446,6 +2446,35 @@ fn main() {
     }
     eprintln!("[codegen] {} cold stubs queued", COLD_STUBS.len());
 
+    // Cross-check every stub's `length` against the canonical narrow
+    // encoded length from `Opcode::encoded_len()`. A mismatch here means
+    // the emitted handler would advance PC by the wrong number of bytes,
+    // misaligning subsequent dispatch (cf. the op_move length=3 bug
+    // fixed in commit "DSL-0c: fix op_move length (3 → 4)…"). Catching
+    // this at codegen time prevents the broken cold.rs from ever
+    // reaching the workspace.
+    let mut mismatches: Vec<(Opcode, u32, u32)> = Vec::new();
+    for stub in COLD_STUBS {
+        let canonical = u32::from(stub.opcode.encoded_len());
+        if stub.length != canonical {
+            mismatches.push((stub.opcode, stub.length, canonical));
+        }
+    }
+    if !mismatches.is_empty() {
+        eprintln!("[codegen] FATAL: {} length mismatches found:", mismatches.len());
+        for (op, declared, canonical) in &mismatches {
+            eprintln!(
+                "  - {:?} (discriminant {}): declared length = {}, canonical = {}",
+                op, *op as u8, declared, canonical,
+            );
+        }
+        panic!(
+            "COLD_STUBS metadata has {} length mismatch(es) — fix the `length:` field(s) above and re-run",
+            mismatches.len(),
+        );
+    }
+    eprintln!("[codegen] length-consistency check passed");
+
     // Sort by opcode discriminant for deterministic output.
     let mut sorted: Vec<&Stub> = COLD_STUBS.iter().collect();
     sorted.sort_by_key(|s| s.opcode as u8);
