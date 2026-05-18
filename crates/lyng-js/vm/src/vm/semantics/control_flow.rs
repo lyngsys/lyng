@@ -89,8 +89,9 @@ fn op_jump_shared_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     if args.delta < 0 {
-        let code = inner.code();
-        inner.vm.observe_tier_backedge_event(code);
+        // DSL-0c C6: tier-accounting on backedges deleted with the α path.
+        // Per design §6 + §10: the interpreter has no tier-up accounting —
+        // intentional, per §2 (JIT is out of scope).
         Vm::poll_incremental_mark_safepoint(inner.agent);
     }
     let instruction_offset = inner.frame.instruction_offset();
@@ -235,10 +236,6 @@ pub(crate) fn op_loop_header_semantic(
     args: OpLoopHeaderArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    // Capture the entry-frame code before any debug-poll refresh; the
-    // tier-backedge event is attributed to the code the loop-header lives
-    // in, even if a debugger step relocated the active frame mid-handler.
-    let code = inner.code();
     if inner.vm.debug_poll_enabled() {
         inner.sync_active_frame();
         {
@@ -249,7 +246,9 @@ pub(crate) fn op_loop_header_semantic(
             return SemanticOutcome::ExitError { error };
         }
     }
-    inner.vm.observe_tier_backedge_event(code);
+    // DSL-0c C6: tier-accounting on backedges deleted with the α path.
+    // Per design §6 + §10: the interpreter has no tier-up accounting —
+    // intentional, per §2 (JIT is out of scope).
     Vm::poll_incremental_mark_safepoint(inner.agent);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,

@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 
 const TIER_READY_HOTNESS_THRESHOLD: u32 = 8;
 const FEEDBACK_EVENT_WEIGHT: u32 = 1;
-const BACKEDGE_EVENT_WEIGHT: u32 = 2;
+// DSL-0c C6: BACKEDGE_EVENT_WEIGHT deleted with α path's backedge accounting.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TierStatus {
@@ -137,14 +137,8 @@ impl TieringState {
         self.observe_hotness(FEEDBACK_EVENT_WEIGHT);
     }
 
-    #[inline]
-    fn observe_backedge_event(&mut self) {
-        if !self.eligible {
-            return;
-        }
-        self.backedge_events = self.backedge_events.saturating_add(1);
-        self.observe_hotness(BACKEDGE_EVENT_WEIGHT);
-    }
+    // DSL-0c C6: observe_backedge_event deleted with α path's
+    // backedge accounting.
 
     #[inline]
     fn observe_hotness(&mut self, weight: u32) {
@@ -207,14 +201,7 @@ impl Vm {
         }
     }
 
-    #[inline]
-    pub(super) fn observe_tier_backedge_event(&mut self, code: CodeRef) {
-        if let Some(state) = self
-            .tiering
-            .get_mut(code_index(code))
-            .and_then(Option::as_mut)
-        {
-            state.observe_backedge_event();
-        }
-    }
+    // DSL-0c C6: observe_tier_backedge_event deleted with α path's
+    // backedge accounting. The interpreter has no tier-up accounting
+    // post-DSL-0c (design §6 + §10).
 }

@@ -1020,7 +1020,16 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
 }
 
 #[test]
-fn loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness() {
+fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
+    // DSL-0c C6: tier-accounting on backedges deleted with the α path.
+    // After DSL-0c the interpreter has no tier-up accounting on backedges —
+    // intentional per design §6 + §10 (JIT is out of scope, §2). A loop
+    // no longer bumps hotness; only feedback-site events do. This test
+    // exercises the same workload as the pre-DSL-0c
+    // `loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness`
+    // test, but only checks invariants that survive the backedge-deletion:
+    // the tier state remains Collecting (since no backedge events fire),
+    // invalidation still resets hotness, and reruns still execute cleanly.
     let unit = compile_test_unit(
         27,
         r"
@@ -1044,14 +1053,14 @@ fn loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness() {
         .unwrap();
     assert_eq!(first, Value::from_smi(120));
 
-    let ready = vm
+    let after_first = vm
         .tiering_snapshot(installed.code())
         .expect("installed code should expose tiering state");
-    assert_eq!(ready.status(), TierStatus::ReadyForNative);
-    assert!(ready.hotness() >= 8);
-    assert!(ready.backedge_events() > 0);
-    assert_eq!(ready.invalidation_epoch(), 0);
-    assert_eq!(ready.native_generation(), None);
+    // Without backedge accounting the loop alone never reaches
+    // ReadyForNative — feedback-site events are the only hotness source.
+    assert_eq!(after_first.backedge_events(), 0);
+    assert_eq!(after_first.invalidation_epoch(), 0);
+    assert_eq!(after_first.native_generation(), None);
 
     assert!(vm.invalidate_tier_state(installed.code()));
     let invalidated = vm
@@ -1069,8 +1078,8 @@ fn loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness() {
     let rewarmed = vm
         .tiering_snapshot(installed.code())
         .expect("installed code should expose tiering state");
-    assert_eq!(rewarmed.status(), TierStatus::ReadyForNative);
     assert_eq!(rewarmed.invalidation_epoch(), 1);
+    assert_eq!(rewarmed.backedge_events(), 0);
 }
 
 #[test]
