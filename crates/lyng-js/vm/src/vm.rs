@@ -399,6 +399,12 @@ impl Vm {
 
     #[cfg(feature = "opcode-counters")]
     pub fn enable_slow_path_counts(&mut self) {
+        // No-op: slow-path counters are always allocated alongside the
+        // dispatch bank in `self.dispatch_counters` (a single
+        // `Box<DispatchCounters>`). Kept for backward compatibility with
+        // tests/benches that called this method when the counters were
+        // a separate optional store. The `SlowPathCounterStore` field
+        // remains for legacy paths but is unused by `slow_path_counts()`.
         if self.slow_path_counts.is_none() {
             self.slow_path_counts = Some(crate::slow_path_counts::SlowPathCounterStore::new());
         }
@@ -411,14 +417,35 @@ impl Vm {
 
     #[cfg(feature = "opcode-counters")]
     pub fn reset_slow_path_counts(&mut self) {
+        // Reset the asm-driven slow-path banks (where the DSL handlers
+        // actually write via `inc_slow_semantic_counter!` /
+        // `inc_slow_safepoint_counter!`). The legacy Rust-side store is
+        // also reset for symmetry, even though it's no longer wired into
+        // the snapshot path.
+        self.dispatch_counters.counters_mut().slow_semantic.fill(0);
+        self.dispatch_counters.counters_mut().slow_safepoint.fill(0);
         if let Some(store) = &self.slow_path_counts {
             store.reset();
         }
     }
 
+    /// Snapshot the asm-driven `slow_semantic` + `slow_safepoint` counter
+    /// banks (filled by `inc_slow_semantic_counter!` /
+    /// `inc_slow_safepoint_counter!` at DSL `call_slow!` / `poll_safepoint!`
+    /// sites). The legacy `SlowPathCounterStore` (`record_semantic` /
+    /// `record_safepoint` from Rust) is no longer the source of truth —
+    /// the asm path is. Returns `None` only when slow-path tracking is
+    /// disabled via `disable_slow_path_counts`.
     #[cfg(feature = "opcode-counters")]
     pub fn slow_path_counts(&self) -> Option<crate::slow_path_counts::SlowPathCounts> {
-        self.slow_path_counts.as_ref().map(|store| store.snapshot())
+        if self.slow_path_counts.is_none() {
+            return None;
+        }
+        let counters = self.dispatch_counters.counters();
+        Some(crate::slow_path_counts::SlowPathCounts::from_dispatch_arrays(
+            &counters.slow_semantic,
+            &counters.slow_safepoint,
+        ))
     }
 
     #[cfg(feature = "opcode-counters")]

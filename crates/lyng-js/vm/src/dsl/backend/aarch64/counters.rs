@@ -22,11 +22,23 @@
 //! Emitted shape (4 instructions per increment):
 //!
 //! ```text
-//!     ldr  x9, [x22, {vm_counter_base}]              ; x9 = *DispatchCounters
-//!     ldr  x10, [x9, #<bank_offset + op*8>]          ; x10 = current count
-//!     add  x10, x10, #1
-//!     str  x10, [x9, #<bank_offset + op*8>]          ; store back
+//!     ldr  xS, [x22, {vm_counter_base}]              ; xS = *DispatchCounters
+//!     ldr  xT, [xS, #<bank_offset + op*8>]           ; xT = current count
+//!     add  xT, xT, #1
+//!     str  xT, [xS, #<bank_offset + op*8>]           ; store back
 //! ```
+//!
+//! ## Scratch-register convention per bank (DSL-1 Phase 1.B.0 Task 5)
+//!
+//! - **Dispatch bank** (`inc_dispatch_counter!`) uses `x9, x10`. Emitted
+//!   as the FIRST body fragment, BEFORE the operand-decode prologue —
+//!   no live operand values to clobber.
+//! - **Slow_semantic / Slow_safepoint banks** use `x16, x17` (AAPCS64
+//!   IP0/IP1 scratch). Emitted INSIDE `call_slow!` / `poll_safepoint!`
+//!   AFTER the operand-decode prologue, so any live operands in x9..x15
+//!   are preserved. The `call_slow!` bridge subsequently reloads x16/x17
+//!   for its own pc-offset stash — the counter values are stored before
+//!   that point so the clobber is harmless.
 //!
 //! ## Bindings expected from the proc-macro lowerer (when feature is on)
 //!
@@ -62,10 +74,16 @@ macro_rules! inc_dispatch_counter {
 macro_rules! inc_slow_semantic_counter {
     ($opcode_byte:literal) => {
         concat!(
-            "ldr    x9, [x22, {vm_counter_base}]\n",
-            "ldr    x10, [x9, #", stringify!($opcode_byte), " * 8 + 2048]\n",
-            "add    x10, x10, #1\n",
-            "str    x10, [x9, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+            // Use x16/x17 (AAPCS64 IP0/IP1) — they're free to clobber
+            // before the `call_slow!` bridge runs, which reloads them
+            // for its own pc-offset stash. Crucially, x9..x15 hold
+            // decoded operand values that the bridge moves into w1..w5
+            // immediately after this fragment; using x9/x10 here would
+            // corrupt them.
+            "ldr    x16, [x22, {vm_counter_base}]\n",
+            "ldr    x17, [x16, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+            "add    x17, x17, #1\n",
+            "str    x17, [x16, #", stringify!($opcode_byte), " * 8 + 2048]\n",
         )
     };
 }
@@ -75,10 +93,13 @@ macro_rules! inc_slow_semantic_counter {
 macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => {
         concat!(
-            "ldr    x9, [x22, {vm_counter_base}]\n",
-            "ldr    x10, [x9, #", stringify!($opcode_byte), " * 8 + 4096]\n",
-            "add    x10, x10, #1\n",
-            "str    x10, [x9, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+            // Same x16/x17 convention as `inc_slow_semantic_counter!`:
+            // they're free to clobber before the pending-poll path
+            // jumps into a `call_slow!` site (which reloads them).
+            "ldr    x16, [x22, {vm_counter_base}]\n",
+            "ldr    x17, [x16, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+            "add    x17, x17, #1\n",
+            "str    x17, [x16, #", stringify!($opcode_byte), " * 8 + 4096]\n",
         )
     };
 }

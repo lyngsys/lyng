@@ -61,6 +61,18 @@ pub struct SlowPathCounts {
 }
 
 impl SlowPathCounts {
+    /// Build a `SlowPathCounts` from the `slow_semantic` / `slow_safepoint`
+    /// banks of a `DispatchCounters` struct. Used by `Vm::slow_path_counts`
+    /// to surface the asm-driven counter banks behind the same interface
+    /// the bench and tests already consume (DSL-1 Phase 1.B.0 Task 5).
+    #[must_use]
+    pub fn from_dispatch_arrays(semantic: &[u64; 256], safepoint: &[u64; 256]) -> Self {
+        Self {
+            semantic: semantic[..OPCODE_COUNT_LEN].to_vec(),
+            safepoint: safepoint[..OPCODE_COUNT_LEN].to_vec(),
+        }
+    }
+
     #[must_use]
     pub fn semantic(&self, opcode: Opcode) -> u64 {
         self.semantic.get(usize::from(opcode as u8)).copied().unwrap_or(0)

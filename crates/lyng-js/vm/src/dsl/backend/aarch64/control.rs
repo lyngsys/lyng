@@ -92,15 +92,53 @@ macro_rules! dispatch {
 /// expands one match arm per arity, hardcoding `w1..w5` so the
 /// per-operand mov has the correct destination register.
 ///
-/// Bindings: `<shim>` (per call site), `{state_pb}`, `{state_pc}`.
+/// ## Opcode-byte injection (DSL-1 Phase 1.B.0 Task 5)
+///
+/// The lowerer rewrites every `call_slow!(...)` body invocation to
+/// append `, opcode_byte = <N>` — the handler's own opcode discriminant
+/// from its `llint_handler!` signature. The macro emits
+/// `inc_slow_semantic_counter!(N)` before the rest of the bridge,
+/// bumping the slow-semantic bank slot for this opcode whenever the
+/// fast-path falls through (or always, for cold-stub-only opcodes).
+///
+/// Each arity has two match arms:
+/// - With `opcode_byte = N` (preferred — emitted by the lowerer).
+/// - Without `opcode_byte` (fallback — only fires if a hand-written
+///   call site bypasses the lowerer; emits no counter inc).
+///
+/// Bindings: `<shim>` (per call site), `{state_pb}`, `{state_pc}`,
+/// `{vm_counter_base}` (when `opcode-counters` feature is on).
 #[macro_export]
 macro_rules! call_slow {
+    // ---- 0 args ----
+    ($shim:ident, args = [], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
     ($shim:ident, args = []) => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
+    // ---- 1 arg ----
+    ($shim:ident, args = [$a:tt], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w", stringify!($a), "\n",
             "bl     {", stringify!($shim), "}\n",
         )
     };
@@ -114,6 +152,19 @@ macro_rules! call_slow {
             "bl     {", stringify!($shim), "}\n",
         )
     };
+    // ---- 2 args ----
+    ($shim:ident, args = [$a:tt, $b:tt], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w", stringify!($a), "\n",
+            "mov    w2, w", stringify!($b), "\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
     ($shim:ident, args = [$a:tt, $b:tt]) => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
@@ -122,6 +173,20 @@ macro_rules! call_slow {
             "mov    x0, x24\n",
             "mov    w1, w", stringify!($a), "\n",
             "mov    w2, w", stringify!($b), "\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
+    // ---- 3 args ----
+    ($shim:ident, args = [$a:tt, $b:tt, $c:tt], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w", stringify!($a), "\n",
+            "mov    w2, w", stringify!($b), "\n",
+            "mov    w3, w", stringify!($c), "\n",
             "bl     {", stringify!($shim), "}\n",
         )
     };
@@ -137,6 +202,21 @@ macro_rules! call_slow {
             "bl     {", stringify!($shim), "}\n",
         )
     };
+    // ---- 4 args ----
+    ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w", stringify!($a), "\n",
+            "mov    w2, w", stringify!($b), "\n",
+            "mov    w3, w", stringify!($c), "\n",
+            "mov    w4, w", stringify!($d), "\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
     ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt]) => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
@@ -147,6 +227,22 @@ macro_rules! call_slow {
             "mov    w2, w", stringify!($b), "\n",
             "mov    w3, w", stringify!($c), "\n",
             "mov    w4, w", stringify!($d), "\n",
+            "bl     {", stringify!($shim), "}\n",
+        )
+    };
+    // ---- 5 args ----
+    ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt, $e:tt], opcode_byte = $op:literal) => {
+        concat!(
+            $crate::inc_slow_semantic_counter!($op),
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w", stringify!($a), "\n",
+            "mov    w2, w", stringify!($b), "\n",
+            "mov    w3, w", stringify!($c), "\n",
+            "mov    w4, w", stringify!($d), "\n",
+            "mov    w5, w", stringify!($e), "\n",
             "bl     {", stringify!($shim), "}\n",
         )
     };

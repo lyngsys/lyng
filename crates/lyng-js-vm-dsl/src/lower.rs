@@ -60,11 +60,11 @@
 //! quiet about unused named args regardless of which backend macros
 //! the body actually uses.
 
-use proc_macro2::{Delimiter, Group, Ident, Literal, Span, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro2::Spacing;
 use quote::quote;
 use std::collections::BTreeSet;
-use syn::Result;
+use syn::{LitInt, Result};
 
 use crate::layouts::Layout;
 use crate::parse::{BodyStmt, HandlerAst};
@@ -130,7 +130,16 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     for stmt in &ast.body {
         match stmt {
             BodyStmt::MacroCall(tokens) => {
-                let rewritten = substitute_idents(tokens.clone(), &mut scratch, &label_prefix)?;
+                // Inject `opcode_byte = N` into call_slow!() and
+                // poll_safepoint!() invocations (DSL-1 Phase 1.B.0
+                // Task 5). The handler's opcode discriminant from the
+                // `llint_handler!` signature is threaded through so the
+                // backend macros emit `inc_slow_semantic_counter!(N)` /
+                // `inc_slow_safepoint_counter!(N)` for slow-path-share
+                // accounting. Idempotent — if the user already wrote
+                // `opcode_byte = N` explicitly, the injection is skipped.
+                let injected = inject_opcode_byte(tokens.clone(), opcode_byte);
+                let rewritten = substitute_idents(injected, &mut scratch, &label_prefix)?;
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
             }
@@ -263,6 +272,112 @@ fn substitute_idents(
         }
     }
     Ok(out.into_iter().collect())
+}
+
+/// Inject `, opcode_byte = <N>` into the argument group of every
+/// `call_slow!(...)` / `poll_safepoint!(...)` macro call found in
+/// `tokens`. This threads the handler's opcode discriminant (from the
+/// `llint_handler!` signature) into the slow-path bridge macros so they
+/// can emit `inc_slow_semantic_counter!(N)` / `inc_slow_safepoint_counter!(N)`
+/// at the correct site (DSL-1 Phase 1.B.0 Task 5).
+///
+/// Skipped if the user already wrote `opcode_byte = N` explicitly in
+/// the invocation. This keeps the rewrite idempotent and allows hand
+/// override during testing.
+///
+/// Each statement passed in is a single macro call of the shape
+/// `<path>!(<args>)`, but we still recurse into groups so any nested
+/// invocations are also rewritten.
+fn inject_opcode_byte(tokens: TokenStream, opcode_byte: &LitInt) -> TokenStream {
+    let trees: Vec<TokenTree> = tokens.into_iter().collect();
+    let mut out: Vec<TokenTree> = Vec::with_capacity(trees.len());
+    let mut i = 0;
+    while i < trees.len() {
+        // Detect `<name> ! (...)` where <name> is one of the slow-path
+        // bridge macros that we want to enrich.
+        let name = match &trees[i] {
+            TokenTree::Ident(id) => id.to_string(),
+            _ => {
+                // Recurse into groups (e.g. macro args that themselves
+                // contain nested invocations — rare but defensive).
+                out.push(rewrite_group(trees[i].clone(), opcode_byte));
+                i += 1;
+                continue;
+            }
+        };
+        let is_target = name == "call_slow" || name == "poll_safepoint";
+        if !is_target {
+            out.push(rewrite_group(trees[i].clone(), opcode_byte));
+            i += 1;
+            continue;
+        }
+        // Followed by `!` Punct?
+        let bang = match trees.get(i + 1) {
+            Some(TokenTree::Punct(p)) if p.as_char() == '!' => p,
+            _ => {
+                out.push(trees[i].clone());
+                i += 1;
+                continue;
+            }
+        };
+        // Followed by a parenthesized arg group?
+        let arg_group = match trees.get(i + 2) {
+            Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Parenthesis => g,
+            _ => {
+                out.push(trees[i].clone());
+                i += 1;
+                continue;
+            }
+        };
+        // Already has `opcode_byte = ...`? Skip injection.
+        if arg_group_has_opcode_byte(arg_group.stream()) {
+            out.push(trees[i].clone());
+            out.push(TokenTree::Punct(bang.clone()));
+            out.push(TokenTree::Group(arg_group.clone()));
+            i += 3;
+            continue;
+        }
+        // Append `, opcode_byte = <N>` to the arg-group's contents.
+        let mut new_inner: Vec<TokenTree> = arg_group.stream().into_iter().collect();
+        let span = bang.span();
+        new_inner.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        new_inner.push(TokenTree::Ident(Ident::new("opcode_byte", span)));
+        new_inner.push(TokenTree::Punct(Punct::new('=', Spacing::Alone)));
+        new_inner.push(TokenTree::Literal(opcode_byte.token()));
+        let new_group = Group::new(arg_group.delimiter(), new_inner.into_iter().collect());
+        out.push(trees[i].clone());
+        out.push(TokenTree::Punct(bang.clone()));
+        out.push(TokenTree::Group(new_group));
+        i += 3;
+    }
+    out.into_iter().collect()
+}
+
+/// Recurse into a TokenTree::Group, applying `inject_opcode_byte` to
+/// the inner stream. Non-group trees pass through unchanged.
+fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt) -> TokenTree {
+    match tt {
+        TokenTree::Group(g) => {
+            let inner = inject_opcode_byte(g.stream(), opcode_byte);
+            TokenTree::Group(Group::new(g.delimiter(), inner))
+        }
+        other => other,
+    }
+}
+
+/// Returns `true` if the token stream of a `call_slow!` / `poll_safepoint!`
+/// argument group already contains a top-level `opcode_byte = ...` named
+/// arg. Used to keep the lowerer's injection idempotent so hand-written
+/// callsites can opt out.
+fn arg_group_has_opcode_byte(stream: TokenStream) -> bool {
+    for tt in stream {
+        if let TokenTree::Ident(id) = tt {
+            if id == "opcode_byte" {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// Scan `tokens` for `call_slow!(<shim_name>, args = [...])` invocations
