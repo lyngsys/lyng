@@ -143,7 +143,27 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
         quote! { #ident = sym #ident, }
     });
 
+    // Emit a sibling `pub const <NAME>_LENGTH: u32 = N;` so a runtime
+    // consistency test can cross-check the declared length against the
+    // canonical `Opcode::encoded_len()`. The const name is the uppercase
+    // of the handler ident (`op_move` → `OP_MOVE_LENGTH`).
+    //
+    // This is "Option C-light" from DSL-0c's commit-3 plan: the
+    // proc-macro emits the const, the hand-written test imports it and
+    // compares against `Opcode::<Variant>.encoded_len()`. The const lives
+    // in the same module as its handler — no extra symbol-management
+    // ceremony.
+    let length_const_name = Ident::new(
+        &format!("{}_LENGTH", name.to_string().to_uppercase()),
+        name.span(),
+    );
+
     Ok(quote! {
+        /// Declared instruction length (narrow form) for the
+        /// sibling handler. Kept in sync with the `length = N`
+        /// attribute by construction (emitted by `llint_handler!`).
+        pub const #length_const_name: u32 = #length as u32;
+
         #[unsafe(naked)]
         pub extern "C" fn #name() -> ! {
             // `naked_asm!` implies `noreturn`; explicit `options(noreturn)`
