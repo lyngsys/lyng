@@ -563,8 +563,9 @@ impl Vm {
     /// DSL-0c (Task C1) flipped this from `run_via_trampoline` (α path
     /// using `DispatchState` + `DISPATCH_TABLE` + `dispatch_handlers/`)
     /// to `run_via_dsl` (asm-DSL trampoline + `DSL_DISPATCH_TABLE`).
-    /// The α machinery is still linked in for one commit so the
-    /// rollback diff is small; Tasks C2–C5 delete it.
+    /// Task C5 deleted the α trampoline functions themselves; the
+    /// `dispatch_handlers/` modules + `DISPATCH_TABLE` survive only for
+    /// the wide-form prefix bridge in `dsl::handlers::warm::op_prefix_via_alpha`.
     pub(super) fn run(
         &mut self,
         agent: &mut Agent,

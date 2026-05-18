@@ -333,25 +333,28 @@ impl Vm {
             .map(OpcodeDispatchCounterStore::snapshot)
     }
 
-    /// One-shot check used by `run_trampoline` to branch between the
-    /// uncounted hot path and the counted instrumented path. Cheap (single
-    /// load + nullness check); called once per script invocation, not per
-    /// dispatch.
-    #[cfg(feature = "opcode-counters")]
-    #[inline]
-    pub(in crate::vm) fn opcode_counter_enabled(&self) -> bool {
-        self.opcode_dispatch_counts.is_some()
-    }
+    // DSL-0c C5: opcode_counter_enabled deleted with run_trampoline*.
+    // The runtime branch from `run_via_trampoline` between
+    // `run_trampoline_counted` and `run_trampoline_uncounted` no longer
+    // exists; if/when DSL grows an opcode-dispatch counting tail, it
+    // will re-introduce the necessary branch in its own dispatch macro.
 
     /// Trampoline-side opcode counter: translates the raw byte to `Opcode`,
     /// skips `Wide` / `ExtraWide` prefixes (so the recorded total mirrors
     /// the legacy "semantic only" count), and records the dispatch. No-op
-    /// when counters are disabled. Called only from
-    /// `run_trampoline_counted`, so the hot dispatch path
-    /// (`run_trampoline_uncounted` + every `dispatch_next!` tail) never
-    /// pays the cost of the disabled-case load+branch.
+    /// when counters are disabled.
+    ///
+    /// DSL-0c C5: kept compiled (feature-gated) for future re-wiring into
+    /// a DSL dispatch macro, but unreferenced as of DSL-0c. The
+    /// `opcode-counters` feature's behavioral tests (`tests/core.rs`)
+    /// no longer pass with the feature enabled — flipping the
+    /// counter on now records zero dispatches because the α
+    /// trampoline that called this helper is gone. Restoring
+    /// counter functionality is a follow-up to wire `record_dispatch`
+    /// into the DSL `dispatch!` tail.
     #[cfg(feature = "opcode-counters")]
     #[inline]
+    #[allow(dead_code)]
     pub(in crate::vm) fn maybe_record_opcode_dispatch(&self, byte: u8) {
         let Some(counts) = &self.opcode_dispatch_counts else {
             return;
@@ -1665,16 +1668,16 @@ impl Vm {
         }
     }
 
-    /// DSL-0c: dispatch entrypoint that routes through
+    /// DSL-0c: sole dispatch entrypoint, routing through
     /// `crate::dsl::entry::run_via_dsl` (asm-DSL trampoline).
     ///
-    /// Pulls the active frame + installed function the same way
-    /// `run_via_trampoline` did (sub-8 invariant), then hands off to
-    /// the DSL entry shim. `Vm::run` (in `vm/dispatch.rs`) calls this
-    /// after C1 flips the dispatch route; the trampoline machinery
-    /// (`run_via_trampoline`, `run_trampoline`, `DISPATCH_TABLE`,
-    /// `dispatch_handlers/`) survives the flip for one commit so the
-    /// rollback diff is small. Tasks C2–C5 delete it.
+    /// Pulls the active frame + installed function (sub-8 invariant),
+    /// then hands off to the DSL entry shim. `Vm::run` (in
+    /// `vm/dispatch.rs`) calls this. DSL-0c (Task C5) deleted the
+    /// α trampoline (`run_via_trampoline`, `run_trampoline`,
+    /// `still_active`); `DISPATCH_TABLE` + `dispatch_handlers/`
+    /// survive specifically for the wide-form prefix bridge in
+    /// `crate::dsl::handlers::warm::op_prefix_via_alpha`.
     pub(crate) fn run_via_dsl(
         &mut self,
         agent: &mut Agent,

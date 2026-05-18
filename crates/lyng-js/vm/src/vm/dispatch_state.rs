@@ -11,11 +11,18 @@
 //! `Vm`, `Agent`, host hooks, native-function registry, the active
 //! `FrameRecord`, and the `Arc<InstalledFunction>` whose `instruction_bytes()`
 //! the handler is decoding. Handlers are `extern "C" fn`s receiving
-//! `&mut DispatchState` and returning `Step`; the trampoline does the indirect
-//! call and loops on `Step::Continue(handler)`.
+//! `&mut DispatchState` and returning `Step`.
 //!
-//! Post sub-8 cutover (`lyng-9gyk`), `run_trampoline` is the only dispatch
-//! path — `Vm::run` routes here via `run_via_trampoline`.
+//! DSL-0c (Tasks C2–C5) deleted the α trampoline (`run_trampoline*`,
+//! `Vm::run_via_trampoline`, `still_active`) because `Vm::run` now routes
+//! through the asm-DSL path (`run_via_dsl`). The α `dispatch_handlers/`
+//! family modules + `DISPATCH_TABLE` + `Step` + `DispatchState` survive
+//! specifically for the wide-form prefix bridge in
+//! `crate::dsl::handlers::warm::op_prefix_via_alpha`, which delegates
+//! wide-form opcodes through the α DISPATCH_TABLE until proper wide-form
+//! DSL decoders land in a future batch (see the comment block on
+//! `dsl/handlers/warm.rs` `op_wide` / `op_extra_wide`). Semantic bodies
+//! in `vm/semantics/` also consume `DispatchState` directly.
 
 use std::sync::Arc;
 
@@ -128,18 +135,16 @@ impl<'vm> DispatchState<'vm> {
         &self.installed.function.instruction_bytes()[pc..]
     }
 
-    #[inline]
-    pub(crate) fn first_opcode_byte(&self) -> u8 {
-        self.current_bytes()[0]
-    }
+    // DSL-0c C5: first_opcode_byte deleted with `run_trampoline*` — the
+    // only caller. α handlers reach the next opcode byte through
+    // `next_opcode_byte` instead.
 
     /// Hot-path read of the byte at the current `pc`, with the slice
     /// bounds check elided. Mirrors JSC LLInt's `loadb [PB, PC, 1], t0`
     /// pattern: the bytecode validator guarantees that any opcode
-    /// reachable via `dispatch_next!` is followed by another valid
-    /// opcode byte (every script-completion path ends in `Return` /
-    /// `ReturnUndefined`, which exit via `Step::Done` rather than
-    /// `dispatch_next!`).
+    /// reachable via dispatch is followed by another valid opcode byte
+    /// (every script-completion path ends in `Return` / `ReturnUndefined`,
+    /// which exit via `Step::Done` rather than continuing dispatch).
     ///
     /// # Safety
     ///
@@ -270,91 +275,12 @@ pub enum Step {
     Error(VmError),
 }
 
-/// Tail of every fast-path handler: pick the next handler from
-/// `DISPATCH_TABLE` indexed by the byte at the current `pc`, and return it
-/// inside `Step::Continue`. The trampoline turns this into one indirect call
-/// per opcode.
-///
-/// **Prefix handling invariant:** this macro does NOT clear `state.prefix`.
-/// Handlers that consult the prefix (`op_move`, `op_load_*`, `op_jump_if_*`)
-/// must consume it with `state.prefix.take()` to leave `None` for the next
-/// handler. Narrow-only handlers ignore the field entirely; the bytecode
-/// emitter guarantees they never run with a stale prefix set (every Wide /
-/// ExtraWide is immediately followed by a prefix-aware semantic opcode).
-/// This keeps the narrow hot path free of a per-dispatch store.
-///
-/// **Counter invariant (lyng-3uem T1):** opcode dispatch counting lives in
-/// `run_trampoline_counted`, never in this macro. The hot dispatch path stays
-/// free of the `state.vm.opcode_dispatch_counts.is_some()` check that used
-/// to inline here. `run_trampoline` branches once per script entry to pick
-/// between `run_trampoline_uncounted` (hot) and `run_trampoline_counted`
-/// (instrumented).
-///
-/// `dispatch_next!` is the *only* place in any handler body that should
-/// reference `DISPATCH_TABLE` — Phase 1's acceptance criteria grep for this
-/// invariant.
-#[macro_export]
-macro_rules! dispatch_next {
-    ($state:expr) => {{
-        let byte = $state.next_opcode_byte();
-        #[cfg(debug_assertions)]
-        $state
-            .vm
-            .assert_deopt_safepoint_state($state.agent, &$state.frame, &$state.installed);
-        return $crate::vm::dispatch_state::Step::Continue(
-            $crate::vm::dispatch_state::DISPATCH_TABLE[byte as usize],
-        );
-    }};
-}
-
-/// Star-fusion variant of `dispatch_next!` for value-producing handlers
-/// whose target register is the accumulator (`r0`).
-///
-/// Matches V8 Ignition's writer-side Star-fusion peephole
-/// (`src/interpreter/interpreter-assembler.cc`): if the next byte is a
-/// `StarN` opcode, the handler writes the just-produced value to register
-/// `N` inline and advances past the `Star` byte before dispatching to the
-/// instruction *after* it — eliminating one dispatch per fused pair.
-///
-/// Callers must have already written `value` to register 0; this macro
-/// only performs the extra write to register `N`. Pass the value in a
-/// local variable (not a side-effecting expression) — the macro evaluates
-/// `$value` once on the fast path and not at all on the no-fusion path.
-///
-/// The SAFETY contract on `next_opcode_byte()` is satisfied transitively:
-/// every `StarN` is followed by another valid opcode (Stars never appear
-/// as a terminal instruction), so the second `next_opcode_byte()` after
-/// `advance(1)` is also in-bounds.
-#[macro_export]
-macro_rules! dispatch_next_with_value {
-    ($state:expr, $value:expr) => {{
-        let byte = $state.next_opcode_byte();
-        if let Some(target) =
-            ::lyng_js_bytecode::Opcode::accumulator_store_index_for_byte(byte)
-        {
-            let registers = $state.frame.registers();
-            $state.vm.write_register_unchecked(registers, target, $value);
-            $state.advance(1);
-            let next_byte = $state.next_opcode_byte();
-            #[cfg(debug_assertions)]
-            $state.vm.assert_deopt_safepoint_state(
-                $state.agent,
-                &$state.frame,
-                &$state.installed,
-            );
-            return $crate::vm::dispatch_state::Step::Continue(
-                $crate::vm::dispatch_state::DISPATCH_TABLE[next_byte as usize],
-            );
-        }
-        #[cfg(debug_assertions)]
-        $state
-            .vm
-            .assert_deopt_safepoint_state($state.agent, &$state.frame, &$state.installed);
-        return $crate::vm::dispatch_state::Step::Continue(
-            $crate::vm::dispatch_state::DISPATCH_TABLE[byte as usize],
-        );
-    }};
-}
+// DSL-0c C5: dispatch_next! and dispatch_next_with_value! macros deleted
+// with the α trampoline. The α handlers in `dispatch_handlers/` no longer
+// terminate with `dispatch_next!` — `translate_outcome_to_step` in
+// `dispatch_handlers/mod.rs` constructs the `Step::Continue(next)`
+// value directly. The prefix bridge in `dsl::handlers::warm`
+// (`op_prefix_via_alpha`) likewise reads `DISPATCH_TABLE` directly.
 
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
 /// `return Step::Error(e)` on Err.
@@ -378,144 +304,16 @@ pub const DISPATCH_TABLE_LEN: usize = 256;
 pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
     dispatch_handlers::build_dispatch_table();
 
-/// Central trampoline — the production dispatch loop. One indirect call
-/// per opcode. The hot path is the `Step::Continue(next) => handler = next`
-/// arm; `Done` and `Error` are taken once per script.
-///
-/// `state.vm` is hoisted into a raw pointer kept in a callee-saved register
-/// across the loop (lyng-3uem T2). Without this, LLVM re-loads `state.vm`
-/// every iteration because the indirect `blr handler` can clobber any state
-/// field under the extern "C" ABI; manually pinning it saves one load per
-/// dispatch. `local_epoch` mirrors `state.frame_check_epoch` in the same
-/// way — synced to `state` only on the cold (epoch-changed) arm.
-///
-/// The opcode dispatch counter lives on a sibling path: when the
-/// `opcode-counters` feature is enabled AND counters are turned on at
-/// runtime, `Vm::run_via_trampoline` routes to `run_trampoline_counted`
-/// instead. The hot path here never checks for it (lyng-3lqp).
-///
-/// Per the post-spike asm audit (`lyng-3uem`,
-/// `reports/js/lyng-js/phase-1-diagnostics.md`), an earlier design inlined
-/// `maybe_record_opcode_dispatch` into every `dispatch_next!` tail and cost
-/// ~4 instructions per dispatch even when counters were `None`. The
-/// current shape has zero counter cost on this path.
-#[inline(never)]
-pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
-    #[cfg(debug_assertions)]
-    state
-        .vm
-        .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
-
-    // T2 hoist: cache vm address + frame_check_epoch in locals so LLVM keeps
-    // them in callee-saved registers across the indirect call. `vm_ptr`
-    // aliases `state.vm` for the lifetime of this function call; no handler
-    // reassigns `state.vm` (handlers receive `&mut DispatchState` only).
-    let vm_ptr: *mut Vm = &raw mut *state.vm;
-    let mut local_epoch = state.frame_check_epoch;
-
-    let mut handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
-    loop {
-        match (handler)(state) {
-            Step::Continue(next) => {
-                // SAFETY: `vm_ptr` is stable for the lifetime of this call —
-                // it was derived from `state.vm` at function entry and
-                // handlers cannot reassign `state.vm` under Rust's borrow
-                // rules. The handler call's extern "C" ABI clobbers caller-
-                // saved registers but cannot mutate the local `vm_ptr` /
-                // `local_epoch` slots.
-                let vm_epoch = unsafe { (*vm_ptr).dispatch_frame_check_epoch() };
-                if local_epoch != vm_epoch {
-                    local_epoch = vm_epoch;
-                    state.frame_check_epoch = vm_epoch;
-                    if !still_active(state) {
-                        state.refresh_from_active_frame()?;
-                        local_epoch = state.frame_check_epoch;
-                        handler = DISPATCH_TABLE[state.first_opcode_byte() as usize];
-                        continue;
-                    }
-                }
-                handler = next;
-            }
-            Step::Done(value) => return Ok(value),
-            Step::Error(error) => return Err(error),
-        }
-    }
-}
-
-/// Instrumented dispatch loop — counters enabled. Records every dispatched
-/// opcode by calling `maybe_record_opcode_dispatch` between handler
-/// returns. The cost lives here so the hot path (`run_trampoline`) stays
-/// clean. Not size-budgeted; only run when something has explicitly
-/// enabled counters.
-///
-/// Gated behind the `opcode-counters` Cargo feature; absent from the
-/// production binary entirely (`lyng-3lqp`). The runtime routing happens
-/// in `Vm::run_via_trampoline`, not in a wrapper next to `run_trampoline`.
-#[cfg(feature = "opcode-counters")]
-#[inline(never)]
-fn run_trampoline_counted(state: &mut DispatchState) -> VmResult<Value> {
-    let first_byte = state.first_opcode_byte();
-    state.vm.maybe_record_opcode_dispatch(first_byte);
-    #[cfg(debug_assertions)]
-    state
-        .vm
-        .assert_deopt_safepoint_state(state.agent, &state.frame, &state.installed);
-    let mut handler = DISPATCH_TABLE[first_byte as usize];
-    loop {
-        match (handler)(state) {
-            Step::Continue(next) => {
-                // After the handler returns Continue, pc has been advanced
-                // to the next opcode byte. Record that byte before
-                // dispatching to its handler — same semantics as the
-                // pre-split macro that recorded inside `dispatch_next!`.
-                let next_byte = state.next_opcode_byte();
-                state.vm.maybe_record_opcode_dispatch(next_byte);
-
-                if state.frame_check_epoch != state.vm.dispatch_frame_check_epoch() {
-                    state.frame_check_epoch = state.vm.dispatch_frame_check_epoch();
-                    if !still_active(state) {
-                        state.refresh_from_active_frame()?;
-                        let byte = state.first_opcode_byte();
-                        state.vm.maybe_record_opcode_dispatch(byte);
-                        handler = DISPATCH_TABLE[byte as usize];
-                        continue;
-                    }
-                }
-                handler = next;
-            }
-            Step::Done(value) => return Ok(value),
-            Step::Error(error) => return Err(error),
-        }
-    }
-}
-
-/// Frame-stack identity check shared by both trampoline variants.
-///
-/// The Vm bumps the epoch via `request_dispatch_frame_check` whenever frame
-/// state changes (function call/return, exception transfer). When that
-/// fires we have to decide: is `state.frame` still the active frame, or
-/// did the underlying frame stack change?
-///
-/// - Property getter calls, builtin invocations, etc. bump the epoch but
-///   leave `self.frames.last()` pointing at the same caller frame. The
-///   handler-local pc advance in `state.frame` is the source of truth (the
-///   legacy helpers don't write back to `self.frames` on success). DON'T
-///   refresh — clobbering pc with `self.frames.last()` would revert the
-///   advance and re-dispatch the same opcode (the bug behind a 30 GB OOM
-///   in nested-call hot paths fixed in `fbace3dd`).
-/// - Cross-frame exception transfer or a call's manual refresh (handlers
-///   in `calls.rs`) bumps the epoch AND changes which frame is on top.
-///   Frame depth / top-frame code differs from `state`'s snapshot —
-///   caller refreshes and re-dispatches from the new active frame's pc.
-#[inline]
-fn still_active(state: &DispatchState) -> bool {
-    state.frame_depth == state.vm.frames().len()
-        && state
-            .vm
-            .frames()
-            .last()
-            .is_some_and(|f| f.code() == state.frame.code())
-}
+// DSL-0c C5: run_trampoline, run_trampoline_counted, still_active deleted.
+// The α trampoline was the production dispatch loop until DSL-0c (Task C1)
+// flipped `Vm::run` to `run_via_dsl`. The asm-DSL trampoline replaces
+// `run_trampoline`; the epoch-check + `still_active` logic is now in
+// `LlIntDispatchState::translate_outcome` in `dsl/slow_path.rs` (mirrors
+// the same policy: only refresh on a true frame-stack change, never on a
+// same-frame epoch bump). Wide-form prefix dispatch — the only remaining
+// α consumer — invokes handlers directly through `DISPATCH_TABLE` from
+// `dsl::handlers::warm::op_prefix_via_alpha` without going through a
+// trampoline loop.
 
 impl Vm {
     /// Look up the `Arc<InstalledFunction>` for a given `CodeRef`. Used by
@@ -602,54 +400,6 @@ impl Vm {
         self.current_exception().unwrap_or_else(Value::undefined)
     }
 
-    /// Bridge from the live `Vm::run` entrypoint into the trampoline
-    /// dispatch path. Constructs a `DispatchState` from the current active
-    /// frame, then hands control to `run_trampoline` (the production hot
-    /// path) — or, when the `opcode-counters` feature is enabled AND the
-    /// runtime counter is on, to `run_trampoline_counted` instead. The
-    /// branch happens here, once per script invocation, so the hot dispatch
-    /// loop never re-checks (lyng-3lqp).
-    ///
-    /// Frame transitions (Call*, Construct, TailCall) are handled by the
-    /// family handlers themselves in sub-6; this entry point only sets up
-    /// the initial frame snapshot.
-    pub(super) fn run_via_trampoline(
-        &mut self,
-        agent: &mut Agent,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        let frame_depth = self.frames.len();
-        let frame = self
-            .frames
-            .last()
-            .copied()
-            .expect("evaluation should install one active frame");
-        let code = frame.code();
-        let installed = self
-            .installed
-            .get(code_index(code))
-            .and_then(Option::as_ref)
-            .cloned()
-            .ok_or(VmError::MissingInstalledCode(code))?;
-        let frame_check_epoch = self.dispatch_frame_check_epoch();
-
-        let mut state = DispatchState {
-            vm: self,
-            agent,
-            host,
-            registry,
-            installed,
-            frame,
-            frame_depth,
-            frame_check_epoch,
-            prefix: None,
-        };
-
-        #[cfg(feature = "opcode-counters")]
-        if state.vm.opcode_counter_enabled() {
-            return run_trampoline_counted(&mut state);
-        }
-        run_trampoline(&mut state)
-    }
+    // DSL-0c C5: run_via_trampoline deleted with the α trampoline.
+    // `Vm::run` routes through `Vm::run_via_dsl` (see `dsl/entry.rs`).
 }
