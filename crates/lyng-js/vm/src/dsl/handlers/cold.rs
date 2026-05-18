@@ -4528,6 +4528,2178 @@ pub extern "C" fn op_store_local_3_slow_rs(
 }
 
 // =====================================================================
+// dispatch_wide_form — centralized wide-form instruction dispatcher
+// (DSL-0c C2 replacement for the α `op_prefix_via_alpha` bridge).
+// =====================================================================
+
+/// Centralized wide-form dispatcher invoked by `op_wide` /
+/// `op_extra_wide`'s DSL slow-path shims. Reads the semantic byte
+/// at `bytes[pc+1]`, decodes the wide-form operands via
+/// `crate::vm::dispatch::decode_*_operands`, calls the matching
+/// semantic body, and returns the resulting `SemanticOutcome`
+/// (with `pc_advance` = full wide-form instruction length).
+///
+/// Auto-generated from `tools/lyng-js-dsl-codegen/src/main.rs`'s
+/// `COLD_STUBS` + `HOT_WARM_STUBS` tables.
+#[cfg(target_arch = "aarch64")]
+#[allow(unused_variables)]
+pub(crate) fn dispatch_wide_form(
+    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+    prefix: lyng_js_bytecode::Opcode,
+) -> crate::dsl::slow_path::SemanticOutcome {
+    use crate::dsl::slow_path::SemanticOutcome;
+    use crate::error::VmError;
+    use lyng_js_bytecode::Opcode;
+    // Peek the semantic byte at bytes[pc+1] without holding
+    // a `&` borrow of `dispatch` across the match — the per-
+    // opcode arms borrow `dispatch` mutably to call the
+    // semantic body. Each arm re-acquires the byte slice
+    // through `dispatch.dispatch_state()` after the borrow is
+    // released; the `bytes.to_vec()` allocation in the prior
+    // shape would have shown up as a per-wide-instruction
+    // hot-loop cost in profiling.
+    let (pc, code, semantic_byte) = {
+        let inner = dispatch.dispatch_state();
+        let pc = inner.frame.instruction_offset();
+        let code = inner.frame.code();
+        let full_bytes = inner.installed.function().instruction_bytes();
+        let bytes = &full_bytes[pc as usize..];
+        let sb = match bytes.get(1).copied() {
+            Some(b) => b,
+            None => return SemanticOutcome::ExitError { error: VmError::InstructionOutOfBounds { code, instruction_offset: pc } },
+        };
+        (pc, code, sb)
+    };
+    let semantic_opcode = match Opcode::from_byte(semantic_byte) {
+        Some(op) => op,
+        None => return SemanticOutcome::ExitError { error: VmError::InstructionOutOfBounds { code, instruction_offset: pc } },
+    };
+    match semantic_opcode {
+        Opcode::LoadUndefined => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_undefined_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadUninitializedLexical => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_uninitialized_lexical_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadNull => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_null_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadTrue => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_true_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadFalse => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_false_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadZero => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_zero_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadOne => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
+                        a: a as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_one_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadSmiArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadConst => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::loads::OpLoadConstArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_load_const_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadEnvSlot => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::scope::OpScopeAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::scope::op_load_env_slot_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StoreEnvSlot => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::scope::OpScopeAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::scope::op_store_env_slot_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignEnvSlot => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::scope::OpScopeAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::scope::op_assign_env_slot_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadGlobal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let feedback_slot = slot_opt;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: feedback_slot,
+                    };
+                    crate::vm::semantics::names::op_load_global_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StoreGlobal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let feedback_slot = slot_opt;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: feedback_slot,
+                    };
+                    crate::vm::semantics::names::op_store_global_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignGlobal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let feedback_slot = slot_opt;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: feedback_slot,
+                    };
+                    crate::vm::semantics::names::op_assign_global_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DeleteGlobal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_delete_global_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_load_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ResolveName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_resolve_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ResolveGlobal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_resolve_global_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_assign_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignVariableName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_assign_variable_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DeleteName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_delete_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CaptureName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_capture_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadCapturedName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpCapturedNameArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::names::op_load_captured_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadCapturedNameThis => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpCapturedNameArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::names::op_load_captured_name_this_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignCapturedName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpCapturedNameArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::names::op_assign_captured_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadThis => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_load_this_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadCallee => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_load_callee_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadNewTarget => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::names::OpAtomArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                        feedback_slot: None,
+                    };
+                    crate::vm::semantics::names::op_load_new_target_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AddSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_add_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Sub => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_sub_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::SubSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_sub_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Mul => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_mul_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::MulSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_mul_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Div => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_div_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Mod => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_mod_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DivSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_div_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ModSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_mod_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Exp => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_exp_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::BitOr => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_bit_or_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::BitXor => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_bit_xor_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::BitAnd => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_bit_and_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::BitAndSmi => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        imm_raw: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_bit_and_smi_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::BitNot => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpUnaryArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_bit_not_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ShiftLeft => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_shift_left_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ShiftRight => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_shift_right_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::UnsignedShiftRight => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_unsigned_shift_right_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Negate => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpUnaryArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_negate_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Increment => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpUpdateArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_increment_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Decrement => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpUpdateArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_decrement_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Equal => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_equal_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StrictEqual => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_strict_equal_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::EqualZero => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpEqualZeroArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_equal_zero_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LessThan => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_less_than_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LessEqual => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_less_equal_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::GreaterThan => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_greater_than_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::GreaterEqual => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_greater_equal_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::In => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_in_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CreateObject => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::property::OpPropertyAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_create_object_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CreateArray => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::property::OpPropertyAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_create_array_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CheckObjectCoercible => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::property::OpPropertyAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_check_object_coercible_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ThrowIfUninitialized => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::property::OpPropertyAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_throw_if_uninitialized_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DefineNamedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_define_named_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DefineKeyedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_define_keyed_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StoreDenseElement => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_store_dense_element_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LoadDenseElement => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_load_dense_element_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::GetNamedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_get_named_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::SetNamedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_set_named_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignNamedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_assign_named_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StrictAssignNamedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_strict_assign_named_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::GetKeyedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_get_keyed_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::SetKeyedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_set_keyed_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AssignKeyedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_assign_keyed_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::StrictAssignKeyedProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::property::OpPropertyAccessArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_strict_assign_keyed_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DeleteProperty => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_delete_property_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CopyDataProperties => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_copy_data_properties_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::SetFunctionName => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_set_function_name_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::ToPropertyKey => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::property::OpPropertyAbArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::property::op_to_property_key_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Call0 => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::calls::OpCallSmallArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        arity: 0u8,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::calls::op_call0_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Call1 => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::calls::OpCallSmallArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        arity: 1u8,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::calls::op_call1_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Call2 => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::calls::OpCallSmallArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        arity: 2u8,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::calls::op_call2_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Call3 => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::calls::OpCallSmallArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        arity: 3u8,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::calls::op_call3_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CreateClosure => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::calls::OpCreateClosureArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::calls::op_create_closure_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CreateForIn => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_create_for_in_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AdvanceForIn => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_advance_for_in_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CloseForIn => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_close_for_in_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CreateIterator => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_create_iterator_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::AdvanceIterator => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_advance_iterator_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::CloseIterator => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::iterators::op_close_iterator_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::DelegateYield => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::generators::OpDelegateYieldArgs {
+                        a: a as u16,
+                        b: b as u16,
+                        c: c as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::generators::op_delegate_yield_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::EnterEnvScope => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::scope::OpScopeAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::scope::op_enter_env_scope_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::LeaveEnvScope => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::scope::OpScopeAbxArgs {
+                        a: a as u16,
+                        bx: bx,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::scope::op_leave_env_scope_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Move => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let args = crate::vm::semantics::loads::OpMoveArgs {
+                        dst: a as u16,
+                        src: b as u16,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::loads::op_move_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::Add => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), true, code, pc)
+            };
+            match decoded {
+                Ok((a16, b16, c16, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let b: u32 = b16 as u32;
+                    let c: u32 = c16 as u32;
+                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
+                    let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
+                        dst: a as u16,
+                        lhs: b as u16,
+                        rhs: c as u16,
+                        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(slot),
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::arithmetic::op_add_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::JumpIfTrue => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+                        condition_register: a as u16,
+                        delta: (bx as i16) as i32,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::control_flow::op_jump_if_true_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        Opcode::JumpIfFalse => {
+            let decoded = {
+                let inner = dispatch.dispatch_state();
+                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];
+                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), false, code, pc)
+            };
+            match decoded {
+                Ok((a16, bx_val, slot_opt, instruction_len)) => {
+                    let a: u32 = a16 as u32;
+                    let bx: u32 = bx_val;
+                    let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
+                        condition_register: a as u16,
+                        delta: (bx as i16) as i32,
+                        instruction_len: instruction_len,
+                    };
+                    crate::vm::semantics::control_flow::op_jump_if_false_semantic(dispatch, args)
+                }
+                Err(error) => SemanticOutcome::ExitError { error },
+            }
+        }
+        _ => SemanticOutcome::ExitError { error: VmError::DoublePrefix { code, instruction_offset: pc } },
+    }
+}
+
+// =====================================================================
 // Non-aarch64 stubs (link-only placeholders).
 // =====================================================================
 

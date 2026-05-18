@@ -201,33 +201,30 @@ pub extern "C" fn op_jump_if_false8_slow_rs(
 }
 
 // =====================================================================
-// op_wide / op_extra_wide (DSL-0c) — None layout, length = 1.
+// op_wide / op_extra_wide (DSL-0c C2) — None layout, length = 1.
 //
-// The DSL-0b plan punted wide-form operand decoding for cold opcodes
-// to "Batch 7" — the narrow `decode_ab!` / `decode_abc!` /
-// `decode_abx!` fragments only ldrb / ldrh operands, so a Wide-prefixed
-// instruction whose operands are u16 / u32 would be decoded with
-// truncated bytes and an underadvanced PC, cascading PC misalignment
-// through the rest of the bytecode stream.
+// The DSL prefix handlers drive wide-form dispatch entirely through
+// `crate::dsl::handlers::cold::dispatch_wide_form` — a centralized
+// Rust function whose match arms decode + execute each prefix-accepting
+// opcode's wide-form encoding. The shim:
 //
-// To unblock DSL-0c without re-authoring 152 wide-form decoders, the
-// prefix handlers delegate the WHOLE wide-form instruction to the α
-// dispatch path: the slow-path shim sets `state.prefix`, looks up the
-// α handler for the byte at `PC+1`, invokes it (which decodes
-// wide-form + executes the semantic + advances the frame's
-// instruction_offset), then returns `Refresh` so the asm trampoline
-// reloads PC from `state.frame_pc_offset`.
+//   1. Checks for a stacked prefix (returns `DoublePrefix` if set).
+//   2. Calls `dispatch_wide_form(state, Wide | ExtraWide)`, which reads
+//      `bytes[pc+1]` (the semantic byte), invokes the matching opcode's
+//      decoder + semantic body, and returns a `SemanticOutcome` whose
+//      `pc_advance` is the full wide-form instruction length.
+//   3. Translates the outcome via `translate_outcome` so the asm bridge
+//      advances PC past the entire wide instruction.
 //
-// This is a temporary bridge. Removing α (Tasks C2–C5) requires
-// authoring wide-form decoders for every opcode — that's a future
-// batch's work. Until then, the α dispatch table stays linked
-// specifically for this delegation.
+// This replaces the legacy `op_prefix_via_alpha` bridge that delegated
+// wide-form dispatch through the α dispatch table. The α tables and
+// `dispatch_handlers/` are now unreferenced and can be deleted.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_wide, layout = None, length = 1, || {
-        call_slow!(op_wide_via_alpha_rs, args = []);
+        call_slow!(op_wide_set_prefix_rs, args = []);
         dispatch_after_slow!();
     }
 }
@@ -235,94 +232,70 @@ llint_handler! {
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_extra_wide, layout = None, length = 1, || {
-        call_slow!(op_extra_wide_via_alpha_rs, args = []);
+        call_slow!(op_extra_wide_set_prefix_rs, args = []);
         dispatch_after_slow!();
     }
 }
 
-/// Slow-path delegate for `op_wide`. Invokes the corresponding α
-/// handler at the byte following the prefix; that handler will read
-/// `state.prefix`, decode wide-form operands, execute, and advance
-/// `state.frame.instruction_offset` accordingly. Returns
-/// [`SlowPathReturn`] with the `Refresh` tag so the asm bridge
-/// reloads PC / REGS / FV from `state.frame_*`.
+/// Slow-path shim for `op_wide`. Delegates the full wide-form
+/// instruction to `dispatch_wide_form`, which decodes operands and
+/// runs the semantic body for the byte at `bytes[pc+1]`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_wide_via_alpha_rs(
+pub extern "C" fn op_wide_set_prefix_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    op_prefix_via_alpha(state, lyng_js_bytecode::Opcode::Wide)
-}
-
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_extra_wide_via_alpha_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    op_prefix_via_alpha(state, lyng_js_bytecode::Opcode::ExtraWide)
-}
-
-/// Shared body of `op_wide_via_alpha_rs` /
-/// `op_extra_wide_via_alpha_rs`. Set the prefix, look up the α
-/// handler for the byte at PC+1, invoke it, translate its `Step`
-/// into a `SemanticOutcome`, return Refresh / Exit as appropriate.
-#[cfg(target_arch = "aarch64")]
-fn op_prefix_via_alpha(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    prefix_opcode: lyng_js_bytecode::Opcode,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
-    use crate::vm::dispatch_state::{Step, DISPATCH_TABLE};
-
-    let mut dispatch = unsafe { LlIntDispatchState::from_raw(state) };
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let outcome = {
-        let dstate = dispatch.dispatch_state();
-        // The α handler for the prefix opcode reads bytes[pc+1] to
-        // pick the semantic opcode and bytes[pc+1..] to decode
-        // wide-form operands. The prefix-α handler also handles
-        // double-prefix rejection via `VmError::DoublePrefix`.
-        let pc = dstate.frame.instruction_offset() as usize;
-        let bytes = dstate.installed.function().instruction_bytes();
-        if pc >= bytes.len() {
-            SemanticOutcome::ExitError {
-                error: crate::error::VmError::InstructionOutOfBounds {
-                    code: dstate.frame.code(),
-                    instruction_offset: dstate.frame.instruction_offset(),
-                },
-            }
-        } else {
-            let prefix_handler = DISPATCH_TABLE[prefix_opcode as u8 as usize];
-            match prefix_handler(dstate) {
-                Step::Continue(semantic_handler) => {
-                    // The prefix α handler set state.prefix and
-                    // returned the α handler for the semantic
-                    // opcode. Invoke it — it decodes wide-form
-                    // operands, executes, advances PC.
-                    match semantic_handler(dstate) {
-                        Step::Continue(_) => {
-                            // The α semantic handler advanced
-                            // `dstate.frame.instruction_offset`. Sync
-                            // it back to `vm.frames.last_mut()` so
-                            // the subsequent `Refresh` arm reloads
-                            // the updated PC (instead of resetting
-                            // to the pre-prefix PC stored on the
-                            // canonical frame at the last sync —
-                            // typically the call-entry PC for the
-                            // active frame).
-                            dstate.sync_active_frame();
-                            SemanticOutcome::Refresh
-                        }
-                        Step::Done(value) => SemanticOutcome::ExitDone { value },
-                        Step::Error(error) => SemanticOutcome::ExitError { error },
-                    }
-                }
-                Step::Done(value) => SemanticOutcome::ExitDone { value },
-                Step::Error(error) => SemanticOutcome::ExitError { error },
-            }
-        }
-    };
+    let outcome = run_prefix(&mut dispatch, lyng_js_bytecode::Opcode::Wide);
     dispatch.translate_outcome(outcome)
+}
+
+/// Slow-path shim for `op_extra_wide`. Counterpart to
+/// `op_wide_set_prefix_rs`; routes through `dispatch_wide_form` with
+/// the `ExtraWide` prefix.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_extra_wide_set_prefix_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let outcome = run_prefix(&mut dispatch, lyng_js_bytecode::Opcode::ExtraWide);
+    dispatch.translate_outcome(outcome)
+}
+
+/// Shared body of `op_wide_set_prefix_rs` /
+/// `op_extra_wide_set_prefix_rs`. Mirrors the α prefix handler:
+/// rejects a stacked prefix (`state.prefix.is_some()`) with
+/// `VmError::DoublePrefix`, then delegates the full wide-form
+/// instruction to `dispatch_wide_form`. The dispatcher's
+/// `SemanticOutcome` carries the total instruction length so PC
+/// advances past the entire wide-form instruction in one step.
+#[cfg(target_arch = "aarch64")]
+fn run_prefix(
+    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+    prefix: lyng_js_bytecode::Opcode,
+) -> crate::dsl::slow_path::SemanticOutcome {
+    use crate::dsl::slow_path::SemanticOutcome;
+    {
+        let inner = dispatch.dispatch_state();
+        if inner.prefix.is_some() {
+            return SemanticOutcome::ExitError {
+                error: crate::error::VmError::DoublePrefix {
+                    code: inner.frame.code(),
+                    instruction_offset: inner.frame.instruction_offset(),
+                },
+            };
+        }
+        inner.prefix = Some(prefix);
+    }
+    let outcome = crate::dsl::handlers::cold::dispatch_wide_form(dispatch, prefix);
+    // Clear the prefix on the way out — the dispatcher's semantic
+    // bodies consume it via their args, but the trampoline must see
+    // `prefix = None` before the next instruction dispatches.
+    dispatch.dispatch_state().prefix = None;
+    outcome
 }
 
 /// Non-aarch64 stubs.

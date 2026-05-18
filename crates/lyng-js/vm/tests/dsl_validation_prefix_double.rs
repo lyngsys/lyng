@@ -83,8 +83,10 @@ fn op_extra_wide_followed_by_op_wide_raises_double_prefix() {
 fn op_wide_alone_records_prefix_and_continues() {
     // Sanity twin: when there's no pre-existing prefix the semantic
     // should set `state.prefix = Some(Wide)` and return Continue with
-    // `pc_advance = 0`. This protects against accidentally inverting
-    // the guard condition during a future refactor.
+    // `pc_advance = 0`. The DSL-0c `op_wide` shim drives wide-form
+    // dispatch in Rust (see `run_wide_form_instruction`) and advances
+    // PC past the full wide instruction itself — the semantic body's
+    // role here is the prefix bit-flip plus double-prefix guard.
     let mut harness = DslHarness::new();
     let outcome = harness.with_alpha_dispatch(None, |state| {
         invoke_wide_semantic_via_dsl_harness(state)

@@ -2375,6 +2375,363 @@ fn write_header(out: &mut String) {
     out.push('\n');
 }
 
+/// Which prefix-aware decode helper to emit for an opcode (DSL-0c C2).
+///
+/// Only opcodes with bytecode instruction form `Abc` or `Abx` accept a
+/// `Wide` / `ExtraWide` prefix; all other forms reject prefix at decode
+/// time. The codegen emits a wide-form dispatch match arm for each
+/// `Abc`/`Abx`-form opcode (cold + hot/warm); the resulting function
+/// `dispatch_wide_form` replaces the legacy `op_prefix_via_alpha`
+/// bridge that delegated wide-form dispatch through the α dispatch
+/// table.
+#[derive(Clone, Copy, Debug)]
+enum PrefixKind {
+    /// `decode_abc_operands` — three register operands, optional inline
+    /// feedback slot. Covers `Layout::Abc, length=4` (no slot) and
+    /// `Layout::AbcSlot, length=6` (slot).
+    Abc,
+    /// `decode_abx_operands` — one register operand + one immediate (Bx),
+    /// optional inline feedback slot. Covers `Layout::Abx, length=4`
+    /// (no slot) and `Layout::Abx, length=6` (slot).
+    Abx,
+}
+
+/// Classify a stub: returns `Some(PrefixKind)` when the stub's bytecode
+/// form accepts a `Wide` / `ExtraWide` prefix, `None` otherwise.
+///
+/// `Layout::Abc, length=10` is CallRange (`Call` / `TailCall` /
+/// `Construct`), which the bytecode decoder explicitly rejects prefixes
+/// for. Treat as non-prefix-aware here.
+fn prefix_kind_for(layout: Layout, length: u32) -> Option<PrefixKind> {
+    match (layout, length) {
+        (Layout::Abc, 4) | (Layout::AbcSlot, 6) => Some(PrefixKind::Abc),
+        (Layout::Abx, 4) | (Layout::Abx, 6) => Some(PrefixKind::Abx),
+        _ => None,
+    }
+}
+
+/// Whether the stub's bytecode form carries a feedback slot.
+fn is_profiled_for(layout: Layout, length: u32) -> bool {
+    matches!((layout, length), (Layout::AbcSlot, _) | (Layout::Abx, 6))
+}
+
+/// Hot/warm opcodes the codegen does NOT own — their asm/Rust handlers
+/// live in `dsl/handlers/hot.rs` and `dsl/handlers/warm.rs` — but whose
+/// bytecode form accepts a prefix and which therefore need an entry in
+/// the wide-form dispatch match. Manually mirrored from those files so
+/// the wide-form dispatcher covers every prefix-accepting opcode.
+const HOT_WARM_STUBS: &[Stub] = &[
+    // hot.rs — op_move: Layout::Ab in asm (operand_names = ["a", "b"]),
+    // but the bytecode form is Abc (3 operands; the third is unused at
+    // narrow encoding). For wide-form decoding we treat it as Abc so
+    // `decode_abc_operands` reads both registers correctly.
+    Stub {
+        opcode: Opcode::Move,
+        family: "loads",
+        semantic: "op_move_semantic",
+        args: "OpMoveArgs",
+        layout: Layout::Abc,
+        length: 4,
+        fields: &[
+            f("dst", "a as u16"),
+            f("src", "b as u16"),
+            f("instruction_len", "4u32"),
+        ],
+    },
+    // hot.rs — op_add: Abc + feedback slot.
+    Stub {
+        opcode: Opcode::Add,
+        family: "arithmetic",
+        semantic: "op_add_semantic",
+        args: "OpBinaryArgs",
+        layout: Layout::AbcSlot,
+        length: 6,
+        fields: &[
+            f("dst", "a as u16"),
+            f("lhs", "b as u16"),
+            f("rhs", "c as u16"),
+            f(
+                "feedback_slot",
+                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+            ),
+            f("instruction_len", "6u32"),
+        ],
+    },
+    // warm.rs — op_jump_if_true: Abx (register + i16 delta), no slot.
+    Stub {
+        opcode: Opcode::JumpIfTrue,
+        family: "control_flow",
+        semantic: "op_jump_if_true_semantic",
+        args: "OpJumpIfArgs",
+        layout: Layout::Abx,
+        length: 4,
+        fields: &[
+            f("condition_register", "a as u16"),
+            f("delta", "(bx as i16) as i32"),
+            f("instruction_len", "4u32"),
+        ],
+    },
+    // warm.rs — op_jump_if_false: same shape as op_jump_if_true.
+    Stub {
+        opcode: Opcode::JumpIfFalse,
+        family: "control_flow",
+        semantic: "op_jump_if_false_semantic",
+        args: "OpJumpIfArgs",
+        layout: Layout::Abx,
+        length: 4,
+        fields: &[
+            f("condition_register", "a as u16"),
+            f("delta", "(bx as i16) as i32"),
+            f("instruction_len", "4u32"),
+        ],
+    },
+];
+
+/// Emit the centralized wide-form dispatcher `dispatch_wide_form`.
+///
+/// The asm-DSL `op_wide` / `op_extra_wide` shims call this function with
+/// the prefix opcode and a `&mut LlIntDispatchState`. It reads the
+/// semantic byte at `bytes[pc+1]`, dispatches to the matching opcode's
+/// decoder + semantic call, and returns the resulting `SemanticOutcome`
+/// (with `pc_advance` = full wide-form instruction length). The caller
+/// translates the outcome via `LlIntDispatchState::translate_outcome`
+/// so the asm bridge advances PC past the entire wide instruction.
+///
+/// Replaces the legacy `op_prefix_via_alpha` bridge that delegated
+/// wide-form dispatch through the α dispatch table.
+fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
+    let mut all_stubs: Vec<&Stub> = cold_stubs.iter().collect();
+    all_stubs.extend(HOT_WARM_STUBS.iter());
+
+    out.push_str("// =====================================================================\n");
+    out.push_str("// dispatch_wide_form — centralized wide-form instruction dispatcher\n");
+    out.push_str("// (DSL-0c C2 replacement for the α `op_prefix_via_alpha` bridge).\n");
+    out.push_str("// =====================================================================\n\n");
+
+    out.push_str("/// Centralized wide-form dispatcher invoked by `op_wide` /\n");
+    out.push_str("/// `op_extra_wide`'s DSL slow-path shims. Reads the semantic byte\n");
+    out.push_str("/// at `bytes[pc+1]`, decodes the wide-form operands via\n");
+    out.push_str("/// `crate::vm::dispatch::decode_*_operands`, calls the matching\n");
+    out.push_str("/// semantic body, and returns the resulting `SemanticOutcome`\n");
+    out.push_str("/// (with `pc_advance` = full wide-form instruction length).\n");
+    out.push_str("///\n");
+    out.push_str("/// Auto-generated from `tools/lyng-js-dsl-codegen/src/main.rs`'s\n");
+    out.push_str("/// `COLD_STUBS` + `HOT_WARM_STUBS` tables.\n");
+    out.push_str("#[cfg(target_arch = \"aarch64\")]\n");
+    // The match arms unpack the full decoder tuple even when the
+    // corresponding `is_profiled` branch is false (no slot field on the
+    // args struct). Suppress the per-arm "unused variable" lints at the
+    // function level rather than littering the emitted match with
+    // per-arm `_` prefixes.
+    out.push_str("#[allow(unused_variables)]\n");
+    out.push_str("pub(crate) fn dispatch_wide_form(\n");
+    out.push_str(
+        "    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n",
+    );
+    out.push_str("    prefix: lyng_js_bytecode::Opcode,\n");
+    out.push_str(") -> crate::dsl::slow_path::SemanticOutcome {\n");
+    out.push_str("    use crate::dsl::slow_path::SemanticOutcome;\n");
+    out.push_str("    use crate::error::VmError;\n");
+    out.push_str("    use lyng_js_bytecode::Opcode;\n");
+    out.push_str("    // Peek the semantic byte at bytes[pc+1] without holding\n");
+    out.push_str("    // a `&` borrow of `dispatch` across the match — the per-\n");
+    out.push_str("    // opcode arms borrow `dispatch` mutably to call the\n");
+    out.push_str("    // semantic body. Each arm re-acquires the byte slice\n");
+    out.push_str("    // through `dispatch.dispatch_state()` after the borrow is\n");
+    out.push_str("    // released; the `bytes.to_vec()` allocation in the prior\n");
+    out.push_str("    // shape would have shown up as a per-wide-instruction\n");
+    out.push_str("    // hot-loop cost in profiling.\n");
+    out.push_str("    let (pc, code, semantic_byte) = {\n");
+    out.push_str("        let inner = dispatch.dispatch_state();\n");
+    out.push_str("        let pc = inner.frame.instruction_offset();\n");
+    out.push_str("        let code = inner.frame.code();\n");
+    out.push_str("        let full_bytes = inner.installed.function().instruction_bytes();\n");
+    out.push_str("        let bytes = &full_bytes[pc as usize..];\n");
+    out.push_str("        let sb = match bytes.get(1).copied() {\n");
+    out.push_str("            Some(b) => b,\n");
+    out.push_str(
+        "            None => return SemanticOutcome::ExitError { error: VmError::InstructionOutOfBounds { code, instruction_offset: pc } },\n",
+    );
+    out.push_str("        };\n");
+    out.push_str("        (pc, code, sb)\n");
+    out.push_str("    };\n");
+    out.push_str("    let semantic_opcode = match Opcode::from_byte(semantic_byte) {\n");
+    out.push_str("        Some(op) => op,\n");
+    out.push_str(
+        "        None => return SemanticOutcome::ExitError { error: VmError::InstructionOutOfBounds { code, instruction_offset: pc } },\n",
+    );
+    out.push_str("    };\n");
+    out.push_str("    match semantic_opcode {\n");
+
+    // One arm per prefix-accepting opcode.
+    let mut emitted: Vec<u8> = Vec::new();
+    for stub in &all_stubs {
+        let Some(kind) = prefix_kind_for(stub.layout, stub.length) else {
+            continue;
+        };
+        let op_byte = stub.opcode as u8;
+        if emitted.contains(&op_byte) {
+            continue;
+        }
+        emitted.push(op_byte);
+        let profiled = is_profiled_for(stub.layout, stub.length);
+        let opcode_variant = stub.opcode.name();
+        match kind {
+            PrefixKind::Abc => {
+                writeln!(out, "        Opcode::{opcode_variant} => {{").unwrap();
+                // Re-acquire the bytes slice from `dispatch` in each arm
+                // so we never hold an immutable borrow across the
+                // semantic-body mutable call below.
+                out.push_str(
+                    "            let decoded = {\n",
+                );
+                out.push_str("                let inner = dispatch.dispatch_state();\n");
+                out.push_str(
+                    "                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];\n",
+                );
+                writeln!(
+                    out,
+                    "                crate::vm::dispatch::decode_abc_operands(bytes, Some(prefix), {profiled}, code, pc)"
+                )
+                .unwrap();
+                out.push_str("            };\n");
+                out.push_str(
+                    "            match decoded {\n",
+                );
+                out.push_str(
+                    "                Ok((a16, b16, c16, slot_opt, instruction_len)) => {\n",
+                );
+                // Bind to names the existing field expressions expect:
+                // `a`, `b`, `c` as u32 (matching asm-passed convention);
+                // `slot` as raw u32 for `FeedbackSlotId::from_raw(slot)`
+                // field expressions.
+                out.push_str("                    let a: u32 = a16 as u32;\n");
+                out.push_str("                    let b: u32 = b16 as u32;\n");
+                out.push_str("                    let c: u32 = c16 as u32;\n");
+                if profiled {
+                    out.push_str(
+                        "                    let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());\n",
+                    );
+                }
+                writeln!(
+                    out,
+                    "                    let args = crate::vm::semantics::{family}::{args_ty} {{",
+                    family = stub.family,
+                    args_ty = stub.args,
+                )
+                .unwrap();
+                for field in stub.fields {
+                    if field.name == "instruction_len" {
+                        out.push_str("                        instruction_len: instruction_len,\n");
+                        continue;
+                    }
+                    let expr = field.expr.replace("state", "dispatch").replace(
+                        "Self::",
+                        "ColdShimHelpers::",
+                    );
+                    writeln!(
+                        out,
+                        "                        {name}: {expr},",
+                        name = field.name,
+                        expr = expr,
+                    )
+                    .unwrap();
+                }
+                out.push_str("                    };\n");
+                writeln!(
+                    out,
+                    "                    crate::vm::semantics::{family}::{semantic}(dispatch, args)",
+                    family = stub.family,
+                    semantic = stub.semantic,
+                )
+                .unwrap();
+                out.push_str("                }\n");
+                out.push_str(
+                    "                Err(error) => SemanticOutcome::ExitError { error },\n",
+                );
+                out.push_str("            }\n");
+                out.push_str("        }\n");
+            }
+            PrefixKind::Abx => {
+                writeln!(out, "        Opcode::{opcode_variant} => {{").unwrap();
+                out.push_str("            let decoded = {\n");
+                out.push_str("                let inner = dispatch.dispatch_state();\n");
+                out.push_str(
+                    "                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];\n",
+                );
+                writeln!(
+                    out,
+                    "                crate::vm::dispatch::decode_abx_operands(bytes, Some(prefix), {profiled}, code, pc)"
+                )
+                .unwrap();
+                out.push_str("            };\n");
+                out.push_str("            match decoded {\n");
+                out.push_str(
+                    "                Ok((a16, bx_val, slot_opt, instruction_len)) => {\n",
+                );
+                out.push_str("                    let a: u32 = a16 as u32;\n");
+                out.push_str("                    let bx: u32 = bx_val;\n");
+                if profiled {
+                    // For Abx length=6, the slot is decoded by the helper.
+                    // For narrow path the args expects `Option<FeedbackSlotId>`
+                    // via `Self::feedback_slot_from_pc(state, 4)`; the wide
+                    // path overrides that expr to use the decoded slot.
+                    out.push_str("                    let feedback_slot = slot_opt;\n");
+                }
+                writeln!(
+                    out,
+                    "                    let args = crate::vm::semantics::{family}::{args_ty} {{",
+                    family = stub.family,
+                    args_ty = stub.args,
+                )
+                .unwrap();
+                for field in stub.fields {
+                    if field.name == "instruction_len" {
+                        out.push_str("                        instruction_len: instruction_len,\n");
+                        continue;
+                    }
+                    if field.name == "feedback_slot" && profiled {
+                        out.push_str("                        feedback_slot: feedback_slot,\n");
+                        continue;
+                    }
+                    let expr = field.expr.replace("state", "dispatch").replace(
+                        "Self::",
+                        "ColdShimHelpers::",
+                    );
+                    writeln!(
+                        out,
+                        "                        {name}: {expr},",
+                        name = field.name,
+                        expr = expr,
+                    )
+                    .unwrap();
+                }
+                out.push_str("                    };\n");
+                writeln!(
+                    out,
+                    "                    crate::vm::semantics::{family}::{semantic}(dispatch, args)",
+                    family = stub.family,
+                    semantic = stub.semantic,
+                )
+                .unwrap();
+                out.push_str("                }\n");
+                out.push_str(
+                    "                Err(error) => SemanticOutcome::ExitError { error },\n",
+                );
+                out.push_str("            }\n");
+                out.push_str("        }\n");
+            }
+        }
+    }
+
+    // Fallback: any non-prefix-accepting opcode is an error.
+    out.push_str(
+        "        _ => SemanticOutcome::ExitError { error: VmError::DoublePrefix { code, instruction_offset: pc } },\n",
+    );
+    out.push_str("    }\n");
+    out.push_str("}\n\n");
+}
+
 /// Emit one `llint_handler!` block + its `op_xxx_slow_rs` shim.
 fn write_stub(out: &mut String, stub: &Stub) {
     let opcode_name = opcode_snake_name(stub.opcode);
@@ -2556,6 +2913,16 @@ fn main() {
     for stub in &sorted {
         write_stub(&mut out, stub);
     }
+
+    // DSL-0c C2: emit the centralized wide-form dispatcher after the
+    // per-opcode cold stubs. The dispatcher's match arms refer to the
+    // semantic bodies (already imported via the per-stub shims above)
+    // plus `crate::vm::dispatch::decode_*_operands`.
+    write_wide_form_dispatcher(
+        &mut out,
+        &sorted.iter().copied().copied().collect::<Vec<_>>(),
+    );
+
     write_non_aarch64_stubs(&mut out, &sorted.iter().copied().copied().collect::<Vec<_>>());
 
     // Determine output path. The tool runs from the workspace root

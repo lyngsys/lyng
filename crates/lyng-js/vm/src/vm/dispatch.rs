@@ -23,6 +23,13 @@ mod tests {
     /// "Wide" here means more than 10 arms in a single `match`. Small matches
     /// (e.g., on `prefix == Opcode::ExtraWide` in wide-decode helpers,
     /// short `match` over `AbruptCompletion`, etc.) are fine.
+    ///
+    /// DSL-0c C2 update: the only large opcode-match in the workspace now
+    /// lives in `crate::dsl::handlers::cold::dispatch_wide_form`, which the
+    /// codegen tool emits and which `dsl::handlers::warm` consults for
+    /// `Wide` / `ExtraWide` dispatch — it deliberately replaces the deleted
+    /// α `DISPATCH_TABLE` indirection with a single, code-generated match.
+    /// This file (dispatch.rs) only holds shared decoders + helpers.
     #[test]
     fn dispatch_rs_contains_no_match_over_10_arms() {
         let source = include_str!("dispatch.rs");
@@ -77,51 +84,10 @@ mod tests {
             max_arms <= 10,
             "dispatch.rs contains a match with {max_arms} arms; Phase 1 sub-8 invariant is ≤ 10. \
              A wide opcode match here would re-grow the dispatch jump table that Track H + \
-             trampoline cutover (`lyng-33i2`) eliminated. Move new opcode handlers under \
-             vm/dispatch_handlers/ instead.",
+             trampoline cutover (`lyng-33i2`) eliminated. The wide-form opcode match lives in \
+             `crate::dsl::handlers::cold::dispatch_wide_form` (codegen-emitted); add new opcodes \
+             via the codegen tool, not by hand-rolling a match here.",
         );
-    }
-
-    /// `DISPATCH_TABLE` must be referenced only from `dispatch_next!`.
-    /// Any handler that touches it directly is bypassing the trampoline
-    /// indirection contract.
-    ///
-    /// Two whitelisted exceptions:
-    /// - `mod.rs` builds the table at compile time.
-    /// - `prefix.rs` handles `Wide` / `ExtraWide`. The prefix opcode reads
-    ///   `bytes[1]` (the semantic byte) rather than advancing pc, so it
-    ///   cannot use `dispatch_next!` (which reads at the current pc).
-    #[test]
-    fn handlers_reference_dispatch_table_only_through_macro() {
-        use std::fs;
-        use std::path::PathBuf;
-        let mut handlers_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        handlers_dir.push("src/vm/dispatch_handlers");
-        let entries = fs::read_dir(&handlers_dir)
-            .expect("dispatch_handlers/ directory should exist at this manifest dir");
-        for entry in entries {
-            let entry = entry.expect("entry");
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("rs") {
-                continue;
-            }
-            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if file_name == "mod.rs" || file_name == "prefix.rs" {
-                continue;
-            }
-            let contents = fs::read_to_string(&path).expect("readable rs");
-            // Match the index-access shape `DISPATCH_TABLE[` — that's the
-            // construct dispatch_next! emits and the only one that bypasses
-            // the trampoline contract. Plain doc-comment mentions of the
-            // name are fine.
-            if contents.contains("DISPATCH_TABLE[") {
-                panic!(
-                    "{} indexes DISPATCH_TABLE directly. The trampoline contract requires \
-                     handlers to dispatch only via the `dispatch_next!` macro.",
-                    path.display(),
-                );
-            }
-        }
     }
 }
 
@@ -203,7 +169,7 @@ pub(in crate::vm) fn decode_feedback_slot_operand(
 }
 
 #[inline]
-pub(in crate::vm) fn decode_abc_operands(
+pub(crate) fn decode_abc_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,
@@ -262,7 +228,7 @@ fn decode_abc_operands_wide(
 }
 
 #[inline]
-pub(in crate::vm) fn decode_abx_operands(
+pub(crate) fn decode_abx_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,

@@ -35,7 +35,6 @@ use lyng_js_types::{CodeRef, Value};
 use crate::error::{VmError, VmResult};
 use crate::FrameRecord;
 
-use super::dispatch_handlers;
 use super::install::InstalledFunction;
 use super::{code_index, Vm};
 
@@ -282,14 +281,20 @@ pub enum Step {
 }
 
 // DSL-0c C5: dispatch_next! and dispatch_next_with_value! macros deleted
-// with the α trampoline. The α handlers in `dispatch_handlers/` no longer
-// terminate with `dispatch_next!` — `translate_outcome_to_step` in
-// `dispatch_handlers/mod.rs` constructs the `Step::Continue(next)`
-// value directly. The prefix bridge in `dsl::handlers::warm`
-// (`op_prefix_via_alpha`) likewise reads `DISPATCH_TABLE` directly.
+// with the α trampoline.
+//
+// DSL-0c C2: α `DISPATCH_TABLE` + `dispatch_handlers/` deleted alongside
+// `op_prefix_via_alpha`. Wide-form prefix dispatch is now driven entirely
+// by `crate::dsl::handlers::cold::dispatch_wide_form` — a centralized
+// Rust function whose match arms decode + execute each prefix-accepting
+// opcode's wide-form encoding.
 
 /// `?`-like early-return for handlers. `Result<T, VmError>` → `T` on Ok, or
 /// `return Step::Error(e)` on Err.
+///
+/// Retained for the DSL test harness (`dsl/test_helpers.rs`), which still
+/// constructs a `DispatchState` directly and exercises semantic bodies
+/// outside the asm trampoline.
 #[macro_export]
 macro_rules! try_step {
     ($e:expr) => {
@@ -300,26 +305,14 @@ macro_rules! try_step {
     };
 }
 
-/// Sized to cover every byte that could land in `bytes[pc]`. The first
-/// `lyng_js_bytecode::OPCODE_COUNT` slots map to real or stub handlers; the
-/// rest are `op_stub`, so an invalid byte fails cleanly rather than indexing
-/// past the table.
-pub const DISPATCH_TABLE_LEN: usize = 256;
-
-/// Static dispatch table — one `Handler` per opcode byte value.
-pub static DISPATCH_TABLE: [Handler; DISPATCH_TABLE_LEN] =
-    dispatch_handlers::build_dispatch_table();
-
 // DSL-0c C5: run_trampoline, run_trampoline_counted, still_active deleted.
 // The α trampoline was the production dispatch loop until DSL-0c (Task C1)
 // flipped `Vm::run` to `run_via_dsl`. The asm-DSL trampoline replaces
 // `run_trampoline`; the epoch-check + `still_active` logic is now in
 // `LlIntDispatchState::translate_outcome` in `dsl/slow_path.rs` (mirrors
 // the same policy: only refresh on a true frame-stack change, never on a
-// same-frame epoch bump). Wide-form prefix dispatch — the only remaining
-// α consumer — invokes handlers directly through `DISPATCH_TABLE` from
-// `dsl::handlers::warm::op_prefix_via_alpha` without going through a
-// trampoline loop.
+// same-frame epoch bump). Wide-form prefix dispatch — formerly the last
+// α consumer — is now native Rust via `dispatch_wide_form`.
 
 impl Vm {
     /// Look up the `Arc<InstalledFunction>` for a given `CodeRef`. Used by
