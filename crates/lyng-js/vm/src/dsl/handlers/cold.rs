@@ -17,7 +17,7 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     call_slow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, store_reg, tag_undefined,
+    decode_ax, dispatch, dispatch_after_slow, store_reg, tag_null, tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -185,33 +185,20 @@ pub extern "C" fn op_load_uninitialized_lexical_slow_rs(
 }
 
 // =====================================================================
-// LoadNull
+// LoadNull — inline DSL fast path (DSL-1 Phase 1.A, Task 2).
+//
+// Writes Value::null() to register `a`. The `bx` operand is unused
+// (layout reserves a 16-bit slot for forward compat that this opcode
+// doesn't consume). No fail mode → no slow path.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_null_dsl, layout = Abx, length = 4, |a, bx| {
-        call_slow!(op_load_null_slow_rs, args = [a, bx]);
-        dispatch_after_slow!();
+    op_load_null_dsl, layout = Abx, length = 4, |a, _bx| {
+        tag_null!(t0);
+        store_reg!(a, t0);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_null_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
-        a: a as u16,
-        instruction_len: 4u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_null_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
