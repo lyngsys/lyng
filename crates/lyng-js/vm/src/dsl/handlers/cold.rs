@@ -221,33 +221,19 @@ llint_handler! {
 }
 
 // =====================================================================
-// LoadFalse
+// LoadFalse — inline DSL fast path (DSL-1 Phase 1.A, Task 4).
+//
+// Writes Value::from_bool(false) to register `a`. Mirror of Task 3
+// (op_load_true) with payload = 0 instead of 1.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_false_dsl, layout = Abx, length = 4, |a, bx| {
-        call_slow!(op_load_false_slow_rs, args = [a, bx]);
-        dispatch_after_slow!();
+    op_load_false_dsl, layout = Abx, length = 4, |a, _bx| {
+        tag_bool_const!(t0, 0);
+        store_reg!(a, t0);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_false_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadConstantArgs {
-        a: a as u16,
-        instruction_len: 4u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_false_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
