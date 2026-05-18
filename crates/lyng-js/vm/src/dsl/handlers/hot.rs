@@ -19,7 +19,7 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     add_smi_overflow, call_slow, check_smi, decode_ab, decode_abc_slot, dispatch,
-    dispatch_after_slow, load_reg, record_smi, store_reg, tag_smi, untag_smi,
+    dispatch_after_slow, load_reg, store_reg, tag_smi, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -38,9 +38,21 @@ llint_handler! {
 // op_add (B40) — Abc layout with feedback slot, SMI fast path.
 // =====================================================================
 //
-// Fast path: 2x check_smi + 2x untag + add + tag + store_reg + record_smi
-// + dispatch. Slow path: call_slow into the op_add semantic body, then
-// dispatch_after_slow.
+// Fast path: 2x check_smi + 2x untag + add + tag + store_reg +
+// call_slow!(op_add_record_smi_rs) + dispatch. The slot-recording
+// shim bumps the warmup counter and execution count through
+// `Vm::record_feedback_slot` (which also mirrors the legacy state to
+// the flat array). Inline `record_smi!` was dropped in DSL-0c because
+// the `entry_observed` offset binding is still a placeholder (offset
+// 0) — writing at offset 0 would corrupt the `Option<FeedbackSiteState>`
+// discriminant. Slow path: call_slow into the op_add semantic body,
+// which performs the same feedback recording itself.
+//
+// The extra `call_slow!` on the fast path adds one Rust function call
+// per SMI add, but preserves the warmup/execution-count bookkeeping
+// the tiering machinery relies on. A future task can re-introduce
+// inline observed-types recording once the `entry_observed` offset
+// binding lands.
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
@@ -54,12 +66,43 @@ llint_handler! {
         add_smi_overflow!(t0, t1 => t2, .slow);
         tag_smi!(t2);
         store_reg!(a, t2);
-        record_smi!(slot);
-        dispatch!();
+        call_slow!(op_add_record_smi_rs, args = [slot]);
+        dispatch_after_slow!();
         .slow:
         call_slow!(op_add_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+/// Slow-path shim for the SMI fast path's feedback recording. The
+/// inline `record_smi!` macro would write the observed-types bit into
+/// the flat-array entry, but its offset binding (`entry_observed`) is
+/// still a placeholder (offset 0). Routing through
+/// `Vm::record_feedback_slot` is functionally correct: it bumps the
+/// warmup counter, allocates the legacy vector at threshold, mirrors
+/// the legacy state to the flat array, and observes the tier feedback
+/// event — all the bookkeeping `op_add_semantic`'s slow path performs.
+/// The fast path returns `Continue { pc_advance: 6 }` so the asm
+/// bridge advances PC by the encoded op_add length without going
+/// through `op_add_semantic`.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_add_record_smi_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    feedback_slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    {
+        let inner = dispatch.dispatch_state();
+        let code = inner.code();
+        inner
+            .vm
+            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+    }
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
+        pc_advance: 6,
+    })
 }
 
 /// Slow-path shim for `op_add`. The asm trampoline tail-calls this

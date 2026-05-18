@@ -2177,7 +2177,7 @@ impl Vm {
         true
     }
 
-    pub(super) fn record_feedback_slot(&mut self, code: CodeRef, slot: Option<FeedbackSlotId>) {
+    pub(crate) fn record_feedback_slot(&mut self, code: CodeRef, slot: Option<FeedbackSlotId>) {
         let Some(slot) = slot else {
             return;
         };
