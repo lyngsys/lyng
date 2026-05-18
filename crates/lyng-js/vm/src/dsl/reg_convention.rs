@@ -55,3 +55,76 @@ pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 pub const VM_POLL_PENDING_OFFSET: usize = offset_of!(crate::vm::Vm, dsl_poll_pending);
 pub const VM_OPCODE_COUNTER_OFFSET: usize = 0;
 pub const VM_HEAP_POOL_OFFSET: usize = 0;
+
+// =============================================================================
+// VM-relative offsets (read from pinned register x22 = VM).
+//
+// Only valid when the `opcode-counters` feature is on; otherwise the
+// `dispatch_counters` field doesn't exist on `Vm`.
+// =============================================================================
+
+/// Byte offset of `Vm::dispatch_counters` (the `OpcodeDispatchCounterStore`).
+///
+/// The asm-side counter macros read `[x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]`
+/// to access the counter store. Note: `OpcodeDispatchCounterStore` is a thin
+/// wrapper around `Box<DispatchCounters>`; its single field is the Box at
+/// offset 0. So the asm path needs TWO loads:
+///   1. `ldr x9, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` — gets the Box's
+///      raw pointer (the first u64 of OpcodeDispatchCounterStore is the Box).
+///   2. `ldr x9, [x9]` (or equivalent indexed load) — dereferences the Box
+///      pointer to reach `DispatchCounters`.
+///
+/// From there, bank offsets (0, 2048, 4096) index into the flat `[u64; 256]`
+/// banks.
+#[cfg(feature = "opcode-counters")]
+pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize =
+    ::core::mem::offset_of!(crate::vm::Vm, dispatch_counters);
+
+/// Byte offset of the `dispatch` bank within `DispatchCounters`. 0
+/// because it's the first field of the `#[repr(C)]` struct.
+#[cfg(feature = "opcode-counters")]
+pub const DISPATCH_COUNTER_BANK_DISPATCH: usize = 0;
+
+/// Byte offset of the `slow_semantic` bank within `DispatchCounters`.
+/// 256 × 8 = 2048 (one full bank past `dispatch`).
+#[cfg(feature = "opcode-counters")]
+pub const DISPATCH_COUNTER_BANK_SLOW_SEMANTIC: usize = 256 * 8;
+
+/// Byte offset of the `slow_safepoint` bank within `DispatchCounters`.
+/// 512 × 8 = 4096 (two full banks past `dispatch`).
+#[cfg(feature = "opcode-counters")]
+pub const DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT: usize = 512 * 8;
+
+#[cfg(test)]
+#[cfg(feature = "opcode-counters")]
+mod counter_offset_tests {
+    use super::*;
+
+    #[test]
+    fn counter_bank_offsets_are_well_aligned() {
+        // All bank offsets must be 8-byte-aligned for u64 indexed loads.
+        assert_eq!(DISPATCH_COUNTER_BANK_DISPATCH % 8, 0);
+        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SEMANTIC % 8, 0);
+        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT % 8, 0);
+    }
+
+    #[test]
+    fn counter_bank_offsets_match_struct_layout() {
+        use crate::DispatchCounters;
+        use std::mem::offset_of;
+        assert_eq!(DISPATCH_COUNTER_BANK_DISPATCH, offset_of!(DispatchCounters, dispatch));
+        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SEMANTIC, offset_of!(DispatchCounters, slow_semantic));
+        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT, offset_of!(DispatchCounters, slow_safepoint));
+    }
+
+    #[test]
+    fn vm_dispatch_counters_offset_resolves() {
+        // Sanity check that the offset_of!() invocation produces a
+        // sensible non-zero value (Vm is large; dispatch_counters is
+        // unlikely to be at the very start).
+        // Just verifies the const is reachable; the exact value depends
+        // on Vm's struct layout which may change.
+        let _offset: usize = VM_DISPATCH_COUNTERS_PTR_OFFSET;
+        // No specific assertion — the import resolving is the test.
+    }
+}
