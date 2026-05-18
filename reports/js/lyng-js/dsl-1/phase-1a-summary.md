@@ -75,9 +75,17 @@ The plan's §4 per-opcode gates that could not be verified in this session:
 
 **Goal:** restore per-opcode slow-path-share measurement so the DSL-1 < 20% slow-path-share invariant becomes enforceable.
 
-**Approach:** add a counter increment to the DSL `dispatch!` tail or the `call_slow!` shim, gated behind `--features opcode-counters`. Likely 1-3 instructions per dispatch when the feature is enabled; 0 when disabled.
+**Current state (verified post-Phase-1.A):** the `inc_counter!` macro already exists at [`crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs) emitting 4 instructions when the `opcode-counters` feature is on. It is NOT yet wired into the `dispatch!` tail. The macro references `{vm_counter_base}` — a binding that doesn't yet exist.
 
-**Effort:** ~half day. Touches the proc-macro lowerer (`crates/lyng-js-vm-dsl/src/lower.rs`) or the backend `dispatch!` / `call_slow!` macros.
+**Scope:**
+1. Add a flat `[u64; 256]` counter array as an asm-stable field on `Vm` (currently the storage is `Option<OpcodeDispatchCounterStore>`, accessed via Rust APIs and unsuitable for direct asm load).
+2. Add `VM_OPCODE_COUNTER_OFFSET` const in [`reg_convention.rs`](../../../crates/lyng-js/vm/src/dsl/reg_convention.rs).
+3. Update `OpcodeDispatchCounterStore::snapshot` to read from the flat array.
+4. Invoke `inc_counter!` from the DSL `dispatch!` macro tail with the destination opcode byte.
+5. Add separate banks for `slow_path_semantic` and `slow_path_safepoint` counters, with their own invocation sites in `call_slow!` / `poll_safepoint!`.
+6. Verify per-bench overhead is acceptable (≤5% on tight loops per parent §13.12 open question).
+
+**Effort:** ~1-2 days (revised up from "half day"). The asm change is small but the `Vm` struct layout change + counter store API migration ripples through several files (`vm.rs`, `vm/opcode_counter_store.rs`, `tools/lyng-js-bench/src/v8suite.rs`, and the `dispatch!` / `call_slow!` backend macros).
 
 ### Task 10.B — add microbench snippets for 7 ported opcodes
 
