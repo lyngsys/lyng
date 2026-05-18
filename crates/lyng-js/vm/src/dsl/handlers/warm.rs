@@ -23,7 +23,7 @@ use lyng_js_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_loop_header, layout = Ax, length = 4, |_unused_target_offset| {
+    op_loop_header, opcode_byte = 66, layout = Ax, length = 4, |_unused_target_offset| {
         poll_safepoint!(.poll_pending);
         dispatch!(advance = 4);
         .poll_pending:
@@ -55,7 +55,7 @@ pub extern "C" fn op_loop_header_poll_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump8, layout = A, length = 2, |offset| {
+    op_jump8, opcode_byte = 141, layout = A, length = 2, |offset| {
         call_slow!(op_jump8_slow_rs, args = [offset]);
         dispatch_after_slow!();
     }
@@ -85,7 +85,7 @@ pub extern "C" fn op_jump8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump_if_true, layout = Abx, length = 4, |condition, offset| {
+    op_jump_if_true, opcode_byte = 64, layout = Abx, length = 4, |condition, offset| {
         call_slow!(op_jump_if_true_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
@@ -113,7 +113,7 @@ pub extern "C" fn op_jump_if_true_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump_if_false, layout = Abx, length = 4, |condition, offset| {
+    op_jump_if_false, opcode_byte = 65, layout = Abx, length = 4, |condition, offset| {
         call_slow!(op_jump_if_false_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
@@ -146,7 +146,7 @@ pub extern "C" fn op_jump_if_false_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump_if_true8, layout = Ab, length = 3, |condition, offset| {
+    op_jump_if_true8, opcode_byte = 142, layout = Ab, length = 3, |condition, offset| {
         call_slow!(op_jump_if_true8_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
@@ -174,7 +174,7 @@ pub extern "C" fn op_jump_if_true8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump_if_false8, layout = Ab, length = 3, |condition, offset| {
+    op_jump_if_false8, opcode_byte = 143, layout = Ab, length = 3, |condition, offset| {
         call_slow!(op_jump_if_false8_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
@@ -223,7 +223,7 @@ pub extern "C" fn op_jump_if_false8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_wide, layout = None, length = 1, || {
+    op_wide, opcode_byte = 120, layout = None, length = 1, || {
         call_slow!(op_wide_set_prefix_rs, args = []);
         dispatch_after_slow!();
     }
@@ -231,7 +231,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_extra_wide, layout = None, length = 1, || {
+    op_extra_wide, opcode_byte = 121, layout = None, length = 1, || {
         call_slow!(op_extra_wide_set_prefix_rs, args = []);
         dispatch_after_slow!();
     }

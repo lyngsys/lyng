@@ -22,7 +22,7 @@
 //! [`COLD_STUBS`] holds 140 rows, one per Cold opcode. Each row carries
 //! enough to emit:
 //!
-//! 1. `llint_handler! { op_xxx_dsl, layout = L, length = N, |...| {
+//! 1. `llint_handler! { op_xxx_dsl, opcode_byte = N, layout = L, length = N, |...| {
 //!    call_slow!(op_xxx_slow_rs, args = [...]); dispatch_after_slow!(); }
 //!    }`
 //! 2. `extern "C" fn op_xxx_slow_rs(state, op0, ...) -> SlowPathReturn`
@@ -2759,13 +2759,20 @@ fn write_stub(out: &mut String, stub: &Stub) {
     writeln!(out, "{underline}").unwrap();
     out.push('\n');
 
-    // Emit `llint_handler!` body.
+    // Emit `llint_handler!` body. The `opcode_byte = N` arg encodes
+    // the discriminant of the matching `Opcode` variant so the proc-
+    // macro lowerer can splice it into the leading
+    // `inc_dispatch_counter!(N)` body fragment (no-op when the
+    // `opcode-counters` feature is off; bumps `Vm::dispatch_counters`'
+    // dispatch bank otherwise).
+    let opcode_byte = stub.opcode as u8;
     out.push_str("#[cfg(target_arch = \"aarch64\")]\n");
     out.push_str("llint_handler! {\n");
     writeln!(
         out,
-        "    {dsl}, layout = {layout}, length = {length}, {pipe} {{",
+        "    {dsl}, opcode_byte = {opcode_byte}, layout = {layout}, length = {length}, {pipe} {{",
         dsl = dsl_handler,
+        opcode_byte = opcode_byte,
         layout = stub.layout.ident(),
         length = stub.length,
         pipe = pipe_args,

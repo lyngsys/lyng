@@ -27,7 +27,7 @@ use lyng_js_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_move, layout = Ab, length = 4, |dst, src| {
+    op_move, opcode_byte = 1, layout = Ab, length = 4, |dst, src| {
         load_reg!(src => t0);
         store_reg!(dst, t0);
         dispatch!();
@@ -56,7 +56,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_add, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_add, opcode_byte = 31, layout = AbcSlot, length = 6, |a, b, c, slot| {
         load_reg!(b => t0);
         check_smi!(t0, .slow);
         load_reg!(c => t1);
@@ -150,7 +150,7 @@ pub extern "C" fn op_add_slow_rs(
 // byte is harmless.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump, layout = Ax, length = 4, |offset| {
+    op_jump, opcode_byte = 63, layout = Ax, length = 4, |offset| {
         call_slow!(op_jump_slow_rs, args = [offset]);
         dispatch_after_slow!();
     }
@@ -186,7 +186,7 @@ pub extern "C" fn op_jump_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_return, layout = Ax, length = 4, |src| {
+    op_return, opcode_byte = 67, layout = Ax, length = 4, |src| {
         call_slow!(op_return_slow_rs, args = [src]);
         dispatch_after_slow!();
     }

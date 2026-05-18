@@ -3,9 +3,16 @@
 //! Input shape (see design §4):
 //! ```ignore
 //! llint_handler! {
-//!     name, layout = LayoutIdent, length = N, |a, b, c, slot| { <body> }
+//!     name, opcode_byte = N, layout = LayoutIdent, length = N, |a, b, c, slot| { <body> }
 //! }
 //! ```
+//!
+//! The `opcode_byte = N` arg is the `u8` discriminant of the matching
+//! `Opcode` enum variant. The lowerer threads it into
+//! `inc_dispatch_counter!(N)` — the leading body fragment in the asm
+//! template — so each handler bumps its per-opcode dispatch counter on
+//! entry (when the `opcode-counters` feature is on; the macro expands to
+//! an empty string when the feature is off).
 //!
 //! `<body>` is a sequence of DSL-op macro invocations, each terminated by
 //! `;`, optionally interleaved with `.label:` declarations. The parser
@@ -44,6 +51,11 @@ pub(crate) enum BodyStmt {
 pub(crate) struct HandlerAst {
     /// Function name (e.g. `op_add`).
     pub(crate) name: Ident,
+    /// `u8` discriminant of the matching `Opcode` variant. Threaded
+    /// into `inc_dispatch_counter!(N)` as the leading body fragment,
+    /// so each handler bumps its per-opcode dispatch counter on entry
+    /// (no-op when the `opcode-counters` feature is off).
+    pub(crate) opcode_byte: LitInt,
     /// Layout identifier (e.g. `AbcSlot`, `None`).
     pub(crate) layout: Ident,
     /// Encoded instruction length, used as the `length = const N as u32`
@@ -61,6 +73,20 @@ impl Parse for HandlerAst {
     fn parse(input: ParseStream) -> Result<Self> {
         // `<name>,`
         let name: Ident = input.parse()?;
+        input.parse::<Token![,]>()?;
+
+        // `opcode_byte = <lit>,`
+        let opcode_byte_ident: Ident = input.parse()?;
+        if opcode_byte_ident != "opcode_byte" {
+            return Err(syn::Error::new(
+                opcode_byte_ident.span(),
+                "expected `opcode_byte = <u8 literal>` — every llint_handler! \
+                 must declare its Opcode discriminant so the lowerer can wire \
+                 `inc_dispatch_counter!`",
+            ));
+        }
+        input.parse::<Token![=]>()?;
+        let opcode_byte: LitInt = input.parse()?;
         input.parse::<Token![,]>()?;
 
         // `layout = <ident>,`
@@ -118,6 +144,7 @@ impl Parse for HandlerAst {
 
         Ok(HandlerAst {
             name,
+            opcode_byte,
             layout,
             length,
             operand_idents,

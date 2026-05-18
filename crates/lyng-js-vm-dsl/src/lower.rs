@@ -95,6 +95,18 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
 
     let name = &ast.name;
     let length = &ast.length;
+    let opcode_byte = &ast.opcode_byte;
+    // Counter-increment fragment, emitted as the FIRST body fragment
+    // BEFORE the operand-decode prologue. When the `opcode-counters`
+    // feature is on the macro emits 4 instructions bumping the
+    // dispatch-bank slot for this opcode; when off it expands to the
+    // empty string and is invisible. Either way the `vm_counter_base`
+    // binding below is supplied (with a fallback `= 0` sentinel const
+    // when the feature is off — see `reg_convention.rs`) so rustc
+    // never complains about an unused named arg.
+    let counter_increment = quote! {
+        crate::inc_dispatch_counter!(#opcode_byte)
+    };
     let prologue_raw = layout.decode_prologue_tokens(&operands);
     // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
     // macros stringify their args verbatim — feeding them `dst, src`
@@ -129,7 +141,14 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
         }
     }
 
-    let template_entries = std::iter::once(prologue)
+    // Emission order: counter-inc → operand-decode prologue → body
+    // statements. The counter increment must precede the prologue so
+    // it bumps the dispatch counter regardless of which fast-path
+    // branch the body's later `dispatch!`/`dispatch_after_slow!` takes
+    // (slow-path round-trips re-enter the dispatch table; their target
+    // handler's own counter increment fires on entry there).
+    let template_entries = std::iter::once(counter_increment)
+        .chain(std::iter::once(prologue))
         .chain(body_tokens)
         .map(|tokens| quote! { #tokens, });
 
@@ -173,7 +192,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -184,6 +203,14 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 vm_poll = const ::lyng_js_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
                 entry_stride_shift = const 6_u32,
                 entry_observed = const 0_u32,
+                // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
+                // (a `Box<DispatchCounters>` whose raw pointer reads through the
+                // `*mut DispatchCounters` repr-equivalence). When the
+                // `opcode-counters` feature is off the binding falls back to `0`
+                // via the sentinel const in `reg_convention.rs`; the counter
+                // macros themselves emit empty strings in that config, so the
+                // binding is referenced only by the leading comment.
+                vm_counter_base = const ::lyng_js_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET,
                 exit = sym ::lyng_js_vm::dsl::entry::_interpreter_exit,
                 #(#shim_bindings)*
             )

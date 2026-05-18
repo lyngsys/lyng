@@ -80,6 +80,16 @@ pub const VM_HEAP_POOL_OFFSET: usize = 0;
 pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize =
     ::core::mem::offset_of!(crate::vm::Vm, dispatch_counters);
 
+/// Feature-off fallback. The proc-macro lowerer always emits
+/// `vm_counter_base = const VM_DISPATCH_COUNTERS_PTR_OFFSET` as a named
+/// `naked_asm!` binding (so the leading `/* ... ctr={vm_counter_base} ... */`
+/// comment fragment doesn't reference an unbound name). When the feature
+/// is off the `inc_dispatch_counter!` / `inc_slow_*_counter!` macros all
+/// expand to empty strings and never reference the binding at runtime, so
+/// the value is irrelevant — `0` is a safe sentinel.
+#[cfg(not(feature = "opcode-counters"))]
+pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize = 0;
+
 /// Byte offset of the `dispatch` bank within `DispatchCounters`. 0
 /// because it's the first field of the `#[repr(C)]` struct.
 #[cfg(feature = "opcode-counters")]

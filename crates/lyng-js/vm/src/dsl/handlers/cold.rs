@@ -116,7 +116,7 @@ impl ColdShimHelpers {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_nop_dsl, layout = Ax, length = 4, |ax| {
+    op_nop_dsl, opcode_byte = 0, layout = Ax, length = 4, |ax| {
         call_slow!(op_nop_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -148,7 +148,7 @@ pub extern "C" fn op_nop_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_undefined_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_undefined_dsl, opcode_byte = 2, layout = Abx, length = 4, |a, _bx| {
         tag_undefined!(t0);
         store_reg!(a, t0);
         dispatch!();
@@ -161,7 +161,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_uninitialized_lexical_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_uninitialized_lexical_dsl, opcode_byte = 3, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_uninitialized_lexical_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -195,7 +195,7 @@ pub extern "C" fn op_load_uninitialized_lexical_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_null_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_null_dsl, opcode_byte = 4, layout = Abx, length = 4, |a, _bx| {
         tag_null!(t0);
         store_reg!(a, t0);
         dispatch!();
@@ -213,7 +213,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_true_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_true_dsl, opcode_byte = 5, layout = Abx, length = 4, |a, _bx| {
         tag_bool_const!(t0, 1);
         store_reg!(a, t0);
         dispatch!();
@@ -229,7 +229,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_false_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_false_dsl, opcode_byte = 6, layout = Abx, length = 4, |a, _bx| {
         tag_bool_const!(t0, 0);
         store_reg!(a, t0);
         dispatch!();
@@ -246,7 +246,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_zero_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_zero_dsl, opcode_byte = 7, layout = Abx, length = 4, |a, _bx| {
         tag_smi_const!(t0, 0);
         store_reg!(a, t0);
         dispatch!();
@@ -263,7 +263,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_one_dsl, layout = Abx, length = 4, |a, _bx| {
+    op_load_one_dsl, opcode_byte = 8, layout = Abx, length = 4, |a, _bx| {
         tag_smi_const!(t0, 1);
         store_reg!(a, t0);
         dispatch!();
@@ -276,7 +276,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_smi_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_smi_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -307,7 +307,7 @@ pub extern "C" fn op_load_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_const_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_const_dsl, opcode_byte = 10, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_const_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -338,7 +338,7 @@ pub extern "C" fn op_load_const_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_env_slot_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_env_slot_dsl, opcode_byte = 11, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_env_slot_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -369,7 +369,7 @@ pub extern "C" fn op_load_env_slot_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_env_slot_dsl, layout = Abx, length = 4, |a, bx| {
+    op_store_env_slot_dsl, opcode_byte = 12, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_store_env_slot_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -400,7 +400,7 @@ pub extern "C" fn op_store_env_slot_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_env_slot_dsl, layout = Abx, length = 4, |a, bx| {
+    op_assign_env_slot_dsl, opcode_byte = 13, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_assign_env_slot_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -431,7 +431,7 @@ pub extern "C" fn op_assign_env_slot_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_global_dsl, layout = Abx, length = 6, |a, bx| {
+    op_load_global_dsl, opcode_byte = 14, layout = Abx, length = 6, |a, bx| {
         call_slow!(op_load_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -463,7 +463,7 @@ pub extern "C" fn op_load_global_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_global_dsl, layout = Abx, length = 6, |a, bx| {
+    op_store_global_dsl, opcode_byte = 15, layout = Abx, length = 6, |a, bx| {
         call_slow!(op_store_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -495,7 +495,7 @@ pub extern "C" fn op_store_global_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_global_dsl, layout = Abx, length = 6, |a, bx| {
+    op_assign_global_dsl, opcode_byte = 16, layout = Abx, length = 6, |a, bx| {
         call_slow!(op_assign_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -527,7 +527,7 @@ pub extern "C" fn op_assign_global_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_delete_global_dsl, layout = Abx, length = 4, |a, bx| {
+    op_delete_global_dsl, opcode_byte = 17, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_delete_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -559,7 +559,7 @@ pub extern "C" fn op_delete_global_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_name_dsl, opcode_byte = 18, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -591,7 +591,7 @@ pub extern "C" fn op_load_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_resolve_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_resolve_name_dsl, opcode_byte = 19, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_resolve_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -623,7 +623,7 @@ pub extern "C" fn op_resolve_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_resolve_global_dsl, layout = Abx, length = 4, |a, bx| {
+    op_resolve_global_dsl, opcode_byte = 20, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_resolve_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -655,7 +655,7 @@ pub extern "C" fn op_resolve_global_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_assign_name_dsl, opcode_byte = 21, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_assign_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -687,7 +687,7 @@ pub extern "C" fn op_assign_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_variable_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_assign_variable_name_dsl, opcode_byte = 22, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_assign_variable_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -719,7 +719,7 @@ pub extern "C" fn op_assign_variable_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_delete_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_delete_name_dsl, opcode_byte = 23, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_delete_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -751,7 +751,7 @@ pub extern "C" fn op_delete_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_capture_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_capture_name_dsl, opcode_byte = 24, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_capture_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -783,7 +783,7 @@ pub extern "C" fn op_capture_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_captured_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_captured_name_dsl, opcode_byte = 25, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_captured_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -814,7 +814,7 @@ pub extern "C" fn op_load_captured_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_captured_name_this_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_captured_name_this_dsl, opcode_byte = 26, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_captured_name_this_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -845,7 +845,7 @@ pub extern "C" fn op_load_captured_name_this_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_captured_name_dsl, layout = Abx, length = 4, |a, bx| {
+    op_assign_captured_name_dsl, opcode_byte = 27, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_assign_captured_name_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -876,7 +876,7 @@ pub extern "C" fn op_assign_captured_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_this_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_this_dsl, opcode_byte = 28, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_this_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -908,7 +908,7 @@ pub extern "C" fn op_load_this_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_callee_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_callee_dsl, opcode_byte = 29, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_callee_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -940,7 +940,7 @@ pub extern "C" fn op_load_callee_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_new_target_dsl, layout = Abx, length = 4, |a, bx| {
+    op_load_new_target_dsl, opcode_byte = 30, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_load_new_target_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -972,7 +972,7 @@ pub extern "C" fn op_load_new_target_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_add_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_add_smi_dsl, opcode_byte = 32, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_add_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1007,7 +1007,7 @@ pub extern "C" fn op_add_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_sub_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_sub_dsl, opcode_byte = 33, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_sub_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1042,7 +1042,7 @@ pub extern "C" fn op_sub_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_sub_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_sub_smi_dsl, opcode_byte = 34, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_sub_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1077,7 +1077,7 @@ pub extern "C" fn op_sub_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_mul_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_mul_dsl, opcode_byte = 35, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_mul_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1112,7 +1112,7 @@ pub extern "C" fn op_mul_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_mul_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_mul_smi_dsl, opcode_byte = 36, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_mul_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1147,7 +1147,7 @@ pub extern "C" fn op_mul_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_div_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_div_dsl, opcode_byte = 37, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_div_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1182,7 +1182,7 @@ pub extern "C" fn op_div_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_mod_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_mod_dsl, opcode_byte = 38, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_mod_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1217,7 +1217,7 @@ pub extern "C" fn op_mod_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_div_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_div_smi_dsl, opcode_byte = 39, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_div_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1252,7 +1252,7 @@ pub extern "C" fn op_div_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_mod_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_mod_smi_dsl, opcode_byte = 40, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_mod_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1287,7 +1287,7 @@ pub extern "C" fn op_mod_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_exp_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_exp_dsl, opcode_byte = 41, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_exp_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1322,7 +1322,7 @@ pub extern "C" fn op_exp_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_bit_or_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_bit_or_dsl, opcode_byte = 42, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_bit_or_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1357,7 +1357,7 @@ pub extern "C" fn op_bit_or_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_bit_xor_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_bit_xor_dsl, opcode_byte = 43, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_bit_xor_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1392,7 +1392,7 @@ pub extern "C" fn op_bit_xor_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_bit_and_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_bit_and_dsl, opcode_byte = 44, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_bit_and_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1427,7 +1427,7 @@ pub extern "C" fn op_bit_and_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_bit_and_smi_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_bit_and_smi_dsl, opcode_byte = 45, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_bit_and_smi_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1462,7 +1462,7 @@ pub extern "C" fn op_bit_and_smi_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_bit_not_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_bit_not_dsl, opcode_byte = 46, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_bit_not_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1496,7 +1496,7 @@ pub extern "C" fn op_bit_not_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_shift_left_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_shift_left_dsl, opcode_byte = 47, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_shift_left_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1531,7 +1531,7 @@ pub extern "C" fn op_shift_left_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_shift_right_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_shift_right_dsl, opcode_byte = 48, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_shift_right_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1566,7 +1566,7 @@ pub extern "C" fn op_shift_right_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_unsigned_shift_right_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_unsigned_shift_right_dsl, opcode_byte = 49, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_unsigned_shift_right_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1601,7 +1601,7 @@ pub extern "C" fn op_unsigned_shift_right_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_negate_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_negate_dsl, opcode_byte = 50, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_negate_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1635,7 +1635,7 @@ pub extern "C" fn op_negate_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_increment_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_increment_dsl, opcode_byte = 51, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_increment_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1669,7 +1669,7 @@ pub extern "C" fn op_increment_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_decrement_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_decrement_dsl, opcode_byte = 52, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_decrement_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1703,7 +1703,7 @@ pub extern "C" fn op_decrement_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_equal_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_equal_dsl, opcode_byte = 53, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1738,7 +1738,7 @@ pub extern "C" fn op_equal_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_strict_equal_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_strict_equal_dsl, opcode_byte = 54, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_strict_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1773,7 +1773,7 @@ pub extern "C" fn op_strict_equal_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_equal_zero_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_equal_zero_dsl, opcode_byte = 55, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_equal_zero_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1807,7 +1807,7 @@ pub extern "C" fn op_equal_zero_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_less_than_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_less_than_dsl, opcode_byte = 56, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_less_than_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1842,7 +1842,7 @@ pub extern "C" fn op_less_than_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_less_equal_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_less_equal_dsl, opcode_byte = 57, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_less_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1877,7 +1877,7 @@ pub extern "C" fn op_less_equal_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_greater_than_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_greater_than_dsl, opcode_byte = 58, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_greater_than_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1912,7 +1912,7 @@ pub extern "C" fn op_greater_than_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_greater_equal_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_greater_equal_dsl, opcode_byte = 59, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_greater_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -1947,7 +1947,7 @@ pub extern "C" fn op_greater_equal_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_type_of_dsl, layout = Ax, length = 4, |ax| {
+    op_type_of_dsl, opcode_byte = 60, layout = Ax, length = 4, |ax| {
         call_slow!(op_type_of_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -1976,7 +1976,7 @@ pub extern "C" fn op_type_of_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_instance_of_dsl, layout = Ax, length = 4, |ax| {
+    op_instance_of_dsl, opcode_byte = 61, layout = Ax, length = 4, |ax| {
         call_slow!(op_instance_of_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -2002,7 +2002,7 @@ pub extern "C" fn op_instance_of_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_in_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_in_dsl, opcode_byte = 62, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_in_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2035,7 +2035,7 @@ pub extern "C" fn op_in_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_return_undefined_dsl, layout = Ax, length = 4, |ax| {
+    op_return_undefined_dsl, opcode_byte = 68, layout = Ax, length = 4, |ax| {
         call_slow!(op_return_undefined_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -2061,7 +2061,7 @@ pub extern "C" fn op_return_undefined_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_create_object_dsl, layout = Abx, length = 4, |a, bx| {
+    op_create_object_dsl, opcode_byte = 69, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_create_object_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -2092,7 +2092,7 @@ pub extern "C" fn op_create_object_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_create_array_dsl, layout = Abx, length = 4, |a, bx| {
+    op_create_array_dsl, opcode_byte = 70, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_create_array_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -2123,7 +2123,7 @@ pub extern "C" fn op_create_array_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_check_object_coercible_dsl, layout = Abx, length = 4, |a, bx| {
+    op_check_object_coercible_dsl, opcode_byte = 71, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_check_object_coercible_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -2154,7 +2154,7 @@ pub extern "C" fn op_check_object_coercible_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_throw_if_uninitialized_dsl, layout = Abx, length = 4, |a, bx| {
+    op_throw_if_uninitialized_dsl, opcode_byte = 72, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_throw_if_uninitialized_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -2185,7 +2185,7 @@ pub extern "C" fn op_throw_if_uninitialized_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_define_named_property_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_define_named_property_dsl, opcode_byte = 73, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_define_named_property_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2218,7 +2218,7 @@ pub extern "C" fn op_define_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_define_keyed_property_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_define_keyed_property_dsl, opcode_byte = 74, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_define_keyed_property_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2251,7 +2251,7 @@ pub extern "C" fn op_define_keyed_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_dense_element_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_store_dense_element_dsl, opcode_byte = 75, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_store_dense_element_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2284,7 +2284,7 @@ pub extern "C" fn op_store_dense_element_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_dense_element_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_load_dense_element_dsl, opcode_byte = 76, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_load_dense_element_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2317,7 +2317,7 @@ pub extern "C" fn op_load_dense_element_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_get_named_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_get_named_property_dsl, opcode_byte = 77, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_get_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2352,7 +2352,7 @@ pub extern "C" fn op_get_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_set_named_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_set_named_property_dsl, opcode_byte = 78, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_set_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2387,7 +2387,7 @@ pub extern "C" fn op_set_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_named_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_assign_named_property_dsl, opcode_byte = 79, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_assign_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2422,7 +2422,7 @@ pub extern "C" fn op_assign_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_strict_assign_named_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_strict_assign_named_property_dsl, opcode_byte = 80, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_strict_assign_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2457,7 +2457,7 @@ pub extern "C" fn op_strict_assign_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_get_keyed_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_get_keyed_property_dsl, opcode_byte = 81, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_get_keyed_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2492,7 +2492,7 @@ pub extern "C" fn op_get_keyed_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_set_keyed_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_set_keyed_property_dsl, opcode_byte = 82, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_set_keyed_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2527,7 +2527,7 @@ pub extern "C" fn op_set_keyed_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_assign_keyed_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_assign_keyed_property_dsl, opcode_byte = 83, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_assign_keyed_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2562,7 +2562,7 @@ pub extern "C" fn op_assign_keyed_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_strict_assign_keyed_property_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_strict_assign_keyed_property_dsl, opcode_byte = 84, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_strict_assign_keyed_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2597,7 +2597,7 @@ pub extern "C" fn op_strict_assign_keyed_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_delete_property_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_delete_property_dsl, opcode_byte = 85, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_delete_property_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2630,7 +2630,7 @@ pub extern "C" fn op_delete_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_copy_data_properties_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_copy_data_properties_dsl, opcode_byte = 86, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_copy_data_properties_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2663,7 +2663,7 @@ pub extern "C" fn op_copy_data_properties_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_set_function_name_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_set_function_name_dsl, opcode_byte = 87, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_set_function_name_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2695,7 +2695,7 @@ pub extern "C" fn op_set_function_name_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_to_property_key_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_to_property_key_dsl, opcode_byte = 88, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_to_property_key_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2727,7 +2727,7 @@ pub extern "C" fn op_to_property_key_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call0_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_call0_dsl, opcode_byte = 89, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_call0_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2763,7 +2763,7 @@ pub extern "C" fn op_call0_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call1_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_call1_dsl, opcode_byte = 90, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_call1_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2799,7 +2799,7 @@ pub extern "C" fn op_call1_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call2_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_call2_dsl, opcode_byte = 91, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_call2_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2835,7 +2835,7 @@ pub extern "C" fn op_call2_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call3_dsl, layout = AbcSlot, length = 6, |a, b, c, slot| {
+    op_call3_dsl, opcode_byte = 92, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_slow!(op_call3_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -2871,7 +2871,7 @@ pub extern "C" fn op_call3_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call_dsl, layout = Abc, length = 10, |a, b, c| {
+    op_call_dsl, opcode_byte = 93, layout = Abc, length = 10, |a, b, c| {
         call_slow!(op_call_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2907,7 +2907,7 @@ pub extern "C" fn op_call_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_call_method_dsl, layout = Ax, length = 4, |ax| {
+    op_call_method_dsl, opcode_byte = 94, layout = Ax, length = 4, |ax| {
         call_slow!(op_call_method_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -2933,7 +2933,7 @@ pub extern "C" fn op_call_method_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_tail_call_dsl, layout = Abc, length = 10, |a, b, c| {
+    op_tail_call_dsl, opcode_byte = 95, layout = Abc, length = 10, |a, b, c| {
         call_slow!(op_tail_call_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -2967,7 +2967,7 @@ pub extern "C" fn op_tail_call_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_construct_dsl, layout = Abc, length = 10, |a, b, c| {
+    op_construct_dsl, opcode_byte = 96, layout = Abc, length = 10, |a, b, c| {
         call_slow!(op_construct_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3003,7 +3003,7 @@ pub extern "C" fn op_construct_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_create_closure_dsl, layout = Abx, length = 4, |a, bx| {
+    op_create_closure_dsl, opcode_byte = 97, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_create_closure_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -3034,7 +3034,7 @@ pub extern "C" fn op_create_closure_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_create_for_in_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_create_for_in_dsl, opcode_byte = 98, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_create_for_in_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3067,7 +3067,7 @@ pub extern "C" fn op_create_for_in_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_advance_for_in_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_advance_for_in_dsl, opcode_byte = 99, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_advance_for_in_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3100,7 +3100,7 @@ pub extern "C" fn op_advance_for_in_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_close_for_in_dsl, layout = Abx, length = 4, |a, bx| {
+    op_close_for_in_dsl, opcode_byte = 100, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_close_for_in_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -3131,7 +3131,7 @@ pub extern "C" fn op_close_for_in_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_create_iterator_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_create_iterator_dsl, opcode_byte = 101, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_create_iterator_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3164,7 +3164,7 @@ pub extern "C" fn op_create_iterator_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_advance_iterator_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_advance_iterator_dsl, opcode_byte = 102, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_advance_iterator_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3197,7 +3197,7 @@ pub extern "C" fn op_advance_iterator_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_close_iterator_dsl, layout = Abx, length = 4, |a, bx| {
+    op_close_iterator_dsl, opcode_byte = 103, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_close_iterator_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -3228,7 +3228,7 @@ pub extern "C" fn op_close_iterator_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_suspend_generator_start_dsl, layout = Ax, length = 4, |ax| {
+    op_suspend_generator_start_dsl, opcode_byte = 104, layout = Ax, length = 4, |ax| {
         call_slow!(op_suspend_generator_start_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3256,7 +3256,7 @@ pub extern "C" fn op_suspend_generator_start_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_yield_dsl, layout = Ax, length = 4, |ax| {
+    op_yield_dsl, opcode_byte = 105, layout = Ax, length = 4, |ax| {
         call_slow!(op_yield_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3285,7 +3285,7 @@ pub extern "C" fn op_yield_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_await_dsl, layout = Ax, length = 4, |ax| {
+    op_await_dsl, opcode_byte = 106, layout = Ax, length = 4, |ax| {
         call_slow!(op_await_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3314,7 +3314,7 @@ pub extern "C" fn op_await_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_delegate_yield_dsl, layout = Abc, length = 4, |a, b, c| {
+    op_delegate_yield_dsl, opcode_byte = 107, layout = Abc, length = 4, |a, b, c| {
         call_slow!(op_delegate_yield_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }
@@ -3347,7 +3347,7 @@ pub extern "C" fn op_delegate_yield_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_resume_kind_dsl, layout = Ax, length = 4, |ax| {
+    op_load_resume_kind_dsl, opcode_byte = 108, layout = Ax, length = 4, |ax| {
         call_slow!(op_load_resume_kind_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3376,7 +3376,7 @@ pub extern "C" fn op_load_resume_kind_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_resume_value_dsl, layout = Ax, length = 4, |ax| {
+    op_load_resume_value_dsl, opcode_byte = 109, layout = Ax, length = 4, |ax| {
         call_slow!(op_load_resume_value_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3405,7 +3405,7 @@ pub extern "C" fn op_load_resume_value_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_push_closure_env_dsl, layout = Ax, length = 4, |ax| {
+    op_push_closure_env_dsl, opcode_byte = 110, layout = Ax, length = 4, |ax| {
         call_slow!(op_push_closure_env_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3434,7 +3434,7 @@ pub extern "C" fn op_push_closure_env_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_pop_closure_env_dsl, layout = Ax, length = 4, |ax| {
+    op_pop_closure_env_dsl, opcode_byte = 111, layout = Ax, length = 4, |ax| {
         call_slow!(op_pop_closure_env_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3463,7 +3463,7 @@ pub extern "C" fn op_pop_closure_env_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_enter_env_scope_dsl, layout = Abx, length = 4, |a, bx| {
+    op_enter_env_scope_dsl, opcode_byte = 112, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_enter_env_scope_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -3494,7 +3494,7 @@ pub extern "C" fn op_enter_env_scope_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_leave_env_scope_dsl, layout = Abx, length = 4, |a, bx| {
+    op_leave_env_scope_dsl, opcode_byte = 113, layout = Abx, length = 4, |a, bx| {
         call_slow!(op_leave_env_scope_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
@@ -3525,7 +3525,7 @@ pub extern "C" fn op_leave_env_scope_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_push_with_env_dsl, layout = Ax, length = 4, |ax| {
+    op_push_with_env_dsl, opcode_byte = 114, layout = Ax, length = 4, |ax| {
         call_slow!(op_push_with_env_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3554,7 +3554,7 @@ pub extern "C" fn op_push_with_env_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_pop_with_env_dsl, layout = Ax, length = 4, |ax| {
+    op_pop_with_env_dsl, opcode_byte = 115, layout = Ax, length = 4, |ax| {
         call_slow!(op_pop_with_env_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3583,7 +3583,7 @@ pub extern "C" fn op_pop_with_env_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_throw_dsl, layout = Ax, length = 4, |ax| {
+    op_throw_dsl, opcode_byte = 116, layout = Ax, length = 4, |ax| {
         call_slow!(op_throw_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3612,7 +3612,7 @@ pub extern "C" fn op_throw_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_enter_handler_dsl, layout = Ax, length = 4, |ax| {
+    op_enter_handler_dsl, opcode_byte = 117, layout = Ax, length = 4, |ax| {
         call_slow!(op_enter_handler_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3640,7 +3640,7 @@ pub extern "C" fn op_enter_handler_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_leave_handler_dsl, layout = Ax, length = 4, |ax| {
+    op_leave_handler_dsl, opcode_byte = 118, layout = Ax, length = 4, |ax| {
         call_slow!(op_leave_handler_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3668,7 +3668,7 @@ pub extern "C" fn op_leave_handler_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_exception_dsl, layout = Ax, length = 4, |ax| {
+    op_load_exception_dsl, opcode_byte = 119, layout = Ax, length = 4, |ax| {
         call_slow!(op_load_exception_slow_rs, args = [ax]);
         dispatch_after_slow!();
     }
@@ -3697,7 +3697,7 @@ pub extern "C" fn op_load_exception_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_undefined_dsl, layout = None, length = 1, || {
+    op_lda_undefined_dsl, opcode_byte = 122, layout = None, length = 1, || {
         call_slow!(op_lda_undefined_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3724,7 +3724,7 @@ pub extern "C" fn op_lda_undefined_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_null_dsl, layout = None, length = 1, || {
+    op_lda_null_dsl, opcode_byte = 123, layout = None, length = 1, || {
         call_slow!(op_lda_null_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3751,7 +3751,7 @@ pub extern "C" fn op_lda_null_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_true_dsl, layout = None, length = 1, || {
+    op_lda_true_dsl, opcode_byte = 124, layout = None, length = 1, || {
         call_slow!(op_lda_true_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3778,7 +3778,7 @@ pub extern "C" fn op_lda_true_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_false_dsl, layout = None, length = 1, || {
+    op_lda_false_dsl, opcode_byte = 125, layout = None, length = 1, || {
         call_slow!(op_lda_false_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3805,7 +3805,7 @@ pub extern "C" fn op_lda_false_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_zero_dsl, layout = None, length = 1, || {
+    op_lda_zero_dsl, opcode_byte = 126, layout = None, length = 1, || {
         call_slow!(op_lda_zero_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3832,7 +3832,7 @@ pub extern "C" fn op_lda_zero_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_one_dsl, layout = None, length = 1, || {
+    op_lda_one_dsl, opcode_byte = 127, layout = None, length = 1, || {
         call_slow!(op_lda_one_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3859,7 +3859,7 @@ pub extern "C" fn op_lda_one_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_smi8_dsl, layout = A, length = 2, |a| {
+    op_lda_smi8_dsl, opcode_byte = 128, layout = A, length = 2, |a| {
         call_slow!(op_lda_smi8_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -3888,7 +3888,7 @@ pub extern "C" fn op_lda_smi8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_lda_const8_dsl, layout = A, length = 2, |a| {
+    op_lda_const8_dsl, opcode_byte = 129, layout = A, length = 2, |a| {
         call_slow!(op_lda_const8_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -3917,7 +3917,7 @@ pub extern "C" fn op_lda_const8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_ldar_dsl, layout = A, length = 2, |a| {
+    op_ldar_dsl, opcode_byte = 130, layout = A, length = 2, |a| {
         call_slow!(op_ldar_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -3946,7 +3946,7 @@ pub extern "C" fn op_ldar_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_0_dsl, layout = None, length = 1, || {
+    op_star_0_dsl, opcode_byte = 131, layout = None, length = 1, || {
         call_slow!(op_star_0_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -3973,7 +3973,7 @@ pub extern "C" fn op_star_0_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_1_dsl, layout = None, length = 1, || {
+    op_star_1_dsl, opcode_byte = 132, layout = None, length = 1, || {
         call_slow!(op_star_1_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4000,7 +4000,7 @@ pub extern "C" fn op_star_1_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_2_dsl, layout = None, length = 1, || {
+    op_star_2_dsl, opcode_byte = 133, layout = None, length = 1, || {
         call_slow!(op_star_2_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4027,7 +4027,7 @@ pub extern "C" fn op_star_2_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_3_dsl, layout = None, length = 1, || {
+    op_star_3_dsl, opcode_byte = 134, layout = None, length = 1, || {
         call_slow!(op_star_3_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4054,7 +4054,7 @@ pub extern "C" fn op_star_3_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_4_dsl, layout = None, length = 1, || {
+    op_star_4_dsl, opcode_byte = 135, layout = None, length = 1, || {
         call_slow!(op_star_4_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4081,7 +4081,7 @@ pub extern "C" fn op_star_4_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_5_dsl, layout = None, length = 1, || {
+    op_star_5_dsl, opcode_byte = 136, layout = None, length = 1, || {
         call_slow!(op_star_5_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4108,7 +4108,7 @@ pub extern "C" fn op_star_5_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_6_dsl, layout = None, length = 1, || {
+    op_star_6_dsl, opcode_byte = 137, layout = None, length = 1, || {
         call_slow!(op_star_6_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4135,7 +4135,7 @@ pub extern "C" fn op_star_6_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_star_7_dsl, layout = None, length = 1, || {
+    op_star_7_dsl, opcode_byte = 138, layout = None, length = 1, || {
         call_slow!(op_star_7_slow_rs, args = []);
         dispatch_after_slow!();
     }
@@ -4168,7 +4168,7 @@ pub extern "C" fn op_star_7_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_smi8_dsl, layout = Ab, length = 3, |a, b| {
+    op_load_smi8_dsl, opcode_byte = 139, layout = Ab, length = 3, |a, b| {
         tag_smi_from_signed_byte!(b);
         store_reg!(a, b);
         dispatch!();
@@ -4181,7 +4181,7 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_const8_dsl, layout = Ab, length = 3, |a, b| {
+    op_load_const8_dsl, opcode_byte = 140, layout = Ab, length = 3, |a, b| {
         call_slow!(op_load_const8_slow_rs, args = [a, b]);
         dispatch_after_slow!();
     }
@@ -4212,7 +4212,7 @@ pub extern "C" fn op_load_const8_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_local_0_dsl, layout = A, length = 2, |a| {
+    op_load_local_0_dsl, opcode_byte = 144, layout = A, length = 2, |a| {
         call_slow!(op_load_local_0_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4241,7 +4241,7 @@ pub extern "C" fn op_load_local_0_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_local_1_dsl, layout = A, length = 2, |a| {
+    op_load_local_1_dsl, opcode_byte = 145, layout = A, length = 2, |a| {
         call_slow!(op_load_local_1_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4270,7 +4270,7 @@ pub extern "C" fn op_load_local_1_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_local_2_dsl, layout = A, length = 2, |a| {
+    op_load_local_2_dsl, opcode_byte = 146, layout = A, length = 2, |a| {
         call_slow!(op_load_local_2_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4299,7 +4299,7 @@ pub extern "C" fn op_load_local_2_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_local_3_dsl, layout = A, length = 2, |a| {
+    op_load_local_3_dsl, opcode_byte = 147, layout = A, length = 2, |a| {
         call_slow!(op_load_local_3_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4328,7 +4328,7 @@ pub extern "C" fn op_load_local_3_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_local_0_dsl, layout = A, length = 2, |a| {
+    op_store_local_0_dsl, opcode_byte = 148, layout = A, length = 2, |a| {
         call_slow!(op_store_local_0_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4357,7 +4357,7 @@ pub extern "C" fn op_store_local_0_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_local_1_dsl, layout = A, length = 2, |a| {
+    op_store_local_1_dsl, opcode_byte = 149, layout = A, length = 2, |a| {
         call_slow!(op_store_local_1_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4386,7 +4386,7 @@ pub extern "C" fn op_store_local_1_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_local_2_dsl, layout = A, length = 2, |a| {
+    op_store_local_2_dsl, opcode_byte = 150, layout = A, length = 2, |a| {
         call_slow!(op_store_local_2_slow_rs, args = [a]);
         dispatch_after_slow!();
     }
@@ -4415,7 +4415,7 @@ pub extern "C" fn op_store_local_2_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_store_local_3_dsl, layout = A, length = 2, |a| {
+    op_store_local_3_dsl, opcode_byte = 151, layout = A, length = 2, |a| {
         call_slow!(op_store_local_3_slow_rs, args = [a]);
         dispatch_after_slow!();
     }

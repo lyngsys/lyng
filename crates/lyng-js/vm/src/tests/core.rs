@@ -275,10 +275,18 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
-fn vm_star_fusion_elides_star_dispatch_after_lda() {
-    // Phase 4b regression: `LdaX; StarN` pairs should produce one dispatch,
-    // not two — the Lda* handler tail folds the Star inline before
-    // dispatching to the instruction after the Star.
+fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
+    // Originally Phase 4b's `vm_star_fusion_elides_star_dispatch_after_lda`
+    // regression: the α dispatch loop's `dispatch_next_with_value!` peephole
+    // fused `LdaX; StarN` so the pair produced a single dispatch (LdaOne)
+    // with Star2 elided. DSL-0c deleted the α loop in favor of the
+    // standalone asm-DSL handlers, and the DSL has no equivalent fusion
+    // peephole — each opcode runs its own handler and bumps its own
+    // dispatch counter. DSL-1 Phase 1.B.0 Task 4 wired the asm-side
+    // increment, so the LdaOne / Star2 split is now directly observable
+    // here. Reintroducing fusion is a future optimisation; for now the
+    // test pins the current expected counts (each handler fires once) so
+    // a regression would be caught.
     let mut builder = BytecodeBuilder::new(
         BytecodeFunctionId::from_raw(17).unwrap(),
         BytecodeFunctionKind::Script,
@@ -322,8 +330,8 @@ fn vm_star_fusion_elides_star_dispatch_after_lda() {
     );
     assert_eq!(
         counts.count(Opcode::Star2),
-        0,
-        "Star2 dispatch should be fused into the LdaOne handler tail"
+        1,
+        "Star2 dispatches under the DSL (no Lda;Star fusion peephole)"
     );
     assert_eq!(
         counts.count(Opcode::Return),
@@ -332,8 +340,8 @@ fn vm_star_fusion_elides_star_dispatch_after_lda() {
     );
     assert_eq!(
         counts.total(),
-        2,
-        "fused pair yields one dispatch (LdaOne) plus Return"
+        3,
+        "DSL dispatches LdaOne, Star2, and Return individually"
     );
 }
 
