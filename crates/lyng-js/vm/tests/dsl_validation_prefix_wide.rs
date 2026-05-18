@@ -43,7 +43,7 @@ use lyng_js_vm_dsl::llint_handler;
 // `state.prefix` write — see the `#[ignore]`d runtime test below.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_validation_wide_prefix, layout = None, length = 1, || {
+    op_validation_wide_prefix, opcode_byte = 201, layout = None, length = 1, || {
         dispatch!(advance = 1);
     }
 }

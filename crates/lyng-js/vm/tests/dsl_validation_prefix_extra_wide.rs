@@ -27,7 +27,7 @@ use lyng_js_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_validation_extra_wide_prefix, layout = None, length = 1, || {
+    op_validation_extra_wide_prefix, opcode_byte = 202, layout = None, length = 1, || {
         dispatch!(advance = 1);
     }
 }

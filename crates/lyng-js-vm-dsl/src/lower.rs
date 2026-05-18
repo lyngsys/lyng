@@ -105,7 +105,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     // when the feature is off — see `reg_convention.rs`) so rustc
     // never complains about an unused named arg.
     let counter_increment = quote! {
-        crate::inc_dispatch_counter!(#opcode_byte)
+        ::lyng_js_vm::inc_dispatch_counter!(#opcode_byte)
     };
     let prologue_raw = layout.decode_prologue_tokens(&operands);
     // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
