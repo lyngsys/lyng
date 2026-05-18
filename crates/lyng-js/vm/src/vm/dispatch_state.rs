@@ -42,13 +42,18 @@ use super::{code_index, Vm};
 /// Per-frame execution state threaded through every handler call.
 ///
 /// All references share the `'vm` lifetime — the state exists only for one
-/// `run_trampoline` invocation. Handlers split-borrow the fields when they
+/// dispatch invocation. Handlers split-borrow the fields when they
 /// need both `&mut vm` and another `&mut` field at once:
 ///
 /// ```ignore
 /// let DispatchState { vm, agent, host, registry, frame, .. } = &mut *state;
 /// let result = vm.execute_add_opcode(agent, host, registry, frame, b, c);
 /// ```
+///
+/// DSL-0c kept `DispatchState` because (a) every semantic body in
+/// `vm/semantics/` consumes it through `LlIntDispatchState::dispatch_state()`,
+/// (b) the `LlIntRustContext::dispatch` field on the asm side holds one,
+/// and (c) the wide-form prefix bridge passes one to α handlers.
 pub struct DispatchState<'vm> {
     pub(crate) vm: &'vm mut Vm,
     pub(crate) agent: &'vm mut Agent,
@@ -66,10 +71,11 @@ pub struct DispatchState<'vm> {
 
 impl<'vm> DispatchState<'vm> {
     /// DSL-0b validation-case helper: construct a `DispatchState` from
-    /// pre-built components for the `crate::dsl::test_helpers`
-    /// harness. Production code builds `DispatchState` inline inside
-    /// [`Vm::run_via_trampoline`]; the harness needs a public path
-    /// because [`crate::dsl::test_helpers::DslHarness::with_alpha_dispatch`]
+    /// pre-built components for the `crate::dsl::test_helpers` harness.
+    /// Production code now builds `DispatchState` inline inside
+    /// [`Self::new_for_dsl_entry`] (called from `dsl::entry::run_via_dsl`);
+    /// the harness needs a public path because
+    /// [`crate::dsl::test_helpers::DslHarness::with_alpha_dispatch`]
     /// lives in a module that the integration tests can see.
     #[doc(hidden)]
     #[allow(clippy::too_many_arguments)]
