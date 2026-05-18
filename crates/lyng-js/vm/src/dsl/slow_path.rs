@@ -177,6 +177,21 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     }
                     rust.dispatch.frame_check_epoch = vm_epoch;
                 }
+                // REGS-pin refresh — the asm-side `x20` register pins
+                // the active frame's register-stack base. When a slow
+                // path triggers a nested call (e.g. `op_add_semantic`
+                // → ToPrimitive → valueOf bytecode) and the nested
+                // call's `reserve_register_window` reallocates the
+                // underlying `Vec<Value>`, the old base pointer in
+                // `x20` is freed — even when frame depth is unchanged
+                // after the nested call returns. Recompute REGS (and
+                // FV) from the live `Vm::register_stack_storage_mut_ptr`
+                // on every Continue egress so the asm bridge picks up
+                // the post-reallocation base. PC stays sourced from
+                // `rust.dispatch.frame` so handler-local PC advances
+                // (which haven't been synced to `vm.frames`) are
+                // preserved — matching α's `still_active` policy that
+                // never clobbers PC on a same-frame epoch bump.
                 let mut new_offset_u64: u64 = 0;
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
                     let new_offset = rust
@@ -185,14 +200,30 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .instruction_offset()
                         .wrapping_add(pc_advance);
                     new_offset_u64 = u64::from(new_offset);
+                    let active_frame = rust.dispatch.frame;
+                    let regs_base_ptr = {
+                        let base = active_frame.registers().base() as usize;
+                        // SAFETY: register window is reserved on the
+                        // active frame; one-past-the-end is well-defined.
+                        unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
+                    };
+                    let fv_base = {
+                        let index = crate::vm::code_index_for_dsl(active_frame.code());
+                        rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
+                            as *mut crate::dsl::feedback_flat::FeedbackEntry
+                    };
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
                     // a subsequent slow-path Refresh — or the test
                     // harness, which reads via state — sees the
-                    // authoritative value.
+                    // authoritative value. Likewise refresh REGS/FV
+                    // so the asm bridge's next dispatch picks up any
+                    // reallocation that happened during nested calls.
                     unsafe {
                         (**state).frame_pc_offset = new_offset;
+                        (**state).frame_regs_base = regs_base_ptr;
+                        (**state).frame_fv_base = fv_base;
                     }
                 }
                 // The asm bridge's `dispatch_after_slow!` Continue

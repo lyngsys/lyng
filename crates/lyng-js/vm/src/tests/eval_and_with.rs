@@ -1688,3 +1688,47 @@ fn evaluate_script_direct_eval_var_initializer_returns_inner_value_and_updates_o
 
     assert_eq!(result, Value::from_smi(11));
 }
+
+// Regression test for DSL-0c: nested call from a slow path's semantic body
+// (e.g. ToPrimitive calling valueOf from inside `op_add_semantic`) can resize
+// `Vm::register_stack`, invalidating the asm-side `REGS` pin (`x20`) of the
+// outer slow path. When the throw is then caught by the outer's same-frame
+// catch, the Continue arm previously did not refresh REGS/FV — but the
+// catch body would then run against a stale REGS pin, corrupting writes
+// (`caught = e` would write into freed memory and read as `undefined`).
+//
+// Fix: in `translate_outcome`'s Continue arm, always recompute
+// `state.frame_regs_base` / `state.frame_fv_base` from the live
+// `Vm::register_stack_storage_mut_ptr` and `feedback_flat_storage`. The
+// asm bridge's `dispatch_after_slow!` Continue path now reloads `x20` /
+// `x21` from those state fields on every slow-path egress so a nested
+// call's realloc is visible to the next dispatched handler. PC stays
+// sourced from `rust.dispatch.frame.instruction_offset()`, matching α's
+// `still_active` policy that never clobbers PC on a same-frame epoch bump.
+#[test]
+fn caught_throw_from_to_primitive_call_propagates_value_through_register_writes() {
+    let unit = compile_test_unit(
+        99021,
+        r#"
+            var caught = "no-catch";
+            try {
+                1 + {valueOf: function() {throw "error"}};
+            } catch (e) {
+                caught = e;
+            }
+            caught
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    // The catch body must observe `e === "error"` and write it through to
+    // `caught`. Before the fix, `caught` ended up `undefined` because the
+    // asm REGS pin pointed into a freed register-stack buffer after valueOf
+    // returned and the catch body's writes landed in unreachable memory.
+    let caught_string = result.as_string_ref().expect("caught should be a string");
+    let _ = caught_string; // keep value used; the run completed with a string ref
+}

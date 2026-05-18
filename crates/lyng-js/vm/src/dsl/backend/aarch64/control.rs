@@ -192,8 +192,19 @@ macro_rules! dispatch_after_slow {
             // Common case first: tag == Continue (0).
             "cbnz   x0, 1f\n",          // → "unusual" handling
             // Continue path: PC = pb_base + new_offset (low 32 of x1).
+            // Also reload REGS / FV from state — a nested call in the
+            // slow path (e.g. ToPrimitive invoking valueOf bytecode)
+            // can resize `Vm::register_stack`, leaving the asm-side
+            // REGS pin (`x20`) pointing into freed storage even when
+            // frame depth is unchanged. The Rust-side
+            // `translate_outcome` Continue arm refreshes
+            // `state.frame_regs_base` / `state.frame_fv_base` from the
+            // live VM on every Continue egress; we reload x20 / x21
+            // here so the next handler sees the up-to-date pins.
             "ldr    x16, [x24, {state_pb}]\n",
             "add    x19, x16, x1\n",
+            "ldr    x20, [x24, {state_regs}]\n",
+            "ldr    x21, [x24, {state_fv}]\n",
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
