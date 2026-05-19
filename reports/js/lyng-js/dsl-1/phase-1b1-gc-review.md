@@ -44,8 +44,8 @@ This invariant mirrors the existing invariant for `frame_pb_base`, `frame_regs_b
 
 `RuntimeCodeRecord::constants` is an arena slot. The data pointer's stability across slow-path calls is supported by three arguments:
 
-1. **Precedent:** `frame_pb_base` is a pointer into the code record's instruction bytes — the same arena. It has shipped in production since DSL-0c and has held under all V8 v7 and Test262 runs.
-2. **Active-frame retention:** GC can compact unused records but cannot move an arena slot that's referenced by an active frame on `vm.frames`. The same retention preserves both the instruction bytes (used by `frame_pb_base`) and the constants slot (used by `frame_const_base`). The constants array and instruction bytes are reached through the same `CodeRef → RuntimeCodeRecord` indirection.
+1. **Precedent (structurally parallel, not strictly identical):** `frame_pb_base` is a pointer into the `BytecodeFunction` template's `instructions` slice (`entry.rs:47`, `slow_path.rs:283`), held by the `Arc<InstalledFunction>` for the lifetime of the active frame. The stability argument for `frame_const_base` is structurally parallel but with a different ownership chain: the `RuntimeCodeRecord::constants` arena slot is reachable from every active frame via `frame.code() → RuntimeCodeRecord`, and the code record cannot be compacted while reachable from a live frame. Both pointers stay valid for the same reason — they're owned by storage that the active frame keeps alive — but the storage is different (Arc-held template vs GC arena slot).
+2. **Active-frame retention:** GC can compact unused records but cannot move an arena slot that's referenced by an active frame on `vm.frames`. The constants array is reached through `frame.code() → RuntimeCodeRecord → constants → CodeSlotsRef` and the code record is retained because every active frame carries a `CodeRef`.
 3. **Safety net:** Task 4 added a `#[cfg(debug_assertions)]` stability assertion in the Refresh arm. It re-derives `const_base` from the canonical chain and asserts equality with the value about to be written. **It did NOT fire across 417 vm-lib tests, 1187 lyng-js-tests, the gc-stress test (Task 7), or any V8 v7 sample.** Strong empirical evidence the assumption holds.
 
 ## Risk surface and mitigations
@@ -79,4 +79,30 @@ This is a known limitation. Future work — when the parent design's safepoint s
 
 ## Reviewer dispatch sign-off
 
-(To be appended in Task 9.)
+Reviewer: `feature-dev:code-reviewer` (dispatched 2026-05-19)
+Commit range reviewed: `ae8b7766..26ec0742` (8 commits)
+
+### Findings summary
+
+| Severity | Count | Resolution |
+|----------|------:|-----------|
+| High     | 0     | n/a |
+| Medium   | 0     | n/a |
+| Low      | 2     | Both addressed inline in this doc (precedent argument clarified above; A/B sign comment cross-checked) |
+
+### Reviewer focus areas confirmed sound
+
+1. **GC root scanning:** Both new fields are mirrors of already-scanned canonical state. No new tracer code required. Mirror-discipline invariant matches `frame_pb_base`.
+2. **`resolve_initial_this_value` semantic equivalence vs `op_load_this_semantic`:** Semantically equivalent for all four arms (`Value(v)`, `Uninitialized`, `Lexical`, no-EC fallback). The sentinel path defers the throw/lex-env-walk to the slow path, preserving throw-at-correct-PC semantics for Phase 1.B.2 inline ports.
+3. **Arena pointer stability:** Structurally parallel argument to `frame_pb_base` (different storage, same active-frame retention principle). Debug-only `debug_assert_eq!` in the Refresh arm did NOT fire across 417 vm-lib + 1187 lyng-js-tests + the gc-stress test + 14 V8 v7 samples (7 base + 7 post). Strong empirical evidence.
+4. **Continue arm vs Refresh arm:** `super()` and all `frame.set_this_value` mutators egress via `SemanticOutcome::Refresh` (verified by reviewer at `crates/lyng-js/vm/src/vm/builtin_dispatch/class_helpers/super_ops.rs:255` → `op_construct_semantic` → Refresh). No continue-path semantic mutates `frame.this_value()`. No staleness window.
+5. **ABI layout stability:** `size_of::<LlIntState>` asserted to 72 bytes in `ll_int_state_offsets_stable`; no other code makes a hard-coded size assumption (verified by reviewer grep).
+6. **Sentinel choice:** `Value::uninitialized_lexical()` (`InternalSentinel::UninitializedLexical`) is exclusively for TDZ and cannot legitimately appear as a `this` value. Safe to reuse as the bail-to-slow-path marker.
+7. **Debug-only stability assertion correctness:** Uses identical derivation chain as the write path; correctly gated on `#[cfg(debug_assertions)]`; verified to fire zero times across the full test suite.
+8. **Test coverage adequacy:** Structural-only validation tests follow `dsl_validation_*.rs` precedent. End-to-end deferral to Phase 1.B.2 is correct (the canonical opcodes don't exist yet). The gc-stress test's "no mid-dispatch GC" limitation is documented and acceptable.
+
+### Verdict
+
+**APPROVED — Phase 1.B.1 substrate is sound; sub-phase can close.**
+
+All exit gates per spec §1 are met. The two low-severity findings have been addressed inline (precedent argument clarified; A/B sign verified consistent). No high- or medium-severity findings.
