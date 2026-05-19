@@ -287,12 +287,63 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
                             as *mut crate::dsl::feedback_flat::FeedbackEntry
                     };
+                    // Phase 1.B.1: derive the new fields for the
+                    // active frame. Identical chain to the entry shim
+                    // in entry.rs::run_via_dsl. See spec §3.4.
+                    let const_base: *const lyng_js_types::Value = rust
+                        .dispatch
+                        .agent
+                        .heap()
+                        .view()
+                        .code(active_frame.code())
+                        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+                        .and_then(|slots| {
+                            rust.dispatch.agent.heap().view().code_slots(slots)
+                        })
+                        .map(|s| s.as_ptr())
+                        .unwrap_or(std::ptr::null());
+
+                    // Phase 1.B.1: refresh the `this` mirror. Captures
+                    // super() mutations and any other slow-path
+                    // changes to frame.this_value().
+                    let this_value = crate::dsl::llint_state::resolve_initial_this_value(
+                        rust.dispatch.agent,
+                        &active_frame,
+                    );
                     // SAFETY: state is valid by from_raw's contract.
                     unsafe {
                         (**state).frame_pc_offset = active_frame.instruction_offset();
                         (**state).frame_pb_base = pb_base;
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
+                        // Phase 1.B.1: refresh the new fields.
+                        (**state).frame_const_base = const_base;
+                        (**state).frame_this_value = this_value;
+                    }
+                    // Phase 1.B.1: debug-only stability assertion.
+                    // The arena slot's data pointer must be stable
+                    // across the slow-path call. If this fires, the
+                    // arena moved under us — investigate before
+                    // disabling. Matches the implicit invariant
+                    // `frame_pb_base` already relies on. See spec §3.6.
+                    #[cfg(debug_assertions)]
+                    {
+                        let recomputed: *const lyng_js_types::Value = rust
+                            .dispatch
+                            .agent
+                            .heap()
+                            .view()
+                            .code(active_frame.code())
+                            .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+                            .and_then(|slots| {
+                                rust.dispatch.agent.heap().view().code_slots(slots)
+                            })
+                            .map(|s| s.as_ptr())
+                            .unwrap_or(std::ptr::null());
+                        debug_assert_eq!(
+                            const_base, recomputed,
+                            "frame_const_base unstable across Refresh"
+                        );
                     }
                 }
                 SlowPathReturn {
