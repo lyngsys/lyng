@@ -16,10 +16,10 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    call_slow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, load_constant, store_reg,
-    tag_bool_const, tag_null, tag_smi_const, tag_smi_from_signed_byte,
-    tag_undefined,
+    call_slow, cmp_branch_eq, decode_a, decode_ab, decode_abc, decode_abc_slot,
+    decode_abx, decode_ax, dispatch, dispatch_after_slow, load_constant,
+    load_state_value, load_uninit_lex_sentinel, store_reg, tag_bool_const,
+    tag_null, tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -872,12 +872,50 @@ pub extern "C" fn op_assign_captured_name_slow_rs(
 }
 
 // =====================================================================
-// LoadThis
+// LoadThis — inline DSL fast path with sentinel-bail (DSL-1 Phase 1.B.2 Task 3).
+//
+// Top-30 dispatch share: #12 (~256M dispatches/V8 v7 run). Reads the
+// pre-resolved `this`-value mirror via `LlIntState::frame_this_value`
+// established by Phase 1.B.1's substrate. The mirror holds either the
+// real `this` Value (`ThisState::Value(v)`) or the sentinel
+// `Value::uninitialized_lexical()` (`ThisState::Uninitialized` or
+// `ThisState::Lexical` — `resolve_initial_this_value` decides at
+// trampoline entry / Refresh egress).
+//
+// Inline fast path:
+// 1. `load_state_value!(10, vm_state_offset = state_this_value)` — 1
+//    instr: ldr x10, [x24, #LLINT_STATE_FRAME_THIS_VALUE].
+// 2. `load_uninit_lex_sentinel!(11)` — 4 instr: movz + 3× movk to
+//    materialize the sentinel constant in x11.
+// 3. `cmp_branch_eq!(10, 11, .slow)` — 2 instr: cmp x10, x11; b.eq
+//    .slow. Bails to the slow path when the mirror equals the
+//    sentinel (Uninitialized → ReferenceError throw; Lexical → walk
+//    lex-env).
+// 4. `store_reg!(a, 10); dispatch!()` — 5 instr: str + dispatch tail.
+//
+// Total fast path: 12 instructions inline + 2-instr decode prologue =
+// 14 at handler entry through the dispatch tail jump. (The plan's
+// ≤12 budget refers to handler body without the decode prologue;
+// 1 + 4 + 2 + 1 + 4 = 12 body instructions, within budget.)
+//
+// `bx` is reserved by the Abx layout convention but unused at runtime
+// (mirrors `op_load_null_dsl` etc.). Future IC-site instrumentation
+// can populate it without changing the handler.
+//
+// Slow path: `op_load_this_slow_rs` is RETAINED as the bail target.
+// It re-enters the semantic body which handles the Uninitialized /
+// Lexical arms and refreshes `frame_this_value` on egress.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_this_dsl, opcode_byte = 28, layout = Abx, length = 4, |a, bx| {
+        load_state_value!(10, vm_state_offset = state_this_value);
+        load_uninit_lex_sentinel!(11);
+        cmp_branch_eq!(10, 11, .slow);
+        store_reg!(a, 10);
+        dispatch!();
+        .slow:
         call_slow!(op_load_this_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }

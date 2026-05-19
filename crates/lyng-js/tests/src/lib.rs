@@ -56,3 +56,6 @@ mod gc_stress_frame_context;
 
 #[cfg(test)]
 mod op_load_const8_inline;
+
+#[cfg(test)]
+mod op_load_this_inline;

@@ -362,6 +362,27 @@ macro_rules! label {
     };
 }
 
+/// Compare two registers and branch to `$label` if equal.
+///
+/// Two instructions: `cmp x{a}, x{b}; b.eq {label}`. The label is
+/// substituted by the lowerer (DSL `.slow` → `<handler_name>slow`),
+/// matching the existing `.slow:` body-label convention used by hot
+/// handlers like `op_add` (see `crates/lyng-js/vm/src/dsl/handlers/hot.rs`).
+///
+/// Used by Phase 1.B.2's `op_load_this` inline port to bail to the
+/// slow path when `frame_this_value` holds the
+/// `Value::uninitialized_lexical()` sentinel (i.e., `ThisState` was
+/// `Uninitialized` or `Lexical` at trampoline entry).
+#[macro_export]
+macro_rules! cmp_branch_eq {
+    ($a:tt, $b:tt, $label:tt) => {
+        concat!(
+            "cmp    x", stringify!($a), ", x", stringify!($b), "\n",
+            "b.eq   ", stringify!($label), "\n",
+        )
+    };
+}
+
 // ===========================================================================
 // Prefix dispatch (op_wide / op_extra_wide).
 // ===========================================================================
