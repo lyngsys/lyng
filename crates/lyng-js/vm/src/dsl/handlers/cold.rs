@@ -17,8 +17,9 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     call_slow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, store_reg, tag_bool_const, tag_null,
-    tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
+    decode_ax, dispatch, dispatch_after_slow, load_constant, store_reg,
+    tag_bool_const, tag_null, tag_smi_const, tag_smi_from_signed_byte,
+    tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -4176,34 +4177,35 @@ llint_handler! {
 }
 
 // =====================================================================
-// LoadConst8
+// LoadConst8 — inline DSL fast path (DSL-1 Phase 1.B.2 Task 2).
+//
+// Top-30 dispatch share: #21 (~104M dispatches/V8 v7 run). Reads the
+// pre-resolved constants array via the
+// `LlIntState::frame_const_base` mirror established by Phase 1.B.1.
+// The constants array is populated by `Vm::install_constants` at
+// install time (materializing each `ConstantValue` — Smi, Float64,
+// Atom, Builtin — into a flat `Value`); the asm side just does an
+// indexed read.
+//
+// `b` is the constant pool index (u8); `a` is the destination
+// register. `load_constant!(b => 10)` emits a 2-instruction sequence
+// that loads `frame_const_base` (via STATE pin x24) into scratch x16,
+// then reads `*(x16 + b * 8)` into scratch x10. `store_reg!(a, 10)`
+// stores x10 to `regs[a]`. Total: 4 instructions inline + 4 dispatch
+// tail = 8.
+//
+// Slow path deleted (op_load_const8_slow_rs): the inline path covers
+// every ConstantValue variant the install-time pre-resolution
+// produces; no condition forces a bail.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_const8_dsl, opcode_byte = 140, layout = Ab, length = 3, |a, b| {
-        call_slow!(op_load_const8_slow_rs, args = [a, b]);
-        dispatch_after_slow!();
+        load_constant!(b => 10);
+        store_reg!(a, 10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_const8_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    b: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadConst8Args {
-        a: a as u16,
-        bx: b,
-        instruction_len: 3u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_const8_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================

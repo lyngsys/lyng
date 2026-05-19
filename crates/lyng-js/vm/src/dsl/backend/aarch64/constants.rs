@@ -13,9 +13,20 @@
 //! ## Emitted shape (2 instructions)
 //!
 //! ```text
-//!     ldr  x16, [x22, {vm_const_base}]        ; x16 = frame_const_base (*const Value)
+//!     ldr  x16, [x24, {vm_const_base}]        ; x16 = frame_const_base (*const Value)
 //!     ldr  {dst}, [x16, {idx}, lsl #3]        ; dst = base[idx] (Value is 8B → lsl #3)
 //! ```
+//!
+//! The base pointer lives on `LlIntState` (the STATE pin = x24), not
+//! `Vm` (the VM pin = x22) — `LLINT_STATE_FRAME_CONST_BASE` is
+//! `offset_of!(LlIntState, frame_const_base)`. Earlier drafts of this
+//! macro emitted `[x22, …]` because the binding is named
+//! `vm_const_base` for historical reasons (parallel to
+//! `vm_counter_base` which does live on `Vm`); the offset itself was
+//! always LlIntState-relative. Phase 1.B.2 promotes the macro from
+//! "compiles only" (structural validation tests, opcode 210 never
+//! dispatches) to "runs in op_load_const8", which exposes the bug.
+//! Fixed here.
 //!
 //! ## Scratch-register convention
 //!
@@ -55,7 +66,7 @@
 macro_rules! load_constant {
     ($idx_reg:tt => $dst_reg:tt) => {
         concat!(
-            "ldr    x16, [x22, {vm_const_base}]\n",
+            "ldr    x16, [x24, {vm_const_base}]\n",
             "ldr    x", stringify!($dst_reg), ", [x16, x", stringify!($idx_reg), ", lsl #3]\n",
         )
     };

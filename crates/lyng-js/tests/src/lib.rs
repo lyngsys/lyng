@@ -53,3 +53,6 @@ mod smoke;
 
 #[cfg(test)]
 mod gc_stress_frame_context;
+
+#[cfg(test)]
+mod op_load_const8_inline;

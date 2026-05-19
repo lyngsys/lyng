@@ -3,7 +3,7 @@
 //! [`load_state_value!`] is a 1-instruction fixed-offset
 //! [`lyng_js_types::Value`] load from
 //! [`LlIntState`](crate::dsl::llint_state::LlIntState) through the
-//! STATE pin (x22).
+//! STATE pin (x24).
 //!
 //! Phase 1.B.1 uses this for
 //! [`LlIntState::frame_this_value`](crate::dsl::llint_state::LlIntState::frame_this_value)
@@ -14,7 +14,7 @@
 //! ## Emitted shape (1 instruction)
 //!
 //! ```text
-//!     ldr  {dst}, [x22, {state_offset}]
+//!     ldr  {dst}, [x24, {state_offset}]
 //! ```
 //!
 //! ## Argument conventions
@@ -44,7 +44,7 @@
 /// One instruction:
 ///
 /// ```text
-///     ldr  x{dst}, [x22, {<binding>}]
+///     ldr  x{dst}, [x24, {<binding>}]
 /// ```
 ///
 /// Usage from a handler body (the lowerer substitutes operand idents
@@ -59,7 +59,7 @@
 macro_rules! load_state_value {
     ($dst_reg:tt, vm_state_offset = $binding:ident) => {
         concat!(
-            "ldr    x", stringify!($dst_reg), ", [x22, {", stringify!($binding), "}]\n",
+            "ldr    x", stringify!($dst_reg), ", [x24, {", stringify!($binding), "}]\n",
         )
     };
 }
