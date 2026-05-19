@@ -114,28 +114,56 @@ constant-pool base pointer is materialized.
 
 ## Microbench
 
-`LoadConst8` microbench snippet present (added in Phase 1.B.0 Task 7).
-ns/dispatch result: **TBD-Task-4** — Task 4 of Phase 1.B.2 runs the
-microbench suite + slow-path-share counter, and fills in the number
-here.
+The Phase 1.B.2 plan / spec assumed a `LoadConst8` snippet was added in
+Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
+at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
+`LoadThis` are among them. The microbench gate for this opcode is
+therefore **deferred** — the bench tool's snippet table needs a
+`LoadConst8` entry before the microbench can produce a ns/dispatch
+number.
 
-Expected: significantly lower than the cold-stub call-slow shim (4
-instructions inline vs 7+ call-shim instructions). Target: within 2×
-LLInt reference.
+Expected (analogous-opcode extrapolation): ~40-45 ns/dispatch
+(7-instruction inline body sitting between LoadZero at 36 ns and
+LoadSmi8 at 45 ns). LLInt 2× reference would be ~110 ns. Substantial
+headroom predicted; not measured directly at this HEAD.
+
+The full microbench discussion lives at
+[`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
 
 ## V8 v7
 
-A single-opcode port is not expected to move the V8 v7 geomean
-measurably on its own, but combined with op_load_this (also in Phase
-1.B.2) the aggregate effect should clear the +0.3% gate. Same-load
-A/B comparison vs `68dd5e89` (Phase 1.B.1 close): **TBD-Task-4**.
+Same-load A/B comparison vs `68dd5e89` (Phase 1.B.1 close):
+**+4.89% V8 v7 geomean** combined improvement from op_load_const8 +
+op_load_this Phase 1.B.2 ports. Single-opcode attribution isn't
+possible from the A/B alone (the two ports landed together), but the
+slow-path-share data confirms op_load_const8 inline-handles 100% of
+its V8 v7 dispatches with no bail (~103M dispatches aggregate across 3
+samples = ~34M per V8 v7 run; matches the predicted #21 dispatch share).
+
+Full A/B report: [`reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
 
 ## Slow-path-share
 
-**TBD-Task-4** (microbench + slow-path-share gate). Expected: **~0%**
-on V8 v7. The inline path has no bail condition; the cold-stub call-
-slow shim is deleted. The slow-path-share counter for opcode 140
-should report 0 dispatches falling through to a Rust-side bail.
+**0.00%** on V8 v7 (measured 2026-05-19, 3-sample run via
+`v8suite --count-opcodes --count-slow-path-share`). Across all 6
+V8 v7 workloads, op_load_const8 dispatched 102,913,132 times and
+recorded 0 semantic / 0 safepoint slow-path entries.
+
+Per-workload breakdown:
+
+| Workload     | Dispatches | Semantic SP | Share   |
+|--------------|-----------:|------------:|--------:|
+| Richards     |     233,267 |          0 |  0.00% |
+| DeltaBlue    |      85,632 |          0 |  0.00% |
+| Crypto       |  84,404,055 |          0 |  0.00% |
+| RayTrace     |      55,703 |          0 |  0.00% |
+| NavierStokes |  10,646,322 |          0 |  0.00% |
+| Splay        |   7,488,153 |          0 |  0.00% |
+
+This is the expected outcome — the inline path handles every
+`ConstantValue` variant, the slow-path stub `op_load_const8_slow_rs`
+was deleted in Task 2, and there is no remaining bail condition. The
+slow-path-share gate (< 20%) is satisfied with maximum headroom.
 
 ## Behavioral tests
 

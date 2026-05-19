@@ -138,30 +138,62 @@ distinguished pattern).
 
 ## Microbench
 
-`LoadThis` microbench snippet present (added in Phase 1.B.0 Task 7).
-ns/dispatch result: **TBD-Task-4**.
+The Phase 1.B.2 plan / spec assumed a `LoadThis` snippet was added in
+Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
+at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
+`LoadThis` are among them. The microbench gate for this opcode is
+therefore **deferred** — the bench tool's snippet table needs a
+`LoadThis` entry before the microbench can produce a ns/dispatch
+number.
 
-Expected: significantly lower than the cold-stub call-slow shim. The
-inline body adds ~5 instructions over a perfectly-trivial loader
-(constant Value materialization) due to the sentinel-bail comparison;
-that's the cost of preserving correct ThisState::Uninitialized /
-Lexical semantics inline.
+Expected (analogous-opcode extrapolation): ~50-55 ns/dispatch (12-inline-
+instruction body adds ~5 instr of sentinel-materialization + cmp/branch
+over LoadSmi8's 45 ns). LLInt 2× reference would be ~140 ns; substantial
+headroom predicted but not measured directly at this HEAD.
+
+The full microbench discussion lives at
+[`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
 
 ## V8 v7
 
-Combined with op_load_const8 (Phase 1.B.2 Task 2), expected aggregate
-improvement ≥ +0.3% on V8 v7 cumulative. op_load_this carries the
-bulk of the share (#12 at 256M dispatches vs #21 at 104M dispatches).
-Same-load A/B comparison vs `68dd5e89` (Phase 1.B.1 close): **TBD-Task-4**.
+Same-load A/B comparison vs `68dd5e89` (Phase 1.B.1 close):
+**+4.89% V8 v7 geomean** combined improvement from op_load_const8 +
+op_load_this Phase 1.B.2 ports. Single-opcode attribution isn't
+direct, but op_load_this carries the bulk of the dispatch volume
+(~239M dispatches aggregate across 3 V8 v7 samples = ~80M per run;
+slightly below the spec's 256M estimate but in same order of
+magnitude), and the two workloads showing the largest improvement
+(Richards +15.06%, DeltaBlue +9.03%) are method-dispatch-heavy and
+the natural targets for an op_load_this speedup.
+
+Full A/B report: [`reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
 
 ## Slow-path-share
 
-**TBD-Task-4** (microbench + slow-path-share gate). Expected: **< 5%**
-on V8 v7. The Uninitialized arm only fires for derived-constructor
-TDZ accesses (rare in V8 v7 workloads, which are pre-class-style).
-The Lexical arm fires for arrow functions; V8 v7 includes some
-arrow-using workloads but they're not dominant. The slow-path-share
-gate is **< 20%** per spec; expect well below that.
+**0.00%** on V8 v7 (measured 2026-05-19, 3-sample run via
+`v8suite --count-opcodes --count-slow-path-share`). Across all 6
+V8 v7 workloads, op_load_this dispatched 239,159,248 times and recorded
+0 semantic / 0 safepoint slow-path entries.
+
+Per-workload breakdown:
+
+| Workload     | Dispatches | Semantic SP | Share   |
+|--------------|-----------:|------------:|--------:|
+| Richards     |  82,426,819 |          0 |  0.00% |
+| DeltaBlue    |  55,009,605 |          0 |  0.00% |
+| Crypto       |  35,929,858 |          0 |  0.00% |
+| RayTrace     |  60,452,179 |          0 |  0.00% |
+| NavierStokes |       1,605 |          0 |  0.00% |
+| Splay        |   5,339,182 |          0 |  0.00% |
+
+V8 v7's workloads exercise only `ThisState::Value(v)` paths — no
+derived constructors (Uninitialized) and no arrow functions reading a
+lexical `this` (arrow-captured `this` is resolved to a concrete `Value`
+at trampoline entry by `resolve_initial_this_value`, not stored as the
+sentinel). The sentinel compare on the fast path is therefore always
+not-equal for these workloads. Future workloads (e.g., Test262 with
+class-heavy fixtures) may push share above 0%, but the < 20% gate has
+substantial headroom.
 
 ## Behavioral tests
 
