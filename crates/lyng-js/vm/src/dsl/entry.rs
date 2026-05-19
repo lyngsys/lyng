@@ -119,6 +119,9 @@ pub(crate) fn run_via_dsl(
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
+        // Phase 1.B.1 Task 1: placeholders. Task 3 wires real values.
+        frame_const_base: std::ptr::null(),
+        frame_this_value: Value::undefined(),
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
         rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>

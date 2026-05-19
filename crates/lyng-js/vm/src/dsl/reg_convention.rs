@@ -40,6 +40,11 @@ pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_o
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
 pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs_base);
 pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
+// Phase 1.B.1: pre-resolved constants array base + this-mirror.
+// Populated at trampoline entry (entry.rs::run_via_dsl) and refreshed
+// in the slow-path Refresh arm (slow_path.rs::translate_outcome).
+pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
+pub const LLINT_STATE_FRAME_THIS_VALUE: usize = offset_of!(LlIntState, frame_this_value);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 
 // VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,

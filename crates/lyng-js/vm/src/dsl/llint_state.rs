@@ -28,6 +28,20 @@ pub struct LlIntState {
     pub frame_pb_base: *const u8,
     pub frame_regs_base: *mut Value,
     pub frame_fv_base: *mut FeedbackEntry,
+    // Phase 1.B.1: asm-visible frame context. `frame_const_base`
+    // points into the active code record's pre-resolved constants
+    // array (`RuntimeCodeRecord::constants` → `CodeSlotsRef`,
+    // `&[Value]` from `heap.view().code_slots()`).
+    // `frame_this_value` is a mirror of `frame.this_value()` for
+    // `ThisState::Value(v)`, or `Value::uninitialized_lexical()` as
+    // the bail-to-slow-path sentinel for
+    // `ThisState::Uninitialized`/`Lexical`.
+    //
+    // Both fields are valid only between Refresh egress events; GC
+    // can only happen during slow-path bridges, which refresh both
+    // fields on egress. See spec §5 mirror discipline.
+    pub frame_const_base: *const Value,
+    pub frame_this_value: Value,
     pub frame_depth: u32,
     pub frame_check_epoch: u32,
     pub rust_context: *mut LlIntRustContextOpaque,
@@ -97,7 +111,13 @@ mod tests {
         assert_eq!(r::LLINT_STATE_FRAME_PB_BASE, 8);
         assert_eq!(r::LLINT_STATE_FRAME_REGS_BASE, 16);
         assert_eq!(r::LLINT_STATE_FRAME_FV_BASE, 24);
-        assert_eq!(r::LLINT_STATE_PREFIX, 48);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 56);
+        // Phase 1.B.1: two new fields inserted between FV_BASE and the
+        // existing scalar block. Each is 8B.
+        assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 32);
+        assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 40);
+        // Phase 1.B.1: PREFIX shifts from 48 → 64 due to the two
+        // 8-byte inserts.
+        assert_eq!(r::LLINT_STATE_PREFIX, 64);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 72);
     }
 }

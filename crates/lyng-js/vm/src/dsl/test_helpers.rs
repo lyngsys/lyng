@@ -254,6 +254,10 @@ impl DslHarness {
             frame_pb_base: core::ptr::null(),
             frame_regs_base: core::ptr::null_mut(),
             frame_fv_base: core::ptr::null_mut(),
+            // Phase 1.B.1: harness doesn't exercise these fields;
+            // null / undefined placeholders are safe.
+            frame_const_base: core::ptr::null(),
+            frame_this_value: Value::undefined(),
             frame_depth: 0,
             frame_check_epoch: 0,
             rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>
