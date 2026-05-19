@@ -89,6 +89,31 @@ pub(crate) fn run_via_dsl(
         unsafe { vm.register_stack_storage_mut_ptr().add(base) }
     };
 
+    // Phase 1.B.1: derive `frame_const_base` from the pre-resolved
+    // constants array. Reuses the existing arena slot owned by
+    // `RuntimeCodeRecord::constants` (populated at install time by
+    // `Vm::install_constants`). Pointer is stable for the lifetime
+    // of the code record; refreshed on every Refresh egress.
+    // See spec §3.4.
+    //
+    // The chain mirrors `Vm::read_constant` in
+    // crates/lyng-js/vm/src/vm/values.rs:795-806.
+    let const_base: *const Value = agent
+        .heap()
+        .view()
+        .code(frame.code())
+        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+        .and_then(|slots| agent.heap().view().code_slots(slots))
+        .map(|s| s.as_ptr())
+        .unwrap_or(std::ptr::null());
+
+    // Phase 1.B.1: derive `frame_this_value`. Pre-resolves the
+    // active execution context's ThisState into either the real
+    // Value or Value::uninitialized_lexical() sentinel.
+    // See spec §3.3.
+    let this_value: Value =
+        crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
+
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
 
@@ -119,9 +144,10 @@ pub(crate) fn run_via_dsl(
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
-        // Phase 1.B.1 Task 1: placeholders. Task 3 wires real values.
-        frame_const_base: std::ptr::null(),
-        frame_this_value: Value::undefined(),
+        // Phase 1.B.1 Task 3: real values derived above before the
+        // installed/frame move into DispatchState.
+        frame_const_base: const_base,
+        frame_this_value: this_value,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
         rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>
