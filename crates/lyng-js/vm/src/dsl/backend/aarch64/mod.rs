@@ -6,17 +6,21 @@
 //! - [`values`]   — NaN-tag checks and tag manipulation.
 //! - [`objects`]  — ObjectRecord access via `ObjectRef` handles.
 //! - [`arithmetic`] — SMI fast-path arithmetic + bitwise.
+//! - [`constants`] — Phase 1.B.1 indexed load from `frame_const_base`.
 //! - [`control`]  — dispatch, branches, slow-path bridge, prefix.
 //! - [`feedback`] — IC-site lookups + observed-type recording.
+//! - [`frame`]    — Phase 1.B.1 fixed-offset `LlIntState` Value loads.
 //! - [`safepoint`] — interrupt-poll macro.
 //! - [`memory`]   — raw load/store fragments referenced by other macros.
 //! - [`counters`] — feature-gated opcode counters.
 //! - [`prelude`]  — NaN-tag mask constants + layout helpers.
 
 pub mod arithmetic;
+pub mod constants;
 pub mod control;
 pub mod counters;
 pub mod feedback;
+pub mod frame;
 pub mod memory;
 pub mod objects;
 pub mod operands;

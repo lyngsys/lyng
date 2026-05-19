@@ -201,7 +201,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -220,6 +220,22 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // macros themselves emit empty strings in that config, so the
                 // binding is referenced only by the leading comment.
                 vm_counter_base = const ::lyng_js_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET,
+                // Phase 1.B.1: byte offset of `LlIntState::frame_const_base`,
+                // the pre-resolved constants-array pointer. Read by
+                // `load_constant!` (backend/aarch64/constants.rs). Universally
+                // bound even when no handler in this translation unit uses the
+                // macro — the leading reference comment keeps rustc quiet about
+                // unused named args.
+                vm_const_base = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE,
+                // Phase 1.B.1: byte offset of `LlIntState::frame_this_value`,
+                // the asm-side `this` mirror (either the real `this` Value or
+                // `Value::uninitialized_lexical()` sentinel — see
+                // `resolve_initial_this_value`). Targeted by `load_state_value!`
+                // (backend/aarch64/frame.rs) via
+                // `load_state_value!(dst, vm_state_offset = state_this_value)`.
+                // Universally bound; unused-binding warning is suppressed by
+                // the reference comment above.
+                state_this_value = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
                 exit = sym ::lyng_js_vm::dsl::entry::_interpreter_exit,
                 #(#shim_bindings)*
             )
