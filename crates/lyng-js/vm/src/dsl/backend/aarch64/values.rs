@@ -277,3 +277,61 @@ macro_rules! tag_smi_from_signed_byte {
         )
     };
 }
+
+// ===========================================================================
+// Sentinel materialization (Phase 1.B.2).
+// ===========================================================================
+
+/// Materialize the `Value::uninitialized_lexical()` 64-bit sentinel
+/// into the destination register. Used by `op_load_this` to compare
+/// against the pre-resolved `frame_this_value` mirror; on match,
+/// the handler bails to the slow path which resolves the actual
+/// ThisState (Uninitialized → throw ReferenceError; Lexical → walk
+/// lex-env).
+///
+/// The Apple Silicon AArch64 assembler (clang's integrated assembler
+/// driven by rustc's `naked_asm!`) rejects the `ldr {dst}, =literal`
+/// literal-pool form inside a `naked_asm!` block — there's no enclosing
+/// function for the assembler to attach the literal pool to, and the
+/// inline-asm parser doesn't synthesize one. The existing tag macros
+/// (`tag_smi_const!`, `tag_undefined!`, etc.) all use `movz` + `movk`
+/// for the same reason; this macro mirrors that pattern.
+///
+/// The sentinel is `Value::uninitialized_lexical()`, which is
+/// `tagged(TagKind::Sentinel = 9, InternalSentinel::UninitializedLexical.raw() = 2)`
+/// = `0x7ff8_0009_0000_0002`. We materialize it in 4 instructions:
+/// movz the low quarter (payload bits 0-15), then movk the three
+/// higher quarters at lsl #16, #32, #48. The named binding
+/// `value_uninit_lex_bits` carries the full 64-bit pattern, and the
+/// `>> N & 0xffff` arithmetic in the immediate slot is evaluated by
+/// the assembler at template-substitution time.
+///
+/// ## Emitted shape (4 instructions)
+///
+/// ```text
+///     movz  x{dst}, #{value_uninit_lex_bits} & 0xffff
+///     movk  x{dst}, #({value_uninit_lex_bits} >> 16) & 0xffff, lsl #16
+///     movk  x{dst}, #({value_uninit_lex_bits} >> 32) & 0xffff, lsl #32
+///     movk  x{dst}, #({value_uninit_lex_bits} >> 48) & 0xffff, lsl #48
+/// ```
+///
+/// ## Argument conventions
+///
+/// - `$dst_reg` is the scratch register number (the lowerer's
+///   `t0..t6` slots have already been substituted by macro-expansion
+///   time).
+/// - `value_uninit_lex_bits` is a `naked_asm!`-supplied named binding
+///   added to the lowerer's universal binding set in Phase 1.B.2 Task 1.
+///
+/// See spec §3.2.
+#[macro_export]
+macro_rules! load_uninit_lex_sentinel {
+    ($dst_reg:tt) => {
+        concat!(
+            "movz   x", stringify!($dst_reg), ", #({value_uninit_lex_bits} & 0xffff)\n",
+            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 16) & 0xffff), lsl #16\n",
+            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 32) & 0xffff), lsl #32\n",
+            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 48) & 0xffff), lsl #48\n",
+        )
+    };
+}

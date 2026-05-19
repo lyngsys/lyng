@@ -60,7 +60,7 @@
 //! - The resulting `extern "C" fn` symbols are addressable at runtime.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::{dispatch, load_constant, load_state_value};
+use lyng_js_vm::{dispatch, load_constant, load_state_value, load_uninit_lex_sentinel};
 #[cfg(target_arch = "aarch64")]
 use lyng_js_vm_dsl::llint_handler;
 
@@ -99,6 +99,19 @@ llint_handler! {
     }
 }
 
+// Phase 1.B.2: exercise `load_uninit_lex_sentinel!` end-to-end through
+// the lowerer + `naked_asm!`. Opcode 213 extends the 210/211/212 range
+// used by the prior synthetic handlers. The macro emits 4 instructions
+// (movz + 3× movk) that materialize `VALUE_UNINIT_LEX_BITS` into the
+// destination scratch.
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_test_load_uninit_lex_sentinel_dsl, opcode_byte = 213, layout = None, length = 1, || {
+        load_uninit_lex_sentinel!(t0);
+        dispatch!(advance = 0);
+    }
+}
+
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_constant_handler_compiles_and_links() {
@@ -120,6 +133,13 @@ fn load_this_sentinel_handler_compiles_and_links() {
     DslHarness::assert_handler_symbol_exists(op_test_load_this_sentinel_dsl);
 }
 
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn load_uninit_lex_sentinel_handler_compiles_and_links() {
+    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    DslHarness::assert_handler_symbol_exists(op_test_load_uninit_lex_sentinel_dsl);
+}
+
 // On non-aarch64 hosts the backend macros aren't compiled in, so
 // skip the validation cases entirely (mirrors `dsl_validation_empty.rs`).
 #[cfg(not(target_arch = "aarch64"))]
@@ -137,6 +157,12 @@ fn load_this_value_handler_compiles_and_links() {
 #[cfg(not(target_arch = "aarch64"))]
 #[test]
 fn load_this_sentinel_handler_compiles_and_links() {
+    // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+#[test]
+fn load_uninit_lex_sentinel_handler_compiles_and_links() {
     // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
 }
 

@@ -201,7 +201,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -236,6 +236,16 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // Universally bound; unused-binding warning is suppressed by
                 // the reference comment above.
                 state_this_value = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
+                // Phase 1.B.2: 64-bit bit pattern of
+                // `Value::uninitialized_lexical()`, used by
+                // `load_uninit_lex_sentinel!` (backend/aarch64/values.rs)
+                // to materialize the sentinel in a scratch register for
+                // the `op_load_this` sentinel-bail comparison. Mirrors
+                // the `state_this_value` pattern; universally bound and
+                // referenced by the leading comment so unused-binding
+                // warnings stay silent in translation units that don't
+                // expand the macro.
+                value_uninit_lex_bits = const ::lyng_js_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
                 exit = sym ::lyng_js_vm::dsl::entry::_interpreter_exit,
                 #(#shim_bindings)*
             )

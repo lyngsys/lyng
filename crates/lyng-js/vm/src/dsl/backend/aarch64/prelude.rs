@@ -71,6 +71,17 @@ pub const VALUE_NULL_BITS: u64 = VALUE_TAG_HEADER | (TAG_KIND_NULL << VALUE_TAG_
 pub const VALUE_TRUE_BITS: u64 = VALUE_TAG_BOOL_PATTERN | 1;
 pub const VALUE_FALSE_BITS: u64 = VALUE_TAG_BOOL_PATTERN;
 
+/// 64-bit bit pattern of `Value::uninitialized_lexical()`. Used by the
+/// `load_uninit_lex_sentinel!` backend macro to materialize the sentinel
+/// for sentinel-bail comparisons in `op_load_this` and any future opcode
+/// that needs to compare against this sentinel.
+///
+/// `Value::uninitialized_lexical()` is a `const fn` returning
+/// `Self::tagged(TagKind::Sentinel, InternalSentinel::UninitializedLexical.raw())`,
+/// so this const folds at compile time. The compile-time assertion below
+/// pins the relationship.
+pub const VALUE_UNINIT_LEX_BITS: u64 = Value::uninitialized_lexical().bits();
+
 // Mask combining TAG_HEADER + TAG_KIND_MASK — the bits a `check_kind!`
 // macro AND's into a scratch reg before comparing against the pattern.
 pub const VALUE_TAG_KIND_AND_HEADER_MASK: u64 = VALUE_TAG_HEADER | VALUE_TAG_KIND_MASK;
@@ -86,4 +97,20 @@ const _: () = {
     assert!(Value::null().bits() == VALUE_NULL_BITS);
     assert!(Value::from_bool(true).bits() == VALUE_TRUE_BITS);
     assert!(Value::from_bool(false).bits() == VALUE_FALSE_BITS);
+    // Phase 1.B.2: pin sentinel bits to the runtime constructor.
+    assert!(Value::uninitialized_lexical().bits() == VALUE_UNINIT_LEX_BITS);
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_uninit_lex_bits_matches_runtime() {
+        assert_eq!(VALUE_UNINIT_LEX_BITS, Value::uninitialized_lexical().bits());
+        // Sanity: the sentinel must be distinguishable from common Values.
+        assert_ne!(VALUE_UNINIT_LEX_BITS, Value::undefined().bits());
+        assert_ne!(VALUE_UNINIT_LEX_BITS, Value::null().bits());
+        assert_ne!(VALUE_UNINIT_LEX_BITS, Value::from_smi(0).bits());
+    }
+}
