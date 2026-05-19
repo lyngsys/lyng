@@ -50,3 +50,6 @@ mod sema_integration;
 
 #[cfg(test)]
 mod smoke;
+
+#[cfg(test)]
+mod gc_stress_frame_context;
