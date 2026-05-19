@@ -97,10 +97,58 @@ impl Default for LlIntExitSlot {
     }
 }
 
+/// Lower-level helper: maps a (`ThisState`, frame-`this`-value
+/// fallback) pair to the mirror value stored in
+/// [`LlIntState::frame_this_value`]. Pure / no side effects /
+/// trivially unit-testable.
+///
+/// Phase 1.B.1 sentinel rule:
+/// - `ThisState::Value(v)` → `v` (real `this` binding)
+/// - `ThisState::Uninitialized` → `Value::uninitialized_lexical()` (bail)
+/// - `ThisState::Lexical` → `Value::uninitialized_lexical()` (bail)
+/// - `None` (no current execution context) → fallback
+///
+/// The sentinel is observed by inline `op_load_this` handlers (landed
+/// in Phase 1.B.2); on match the handler bails to the slow path,
+/// which handles the throw / lex-env walk as appropriate.
+#[inline]
+pub(crate) fn resolve_this_state_to_mirror(
+    this_state: Option<lyng_js_env::ThisState>,
+    fallback_frame_this: Value,
+) -> Value {
+    match this_state {
+        Some(lyng_js_env::ThisState::Value(v)) => v,
+        Some(lyng_js_env::ThisState::Uninitialized)
+        | Some(lyng_js_env::ThisState::Lexical) => Value::uninitialized_lexical(),
+        None => fallback_frame_this,
+    }
+}
+
+/// Top-level helper: derives the mirror from an `Agent` + a
+/// `FrameRecord`. Mirrors the read path in
+/// `crates/lyng-js/vm/src/vm/semantics/names.rs` so the pre-resolution
+/// matches `op_load_this` semantics exactly.
+///
+/// Called from:
+/// - `crate::dsl::entry::run_via_dsl` (initial population)
+/// - `crate::dsl::slow_path::LlIntDispatchState::translate_outcome`
+///   (Refresh arm)
+#[inline]
+pub(crate) fn resolve_initial_this_value(
+    agent: &lyng_js_env::Agent,
+    frame: &crate::FrameRecord,
+) -> Value {
+    let this_state = agent.current_execution_context().map(|ec| ec.this_state());
+    let fallback = frame.this_value();
+    resolve_this_state_to_mirror(this_state, fallback)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::dsl::reg_convention as r;
+    use lyng_js_env::ThisState;
+    use lyng_js_types::Value;
 
     #[test]
     fn ll_int_state_offsets_stable() {
@@ -119,5 +167,33 @@ mod tests {
         // 8-byte inserts.
         assert_eq!(r::LLINT_STATE_PREFIX, 64);
         assert_eq!(core::mem::size_of::<LlIntState>(), 72);
+    }
+
+    #[test]
+    fn resolve_this_state_value_passthrough() {
+        let v = Value::from_smi(42);
+        let result = resolve_this_state_to_mirror(Some(ThisState::Value(v)), v);
+        assert_eq!(result, v);
+    }
+
+    #[test]
+    fn resolve_this_state_uninitialized_returns_sentinel() {
+        let fallback = Value::from_smi(99); // arbitrary; should be ignored.
+        let result = resolve_this_state_to_mirror(Some(ThisState::Uninitialized), fallback);
+        assert_eq!(result, Value::uninitialized_lexical());
+    }
+
+    #[test]
+    fn resolve_this_state_lexical_returns_sentinel() {
+        let fallback = Value::from_smi(99); // arbitrary; should be ignored.
+        let result = resolve_this_state_to_mirror(Some(ThisState::Lexical), fallback);
+        assert_eq!(result, Value::uninitialized_lexical());
+    }
+
+    #[test]
+    fn resolve_this_state_none_falls_back_to_frame_this() {
+        let fallback = Value::from_smi(7);
+        let result = resolve_this_state_to_mirror(None, fallback);
+        assert_eq!(result, fallback);
     }
 }
