@@ -218,6 +218,65 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 4,
     });
 
+    // LoadConst8: 4 distinct float literals per iter. Floats are stored in
+    // the per-function constant pool and dispatched via `LoadConst8 dst, idx`
+    // (the i8-immediate form of `LoadConst`). i8/i16-range integers would
+    // peephole to `LoadSmi8`/`LoadSmi`, so we use `3.14`-style float literals
+    // that don't fit any immediate form. The peephole that rewrites
+    // `LoadConst dst, idx` → `LoadConst8 dst, idx` fires when `idx <= 255`,
+    // which holds trivially for any short snippet (only a handful of
+    // constants in the pool).
+    //
+    // Backfilled in cleanup batch 1 (DSL-1 Phase 1.B cleanup) — the original
+    // Phase 1.B.0 Tasks 7+8 commit (`ad240f50`) framing implied this snippet
+    // was added but it was not.
+    map.insert("LoadConst8", Snippet {
+        opcode: "LoadConst8",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = 3.14;
+                    let b = 1.5;
+                    let c = 2.5;
+                    let d = 0.5;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    // LoadThis: 4 reads of `this` per iter. In a non-arrow function called
+    // bare (the harness invokes `bench(iters)` at script level), `this`
+    // binds to the global object in sloppy mode (lyng-js scripts are sloppy
+    // by default) — but the compiler still emits `LoadThis dst` regardless
+    // of the runtime arm. The slot-0 accumulator slot is avoided by
+    // assigning to fresh `let` bindings.
+    //
+    // The harness calls `bench(iters)` from script level, so the
+    // `ThisState` at trampoline entry is `Value(globalThis)` — fast path,
+    // no sentinel bail. This exercises the inline fast path of
+    // `op_load_this_dsl`.
+    //
+    // Backfilled in cleanup batch 1 (DSL-1 Phase 1.B cleanup) — the original
+    // Phase 1.B.0 Tasks 7+8 commit (`ad240f50`) framing implied this snippet
+    // was added but it was not.
+    map.insert("LoadThis", Snippet {
+        opcode: "LoadThis",
+        source: r"
+            function bench(iters) {
+                for (let i = 0; i < iters; i++) {
+                    let a = this;
+                    let b = this;
+                    let c = this;
+                    let d = this;
+                }
+                return iters;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
     // =====================================================================
     // Phase-1.B anchor opcodes (DSL-1 Phase 1.B.0 Task 8).
     //
@@ -499,6 +558,9 @@ mod verify_counts {
 
         let snippets = all_snippets();
         // Verify the newly-added Phase-1.A and Phase-1.B anchor opcodes.
+        // `LoadConst8` and `LoadThis` were backfilled in DSL-1 Phase 1.B
+        // cleanup batch 1 — the Phase 1.B.0 framing implied they were
+        // present but they were not.
         let names = [
             "LoadUndefined",
             "LoadNull",
@@ -507,6 +569,8 @@ mod verify_counts {
             "LoadZero",
             "LoadOne",
             "LoadSmi8",
+            "LoadConst8",
+            "LoadThis",
             "LoadLocal0",
             "LoadLocal1",
             "LoadLocal2",
