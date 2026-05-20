@@ -110,3 +110,114 @@ f00f0355 DSL-1 Phase 1.B.1 Task 3: populate frame_const_base + frame_this_value 
 ```
 
 9 commits + this summary. Phase 1.B.1 is the substrate refactor that Phase 1.B.2 + 1.B.3 depend on.
+
+## Retrospective: structural-only validation tests insufficient for substrate macros
+
+> Added 2026-05-20 (Phase 1.B cleanup batch 1). This retrospective
+> captures a process lesson surfaced during Phase 1.B.2 Task 2 that the
+> mandatory Phase 1.B.1 reviewer (Task 9) also missed. The defect was
+> fixed inline in Phase 1.B.2 Task 2 (commit `de2947f2`); this section
+> documents the lesson so future sub-phases do not repeat the pattern.
+
+### What the spec required
+
+The Phase 1.B.1 design spec
+(`docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md` §6.2)
+required Task 6 to "exercise the new `LlIntState` fields through a
+synthetic handler" so that the asm-DSL pipeline could be validated
+end-to-end before Phase 1.B.2 consumed the macros via canonical
+opcodes. The implicit reading was **runtime exercise** — actually
+dispatching through `load_constant!` / `load_state_value!` so the
+runtime ABI contract (which pinned register holds the field base)
+would be validated.
+
+### What landed
+
+Task 6 (commit `0605a407`) added
+`crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` with three
+structural compiles-and-links tests using
+`DslHarness::assert_handler_symbol_exists`. The synthetic handlers
+(opcodes 210/211/212) are NOT in `DSL_DISPATCH_TABLE`; the tests
+verify only that the macro lowers, the asm assembles, and the
+resulting function symbol is addressable. They do not dispatch
+through the handler, so they do not validate the runtime ABI
+contract.
+
+### Consequence: the x22→x24 register-pin bug
+
+The `load_constant!` macro in
+`crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs` initially
+emitted `ldr x16, [x22, ...]` (VM pin) to read `frame_const_base` —
+but `frame_const_base` lives on `LlIntState`, which is addressed via
+the STATE pin (`x24`), not the VM pin (`x22`). The same bug existed
+in `load_state_value!` in `aarch64/frame.rs`.
+
+Both bugs were:
+- **Latent through Phase 1.B.1.** The structural validation tests
+  compiled the macros end-to-end but never dispatched through them.
+  The structural pipeline (parse → lower → emit → assemble → link)
+  was fully covered; the runtime contract (register-pin / ABI) was
+  not.
+- **Latent through Task 9 (mandatory reviewer).** The reviewer
+  approved Phase 1.B.1 with verdict "APPROVED, 0 high/medium findings,
+  2 low addressed inline". The reviewer dispatch verified the spec's
+  structural gates (layout stability, validation tests passing, GC
+  review) but did not cross-check that the validation tests
+  runtime-exercise the macros. The reviewer pattern at the time
+  treated "validation tests pass" as a sufficient proxy for substrate
+  readiness; this defect demonstrates that's a wrong proxy when the
+  tests are structural-only.
+- **Caught only in Phase 1.B.2 Task 2.** When `op_load_const8_dsl`
+  dispatched real bytecode for the first time, the inline body
+  produced wrong values (or crashed during the GC-stress phase)
+  immediately. The fix was a one-line change per macro
+  (`x22` → `x24`), committed alongside the Phase 1.B.2 Task 2 port.
+
+### Pattern recommendation for future sub-phases
+
+**For sub-phases that introduce backend macros without canonical
+opcodes** (i.e., substrate-only sub-phases): the validation tests
+MUST runtime-dispatch through the macros. Two acceptable patterns:
+
+1. **Synthetic-opcode runtime dispatch.** Wire a synthetic opcode
+   into `DSL_DISPATCH_TABLE` (as a test-only entry), construct a
+   minimal bytecode unit that emits the synthetic opcode, and
+   evaluate it through `Vm::evaluate_installed`. This validates the
+   register-pin contract end-to-end. Requires a future bench-tool /
+   test-infra enhancement to support synthetic-opcode injection
+   cleanly.
+
+2. **Defer substrate validation to the immediately-following port
+   sub-phase.** Acceptable IF the port sub-phase is committed-to
+   within the same epic and the structural validation tests are
+   clearly labelled as "macro-emit / lowerer-binding regression
+   catchers, NOT substrate readiness validators". The Phase 1.B.2
+   port sub-phase did catch the x22→x24 bug; in retrospect that's
+   the path Phase 1.B.1 took de facto, but without the explicit
+   acknowledgement that substrate validation was deferred.
+
+**For sub-phases that introduce backend macros AND canonical opcodes
+simultaneously** (e.g., Phase 1.A's LoadZero / LoadSmi8): the
+canonical-opcode integration tests provide the runtime exercise.
+Phase 1.A's pattern was correct because the canonical opcodes
+dispatched through the macros end-to-end as part of the
+sub-phase scope.
+
+**For mandatory reviewer dispatches** (e.g., Phase 1.B.1 Task 9):
+explicitly verify the validation tests dispatch through any new
+substrate macros. A "tests pass" verdict on structural-only tests
+does NOT validate the substrate. The reviewer prompt should include
+a question like "do the validation tests runtime-dispatch through
+the new macros?" and route to "deferred to next port sub-phase"
+explicitly if the answer is no.
+
+### What changed in the test file
+
+The inline note at the top of
+`crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` was
+extended in this cleanup commit to point readers to this
+retrospective. The test file itself is unchanged — the 4 structural
+tests still serve their (now-correctly-scoped) macro-emit /
+lowerer-binding regression-catching role. End-to-end runtime
+coverage of `op_load_const8` and `op_load_this` lives in the
+per-opcode integration tests in `lyng-js-tests` added in Phase 1.B.2.

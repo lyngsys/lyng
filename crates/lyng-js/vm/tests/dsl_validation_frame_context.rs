@@ -15,6 +15,29 @@
 //! macro-emit and lowerer-binding regressions before they hit
 //! production handlers.
 //!
+//! ## Retrospective (Phase 1.B cleanup batch 1, 2026-05-20)
+//!
+//! **These structural tests are NOT a substitute for runtime dispatch.**
+//! The x22→x24 register-pin bug in `load_constant!` and
+//! `load_state_value!` (latent through Phase 1.B.1 + the mandatory
+//! Phase 1.B.1 reviewer; caught only in Phase 1.B.2 Task 2 when
+//! `op_load_const8_dsl` dispatched real bytecode for the first time)
+//! demonstrates that structural compiles-and-links coverage is not
+//! sufficient for substrate macros that read pinned-register-relative
+//! state.
+//!
+//! Future sub-phases that introduce backend macros without canonical
+//! opcodes should either: (1) wire a synthetic opcode into
+//! `DSL_DISPATCH_TABLE` and runtime-dispatch through it from a test,
+//! or (2) explicitly defer substrate validation to the
+//! immediately-following port sub-phase and label these tests as
+//! macro-emit / lowerer-binding regression catchers only.
+//!
+//! See
+//! `reports/js/lyng-js/dsl-1/phase-1b1-summary.md` §
+//! "Retrospective: structural-only validation tests insufficient for
+//! substrate macros" for the full lesson.
+//!
 //! ## Scope
 //!
 //! Four synthetic `llint_handler!` invocations exercise the macros in

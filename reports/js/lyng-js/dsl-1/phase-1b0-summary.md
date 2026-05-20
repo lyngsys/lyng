@@ -60,6 +60,17 @@ All 14 in-scope opcodes (7 Phase-1.A + 7 Phase-1.B anchors) produce ns/dispatch 
 | StoreLocal3 | 52.49       | ±0.08 | 4       |
 | Ldar        | 42.30       | ±0.02 | 4       |
 
+> **2026-05-20 correction (Phase 1.B cleanup batch 1).** The "14
+> in-scope opcodes (7 Phase-1.A + 7 Phase-1.B anchors)" framing above
+> implied `LoadConst8` and `LoadThis` were among the 14. **They were
+> not.** Verified via `grep` at both `ad240f50` (this sub-phase close)
+> and `7baf5846` (Phase 1.B.2 close). The 14 entries actually landed
+> were: the 7 Phase-1.A constant-loader opcodes (LoadUndefined,
+> LoadNull, LoadTrue, LoadFalse, LoadZero, LoadOne, LoadSmi8) and
+> 7 Phase-1.B anchor opcodes (LoadLocal0..3, StoreLocal3, LoadEnvSlot,
+> Ldar). `LoadConst8` and `LoadThis` were backfilled in cleanup batch 1
+> commit `922ff5f2`. Future readers: trust `grep`, not summary tables.
+
 Verified per-snippet `opcodes_per_iter` via a `verify_opcodes_per_iter` test in `snippets.rs` that runs each snippet under the dispatch counter and asserts ±5% match.
 
 ## Same-load A/B vs pre-1.B.0
@@ -100,7 +111,7 @@ Per spec §4:
 | Gate | Result |
 |------|--------|
 | Counter records Move ≈ 4.66B on Richards (within 5% of expected) | ✅ 1,552M × 3 = 4,656M (within 0.2%) |
-| All 14 in-scope opcodes produce ns/dispatch with CI95 | ✅ All 14 present with single-digit CI95 |
+| All 14 in-scope opcodes produce ns/dispatch with CI95 | ✅ All 14 present with single-digit CI95 (see 2026-05-20 correction above: `LoadConst8` + `LoadThis` were NOT among the 14; backfilled in cleanup batch 1) |
 | `--features opcode-counters` overhead ≤ 5% | ✅ ≈ 0% (well within) |
 | Behavioral parity (413 + 1186 + DSL validation tests) | ✅ All passing; 2 pre-existing failures unrelated |
 | Same-load A/B aggregate V8 v7 regression ≤ 2% | ✅ 0% (infra-only sub-phase) |
