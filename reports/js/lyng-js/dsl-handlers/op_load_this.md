@@ -141,15 +141,39 @@ distinguished pattern).
 The Phase 1.B.2 plan / spec assumed a `LoadThis` snippet was added in
 Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
 at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
-`LoadThis` are among them. The microbench gate for this opcode is
-therefore **deferred** — the bench tool's snippet table needs a
-`LoadThis` entry before the microbench can produce a ns/dispatch
-number.
+`LoadThis` are among them.
 
-Expected (analogous-opcode extrapolation): ~50-55 ns/dispatch (12-inline-
-instruction body adds ~5 instr of sentinel-materialization + cmp/branch
-over LoadSmi8's 45 ns). LLInt 2× reference would be ~140 ns; substantial
-headroom predicted but not measured directly at this HEAD.
+**Snippet backfilled in Phase 1.B cleanup batch 1, commit `922ff5f2`.**
+The snippet reads `this` 4 times per iteration into fresh `let`
+bindings (`let a = this; let b = this; ...`). In a non-arrow function
+called bare from script level (the harness invokes `bench(iters)`),
+sloppy-mode `this` binds to the global object — so `ThisState::Value(globalThis)`
+is the resolved arm at trampoline entry. The inline fast path runs:
+no sentinel-bail occurs. The `verify_opcodes_per_iter` test confirms
+4 LoadThis dispatches per iter ± 5%.
+
+Measured ns/dispatch (7-sample microbench, post-cleanup HEAD):
+
+| Median ns/dispatch | CI95 half-width | Snippet ratio |
+|-------------------:|----------------:|--------------:|
+| 36.52              | ±0.14           | 4 ops/iter    |
+
+LLInt reference (predicted): ~70 ns/dispatch for JSC's LLInt
+`op_to_this` fast path on AArch64. 2× threshold = ~140 ns.
+
+**Gate verdict:** ✅ within 2× LLInt reference (36.52 ns vs ~140 ns
+budget — 3.8× headroom). The 12-instruction body (incl. 4-instr
+sentinel materialization, 2-instr cmp/branch) is fully absorbed by
+Apple Silicon's wide-issue OOO execution; the fast-path dominates
+because the sentinel compare always fails for the `ThisState::Value(v)`
+arm exercised here. The 4 movz/movk sentinel-materialization
+instructions add minimal latency on the critical path — the cmp can
+issue in parallel with the dispatch tail's PC-advance/load/branch.
+
+The measured ns/dispatch sits essentially on top of LoadConst8 (36.34
+ns), LoadZero (36.24 ns), and the rest of the trivial-loader cluster —
+strong evidence that the sentinel-materialization cost is not on the
+critical path of the dispatch loop.
 
 The full microbench discussion lives at
 [`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).

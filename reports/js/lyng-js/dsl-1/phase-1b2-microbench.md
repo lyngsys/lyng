@@ -1,7 +1,11 @@
 # Phase 1.B.2 — Microbench + slow-path-share results
 
-Measured 2026-05-19 after `op_load_const8` and `op_load_this` inline ports
-landed (HEAD `3a5facc4`).
+Originally measured 2026-05-19 after `op_load_const8` and `op_load_this`
+inline ports landed (HEAD `3a5facc4`). **Snippets for `LoadConst8` and
+`LoadThis` were backfilled in DSL-1 Phase 1.B cleanup batch 1 (commit
+`922ff5f2`)**; the microbench gate is now verified post-hoc with real
+measurements. Section below updated 2026-05-20 to replace the
+"deferred" rows.
 
 ## Microbench (post-port ns/dispatch)
 
@@ -11,50 +15,48 @@ The `lyng-js-bench microbench` runner inspects the snippet table at
 opcodes") added snippets for 7 Phase-1.A opcodes + 7 Phase-1.B anchor
 opcodes (LoadLocal0..3, StoreLocal3, LoadEnvSlot, Ldar). **It did NOT
 add `LoadConst8` or `LoadThis` snippets**, despite the Phase 1.B.2 spec
-§5 claiming both were present. The microbench gate is therefore not
-directly measurable for these two opcodes at this HEAD.
+§5 claiming both were present. The cleanup-batch-1 backfill closes that
+gap.
 
 ```text
 | Opcode      | Samples | Median ns/dispatch  | Notes                                  |
 |-------------|--------:|--------------------:|----------------------------------------|
-| LoadConst8  | —       | no snippet          | Not in snippets.rs; gate deferred      |
-| LoadThis    | —       | no snippet          | Not in snippets.rs; gate deferred      |
-| LoadSmi8    | 7       | 44.98 (±0.10)       | Closest Phase-1.A analog — inline Value materialization |
-| LoadZero    | 7       | 36.15 (±0.10)       | Trivial inline path (1 mov + dispatch) |
-| LoadLocal0  | 7       | 33.68 (±0.13)       | Inline frame-relative read             |
-| Ldar        | 7       | 42.88 (±0.05)       | Accumulator load                       |
+| LoadConst8  | 7       | 36.34 (±0.09)       | Backfilled snippet — 4× Float64 literals per iter |
+| LoadThis    | 7       | 36.52 (±0.14)       | Backfilled snippet — 4× `this` reads per iter (ThisState::Value arm) |
+| LoadSmi8    | 7       | 45.07 (±0.09)       | Closest Phase-1.A analog — inline Value materialization |
+| LoadZero    | 7       | 36.24 (±0.27)       | Trivial inline path (1 mov + dispatch) |
+| LoadLocal0  | 7       | 34.61 (±0.40)       | Inline frame-relative read             |
+| Ldar        | 7       | 43.18 (±0.06)       | Accumulator load                       |
 ```
 
-(Source: `/tmp/phase-1b2-microbench.md` produced by
+(Source: `/tmp/cleanup-microbench.md` produced by
 `cargo run --release -p lyng-js-bench -- microbench --samples 7
---output /tmp/phase-1b2-microbench.md`.)
+--output /tmp/cleanup-microbench.md` at HEAD `922ff5f2`.)
 
-**Analogous-opcode reasoning:** the inline ports of `op_load_const8`
-(3 inline instr body + 4 dispatch tail = 7 instructions) and
-`op_load_this` (8 inline instr body + 4 dispatch tail = 12
-instructions) sit between the trivial loaders (~36 ns at 5 instr) and
-the more-complex paths (~45 ns at 7+ instr).
+**Observed shape vs the analogous-opcode prediction:**
 
-Linear extrapolation from the Phase-1.A measured set:
-- LoadConst8 expected ~40-45 ns (7-instruction body, sub-LoadSmi8
-  shape — no immediate decode, one extra indexed load vs. LoadSmi8's
-  immediate materialization).
-- LoadThis expected ~50-55 ns (12-instruction body, 4 extra
-  sentinel-materialization movz/movk + cmp/branch on the fast path
-  vs. LoadSmi8).
+Pre-cleanup predictions (linear extrapolation, since deferred):
+- LoadConst8 expected ~40-45 ns; **measured 36.34 ns** — slightly
+  better than predicted; the 9-instruction inline body's indexed
+  constant-pool load (1 load + 1 indexed load) is faster than
+  LoadSmi8's immediate-materialization sequence on Apple Silicon.
+- LoadThis expected ~50-55 ns; **measured 36.52 ns** — significantly
+  better than predicted. The 4-instruction sentinel-materialization
+  was assumed to dominate latency; in practice Apple Silicon's
+  wide-issue OOO execution overlaps it with the dispatch tail, so the
+  effective added cost is near-zero on the `ThisState::Value(v)` fast
+  path the snippet exercises.
 
 LLInt reference for the gate (the 2× ratio):
 - LoadConst8 ≤ ~110 ns (2× ~55 ns JSC LLInt `op_mov` constant-pool read).
 - LoadThis ≤ ~140 ns (2× ~70 ns JSC LLInt `op_to_this` fast path).
 
-Both are well within reach based on the analogous-opcode trajectory.
-
-**Verdict (microbench gate):** the gate is "**deferred — snippets not
-yet present in the bench tool**". The substrate gap is on the bench
-tool's snippets file (no `LoadConst8` / `LoadThis` entries), not on
-the inline ports themselves. The per-handler asm baselines confirm
-both inline bodies are within the ≤ 12 instruction budget, and the
-V8 v7 A/B gives the dispositive same-load measurement (see below).
+**Verdict (microbench gate):** ✅ both opcodes within 2× LLInt
+reference. LoadConst8 at 36.34 ns vs ~110 ns budget (3.0× headroom);
+LoadThis at 36.52 ns vs ~140 ns budget (3.8× headroom). The
+per-handler asm baselines confirm both inline bodies are within the
+≤ 12 instruction body budget, and the V8 v7 A/B gives the dispositive
+same-load measurement (see below).
 
 ## Slow-path-share on V8 v7
 
@@ -134,19 +136,21 @@ authoritative artifact.
 
 ## Verdict
 
-| Gate                                  | op_load_const8 | op_load_this    |
-|---------------------------------------|----------------|-----------------|
-| ≤ 12 inline instructions (body)       | ✅ 5 instr     | ✅ 8 instr      |
-| Microbench within 2× LLInt reference  | deferred (snippet absent) | deferred (snippet absent) |
-| Slow-path-share < 20% on V8 v7        | ✅ 0.00%       | ✅ 0.00%        |
-| Behavioral parity                     | ✅             | ✅              |
-| Per-handler ported report present     | ✅             | ✅              |
-| Asm baseline captured                 | ✅             | ✅              |
+| Gate                                  | op_load_const8         | op_load_this            |
+|---------------------------------------|------------------------|-------------------------|
+| ≤ 12 inline instructions (body)       | ✅ 5 instr             | ✅ 8 instr              |
+| Microbench within 2× LLInt reference  | ✅ 36.34 ns (3.0× headroom) | ✅ 36.52 ns (3.8× headroom) |
+| Slow-path-share < 20% on V8 v7        | ✅ 0.00%               | ✅ 0.00%                |
+| Behavioral parity                     | ✅                     | ✅                      |
+| Per-handler ported report present     | ✅                     | ✅                      |
+| Asm baseline captured                 | ✅                     | ✅                      |
 
-Two of three quantitative gates pass cleanly (≤ 12 instr, slow-path-share
-< 20%). The microbench gate is deferred to a follow-up — the bench tool's
-snippets file needs `LoadConst8` and `LoadThis` entries before the
-microbench can produce ns/dispatch numbers for these opcodes. The V8 v7
-A/B (see [`phase-1b2-ab-comparison.md`](phase-1b2-ab-comparison.md)) is
-the dispositive measurement at the suite level: **+4.89% geomean**,
-well above the +0.3% expected.
+All three quantitative gates now pass cleanly. The microbench gate
+was originally deferred at Phase 1.B.2 closure because the
+`LoadConst8` / `LoadThis` snippets were missing from
+`tools/lyng-js-bench/src/microbench/snippets.rs`; the snippets were
+backfilled in Phase 1.B cleanup batch 1 (commit `922ff5f2`) and the
+gate is verified post-hoc. The V8 v7 A/B (see
+[`phase-1b2-ab-comparison.md`](phase-1b2-ab-comparison.md)) is the
+dispositive measurement at the suite level: **+4.89% geomean**, well
+above the +0.3% expected.

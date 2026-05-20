@@ -117,15 +117,31 @@ constant-pool base pointer is materialized.
 The Phase 1.B.2 plan / spec assumed a `LoadConst8` snippet was added in
 Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
 at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
-`LoadThis` are among them. The microbench gate for this opcode is
-therefore **deferred** — the bench tool's snippet table needs a
-`LoadConst8` entry before the microbench can produce a ns/dispatch
-number.
+`LoadThis` are among them.
 
-Expected (analogous-opcode extrapolation): ~40-45 ns/dispatch
-(7-instruction inline body sitting between LoadZero at 36 ns and
-LoadSmi8 at 45 ns). LLInt 2× reference would be ~110 ns. Substantial
-headroom predicted; not measured directly at this HEAD.
+**Snippet backfilled in Phase 1.B cleanup batch 1, commit `922ff5f2`.**
+The snippet writes 4 distinct `Float64` literals into fresh `let`
+bindings per iteration (`let a = 3.14; let b = 1.5; ...`). Floats land
+in the per-function constant pool (idx < 256), so the bytecode builder
+peepholes the canonical `LoadConst` form to `LoadConst8`. The
+`verify_opcodes_per_iter` test in `snippets.rs` confirms 4 LoadConst8
+dispatches per iter ± 5%.
+
+Measured ns/dispatch (7-sample microbench, post-cleanup HEAD):
+
+| Median ns/dispatch | CI95 half-width | Snippet ratio |
+|-------------------:|----------------:|--------------:|
+| 36.34              | ±0.09           | 4 ops/iter    |
+
+LLInt reference (predicted): ~55 ns/dispatch for JSC's LLInt
+`op_mov`-via-constant-pool fast path on AArch64. 2× threshold = ~110 ns.
+
+**Gate verdict:** ✅ within 2× LLInt reference (36.34 ns vs ~110 ns
+budget — 3.0× headroom). The 9-instruction inline body sits at the
+LoadZero (36 ns) end of the constant-loader range, slightly faster
+than LoadSmi8 (45 ns) because no immediate decode is needed — the
+indexed constant-pool load is a single `ldr` after the cached
+`frame_const_base` mirror.
 
 The full microbench discussion lives at
 [`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
