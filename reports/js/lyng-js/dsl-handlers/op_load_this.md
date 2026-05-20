@@ -287,3 +287,21 @@ sentinel-bail arm fires (it just bails uniformly).
   (where GC can occur). Phase 1.B.1 Task 7's
   `gc_stress_frame_context.rs` exercises this; this port consumes
   the substrate without changes.
+
+## Known follow-ups
+
+- **JS-level test for `ThisState::Uninitialized` arm** —
+  the derived-constructor-pre-super() TDZ scenario is not directly
+  tested through JS in this codebase yet. Tracked in
+  [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
+  item 1. Blocked on the lyng-js parser/compiler covering
+  class-inheritance + super() flow reliably; the inline-asm fast
+  path is invariant to which sentinel-bail arm fires, so deferring
+  this test does not affect the inline-port correctness.
+- **asm-diff registry extension for `dsl::handlers::cold::*`** —
+  the asm baseline at
+  `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_this.asm`
+  was captured manually because the structured asm-diff tool
+  doesn't yet support the cold-handler namespace. Tracked in
+  [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
+  item 2.
