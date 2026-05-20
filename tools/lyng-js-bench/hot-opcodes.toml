@@ -160,6 +160,26 @@ target_slow_path_share = 0.20
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
 
+# DSL-1 Phase 1.B.3 Task 4: StoreLocal1/2 added to the microbench
+# coverage list. Not in the top-30 by v8 v7 share, but ship with
+# snippets so the per-opcode gates are armed after the 1.B.3 inline
+# ports land. StoreLocal0 is intentionally omitted from snippets — the
+# bytecode-builder peephole rewrites `Move dst=0` to `Ldar` before the
+# `store_local_opcode` branch fires, so StoreLocal0 cannot be emitted
+# via the standard pipeline. See
+# `reports/js/lyng-js/dsl-handlers/op_store_local_0.md`.
+[[opcodes]]
+name = "StoreLocal1"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
+[[opcodes]]
+name = "StoreLocal2"
+target_slow_path_share = 0.20
+aarch64_max_instructions = 0
+x86_64_max_instructions = 0
+
 [[opcodes]]
 name = "Decrement"
 target_slow_path_share = 0.20

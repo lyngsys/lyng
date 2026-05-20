@@ -387,6 +387,56 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 4,
     });
 
+    // StoreLocal1/2: symmetric pairs of StoreLocal3 (DSL-1 Phase 1.B.3
+    // Task 4). Each writes to the corresponding parameter slot four
+    // times per iter; the bytecode-builder peephole
+    // (`compact_move_instruction` in `crates/lyng-js/bytecode/src/
+    // builder.rs:150-166`) rewrites `Move dst=N, src=...` to
+    // `StoreLocalN` for N in 1..3 just as it does for N=3.
+    //
+    // **StoreLocal0 is intentionally omitted from this list** — the
+    // peephole's `dst==0` branch fires BEFORE `store_local_opcode`,
+    // rewriting `Move dst=0, src=B` to `Ldar B` (load accumulator
+    // from register B). Slot 0 is the accumulator by the calling
+    // convention; emitting an explicit `StoreLocal0` would be
+    // redundant with `Ldar`. The handler exists (and is inline-ported
+    // in DSL-1 Phase 1.B.3 Task 3 for symmetry with the
+    // `store_local_fixed!` macro), but is unreachable via the standard
+    // emit pipeline — see the per-handler report at
+    // `reports/js/lyng-js/dsl-handlers/op_store_local_0.md` for the
+    // detailed finding.
+    map.insert("StoreLocal1", Snippet {
+        opcode: "StoreLocal1",
+        source: r"
+            function bench(iters, p1, p2, p3) {
+                for (let i = 0; i < iters; i++) {
+                    p1 = i;
+                    p1 = i;
+                    p1 = i;
+                    p1 = i;
+                }
+                return p1 + p2 + p3;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
+    map.insert("StoreLocal2", Snippet {
+        opcode: "StoreLocal2",
+        source: r"
+            function bench(iters, p1, p2, p3) {
+                for (let i = 0; i < iters; i++) {
+                    p2 = i;
+                    p2 = i;
+                    p2 = i;
+                    p2 = i;
+                }
+                return p1 + p2 + p3;
+            }
+        ",
+        opcodes_per_iter: 4,
+    });
+
     // LoadEnvSlot: inner closure reads a captured variable four times per
     // iter. The captured var lives in the enclosing environment, so each
     // read dispatches LoadEnvSlot rather than LoadLocalN. The outer loop
@@ -575,6 +625,16 @@ mod verify_counts {
             "LoadLocal1",
             "LoadLocal2",
             "LoadLocal3",
+            // Phase 1.B.3 Task 4: StoreLocal1/2 backfilled to close the
+            // snippets-coverage gap (StoreLocal3 was the only one
+            // present in Phase 1.B.0). **StoreLocal0 is intentionally
+            // omitted** — the bytecode-builder peephole rewrites
+            // `Move dst=0, src=B` to `Ldar B` before the
+            // `store_local_opcode` branch fires, so StoreLocal0 cannot
+            // be emitted via the standard pipeline. See the per-handler
+            // report at `reports/js/lyng-js/dsl-handlers/op_store_local_0.md`.
+            "StoreLocal1",
+            "StoreLocal2",
             "StoreLocal3",
             "LoadEnvSlot",
             "Ldar",
