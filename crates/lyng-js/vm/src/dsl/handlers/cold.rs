@@ -3952,32 +3952,33 @@ pub extern "C" fn op_lda_const8_slow_rs(
 }
 
 // =====================================================================
-// Ldar
+// Ldar — inline DSL fast path (DSL-1 Phase 1.B.3 Task 3).
+//
+// "Load Accumulator from Register" — copies `registers[a]` into the
+// accumulator (`registers[0]`). Emitted by the bytecode peephole when
+// a `Move dst=0, src=…` is produced. Top-30 dispatch share: ~250M
+// dispatches/V8 v7 run.
+//
+// Inline shape (2 body instructions):
+//   1. `load_reg!(a => 10)`  → `ldr x10, [x20, x_a, lsl #3]`
+//   2. `store_acc!(10)`      → `str x10, [x20]`
+//   3. `dispatch!()`         → standard 4-instr tail
+//
+// Total: 1 decode + 2 body + 4 dispatch = 7 instructions. Within ≤12
+// budget.
+//
+// Slow path deleted (`op_ldar_slow_rs` removed): no remaining callers
+// (verified via grep). Pure register-to-register move with no bail
+// conditions.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_ldar_dsl, opcode_byte = 130, layout = A, length = 2, |a| {
-        call_slow!(op_ldar_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_reg!(a => 10);
+        store_acc!(10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_ldar_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLdarArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_ldar_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4324,32 +4325,36 @@ llint_handler! {
 }
 
 // =====================================================================
+// StoreLocal0 / StoreLocal1 / StoreLocal2 / StoreLocal3 — inline DSL
+// fast paths (DSL-1 Phase 1.B.3 Task 3).
+//
+// StoreLocal3 is the top-30 anchor (~125M dispatches/V8 v7 run).
+// StoreLocal0/1/2 are macro-shared symmetric pairs that qualify under
+// the umbrella's 15-min rule (same handler body parameterized by a
+// literal slot index).
+//
+// Each handler:
+//   1. `load_reg!(a => 10)`             → `ldr x10, [x20, x_a, lsl #3]`
+//   2. `store_local_fixed!(10, N)`      → `str x10, [x20, #N*8]`
+//   3. `dispatch!()`                    → standard 4-instr tail
+//
+// Total: 1 decode + 2 body + 4 dispatch = 7 instructions per handler.
+//
+// Slow paths deleted (`op_store_local_{0,1,2,3}_slow_rs`): no remaining
+// callers; pure register-window moves with no bail conditions.
+// =====================================================================
+
+// =====================================================================
 // StoreLocal0
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_store_local_0_dsl, opcode_byte = 148, layout = A, length = 2, |a| {
-        call_slow!(op_store_local_0_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_reg!(a => 10);
+        store_local_fixed!(10, 0);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_store_local_0_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpStoreLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_store_local_0_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4359,26 +4364,10 @@ pub extern "C" fn op_store_local_0_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_store_local_1_dsl, opcode_byte = 149, layout = A, length = 2, |a| {
-        call_slow!(op_store_local_1_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_reg!(a => 10);
+        store_local_fixed!(10, 1);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_store_local_1_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpStoreLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_store_local_1_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4388,26 +4377,10 @@ pub extern "C" fn op_store_local_1_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_store_local_2_dsl, opcode_byte = 150, layout = A, length = 2, |a| {
-        call_slow!(op_store_local_2_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_reg!(a => 10);
+        store_local_fixed!(10, 2);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_store_local_2_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpStoreLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_store_local_2_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4417,26 +4390,10 @@ pub extern "C" fn op_store_local_2_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_store_local_3_dsl, opcode_byte = 151, layout = A, length = 2, |a| {
-        call_slow!(op_store_local_3_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_reg!(a => 10);
+        store_local_fixed!(10, 3);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_store_local_3_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpStoreLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_store_local_3_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================

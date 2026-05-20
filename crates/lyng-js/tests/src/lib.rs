@@ -62,3 +62,6 @@ mod op_load_this_inline;
 
 #[cfg(test)]
 mod op_locals_inline;
+
+#[cfg(test)]
+mod op_ldar_inline;
