@@ -10,6 +10,8 @@
 //! - [`control`]  — dispatch, branches, slow-path bridge, prefix.
 //! - [`feedback`] — IC-site lookups + observed-type recording.
 //! - [`frame`]    — Phase 1.B.1 fixed-offset `LlIntState` Value loads.
+//! - [`locals`]   — Phase 1.B.3 fixed-immediate-index register-window
+//!                  load/store (`load_local_fixed!` / `store_local_fixed!`).
 //! - [`safepoint`] — interrupt-poll macro.
 //! - [`memory`]   — raw load/store fragments referenced by other macros.
 //! - [`counters`] — feature-gated opcode counters.
@@ -21,6 +23,7 @@ pub mod control;
 pub mod counters;
 pub mod feedback;
 pub mod frame;
+pub mod locals;
 pub mod memory;
 pub mod objects;
 pub mod operands;

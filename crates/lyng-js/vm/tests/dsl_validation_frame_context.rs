@@ -99,7 +99,10 @@
 //! - The resulting `extern "C" fn` symbols are addressable at runtime.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::{dispatch, load_constant, load_state_value, load_uninit_lex_sentinel};
+use lyng_js_vm::{
+    dispatch, load_constant, load_local_fixed, load_state_value, load_uninit_lex_sentinel,
+    store_local_fixed,
+};
 #[cfg(target_arch = "aarch64")]
 use lyng_js_vm_dsl::llint_handler;
 
@@ -151,6 +154,43 @@ llint_handler! {
     }
 }
 
+// Phase 1.B.3: exercise `load_local_fixed!` end-to-end through the
+// lowerer + `naked_asm!`. Opcode 214 extends the synthetic-handler
+// range. Loads register-window slot 1 (an arbitrary non-zero literal)
+// into scratch `t0` via the fixed-immediate-offset form. The macro
+// emits a single `ldr x{dst}, [x20, #1 * 8]` instruction; the
+// structural test confirms the macro syntax, lowerer-binding, and
+// `naked_asm!` consumption are correct.
+//
+// **Runtime-dispatch coverage** — per the Phase 1.B.1 retrospective
+// (structural-only validation tests insufficient for substrate macros),
+// real handler dispatch through this macro lands in Phase 1.B.3
+// Tasks 2 + 3 via `op_load_local_1/2/3_dsl` and the per-opcode
+// integration tests in `crates/lyng-js/tests/src/op_locals_inline.rs`.
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_test_load_local_fixed_dsl, opcode_byte = 214, layout = None, length = 1, || {
+        load_local_fixed!(1 => t0);
+        dispatch!(advance = 0);
+    }
+}
+
+// Phase 1.B.3: exercise `store_local_fixed!` end-to-end. Opcode 215
+// extends the synthetic-handler range. Stores from scratch `t0` into
+// register-window slot 2 via the fixed-immediate-offset form. The
+// macro emits a single `str x{src}, [x20, #2 * 8]` instruction.
+//
+// Real handler dispatch through this macro lands in Phase 1.B.3
+// Task 3 via `op_store_local_0/1/2/3_dsl` and the per-opcode
+// integration tests in `crates/lyng-js/tests/src/op_locals_inline.rs`.
+#[cfg(target_arch = "aarch64")]
+llint_handler! {
+    op_test_store_local_fixed_dsl, opcode_byte = 215, layout = None, length = 1, || {
+        store_local_fixed!(t0, 2);
+        dispatch!(advance = 0);
+    }
+}
+
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_constant_handler_compiles_and_links() {
@@ -179,6 +219,20 @@ fn load_uninit_lex_sentinel_handler_compiles_and_links() {
     DslHarness::assert_handler_symbol_exists(op_test_load_uninit_lex_sentinel_dsl);
 }
 
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn load_local_fixed_handler_compiles_and_links() {
+    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    DslHarness::assert_handler_symbol_exists(op_test_load_local_fixed_dsl);
+}
+
+#[cfg(target_arch = "aarch64")]
+#[test]
+fn store_local_fixed_handler_compiles_and_links() {
+    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    DslHarness::assert_handler_symbol_exists(op_test_store_local_fixed_dsl);
+}
+
 // On non-aarch64 hosts the backend macros aren't compiled in, so
 // skip the validation cases entirely (mirrors `dsl_validation_empty.rs`).
 #[cfg(not(target_arch = "aarch64"))]
@@ -202,6 +256,18 @@ fn load_this_sentinel_handler_compiles_and_links() {
 #[cfg(not(target_arch = "aarch64"))]
 #[test]
 fn load_uninit_lex_sentinel_handler_compiles_and_links() {
+    // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+#[test]
+fn load_local_fixed_handler_compiles_and_links() {
+    // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+#[test]
+fn store_local_fixed_handler_compiles_and_links() {
     // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
 }
 
