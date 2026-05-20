@@ -17,9 +17,10 @@
 #[cfg(target_arch = "aarch64")]
 use crate::{
     call_slow, cmp_branch_eq, decode_a, decode_ab, decode_abc, decode_abc_slot,
-    decode_abx, decode_ax, dispatch, dispatch_after_slow, load_constant,
-    load_state_value, load_uninit_lex_sentinel, store_reg, tag_bool_const,
-    tag_null, tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
+    decode_abx, decode_ax, dispatch, dispatch_after_slow, load_acc, load_constant,
+    load_local_fixed, load_reg, load_state_value, load_uninit_lex_sentinel,
+    store_acc, store_local_fixed, store_reg, tag_bool_const, tag_null,
+    tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -4247,32 +4248,40 @@ llint_handler! {
 }
 
 // =====================================================================
+// LoadLocal0 / LoadLocal1 / LoadLocal2 / LoadLocal3 — inline DSL fast
+// paths (DSL-1 Phase 1.B.3 Task 2).
+//
+// Combined top-30 share: ~1.13B dispatches/V8 v7 run for the 4 anchors.
+// All four read a fixed register-window slot and copy into the
+// destination register identified by operand byte `a`. No bail
+// conditions; the inline path handles 100% of cases.
+//
+// Inline shape (slot N in 0..3):
+//   1. Source-side load (1 instr):
+//      - N=0: `load_acc!(10)`         → `ldr x10, [x20]` (slot 0 = accumulator).
+//      - N=1..3: `load_local_fixed!(N => 10)` → `ldr x10, [x20, #N*8]`.
+//   2. `store_reg!(a, 10)` (1 instr)  → `str x10, [x20, x_a, lsl #3]`.
+//   3. `dispatch!()` (4 instr)        → standard tail.
+//
+// Total: 2 decode + 2 body + 4 dispatch = 8 instructions per handler.
+// Comfortably within the ≤12 budget.
+//
+// Slow paths deleted (`op_load_local_{0,1,2,3}_slow_rs`): no remaining
+// callers (verified via grep across `crates/lyng-js/`); pure register-
+// window moves have no bail conditions to fall back through.
+// =====================================================================
+
+// =====================================================================
 // LoadLocal0
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_local_0_dsl, opcode_byte = 144, layout = A, length = 2, |a| {
-        call_slow!(op_load_local_0_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_acc!(10);
+        store_reg!(a, 10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_local_0_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_local_0_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4282,26 +4291,10 @@ pub extern "C" fn op_load_local_0_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_local_1_dsl, opcode_byte = 145, layout = A, length = 2, |a| {
-        call_slow!(op_load_local_1_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_local_fixed!(1 => 10);
+        store_reg!(a, 10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_local_1_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_local_1_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4311,26 +4304,10 @@ pub extern "C" fn op_load_local_1_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_local_2_dsl, opcode_byte = 146, layout = A, length = 2, |a| {
-        call_slow!(op_load_local_2_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_local_fixed!(2 => 10);
+        store_reg!(a, 10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_local_2_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_local_2_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================
@@ -4340,26 +4317,10 @@ pub extern "C" fn op_load_local_2_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_local_3_dsl, opcode_byte = 147, layout = A, length = 2, |a| {
-        call_slow!(op_load_local_3_slow_rs, args = [a]);
-        dispatch_after_slow!();
+        load_local_fixed!(3 => 10);
+        store_reg!(a, 10);
+        dispatch!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_local_3_slow_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let args = crate::vm::semantics::loads::OpLoadLocalArgs {
-        a: a as u16,
-        instruction_len: 2u32,
-    };
-    let outcome = crate::vm::semantics::loads::op_load_local_3_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
 }
 
 // =====================================================================

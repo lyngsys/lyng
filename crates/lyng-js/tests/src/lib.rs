@@ -59,3 +59,6 @@ mod op_load_const8_inline;
 
 #[cfg(test)]
 mod op_load_this_inline;
+
+#[cfg(test)]
+mod op_locals_inline;
