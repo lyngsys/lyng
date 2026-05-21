@@ -27,9 +27,9 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    bit_and_smi, call_slow, check_smi, cmp_branch_eq, decode_a, decode_ab, decode_abc,
-    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow, inc_smi_overflow,
-    load_acc, load_constant, load_local_fixed, load_reg, load_state_value,
+    bit_and_smi, call_slow, check_smi, cmp_branch_eq, dec_smi_overflow, decode_a, decode_ab,
+    decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    inc_smi_overflow, load_acc, load_constant, load_local_fixed, load_reg, load_state_value,
     load_uninit_lex_sentinel, mul_smi_overflow, shift_left_smi, shift_right_smi, store_acc,
     store_local_fixed, store_reg, sub_smi_overflow, tag_bool_const, tag_null, tag_smi,
     tag_smi_const, tag_smi_from_signed_byte, tag_undefined, untag_smi,
@@ -1967,9 +1967,50 @@ pub extern "C" fn op_increment_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_decrement_dsl, opcode_byte = 52, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        load_reg!(b => t0);
+        check_smi!(t0, .slow);
+        untag_smi!(t0);
+        dec_smi_overflow!(t0 => t1, .slow);
+        tag_smi!(t1);
+        store_reg!(a, t1);
+        // SMI fast-path elision: see op_increment. ToNumeric(SMI)==SMI so
+        // the semantic's writeback to src is idempotent for SMI src;
+        // non-SMI src takes slow path which still writes back.
+        call_slow!(op_decrement_record_smi_rs, args = [slot]);
+        dispatch_after_slow!();
+        .slow:
         call_slow!(op_decrement_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+/// Fast-path feedback-recording shim for `op_decrement`. Mirrors
+/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
+/// allocates the legacy vector at threshold, mirrors legacy state to
+/// the flat array, observes the tier feedback event. Returns
+/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
+/// op_decrement's encoded length without re-entering
+/// `op_decrement_semantic`.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_decrement_record_smi_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    feedback_slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: state is a valid LlIntState pointer for the duration of
+    // the call per the DSL-0b ABI contract on `from_raw`.
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    {
+        let inner = dispatch.dispatch_state();
+        let code = inner.code();
+        inner
+            .vm
+            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+    }
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
+        pc_advance: 6,
+    })
 }
 
 #[cfg(target_arch = "aarch64")]

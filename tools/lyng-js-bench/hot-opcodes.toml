@@ -211,7 +211,17 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "Decrement"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.C.3: inline DSL port landed. Budget = measured + 2.
+# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm
+# (27 instructions in the inline fast path through bl record_smi — identical
+# to op_increment because the two unary update ops share the same shape;
+# only the arith mnemonic differs (subs vs adds). `dec_smi_overflow!` uses
+# the `subs wD, wS, #1` immediate form (12-bit unsigned), no scratch-register
+# dance, 3 instructions total (subs + b.vs + sxtw). Overflow only at i32::MIN.
+# Slow-path-share measurement currently artificially 100% due to
+# call_slow! counter-injection artifact (Phase 1.C followup tracked
+# in the per-opcode report).
+aarch64_max_instructions = 29
 x86_64_max_instructions = 0
 
 [[opcodes]]
