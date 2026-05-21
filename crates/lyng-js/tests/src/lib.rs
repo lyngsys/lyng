@@ -65,3 +65,6 @@ mod op_locals_inline;
 
 #[cfg(test)]
 mod op_ldar_inline;
+
+#[cfg(test)]
+mod dsl_increment_writeback;
