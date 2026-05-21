@@ -168,3 +168,43 @@ macro_rules! bit_not_smi {
         )
     };
 }
+
+/// 32-bit signed increment by 1 with overflow detection.
+///
+/// `$src` is an untagged SMI (sign-extended i32 in the low 32 bits of an
+/// X-register). `$dst` receives the incremented payload sign-extended to
+/// i64. On overflow, branch to `$label` (slow path).
+///
+/// `adds wD, wS, #1` accepts a 12-bit unsigned immediate (`#1` is well
+/// within range), no scratch register needed. 3 instructions total:
+/// adds + b.vs + sxtw.
+#[macro_export]
+macro_rules! inc_smi_overflow {
+    ($src:tt => $dst:tt, $label:tt) => {
+        concat!(
+            "adds   w", stringify!($dst), ", w", stringify!($src), ", #1\n",
+            "b.vs   ", stringify!($label), "\n",
+            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+        )
+    };
+}
+
+/// 32-bit signed decrement by 1 with overflow detection.
+///
+/// `$src` is an untagged SMI; `$dst` receives the decremented payload
+/// sign-extended to i64. On overflow (only at `i32::MIN`), branch to
+/// `$label`.
+///
+/// `subs wD, wS, #1` accepts a 12-bit unsigned immediate (`#1` is well
+/// within range), no scratch register needed. 3 instructions total:
+/// subs + b.vs + sxtw.
+#[macro_export]
+macro_rules! dec_smi_overflow {
+    ($src:tt => $dst:tt, $label:tt) => {
+        concat!(
+            "subs   w", stringify!($dst), ", w", stringify!($src), ", #1\n",
+            "b.vs   ", stringify!($label), "\n",
+            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+        )
+    };
+}

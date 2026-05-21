@@ -156,6 +156,8 @@ sign-extended i64 ready for `tag_smi!`.
 | `ushift_right_smi!`    | `>>>` (logical) with low-5 mask                 | and + lsr + uxtw |
 | `neg_smi_overflow!`    | Negate; branch on `i32::MIN` overflow           | negs + b.vs + sxtw |
 | `bit_not_smi!`         | Bitwise NOT (in place)                          | mvn + sxtw |
+| `inc_smi_overflow!`    | Increment by 1 (12-bit imm); branch on overflow | adds + b.vs + sxtw |
+| `dec_smi_overflow!`    | Decrement by 1 (12-bit imm); branch on overflow | subs + b.vs + sxtw |
 
 ## Dispatch and slow-path bridge
 
