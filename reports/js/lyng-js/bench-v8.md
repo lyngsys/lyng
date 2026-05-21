@@ -8,7 +8,7 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 ## Configuration
 
-- Samples per benchmark: `5`
+- Samples per benchmark: `11`
 - Per-sample timeout: `120s`
 - lyng-js binary: `target/release/lyng-js`
 - V8 v7 sources: `testdata/js-benchmarks/v8-v7`
@@ -17,11 +17,11 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 | Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |
 | --- | ---: | ---: | ---: | ---: | :---: | ---: | --- |
-| `Richards` | `248` | `234` | `260` | `+6.0%` | ✗ | `14234.7` | 248, 242, 248, 249, 249 |
-| `DeltaBlue` | `294` | `277` | `310` | `+6.1%` | ✗ | `22489.1` | 293, 295, 294, 294, 295 |
-| `Crypto` | `271` | `236` | `265` | `+14.8%` | ✓ | `98221.8` | 271, 270, 271, 272, 272 |
-| `RayTrace` | `405` | `387` | `430` | `+4.7%` | ✗ | `182713.3` | 385, 402, 405, 407, 407 |
-| `NavierStokes` | `451` | `424` | `470` | `+6.4%` | ✗ | `329046.6` | 451, 450, 453, 448, 452 |
-| `Splay` | `1242` | `1198` | `1330` | `+3.7%` | ✗ | `6561.3` | 1235, 1252, 1242, 1233, 1271 |
+| `Richards` | `308` | `234` | `260` | `+31.6%` | ✓ | `11461.7` | 309, 308, 309, 308, 308, 310, 309, 307, 304, 310, 308 |
+| `DeltaBlue` | `337` | `277` | `310` | `+21.7%` | ✓ | `19619.6` | 337, 337, 337, 337, 337, 336, 334, 338, 336, 336, 337 |
+| `Crypto` | `278` | `236` | `265` | `+17.8%` | ✓ | `95748.6` | 278, 278, 277, 276, 276, 278, 278, 279, 278, 278, 278 |
+| `RayTrace` | `432` | `387` | `430` | `+11.6%` | ✓ | `171293.8` | 433, 431, 432, 430, 433, 428, 432, 432, 432, 431, 432 |
+| `NavierStokes` | `461` | `424` | `470` | `+8.7%` | ✗ | `321908.9` | 462, 461, 462, 458, 461, 460, 459, 463, 462, 461, 461 |
+| `Splay` | `1406` | `1198` | `1330` | `+17.4%` | ✓ | `5795.9` | 1408, 1396, 1403, 1408, 1410, 1404, 1406, 1406, 1404, 1406, 1408 |
 
 Baseline / target columns come from the Phase 1 exit-gate table in [jsc-aligned-engine-roadmap.md](jsc-aligned-engine-roadmap.md). Baseline = pre-Phase-1 score on the legacy match dispatcher; target = Phase 1 trampoline-cutover score gate (sub-9, `lyng-2wji`). `Δ vs baseline` is `(score − baseline) / baseline × 100%`; negative values are regressions.
