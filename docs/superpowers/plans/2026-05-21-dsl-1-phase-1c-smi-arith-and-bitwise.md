@@ -12,6 +12,79 @@
 
 ---
 
+## Bench tool CLI reference (read this first)
+
+Per `cargo run --release -p lyng-js-bench -- <subcommand> --help`, the actual CLIs are:
+
+**Microbench** — runs ALL opcodes from `hot-opcodes.toml`; filter output post-hoc.
+```bash
+# Check loadavg first (--require-isolation aborts if 1-min loadavg > 2.0):
+uptime
+cargo run --release -p lyng-js-bench -- microbench --require-isolation --samples 7 \
+  --output /tmp/microbench-<context>.md
+grep -A 1 "<OpcodeName>" /tmp/microbench-<context>.md  # extract specific opcode row
+```
+
+**Per-opcode slow-path-share** — requires `--count-opcodes --count-slow-path-share` (NOT `--require-isolation`; the v8suite subcommand doesn't accept that flag — manage loadavg manually by checking `uptime` before/after).
+```bash
+uptime  # verify loadavg <= 2.0 before starting
+cargo run --release -p lyng-js-bench -- v8suite --samples 5 \
+  --count-opcodes --count-slow-path-share \
+  --counts-json /tmp/v8-share-<context>.json \
+  --report /tmp/v8-counts-<context>.md
+uptime  # record loadavg at end too
+# Parse JSON to find per-opcode share:
+jq '.workloads[] | {name, opcodes: [.opcodes[] | select(.name == "<OpcodeName>")]}' /tmp/v8-share-<context>.json
+```
+
+**V8 v7 A/B between two binaries** — there is NO `ab` subcommand. The protocol from Phase 1.B.3 (see `reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md`) is:
+```bash
+# Build the base binary in a worktree
+git worktree add /tmp/wt-base <base-commit-sha>
+(cd /tmp/wt-base && cargo build --release -p lyng-js)
+cp /tmp/wt-base/target/release/lyng-js /tmp/lyng-js-base
+git worktree remove /tmp/wt-base
+
+# Record loadavg, then run v8suite against base binary
+uptime
+cargo run --release -p lyng-js-bench -- v8suite --samples 11 \
+  --lyng-bin /tmp/lyng-js-base \
+  --report /tmp/v8-base.md \
+  --json /tmp/v8-base.json
+uptime  # record loadavg at end
+
+# Build the post binary (current HEAD)
+cargo build --release -p lyng-js
+cp target/release/lyng-js /tmp/lyng-js-post
+
+# Record loadavg, run v8suite against post binary
+uptime
+cargo run --release -p lyng-js-bench -- v8suite --samples 11 \
+  --lyng-bin /tmp/lyng-js-post \
+  --report /tmp/v8-post.md \
+  --json /tmp/v8-post.json
+uptime
+
+# Write the A/B comparison markdown manually (use Phase 1.B.3 format):
+# - Capture 1m/5m/15m loadavg at start + end of each run
+# - Compute ±% overlap at the 5-min point
+# - Tabulate per-workload medians from /tmp/v8-base.md vs /tmp/v8-post.md
+# - Compute geomean delta
+# - Save to reports/js/lyng-js/dsl-1/phase-1c<N>-{ab-comparison|cumulative-ab}.md
+```
+
+**Asm baseline capture** — `asm-diff --check` doesn't auto-discover `dsl::handlers::cold::*` symbols (Phase 1.B followup), so each port task captures manually:
+```bash
+cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_<name>_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" \
+  > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_<name>.asm
+```
+
+Apply this reference whenever the per-task bench commands below appear — they're written in the same form.
+
+---
+
 ## File structure
 
 ### Modified files
