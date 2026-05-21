@@ -146,6 +146,31 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // ShiftRight: SMI fast-path arithmetic right shift (DSL-1 Phase
+    // 1.C.2 Task 7). Mirrors the ShiftLeft snippet's shape (two locals
+    // + `x >> y`) so the cross-opcode microbench A/B is directly
+    // comparable. `shift_right_smi!` emits 3 instructions (and + asr +
+    // sxtw) — the same length as `shift_left_smi!` because both shift
+    // ops mask the rhs to its low 5 bits per ECMAScript >> / ToUint32
+    // semantics. The distinction from op_unsigned_shift_right is in
+    // the shift mnemonic: `asr` is sign-preserving (matches `>>`),
+    // while `>>>` would use `lsr`. `y = 3` keeps the result well
+    // within the i32 range so the fast path stays armed.
+    map.insert("ShiftRight", Snippet {
+        opcode: "ShiftRight",
+        source: r"
+            function bench(iters) {
+                let x = 0;
+                let y = 3;
+                for (let i = 0; i < iters; i++) {
+                    x = i >> y;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 1,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",
