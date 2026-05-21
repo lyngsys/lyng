@@ -139,3 +139,61 @@ runtime-dispatch through the new substrate macros? If not, has
 substrate validation been explicitly deferred to a named follow-up
 sub-phase?" This is a process change, not a code change. Scope:
 ~10 minutes once the reviewer prompt template is identified.
+
+## 5. op_load_env_slot — deferred to a substrate sub-phase
+
+**Date deferred:** 2026-05-20 (Phase 1.B.3 brainstorming)
+
+**Reason:** The semantic body in `crates/lyng-js/vm/src/vm/semantics/scope.rs:81-110`
+requires:
+
+- Reading `frame.lexical_env()` (not mirrored on LlIntState today)
+- A variable-depth `environment_at_depth` walk
+- A loop-iteration-env linear scan even at depth 0
+- A slot read that can yield (`handle_dispatch_result`)
+
+This is substrate work (a Phase-1.B.1-style refactor with a new
+`frame_lexical_env` mirror on `LlIntState`), not a mechanical port.
+
+**Recommendation:** dedicated substrate sub-phase (proposed Phase
+1.B.4 or Phase 1.C.0) co-designed with `op_store_env_slot` and any
+other env-related work. The umbrella §1 criterion 1 floor of "9
+opcodes ported" is still met by Phase 1.B.3 (6 anchors + 3 pairs);
+LoadEnvSlot's deferral changes the *mix* of ports, not the count.
+
+**Estimated effort:** 3-4 days (mirror the Phase 1.B.1 frame-context
+refactor structure — define mirror field on `LlIntState`, populate
+in trampoline entry, refresh on every slow-path return, expose via
+a backend `load_lexical_env_at_depth!` macro, then port the inline
+LoadEnvSlot handler against it).
+
+## 6. StoreLocal0 functional unreachability
+
+**Date discovered:** 2026-05-20 (Phase 1.B.3 Task 1-4 implementation)
+
+**Finding:** The bytecode-builder peephole at
+`crates/lyng-js/bytecode/src/builder.rs:150-166`
+(`compact_move_instruction`) evaluates `Move dst=0, src=B` → `Ldar B`
+(line 159-161) BEFORE the `store_local_opcode` branch (line 162).
+Consequently, `StoreLocal0` cannot be emitted from compiled JS
+source; its inline port has 0 V8 v7 dispatches in practice.
+
+**Decision:** keep the inline port. The handler is correct and cheap
+(7 instructions), matches the symmetric pattern, and remains
+available for hand-crafted bytecode that legitimately needs
+StoreLocal0. Future cleanup could deprecate the opcode formally; not
+in scope for Phase 1.B.3.
+
+**Impact on Phase 1.B.3 metrics:** the umbrella's predicted ~1.38B
+aggregate dispatch share for the 9 ports becomes ~1.26B in practice
+(8 reachable opcodes). This does not affect the cumulative V8 v7
+gate (verified directly via the Phase 1.B.3 cumulative A/B against
+`d850f261`).
+
+**Proposed next step (optional, deferred):** Audit whether
+`Opcode::StoreLocal0 = 148` can be removed entirely. The peephole
+documents the unreachability through the emit pipeline, but a wider
+audit (parser → semantic-check → emit path enumeration; verify no
+hand-crafted bytecode test or future feature requires it) is
+required before deletion. Scope: ~1-2 hours once the audit is
+scheduled.
