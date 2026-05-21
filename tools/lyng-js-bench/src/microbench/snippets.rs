@@ -171,6 +171,28 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // Increment: SMI fast-path unary update (DSL-1 Phase 1.C.3 Task 9).
+    // The `for (let i = 0; i < iters; i++)` header drives one Increment
+    // per loop iteration via `i++`, and the body's `x++` drives a second
+    // one. `x` is reset to `0` each iter so it never escapes the SMI
+    // range; both increments hit the inline fast path on every iter.
+    // Two locals → 2 Increment dispatches per iter, declared via
+    // `opcodes_per_iter = 2`.
+    map.insert("Increment", Snippet {
+        opcode: "Increment",
+        source: r"
+            function bench(iters) {
+                let x = 0;
+                for (let i = 0; i < iters; i++) {
+                    x = 0;
+                    x++;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 2,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",

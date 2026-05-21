@@ -54,7 +54,18 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "Increment"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.C.3: inline DSL port landed. Budget = measured + 2.
+# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm
+# (27 instructions in the inline fast path through bl record_smi —
+# substantially shorter than the binary inline ports because op_increment
+# is unary: a single source register saves the rhs decode/check_smi/untag
+# triplet (1 ldr + 7 check_smi + 1 sxtw = 9 instructions). The `adds wD,
+# wS, #1` immediate form from inc_smi_overflow! keeps the increment core
+# at 3 instructions (adds + b.vs + sxtw).
+# Slow-path-share measurement currently artificially 100% due to
+# call_slow! counter-injection artifact (Phase 1.C followup tracked
+# in the per-opcode report).
+aarch64_max_instructions = 29
 x86_64_max_instructions = 0
 
 [[opcodes]]
