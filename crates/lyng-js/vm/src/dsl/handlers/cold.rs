@@ -19,9 +19,9 @@ use crate::{
     bit_and_smi, call_slow, check_smi, cmp_branch_eq, decode_a, decode_ab, decode_abc,
     decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow, load_acc,
     load_constant, load_local_fixed, load_reg, load_state_value, load_uninit_lex_sentinel,
-    mul_smi_overflow, store_acc, store_local_fixed, store_reg, sub_smi_overflow,
-    tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte,
-    tag_undefined, untag_smi,
+    mul_smi_overflow, shift_left_smi, store_acc, store_local_fixed, store_reg,
+    sub_smi_overflow, tag_bool_const, tag_null, tag_smi, tag_smi_const,
+    tag_smi_from_signed_byte, tag_undefined, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -1657,9 +1657,50 @@ pub extern "C" fn op_bit_not_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_shift_left_dsl, opcode_byte = 47, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        load_reg!(b => t0);
+        check_smi!(t0, .slow);
+        load_reg!(c => t1);
+        check_smi!(t1, .slow);
+        untag_smi!(t0);
+        untag_smi!(t1);
+        shift_left_smi!(t0, t1 => t2);
+        tag_smi!(t2);
+        store_reg!(a, t2);
+        call_slow!(op_shift_left_record_smi_rs, args = [slot]);
+        dispatch_after_slow!();
+        .slow:
         call_slow!(op_shift_left_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+/// Fast-path feedback-recording shim for `op_shift_left`. Mirrors
+/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
+/// allocates the legacy vector at threshold, mirrors legacy state to
+/// the flat array, observes the tier feedback event. Returns
+/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
+/// op_shift_left's encoded length without re-entering
+/// `op_shift_left_semantic`.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_shift_left_record_smi_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    feedback_slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: state is a valid LlIntState pointer for the duration of
+    // the call per the DSL-0b ABI contract on `from_raw`.
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    {
+        let inner = dispatch.dispatch_state();
+        let code = inner.code();
+        inner
+            .vm
+            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+    }
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
+        pc_advance: 6,
+    })
 }
 
 #[cfg(target_arch = "aarch64")]

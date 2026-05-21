@@ -211,7 +211,15 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "ShiftLeft"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.C.2: inline DSL port landed. Budget = measured + 2.
+# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm
+# (36 instructions in the inline fast path through bl record_smi —
+# +1 vs op_bit_and because shift_left_smi! is 3 instructions (and+lsl+sxtw)
+# vs bit_and_smi!'s 2 (and+sxtw). The extra `and w16, rhs, #0x1f` masks the
+# rhs to its low 5 bits per ECMAScript << / ToUint32 semantics).
+# Slow-path-share measurement currently artificially 100% due to
+# call_slow! counter-injection artifact (Phase 1.C followup).
+aarch64_max_instructions = 38
 x86_64_max_instructions = 0
 
 [[opcodes]]

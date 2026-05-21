@@ -122,6 +122,30 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // ShiftLeft: SMI fast-path left shift (DSL-1 Phase 1.C.2 Task 6).
+    // Two locals + `x << y` keeps the rhs as a register (ShiftLeft) —
+    // no ShiftLeftSmi peephole exists in the bytecode-builder so a
+    // literal-RHS form would still emit ShiftLeft, but two locals
+    // mirror the BitAnd snippet's shape for direct A/B comparison.
+    // `shift_left_smi!` emits 3 instructions (and + lsl + sxtw) — one
+    // more than `bit_and_smi!` because ECMAScript `<<` masks the rhs
+    // to its low 5 bits. `y = 3` is a small SMI shift that keeps the
+    // result well within the i32 range so the fast path stays armed.
+    map.insert("ShiftLeft", Snippet {
+        opcode: "ShiftLeft",
+        source: r"
+            function bench(iters) {
+                let x = 0;
+                let y = 3;
+                for (let i = 0; i < iters; i++) {
+                    x = i << y;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 1,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",
