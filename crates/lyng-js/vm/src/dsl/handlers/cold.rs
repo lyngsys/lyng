@@ -1077,6 +1077,8 @@ pub extern "C" fn op_sub_record_smi_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
     feedback_slot: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: state is a valid LlIntState pointer for the duration of
+    // the call per the DSL-0b ABI contract on `from_raw`.
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
     {
