@@ -135,12 +135,16 @@ Ltmp18:
 // `bl _op_mul_record_smi_rs` inclusive): 40 instructions.
 //
 // Compared to op_sub (36 insns): +4 for mul-specific work —
-//   • mul_smi_overflow! is 4 insns (smull + sxtw + cmp + b.ne) vs
-//     sub_smi_overflow! 3 insns (subs + b.vs + sxtw)         → +1
-//   • Negative-zero deferral adds 3 insns (cbnz + orr + tbnz)
-//     so the SMI fast-path returns IEEE-754 `-0` via the slow
-//     path on (-1)*0 / 0*(-1) etc., matching `smi_mul_result`
-//     in vm/dispatch/arithmetic.rs                            → +3
+//   • mul_smi_overflow! is 7 insns (smull + sxtw + cmp + b.ne +
+//     cbnz + orr + tbnz) vs sub_smi_overflow! 3 insns
+//     (subs + b.vs + sxtw)                                    → +4
+//
+// The +4 delta breaks down as +1 for the multiply-overflow shape
+// (smull+sxtw+cmp+b.ne vs adds+b.vs+sxtw) and +3 for the
+// negative-zero deferral (cbnz+orr+tbnz) so the SMI fast path
+// bails to slow on (-1)*0 / 0*(-1) / etc. — matching
+// `smi_mul_result` in vm/dispatch/arithmetic.rs which returns
+// `None` for the same cases.
 //
 // The decode / check_smi / untag / tag / store / record_smi /
 // dispatch fragments are byte-for-byte identical to op_sub and
