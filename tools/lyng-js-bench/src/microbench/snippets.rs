@@ -101,6 +101,27 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // BitAnd: SMI fast-path bitwise AND (DSL-1 Phase 1.C.2 Task 5).
+    // Two locals + `x & y` keeps the rhs as a register (BitAnd) rather
+    // than collapsing to `BitAndSmi` for a literal RHS. `bit_and_smi!`
+    // has no overflow branch so the fast path is shorter than op_sub's
+    // by one instruction. `x` is reset each iteration to a positive SMI
+    // so the SMI fast path stays armed indefinitely.
+    map.insert("BitAnd", Snippet {
+        opcode: "BitAnd",
+        source: r"
+            function bench(iters) {
+                let x = 0;
+                let y = 31;
+                for (let i = 0; i < iters; i++) {
+                    x = i & y;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 1,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",

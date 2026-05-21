@@ -198,7 +198,14 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "BitAnd"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.C.2: inline DSL port landed. Budget = measured + 2.
+# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm
+# (35 instructions in the inline fast path through bl record_smi —
+# 1 fewer than op_sub because bit_and_smi! has no overflow branch
+# (and + sxtw, vs sub_smi_overflow!'s subs + b.vs + sxtw)).
+# Slow-path-share measurement currently artificially 100% due to
+# call_slow! counter-injection artifact (Phase 1.C followup).
+aarch64_max_instructions = 37
 x86_64_max_instructions = 0
 
 [[opcodes]]
