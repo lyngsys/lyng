@@ -1532,7 +1532,10 @@ llint_handler! {
 /// Fast-path feedback-recording shim for `op_bit_and`. Mirrors
 /// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
 /// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event.
+/// the flat array, observes the tier feedback event. Returns
+/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
+/// op_bit_and's encoded length without re-entering
+/// `op_bit_and_semantic`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_bit_and_record_smi_rs(
