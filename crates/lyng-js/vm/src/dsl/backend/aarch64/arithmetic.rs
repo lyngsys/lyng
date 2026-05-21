@@ -46,11 +46,23 @@ macro_rules! sub_smi_overflow {
     };
 }
 
-/// 32-bit signed multiply with overflow detection.
+/// 32-bit signed multiply with overflow detection AND negative-zero
+/// deferral.
 ///
 /// AArch64 has no W-form `muls`; we compute the full 64-bit product
 /// via `smull` (sign-extend lhs/rhs to 64 bits, multiply), then check
 /// that the 64-bit result equals its sign-extended 32-bit form.
+///
+/// ECMAScript multiplication requires `(-1) * 0` (and symmetric cases)
+/// to yield `-0`, which the SMI tag cannot represent (SMI `0` is `+0`).
+/// We mirror `smi_mul_result` in `vm/dispatch/arithmetic.rs`: if the
+/// product is zero AND either operand was negative, branch to `$label`
+/// so the slow path returns the IEEE-754 `-0` Number value.
+///
+/// 7 instructions total: smull + sxtw + cmp + b.ne + cbnz + orr +
+/// tbnz. The `cbnz` short-circuits when the product is non-zero
+/// (the common case), so the negative-zero check only costs 3 extra
+/// instructions in the rare zero-product path.
 #[macro_export]
 macro_rules! mul_smi_overflow {
     ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
@@ -62,6 +74,15 @@ macro_rules! mul_smi_overflow {
             // Overflow if sign-extended low 32 bits != full 64-bit product.
             "cmp    x", stringify!($dst), ", x16\n",
             "b.ne   ", stringify!($label), "\n",
+            // Negative-zero deferral: product == 0 AND (lhs | rhs) < 0
+            // implies one operand was negative and the other zero — the
+            // ECMAScript -0 result that SMI can't carry. The `cbnz`
+            // short-circuits the common non-zero case so we only pay the
+            // orr + tbnz when the product is exactly zero.
+            "cbnz   w", stringify!($dst), ", 8f\n",
+            "orr    w16, w", stringify!($lhs), ", w", stringify!($rhs), "\n",
+            "tbnz   w16, #31, ", stringify!($label), "\n",
+            "8:\n",
         )
     };
 }

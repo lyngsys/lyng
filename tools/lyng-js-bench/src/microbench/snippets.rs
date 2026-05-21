@@ -79,6 +79,28 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // Mul: SMI fast-path arithmetic (DSL-1 Phase 1.C.1 Task 3).
+    // Two locals + `x * y` keeps the rhs as a register (Mul) rather
+    // than collapsing to `MulSmi` for a literal RHS. The reduction
+    // (`x = (x * y) | 0`) keeps `x` bounded as a 32-bit signed int
+    // so the SMI fast path can stay on every iteration; the trailing
+    // `| 0` emits a `BitOr` per iter but it executes the inline shape
+    // and is excluded from the per-opcode timing (we measure Mul).
+    map.insert("Mul", Snippet {
+        opcode: "Mul",
+        source: r"
+            function bench(iters) {
+                let x = 1;
+                let y = 3;
+                for (let i = 0; i < iters; i++) {
+                    x = (x * y) | 0;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 1,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",

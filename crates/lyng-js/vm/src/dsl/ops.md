@@ -147,7 +147,7 @@ sign-extended i64 ready for `tag_smi!`.
 | ---------------------- | ----------------------------------------------- | ---- |
 | `add_smi_overflow!`    | 32-bit signed add; branch on overflow           | adds + b.vs + sxtw |
 | `sub_smi_overflow!`    | 32-bit signed sub; branch on overflow           | subs + b.vs + sxtw |
-| `mul_smi_overflow!`    | Widening signed multiply + overflow check       | smull + sxtw + cmp + b.ne |
+| `mul_smi_overflow!`    | Widening signed multiply + overflow + -0 defer  | smull + sxtw + cmp + b.ne + cbnz + orr + tbnz |
 | `bit_and_smi!`         | 32-bit bitwise AND                              | and + sxtw |
 | `bit_or_smi!`          | 32-bit bitwise OR                               | orr + sxtw |
 | `bit_xor_smi!`         | 32-bit bitwise XOR                              | eor + sxtw |
