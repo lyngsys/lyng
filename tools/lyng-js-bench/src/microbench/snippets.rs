@@ -61,6 +61,24 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         opcodes_per_iter: 1,
     });
 
+    // Sub: SMI fast-path arithmetic (DSL-1 Phase 1.C.1).
+    // Two locals + `x - y` keeps the rhs as a register (Sub) rather
+    // than collapsing to `SubSmi` for a literal RHS.
+    map.insert("Sub", Snippet {
+        opcode: "Sub",
+        source: r"
+            function bench(iters) {
+                let x = 0;
+                let y = 1;
+                for (let i = 0; i < iters; i++) {
+                    x = x - y;
+                }
+                return x;
+            }
+        ",
+        opcodes_per_iter: 1,
+    });
+
     // GetNamedProperty: monomorphic property read.
     map.insert("GetNamedProperty", Snippet {
         opcode: "GetNamedProperty",

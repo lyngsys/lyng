@@ -219,7 +219,10 @@ x86_64_max_instructions = 0
 [[opcodes]]
 name = "Sub"
 target_slow_path_share = 0.20
-aarch64_max_instructions = 0
+# DSL-1 Phase 1.C.1: inline DSL port landed. Budget = measured + 2.
+# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm
+# (36 instructions in the inline fast path through bl record_smi).
+aarch64_max_instructions = 38
 x86_64_max_instructions = 0
 
 [[opcodes]]
