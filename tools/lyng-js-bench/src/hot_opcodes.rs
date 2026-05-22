@@ -116,7 +116,21 @@ mod tests {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("hot-opcodes.toml");
         let config = HotOpcodesConfig::load(&path).expect("load");
-        assert!(config.opcodes.len() >= 25, "expected at least 25 hot opcodes, got {}", config.opcodes.len());
-        assert!(config.opcodes.len() <= 35, "expected at most 35 hot opcodes, got {}", config.opcodes.len());
+        // The hot-opcodes.toml tracks the top-30 V8 v7 opcodes plus any
+        // macro-shared symmetric pairs deemed in-scope by per-phase
+        // retrospectives. Phase 1.A landed 7 ports (including 5 adjacent-
+        // family completions under the pre-rule); Phase 1.B added 9 + 2
+        // backfill; Phase 1.C added 7; current count is 37. Upper bound
+        // accommodates ~5 more for Phase 1.D + opportunistic pickups.
+        assert!(
+            config.opcodes.len() >= 25,
+            "expected at least 25 hot opcodes, got {}",
+            config.opcodes.len()
+        );
+        assert!(
+            config.opcodes.len() <= 45,
+            "expected at most 45 hot opcodes (top-30 + ~15 macro-shared/adjacent), got {}",
+            config.opcodes.len()
+        );
     }
 }
