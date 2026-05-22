@@ -127,6 +127,25 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let label_prefix = format!("L{name}__");
     let mut shim_names: BTreeSet<String> = BTreeSet::new();
     let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
+    // Track whether we've crossed the first `.label:` declaration. The
+    // counter-injection discipline differs for `call_slow!` before vs
+    // after the first label (DSL-1 Phase 1.C followup #1):
+    //
+    // - `call_slow!` BEFORE any label: these are fast-path tail
+    //   invocations (e.g. `call_slow!(op_xxx_record_smi_rs, args = [slot])`
+    //   for feedback recording). They run on every successful inline
+    //   dispatch, NOT just on slow-path entry. Injecting
+    //   `opcode_byte = N` here would emit `inc_slow_semantic_counter!`
+    //   on every dispatch and falsely report ~100% slow-path-share for
+    //   every record-smi-shim opcode (op_add, all Phase 1.C ports).
+    // - `call_slow!` AFTER the first label: these are inside a label
+    //   scope (typically `.slow:`), executed only when the fast path
+    //   bails. Counter-injection here is semantically correct.
+    //
+    // `poll_safepoint!` is unaffected — its asm shape uses a runtime
+    // `cbz`/`cbnz` so the counter-bump fires only on the pending-poll
+    // branch regardless of label position; injection is safe everywhere.
+    let mut seen_label = false;
     for stmt in &ast.body {
         match stmt {
             BodyStmt::MacroCall(tokens) => {
@@ -138,7 +157,13 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // `inc_slow_safepoint_counter!(N)` for slow-path-share
                 // accounting. Idempotent — if the user already wrote
                 // `opcode_byte = N` explicitly, the injection is skipped.
-                let injected = inject_opcode_byte(tokens.clone(), opcode_byte);
+                //
+                // `gate_call_slow = !seen_label` suppresses injection
+                // into `call_slow!` invocations on the fast-path tail
+                // (before any `.label:`) to avoid double-counting fast
+                // path record-smi shim calls as slow-path entries.
+                let injected =
+                    inject_opcode_byte(tokens.clone(), opcode_byte, !seen_label);
                 let rewritten = substitute_idents(injected, &mut scratch, &label_prefix)?;
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
@@ -146,6 +171,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             BodyStmt::Label(name) => {
                 let asm = format!("{label_prefix}{name}:\n");
                 body_tokens.push(quote! { #asm });
+                seen_label = true;
             }
         }
     }
@@ -311,10 +337,25 @@ fn substitute_idents(
 /// the invocation. This keeps the rewrite idempotent and allows hand
 /// override during testing.
 ///
+/// `gate_call_slow` controls whether `call_slow!` injection is
+/// suppressed. The caller (`lower_handler`) sets this to `true` for
+/// statements emitted BEFORE the first `.label:` declaration — those
+/// `call_slow!`s are fast-path tail invocations (e.g. record-smi shim
+/// calls for feedback recording) and must not be counted as slow-path
+/// semantic entries. When `gate_call_slow` is `true`, only
+/// `poll_safepoint!` invocations receive injection (their asm shape
+/// branches on a runtime flag, so counter-bumping is naturally
+/// fast-path-safe — see `safepoint.rs`). When `false`, both macros are
+/// rewritten (the original DSL-1 Phase 1.B.0 Task 5 behavior).
+///
 /// Each statement passed in is a single macro call of the shape
 /// `<path>!(<args>)`, but we still recurse into groups so any nested
 /// invocations are also rewritten.
-fn inject_opcode_byte(tokens: TokenStream, opcode_byte: &LitInt) -> TokenStream {
+fn inject_opcode_byte(
+    tokens: TokenStream,
+    opcode_byte: &LitInt,
+    gate_call_slow: bool,
+) -> TokenStream {
     let trees: Vec<TokenTree> = tokens.into_iter().collect();
     let mut out: Vec<TokenTree> = Vec::with_capacity(trees.len());
     let mut i = 0;
@@ -326,14 +367,20 @@ fn inject_opcode_byte(tokens: TokenStream, opcode_byte: &LitInt) -> TokenStream 
             _ => {
                 // Recurse into groups (e.g. macro args that themselves
                 // contain nested invocations — rare but defensive).
-                out.push(rewrite_group(trees[i].clone(), opcode_byte));
+                out.push(rewrite_group(trees[i].clone(), opcode_byte, gate_call_slow));
                 i += 1;
                 continue;
             }
         };
-        let is_target = name == "call_slow" || name == "poll_safepoint";
+        // `call_slow!` is suppressed when `gate_call_slow` (fast-path
+        // tail); `poll_safepoint!` is always a candidate.
+        let is_target = match name.as_str() {
+            "call_slow" => !gate_call_slow,
+            "poll_safepoint" => true,
+            _ => false,
+        };
         if !is_target {
-            out.push(rewrite_group(trees[i].clone(), opcode_byte));
+            out.push(rewrite_group(trees[i].clone(), opcode_byte, gate_call_slow));
             i += 1;
             continue;
         }
@@ -380,11 +427,14 @@ fn inject_opcode_byte(tokens: TokenStream, opcode_byte: &LitInt) -> TokenStream 
 }
 
 /// Recurse into a TokenTree::Group, applying `inject_opcode_byte` to
-/// the inner stream. Non-group trees pass through unchanged.
-fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt) -> TokenTree {
+/// the inner stream. Non-group trees pass through unchanged. The
+/// `gate_call_slow` flag is propagated so the label-scope discipline is
+/// preserved inside nested groups (a `call_slow!` nested inside another
+/// macro's args still respects the fast-path-tail suppression).
+fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt, gate_call_slow: bool) -> TokenTree {
     match tt {
         TokenTree::Group(g) => {
-            let inner = inject_opcode_byte(g.stream(), opcode_byte);
+            let inner = inject_opcode_byte(g.stream(), opcode_byte, gate_call_slow);
             TokenTree::Group(Group::new(g.delimiter(), inner))
         }
         other => other,
@@ -440,5 +490,166 @@ fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
         if let TokenTree::Group(g) = tt {
             collect_shim_names(&g.stream(), out);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Token-level unit tests for `inject_opcode_byte`'s label-scope
+    //! discipline (DSL-1 Phase 1.C followup #1).
+    //!
+    //! The lowerer can't be exercised end-to-end here — proc-macro
+    //! crates can only emit tokens for downstream crates to compile —
+    //! but the `inject_opcode_byte` helper operates on
+    //! `proc_macro2::TokenStream` and is fully testable in-crate.
+    //!
+    //! Strategy: parse a representative macro-call statement, run it
+    //! through `inject_opcode_byte` with both `gate_call_slow` settings,
+    //! and assert the presence/absence of the `opcode_byte = N` named
+    //! arg in the output stream. This mirrors what the lowerer does
+    //! before each `BodyStmt::MacroCall` is spliced into `naked_asm!`.
+    use super::*;
+    use proc_macro2::TokenStream;
+    use syn::LitInt;
+
+    /// Returns `true` if the output stream contains a top-level
+    /// `opcode_byte` ident (the marker for "injection happened").
+    /// Mirrors `arg_group_has_opcode_byte` but walks the OUTER stream —
+    /// the helper emits `call_slow ! ( ... , opcode_byte = N )` so the
+    /// marker sits inside the parenthesized arg group.
+    fn output_has_opcode_byte_for(name: &str, tokens: &TokenStream) -> bool {
+        let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
+        for i in 0..trees.len() {
+            let TokenTree::Ident(id) = &trees[i] else { continue };
+            if id != name {
+                continue;
+            }
+            let Some(TokenTree::Punct(p)) = trees.get(i + 1) else { continue };
+            if p.as_char() != '!' {
+                continue;
+            }
+            let Some(TokenTree::Group(g)) = trees.get(i + 2) else { continue };
+            if g.delimiter() != Delimiter::Parenthesis {
+                continue;
+            }
+            if arg_group_has_opcode_byte(g.stream()) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn lit31() -> LitInt {
+        syn::parse_str("31").expect("parse u8 literal")
+    }
+
+    #[test]
+    fn fast_path_call_slow_skipped_when_gated() {
+        // The shape of a record-smi shim invocation as it appears in
+        // an op_add-style fast-path tail: `call_slow!(shim, args = [slot])`.
+        let tokens: TokenStream =
+            syn::parse_str("call_slow!(op_add_record_smi_rs, args = [slot])")
+                .expect("parse fast-path call_slow!");
+        let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ true);
+        assert!(
+            !output_has_opcode_byte_for("call_slow", &rewritten),
+            "fast-path `call_slow!` must NOT receive `opcode_byte = N` \
+             when gate_call_slow is true (would over-count slow-path \
+             semantic entries). Got: {}",
+            rewritten,
+        );
+    }
+
+    #[test]
+    fn slow_path_call_slow_injected_when_not_gated() {
+        // The slow-path call_slow inside a `.slow:` label scope. The
+        // lowerer flips `gate_call_slow` to `false` once it has seen
+        // any `BodyStmt::Label`.
+        let tokens: TokenStream =
+            syn::parse_str("call_slow!(op_add_slow_rs, args = [a, b, c, slot])")
+                .expect("parse slow-path call_slow!");
+        let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ false);
+        assert!(
+            output_has_opcode_byte_for("call_slow", &rewritten),
+            "slow-path `call_slow!` MUST receive `opcode_byte = N` \
+             when gate_call_slow is false (correctly counts a slow \
+             entry). Got: {}",
+            rewritten,
+        );
+    }
+
+    #[test]
+    fn poll_safepoint_always_injected() {
+        // `poll_safepoint!` is structurally fast-path-safe: the
+        // counter-bump emission sits behind a runtime `cbz`/`cbnz`
+        // branch on `vm.poll_pending`. Injection is correct in both
+        // pre- and post-label contexts.
+        let tokens: TokenStream = syn::parse_str("poll_safepoint!(.poll_pending)")
+            .expect("parse poll_safepoint!");
+        let gated = inject_opcode_byte(tokens.clone(), &lit31(), true);
+        let ungated = inject_opcode_byte(tokens, &lit31(), false);
+        assert!(
+            output_has_opcode_byte_for("poll_safepoint", &gated),
+            "`poll_safepoint!` should be rewritten even when \
+             gate_call_slow is true. Got: {}",
+            gated,
+        );
+        assert!(
+            output_has_opcode_byte_for("poll_safepoint", &ungated),
+            "`poll_safepoint!` should be rewritten when \
+             gate_call_slow is false. Got: {}",
+            ungated,
+        );
+    }
+
+    #[test]
+    fn idempotent_when_opcode_byte_already_present() {
+        // Hand-written call sites can opt out by spelling
+        // `opcode_byte = N` explicitly. The injection must be a no-op
+        // in both gating modes.
+        let tokens: TokenStream = syn::parse_str(
+            "call_slow!(op_add_slow_rs, args = [a, b, c, slot], opcode_byte = 99)",
+        )
+        .expect("parse call_slow! with explicit opcode_byte");
+        let rewritten = inject_opcode_byte(tokens.clone(), &lit31(), false);
+        // The output stream should still contain exactly one
+        // `opcode_byte = 99` (no duplicate `opcode_byte = 31` appended).
+        let s = rewritten.to_string();
+        let count_99 = s.matches("opcode_byte = 99").count();
+        let count_31 = s.matches("opcode_byte = 31").count();
+        assert_eq!(
+            count_99, 1,
+            "explicit opcode_byte = 99 should pass through unchanged. \
+             Got: {}",
+            s,
+        );
+        assert_eq!(
+            count_31, 0,
+            "lowerer must not inject a second opcode_byte when the \
+             user already spelled one. Got: {}",
+            s,
+        );
+    }
+
+    #[test]
+    fn non_target_macros_pass_through_unchanged() {
+        // `dispatch!()`, `check_smi!(...)`, etc. should not be
+        // rewritten by either gating mode.
+        let tokens: TokenStream =
+            syn::parse_str("check_smi!(t0, .slow)").expect("parse check_smi!");
+        let gated = inject_opcode_byte(tokens.clone(), &lit31(), true);
+        let ungated = inject_opcode_byte(tokens, &lit31(), false);
+        assert!(
+            !output_has_opcode_byte_for("check_smi", &gated),
+            "`check_smi!` should never receive opcode_byte injection. \
+             Got: {}",
+            gated,
+        );
+        assert!(
+            !output_has_opcode_byte_for("check_smi", &ungated),
+            "`check_smi!` should never receive opcode_byte injection. \
+             Got: {}",
+            ungated,
+        );
     }
 }
