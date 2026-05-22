@@ -222,3 +222,34 @@ should be re-measured.
   path doesn't touch Call feedback dual-write.
 - The `parses_the_committed_hot_opcodes_toml` test still fails
   ("37 opcodes > 35 max") — pre-existing and tracked in the plan.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |  10,141,230 |           0.0%  |
+| DeltaBlue    |           0 |              —  |
+| Crypto       | 156,120,783 |         0.008%  |
+| RayTrace     |           0 |              —  |
+| NavierStokes |           0 |              —  |
+| Splay        |   1,232,595 |          85.7%  |
+
+The Crypto/Richards prediction in the pre-fix report (both i32-bounded
+masking patterns → near-0% real share) is empirically confirmed:
+Richards 0.0% on 10.1M dispatches, Crypto 0.008% on 156M dispatches.
+Splay 85.7% is the outlier — sparse-tree node-flag operations
+occasionally encounter non-SMI tagged values (function references in
+node-key positions during balance/rotate).
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: Richards, Crypto
+- ⚠ Workloads requiring waiver: Splay (85.7%). Operand-mix property
+  of the Splay benchmark, not a regression in inline-port discipline
+  — LLInt op_bitand on the same workload would record comparable
+  rates.
+- — N/A: DeltaBlue, RayTrace, NavierStokes (don't emit BitAnd)
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

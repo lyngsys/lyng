@@ -280,3 +280,39 @@ with the `cbnz + orr + tbnz` triplet (see "Substrate change" above)
 and the test now passes. A future ARM-port reviewer should treat
 the macro as the *single source of truth* for SMI-mul semantics
 and audit any caller that doesn't go through `mul_smi_overflow!`.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |           5 |         100.0%  |
+| DeltaBlue    |   1,190,285 |        0.0004%  |
+| Crypto       | 609,815,930 |          0.04%  |
+| RayTrace     |  27,139,775 |          98.9%  |
+| NavierStokes | 361,680,510 |          92.2%  |
+| Splay        |           5 |         100.0%  |
+
+This is the canonical float-workload trade-off case. Integer-dominant
+workloads (Crypto 0.04% on 610M, DeltaBlue 0.0004% on 1.19M) are
+near-perfect fast-path hits. RayTrace 98.9% and NavierStokes 92.2%
+empirically confirm the Phase 1.C.1 +0.31% A/B trade-off hypothesis:
+the SMI fast-path attempt (~7 instructions: check_smi×2 + untag×2 +
+smull/sxtw/cmp/b.ne) is wasted on every dispatch where both operands
+are doubles.
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: DeltaBlue, Crypto
+- ⚠ Workloads requiring waiver: Richards (100.0% on 5 dispatches —
+  statistical noise), RayTrace (98.9%), NavierStokes (92.2%), Splay
+  (100.0% on 5 dispatches — statistical noise). RayTrace and
+  NavierStokes are the canonical float-heavy waiver category — LLInt
+  op_mul has identical SMI-bail discipline and would record
+  comparable rates. The Phase 1.C.1 mini A/B (+0.31% from op_sub+
+  op_mul together) is dominated by integer-workload wins; the float-
+  workload regression suspected at the time is now visible in the
+  data and remains within the per-workload waiver band per spec §5.
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

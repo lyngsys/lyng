@@ -350,3 +350,30 @@ identical shape with op_increment (only `subs` vs `adds` differs).
    slices + asm shape inspection confirm `dec_smi_overflow!` behaves
    correctly. With both unary macros now validated, the Phase 1.C.0
    substrate is fully runtime-verified.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |     869,000 |           0.0%  |
+| DeltaBlue    |           0 |              —  |
+| Crypto       | 169,640,647 |           0.6%  |
+| RayTrace     |           0 |              —  |
+| NavierStokes |         155 |           0.0%  |
+| Splay        |           0 |              —  |
+
+The single-operand SMI fast path with `dec_smi_overflow!`
+(subs w,w,#1 + b.vs to .slow) hits reliably. Crypto's 0.6% share is
+the largest among emitting workloads but still well within the
+<20% gate. NavierStokes 155 dispatches is statistical noise.
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: Richards, Crypto, NavierStokes
+  (all emitting workloads gate-clean)
+- ⚠ Workloads requiring waiver: none
+- — N/A: DeltaBlue, RayTrace, Splay (don't emit Decrement)
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

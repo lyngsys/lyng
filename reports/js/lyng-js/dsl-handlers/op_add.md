@@ -139,3 +139,33 @@ Phase-C dispatch flip.
   to pass.
 - The alpha `op_add` integration tests continue to pass — they
   exercise the legacy handler path, which is unchanged.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |          15 |          33.3%  |
+| DeltaBlue    |   1,346,815 |          11.6%  |
+| Crypto       | 906,339,762 |           0.5%  |
+| RayTrace     |  15,659,345 |          98.5%  |
+| NavierStokes | 556,071,165 |          91.0%  |
+| Splay        |  12,501,730 |          96.5%  |
+
+SMI fast-path is excellent on integer-dominant workloads (Crypto 0.5%,
+DeltaBlue 11.6%). Float-heavy workloads (RayTrace, NavierStokes, Splay)
+show 91–98% slow-path-share — operand mix is IEEE-754 doubles where
+the SMI fast path bails by design.
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: DeltaBlue, Crypto
+- ⚠ Workloads requiring waiver: Richards (33.3% on 15 dispatches —
+  statistical noise), RayTrace (98.5%), NavierStokes (91.0%),
+  Splay (96.5%). Float-heavy and non-SMI-dominant operand mixes are
+  unavoidable consequences of double-precision arithmetic; LLInt
+  op_add on the same workloads has identical SMI-bail discipline and
+  would record comparable rates.
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

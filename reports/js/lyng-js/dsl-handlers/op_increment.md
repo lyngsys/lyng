@@ -328,3 +328,32 @@ instr).
    is the first runtime consumer of `inc_smi_overflow!`, and all
    tests + Test262 slices + asm shape inspection confirm the macro
    behaves correctly.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |   4,451,902 |           0.0%  |
+| DeltaBlue    |   8,311,175 |           0.0%  |
+| Crypto       | 306,624,722 |        0.0003%  |
+| RayTrace     |   2,389,605 |           0.0%  |
+| NavierStokes | 588,989,880 |           0.0%  |
+| Splay        |     217,791 |           0.0%  |
+
+The single-operand SMI fast path with `inc_smi_overflow!`
+(adds w,w,#1 + b.vs to .slow) is essentially never missed in
+practice — loop counters and array indexes overwhelmingly stay
+i32-bounded. Across 911M total dispatches on 6 workloads, only 859
+hit the slow path (all in Crypto). This is the cleanest opcode
+result in Phase 1.C.
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: Richards, DeltaBlue, Crypto,
+  RayTrace, NavierStokes, Splay (all 6 workloads gate-clean)
+- ⚠ Workloads requiring waiver: none
+- — N/A: none
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

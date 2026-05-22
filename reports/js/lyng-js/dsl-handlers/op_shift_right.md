@@ -255,3 +255,30 @@ section should be re-measured.
   Call feedback dual-write.
 - The `parses_the_committed_hot_opcodes_toml` test still fails
   ("37 opcodes > 35 max") — pre-existing and tracked in the plan.
+
+## Post-fix slow-path-share update (2026-05-22)
+
+After Phase 1.C followup #1 substrate fix at commit `47fc5061`, slow-
+path-share re-measured with honest counter-injection discipline:
+
+| Workload     | Dispatches  | Slow-path-share |
+|--------------|------------:|----------------:|
+| Richards     |     868,131 |           0.0%  |
+| DeltaBlue    |           0 |              —  |
+| Crypto       | 456,364,366 |         0.008%  |
+| RayTrace     |       4,200 |           0.0%  |
+| NavierStokes |           0 |              —  |
+| Splay        |           0 |              —  |
+
+The i32-bounded shift-right pattern (SHA/TEA-style accumulator
+operations) stays on the SMI fast path almost perfectly. All three
+emitting workloads measure < 0.01% slow-path-share — a clean win
+across the board.
+
+Per-workload gate status per spec §1.6 + §5:
+- ✅ Workloads meeting <20% gate: Richards, Crypto, RayTrace (all
+  emitting workloads meet the gate cleanly)
+- ⚠ Workloads requiring waiver: none
+- — N/A: DeltaBlue, NavierStokes, Splay (don't emit ShiftRight)
+
+See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
