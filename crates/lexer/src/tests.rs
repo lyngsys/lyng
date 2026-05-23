@@ -236,66 +236,22 @@ fn raw_multibyte_identifier_start_and_continue_are_lexed_as_one_identifier() {
 // =========================================================================
 
 #[test]
-fn decimal_integers() {
-    let tok = lex_single("42");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 42.0);
-}
-
-#[test]
-fn decimal_float() {
-    let tok = lex_single("2.5");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 2.5);
-}
-
-#[test]
-fn decimal_exponent() {
-    let tok = lex_single("1e10");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 1e10);
-}
-
-#[test]
-fn decimal_negative_exponent() {
-    let tok = lex_single("5e-3");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 5e-3);
-}
-
-#[test]
-fn hex_literal() {
-    let tok = lex_single("0xFF");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 255.0);
-}
-
-#[test]
-fn octal_literal() {
-    let tok = lex_single("0o77");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 63.0);
-}
-
-#[test]
-fn binary_literal() {
-    let tok = lex_single("0b1010");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 10.0);
-}
-
-#[test]
-fn numeric_separators() {
-    let tok = lex_single("1_000_000");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 1_000_000.0);
-}
-
-#[test]
-fn hex_with_separators() {
-    let tok = lex_single("0xFF_FF");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 0xFFFF as f64);
+fn numeric_literal_forms() {
+    for &(input, expected) in &[
+        ("42", 42.0),
+        ("2.5", 2.5),
+        ("1e10", 1e10),
+        ("5e-3", 5e-3),
+        ("0xFF", 255.0),
+        ("0o77", 63.0),
+        ("0b1010", 10.0),
+        ("1_000_000", 1_000_000.0),
+        ("0xFF_FF", 0xFFFF as f64),
+    ] {
+        let tok = lex_single(input);
+        assert_eq!(tok.kind, TokenKind::NumericLiteral, "input: {input}");
+        assert_eq!(num_value(&tok), expected, "input: {input}");
+    }
 }
 
 #[test]
@@ -321,17 +277,12 @@ fn bigint_hex() {
 }
 
 #[test]
-fn zero() {
-    let tok = lex_single("0");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 0.0);
-}
-
-#[test]
-fn dot_number() {
-    let tok = lex_single(".5");
-    assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert_eq!(num_value(&tok), 0.5);
+fn numeric_literal_edge_forms() {
+    for &(input, expected) in &[("0", 0.0), (".5", 0.5)] {
+        let tok = lex_single(input);
+        assert_eq!(tok.kind, TokenKind::NumericLiteral, "input: {input}");
+        assert_eq!(num_value(&tok), expected, "input: {input}");
+    }
 }
 
 #[test]
