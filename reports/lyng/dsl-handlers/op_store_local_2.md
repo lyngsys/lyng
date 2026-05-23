@@ -6,7 +6,7 @@ symmetric pair of `op_store_local_3`. V8 v7 aggregate dispatches:
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {

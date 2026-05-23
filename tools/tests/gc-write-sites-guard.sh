@@ -7,7 +7,7 @@ tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 
 fixture_root="$tmpdir/repo"
-source_dir="$fixture_root/crates/lyng/gc/src/arena"
+source_dir="$fixture_root/crates/gc/src/arena"
 doc_dir="$fixture_root/docs/lyng"
 mkdir -p "$source_dir" "$doc_dir"
 
@@ -29,7 +29,7 @@ set +e
 output="$(
     LYNG_GC_WRITE_SITES_ROOT="$fixture_root" \
     LYNG_GC_WRITE_SITES_DOC="$doc" \
-    LYNG_GC_WRITE_SITES_SOURCE_ROOTS="crates/lyng/gc" \
+    LYNG_GC_WRITE_SITES_SOURCE_ROOTS="crates/gc" \
     bash "$checker" 2>&1
 )"
 status=$?
@@ -50,11 +50,11 @@ cat > "$doc" <<'MD'
 # GC Write Sites
 
 <!-- gc-write-site-allowlist:start -->
-crates/lyng/gc/src/arena/store_helpers.rs	record[.]stored_value = value;
+crates/gc/src/arena/store_helpers.rs	record[.]stored_value = value;
 <!-- gc-write-site-allowlist:end -->
 MD
 
 LYNG_GC_WRITE_SITES_ROOT="$fixture_root" \
 LYNG_GC_WRITE_SITES_DOC="$doc" \
-LYNG_GC_WRITE_SITES_SOURCE_ROOTS="crates/lyng/gc" \
+LYNG_GC_WRITE_SITES_SOURCE_ROOTS="crates/gc" \
 bash "$checker"

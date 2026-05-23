@@ -3,12 +3,12 @@
 "Load Accumulator from Register" — copies `registers[a]` into the
 accumulator (`registers[0]`). Emitted by the bytecode-builder
 peephole when a `Move dst=0, src=B` is produced (see
-`crates/lyng/bytecode/src/builder.rs:159-161`). V8 v7 aggregate
+`crates/bytecode/src/builder.rs:159-161`). V8 v7 aggregate
 dispatches: **89,313,894** (3 samples × 6 workloads).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -45,7 +45,7 @@ op_ldar_dsl:
 ## Slow path
 
 **Deleted.** `op_ldar_slow_rs` had no callers after this port landed.
-Semantic body at `crates/lyng/vm/src/vm/semantics/loads.rs:322-333`
+Semantic body at `crates/vm/src/vm/semantics/loads.rs:322-333`
 is `registers[0] = registers[args.a]` with no bail conditions.
 
 ## LLInt reference
@@ -97,7 +97,7 @@ Crypto dominates (96% of aggregate Ldar share). Gate (< 20%) satisfied.
 - `cargo test -p lyng-vm --lib --release` — **418 passed**.
 - `cargo test -p lyng-tests --release` — **1209 passed**.
 
-Integration tests in `crates/lyng/tests/src/op_ldar_inline.rs`
+Integration tests in `crates/tests/src/op_ldar_inline.rs`
 cover:
 1. `ldar_via_intermediate_temporary` — `(a + b) * 2`: the temp is
    Ldar'd into the accumulator before the multiply.

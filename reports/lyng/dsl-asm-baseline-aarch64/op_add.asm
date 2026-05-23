@@ -2,7 +2,7 @@
 //   cargo rustc --release -p lyng-vm --lib -- --emit=asm
 //
 // Symbol: lyng_vm::dsl::handlers::hot::op_add
-// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B40)
+// Source: crates/vm/src/dsl/handlers/hot.rs (B40)
 // Layout: AbcSlot (a, b, c byte operands + 16-bit feedback slot),
 // length = 6 bytes.
 //

@@ -110,28 +110,28 @@ Cross-crate (`lyng-bytecode`, `lyng-objects`, `lyng-compiler`, `lyng-tests`): al
 
 ### α machinery deleted
 
-- `crates/lyng/vm/src/vm/dispatch_handlers/` (entire directory, ~2800 lines)
-- `crates/lyng/vm/src/vm/dispatch_state.rs::run_trampoline`, `run_trampoline_counted`, `still_active`, `Step` enum, `Handler` type, `try_step!` macro, `current_bytes`, `next_opcode_byte`, `advance` methods
-- `crates/lyng/vm/src/vm/dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, α-only decoders (`decode_abx8_operands`, `decode_ax_operands`, `decode_ax8_operands`, `decode_local_operands`, `decode_accumulator_*_operands`, `decode_call_range_operands`)
-- `crates/lyng/vm/src/vm/tiering.rs::observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
-- `crates/lyng/vm/src/vm/state.rs`: `MaterializedRuntimeState`, `MaterializedDeoptSnapshot`, `MaterializedDeoptValue`, `Vm::assert_deopt_safepoint_state`, `Vm::materialize_deopt_snapshot`, `Vm::materialize_deopt_value`, related helpers
+- `crates/vm/src/vm/dispatch_handlers/` (entire directory, ~2800 lines)
+- `crates/vm/src/vm/dispatch_state.rs::run_trampoline`, `run_trampoline_counted`, `still_active`, `Step` enum, `Handler` type, `try_step!` macro, `current_bytes`, `next_opcode_byte`, `advance` methods
+- `crates/vm/src/vm/dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, α-only decoders (`decode_abx8_operands`, `decode_ax_operands`, `decode_ax8_operands`, `decode_local_operands`, `decode_accumulator_*_operands`, `decode_call_range_operands`)
+- `crates/vm/src/vm/tiering.rs::observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
+- `crates/vm/src/vm/state.rs`: `MaterializedRuntimeState`, `MaterializedDeoptSnapshot`, `MaterializedDeoptValue`, `Vm::assert_deopt_safepoint_state`, `Vm::materialize_deopt_snapshot`, `Vm::materialize_deopt_value`, related helpers
 - `Vm::run_via_trampoline` method
 - α-side `translate_outcome_to_step` (in dispatch_handlers/mod.rs)
 
 ### α machinery retained (intentionally, as helpers used by semantic bodies)
 
 - `DispatchState` struct + per-frame accessor methods — used by all semantic bodies via `LlIntDispatchState::dispatch_state()`
-- `crates/lyng/vm/src/vm/dispatch/` — `execute_*_opcode` methods on Vm, narrow-form decoders (`decode_abc_operands`, `decode_abx_operands`, `decode_feedback_slot_operand`), arithmetic helpers (`smi_mul_result`, `smi_mod_result`, `decode_smi_immediate`)
-- `crates/lyng/vm/src/vm/tiering.rs::TieringState`, `TierStatus`, `TieringSnapshot` types + per-code state, `Vm::observe_tier_feedback_event` (still fires for feedback-site events)
-- `crates/lyng/vm/src/vm/feedback.rs::feedback_vectors` — legacy storage now the sole feedback source (flat storage is unread)
+- `crates/vm/src/vm/dispatch/` — `execute_*_opcode` methods on Vm, narrow-form decoders (`decode_abc_operands`, `decode_abx_operands`, `decode_feedback_slot_operand`), arithmetic helpers (`smi_mul_result`, `smi_mod_result`, `decode_smi_immediate`)
+- `crates/vm/src/vm/tiering.rs::TieringState`, `TierStatus`, `TieringSnapshot` types + per-code state, `Vm::observe_tier_feedback_event` (still fires for feedback-site events)
+- `crates/vm/src/vm/feedback.rs::feedback_vectors` — legacy storage now the sole feedback source (flat storage is unread)
 
 ### New DSL infrastructure produced
 
-- `crates/lyng/vm-dsl/` — proc-macro crate (parser + layouts + scratch + lowerer)
-- `crates/lyng/vm/src/dsl/` — runtime ABI (LlIntState, LlIntRustContext, slow-path bridge, entry/exit shims, opcode manifest, feedback flat-array, debugger poll integration)
-- `crates/lyng/vm/src/dsl/backend/aarch64/` — 63 macro_rules! ops across 10 modules
-- `crates/lyng/vm/src/dsl/handlers/{hot,warm,cold}.rs` — 12 hot/warm + 140 cold DSL handlers
-- `crates/lyng/vm/src/vm/semantics/` — 12 family files + mod.rs, ~5000 lines (every opcode's semantic body extracted)
+- `crates/vm-dsl/` — proc-macro crate (parser + layouts + scratch + lowerer)
+- `crates/vm/src/dsl/` — runtime ABI (LlIntState, LlIntRustContext, slow-path bridge, entry/exit shims, opcode manifest, feedback flat-array, debugger poll integration)
+- `crates/vm/src/dsl/backend/aarch64/` — 63 macro_rules! ops across 10 modules
+- `crates/vm/src/dsl/handlers/{hot,warm,cold}.rs` — 12 hot/warm + 140 cold DSL handlers
+- `crates/vm/src/vm/semantics/` — 12 family files + mod.rs, ~5000 lines (every opcode's semantic body extracted)
 - `tools/lyng-dsl-codegen/` — cold-stub generator
 
 ## 7. Open questions for DSL-1
@@ -177,7 +177,7 @@ dcat tickets:
 - DSL-0b sub-epic: `lyng-4oak` (in_review)
 - DSL-0c sub-epic: `lyng-4cdz` (in_review)
 
-Per `crates/lyng/AGENTS.md`, tickets NEVER close without explicit user approval.
+Per `crates/AGENTS.md`, tickets NEVER close without explicit user approval.
 
 ## 9. Overall status
 

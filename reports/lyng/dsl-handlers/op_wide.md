@@ -6,7 +6,7 @@ Wide, 2 for ExtraWide).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/warm.rs`:
+`crates/vm/src/dsl/handlers/warm.rs`:
 
 ```rust
 llint_handler! {

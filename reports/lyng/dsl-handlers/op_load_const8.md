@@ -7,7 +7,7 @@ run.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -49,7 +49,7 @@ op_load_const8_dsl:
 **9 instructions** total. Well within the ≤12 budget. The `#32` literal
 is `offset_of!(LlIntState, frame_const_base)` (pinned by the
 `LLINT_STATE_FRAME_CONST_BASE` const). x24 is the STATE pin per the
-asm-DSL register convention (see `crates/lyng/vm/src/dsl/reg_convention.rs`).
+asm-DSL register convention (see `crates/vm/src/dsl/reg_convention.rs`).
 
 LLVM did not rewrite the `load_constant!` body — the canonical 2-instr
 indexed-load shape (`ldr base; ldr value[idx]`) appears verbatim.

@@ -7,7 +7,7 @@ reserves the slot for forward compat).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {

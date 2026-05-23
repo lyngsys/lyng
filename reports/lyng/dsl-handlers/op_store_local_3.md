@@ -6,7 +6,7 @@ anchor** — V8 v7 aggregate dispatches: **101,644,452** (3 samples ×
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -70,7 +70,7 @@ maximum headroom.
 
 vm 418 / lyng-tests 1209. Integration test
 `store_local_3_updates_param_via_assignment` in
-`crates/lyng/tests/src/op_locals_inline.rs` covers the
+`crates/tests/src/op_locals_inline.rs` covers the
 `d = a + b + c + d` reassignment pattern that lands at slot 3.
 
 ## Notes

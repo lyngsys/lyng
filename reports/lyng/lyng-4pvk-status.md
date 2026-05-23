@@ -101,12 +101,12 @@ through `||` short-circuits.
 - `cargo test --features opcode-counters -p lyng-vm`: **410 passed**
 - `cargo test -p lyng-vm -p lyng-tests -p lyng-bytecode -p lyng-compiler`: **1704 passed**
 - `cargo fmt --check` clean on all touched files
-  ([opcode_counts.rs](../../crates/lyng/vm/src/opcode_counts.rs),
-  [lib.rs](../../crates/lyng/vm/src/lib.rs),
-  [vm.rs](../../crates/lyng/vm/src/vm.rs),
-  [vm/call.rs](../../crates/lyng/vm/src/vm/call.rs),
-  [vm/bytecode_calls.rs](../../crates/lyng/vm/src/vm/bytecode_calls.rs),
-  [tests/core.rs](../../crates/lyng/vm/src/tests/core.rs))
+  ([opcode_counts.rs](../../crates/vm/src/opcode_counts.rs),
+  [lib.rs](../../crates/vm/src/lib.rs),
+  [vm.rs](../../crates/vm/src/vm.rs),
+  [vm/call.rs](../../crates/vm/src/vm/call.rs),
+  [vm/bytecode_calls.rs](../../crates/vm/src/vm/bytecode_calls.rs),
+  [tests/core.rs](../../crates/vm/src/tests/core.rs))
 - `cargo clippy --features opcode-counters -p lyng-vm --tests`: 0 errors;
   the 7 remaining warnings are pre-existing in files not touched by this
   change (`dispatch.rs`, `dispatch/property.rs`, `feedback.rs`,

@@ -17,7 +17,7 @@ Complete the Phase 1.A backfill (frame-context refactor + the 2 deferred opcodes
 ### In scope
 
 - **Infra (10.A + 10.B):** Counter wiring into the DSL `dispatch!` tail (and `call_slow!`/`poll_safepoint!` for slow-path-share banks); microbench snippets for the 14 in-scope opcodes (7 Phase-1.A + 7 Phase-1.B anchors).
-- **Frame-context refactor:** Add `frame_const_base: *const Value` and `frame_this_value: Value` to [`LlIntState`](../../../crates/lyng/vm/src/dsl/llint_state.rs); pre-resolve at activation entry; refresh on frame transitions; GC root-scanning design review.
+- **Frame-context refactor:** Add `frame_const_base: *const Value` and `frame_this_value: Value` to [`LlIntState`](../../../crates/vm/src/dsl/llint_state.rs); pre-resolve at activation entry; refresh on frame transitions; GC root-scanning design review.
 - **Phase 1.A backfill:** Inline ports for `op_load_const8` (#21) and `op_load_this` (#12) using the new fields.
 - **Phase 1.B opcode ports (top-30 anchors):** `op_load_local_0/1/2/3` (#11/8/18/9), `op_store_local_3` (#22), `op_load_env_slot` (#19), `op_ldar` (#26) — 7 opcodes, ~1.38B combined dispatches/run.
 - **Macro-shared symmetric pairs:** `op_store_local_0/1/2` if they share `op_store_local_3`'s macro at <15 min port cost each.
@@ -102,7 +102,7 @@ Same coordinator/worker model as Phase 1.A (scaled cleanly across 7 mechanical p
 
 This is the highest-stakes worker in Phase 1.B. Brief includes:
 - Both deferral notes ([`phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md), [`phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)) as the requirements spec.
-- Pointer to current `LlIntState` layout + offset-of test (`crates/lyng/vm/src/dsl/llint_state.rs`).
+- Pointer to current `LlIntState` layout + offset-of test (`crates/vm/src/dsl/llint_state.rs`).
 - Pointer to entry shim (`entry.rs`) and slow-path bridges (`slow_path.rs`) — must update both for refresh discipline.
 - Pointer to GC scan code; reviewer must verify the new fields are scanned alongside REGS and frame roots.
 - Explicit guidance on `Atom`/`Builtin` constant pre-resolution (const8 deferral note covers this).
@@ -199,12 +199,12 @@ Risks retired from Phase 1.A: workflow ambiguity, mechanical port repeatability,
 ## 6. Deliverables checklist
 
 ### Code
-- 9-12 new inline DSL handlers in [`cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs)
-- Counter wiring in [`backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) (`dispatch!` tail) and `call_slow!`/`poll_safepoint!` macros
+- 9-12 new inline DSL handlers in [`cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs)
+- Counter wiring in [`backend/aarch64/control.rs`](../../../crates/vm/src/dsl/backend/aarch64/control.rs) (`dispatch!` tail) and `call_slow!`/`poll_safepoint!` macros
 - Counter array field on `Vm` struct (asm-stable `[u64; 256]` for opcodes; similar for slow-path-semantic + slow-path-safepoint banks)
-- `LlIntState` extended with `frame_const_base` + `frame_this_value`; offset consts in [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs)
+- `LlIntState` extended with `frame_const_base` + `frame_this_value`; offset consts in [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs)
 - New backend macros as opcode ports surface them (`load_local_const!`, `load_constant!`, `load_value_at_offset!`, others)
-- Flat constant-pool resolution in [`entry.rs`](../../../crates/lyng/vm/src/dsl/entry.rs) activation entry; refresh discipline in [`slow_path.rs`](../../../crates/lyng/vm/src/dsl/slow_path.rs)
+- Flat constant-pool resolution in [`entry.rs`](../../../crates/vm/src/dsl/entry.rs) activation entry; refresh discipline in [`slow_path.rs`](../../../crates/vm/src/dsl/slow_path.rs)
 - Microbench snippets in [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs) for 14 opcodes
 
 ### Reports
@@ -239,7 +239,7 @@ Risks retired from Phase 1.A: workflow ambiguity, mechanical port repeatability,
 
 ## 8. Policy alignment
 
-Per parent §12: policy updates landed in DSL-0. Phase 1.B's frame-context refactor stays within the existing scoped-unsafe boundary (`crates/lyng/vm/src/dsl/`); no policy changes expected. If the refactor surfaces a new unsafe scope question (e.g., direct `*const Value` dereferencing in entry shim), coordinator audits before merging.
+Per parent §12: policy updates landed in DSL-0. Phase 1.B's frame-context refactor stays within the existing scoped-unsafe boundary (`crates/vm/src/dsl/`); no policy changes expected. If the refactor surfaces a new unsafe scope question (e.g., direct `*const Value` dereferencing in entry shim), coordinator audits before merging.
 
 ---
 
@@ -253,5 +253,5 @@ Per parent §12: policy updates landed in DSL-0. Phase 1.B's frame-context refac
   - [`reports/lyng/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)
 - **Measured top-30:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv)
 - **Hot-opcodes config:** [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml)
-- **DSL substrate:** [`crates/lyng/vm/src/dsl/`](../../../crates/lyng/vm/src/dsl/)
-- **inc_counter! macro (already exists, needs wiring):** [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)
+- **DSL substrate:** [`crates/vm/src/dsl/`](../../../crates/vm/src/dsl/)
+- **inc_counter! macro (already exists, needs wiring):** [`crates/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/vm/src/dsl/backend/aarch64/counters.rs)

@@ -11,7 +11,7 @@ not a bug — it is the expected behavior of the bytecode-builder
 peephole.
 
 The peephole at
-`crates/lyng/bytecode/src/builder.rs:150-166`
+`crates/bytecode/src/builder.rs:150-166`
 (`compact_move_instruction`) evaluates the conditions in this order:
 
 ```rust
@@ -33,7 +33,7 @@ produces it.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {

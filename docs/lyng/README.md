@@ -3,12 +3,12 @@
 This directory documents the Lyng JS engine architecture and current implementation shape.
 
 Start with the crate overview in
-[../../crates/lyng/README.md](../../crates/lyng/README.md), then read the
+[../../crates/README.md](../../crates/README.md), then read the
 top-level architecture note and the subsystem note for the area being changed.
 
 ## Read First
 
-1. [Engine Overview](../../crates/lyng/README.md)
+1. [Engine Overview](../../crates/README.md)
 2. [Architecture](architecture.md)
 3. [Engineering Standards](engineering-standards.md)
 4. [JSC-Aligned Engine Roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md) — the active strategic plan: phased work toward JSC LLInt-class interpreter and Baseline JIT performance.

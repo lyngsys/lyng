@@ -17,7 +17,7 @@
 ## File structure overview
 
 ### Created
-- `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs` — new `load_local_fixed!` + `store_local_fixed!` macros
+- `crates/vm/src/dsl/backend/aarch64/locals.rs` — new `load_local_fixed!` + `store_local_fixed!` macros
 - `crates/lyng-tests/tests/op_locals_inline.rs` — JS-level integration tests for the 8 LoadLocal/StoreLocal opcodes
 - `crates/lyng-tests/tests/op_ldar_inline.rs` — JS-level integration tests for Ldar
 - `reports/lyng/dsl-handlers/op_load_local_0.md` (+ similar for 1, 2, 3) — per-handler ported reports
@@ -32,9 +32,9 @@
 - `reports/lyng/dsl-1/phase-1b3-summary.md` — sub-phase summary
 
 ### Modified
-- `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` — declare new `locals` submodule
-- `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace 9 `call_slow!` shims with inline ports (and optionally delete dead slow-path stubs)
-- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — add 2 structural compiles-and-links tests for the new macros
+- `crates/vm/src/dsl/backend/aarch64/mod.rs` — declare new `locals` submodule
+- `crates/vm/src/dsl/handlers/cold.rs` — replace 9 `call_slow!` shims with inline ports (and optionally delete dead slow-path stubs)
+- `crates/vm/tests/dsl_validation_frame_context.rs` — add 2 structural compiles-and-links tests for the new macros
 - `tools/lyng-bench/src/microbench/snippets.rs` — add 3 missing snippets (StoreLocal0, StoreLocal1, StoreLocal2)
 - `reports/lyng/dsl-1/phase-1b-followups.md` — record op_load_env_slot deferral formally
 
@@ -59,19 +59,19 @@
 ## Task 1: Add `load_local_fixed!` + `store_local_fixed!` backend macros
 
 **Files:**
-- Create: `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs`
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
-- Modify: `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (add 2 structural tests)
+- Create: `crates/vm/src/dsl/backend/aarch64/locals.rs`
+- Modify: `crates/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
+- Modify: `crates/vm/tests/dsl_validation_frame_context.rs` (add 2 structural tests)
 
 - [ ] **Step 1: Read the existing operands macros for template shape**
 
 ```bash
-cat crates/lyng/vm/src/dsl/backend/aarch64/operands.rs | head -150
+cat crates/vm/src/dsl/backend/aarch64/operands.rs | head -150
 ```
 
 Pay attention to `load_acc!` (operands.rs:126), `store_acc!` (operands.rs:136), and `load_reg!` (operands.rs:106). Your new `load_local_fixed!` is the fixed-immediate-index sibling of `load_reg!` (`load_reg!` takes an x-register index; yours takes a u8 compile-time literal).
 
-- [ ] **Step 2: Create `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs`**
+- [ ] **Step 2: Create `crates/vm/src/dsl/backend/aarch64/locals.rs`**
 
 ```rust
 //! Fixed-immediate-index register-window load/store macros for DSL-1
@@ -133,7 +133,7 @@ macro_rules! store_local_fixed {
 
 - [ ] **Step 3: Declare the new submodule in `aarch64/mod.rs`**
 
-Open `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`. Add `pub mod locals;` alongside the other `pub mod ...;` declarations (e.g., `pub mod constants;`, `pub mod frame;`).
+Open `crates/vm/src/dsl/backend/aarch64/mod.rs`. Add `pub mod locals;` alongside the other `pub mod ...;` declarations (e.g., `pub mod constants;`, `pub mod frame;`).
 
 - [ ] **Step 4: Build to verify the macros compile**
 
@@ -142,7 +142,7 @@ Expected: clean. No handler uses the macros yet; this only confirms `macro_rules
 
 - [ ] **Step 5: Add 2 structural compiles-and-links tests in dsl_validation_frame_context.rs**
 
-Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing 4 structural handlers, add 2 more:
+Open `crates/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing 4 structural handlers, add 2 more:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -205,7 +205,7 @@ Expected: 418+ vm, 1198+ lyng-tests (parity maintained).
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/backend/aarch64/locals.rs crates/lyng/vm/src/dsl/backend/aarch64/mod.rs crates/lyng/vm/tests/dsl_validation_frame_context.rs
+git add crates/vm/src/dsl/backend/aarch64/locals.rs crates/vm/src/dsl/backend/aarch64/mod.rs crates/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 1: load_local_fixed! + store_local_fixed! backend macros
 
@@ -235,7 +235,7 @@ EOF
 ## Task 2: Inline-port the 4 `op_load_local_N` handlers
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:4253-4365` (replace 4 cold stubs)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:4253-4365` (replace 4 cold stubs)
 - Create: `crates/lyng-tests/tests/op_locals_inline.rs` (integration tests covering all 8 LoadLocal/StoreLocal cases — written here, used by Task 3 too)
 
 - [ ] **Step 1: Discover the lyng-tests script-running helper**
@@ -374,7 +374,7 @@ If any test fails BEFORE you touch the handlers, that's an unrelated bug — inv
 
 - [ ] **Step 4: Replace the 4 `op_load_local_N` cold stubs with inline ports**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the 4 `llint_handler!` invocations (around lines 4255, 4284, 4313, 4342 per the research). Replace each with the inline form.
+In `crates/vm/src/dsl/handlers/cold.rs`, find the 4 `llint_handler!` invocations (around lines 4255, 4284, 4313, 4342 per the research). Replace each with the inline form.
 
 For `op_load_local_0_dsl` (opcode 144, slot 0 = accumulator):
 
@@ -413,7 +413,7 @@ Substitute N = 1, 2, 3 literally in each handler (the lowerer's macro substituti
 - [ ] **Step 5: Check whether the slow-path stubs are now dead**
 
 ```bash
-grep -rn "op_load_local_[0-3]_slow_rs" crates/lyng/
+grep -rn "op_load_local_[0-3]_slow_rs" crates/
 ```
 
 If the 4 `op_load_local_N_slow_rs` functions have no callers outside their own definition, delete them. If something else calls them (e.g., a wide/extra-wide prefix variant), keep them. Document either way in the commit message.
@@ -440,7 +440,7 @@ Expected: 418+ vm, 1198+ lyng-tests + 8 new from op_locals_inline.rs = 1206+ tot
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_locals_inline.rs
+git add crates/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_locals_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 2: op_load_local_0/1/2/3 inline ports
 
@@ -471,7 +471,7 @@ EOF
 ## Task 3: Inline-port the 4 `op_store_local_N` handlers + `op_ldar`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` (lines 3957 area for op_ldar, 4369-4467 area for store_local 0/1/2/3)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` (lines 3957 area for op_ldar, 4369-4467 area for store_local 0/1/2/3)
 - Create: `crates/lyng-tests/tests/op_ldar_inline.rs` (integration tests for Ldar)
 
 - [ ] **Step 1: Write the Ldar integration tests FIRST**
@@ -527,7 +527,7 @@ Expected: 3 passing. Cold stub produces correct semantics.
 
 - [ ] **Step 3: Replace the 4 `op_store_local_N` cold stubs with inline ports**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the 4 store-local stubs (opcodes 148, 149, 150, 151 — around lines 4371, 4400, 4429, 4458). Replace each with:
+In `crates/vm/src/dsl/handlers/cold.rs`, find the 4 store-local stubs (opcodes 148, 149, 150, 151 — around lines 4371, 4400, 4429, 4458). Replace each with:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -546,7 +546,7 @@ Substitute N = 0, 1, 2, 3 literally in each of the 4 handlers.
 
 - [ ] **Step 4: Replace the `op_ldar_dsl` cold stub with inline port**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs` around line 3959, replace:
+In `crates/vm/src/dsl/handlers/cold.rs` around line 3959, replace:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -565,7 +565,7 @@ llint_handler! {
 - [ ] **Step 5: Check whether store-local + Ldar slow stubs are now dead**
 
 ```bash
-grep -rn "op_store_local_[0-3]_slow_rs\|op_ldar_slow_rs" crates/lyng/
+grep -rn "op_store_local_[0-3]_slow_rs\|op_ldar_slow_rs" crates/
 ```
 
 Delete dead-code slow stubs; document in commit message.
@@ -585,7 +585,7 @@ Expected: 418+ vm, 1198+ + 8 (Task 2) + 3 (Ldar) = 1209+ tests.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_ldar_inline.rs
+git add crates/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_ldar_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 3: op_store_local_0/1/2/3 + op_ldar inline ports
 

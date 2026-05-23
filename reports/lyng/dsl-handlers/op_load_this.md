@@ -9,7 +9,7 @@ and bails to the slow path if the mirror equals
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -278,7 +278,7 @@ sentinel-bail arm fires (it just bails uniformly).
   (`branch_zero!`, `branch_nonzero!`, etc.).
 - **`.slow:` label convention.** Mirrors the existing
   `op_add_dsl` hot-path pattern (see
-  `crates/lyng/vm/src/dsl/handlers/hot.rs:71`): the DSL `.slow:`
+  `crates/vm/src/dsl/handlers/hot.rs:71`): the DSL `.slow:`
   body label is lowered to `<handler_name>slow` by the proc-macro
   prefix mechanism, avoiding cross-handler label collisions in the
   same translation unit.

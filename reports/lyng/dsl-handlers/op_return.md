@@ -2,7 +2,7 @@
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/hot.rs`:
+`crates/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {

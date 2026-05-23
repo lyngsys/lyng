@@ -4,7 +4,7 @@
 
 **Goal:** Build the measurement infrastructure (three new `lyng-bench` subcommands, slow-path-share counter mode, opcode-share config) and three evidence reports (value-layout, ABI, safepoints) that gate the asm-DSL interpreter work specified in [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 
-**Architecture:** Extend the existing `tools/lyng-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/lyng/vm/` behind the existing `opcode-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/lyng/AGENTS.md`, `docs/lyng/engineering-standards.md`, `docs/lyng/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/lyng/`.
+**Architecture:** Extend the existing `tools/lyng-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/vm/` behind the existing `opcode-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/AGENTS.md`, `docs/lyng/engineering-standards.md`, `docs/lyng/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/lyng/`.
 
 **Tech Stack:** Rust stable (rustc ≥ 1.88 needed for DSL phase; R-0 itself uses any current stable), `serde_json` (already in `lyng-bench` deps), `toml` (new dep for `hot-opcodes.toml`), system tools (`otool` on macOS for LLInt capture), `cargo asm` (optional convenience; fallback to `cargo rustc --emit=asm`).
 
@@ -116,10 +116,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 ---
 
-### Task 2: Update `crates/lyng/AGENTS.md` to scope-allow DSL unsafe
+### Task 2: Update `crates/AGENTS.md` to scope-allow DSL unsafe
 
 **Files:**
-- Modify: `crates/lyng/AGENTS.md:142`
+- Modify: `crates/AGENTS.md:142`
 
 - [ ] **Step 1: Mark the ticket in progress**
 
@@ -132,13 +132,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  sed -n '139,148p' crates/lyng/AGENTS.md
+  sed -n '139,148p' crates/AGENTS.md
   ```
   Expected: shows the "Memory And Safety" section including `- Do not use unsafe code in Lyng JS crates.`
 
 - [ ] **Step 3: Replace the blanket prohibition with the scoped allowance**
 
-  Use Edit on `crates/lyng/AGENTS.md` to replace:
+  Use Edit on `crates/AGENTS.md` to replace:
   ```
   - Do not use `unsafe` code in Lyng JS crates.
   ```
@@ -146,10 +146,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
   ```
   - `unsafe` code is permitted only in the DSL substrate modules listed below, and
     only behind macro-generated code with audited invariants:
-    - `crates/lyng/vm-dsl/` (proc-macro crate; not yet created)
-    - `crates/lyng/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
-    - Existing narrow unsafe blocks in `crates/lyng/vm/src/vm/dispatch_state.rs` and
-      `crates/lyng/types/src/value.rs` (bounds-check elision, NaN-box construction).
+    - `crates/vm-dsl/` (proc-macro crate; not yet created)
+    - `crates/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
+    - Existing narrow unsafe blocks in `crates/vm/src/vm/dispatch_state.rs` and
+      `crates/types/src/value.rs` (bounds-check elision, NaN-box construction).
     Hand-written `unsafe` outside these locations is forbidden. Every `unsafe` block
     must carry a `// SAFETY:` comment naming the invariant the caller must uphold.
   ```
@@ -158,7 +158,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  head -160 crates/lyng/AGENTS.md | tail -30
+  head -160 crates/AGENTS.md | tail -30
   ```
   Expected: section reads cleanly; bullet list structure intact.
 
@@ -166,11 +166,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  git add crates/lyng/AGENTS.md
+  git add crates/AGENTS.md
   git commit -m "$(cat <<'EOF'
   R-0: scope-allow unsafe in DSL substrate modules
 
-  Replace the blanket no-unsafe rule in crates/lyng/AGENTS.md with a
+  Replace the blanket no-unsafe rule in crates/AGENTS.md with a
   scoped allowance for the asm-DSL substrate modules. Per §12 of
   docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md.
 
@@ -204,8 +204,8 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Edit `docs/lyng/engineering-standards.md` to append after the existing Safety Rules bullets (before `## Testing Rules`):
   ```
-  - DSL boundary: the asm-DSL substrate (`crates/lyng/vm-dsl/` and
-    `crates/lyng/vm/src/dsl/`) is the audited home for inline assembly,
+  - DSL boundary: the asm-DSL substrate (`crates/vm-dsl/` and
+    `crates/vm/src/dsl/`) is the audited home for inline assembly,
     `#[unsafe(naked)]` functions, and the slow-path bridge. Changes to those
     modules require: a `// SAFETY:` invariant comment per unsafe block, an asm
     snapshot diff via `lyng-bench asm-diff` (when the DSL handler set is
@@ -1321,7 +1321,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Replace the placeholder body of `pub fn run` with logic that:
   1. Loads `hot_opcodes::HotOpcodesConfig` from `options.opcodes_config`.
-  2. For each opcode in `config.opcodes`, computes the symbol name (e.g., `lyng_vm::vm::dispatch_handlers::{family}::op_{name}` — the existing handlers in `crates/lyng/vm/src/vm/dispatch_handlers/` follow this pattern; verify with `nm target/release/libl*.rlib` if uncertain).
+  2. For each opcode in `config.opcodes`, computes the symbol name (e.g., `lyng_vm::vm::dispatch_handlers::{family}::op_{name}` — the existing handlers in `crates/vm/src/vm/dispatch_handlers/` follow this pattern; verify with `nm target/release/libl*.rlib` if uncertain).
   3. In Check mode: capture asm, call `check_one_symbol`, collect outcomes, report.
   4. In Update mode: capture asm, call `update_one_baseline`.
 
@@ -2557,10 +2557,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 20: Add `SlowPathCounterStore` to VM
 
 **Files:**
-- Create: `crates/lyng/vm/src/slow_path_counts.rs`
-- Modify: `crates/lyng/vm/src/lib.rs`
-- Modify: `crates/lyng/vm/src/vm.rs`
-- Modify: `crates/lyng/vm/Cargo.toml` (if feature flag absent)
+- Create: `crates/vm/src/slow_path_counts.rs`
+- Modify: `crates/vm/src/lib.rs`
+- Modify: `crates/vm/src/vm.rs`
+- Modify: `crates/vm/Cargo.toml` (if feature flag absent)
 
 - [ ] **Step 1: Mark ticket in progress**
 
@@ -2677,13 +2677,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Wire into the VM crate**
 
-  Edit `crates/lyng/vm/src/lib.rs` to add:
+  Edit `crates/vm/src/lib.rs` to add:
   ```rust
   #[cfg(feature = "opcode-counters")]
   pub mod slow_path_counts;
   ```
 
-  In `crates/lyng/vm/src/vm.rs`, find the `opcode_dispatch_counts` field (around line 157) and add a sibling:
+  In `crates/vm/src/vm.rs`, find the `opcode_dispatch_counts` field (around line 157) and add a sibling:
   ```rust
   #[cfg(feature = "opcode-counters")]
   slow_path_counts: Option<crate::slow_path_counts::SlowPathCounterStore>,
@@ -2745,7 +2745,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng/vm/src/slow_path_counts.rs crates/lyng/vm/src/lib.rs crates/lyng/vm/src/vm.rs
+  git add crates/vm/src/slow_path_counts.rs crates/vm/src/lib.rs crates/vm/src/vm.rs
   git commit -m "R-0: SlowPathCounterStore for slow-path-semantic vs safepoint counts"
   ```
 
@@ -2879,7 +2879,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 2: Read the current Value implementation**
 
   ```sh
-  wc -l crates/lyng/types/src/value.rs
+  wc -l crates/types/src/value.rs
   ```
   Then read the file. Capture:
   - Value byte layout (size, alignment, internal `u64` encoding)
@@ -2912,7 +2912,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   ## Source
 
-  Implementation: [crates/lyng/types/src/value.rs](../../crates/lyng/types/src/value.rs)
+  Implementation: [crates/types/src/value.rs](../../crates/types/src/value.rs)
   Reference: JSC `Source/JavaScriptCore/runtime/JSCJSValue.h`
 
   ## Encoding overview
@@ -2968,7 +2968,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 5: Cross-reference the actual code**
 
-  Read `crates/lyng/types/src/value.rs` and fill in the exact masks and bit positions. Cite `value.rs:LINE` for each fact.
+  Read `crates/types/src/value.rs` and fill in the exact masks and bit positions. Cite `value.rs:LINE` for each fact.
 
 - [ ] **Step 6: Validate the report's asm snippets compile**
 
@@ -3095,7 +3095,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Compute real offsets via a one-off test**
 
-  Add a temporary unit test under `crates/lyng/vm/src/tests/` that builds a placeholder `LlIntState` struct (matching the design's spec exactly) and prints `offset_of!` for each field. Run it, capture the output, and update the table in the report.
+  Add a temporary unit test under `crates/vm/src/tests/` that builds a placeholder `LlIntState` struct (matching the design's spec exactly) and prints `offset_of!` for each field. Run it, capture the output, and update the table in the report.
 
   Delete the temporary test after the table is filled in; the real `LlIntState` lands in DSL-0b with proper tests.
 
@@ -3116,11 +3116,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 1: Read the relevant code paths today**
 
   Read each:
-  - `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs` (op_loop_header, op_jump, op_jump8)
-  - `crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs` (op_wide, op_extra_wide)
+  - `crates/vm/src/vm/dispatch_handlers/control_flow.rs` (op_loop_header, op_jump, op_jump8)
+  - `crates/vm/src/vm/dispatch_handlers/prefix.rs` (op_wide, op_extra_wide)
   - GC poll: search for `poll_incremental_mark_step`
   - Debugger pause: search for `debug_state.should_poll`, `request_debug_pause`
-  - Tier-up: read `crates/lyng/vm/src/vm/tiering.rs`
+  - Tier-up: read `crates/vm/src/vm/tiering.rs`
 
 - [ ] **Step 2: Draft the report**
 
@@ -3137,9 +3137,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Design: §6 (safepoints + prefix dispatch), §10 (tier accounting deferral).
   Current code:
-  - [crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs](../../crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs) — op_loop_header, op_jump, op_jump8.
-  - [crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs](../../crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs) — op_wide, op_extra_wide.
-  - [crates/lyng/vm/src/vm/tiering.rs](../../crates/lyng/vm/src/vm/tiering.rs) — observe_tier_backedge_event.
+  - [crates/vm/src/vm/dispatch_handlers/control_flow.rs](../../crates/vm/src/vm/dispatch_handlers/control_flow.rs) — op_loop_header, op_jump, op_jump8.
+  - [crates/vm/src/vm/dispatch_handlers/prefix.rs](../../crates/vm/src/vm/dispatch_handlers/prefix.rs) — op_wide, op_extra_wide.
+  - [crates/vm/src/vm/tiering.rs](../../crates/vm/src/vm/tiering.rs) — observe_tier_backedge_event.
 
   ## Today's safepoint surface
 
@@ -3364,7 +3364,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   | `microbench` subcommand | done | tools/lyng-bench/src/microbench/ |
   | `asm-diff` subcommand | done | tools/lyng-bench/src/asm_diff.rs |
   | `capture-llint` subcommand | done | tools/lyng-bench/src/capture_llint.rs |
-  | `--count-slow-path-share` infrastructure | done | crates/lyng/vm/src/slow_path_counts.rs |
+  | `--count-slow-path-share` infrastructure | done | crates/vm/src/slow_path_counts.rs |
   | hot-opcodes.toml from measured data | done | tools/lyng-bench/hot-opcodes.toml |
   | LLInt reference capture | done | reports/lyng/llint-reference/ |
   | microbench-baseline.md | done | reports/lyng/microbench-baseline.md |
@@ -3372,7 +3372,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   | llint-dsl-value-layout.md | done | reports/lyng/llint-dsl-value-layout.md |
   | llint-dsl-abi.md | done | reports/lyng/llint-dsl-abi.md |
   | llint-dsl-safepoints.md | done | reports/lyng/llint-dsl-safepoints.md |
-  | Policy doc updates | done | crates/lyng/AGENTS.md, docs/lyng/engineering-standards.md |
+  | Policy doc updates | done | crates/AGENTS.md, docs/lyng/engineering-standards.md |
   | Determinism evidence | done | reports/lyng/r0/determinism.md |
   | Test262 no-regression | done | reports/lyng/r0/test262-after-r0.md |
 
@@ -3430,7 +3430,7 @@ After completing all tasks, verify:
 - [ ] `lyng-bench capture-llint --opcodes op_add --source excerpt --jsc-source /Users/sondre/dev/WebKit` exits 0.
 - [ ] Test262 pass count ≥ 49722/49729.
 - [ ] All three evidence reports exist and cite real `file.rs:LINE` references.
-- [ ] `crates/lyng/AGENTS.md` line 142 area no longer contains a blanket no-unsafe rule.
+- [ ] `crates/AGENTS.md` line 142 area no longer contains a blanket no-unsafe rule.
 - [ ] No new `unsafe` blocks outside the modules explicitly allowed by the updated policy.
 
 If any of these fail, stop and resolve before declaring R-0 done.

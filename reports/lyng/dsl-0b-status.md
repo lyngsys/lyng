@@ -85,27 +85,27 @@ Report: `reports/lyng/dsl-0b-test262.md`.
 
 ### Files created
 
-- `crates/lyng/vm-dsl/` — proc-macro crate (394 lines across 5 source files + Cargo.toml)
-- `crates/lyng/vm/src/dsl/llint_state.rs` — `LlIntState` repr(C) + `LlIntRustContext` + offset-generation tests
-- `crates/lyng/vm/src/dsl/reg_convention.rs` — pinned-register conventions + const field offsets
-- `crates/lyng/vm/src/dsl/entry.rs` — `run_via_dsl` + `_interpreter_exit` (stub trampoline)
-- `crates/lyng/vm/src/dsl/poll.rs` — same-thread `poll_pending` consumer (no-op stub for DSL-0b; real GC/debugger integration is post-Phase-C)
-- `crates/lyng/vm/src/dsl/feedback_flat.rs` — `FeedbackEntry` layout
-- `crates/lyng/vm/src/dsl/handlers/{mod,hot,warm,cold}.rs` — DSL handler bodies
-- `crates/lyng/vm/src/dsl/backend/aarch64/{prelude,operands,values,objects,arithmetic,control,feedback,safepoint,memory,counters}.rs` — 63 macro_rules! ops
-- `crates/lyng/vm/src/dsl/test_helpers.rs` — `DslHarness` shared validation-case fixture
+- `crates/vm-dsl/` — proc-macro crate (394 lines across 5 source files + Cargo.toml)
+- `crates/vm/src/dsl/llint_state.rs` — `LlIntState` repr(C) + `LlIntRustContext` + offset-generation tests
+- `crates/vm/src/dsl/reg_convention.rs` — pinned-register conventions + const field offsets
+- `crates/vm/src/dsl/entry.rs` — `run_via_dsl` + `_interpreter_exit` (stub trampoline)
+- `crates/vm/src/dsl/poll.rs` — same-thread `poll_pending` consumer (no-op stub for DSL-0b; real GC/debugger integration is post-Phase-C)
+- `crates/vm/src/dsl/feedback_flat.rs` — `FeedbackEntry` layout
+- `crates/vm/src/dsl/handlers/{mod,hot,warm,cold}.rs` — DSL handler bodies
+- `crates/vm/src/dsl/backend/aarch64/{prelude,operands,values,objects,arithmetic,control,feedback,safepoint,memory,counters}.rs` — 63 macro_rules! ops
+- `crates/vm/src/dsl/test_helpers.rs` — `DslHarness` shared validation-case fixture
 - `tools/lyng-dsl-codegen/` — cold-stub generator (~2400-line metadata table + emitter)
 - `reports/lyng/dsl-handlers/op_*.md` — 12 per-handler ported reports
 - `reports/lyng/dsl-asm-baseline-aarch64/op_*.asm` — 9 asm baselines for new DSL handlers
 
 ### Files modified
 
-- `crates/lyng/vm/src/dsl/opcode_manifest.rs` — `OpcodeCategory` updates for 12 hot/warm + 140 cold entries
-- `crates/lyng/vm/src/dsl/slow_path.rs` — `LlIntDispatchInner::Asm` variant + `from_raw` + `sync_from_asm` + `translate_outcome` + `dsl_cold_shim!` macro
-- `crates/lyng/vm/src/vm/feedback.rs` — dual-write from `record_*` paths to flat-array storage
-- `crates/lyng/vm/src/vm/install.rs` — eager flat-array allocation at install
-- `crates/lyng/vm/src/vm.rs` — `Vm::run_via_dsl` wrapper (not yet active) + `feedback_flat_storage` sibling map
-- `crates/lyng/vm/src/error.rs` — `VmError::TrampolineExitedWithoutSetting`, `VmError::DoublePrefix` (latter from DSL-0a)
+- `crates/vm/src/dsl/opcode_manifest.rs` — `OpcodeCategory` updates for 12 hot/warm + 140 cold entries
+- `crates/vm/src/dsl/slow_path.rs` — `LlIntDispatchInner::Asm` variant + `from_raw` + `sync_from_asm` + `translate_outcome` + `dsl_cold_shim!` macro
+- `crates/vm/src/vm/feedback.rs` — dual-write from `record_*` paths to flat-array storage
+- `crates/vm/src/vm/install.rs` — eager flat-array allocation at install
+- `crates/vm/src/vm.rs` — `Vm::run_via_dsl` wrapper (not yet active) + `feedback_flat_storage` sibling map
+- `crates/vm/src/error.rs` — `VmError::TrampolineExitedWithoutSetting`, `VmError::DoublePrefix` (latter from DSL-0a)
 - Various visibility widenings for cross-module access (`pub(crate)` adjustments to `InstalledFunction`, `FeedbackSiteState`, etc.)
 
 ## 6. Concerns and deviations
@@ -151,7 +151,7 @@ Phase C is the final DSL-0 phase:
 - **C9–C11**: enable manifest Tests 3, 5, 6, 7.
 - **C12–C13**: DSL-0 decision document + exit gate.
 
-DSL-0b dcat ticket (`lyng-4oak`) and 50 sub-tickets are in `in_review` awaiting user approval to close. Per `crates/lyng/AGENTS.md`: tickets NEVER close without explicit user approval.
+DSL-0b dcat ticket (`lyng-4oak`) and 50 sub-tickets are in `in_review` awaiting user approval to close. Per `crates/AGENTS.md`: tickets NEVER close without explicit user approval.
 
 ## 9. Status
 

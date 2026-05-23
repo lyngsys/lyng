@@ -60,7 +60,7 @@ This invariant mirrors the existing invariant for `frame_pb_base`, `frame_regs_b
 
 ## Task 7 GC-stress test caveat
 
-The gc-stress test at `crates/lyng/tests/src/gc_stress_frame_context.rs` does not auto-trigger minor GC during the loop — the interpreter's mutator path doesn't attach `ActiveVmRoots` at allocation safepoints (documented finding from Task 7).
+The gc-stress test at `crates/tests/src/gc_stress_frame_context.rs` does not auto-trigger minor GC during the loop — the interpreter's mutator path doesn't attach `ActiveVmRoots` at allocation safepoints (documented finding from Task 7).
 
 What the test **does** exercise:
 - ~15K object allocations (nursery fills to ~1 MB)
@@ -95,7 +95,7 @@ Commit range reviewed: `ae8b7766..26ec0742` (8 commits)
 1. **GC root scanning:** Both new fields are mirrors of already-scanned canonical state. No new tracer code required. Mirror-discipline invariant matches `frame_pb_base`.
 2. **`resolve_initial_this_value` semantic equivalence vs `op_load_this_semantic`:** Semantically equivalent for all four arms (`Value(v)`, `Uninitialized`, `Lexical`, no-EC fallback). The sentinel path defers the throw/lex-env-walk to the slow path, preserving throw-at-correct-PC semantics for Phase 1.B.2 inline ports.
 3. **Arena pointer stability:** Structurally parallel argument to `frame_pb_base` (different storage, same active-frame retention principle). Debug-only `debug_assert_eq!` in the Refresh arm did NOT fire across 417 vm-lib + 1187 lyng-tests + the gc-stress test + 14 V8 v7 samples (7 base + 7 post). Strong empirical evidence.
-4. **Continue arm vs Refresh arm:** `super()` and all `frame.set_this_value` mutators egress via `SemanticOutcome::Refresh` (verified by reviewer at `crates/lyng/vm/src/vm/builtin_dispatch/class_helpers/super_ops.rs:255` → `op_construct_semantic` → Refresh). No continue-path semantic mutates `frame.this_value()`. No staleness window.
+4. **Continue arm vs Refresh arm:** `super()` and all `frame.set_this_value` mutators egress via `SemanticOutcome::Refresh` (verified by reviewer at `crates/vm/src/vm/builtin_dispatch/class_helpers/super_ops.rs:255` → `op_construct_semantic` → Refresh). No continue-path semantic mutates `frame.this_value()`. No staleness window.
 5. **ABI layout stability:** `size_of::<LlIntState>` asserted to 72 bytes in `ll_int_state_offsets_stable`; no other code makes a hard-coded size assumption (verified by reviewer grep).
 6. **Sentinel choice:** `Value::uninitialized_lexical()` (`InternalSentinel::UninitializedLexical`) is exclusively for TDZ and cannot legitimately appear as a `this` value. Safe to reuse as the bail-to-slow-path marker.
 7. **Debug-only stability assertion correctness:** Uses identical derivation chain as the write path; correctly gated on `#[cfg(debug_assertions)]`; verified to fire zero times across the full test suite.

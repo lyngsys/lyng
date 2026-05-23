@@ -9,7 +9,7 @@ already handle backward-edge polling and PC arithmetic.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/warm.rs`:
+`crates/vm/src/dsl/handlers/warm.rs`:
 
 ```rust
 llint_handler! { op_jump8, layout = A, length = 2, |offset| { ... } }

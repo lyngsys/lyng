@@ -188,16 +188,16 @@ of inner-loop patterns). With Phase 4c, the fusion fires more often.
 ## Files changed
 
 **VM**:
-- `crates/lyng/vm/src/vm/dispatch_state.rs` — new
+- `crates/vm/src/vm/dispatch_state.rs` — new
   `dispatch_next_with_value!` macro alongside `dispatch_next!`.
-- `crates/lyng/vm/src/vm/dispatch_handlers/loads.rs` — nine `Lda*`
+- `crates/vm/src/vm/dispatch_handlers/loads.rs` — nine `Lda*`
   handlers switched to `dispatch_next_with_value!`.
-- `crates/lyng/vm/src/tests/core.rs` — new
+- `crates/vm/src/tests/core.rs` — new
   `vm_star_fusion_elides_star_dispatch_after_lda` regression test
   (`#[cfg(feature = "opcode-counters")]`).
 
 **Bytecode**:
-- `crates/lyng/bytecode/src/opcode.rs` — new
+- `crates/bytecode/src/opcode.rs` — new
   `Opcode::accumulator_store_index_for_byte(byte)` helper for the
   dispatch-loop peek (avoids materializing a full `Opcode` enum value
   on the hot path).

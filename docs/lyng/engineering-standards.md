@@ -66,8 +66,8 @@ performance, memory behavior, and verification clarity.
 - Rooting and tracing must be explicit around allocation paths.
 - Host callbacks and embedding functions must have clear ownership and error propagation.
 - Shared-memory behavior must remain behind backing-store and shared-memory operation APIs.
-- DSL boundary: the asm-DSL substrate (`crates/lyng/vm-dsl/` and
-  `crates/lyng/vm/src/dsl/`) is the audited home for inline assembly,
+- DSL boundary: the asm-DSL substrate (`crates/vm-dsl/` and
+  `crates/vm/src/dsl/`) is the audited home for inline assembly,
   `#[unsafe(naked)]` functions, and the slow-path bridge. Changes to those
   modules require: a `// SAFETY:` invariant comment per unsafe block, an asm
   snapshot diff via `lyng-bench asm-diff` (when the DSL handler set is

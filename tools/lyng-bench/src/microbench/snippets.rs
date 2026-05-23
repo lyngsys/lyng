@@ -620,7 +620,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // StoreLocal1/2: symmetric pairs of StoreLocal3 (DSL-1 Phase 1.B.3
     // Task 4). Each writes to the corresponding parameter slot four
     // times per iter; the bytecode-builder peephole
-    // (`compact_move_instruction` in `crates/lyng/bytecode/src/
+    // (`compact_move_instruction` in `crates/bytecode/src/
     // builder.rs:150-166`) rewrites `Move dst=N, src=...` to
     // `StoreLocalN` for N in 1..3 just as it does for N=3.
     //

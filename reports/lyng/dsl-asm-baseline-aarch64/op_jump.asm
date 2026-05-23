@@ -1,6 +1,6 @@
 // DSL-0b op_jump handler asm (AArch64).
 // Symbol: lyng_vm::dsl::handlers::hot::op_jump
-// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B41)
+// Source: crates/vm/src/dsl/handlers/hot.rs (B41)
 // Layout: Ax (single u32 operand at PC+1), length = 5 bytes.
 //
 // For DSL-0b op_jump is a thin call_slow + dispatch_after_slow. The

@@ -7,7 +7,7 @@
 
 ## Why deferred
 
-`this` is not stored at a fixed register slot. The semantic body at [`crates/lyng/vm/src/vm/semantics/names.rs:600-627`](../../../crates/lyng/vm/src/vm/semantics/names.rs) resolves `this` dynamically through `agent.current_execution_context()` with three `ThisState` variants (`Value`, `Uninitialized`, `Lexical`), with a fallback to `frame.this_value()` on the [`FrameRecord`](../../../crates/lyng/vm/src/frame.rs).
+`this` is not stored at a fixed register slot. The semantic body at [`crates/vm/src/vm/semantics/names.rs:600-627`](../../../crates/vm/src/vm/semantics/names.rs) resolves `this` dynamically through `agent.current_execution_context()` with three `ThisState` variants (`Value`, `Uninitialized`, `Lexical`), with a fallback to `frame.this_value()` on the [`FrameRecord`](../../../crates/vm/src/frame.rs).
 
 ```
 state.rust_context (opaque)
@@ -23,7 +23,7 @@ None of these paths are reachable from asm without either (a) a multi-indirectio
 
 Unlike `op_load_const8`'s `Smi`/`Float64Bits` variants which can be pre-resolved at install time, `op_load_this` faces:
 
-- **`ThisState::Lexical`** requires walking the lexical environment chain at resolution time (see `Vm::resolve_this_binding` in [`vm/src/bytecode_calls.rs`](../../../crates/lyng/vm/src/vm/bytecode_calls.rs)), which can change between calls.
+- **`ThisState::Lexical`** requires walking the lexical environment chain at resolution time (see `Vm::resolve_this_binding` in [`vm/src/bytecode_calls.rs`](../../../crates/vm/src/vm/bytecode_calls.rs)), which can change between calls.
 - **`ThisState::Uninitialized`** must throw `ReferenceError` on observation; cannot be eagerly resolved without altering throw semantics (loop-invariant throws would surface at the wrong PC).
 - **Dominant path is via `agent.current_execution_context()`,** not `frame.this_value()`. The execution-context `this_state` can override the frame slot; inlining only the frame slot diverges from current semantics.
 
@@ -31,16 +31,16 @@ A bailout-on-discriminant approach (read both Option<ExecutionContextEntry> and 
 
 ## Recommendation: co-design with `op_load_const8` refactor in Phase 1.B
 
-Both deferred opcodes want the same kind of asm-visible pre-resolved Value-typed frame-context field on [`LlIntState`](../../../crates/lyng/vm/src/dsl/llint_state.rs). A unified refactor:
+Both deferred opcodes want the same kind of asm-visible pre-resolved Value-typed frame-context field on [`LlIntState`](../../../crates/vm/src/dsl/llint_state.rs). A unified refactor:
 
 1. **Add fields to `LlIntState`:**
    - `frame_const_base: *const Value` (for `op_load_const8`, indexed)
    - `frame_this_value: Value` (for `op_load_this`, fixed offset)
-2. **Add offsets to [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs)** via `offset_of!`.
-3. **Pre-resolve at activation entry** in [`entry.rs`](../../../crates/lyng/vm/src/dsl/entry.rs):
+2. **Add offsets to [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs)** via `offset_of!`.
+3. **Pre-resolve at activation entry** in [`entry.rs`](../../../crates/vm/src/dsl/entry.rs):
    - Constants: resolve all `ConstantValue` entries to flat `Value` array.
    - This: resolve the `ThisState::Value` happy path; design a sentinel scheme for `Uninitialized`/`Lexical` that branches to slow path.
-4. **Add refresh discipline** in [`slow_path.rs`](../../../crates/lyng/vm/src/dsl/slow_path.rs) bridges, mirroring PB/REGS/FV.
+4. **Add refresh discipline** in [`slow_path.rs`](../../../crates/vm/src/dsl/slow_path.rs) bridges, mirroring PB/REGS/FV.
 5. **Add DSL backend macros:**
    - `load_constant!($idx => $dst)` for indexed loads
    - Fixed-offset Value-load for this (note: Value is 16 bytes, so 2× `ldp` or a sentinel-aware single-load approach)
@@ -64,4 +64,4 @@ Estimated: 2-3 days of implementation + GC design review.
 
 LoadSmi8 alone (#7, 388M dispatches/run) is the dominant Phase 1.A contributor. The Phase 1.A summary at Task 10 will document `op_load_this` and `op_load_const8` deferrals as known limitations.
 
-Cold-stub at [`crates/lyng/vm/src/dsl/handlers/cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs) for `op_load_this_dsl` remains in place; the opcode continues to dispatch through `op_load_this_slow_rs` during Phase 1.A.
+Cold-stub at [`crates/vm/src/dsl/handlers/cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs) for `op_load_this_dsl` remains in place; the opcode continues to dispatch through `op_load_this_slow_rs` during Phase 1.A.

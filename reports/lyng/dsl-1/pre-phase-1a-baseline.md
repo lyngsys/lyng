@@ -84,7 +84,7 @@ provide a generator for it.
 **Captured as all-zero** — this is a known DSL-0c gap, not a Phase
 1.A blocker.
 
-`crates/lyng/vm/src/vm.rs:335-353` documents the cause: when the
+`crates/vm/src/vm.rs:335-353` documents the cause: when the
 α trampoline was removed in DSL-0c C2, the
 `maybe_record_opcode_dispatch` call site went with it. The
 `opcode-counters` feature still compiles, but `vm.enable_opcode_dispatch_counts()`

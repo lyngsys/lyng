@@ -7,7 +7,7 @@ single port in Phase 1.C (~589M dispatches per V8 v7 run; total
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -60,7 +60,7 @@ either operand was negative, the spec demands `-0` (the IEEE-754
 negative-zero `Number`), which the SMI tag cannot carry (SMI `0` is
 always `+0`).
 
-`crates/lyng/vm/src/vm/dispatch/arithmetic.rs:21-26`:
+`crates/vm/src/vm/dispatch/arithmetic.rs:21-26`:
 
 ```rust
 pub(in crate::vm) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
@@ -85,7 +85,7 @@ non-zero-product path (a single `cbnz` mispredict-free branch) and
 instructions in the macro vs the Task-1 stub.
 
 This change to `mul_smi_overflow!` is in
-`crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs:49-89`; the
+`crates/vm/src/dsl/backend/aarch64/arithmetic.rs:49-89`; the
 only current caller is the new `op_mul_dsl` handler, and the
 existing `dsl/ops.md` reference table should be updated when Phase 1.C
 closes (currently lists `mul_smi_overflow!` as "smull + sxtw + cmp +
@@ -210,7 +210,7 @@ This is a known measurement artifact, not a real regression: every
 fast-path SMI multiply calls
 `call_slow!(op_mul_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope — i.e., the macro doesn't know whether the
 call_slow is reached on a fast path or via a `.slow:` body label).
@@ -225,7 +225,7 @@ still need a shim for feedback recording. Per the Phase 1.C plan
 distinguishes "feedback-recording shim" from "true slow path"** —
 that work is a deferred substrate sub-phase (gate
 counter-injection on label-boundary state in
-`crates/lyng/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is not
+`crates/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is not
 scheduled within Phase 1.C scope.
 
 The float-heavy V8 v7 workloads (RayTrace, NavierStokes, Crypto)
@@ -259,7 +259,7 @@ re-measured.
   Includes `S11.5.1_A4_T*` (the negative-zero / IEEE-754 semantics
   tests that exercise the new neg-zero deferral path).
 - Two pre-existing failures in
-  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
+  `crates/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `386670ee` (Task 2 SAFETY fix) and at

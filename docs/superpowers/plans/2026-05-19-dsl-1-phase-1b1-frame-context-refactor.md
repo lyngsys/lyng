@@ -16,23 +16,23 @@
 ## File structure overview
 
 ### Created
-- `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` — backend macro `load_constant!` (new file in existing backend module)
-- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — synthetic-handler integration test exercising both new macros end-to-end
+- `crates/vm/src/dsl/backend/aarch64/constants.rs` — backend macro `load_constant!` (new file in existing backend module)
+- `crates/vm/tests/dsl_validation_frame_context.rs` — synthetic-handler integration test exercising both new macros end-to-end
 - `crates/lyng-tests/tests/gc_stress_frame_context.rs` — gc-stress integration test (closure + this + allocation pressure)
 - `reports/lyng/dsl-1/phase-1b1-gc-review.md` — GC root-scanning review doc
 - `reports/lyng/dsl-1/phase-1b1-ab-comparison.md` — same-load V8 v7 A/B data
 - `reports/lyng/dsl-1/phase-1b1-summary.md` — final sub-phase summary
 
 ### Modified
-- `crates/lyng/vm/src/dsl/llint_state.rs` — add two fields to `LlIntState`, add `resolve_initial_this_value` helper + unit tests, update `ll_int_state_offsets_stable`
-- `crates/lyng/vm/src/dsl/reg_convention.rs` — add two new `LLINT_STATE_*` offset consts
-- `crates/lyng/vm/src/dsl/entry.rs` — populate new fields at `run_via_dsl` entry (lines 116-128 area)
-- `crates/lyng/vm/src/dsl/slow_path.rs` — refresh new fields in `translate_outcome` Refresh arm (lines 240-296 area); add debug-only stability assertion
-- `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` — declare new `constants` submodule
-- `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` (or new `state.rs`) — add `load_state_value!` macro
+- `crates/vm/src/dsl/llint_state.rs` — add two fields to `LlIntState`, add `resolve_initial_this_value` helper + unit tests, update `ll_int_state_offsets_stable`
+- `crates/vm/src/dsl/reg_convention.rs` — add two new `LLINT_STATE_*` offset consts
+- `crates/vm/src/dsl/entry.rs` — populate new fields at `run_via_dsl` entry (lines 116-128 area)
+- `crates/vm/src/dsl/slow_path.rs` — refresh new fields in `translate_outcome` Refresh arm (lines 240-296 area); add debug-only stability assertion
+- `crates/vm/src/dsl/backend/aarch64/mod.rs` — declare new `constants` submodule
+- `crates/vm/src/dsl/backend/aarch64/frame.rs` (or new `state.rs`) — add `load_state_value!` macro
 
 ### Untouched (verifying invariant)
-- All existing opcode handlers in `crates/lyng/vm/src/dsl/handlers/`. No handler changes in 1.B.1.
+- All existing opcode handlers in `crates/vm/src/dsl/handlers/`. No handler changes in 1.B.1.
 
 ---
 
@@ -49,12 +49,12 @@
 ## Task 1: Add `frame_const_base` and `frame_this_value` fields to `LlIntState`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/llint_state.rs:25-36` (struct definition + tests)
-- Modify: `crates/lyng/vm/src/dsl/reg_convention.rs` (add two new offset consts)
+- Modify: `crates/vm/src/dsl/llint_state.rs:25-36` (struct definition + tests)
+- Modify: `crates/vm/src/dsl/reg_convention.rs` (add two new offset consts)
 
 - [ ] **Step 1: Write the failing offset-stability test**
 
-Open `crates/lyng/vm/src/dsl/llint_state.rs` and update the `ll_int_state_offsets_stable` test (around lines 91-102):
+Open `crates/vm/src/dsl/llint_state.rs` and update the `ll_int_state_offsets_stable` test (around lines 91-102):
 
 ```rust
 #[test]
@@ -84,7 +84,7 @@ Expected: FAIL — `LLINT_STATE_FRAME_CONST_BASE` does not exist yet (unresolved
 
 - [ ] **Step 3: Add the two new offset consts to `reg_convention.rs`**
 
-Open `crates/lyng/vm/src/dsl/reg_convention.rs`. After the existing `LLINT_STATE_FRAME_FV_BASE` declaration (around line 42), add:
+Open `crates/vm/src/dsl/reg_convention.rs`. After the existing `LLINT_STATE_FRAME_FV_BASE` declaration (around line 42), add:
 
 ```rust
 pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
@@ -95,7 +95,7 @@ Keep the existing `LLINT_STATE_PREFIX` declaration as-is — `offset_of!` will c
 
 - [ ] **Step 4: Add the two new fields to `LlIntState`**
 
-In `crates/lyng/vm/src/dsl/llint_state.rs`, update the struct (lines 25-36):
+In `crates/vm/src/dsl/llint_state.rs`, update the struct (lines 25-36):
 
 ```rust
 #[repr(C)]
@@ -167,7 +167,7 @@ Expected: 1186+ passing.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/llint_state.rs crates/lyng/vm/src/dsl/reg_convention.rs crates/lyng/vm/src/dsl/entry.rs
+git add crates/vm/src/dsl/llint_state.rs crates/vm/src/dsl/reg_convention.rs crates/vm/src/dsl/entry.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 1: add frame_const_base + frame_this_value to LlIntState
 
@@ -190,11 +190,11 @@ EOF
 ## Task 2: Add `resolve_initial_this_value` helper with unit tests
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/llint_state.rs` (add helper + unit tests)
+- Modify: `crates/vm/src/dsl/llint_state.rs` (add helper + unit tests)
 
 - [ ] **Step 1: Write the failing unit tests**
 
-In `crates/lyng/vm/src/dsl/llint_state.rs`, replace the existing `tests` mod block (lines 86-103) with an expanded version that includes both the existing offset test and four new helper tests:
+In `crates/vm/src/dsl/llint_state.rs`, replace the existing `tests` mod block (lines 86-103) with an expanded version that includes both the existing offset test and four new helper tests:
 
 ```rust
 #[cfg(test)]
@@ -260,7 +260,7 @@ Expected: FAIL — `resolve_this_state_to_mirror` is undefined (compile error or
 
 - [ ] **Step 3: Implement the helper**
 
-In `crates/lyng/vm/src/dsl/llint_state.rs`, add the helper just before the `#[cfg(test)]` block. Use this exact signature pair:
+In `crates/vm/src/dsl/llint_state.rs`, add the helper just before the `#[cfg(test)]` block. Use this exact signature pair:
 
 ```rust
 use lyng_env::execution::ThisState;
@@ -295,7 +295,7 @@ pub(crate) fn resolve_this_state_to_mirror(
 
 /// Top-level helper: derives the mirror from an `Agent` + a
 /// `FrameRecord`. Mirrors the read path in
-/// `crates/lyng/vm/src/vm/semantics/names.rs:600-627` so the
+/// `crates/vm/src/vm/semantics/names.rs:600-627` so the
 /// pre-resolution matches `op_load_this` semantics exactly.
 ///
 /// Called from:
@@ -315,7 +315,7 @@ pub(crate) fn resolve_initial_this_value(
 }
 ```
 
-**Note on imports:** the exact path to `ThisState` may be `lyng_env::execution::ThisState` or `lyng_env::ThisState` depending on re-exports — check with `grep "pub use.*ThisState" crates/lyng/env/src/lib.rs` if the first import fails. Similarly for `agent.current_execution_context()` — verify against the research report's `env/src/agent/execution_contexts.rs`.
+**Note on imports:** the exact path to `ThisState` may be `lyng_env::execution::ThisState` or `lyng_env::ThisState` depending on re-exports — check with `grep "pub use.*ThisState" crates/env/src/lib.rs` if the first import fails. Similarly for `agent.current_execution_context()` — verify against the research report's `env/src/agent/execution_contexts.rs`.
 
 - [ ] **Step 4: Run unit tests to verify they pass**
 
@@ -330,7 +330,7 @@ Expected: 417+ passing (413 baseline + 4 new).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/llint_state.rs
+git add crates/vm/src/dsl/llint_state.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 2: add resolve_initial_this_value helper
 
@@ -358,7 +358,7 @@ EOF
 ## Task 3: Populate `frame_const_base` and `frame_this_value` at trampoline entry
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/entry.rs:38-128` (the `run_via_dsl` function)
+- Modify: `crates/vm/src/dsl/entry.rs:38-128` (the `run_via_dsl` function)
 
 - [ ] **Step 1: Compute the new field values before the DispatchState move**
 
@@ -375,7 +375,7 @@ Insert these computations after the `regs_base` block (line 90) and before `let 
     // See spec §3.4.
     //
     // The chain mirrors `Vm::read_constant` in
-    // crates/lyng/vm/src/vm/values.rs:795-806.
+    // crates/vm/src/vm/values.rs:795-806.
     let const_base: *const Value = agent
         .heap()
         .view()
@@ -436,7 +436,7 @@ No handler reads `frame_const_base` or `frame_this_value` yet — these tests pa
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/entry.rs
+git add crates/vm/src/dsl/entry.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 3: populate frame_const_base + frame_this_value at trampoline entry
 
@@ -462,7 +462,7 @@ EOF
 ## Task 4: Refresh `frame_const_base` and `frame_this_value` in the slow-path Refresh arm
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/slow_path.rs:240-296` (Refresh arm in `translate_outcome`)
+- Modify: `crates/vm/src/dsl/slow_path.rs:240-296` (Refresh arm in `translate_outcome`)
 
 - [ ] **Step 1: Add the new field derivations in the Refresh arm**
 
@@ -577,7 +577,7 @@ The fields are now refreshed correctly across every Refresh egress, but still no
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/slow_path.rs
+git add crates/vm/src/dsl/slow_path.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 4: refresh frame_const_base + frame_this_value on slow-path Refresh egress
 
@@ -606,24 +606,24 @@ EOF
 ## Task 5: Add `load_constant!` and `load_state_value!` backend macros
 
 **Files:**
-- Create: `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` (add `load_state_value!` macro)
+- Create: `crates/vm/src/dsl/backend/aarch64/constants.rs`
+- Modify: `crates/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
+- Modify: `crates/vm/src/dsl/backend/aarch64/frame.rs` (add `load_state_value!` macro)
 
 - [ ] **Step 1: Read the existing aarch64 backend module structure for context**
 
-Run: `ls -la crates/lyng/vm/src/dsl/backend/aarch64/`
+Run: `ls -la crates/vm/src/dsl/backend/aarch64/`
 And read the existing `counters.rs` file (created in Phase 1.B.0) for the macro shape template:
 
 ```bash
-cat crates/lyng/vm/src/dsl/backend/aarch64/counters.rs | head -80
+cat crates/vm/src/dsl/backend/aarch64/counters.rs | head -80
 ```
 
 This shows the macro_rules pattern used in the DSL backend: the macros emit asm strings that the proc-macro lowerer splices into handler bodies. Use the same pattern.
 
 - [ ] **Step 2: Create `constants.rs` with the `load_constant!` macro**
 
-Create `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`:
+Create `crates/vm/src/dsl/backend/aarch64/constants.rs`:
 
 ```rust
 //! Constants-access backend macros for Phase 1.B.1.
@@ -663,7 +663,7 @@ pub use load_constant;
 
 - [ ] **Step 3: Declare the new submodule in `aarch64/mod.rs`**
 
-Open `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` and add:
+Open `crates/vm/src/dsl/backend/aarch64/mod.rs` and add:
 
 ```rust
 pub mod constants;
@@ -673,7 +673,7 @@ next to the existing `pub mod counters;`, `pub mod control;`, etc.
 
 - [ ] **Step 4: Add `load_state_value!` to `frame.rs`**
 
-In `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs`, add a new macro alongside the existing frame-context macros:
+In `crates/vm/src/dsl/backend/aarch64/frame.rs`, add a new macro alongside the existing frame-context macros:
 
 ```rust
 /// Load a `Value` (8 bytes) from a fixed offset in `LlIntState`.
@@ -701,7 +701,7 @@ pub use load_state_value;
 
 - [ ] **Step 5: Wire the lowerer to recognize the new macros (if applicable)**
 
-If the DSL proc-macro lowerer in `crates/lyng/vm-dsl/src/lower.rs` needs to inject `vm_const_base` / `vm_state_offset` bindings for these macros (mirroring how it injects `vm_counter_base` for the counter macros — see Phase 1.B.0 Task 4), add that wiring.
+If the DSL proc-macro lowerer in `crates/vm-dsl/src/lower.rs` needs to inject `vm_const_base` / `vm_state_offset` bindings for these macros (mirroring how it injects `vm_counter_base` for the counter macros — see Phase 1.B.0 Task 4), add that wiring.
 
 Find the existing `vm_counter_base` injection in `lower.rs`; the new macros need analogous injections:
 - `load_constant!` → inject `vm_const_base = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE`
@@ -722,7 +722,7 @@ Expected: 417+ passing.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/backend/aarch64/constants.rs crates/lyng/vm/src/dsl/backend/aarch64/mod.rs crates/lyng/vm/src/dsl/backend/aarch64/frame.rs crates/lyng/vm-dsl/src/lower.rs
+git add crates/vm/src/dsl/backend/aarch64/constants.rs crates/vm/src/dsl/backend/aarch64/mod.rs crates/vm/src/dsl/backend/aarch64/frame.rs crates/vm-dsl/src/lower.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 5: load_constant! and load_state_value! backend macros
 
@@ -750,21 +750,21 @@ EOF
 ## Task 6: Synthetic validation handler exercising the new fields end-to-end
 
 **Files:**
-- Create: `crates/lyng/vm/tests/dsl_validation_frame_context.rs`
+- Create: `crates/vm/tests/dsl_validation_frame_context.rs`
 
 - [ ] **Step 1: Read the existing dsl_validation_*.rs tests for the template shape**
 
-Run: `ls crates/lyng/vm/tests/ | grep dsl_validation`
+Run: `ls crates/vm/tests/ | grep dsl_validation`
 
 These are integration-test files where the proc-macro `llint_handler!` macro is invoked to build synthetic handlers, which are then run end-to-end through the DSL trampoline. The Phase 1.B.0 Task 4 fix (`845cee79`) updated three of them; that fix landing point is a good reference.
 
-Run: `cat crates/lyng/vm/tests/dsl_validation_empty.rs`
+Run: `cat crates/vm/tests/dsl_validation_empty.rs`
 
 to see the simplest template.
 
 - [ ] **Step 2: Create the new validation test file**
 
-Create `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Follow the structure of `dsl_validation_empty.rs`:
+Create `crates/vm/tests/dsl_validation_frame_context.rs`. Follow the structure of `dsl_validation_empty.rs`:
 
 ```rust
 //! Phase 1.B.1 Task 6: validate that frame_const_base and
@@ -856,7 +856,7 @@ Expected: all green; integration test count goes up by 3.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng/vm/tests/dsl_validation_frame_context.rs
+git add crates/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 6: synthetic validation handlers for frame_const_base + frame_this_value
 
@@ -893,8 +893,8 @@ EOF
 Look for an existing pattern:
 
 ```bash
-grep -rln "gc_stress\|force_minor_gc\|force_major_gc\|trigger_gc" crates/lyng/ | head -10
-grep -rln "cfg.*gc_stress\|feature.*gc_stress" crates/lyng/ | head -10
+grep -rln "gc_stress\|force_minor_gc\|force_major_gc\|trigger_gc" crates/ | head -10
+grep -rln "cfg.*gc_stress\|feature.*gc_stress" crates/ | head -10
 ```
 
 If a `--cfg gc_stress` or similar feature exists, use it. If only manual triggers like `vm.force_gc()` are available, use those. If neither exists, use a tight allocating loop and rely on the GC to trigger on its own threshold; document in the test comment that it depends on the default GC trigger being aggressive enough.
@@ -1135,7 +1135,7 @@ Use the `Agent` tool with `subagent_type: feature-dev:code-reviewer`. Brief:
 >
 > Focus areas (high-priority, per spec §6 risks):
 > 1. GC root scanning — does the trace logic in `vm/src/vm/state.rs` keep both new LlIntState fields' canonical sources alive across every safepoint that can occur during dispatch? Are there any code paths where a slow-path bridge can run GC but NOT return through the Refresh arm?
-> 2. `resolve_initial_this_value` semantics vs `op_load_this` semantic body — read both side-by-side (`crates/lyng/vm/src/dsl/llint_state.rs` resolver vs `crates/lyng/vm/src/vm/semantics/names.rs:600-627`). Do they implement the same rule for the three ThisState arms + the no-EC fallback? Any drift would surface as throw-at-wrong-PC bugs.
+> 2. `resolve_initial_this_value` semantics vs `op_load_this` semantic body — read both side-by-side (`crates/vm/src/dsl/llint_state.rs` resolver vs `crates/vm/src/vm/semantics/names.rs:600-627`). Do they implement the same rule for the three ThisState arms + the no-EC fallback? Any drift would surface as throw-at-wrong-PC bugs.
 > 3. Arena pointer stability — confirm `RuntimeCodeRecord::constants` arena slot's data pointer is stable across the slow-path call. Cross-check the existing `frame_pb_base` precedent (which has the same dependency).
 > 4. Continue arm correctness — confirm super() / mid-frame this_value mutations always egress through Refresh, not Continue. If any continue-path semantic body mutates `frame.this_value()`, that's a bug.
 >

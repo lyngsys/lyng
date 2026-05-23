@@ -102,7 +102,7 @@ Report: `reports/lyng/phase-3f-test262.md`.
 
 ## What landed
 
-### Data layout (`crates/lyng/vm/src/vm/feedback.rs`)
+### Data layout (`crates/vm/src/vm/feedback.rs`)
 
 `NamedPropertyFeedback` adds:
 - `polymorphic_fast: [NamedPropertyHandler; POLY_LIMIT]`
@@ -139,7 +139,7 @@ cache transition.
 
 ### Fast-path entry points
 
-New helpers in `crates/lyng/vm/src/vm/feedback.rs`:
+New helpers in `crates/vm/src/vm/feedback.rs`:
 - `Vm::named_property_polymorphic_fast_handler(code, slot, shape)`
 - `Vm::keyed_property_named_polymorphic_fast_handler(code, slot, atom, shape)`
 - `Vm::keyed_property_dense_polymorphic_fast_handler(code, slot)`
@@ -148,7 +148,7 @@ All `#[inline(always)]`, walk `0..POLY_LIMIT` against the runtime
 shape (+ atom for keyed-named, + flags for dense), return the matching
 handler on hit or `None` on miss.
 
-New inline helpers in `crates/lyng/vm/src/vm/dispatch/property.rs`:
+New inline helpers in `crates/vm/src/vm/dispatch/property.rs`:
 - `Vm::try_named_property_polymorphic_fast_load`
 - `Vm::try_named_property_polymorphic_fast_store`
 - `Vm::try_keyed_named_polymorphic_fast_load`
@@ -172,7 +172,7 @@ and the one-hop proto block (Phase 3e):
 - `op_get_keyed_property` — dense-index + named-atom load sides
 - `op_set_keyed_property_common` — dense-index + named-atom store sides
 
-### Tests (`crates/lyng/vm/src/tests/inline_caches.rs`)
+### Tests (`crates/vm/src/tests/inline_caches.rs`)
 
 5 new tests covering Phase 3f-specific behavior:
 - `named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes`
@@ -220,17 +220,17 @@ existing `FeedbackVectorFootprint` accounting.)
 
 ## Files changed
 
-- `crates/lyng/vm/src/vm/feedback.rs` — `POLY_LIMIT` constant,
+- `crates/vm/src/vm/feedback.rs` — `POLY_LIMIT` constant,
   4 new sidecar fields on `NamedPropertyFeedback`, 4 new fields on
   `KeyedPropertyFeedback`, extended `refresh_monomorphic_fast` for
   both, 3 new lookup helpers, all reset paths cleared on cache
   transitions.
-- `crates/lyng/vm/src/vm/dispatch/property.rs` — 6 new inline
+- `crates/vm/src/vm/dispatch/property.rs` — 6 new inline
   helpers, 6 new call sites (Get/Set named, Get/Set keyed-dense,
   Get/Set keyed-named).
-- `crates/lyng/vm/src/vm/names.rs` — 3 new call sites
+- `crates/vm/src/vm/names.rs` — 3 new call sites
   (LoadGlobal, StoreGlobal, AssignGlobal).
-- `crates/lyng/vm/src/tests/inline_caches.rs` — 5 new tests +
+- `crates/vm/src/tests/inline_caches.rs` — 5 new tests +
   one shared `make_object_with_value` helper.
 - `reports/lyng/phase-3f-*` — bench, test262, asm snapshots,
   and this status report.

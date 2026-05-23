@@ -5,7 +5,7 @@ mirroring the op_add shape from DSL-0 / Phase 1.A.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -115,7 +115,7 @@ This is a known measurement artifact, not a real regression: every
 fast-path SMI subtract calls
 `call_slow!(op_sub_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The
 result: feedback-recording fast-path entries are counted as if they
 were full slow-path entries.
@@ -142,7 +142,7 @@ re-measured.
 
 - `cargo test --release -p lyng-vm --lib`: **418 passed**.
 - `cargo test --release -p lyng-tests`: **1209 passed**.
-- Two pre-existing failures in `crates/lyng/vm/tests/feedback_flat_consistency.rs`
+- Two pre-existing failures in `crates/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `64e3e5cb` with the op_sub changes reverted —

@@ -201,10 +201,10 @@ status reports say "all helpers fully inlined into each dispatch
 handler" ([phase-3f-status.md:60-76](phase-3f-status.md)).
 
 What actually happened: the handler in
-[`dispatch_handlers/property.rs:31-67`](../../../crates/lyng/vm/src/vm/dispatch_handlers/property.rs)
+[`dispatch_handlers/property.rs:31-67`](../../../crates/vm/src/vm/dispatch_handlers/property.rs)
 delegates to `Vm::execute_get_named_property_opcode`, a separate
 function with its own ABI prologue/epilogue
-([`dispatch/property.rs:70-200`](../../../crates/lyng/vm/src/vm/dispatch/property.rs)).
+([`dispatch/property.rs:70-200`](../../../crates/vm/src/vm/dispatch/property.rs)).
 The IC fast paths are inside *that* function, with this shape:
 
 ```rust
@@ -941,13 +941,13 @@ was supposed to encode but didn't.
   - `Source/JavaScriptCore/bytecode/GetByIdMetadata.h` (the mode-byte
     layout this roadmap calls "the missing IC shape").
 - Our current dispatch substrate:
-  - [`crates/lyng/vm/src/vm/dispatch_state.rs`](../../../crates/lyng/vm/src/vm/dispatch_state.rs)
+  - [`crates/vm/src/vm/dispatch_state.rs`](../../../crates/vm/src/vm/dispatch_state.rs)
     (`DispatchState`, `Step`, `dispatch_next!`, `run_trampoline`).
-  - [`crates/lyng/vm/src/vm/dispatch_handlers/property.rs`](../../../crates/lyng/vm/src/vm/dispatch_handlers/property.rs)
+  - [`crates/vm/src/vm/dispatch_handlers/property.rs`](../../../crates/vm/src/vm/dispatch_handlers/property.rs)
     (`op_get_named_property` and friends — the handlers).
-  - [`crates/lyng/vm/src/vm/dispatch/property.rs`](../../../crates/lyng/vm/src/vm/dispatch/property.rs)
+  - [`crates/vm/src/vm/dispatch/property.rs`](../../../crates/vm/src/vm/dispatch/property.rs)
     (`execute_get_named_property_opcode` and the 4-layer IC chain
     R-2 retires).
-  - [`crates/lyng/vm/src/vm/feedback.rs`](../../../crates/lyng/vm/src/vm/feedback.rs)
+  - [`crates/vm/src/vm/feedback.rs`](../../../crates/vm/src/vm/feedback.rs)
     (`NamedPropertyFeedback`, the packed-handler layout, the
     polymorphic sidecar — R-2 unifies these into one mode-byte branch).

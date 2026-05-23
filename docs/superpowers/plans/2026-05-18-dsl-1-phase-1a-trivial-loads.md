@@ -4,9 +4,9 @@
 
 **Goal:** Port 9 trivial constant-loader opcodes from cold-stub delegation to full inline DSL fast paths, producing the first measurable V8 v7 win on the new substrate.
 
-**Architecture:** Each opcode's `_dsl` handler in [`crates/lyng/vm/src/dsl/handlers/cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs) currently delegates 100% to a slow path. We replace each handler body with inline asm that writes the appropriate tagged `Value` to register `a` and tail-dispatches — bypassing the slow path entirely. The slow-path shim stays as the on-error fallback (where applicable — these opcodes have no fail mode, so the slow path becomes dead code and can be deleted).
+**Architecture:** Each opcode's `_dsl` handler in [`crates/vm/src/dsl/handlers/cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs) currently delegates 100% to a slow path. We replace each handler body with inline asm that writes the appropriate tagged `Value` to register `a` and tail-dispatches — bypassing the slow path entirely. The slow-path shim stays as the on-error fallback (where applicable — these opcodes have no fail mode, so the slow path becomes dead code and can be deleted).
 
-**Tech Stack:** Rust 2024 edition (stable, ≥1.88 for `naked_asm!`), `lyng-vm-dsl` proc-macro (existing), AArch64 backend macros in [`crates/lyng/vm/src/dsl/backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/) (existing).
+**Tech Stack:** Rust 2024 edition (stable, ≥1.88 for `naked_asm!`), `lyng-vm-dsl` proc-macro (existing), AArch64 backend macros in [`crates/vm/src/dsl/backend/aarch64/`](../../../crates/vm/src/dsl/backend/aarch64/) (existing).
 
 **Parent spec:** [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md) — Phase 1.A.
 
@@ -38,12 +38,12 @@ Five of these are outside the measured top-30 (load_undefined, _null, _true, _fa
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| [`crates/lyng/vm/src/dsl/handlers/cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs) | Modify | Replace cold-stub bodies for the 9 opcodes with inline DSL handlers. The `op_*_slow_rs` shims become dead code; delete those whose opcodes can never fail (all 6 const loaders), keep for `op_load_smi8`/`op_load_const8`/`op_load_this` only if they have a failure mode. |
-| [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs) | Possibly modify | Add `tag_smi_const!($reg, $payload)` if not present (one-shot tagged-SMI for `op_load_zero`/`op_load_one`/`op_load_smi8`). |
-| [`crates/lyng/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/operands.rs) | Possibly modify | May need `decode_ab_signed!` if the lowerer doesn't sign-extend `b` for `op_load_smi8`. Inspect during Task 7. |
-| [`crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/mod.rs) | Possibly modify | Re-export any new macros. |
-| [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md) | Modify | Document any new ops added. |
-| [`crates/lyng/vm/src/dsl/handlers/cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs) imports section (top of file) | Modify | Add new macros to the import list as needed. |
+| [`crates/vm/src/dsl/handlers/cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs) | Modify | Replace cold-stub bodies for the 9 opcodes with inline DSL handlers. The `op_*_slow_rs` shims become dead code; delete those whose opcodes can never fail (all 6 const loaders), keep for `op_load_smi8`/`op_load_const8`/`op_load_this` only if they have a failure mode. |
+| [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs) | Possibly modify | Add `tag_smi_const!($reg, $payload)` if not present (one-shot tagged-SMI for `op_load_zero`/`op_load_one`/`op_load_smi8`). |
+| [`crates/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/vm/src/dsl/backend/aarch64/operands.rs) | Possibly modify | May need `decode_ab_signed!` if the lowerer doesn't sign-extend `b` for `op_load_smi8`. Inspect during Task 7. |
+| [`crates/vm/src/dsl/backend/aarch64/mod.rs`](../../../crates/vm/src/dsl/backend/aarch64/mod.rs) | Possibly modify | Re-export any new macros. |
+| [`crates/vm/src/dsl/ops.md`](../../../crates/vm/src/dsl/ops.md) | Modify | Document any new ops added. |
+| [`crates/vm/src/dsl/handlers/cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs) imports section (top of file) | Modify | Add new macros to the import list as needed. |
 | [`reports/lyng/dsl-handlers/op_load_undefined.md`](../../../reports/lyng/dsl-handlers/) (and 8 more) | Create | One ported report per opcode with DSL source, current asm, LLInt reference, side-by-side diff, microbench data. |
 | [`reports/lyng/dsl-asm-baseline-aarch64/op_load_undefined.asm`](../../../reports/lyng/dsl-asm-baseline-aarch64/) (and 8 more) | Create | Captured asm baseline per opcode. |
 | [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml) | Modify | Calibrate `aarch64_max_instructions` budgets for the 4 top-30 opcodes (LoadSmi8, LoadThis, LoadZero, LoadConst8) from real measurements. |
@@ -168,8 +168,8 @@ Expected: clean commit; no other files staged.
 ## Task 1: Port `op_load_undefined` (canonical exemplar — full TDD detail)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:140-168` (replace the `op_load_undefined_dsl` handler body; delete `op_load_undefined_slow_rs`)
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` (top of file imports section — add `tag_undefined`, `store_reg`, `dispatch`, `decode_abx` to the use list if not already present)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:140-168` (replace the `op_load_undefined_dsl` handler body; delete `op_load_undefined_slow_rs`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` (top of file imports section — add `tag_undefined`, `store_reg`, `dispatch`, `decode_abx` to the use list if not already present)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_undefined.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_undefined.md`
 
@@ -191,7 +191,7 @@ If capture-llint fails on `auto`, retry with `--source excerpt` to use the offli
 
 - [ ] **Step 2: Read the existing cold-stub to confirm the layout**
 
-Inspect [crates/lyng/vm/src/dsl/handlers/cold.rs:140-168](../../../crates/lyng/vm/src/dsl/handlers/cold.rs). The current handler:
+Inspect [crates/vm/src/dsl/handlers/cold.rs:140-168](../../../crates/vm/src/dsl/handlers/cold.rs). The current handler:
 
 ```rust
 llint_handler! {
@@ -206,7 +206,7 @@ llint_handler! {
 
 - [ ] **Step 3: Confirm the relevant DSL macros exist**
 
-Check [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs) for `tag_undefined!`. It exists at line 203-210:
+Check [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs) for `tag_undefined!`. It exists at line 203-210:
 
 ```rust
 macro_rules! tag_undefined {
@@ -231,7 +231,7 @@ Expected: all `loads`-prefixed tests pass. This is the regression net we must pr
 
 - [ ] **Step 5: Write the new inline DSL handler**
 
-In [`crates/lyng/vm/src/dsl/handlers/cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs), replace lines 140-168 (the `op_load_undefined_dsl` handler block AND the `op_load_undefined_slow_rs` shim — the latter becomes dead code) with:
+In [`crates/vm/src/dsl/handlers/cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs), replace lines 140-168 (the `op_load_undefined_dsl` handler block AND the `op_load_undefined_slow_rs` shim — the latter becomes dead code) with:
 
 ```rust
 // =====================================================================
@@ -350,7 +350,7 @@ operand is unused (layout reserves the slot for forward compat).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -442,7 +442,7 @@ Fill in the `<fill from...>` placeholders with real numbers from the captured JS
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_undefined.asm \
   reports/lyng/dsl-handlers/op_load_undefined.md
 git commit -m "$(cat <<'EOF'
@@ -466,13 +466,13 @@ Expected: clean commit. `git status` shows clean.
 ## Task 2: Port `op_load_null`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:200-228` (replace `op_load_null_dsl` body; delete `op_load_null_slow_rs`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:200-228` (replace `op_load_null_dsl` body; delete `op_load_null_slow_rs`)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_null.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_null.md`
 
 - [ ] **Step 1: Confirm `tag_null!` macro exists**
 
-Inspect [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs) — `tag_null!` is at lines 212-220, producing `movz/movk` against tag pattern 0x7ff8_0002_0000_0000. 2 instructions.
+Inspect [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs) — `tag_null!` is at lines 212-220, producing `movz/movk` against tag pattern 0x7ff8_0002_0000_0000. 2 instructions.
 
 - [ ] **Step 2: Run behavioral tests to confirm starting green**
 
@@ -484,7 +484,7 @@ Expected: pass.
 
 - [ ] **Step 3: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs:200-228`, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs:200-228`, replace with:
 
 ```rust
 // =====================================================================
@@ -552,7 +552,7 @@ Create `reports/lyng/dsl-handlers/op_load_null.md` with the same structure as Ta
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_null.asm \
   reports/lyng/dsl-handlers/op_load_null.md
 git commit -m "$(cat <<'EOF'
@@ -571,13 +571,13 @@ EOF
 ## Task 3: Port `op_load_true`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:230-258` (replace `op_load_true_dsl` body; delete `op_load_true_slow_rs`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:230-258` (replace `op_load_true_dsl` body; delete `op_load_true_slow_rs`)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_true.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_true.md`
 
 - [ ] **Step 1: Confirm `tag_bool_const!` macro exists**
 
-Inspect [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs:222-231`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs): `tag_bool_const!` takes `($reg:tt, $payload:literal)` and produces 3 instructions:
+Inspect [`crates/vm/src/dsl/backend/aarch64/values.rs:222-231`](../../../crates/vm/src/dsl/backend/aarch64/values.rs): `tag_bool_const!` takes `($reg:tt, $payload:literal)` and produces 3 instructions:
 
 ```rust
 macro_rules! tag_bool_const {
@@ -603,7 +603,7 @@ Expected: pass.
 
 - [ ] **Step 3: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs:230-258`, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs:230-258`, replace with:
 
 ```rust
 // =====================================================================
@@ -671,7 +671,7 @@ Create `reports/lyng/dsl-handlers/op_load_true.md` mirroring Task 1's structure.
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_true.asm \
   reports/lyng/dsl-handlers/op_load_true.md
 git commit -m "$(cat <<'EOF'
@@ -690,7 +690,7 @@ EOF
 ## Task 4: Port `op_load_false`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:260-288` (replace `op_load_false_dsl` body; delete `op_load_false_slow_rs`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:260-288` (replace `op_load_false_dsl` body; delete `op_load_false_slow_rs`)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_false.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_false.md`
 
@@ -704,7 +704,7 @@ Expected: pass.
 
 - [ ] **Step 2: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs:260-288`, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs:260-288`, replace with:
 
 ```rust
 // =====================================================================
@@ -772,7 +772,7 @@ Create `reports/lyng/dsl-handlers/op_load_false.md` mirroring Task 3's report, s
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_false.asm \
   reports/lyng/dsl-handlers/op_load_false.md
 git commit -m "$(cat <<'EOF'
@@ -791,22 +791,22 @@ EOF
 ## Task 5: Port `op_load_zero` (SMI constant)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:290-318` (replace `op_load_zero_dsl` body; delete `op_load_zero_slow_rs`)
-- Possibly modify: `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (add `tag_smi_const!` if not present)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:290-318` (replace `op_load_zero_dsl` body; delete `op_load_zero_slow_rs`)
+- Possibly modify: `crates/vm/src/dsl/backend/aarch64/values.rs` (add `tag_smi_const!` if not present)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_zero.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_zero.md`
 
 - [ ] **Step 1: Check whether `tag_smi_const!` exists**
 
 ```bash
-grep -n "tag_smi_const" crates/lyng/vm/src/dsl/backend/aarch64/values.rs
+grep -n "tag_smi_const" crates/vm/src/dsl/backend/aarch64/values.rs
 ```
 
 If found, skip Step 2. If not, proceed to Step 2.
 
 - [ ] **Step 2: Add `tag_smi_const!` macro (if missing)**
 
-In [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs), after `tag_bool_const!` (around line 231), insert:
+In [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs), after `tag_bool_const!` (around line 231), insert:
 
 ```rust
 /// Tag a compile-time SMI literal payload into `$reg`. Produces a
@@ -824,9 +824,9 @@ macro_rules! tag_smi_const {
 }
 ```
 
-Also re-export from [`crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/mod.rs) if it has a per-macro re-export pattern; otherwise the `#[macro_export]` is sufficient.
+Also re-export from [`crates/vm/src/dsl/backend/aarch64/mod.rs`](../../../crates/vm/src/dsl/backend/aarch64/mod.rs) if it has a per-macro re-export pattern; otherwise the `#[macro_export]` is sufficient.
 
-Add an entry to [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md) under the value-tag section:
+Add an entry to [`crates/vm/src/dsl/ops.md`](../../../crates/vm/src/dsl/ops.md) under the value-tag section:
 
 ```markdown
 - `tag_smi_const!($reg, $payload)` — materialize a tagged SMI carrying a compile-time literal payload. 3 instructions. Used by `op_load_zero`, `op_load_one`, and similar constant-loaders.
@@ -842,7 +842,7 @@ Expected: pass.
 
 - [ ] **Step 4: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs:290-318`, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs:290-318`, replace with:
 
 ```rust
 // =====================================================================
@@ -912,9 +912,9 @@ LLInt reference: JSC's `op_load_zero` (if it exists; check captured reference) o
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
-  crates/lyng/vm/src/dsl/backend/aarch64/values.rs \
-  crates/lyng/vm/src/dsl/ops.md \
+  crates/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/backend/aarch64/values.rs \
+  crates/vm/src/dsl/ops.md \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_zero.asm \
   reports/lyng/dsl-handlers/op_load_zero.md
 git commit -m "$(cat <<'EOF'
@@ -936,7 +936,7 @@ EOF
 ## Task 6: Port `op_load_one` (SMI constant)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:320-348` (replace `op_load_one_dsl` body; delete `op_load_one_slow_rs`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:320-348` (replace `op_load_one_dsl` body; delete `op_load_one_slow_rs`)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_one.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_one.md`
 
@@ -950,7 +950,7 @@ Expected: pass.
 
 - [ ] **Step 2: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs:320-348`, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs:320-348`, replace with:
 
 ```rust
 // =====================================================================
@@ -1018,7 +1018,7 @@ Create `reports/lyng/dsl-handlers/op_load_one.md` mirroring Task 5's, swap paylo
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_one.asm \
   reports/lyng/dsl-handlers/op_load_one.md
 git commit -m "$(cat <<'EOF'
@@ -1037,8 +1037,8 @@ EOF
 ## Task 7: Port `op_load_smi8` (SMI with sign-extended i8 operand, top-30 #7)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:4242-4270` (approximate — confirm via grep `op_load_smi8_dsl` to locate; replace handler body; delete slow shim)
-- Possibly modify: `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (add `tag_smi_from_signed!` if `tag_smi!` can't be reused as-is for sign-extended payloads)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:4242-4270` (approximate — confirm via grep `op_load_smi8_dsl` to locate; replace handler body; delete slow shim)
+- Possibly modify: `crates/vm/src/dsl/backend/aarch64/values.rs` (add `tag_smi_from_signed!` if `tag_smi!` can't be reused as-is for sign-extended payloads)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_smi8.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_smi8.md`
 
@@ -1047,7 +1047,7 @@ This is the first Phase 1.A port to touch an operand value (not just a register 
 - [ ] **Step 1: Locate the current cold-stub**
 
 ```bash
-grep -n "op_load_smi8_dsl" crates/lyng/vm/src/dsl/handlers/cold.rs
+grep -n "op_load_smi8_dsl" crates/vm/src/dsl/handlers/cold.rs
 ```
 
 Expected: matches `llint_handler! { op_load_smi8_dsl, layout = Ab, length = 3, ...` and `op_load_smi8_slow_rs`.
@@ -1055,7 +1055,7 @@ Expected: matches `llint_handler! { op_load_smi8_dsl, layout = Ab, length = 3, .
 - [ ] **Step 2: Inspect the existing semantic body**
 
 ```bash
-grep -n -A 20 "op_load_smi8_semantic" crates/lyng/vm/src/vm/semantics/loads.rs
+grep -n -A 20 "op_load_smi8_semantic" crates/vm/src/vm/semantics/loads.rs
 ```
 
 Expected: function takes args including the i8 payload, sign-extends to i32, calls `Value::from_smi32` (or equivalent), writes to register. The inline DSL must replicate: sign-extend i8 → i32, then tag as SMI.
@@ -1070,7 +1070,7 @@ Expected: pass.
 
 - [ ] **Step 4: Check whether `untag_smi!` / `tag_smi!` compose correctly**
 
-Inspect `tag_smi!` at [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs:178-188`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs):
+Inspect `tag_smi!` at [`crates/vm/src/dsl/backend/aarch64/values.rs:178-188`](../../../crates/vm/src/dsl/backend/aarch64/values.rs):
 
 ```rust
 macro_rules! tag_smi {
@@ -1125,7 +1125,7 @@ macro_rules! tag_smi_from_signed_byte {
 
 Option (b) is cleaner. Add the macro in this step.
 
-In [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs), after `tag_smi_const!` (added in Task 5), insert:
+In [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs), after `tag_smi_const!` (added in Task 5), insert:
 
 ```rust
 /// Tag a signed-byte payload (already in `$reg` as the low byte of a
@@ -1147,7 +1147,7 @@ macro_rules! tag_smi_from_signed_byte {
 }
 ```
 
-Add an entry to [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md):
+Add an entry to [`crates/vm/src/dsl/ops.md`](../../../crates/vm/src/dsl/ops.md):
 
 ```markdown
 - `tag_smi_from_signed_byte!($reg)` — sign-extend i8 in low byte of `$reg`, then tag as SMI. 3 instructions. Used by `op_load_smi8`.
@@ -1155,7 +1155,7 @@ Add an entry to [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/ds
 
 - [ ] **Step 5: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs` at the `op_load_smi8_dsl` location, replace with:
+In `crates/vm/src/dsl/handlers/cold.rs` at the `op_load_smi8_dsl` location, replace with:
 
 ```rust
 // =====================================================================
@@ -1251,9 +1251,9 @@ Create `reports/lyng/dsl-handlers/op_load_smi8.md` with:
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
-  crates/lyng/vm/src/dsl/backend/aarch64/values.rs \
-  crates/lyng/vm/src/dsl/ops.md \
+  crates/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/backend/aarch64/values.rs \
+  crates/vm/src/dsl/ops.md \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_smi8.asm \
   reports/lyng/dsl-handlers/op_load_smi8.md
 git commit -m "$(cat <<'EOF'
@@ -1276,9 +1276,9 @@ EOF
 ## Task 8: Port `op_load_const8` (constant pool access, top-30 #21)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` (locate `op_load_const8_dsl` at approximately line 4273; replace body)
-- Possibly create: a new DSL op in [`crates/lyng/vm/src/dsl/backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/) for constant-pool access
-- Possibly modify: [`crates/lyng/vm/src/dsl/llint_state.rs`](../../../crates/lyng/vm/src/dsl/llint_state.rs) (if the constant pool base isn't already on `LlIntState`)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` (locate `op_load_const8_dsl` at approximately line 4273; replace body)
+- Possibly create: a new DSL op in [`crates/vm/src/dsl/backend/aarch64/`](../../../crates/vm/src/dsl/backend/aarch64/) for constant-pool access
+- Possibly modify: [`crates/vm/src/dsl/llint_state.rs`](../../../crates/vm/src/dsl/llint_state.rs) (if the constant pool base isn't already on `LlIntState`)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_const8.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_const8.md`
 
@@ -1287,7 +1287,7 @@ This is the first Phase 1.A port that needs runtime data lookup (the code's cons
 - [ ] **Step 1: Locate the current cold-stub and inspect**
 
 ```bash
-grep -n "op_load_const8" crates/lyng/vm/src/dsl/handlers/cold.rs | head -10
+grep -n "op_load_const8" crates/vm/src/dsl/handlers/cold.rs | head -10
 ```
 
 Expected: line ~4273 for `op_load_const8_dsl` and a slow-path shim nearby.
@@ -1297,7 +1297,7 @@ Inspect lines ~4270-4300 to see the current handler shape and the slow path's ar
 - [ ] **Step 2: Inspect the semantic body to understand the data path**
 
 ```bash
-grep -n -A 25 "op_load_const8_semantic" crates/lyng/vm/src/vm/semantics/loads.rs
+grep -n -A 25 "op_load_const8_semantic" crates/vm/src/vm/semantics/loads.rs
 ```
 
 Expected: semantic body reads `state.frame.code.constants[b as usize]` and writes to register `a`. Confirm exactly which field of which structure holds the constants array — needed to encode the offset in the inline DSL.
@@ -1308,10 +1308,10 @@ The pinned `STATE` register (x24 on AArch64) points at `LlIntState`. The constan
 - `state.rust_context` → `LlIntRustContext.installed.code.constants` (multiple dereferences)
 - OR through a dedicated `frame_const_base` field on `LlIntState` (if one was added during DSL-0a)
 
-Inspect [`crates/lyng/vm/src/dsl/llint_state.rs`](../../../crates/lyng/vm/src/dsl/llint_state.rs):
+Inspect [`crates/vm/src/dsl/llint_state.rs`](../../../crates/vm/src/dsl/llint_state.rs):
 
 ```bash
-grep -n "const\|constant" crates/lyng/vm/src/dsl/llint_state.rs
+grep -n "const\|constant" crates/vm/src/dsl/llint_state.rs
 ```
 
 If there's a `frame_const_base: *const Value` field, the inline path is one indirection: `ldr xT, [STATE, #FRAME_CONST_OFFSET]; ldr xR, [xT, xIdx, lsl #3]; store_reg!(a, R); dispatch!()`.
@@ -1324,7 +1324,7 @@ If not, the inline path needs to chase `rust_context` → `installed` → `code`
 
 - [ ] **Step 4: If inline path is viable, add a `load_constant!` macro**
 
-If proceeding inline (i.e., `frame_const_base` exists), add to [`crates/lyng/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/operands.rs) (or `objects.rs`, whichever is the natural home):
+If proceeding inline (i.e., `frame_const_base` exists), add to [`crates/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/vm/src/dsl/backend/aarch64/operands.rs) (or `objects.rs`, whichever is the natural home):
 
 ```rust
 /// Load a constant from the active frame's constant pool into `$dst`.
@@ -1342,11 +1342,11 @@ macro_rules! load_constant {
 }
 ```
 
-Note: this assumes a `const LLINTSTATE_FRAME_CONST_BASE_OFFSET: usize = offset_of!(LlIntState, frame_const_base)` is exposed by [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs). If not, add the const there.
+Note: this assumes a `const LLINTSTATE_FRAME_CONST_BASE_OFFSET: usize = offset_of!(LlIntState, frame_const_base)` is exposed by [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs). If not, add the const there.
 
 Actually — `stringify!(LLINTSTATE_FRAME_CONST_BASE_OFFSET)` won't substitute the value, it'll produce the literal string. The proc-macro lowerer's binding mechanism (the named-arg pattern from DSL-0b's `entry_observed`, `state_pc_offset`, etc.) is the right path. See the existing `dispatch!()` macro and how it references `state_pc_off` for the binding shape — mirror that.
 
-Document in [`ops.md`](../../../crates/lyng/vm/src/dsl/ops.md):
+Document in [`ops.md`](../../../crates/vm/src/dsl/ops.md):
 
 ```markdown
 - `load_constant!($idx => $dst)` — load a Value from the active frame's constant pool at `$idx` (byte index, zero-extended). 2 instructions. Used by `op_load_const8`.
@@ -1354,7 +1354,7 @@ Document in [`ops.md`](../../../crates/lyng/vm/src/dsl/ops.md):
 
 - [ ] **Step 5: Replace the handler body**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs` at `op_load_const8_dsl`:
+In `crates/vm/src/dsl/handlers/cold.rs` at `op_load_const8_dsl`:
 
 ```rust
 // =====================================================================
@@ -1438,11 +1438,11 @@ If a refactor was needed and skipped this opcode, instead create a note document
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
-  crates/lyng/vm/src/dsl/backend/aarch64/operands.rs \
-  crates/lyng/vm/src/dsl/llint_state.rs \
-  crates/lyng/vm/src/dsl/reg_convention.rs \
-  crates/lyng/vm/src/dsl/ops.md \
+  crates/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/backend/aarch64/operands.rs \
+  crates/vm/src/dsl/llint_state.rs \
+  crates/vm/src/dsl/reg_convention.rs \
+  crates/vm/src/dsl/ops.md \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_const8.asm \
   reports/lyng/dsl-handlers/op_load_const8.md
 git commit -m "$(cat <<'EOF'
@@ -1467,8 +1467,8 @@ Adjust the `git add` list to only include files actually modified — if `llint_
 ## Task 9: Port `op_load_this` (frame-context access, top-30 #12)
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:956-980` (locate `op_load_this_dsl`; replace body)
-- Possibly modify: [`crates/lyng/vm/src/dsl/llint_state.rs`](../../../crates/lyng/vm/src/dsl/llint_state.rs) and [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs) (if `frame_this_value` isn't already an asm-visible field)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:956-980` (locate `op_load_this_dsl`; replace body)
+- Possibly modify: [`crates/vm/src/dsl/llint_state.rs`](../../../crates/vm/src/dsl/llint_state.rs) and [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs) (if `frame_this_value` isn't already an asm-visible field)
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_load_this.asm`
 - Create: `reports/lyng/dsl-handlers/op_load_this.md`
 
@@ -1477,7 +1477,7 @@ Adjust the `git add` list to only include files actually modified — if `llint_
 - [ ] **Step 1: Inspect the semantic body**
 
 ```bash
-grep -n -A 25 "op_load_this_semantic" crates/lyng/vm/src/vm/semantics/loads.rs
+grep -n -A 25 "op_load_this_semantic" crates/vm/src/vm/semantics/loads.rs
 ```
 
 Expected: function reads `state.frame.this()` or similar accessor and writes to register `a`. Identify exactly which path the data takes.
@@ -1624,7 +1624,7 @@ Create `reports/lyng/dsl-handlers/op_load_this.md` with the inline path's shape 
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/handlers/cold.rs \
+  crates/vm/src/dsl/handlers/cold.rs \
   reports/lyng/dsl-asm-baseline-aarch64/op_load_this.asm \
   reports/lyng/dsl-handlers/op_load_this.md
 git commit -m "$(cat <<'EOF'

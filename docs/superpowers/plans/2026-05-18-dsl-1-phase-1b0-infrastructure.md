@@ -26,14 +26,14 @@ At plan completion: counter infrastructure produces correct per-opcode dispatch 
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| [`crates/lyng/vm/src/opcode_counts.rs`](../../../crates/lyng/vm/src/opcode_counts.rs) | Modify | Add `DispatchCounters` `#[repr(C)]` struct with 3 flat counter banks. Update `OpcodeDispatchCounterStore` API to read from flat arrays. |
-| [`crates/lyng/vm/src/vm.rs`](../../../crates/lyng/vm/src/vm.rs) | Modify | Replace `Option<OpcodeDispatchCounterStore>` field with `Box<DispatchCounters>` (always allocated when feature is on). |
-| [`crates/lyng/vm/src/dsl/reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs) | Modify | Add `VM_DISPATCH_COUNTERS_PTR_OFFSET`, `DISPATCH_COUNTER_BANK_DISPATCH`, `DISPATCH_COUNTER_BANK_SLOW_SEMANTIC`, `DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT` consts via `offset_of!`. |
-| [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs) | Modify | Replace existing `inc_counter!` macro with three new variants: `inc_dispatch_counter!`, `inc_slow_semantic_counter!`, `inc_slow_safepoint_counter!`, each taking `$opcode_byte:literal`. |
-| [`crates/lyng/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) | Modify | Wire `inc_slow_semantic_counter!` into `call_slow!` macros (needs opcode-byte parameter). Wire `inc_slow_safepoint_counter!` into the slow path of `poll_safepoint!`. |
-| [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) | Modify | Emit `inc_dispatch_counter!(OPCODE_BYTE)` at the start of every generated handler body. Map handler name → Opcode discriminant. Also pass `opcode_byte` as a binding so the call_slow!/poll_safepoint! macros can use it. |
+| [`crates/vm/src/opcode_counts.rs`](../../../crates/vm/src/opcode_counts.rs) | Modify | Add `DispatchCounters` `#[repr(C)]` struct with 3 flat counter banks. Update `OpcodeDispatchCounterStore` API to read from flat arrays. |
+| [`crates/vm/src/vm.rs`](../../../crates/vm/src/vm.rs) | Modify | Replace `Option<OpcodeDispatchCounterStore>` field with `Box<DispatchCounters>` (always allocated when feature is on). |
+| [`crates/vm/src/dsl/reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs) | Modify | Add `VM_DISPATCH_COUNTERS_PTR_OFFSET`, `DISPATCH_COUNTER_BANK_DISPATCH`, `DISPATCH_COUNTER_BANK_SLOW_SEMANTIC`, `DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT` consts via `offset_of!`. |
+| [`crates/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/vm/src/dsl/backend/aarch64/counters.rs) | Modify | Replace existing `inc_counter!` macro with three new variants: `inc_dispatch_counter!`, `inc_slow_semantic_counter!`, `inc_slow_safepoint_counter!`, each taking `$opcode_byte:literal`. |
+| [`crates/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/vm/src/dsl/backend/aarch64/control.rs) | Modify | Wire `inc_slow_semantic_counter!` into `call_slow!` macros (needs opcode-byte parameter). Wire `inc_slow_safepoint_counter!` into the slow path of `poll_safepoint!`. |
+| [`crates/vm-dsl/src/lower.rs`](../../../crates/vm-dsl/src/lower.rs) | Modify | Emit `inc_dispatch_counter!(OPCODE_BYTE)` at the start of every generated handler body. Map handler name → Opcode discriminant. Also pass `opcode_byte` as a binding so the call_slow!/poll_safepoint! macros can use it. |
 | [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs) | Modify | Add 14 new `Snippet` entries: 7 Phase-1.A opcodes + 7 Phase-1.B anchors. |
-| [`crates/lyng/vm/tests/`](../../../crates/lyng/vm/tests/) | Modify or Create | Update `ll_int_state_offsets_stable` to also check `Vm` size + `dispatch_counters` offset. Add counter-correctness test (Move dispatch count on Richards ≈ 4.66B ± 5%). |
+| [`crates/vm/tests/`](../../../crates/vm/tests/) | Modify or Create | Update `ll_int_state_offsets_stable` to also check `Vm` size + `dispatch_counters` offset. Add counter-correctness test (Move dispatch count on Richards ≈ 4.66B ± 5%). |
 | [`reports/lyng/dsl-1/phase-1b0-summary.md`](../../../reports/lyng/dsl-1/) | Create | Sub-phase gate summary with measured counter overhead + CI95 confirmation per opcode. |
 
 ---
@@ -42,8 +42,8 @@ At plan completion: counter infrastructure produces correct per-opcode dispatch 
 
 **Files:**
 - Read: [`reports/lyng/dsl-1/phase-1a-summary.md`](../../../reports/lyng/dsl-1/phase-1a-summary.md)
-- Read: [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)
-- Read: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs)
+- Read: [`crates/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/vm/src/dsl/backend/aarch64/counters.rs)
+- Read: [`crates/vm-dsl/src/lower.rs`](../../../crates/vm-dsl/src/lower.rs)
 
 - [ ] **Step 1: Verify all tests pass at starting HEAD**
 
@@ -75,7 +75,7 @@ Records the starting HEAD SHA, V8 v7 numbers, and machine load for the eventual 
 - [ ] **Step 4: Locate `Opcode` enum + OPCODE_COUNT**
 
 ```bash
-grep -n "pub enum Opcode\|OPCODE_COUNT" crates/lyng/bytecode/src/lib.rs crates/lyng/bytecode/src/*.rs 2>&1 | head -10
+grep -n "pub enum Opcode\|OPCODE_COUNT" crates/bytecode/src/lib.rs crates/bytecode/src/*.rs 2>&1 | head -10
 ```
 
 Confirm: `OPCODE_COUNT` is a `u8` const for the number of opcode variants (likely 152). Verify the `Opcode` enum's discriminant assignment is `#[repr(u8)]` so `opcode as u8` gives the dispatch byte.
@@ -84,7 +84,7 @@ This is needed for the lowerer task — the lowerer must resolve a handler symbo
 
 - [ ] **Step 5: Inspect the proc-macro lowerer**
 
-Read [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) (276 lines). Note:
+Read [`crates/vm-dsl/src/lower.rs`](../../../crates/vm-dsl/src/lower.rs) (276 lines). Note:
 - How the lowerer builds the `naked_asm!` template (the bindings section).
 - Where in the emission order the operand-decode prologue is emitted.
 - What named-arg bindings are already in place (`length`, `state_pc`, `state_pb`, `state_regs`, `state_fv`, `state_prefix`, `vm_poll`, `entry_stride_shift`, `entry_observed`, `exit`).
@@ -111,9 +111,9 @@ No git commit needed — the baseline files are in /tmp. This step exists to rec
 ## Task 1: Add `DispatchCounters` struct + replace `Option<...>` Vm field
 
 **Files:**
-- Modify: `crates/lyng/vm/src/opcode_counts.rs:1-130` (add `DispatchCounters` struct; rewrite `OpcodeDispatchCounterStore` to wrap it)
-- Modify: `crates/lyng/vm/src/vm.rs:166` (replace field) + `vm.rs:253` (replace initializer) + `vm.rs:309-368` (rewrite the enable/disable/reset/snapshot/maybe_record API)
-- Test: `crates/lyng/vm/tests/dispatch_counters_layout.rs` (new — verify struct size + offset stability)
+- Modify: `crates/vm/src/opcode_counts.rs:1-130` (add `DispatchCounters` struct; rewrite `OpcodeDispatchCounterStore` to wrap it)
+- Modify: `crates/vm/src/vm.rs:166` (replace field) + `vm.rs:253` (replace initializer) + `vm.rs:309-368` (rewrite the enable/disable/reset/snapshot/maybe_record API)
+- Test: `crates/vm/tests/dispatch_counters_layout.rs` (new — verify struct size + offset stability)
 
 - [ ] **Step 1: Add `DispatchCounters` struct to `opcode_counts.rs`**
 
@@ -259,7 +259,7 @@ Note: this changes the previous interior-mutability via `Cell<u64>` to direct `u
 
 - [ ] **Step 3: Update `Vm` struct field**
 
-In `crates/lyng/vm/src/vm.rs` around line 166, replace:
+In `crates/vm/src/vm.rs` around line 166, replace:
 
 ```rust
 opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
@@ -329,7 +329,7 @@ Remove the `maybe_record_opcode_dispatch` function entirely. Any callers (search
 
 - [ ] **Step 5: Add the layout-stability test**
 
-Create `crates/lyng/vm/tests/dispatch_counters_layout.rs`:
+Create `crates/vm/tests/dispatch_counters_layout.rs`:
 
 ```rust
 //! Verify `DispatchCounters` layout is stable for asm access.
@@ -360,7 +360,7 @@ fn dispatch_counters_field_offsets_are_stable() {
 }
 ```
 
-You'll need to add `pub use opcode_counts::DispatchCounters;` to `crates/lyng/vm/src/lib.rs` for the test to find it.
+You'll need to add `pub use opcode_counts::DispatchCounters;` to `crates/vm/src/lib.rs` for the test to find it.
 
 - [ ] **Step 6: Build + run tests**
 
@@ -378,10 +378,10 @@ If the build fails on a removed `maybe_record_opcode_dispatch` caller, fix it (l
 
 ```bash
 git add \
-  crates/lyng/vm/src/opcode_counts.rs \
-  crates/lyng/vm/src/vm.rs \
-  crates/lyng/vm/src/lib.rs \
-  crates/lyng/vm/tests/dispatch_counters_layout.rs
+  crates/vm/src/opcode_counts.rs \
+  crates/vm/src/vm.rs \
+  crates/vm/src/lib.rs \
+  crates/vm/tests/dispatch_counters_layout.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 1: add DispatchCounters with asm-stable layout
 
@@ -407,19 +407,19 @@ EOF
 ## Task 2: Add asm-stable offset consts in reg_convention.rs
 
 **Files:**
-- Modify: [`crates/lyng/vm/src/dsl/reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs)
+- Modify: [`crates/vm/src/dsl/reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs)
 
 - [ ] **Step 1: Read the existing offset-const layout**
 
 ```bash
-cat crates/lyng/vm/src/dsl/reg_convention.rs
+cat crates/vm/src/dsl/reg_convention.rs
 ```
 
 Identify the existing offset consts (`LLINT_STATE_FRAME_PC_OFFSET`, etc.) and the pattern they use.
 
 - [ ] **Step 2: Add the new VM-relative consts**
 
-In `crates/lyng/vm/src/dsl/reg_convention.rs`, after the existing offset consts (likely near the bottom, before the closing `}` if there's a module), add:
+In `crates/vm/src/dsl/reg_convention.rs`, after the existing offset consts (likely near the bottom, before the closing `}` if there's a module), add:
 
 ```rust
 // =============================================================================
@@ -476,7 +476,7 @@ Expected: clean build. If `offset_of!` complains about field access, make `dispa
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/reg_convention.rs crates/lyng/vm/src/vm.rs
+git add crates/vm/src/dsl/reg_convention.rs crates/vm/src/vm.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 2: add VM-relative counter offset consts
 
@@ -494,7 +494,7 @@ EOF
 ## Task 3: Replace `inc_counter!` macro with three bank variants
 
 **Files:**
-- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)
+- Modify: [`crates/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/vm/src/dsl/backend/aarch64/counters.rs)
 
 - [ ] **Step 1: Read the existing macro**
 
@@ -502,7 +502,7 @@ The current macro at lines 24-41 takes `$opcode_byte:literal` and emits 4 instru
 
 - [ ] **Step 2: Replace with three bank-specific macros**
 
-Rewrite `crates/lyng/vm/src/dsl/backend/aarch64/counters.rs` to:
+Rewrite `crates/vm/src/dsl/backend/aarch64/counters.rs` to:
 
 ```rust
 //! Opcode-counter increments, gated by `--features opcode-counters`.
@@ -624,7 +624,7 @@ Expected: clean build in both configurations. The macros must be no-op when the 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/backend/aarch64/counters.rs
+git add crates/vm/src/dsl/backend/aarch64/counters.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 3: three bank-specific counter macros
 
@@ -647,15 +647,15 @@ EOF
 ## Task 4: Wire `inc_dispatch_counter!` into the proc-macro lowerer
 
 **Files:**
-- Modify: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs)
-- Modify: [`crates/lyng/vm-dsl/src/parse.rs`](../../../crates/lyng/vm-dsl/src/parse.rs) (possibly — if the parsed handler signature needs to expose the opcode byte)
+- Modify: [`crates/vm-dsl/src/lower.rs`](../../../crates/vm-dsl/src/lower.rs)
+- Modify: [`crates/vm-dsl/src/parse.rs`](../../../crates/vm-dsl/src/parse.rs) (possibly — if the parsed handler signature needs to expose the opcode byte)
 
 This is the most involved change in Phase 1.B.0. The lowerer must map each handler symbol (e.g., `op_load_undefined_dsl`) to its `Opcode` discriminant byte (e.g., the LoadUndefined variant) and emit `inc_dispatch_counter!(BYTE)` at the start of every handler.
 
 - [ ] **Step 1: Read the lowerer's symbol-handling code**
 
 ```bash
-cat crates/lyng/vm-dsl/src/lower.rs | head -150
+cat crates/vm-dsl/src/lower.rs | head -150
 ```
 
 Identify: where the handler's symbol name (the `op_xxx_dsl` ident) is consumed. Look for `quote::format_ident!` or similar that builds the generated `fn op_xxx_dsl()` definition.
@@ -666,7 +666,7 @@ The lowerer needs to compute the Opcode discriminant byte for a given handler na
 
 **(a)** Hard-code the mapping in the lowerer (`match handler_name { "op_load_undefined_dsl" => 5_u8, ... }`) — brittle, requires updating the lowerer for every new opcode.
 
-**(b)** Use the `crate::DSL_DISPATCH_TABLE` manifest from `crates/lyng/vm/src/dsl/opcode_manifest.rs` to map handler-symbol → Opcode at COMPILE TIME via a build script.
+**(b)** Use the `crate::DSL_DISPATCH_TABLE` manifest from `crates/vm/src/dsl/opcode_manifest.rs` to map handler-symbol → Opcode at COMPILE TIME via a build script.
 
 **(c)** Make the user supply the opcode byte in the `llint_handler!` invocation: `llint_handler! { op_load_undefined_dsl, opcode = 5, layout = Abx, ... }`. Lowerer reads the opcode arg.
 
@@ -719,7 +719,7 @@ This is option (c-revised) with safety check. Most flexible; lowerer doesn't nee
 
 - [ ] **Step 3: Update the parser to accept `opcode_byte = N`**
 
-In `crates/lyng/vm-dsl/src/parse.rs`, find the handler-signature parsing (likely a struct like `ParsedHandler` or similar). Add an `opcode_byte: u8` field. Parse it from `opcode_byte = <LITERAL>` in the signature.
+In `crates/vm-dsl/src/parse.rs`, find the handler-signature parsing (likely a struct like `ParsedHandler` or similar). Add an `opcode_byte: u8` field. Parse it from `opcode_byte = <LITERAL>` in the signature.
 
 ```rust
 // Existing field set probably has: name, layout, length, args, body.
@@ -821,9 +821,9 @@ Whatever approach the subagent picks, the emission goal is the same: every gener
 
 - [ ] **Step 5 (continued): Update all 152 `llint_handler!` callsites if needed**
 
-If the subagent chose option (c-revised), every existing `llint_handler!` callsite in [`crates/lyng/vm/src/dsl/handlers/`](../../../crates/lyng/vm/src/dsl/handlers/) (hot.rs, warm.rs, cold.rs) needs the new `opcode_byte = N` parameter added.
+If the subagent chose option (c-revised), every existing `llint_handler!` callsite in [`crates/vm/src/dsl/handlers/`](../../../crates/vm/src/dsl/handlers/) (hot.rs, warm.rs, cold.rs) needs the new `opcode_byte = N` parameter added.
 
-Use `grep -n "llint_handler!" crates/lyng/vm/src/dsl/handlers/*.rs` to find them all.
+Use `grep -n "llint_handler!" crates/vm/src/dsl/handlers/*.rs` to find them all.
 
 For each, look up the corresponding `Opcode::X as u8` value (from `bytecode/src/lib.rs`'s `Opcode` enum, or by inspecting the dispatch table) and add the literal.
 
@@ -859,11 +859,11 @@ Inspect `/tmp/post-task4-counter.json`. The Move opcode count should be ~4.66B (
 
 ```bash
 git add \
-  crates/lyng/vm-dsl/src/lower.rs \
-  crates/lyng/vm-dsl/src/parse.rs \
-  crates/lyng/vm/src/dsl/handlers/hot.rs \
-  crates/lyng/vm/src/dsl/handlers/warm.rs \
-  crates/lyng/vm/src/dsl/handlers/cold.rs
+  crates/vm-dsl/src/lower.rs \
+  crates/vm-dsl/src/parse.rs \
+  crates/vm/src/dsl/handlers/hot.rs \
+  crates/vm/src/dsl/handlers/warm.rs \
+  crates/vm/src/dsl/handlers/cold.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 4: wire inc_dispatch_counter! into lowerer
 
@@ -887,9 +887,9 @@ EOF
 ## Task 5: Wire slow-path counters into call_slow! and poll_safepoint!
 
 **Files:**
-- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) (`call_slow!` macros)
-- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs) (`poll_safepoint!` macro)
-- Modify: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) (pass `opcode_byte` as a binding so the macros can reference it)
+- Modify: [`crates/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/vm/src/dsl/backend/aarch64/control.rs) (`call_slow!` macros)
+- Modify: [`crates/vm/src/dsl/backend/aarch64/safepoint.rs`](../../../crates/vm/src/dsl/backend/aarch64/safepoint.rs) (`poll_safepoint!` macro)
+- Modify: [`crates/vm-dsl/src/lower.rs`](../../../crates/vm-dsl/src/lower.rs) (pass `opcode_byte` as a binding so the macros can reference it)
 
 - [ ] **Step 1: Pass `opcode_byte` as a named binding**
 
@@ -903,7 +903,7 @@ So the per-handler `naked_asm!` has access to `{opcode_byte}` as a literal that 
 
 - [ ] **Step 2: Update `call_slow!` macros to emit slow-semantic counter increment**
 
-In `crates/lyng/vm/src/dsl/backend/aarch64/control.rs`, modify the `call_slow!` macros (each arity variant). Before the `bl {<shim>}` instruction, insert `inc_slow_semantic_counter!({opcode_byte})`.
+In `crates/vm/src/dsl/backend/aarch64/control.rs`, modify the `call_slow!` macros (each arity variant). Before the `bl {<shim>}` instruction, insert `inc_slow_semantic_counter!({opcode_byte})`.
 
 Concretely, for the 0-arg variant (lines 97-106):
 
@@ -994,9 +994,9 @@ If counts look sensible, commit.
 
 ```bash
 git add \
-  crates/lyng/vm/src/dsl/backend/aarch64/control.rs \
-  crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs \
-  crates/lyng/vm-dsl/src/lower.rs
+  crates/vm/src/dsl/backend/aarch64/control.rs \
+  crates/vm/src/dsl/backend/aarch64/safepoint.rs \
+  crates/vm-dsl/src/lower.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 5: wire slow-path counters into call_slow! / poll_safepoint!
 

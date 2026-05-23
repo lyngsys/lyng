@@ -38,9 +38,9 @@ and concerns / observations from execution.
 
 Real semantic extractions: 148. Stubs (delegating to `op_unimplemented`): 4 (`InstanceOf`, `CallMethod`, `Wide`, `ExtraWide` — though `Wide` and `ExtraWide` have real semantic bodies; only `InstanceOf` and `CallMethod` are stubs because their α handlers are themselves stubs).
 
-Files added under `crates/lyng/vm/src/vm/semantics/`: 12 (`loads.rs`, `arithmetic.rs`, `control_flow.rs`, `property.rs`, `names.rs`, `scope.rs`, `calls.rs`, `iterators.rs`, `generators.rs`, `exceptions.rs`, `prefix.rs`, `misc.rs`) plus `mod.rs`.
+Files added under `crates/vm/src/vm/semantics/`: 12 (`loads.rs`, `arithmetic.rs`, `control_flow.rs`, `property.rs`, `names.rs`, `scope.rs`, `calls.rs`, `iterators.rs`, `generators.rs`, `exceptions.rs`, `prefix.rs`, `misc.rs`) plus `mod.rs`.
 
-α handler files in `crates/lyng/vm/src/vm/dispatch_handlers/` thinned to operand-decode + `LlIntDispatchState::from_alpha(...)` + call-semantic + `translate_outcome_to_step(...)` — each handler is now 5-15 lines.
+α handler files in `crates/vm/src/vm/dispatch_handlers/` thinned to operand-decode + `LlIntDispatchState::from_alpha(...)` + call-semantic + `translate_outcome_to_step(...)` — each handler is now 5-15 lines.
 
 ## 2. Exit-criterion verification (§10 DSL-0a)
 
@@ -48,9 +48,9 @@ The design lists five exit criteria:
 
 | # | Criterion | Status | Evidence |
 |--:|---|---|---|
-| 1 | Every `Opcode` variant appears in `OPCODES` (Manifest Test 1) | ✓ | `crates/lyng/vm/src/dsl/opcode_manifest.rs::manifest_tests::opcodes_manifest_is_exhaustive` passes; `OPCODES.len() == OPCODE_COUNT == 152` |
-| 2 | Every `semantic_symbol` resolves to a real function (Manifest Test 2) | ✓ | `crates/lyng/vm/src/dsl/opcode_manifest.rs::manifest_tests::semantic_fn_ptrs_resolve` passes; `SEMANTIC_FN_PTRS.len() == 152`, all non-null |
-| 3 | Source-grep smoke test passes (Manifest Test 4) | ✓ | `crates/lyng/vm/tests/dsl_manifest_grep.rs::no_op_functions_outside_semantics_and_handlers` passes |
+| 1 | Every `Opcode` variant appears in `OPCODES` (Manifest Test 1) | ✓ | `crates/vm/src/dsl/opcode_manifest.rs::manifest_tests::opcodes_manifest_is_exhaustive` passes; `OPCODES.len() == OPCODE_COUNT == 152` |
+| 2 | Every `semantic_symbol` resolves to a real function (Manifest Test 2) | ✓ | `crates/vm/src/dsl/opcode_manifest.rs::manifest_tests::semantic_fn_ptrs_resolve` passes; `SEMANTIC_FN_PTRS.len() == 152`, all non-null |
+| 3 | Source-grep smoke test passes (Manifest Test 4) | ✓ | `crates/vm/tests/dsl_manifest_grep.rs::no_op_functions_outside_semantics_and_handlers` passes |
 | 4 | `cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler` passes at same count as Pre-flight 4 | ✓ | 1796 passed (was 1793 at Pre-flight 4; +3 from new manifest tests), 1 ignored (was 1; the un-ignored gains are accounted by `+2`, and the remaining ignored is an unrelated doctest) |
 | 5 | Test262 pass count ≥ Pre-flight 7 baseline (49728/49729) | ✓ — **gained** | 49729/49729 passing — 100% pass rate, **gained 1 test vs Pre-flight baseline.** See `reports/lyng/dsl-0a-test262.md`. |
 
@@ -130,18 +130,18 @@ The pre-A18 α handler rejected `Wide; Wide; ...` with `VmError::InstructionOutO
 
 **Major new paths:**
 
-- `crates/lyng/vm/src/dsl/mod.rs`
-- `crates/lyng/vm/src/dsl/opcode_manifest.rs` (~1500 lines — OpcodeEntry + OPCODES + SEMANTIC_FN_PTRS + Tests 1, 2)
-- `crates/lyng/vm/src/dsl/slow_path.rs` (~70 lines — SemanticOutcome, LlIntDispatchState)
-- `crates/lyng/vm/src/vm/semantics/{mod.rs, loads.rs, arithmetic.rs, control_flow.rs, property.rs, names.rs, scope.rs, calls.rs, iterators.rs, generators.rs, exceptions.rs, prefix.rs, misc.rs}` (~5000 lines total)
-- `crates/lyng/vm/tests/dsl_manifest_grep.rs` (~70 lines)
+- `crates/vm/src/dsl/mod.rs`
+- `crates/vm/src/dsl/opcode_manifest.rs` (~1500 lines — OpcodeEntry + OPCODES + SEMANTIC_FN_PTRS + Tests 1, 2)
+- `crates/vm/src/dsl/slow_path.rs` (~70 lines — SemanticOutcome, LlIntDispatchState)
+- `crates/vm/src/vm/semantics/{mod.rs, loads.rs, arithmetic.rs, control_flow.rs, property.rs, names.rs, scope.rs, calls.rs, iterators.rs, generators.rs, exceptions.rs, prefix.rs, misc.rs}` (~5000 lines total)
+- `crates/vm/tests/dsl_manifest_grep.rs` (~70 lines)
 
 **Touched policy:**
 
-- `crates/lyng/vm/src/error.rs` — added `VmError::DoublePrefix` variant.
-- `crates/lyng/vm/src/lib.rs` — `pub mod dsl;` and `pub(crate) mod vm;` (visibility widening for cross-module access).
-- `crates/lyng/vm/src/vm.rs` — `pub(crate) mod dispatch_state;`, `pub(crate) mod semantics;`.
-- `crates/lyng/vm/src/vm/install.rs` — `pub(crate) struct InstalledFunction` (transitive visibility from `DispatchState::installed`).
+- `crates/vm/src/error.rs` — added `VmError::DoublePrefix` variant.
+- `crates/vm/src/lib.rs` — `pub mod dsl;` and `pub(crate) mod vm;` (visibility widening for cross-module access).
+- `crates/vm/src/vm.rs` — `pub(crate) mod dispatch_state;`, `pub(crate) mod semantics;`.
+- `crates/vm/src/vm/install.rs` — `pub(crate) struct InstalledFunction` (transitive visibility from `DispatchState::installed`).
 
 ## 6. Hand-off to DSL-0b
 
@@ -159,7 +159,7 @@ DSL-0b lands the asm-DSL substrate:
 
 The α handlers retain their thin shape during DSL-0b. DSL-0c flips the dispatch path and deletes alpha + tier-accounting machinery.
 
-DSL-0a dcat ticket (`lyng-3ne7`) and all 19 sub-tickets are in `in_review` awaiting user approval to close. **Per `crates/lyng/AGENTS.md`: tickets are NEVER closed without explicit user approval.**
+DSL-0a dcat ticket (`lyng-3ne7`) and all 19 sub-tickets are in `in_review` awaiting user approval to close. **Per `crates/AGENTS.md`: tickets are NEVER closed without explicit user approval.**
 
 ## 7. Status
 

@@ -21,7 +21,7 @@ Complete the substrate win started by DSL-0. Port the remaining 28 top-30 hot op
 - **Pointer-identity cells refactor** — `ObjectRef = u32` → `*mut Cell`, eliminating the side-table indirection on every object-record access (parent §9, ~3-4 weeks).
 - Per-handler ported reports under [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
 - Per-handler asm baselines under [`reports/lyng/dsl-asm-baseline-aarch64/`](../../../reports/lyng/dsl-asm-baseline-aarch64/).
-- New DSL ops added to [`crates/lyng/vm/src/dsl/backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/) as ports demand them, documented in `ops.md`.
+- New DSL ops added to [`crates/vm/src/dsl/backend/aarch64/`](../../../crates/vm/src/dsl/backend/aarch64/) as ports demand them, documented in `ops.md`.
 - Phase summary reports under `reports/lyng/dsl-1/`.
 - Final DSL-1 decision document at `reports/lyng/dsl-1/dsl-1-completion.md`.
 
@@ -308,11 +308,11 @@ These don't block DSL-1 but should be answered with data during the phases:
 - **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) — full substrate design; this spec is a faithful execution of its §10 DSL-1 phase.
 - **Measured top-30 dispatch shares:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv).
 - **Hot-opcodes config:** [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml).
-- **DSL backend:** [`crates/lyng/vm/src/dsl/`](../../../crates/lyng/vm/src/dsl/) — substrate from DSL-0.
-- **Existing DSL handlers (12 from DSL-0):** [`crates/lyng/vm/src/dsl/handlers/hot.rs`](../../../crates/lyng/vm/src/dsl/handlers/hot.rs), [`warm.rs`](../../../crates/lyng/vm/src/dsl/handlers/warm.rs), [`cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs).
-- **Semantic bodies (all 152):** [`crates/lyng/vm/src/vm/semantics/`](../../../crates/lyng/vm/src/vm/semantics/).
-- **DSL ops vocabulary:** [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md), [`backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/).
+- **DSL backend:** [`crates/vm/src/dsl/`](../../../crates/vm/src/dsl/) — substrate from DSL-0.
+- **Existing DSL handlers (12 from DSL-0):** [`crates/vm/src/dsl/handlers/hot.rs`](../../../crates/vm/src/dsl/handlers/hot.rs), [`warm.rs`](../../../crates/vm/src/dsl/handlers/warm.rs), [`cold.rs`](../../../crates/vm/src/dsl/handlers/cold.rs).
+- **Semantic bodies (all 152):** [`crates/vm/src/vm/semantics/`](../../../crates/vm/src/vm/semantics/).
+- **DSL ops vocabulary:** [`crates/vm/src/dsl/ops.md`](../../../crates/vm/src/dsl/ops.md), [`backend/aarch64/`](../../../crates/vm/src/dsl/backend/aarch64/).
 - **Existing ported reports (12 from DSL-0):** [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
 - **Existing asm baselines:** [`reports/lyng/dsl-asm-baseline-aarch64/`](../../../reports/lyng/dsl-asm-baseline-aarch64/).
 - **JSC LLInt reference:** `/Users/sondre/dev/WebKit/Source/JavaScriptCore/llint/LowLevelInterpreter64.asm` (read-only reference, not vendored).
-- **Engineering standards:** [`docs/lyng/engineering-standards.md`](../../lyng/engineering-standards.md), [`AGENTS.md`](../../../AGENTS.md), [`crates/lyng/AGENTS.md`](../../../crates/lyng/AGENTS.md).
+- **Engineering standards:** [`docs/lyng/engineering-standards.md`](../../lyng/engineering-standards.md), [`AGENTS.md`](../../../AGENTS.md), [`crates/AGENTS.md`](../../../crates/AGENTS.md).

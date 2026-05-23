@@ -15,7 +15,7 @@ Two inline ports + 1 substrate extension across commits `e7a6cfab..dfa45a77`:
 
 Combined dispatch share added: **654M / V8 v7 run**.
 
-**Substrate change:** `mul_smi_overflow!` in `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` extended from 4 → 7 instructions to add ECMAScript -0 deferral (`cbnz + orr + tbnz` after the overflow check). The existing `script_core_specialized_smi_arithmetic_preserves_negative_zero` test caught the regression in the first op_mul compile; the macro fix produces `-0` correctly via the slow path for `(-1)*0`-style cases, matching the reference impl `smi_mul_result` in `vm/dispatch/arithmetic.rs:21-26`.
+**Substrate change:** `mul_smi_overflow!` in `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` extended from 4 → 7 instructions to add ECMAScript -0 deferral (`cbnz + orr + tbnz` after the overflow check). The existing `script_core_specialized_smi_arithmetic_preserves_negative_zero` test caught the regression in the first op_mul compile; the macro fix produces `-0` correctly via the slow path for `(-1)*0`-style cases, matching the reference impl `smi_mul_result` in `vm/dispatch/arithmetic.rs:21-26`.
 
 ## A/B vs pre-1.C.1 HEAD
 
@@ -39,7 +39,7 @@ This is informational per Phase 1.B retrospective lesson #2; the phase-close cum
 
 ## Measurement-discipline caveat
 
-The per-opcode `<20%` slow-path-share gate could not be honestly enforced for op_sub or op_mul in 1.C.1 due to a substrate-wide artifact: the `call_slow!` macro auto-injects `inc_slow_semantic_counter!` regardless of label scope (see `crates/lyng/vm-dsl/src/lower.rs` `inject_opcode_byte`). The fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocation therefore counts as a "slow-path semantic entry", giving artificially 100% share for all opcodes using the record-smi shim pattern (op_add since DSL-0, now op_sub and op_mul).
+The per-opcode `<20%` slow-path-share gate could not be honestly enforced for op_sub or op_mul in 1.C.1 due to a substrate-wide artifact: the `call_slow!` macro auto-injects `inc_slow_semantic_counter!` regardless of label scope (see `crates/vm-dsl/src/lower.rs` `inject_opcode_byte`). The fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocation therefore counts as a "slow-path semantic entry", giving artificially 100% share for all opcodes using the record-smi shim pattern (op_add since DSL-0, now op_sub and op_mul).
 
 Spec §1.6 + §5 explicitly allow per-opcode waivers with justification; both ported reports document the waiver per-workload. The substrate fix is tracked as a Phase 1.C followup — see `followups` section below.
 
@@ -62,7 +62,7 @@ Spec §1.6 + §5 explicitly allow per-opcode waivers with justification; both po
 
 Pinned for Phase 1.C close (and the `phase-1c-followups.md` doc):
 
-1. **`inject_opcode_byte` counter-injection discipline (substrate fix).** Track a `seen_label: bool` flag during the body-token walk in `crates/lyng/vm-dsl/src/lower.rs::inject_opcode_byte` so fast-path `call_slow!` invocations (before any `.label:` declaration) don't bump `inc_slow_semantic_counter!`. Estimated effort: ~10 lines + one regression test. Unblocks honest slow-path-share enforcement for op_add, op_sub, op_mul, and all subsequent record-shim-pattern Phase 1.C ports (and Phase 1.D comparison ops which will use the same pattern).
+1. **`inject_opcode_byte` counter-injection discipline (substrate fix).** Track a `seen_label: bool` flag during the body-token walk in `crates/vm-dsl/src/lower.rs::inject_opcode_byte` so fast-path `call_slow!` invocations (before any `.label:` declaration) don't bump `inc_slow_semantic_counter!`. Estimated effort: ~10 lines + one regression test. Unblocks honest slow-path-share enforcement for op_add, op_sub, op_mul, and all subsequent record-shim-pattern Phase 1.C ports (and Phase 1.D comparison ops which will use the same pattern).
 
 2. **`verify_opcodes_per_iter` coverage gap.** Mul snippet (plus pre-existing Sub, Add, Move) are not in the verified-names list of the microbench self-test. Add the missing names once each snippet's `opcodes_per_iter` is confirmed against real opcode-count data. The Mul snippet's `| 0` co-dispatch (a `BitOr` per iter) needs accounting.
 

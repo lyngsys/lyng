@@ -4,7 +4,7 @@
 
 **Goal:** Port 7 SMI arithmetic + bitwise opcodes from cold-stub delegation to inline DSL fast paths, adding ~1.75B inlined dispatches per V8 v7 run on top of Phase 1.B's +8.51% cumulative baseline.
 
-**Architecture:** Three sub-phases grouped by asm shape. 1.C.1 binary-with-overflow (op_sub, op_mul); 1.C.2 bitwise-no-overflow (op_bit_and, op_shift_left, op_shift_right); 1.C.3 unary-with-new-macros (op_increment, op_decrement). Each port replaces a cold-stub `llint_handler!` body in `crates/lyng/vm/src/dsl/handlers/cold.rs` with inline asm assembled from existing backend macros (`check_smi!`, `untag_smi!`, the arithmetic macros `*_smi_overflow!` / `*_smi!`, `tag_smi!`, `store_reg!`), plus a per-opcode `op_xxx_record_smi_rs` shim for fast-path feedback recording (mirrors `op_add_record_smi_rs` in `hot.rs`).
+**Architecture:** Three sub-phases grouped by asm shape. 1.C.1 binary-with-overflow (op_sub, op_mul); 1.C.2 bitwise-no-overflow (op_bit_and, op_shift_left, op_shift_right); 1.C.3 unary-with-new-macros (op_increment, op_decrement). Each port replaces a cold-stub `llint_handler!` body in `crates/vm/src/dsl/handlers/cold.rs` with inline asm assembled from existing backend macros (`check_smi!`, `untag_smi!`, the arithmetic macros `*_smi_overflow!` / `*_smi!`, `tag_smi!`, `store_reg!`), plus a per-opcode `op_xxx_record_smi_rs` shim for fast-path feedback recording (mirrors `op_add_record_smi_rs` in `hot.rs`).
 
 **Tech Stack:** Rust 2024 edition, `naked_asm!` (AArch64-only), proc-macro lowerer `lyng-vm-dsl`, `lyng-bench` measurement tool (microbench / asm-diff / v8suite / count-slow-path-share / require-isolation). All work targets aarch64-apple-darwin.
 
@@ -89,9 +89,9 @@ Apply this reference whenever the per-task bench commands below appear — they'
 
 ### Modified files
 
-- `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace 7 cold-stub `llint_handler!` bodies with inline fast paths; add 7 new `op_xxx_record_smi_rs` shims; update macro imports.
-- `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` — add 2 new macros (`inc_smi_overflow!`, `dec_smi_overflow!`).
-- `crates/lyng/vm/src/dsl/ops.md` — add entries for the 2 new macros.
+- `crates/vm/src/dsl/handlers/cold.rs` — replace 7 cold-stub `llint_handler!` bodies with inline fast paths; add 7 new `op_xxx_record_smi_rs` shims; update macro imports.
+- `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` — add 2 new macros (`inc_smi_overflow!`, `dec_smi_overflow!`).
+- `crates/vm/src/dsl/ops.md` — add entries for the 2 new macros.
 - `tools/lyng-bench/hot-opcodes.toml` — calibrate `aarch64_max_instructions` budgets for the 7 ports (replacing 0 placeholders).
 
 ### Created files
@@ -100,7 +100,7 @@ Apply this reference whenever the per-task bench commands below appear — they'
 - `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm` (and 6 more — manual captures per Phase 1.B precedent).
 - `reports/lyng/dsl-1/phase-1c1-summary.md`, `phase-1c2-summary.md`, `phase-1c3-summary.md`.
 - `reports/lyng/dsl-1/phase-1c-summary.md`, `phase-1c-followups.md`, `phase-1c-cumulative-ab.md`.
-- `crates/lyng/tests/src/dsl_increment_writeback.rs` (1 unit test for the SMI-elision claim in 1.C.3).
+- `crates/tests/src/dsl_increment_writeback.rs` (1 unit test for the SMI-elision claim in 1.C.3).
 - `reports/lyng/asm-dsl-engine-state-<date>.md` (post-phase engine snapshot — optional, can be a followup).
 
 ---
@@ -112,12 +112,12 @@ Two new backend macros for inc/dec, ~1 day. Self-review acceptable; runtime veri
 ## Task 1: Add `inc_smi_overflow!` and `dec_smi_overflow!` macros
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` (append after `bit_not_smi!`, around line 170)
-- Modify: `crates/lyng/vm/src/dsl/ops.md` (add entries in the arithmetic section)
+- Modify: `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` (append after `bit_not_smi!`, around line 170)
+- Modify: `crates/vm/src/dsl/ops.md` (add entries in the arithmetic section)
 
 - [ ] **Step 1: Append `inc_smi_overflow!` and `dec_smi_overflow!` to arithmetic.rs**
 
-Open `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` and append after the last existing macro (`bit_not_smi!`):
+Open `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` and append after the last existing macro (`bit_not_smi!`):
 
 ```rust
 /// 32-bit signed increment by 1 with overflow detection.
@@ -163,7 +163,7 @@ macro_rules! dec_smi_overflow {
 
 - [ ] **Step 2: Add `ops.md` entries**
 
-Open `crates/lyng/vm/src/dsl/ops.md`. Find the arithmetic table (search for `add_smi_overflow`). Add two rows after the bitwise rows for `bit_not_smi!`:
+Open `crates/vm/src/dsl/ops.md`. Find the arithmetic table (search for `add_smi_overflow`). Add two rows after the bitwise rows for `bit_not_smi!`:
 
 ```markdown
 | `inc_smi_overflow!` | `src => dst, label`   | `adds wDst, wSrc, #1; b.vs label; sxtw xDst, wDst`  | 3 instr |
@@ -182,7 +182,7 @@ Expected: compiles cleanly (no handlers use the new macros yet — they're only 
 
 - [ ] **Step 4: Self-review**
 
-Open `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
+Open `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
 - Both macros emit exactly 3 instructions.
 - `inc_smi_overflow!` uses `adds` + `b.vs` + `sxtw`.
 - `dec_smi_overflow!` uses `subs` + `b.vs` + `sxtw`.
@@ -191,7 +191,7 @@ Open `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs crates/lyng/vm/src/dsl/ops.md
+git add crates/vm/src/dsl/backend/aarch64/arithmetic.rs crates/vm/src/dsl/ops.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.0 Task 1: inc_smi_overflow!/dec_smi_overflow! macros
 
@@ -218,14 +218,14 @@ Two ports, ~3-4 days. op_sub first (mechanical mirror of op_add), then op_mul (s
 ## Task 2: Port op_sub inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_sub_dsl` body (around line 1050) and add `op_sub_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_sub_dsl` body (around line 1050) and add `op_sub_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_sub.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Sub`
 
 - [ ] **Step 1: Read the current cold-stub**
 
-Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and locate `op_sub_dsl` (currently around line 1050). The body looks like:
+Open `crates/vm/src/dsl/handlers/cold.rs` and locate `op_sub_dsl` (currently around line 1050). The body looks like:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -281,7 +281,7 @@ llint_handler! {
 
 - [ ] **Step 4: Add the `op_sub_record_smi_rs` shim immediately after the `op_sub_dsl` block**
 
-Add this shim (modeled on `op_add_record_smi_rs` in `crates/lyng/vm/src/dsl/handlers/hot.rs:88-106`) directly after the `op_sub_dsl` `llint_handler!` block and before the existing `op_sub_slow_rs`:
+Add this shim (modeled on `op_add_record_smi_rs` in `crates/vm/src/dsl/handlers/hot.rs:88-106`) directly after the `op_sub_dsl` `llint_handler!` block and before the existing `op_sub_slow_rs`:
 
 ```rust
 /// Fast-path feedback-recording shim for `op_sub`. Mirrors
@@ -379,7 +379,7 @@ mirroring the op_add shape from DSL-0 / Phase 1.A.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs` (around line 1050):
+`crates/vm/src/dsl/handlers/cold.rs` (around line 1050):
 
 ```rust
 llint_handler! {
@@ -405,7 +405,7 @@ llint_handler! {
 ## Slow-path shims
 
 - `op_sub_slow_rs` (unchanged; pre-existing cold-stub shim — invoked from the `.slow` label on SMI miss or overflow).
-- `op_sub_record_smi_rs` (NEW; fast-path feedback recording — mirrors `op_add_record_smi_rs`). Lives next to the handler. See `crates/lyng/vm/src/dsl/handlers/cold.rs` around line <line>.
+- `op_sub_record_smi_rs` (NEW; fast-path feedback recording — mirrors `op_add_record_smi_rs`). Lives next to the handler. See `crates/vm/src/dsl/handlers/cold.rs` around line <line>.
 
 ## Current asm
 
@@ -483,7 +483,7 @@ Set `<measured + 2>` to the instruction count from the ported report (~28-32 exp
 - [ ] **Step 13: Commit the op_sub port**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_sub.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -511,14 +511,14 @@ EOF
 ## Task 3: Port op_mul inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_mul_dsl` body (around line 1120) and add `op_mul_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_mul_dsl` body (around line 1120) and add `op_mul_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_mul.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Mul`
 
 - [ ] **Step 1: Read the current cold-stub**
 
-Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and locate `op_mul_dsl` (around line 1120). Current body:
+Open `crates/vm/src/dsl/handlers/cold.rs` and locate `op_mul_dsl` (around line 1120). Current body:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -670,7 +670,7 @@ If a per-workload waiver was documented in the ported report, also update `targe
 - [ ] **Step 13: Commit the op_mul port**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_mul.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -829,7 +829,7 @@ Three ports, ~3 days. All use the no-overflow shape (no `b.vs` branch — the `*
 ## Task 5: Port op_bit_and inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_bit_and_dsl` body (around line 1435) and add `op_bit_and_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_bit_and_dsl` body (around line 1435) and add `op_bit_and_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_bit_and.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `BitAnd`
@@ -936,7 +936,7 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_bit_and.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -960,7 +960,7 @@ EOF
 ## Task 6: Port op_shift_left inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_shift_left_dsl` body (around line 1539) and add `op_shift_left_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_shift_left_dsl` body (around line 1539) and add `op_shift_left_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_shift_left.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftLeft`
@@ -1063,7 +1063,7 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_shift_left.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -1085,7 +1085,7 @@ EOF
 ## Task 7: Port op_shift_right inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_shift_right_dsl` body (around line 1574) and add `op_shift_right_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_shift_right_dsl` body (around line 1574) and add `op_shift_right_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_shift_right.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftRight`
@@ -1190,7 +1190,7 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_shift_right.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -1312,14 +1312,14 @@ Two ports + 1 unit test, ~3 days. Uses the new `inc_smi_overflow!`/`dec_smi_over
 ## Task 9: Port op_increment inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_increment_dsl` body (around line 1678) and add `op_increment_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_increment_dsl` body (around line 1678) and add `op_increment_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_increment.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Increment`
 
 - [ ] **Step 1: Re-confirm the SMI-elision claim by reading the semantic**
 
-Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and `crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833` side by side. Confirm:
+Open `crates/vm/src/dsl/handlers/cold.rs` and `crates/vm/src/vm/semantics/arithmetic.rs:796-833` side by side. Confirm:
 
 1. `op_update_register_semantic` (the shared body for op_increment/op_decrement) writes `numeric` to `args.src` BEFORE writing `value` to `args.dst` (line 825).
 2. For SMI src, `numeric` equals the original src value (the Vm helper `update_register_value` returns `(numeric=ToNumeric(src), value=numeric±1)`; ToNumeric on SMI is identity).
@@ -1423,7 +1423,7 @@ Use the same template as the prior ports, with an extra section documenting the 
 ## SMI-elision of src register writeback
 
 The semantic body `op_update_register_semantic` (at
-[`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`](../../../crates/lyng/vm/src/vm/semantics/arithmetic.rs#L796-L833))
+[`crates/vm/src/vm/semantics/arithmetic.rs:796-833`](../../../crates/vm/src/vm/semantics/arithmetic.rs#L796-L833))
 writes `numeric = ToNumeric(src)` back to the src register before
 writing the post-update value to dst. For SMI src, `ToNumeric` is
 identity (`Value::from_smi(s).as_smi() == Some(s)`), so the writeback
@@ -1431,7 +1431,7 @@ is observationally a no-op.
 
 The inline fast path elides this writeback. The slow path (entered on
 non-SMI src) still performs it via `op_increment_semantic`. The
-[`dsl_increment_writeback`](../../../crates/lyng/tests/src/dsl_increment_writeback.rs)
+[`dsl_increment_writeback`](../../../crates/tests/src/dsl_increment_writeback.rs)
 unit test exercises a non-SMI src reaching the slow path and asserts
 the writeback still happens.
 ```
@@ -1450,7 +1450,7 @@ x86_64_max_instructions = 0
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_increment.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -1478,7 +1478,7 @@ EOF
 ## Task 10: Port op_decrement inline fast path
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_decrement_dsl` body (around line 1712) and add `op_decrement_record_smi_rs` shim
+- Modify: `crates/vm/src/dsl/handlers/cold.rs` — replace `op_decrement_dsl` body (around line 1712) and add `op_decrement_record_smi_rs` shim
 - Create: `reports/lyng/dsl-handlers/op_decrement.md`
 - Create: `reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm`
 - Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Decrement`
@@ -1582,7 +1582,7 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+git add crates/vm/src/dsl/handlers/cold.rs \
         reports/lyng/dsl-handlers/op_decrement.md \
         reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm \
         tools/lyng-bench/hot-opcodes.toml
@@ -1608,12 +1608,12 @@ EOF
 ## Task 11: Unit test for inc/dec non-SMI-src writeback
 
 **Files:**
-- Create: `crates/lyng/tests/src/dsl_increment_writeback.rs`
-- Modify: `crates/lyng/tests/src/lib.rs` — add `mod dsl_increment_writeback;` (if `lib.rs` uses module declarations) or update the relevant test-module index
+- Create: `crates/tests/src/dsl_increment_writeback.rs`
+- Modify: `crates/tests/src/lib.rs` — add `mod dsl_increment_writeback;` (if `lib.rs` uses module declarations) or update the relevant test-module index
 
 - [ ] **Step 1: Locate the existing test crate's module index**
 
-Open `crates/lyng/tests/src/lib.rs`. Look for how other dsl_* tests are registered (e.g., `mod dsl_validation_xyz;` lines). The new test file must follow the same registration pattern.
+Open `crates/tests/src/lib.rs`. Look for how other dsl_* tests are registered (e.g., `mod dsl_validation_xyz;` lines). The new test file must follow the same registration pattern.
 
 - [ ] **Step 2: Identify what JS expression compiles to op_increment with non-SMI src**
 
@@ -1635,7 +1635,7 @@ If no JS expression in the current language surface compiles to `op_increment` w
 
 - [ ] **Step 3: Write the failing test**
 
-Create `crates/lyng/tests/src/dsl_increment_writeback.rs`:
+Create `crates/tests/src/dsl_increment_writeback.rs`:
 
 ```rust
 //! Verifies that `op_increment` and `op_decrement` still perform the
@@ -1689,7 +1689,7 @@ fn decrement_string_src_writes_coerced_numeric_back_to_src() {
 }
 ```
 
-If `lyng_vm::test_helpers::eval_expr` doesn't exist, look for the equivalent existing helper in `crates/lyng/tests/src/` (check how other dsl_* tests evaluate JS) and adapt the call.
+If `lyng_vm::test_helpers::eval_expr` doesn't exist, look for the equivalent existing helper in `crates/tests/src/` (check how other dsl_* tests evaluate JS) and adapt the call.
 
 - [ ] **Step 4: Run the test and verify it passes**
 
@@ -1705,7 +1705,7 @@ If the test fails, the most likely cause is either:
 - [ ] **Step 5: Commit the unit test**
 
 ```bash
-git add crates/lyng/tests/src/dsl_increment_writeback.rs crates/lyng/tests/src/lib.rs
+git add crates/tests/src/dsl_increment_writeback.rs crates/tests/src/lib.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.3 Task 11: inc/dec non-SMI src writeback test
 

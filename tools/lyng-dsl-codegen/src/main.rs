@@ -1,6 +1,6 @@
 //! Cold-stub codegen for DSL-0b (B46–B47).
 //!
-//! Emits `crates/lyng/vm/src/dsl/handlers/cold.rs`, populating one
+//! Emits `crates/vm/src/dsl/handlers/cold.rs`, populating one
 //! `llint_handler!` block + matching `op_xxx_slow_rs` shim per Cold
 //! opcode listed in [`COLD_STUBS`].
 //!
@@ -153,7 +153,7 @@ const fn f(name: &'static str, expr: &'static str) -> Field {
 ///
 /// Order doesn't matter — the tool sorts by Opcode discriminant before
 /// emitting to keep the output stable. Each entry must cover one
-/// Cold-categorized opcode from `crates/lyng/vm/src/dsl/opcode_manifest.rs`.
+/// Cold-categorized opcode from `crates/vm/src/dsl/opcode_manifest.rs`.
 ///
 /// Mismatch with the manifest is caught at link time by the
 /// `dsl_handler_symbol` resolution test (Test 3).
@@ -2163,7 +2163,7 @@ fn opcode_snake_name(op: Opcode) -> String {
     // Hand-coded snake-case mapping per the manifest's existing
     // semantic-symbol names. Single source of truth: the
     // `semantic_symbol` strings in
-    // `crates/lyng/vm/src/dsl/opcode_manifest.rs`.
+    // `crates/vm/src/dsl/opcode_manifest.rs`.
     match op {
         Opcode::Star0 => "op_star_0".to_string(),
         Opcode::Star1 => "op_star_1".to_string(),
@@ -2900,9 +2900,9 @@ fn main() {
 
     // Determine output path. The tool runs from the workspace root
     // (cargo's working-directory convention), so the relative path
-    // resolves to `crates/lyng/vm/src/dsl/handlers/cold.rs`.
+    // resolves to `crates/vm/src/dsl/handlers/cold.rs`.
     let cwd = std::env::current_dir().expect("current_dir");
-    let output_path = cwd.join("crates/lyng/vm/src/dsl/handlers/cold.rs");
+    let output_path = cwd.join("crates/vm/src/dsl/handlers/cold.rs");
     if !output_path.parent().map(Path::exists).unwrap_or(false) {
         panic!(
             "expected cold.rs parent dir to exist: {}",

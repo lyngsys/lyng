@@ -6,7 +6,7 @@ operand is unused (layout reserves the slot for forward compat).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -169,7 +169,7 @@ Both green; behavioral parity preserved.
   cold-stub bridge to `op_load_undefined_semantic`; with the inline
   fast path it has no callers (grep confirmed only self-references)
   and was removed alongside the handler-body change.
-- **Manifest entry unchanged.** `crates/lyng/vm/src/dsl/opcode_manifest.rs:84`
+- **Manifest entry unchanged.** `crates/vm/src/dsl/opcode_manifest.rs:84`
   references `op_load_undefined_dsl` (the handler symbol, not the
   shim). The symbol identity is preserved; only the body changed.
 - **Pre-existing infra gaps acknowledged (not fixed by this task):**

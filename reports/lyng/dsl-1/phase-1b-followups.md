@@ -18,7 +18,7 @@ access throwing ReferenceError) is NOT directly tested through JS".
   arrow-function tests in
   `crates/lyng-tests/tests/op_load_this_inline.rs` (which trigger
   the Lexical arm) and via the structural validation handler in
-  `crates/lyng/vm/tests/dsl_validation_frame_context.rs`
+  `crates/vm/tests/dsl_validation_frame_context.rs`
   (`load_uninit_lex_sentinel_handler_compiles_and_links`, opcode 213).
 - The Uninitialized arm itself is exercised via the
   `op_load_this_semantic` slow path which existing language tests
@@ -65,7 +65,7 @@ class+super() prerequisite is in place.
   symbols and compares emitted asm against checked-in baselines.
 - Phase 1.A used the registry-driven flow.
 - Phase 1.B.2's two ports (`op_load_const8`, `op_load_this`) live
-  under `crates/lyng/vm/src/dsl/handlers/cold.rs` and are NOT in
+  under `crates/vm/src/dsl/handlers/cold.rs` and are NOT in
   the asm-diff registry. The asm baselines under
   `reports/lyng/dsl-asm-baseline-aarch64/` were captured
   manually.
@@ -144,7 +144,7 @@ sub-phase?" This is a process change, not a code change. Scope:
 
 **Date deferred:** 2026-05-20 (Phase 1.B.3 brainstorming)
 
-**Reason:** The semantic body in `crates/lyng/vm/src/vm/semantics/scope.rs:81-110`
+**Reason:** The semantic body in `crates/vm/src/vm/semantics/scope.rs:81-110`
 requires:
 
 - Reading `frame.lexical_env()` (not mirrored on LlIntState today)
@@ -172,7 +172,7 @@ LoadEnvSlot handler against it).
 **Date discovered:** 2026-05-20 (Phase 1.B.3 Task 1-4 implementation)
 
 **Finding:** The bytecode-builder peephole at
-`crates/lyng/bytecode/src/builder.rs:150-166`
+`crates/bytecode/src/builder.rs:150-166`
 (`compact_move_instruction`) evaluates `Move dst=0, src=B` → `Ldar B`
 (line 159-161) BEFORE the `store_local_opcode` branch (line 162).
 Consequently, `StoreLocal0` cannot be emitted from compiled JS

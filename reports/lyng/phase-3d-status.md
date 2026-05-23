@@ -73,10 +73,10 @@ through to the existing keyed slow chain unchanged.
 
 ### New types and infrastructure
 
-- `KeyedDenseIndexHandler` in `crates/lyng/objects/src/shapes.rs` —
+- `KeyedDenseIndexHandler` in `crates/objects/src/shapes.rs` —
   packs `(receiver_shape: NonZeroU32, receiver_flags: ObjectFlags u16)`
   into a single u64. Low half == 0 ⇒ NONE sentinel.
-- `ObjectFlags::bits` / `from_bits` in `crates/lyng/objects/src/core.rs`
+- `ObjectFlags::bits` / `from_bits` in `crates/objects/src/core.rs`
   — public raw 16-bit accessors needed by the packed handler.
 - 4 new sidecar fields on `KeyedPropertyFeedback`:
   `monomorphic_named_fast`, `monomorphic_named_fast_atom`,
@@ -87,9 +87,9 @@ through to the existing keyed slow chain unchanged.
   `observe_named_atom_slow_path`, `observe_dense_index`, and
   `promote_to_megamorphic`.
 - Two `Vm::keyed_property_{named,dense}_fast_handler` helpers in
-  `crates/lyng/vm/src/vm/feedback.rs` (inline-always).
+  `crates/vm/src/vm/feedback.rs` (inline-always).
 - Four `Vm::try_keyed_{dense,named}_fast_{load,store}` helpers in
-  `crates/lyng/vm/src/vm/dispatch/property.rs` (inline-always).
+  `crates/vm/src/vm/dispatch/property.rs` (inline-always).
 
 ## Verification
 
@@ -168,13 +168,13 @@ Report:
 ## Files changed
 
 **Phase 3d (1/2)** — infrastructure:
-- `crates/lyng/objects/src/core.rs` — `ObjectFlags::bits / from_bits` raw accessors.
-- `crates/lyng/objects/src/shapes.rs` — `KeyedDenseIndexHandler` packed type.
-- `crates/lyng/objects/src/lib.rs` — re-export `KeyedDenseIndexHandler`.
-- `crates/lyng/objects/src/tests.rs` — 3 unit tests for dense handler.
-- `crates/lyng/vm/src/vm/feedback.rs` — 4 sidecar fields + `refresh_monomorphic_fast` + 2 `Vm` lookup helpers.
+- `crates/objects/src/core.rs` — `ObjectFlags::bits / from_bits` raw accessors.
+- `crates/objects/src/shapes.rs` — `KeyedDenseIndexHandler` packed type.
+- `crates/objects/src/lib.rs` — re-export `KeyedDenseIndexHandler`.
+- `crates/objects/src/tests.rs` — 3 unit tests for dense handler.
+- `crates/vm/src/vm/feedback.rs` — 4 sidecar fields + `refresh_monomorphic_fast` + 2 `Vm` lookup helpers.
 
 **Phase 3d (2/2)** — consumer:
-- `crates/lyng/vm/src/vm/dispatch/property.rs` — 4 `#[inline(always)]` fast-path helpers + 6 inline call sites (2 dense get, 1 atom get, 2 dense set, 1 atom set).
+- `crates/vm/src/vm/dispatch/property.rs` — 4 `#[inline(always)]` fast-path helpers + 6 inline call sites (2 dense get, 1 atom get, 2 dense set, 1 atom set).
 
 Total Phase 3d diff: ~310 added lines + ~30 modified across 6 files.

@@ -15,7 +15,7 @@ full tagged Value is `0x7ff8_0004_0000_0000`.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -29,7 +29,7 @@ llint_handler! {
 
 ## New backend macro
 
-`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`:
+`crates/vm/src/dsl/backend/aarch64/values.rs`:
 
 ```rust
 #[macro_export]

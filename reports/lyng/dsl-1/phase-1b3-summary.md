@@ -152,7 +152,7 @@ slow-path-share + behavioral test outcomes.
 
 **Verdict:** PASS — matches umbrella §4 gate (≥ 49729 passing files).
 Phase 1.B.3 changed only inline-body code paths (the slow-path
-semantic bodies remain intact in `crates/lyng/vm/src/vm/semantics/`
+semantic bodies remain intact in `crates/vm/src/vm/semantics/`
 and are unchanged); no semantic surface was touched, so Test262 parity
 was expected.
 
@@ -181,7 +181,7 @@ from the Phase 1.B.1 retrospective lesson were applied directly:
 
 ### StoreLocal0 architectural unreachability
 
-The bytecode-builder peephole at `crates/lyng/bytecode/src/builder.rs:150-166`
+The bytecode-builder peephole at `crates/bytecode/src/builder.rs:150-166`
 (`compact_move_instruction`) evaluates `Move dst=0, src=B` → `Ldar B`
 BEFORE the `store_local_opcode` branch fires. Consequently,
 `StoreLocal0 = Opcode 148` cannot be emitted from compiled JS source;
@@ -207,7 +207,7 @@ validation tests missed the x22→x24 register-pin bug. Phase 1.B.3
 applied the lesson: every new macro has BOTH a structural
 compiles-and-links test (in `dsl_validation_frame_context.rs`, opcodes
 214 + 215) AND end-to-end integration tests in
-`crates/lyng/tests/src/op_{locals,ldar}_inline.rs` that
+`crates/tests/src/op_{locals,ldar}_inline.rs` that
 runtime-dispatch through the inline path. No register-pin-class bug
 slipped through. The new `load_local_fixed!` / `store_local_fixed!`
 macros use `x20` consistently (the REGS pin per `dsl/reg_convention`),

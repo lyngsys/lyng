@@ -1,6 +1,6 @@
 // DSL-0b op_extra_wide handler asm (AArch64).
 // Symbol: lyng_vm::dsl::handlers::warm::op_extra_wide
-// Source: crates/lyng/vm/src/dsl/handlers/warm.rs (B45)
+// Source: crates/vm/src/dsl/handlers/warm.rs (B45)
 // Layout: None (no operands), length = 1 byte.
 
 op_extra_wide:

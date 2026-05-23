@@ -44,7 +44,7 @@ Phase 1.C.1 was +0.31% geomean (mixed signal); Phase 1.C.2 is +3.04% (all positi
 
 ## Measurement-discipline caveat (continued from 1.C.1)
 
-The per-opcode `<20%` slow-path-share gate could not be honestly enforced for any of the three 1.C.2 ports due to the substrate-wide artifact: `call_slow!` macro auto-injects `inc_slow_semantic_counter!` regardless of label scope (see `crates/lyng/vm-dsl/src/lower.rs::inject_opcode_byte`). The fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocation incorrectly counts as a slow-path entry; share reads ~100% for all record-smi-shim-pattern opcodes.
+The per-opcode `<20%` slow-path-share gate could not be honestly enforced for any of the three 1.C.2 ports due to the substrate-wide artifact: `call_slow!` macro auto-injects `inc_slow_semantic_counter!` regardless of label scope (see `crates/vm-dsl/src/lower.rs::inject_opcode_byte`). The fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocation incorrectly counts as a slow-path entry; share reads ~100% for all record-smi-shim-pattern opcodes.
 
 **The fact that the A/B is strongly positive (+3.04%) confirms the artifact is purely instrumentation** — the actual execution correctly takes the inline fast path on SMI inputs. Spec §1.6 + §5 allow per-opcode waivers; all three ported reports document the per-workload waiver. Substrate fix tracked as Phase 1.C followup #1.
 
@@ -69,7 +69,7 @@ The per-opcode `<20%` slow-path-share gate could not be honestly enforced for an
 ## Followups (pinned for Phase 1.C close)
 
 Pinned from 1.C.1 still apply:
-1. **`inject_opcode_byte` counter-injection discipline** — substrate fix in `crates/lyng/vm-dsl/src/lower.rs`. Unblocks honest slow-path-share for all record-smi-shim opcodes.
+1. **`inject_opcode_byte` counter-injection discipline** — substrate fix in `crates/vm-dsl/src/lower.rs`. Unblocks honest slow-path-share for all record-smi-shim opcodes.
 2. **`verify_opcodes_per_iter` coverage** — add BitAnd/ShiftLeft/ShiftRight (plus pre-existing Sub/Mul/Add/Move) to the verified-names list once `opcodes_per_iter` is confirmed empirically.
 3. **op_mul float-workload trade-off** — consider a faster bail-out for non-SMI in op_mul (Phase 1.C.1 surfaced -2.56% on RayTrace).
 

@@ -20,7 +20,7 @@
 
 Asm baselines committed at [`reports/lyng/dsl-asm-baseline-aarch64/`](../dsl-asm-baseline-aarch64/) (7 files: `op_load_{undefined,null,true,false,zero,one,smi8}.asm`).
 Ported reports at [`reports/lyng/dsl-handlers/`](../dsl-handlers/) (7 files mirroring the asm baselines).
-Two new backend macros at [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs) (`tag_smi_const!`, `tag_smi_from_signed_byte!`).
+Two new backend macros at [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs) (`tag_smi_const!`, `tag_smi_from_signed_byte!`).
 
 ## V8 v7 movement vs pre-phase baseline
 
@@ -65,7 +65,7 @@ The observed +1.7% is consistent with `op_load_smi8` being the dominant contribu
 
 The plan's §4 per-opcode gates that could not be verified in this session:
 
-1. **Slow-path-share < 20% per opcode.** The `--count-slow-path-share` counter is no-op since DSL-0c removed the trampoline hook that called `maybe_record_opcode_dispatch` ([`crates/lyng/vm/src/vm.rs:335-353`](../../../crates/lyng/vm/src/vm.rs)). Counter wiring into the DSL `dispatch!` tail is required before this gate can be measured. **Follow-up: Task 10.A.**
+1. **Slow-path-share < 20% per opcode.** The `--count-slow-path-share` counter is no-op since DSL-0c removed the trampoline hook that called `maybe_record_opcode_dispatch` ([`crates/vm/src/vm.rs:335-353`](../../../crates/vm/src/vm.rs)). Counter wiring into the DSL `dispatch!` tail is required before this gate can be measured. **Follow-up: Task 10.A.**
 
 2. **Per-opcode microbench within 2× of LLInt.** Microbench snippets for the 9 Phase-1.A opcodes don't exist in [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs) — only `Move`, `Add`, `GetNamedProperty`, `Jump` have generators. **Follow-up: Task 10.B.**
 
@@ -77,11 +77,11 @@ The plan's §4 per-opcode gates that could not be verified in this session:
 
 **Goal:** restore per-opcode slow-path-share measurement so the DSL-1 < 20% slow-path-share invariant becomes enforceable.
 
-**Current state (verified post-Phase-1.A):** the `inc_counter!` macro already exists at [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs) emitting 4 instructions when the `opcode-counters` feature is on. It is NOT yet wired into the `dispatch!` tail. The macro references `{vm_counter_base}` — a binding that doesn't yet exist.
+**Current state (verified post-Phase-1.A):** the `inc_counter!` macro already exists at [`crates/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/vm/src/dsl/backend/aarch64/counters.rs) emitting 4 instructions when the `opcode-counters` feature is on. It is NOT yet wired into the `dispatch!` tail. The macro references `{vm_counter_base}` — a binding that doesn't yet exist.
 
 **Scope:**
 1. Add a flat `[u64; 256]` counter array as an asm-stable field on `Vm` (currently the storage is `Option<OpcodeDispatchCounterStore>`, accessed via Rust APIs and unsuitable for direct asm load).
-2. Add `VM_OPCODE_COUNTER_OFFSET` const in [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs).
+2. Add `VM_OPCODE_COUNTER_OFFSET` const in [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs).
 3. Update `OpcodeDispatchCounterStore::snapshot` to read from the flat array.
 4. Invoke `inc_counter!` from the DSL `dispatch!` macro tail with the destination opcode byte.
 5. Add separate banks for `slow_path_semantic` and `slow_path_safepoint` counters, with their own invocation sites in `call_slow!` / `poll_safepoint!`.
@@ -105,17 +105,17 @@ The plan's §4 per-opcode gates that could not be verified in this session:
 
 ### Frame-context refactor (op_load_const8 + op_load_this co-design)
 
-**Goal:** add asm-visible pre-resolved frame-context fields to [`LlIntState`](../../../crates/lyng/vm/src/dsl/llint_state.rs) so that:
+**Goal:** add asm-visible pre-resolved frame-context fields to [`LlIntState`](../../../crates/vm/src/dsl/llint_state.rs) so that:
 - `op_load_const8` can read constants from a flat `*const Value` array via a single indirection
 - `op_load_this` can read `this` from a fixed-offset Value slot
 
 **Refactor outline** (from the two deferral notes):
 1. Add fields: `frame_const_base: *const Value` (16 bytes, *const) and `frame_this_value: Value` (16 bytes; Value is NaN-boxed and may be 8 or 16 bytes depending on layout — verify).
-2. Add offsets in [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs) via `offset_of!`.
-3. Pre-resolve at activation entry in [`entry.rs`](../../../crates/lyng/vm/src/dsl/entry.rs):
+2. Add offsets in [`reg_convention.rs`](../../../crates/vm/src/dsl/reg_convention.rs) via `offset_of!`.
+3. Pre-resolve at activation entry in [`entry.rs`](../../../crates/vm/src/dsl/entry.rs):
    - Constants: flatten `ConstantValue` enum to `Value` array (resolving Atom → string-Value at install time).
    - This: resolve `ThisState::Value` happy path; sentinel scheme for `Uninitialized`/`Lexical`.
-4. Refresh discipline updates in [`slow_path.rs`](../../../crates/lyng/vm/src/dsl/slow_path.rs) bridges, mirroring PB/REGS/FV.
+4. Refresh discipline updates in [`slow_path.rs`](../../../crates/vm/src/dsl/slow_path.rs) bridges, mirroring PB/REGS/FV.
 5. New DSL backend macros: `load_constant!($idx => $dst)` and Value-load for fixed offset.
 6. GC root-scanning design review — both fields are GC roots.
 

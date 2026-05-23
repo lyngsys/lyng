@@ -13,8 +13,8 @@
 |  3   | Entry-shim population in `entry.rs::run_via_dsl` — derives both fields before the `DispatchState` move | `f00f0355` |
 |  4   | Refresh-arm wiring in `slow_path.rs::translate_outcome` — both fields refreshed alongside existing PB/REGS/FV; `#[cfg(debug_assertions)]` stability assertion for `frame_const_base` | `546b5ce4` |
 |  5   | Backend macros `load_constant!` (in new `aarch64/constants.rs`) and `load_state_value!` (in `aarch64/frame.rs`); lowerer binding wiring in `lyng-vm-dsl` for `vm_const_base` + `state_this_value` | `3d2bfccc` |
-|  6   | Synthetic validation handlers at `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (3 structural compiles-and-links tests + 3 `#[ignore]`-d forward-pointer tests for Phase 1.B.2) | `0605a407` |
-|  7   | GC-stress test at `crates/lyng/tests/src/gc_stress_frame_context.rs` (50K-iter closure with `this` + captured constant + nursery allocation pressure) | `5a7ab6a8` |
+|  6   | Synthetic validation handlers at `crates/vm/tests/dsl_validation_frame_context.rs` (3 structural compiles-and-links tests + 3 `#[ignore]`-d forward-pointer tests for Phase 1.B.2) | `0605a407` |
+|  7   | GC-stress test at `crates/tests/src/gc_stress_frame_context.rs` (50K-iter closure with `this` + captured constant + nursery allocation pressure) | `5a7ab6a8` |
 |  8   | Same-load V8 v7 A/B vs `ae8b7766` (+0.80% geomean) + GC root-scanning review doc | `26ec0742` |
 |  9   | Mandatory `feature-dev:code-reviewer` dispatch + sign-off section appended to GC review (verdict: APPROVED, 0 high/medium findings, 2 low addressed inline) | `4ff25b9b` |
 
@@ -134,7 +134,7 @@ would be validated.
 ### What landed
 
 Task 6 (commit `0605a407`) added
-`crates/lyng/vm/tests/dsl_validation_frame_context.rs` with three
+`crates/vm/tests/dsl_validation_frame_context.rs` with three
 structural compiles-and-links tests using
 `DslHarness::assert_handler_symbol_exists`. The synthetic handlers
 (opcodes 210/211/212) are NOT in `DSL_DISPATCH_TABLE`; the tests
@@ -146,7 +146,7 @@ contract.
 ### Consequence: the x22→x24 register-pin bug
 
 The `load_constant!` macro in
-`crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` initially
+`crates/vm/src/dsl/backend/aarch64/constants.rs` initially
 emitted `ldr x16, [x22, ...]` (VM pin) to read `frame_const_base` —
 but `frame_const_base` lives on `LlIntState`, which is addressed via
 the STATE pin (`x24`), not the VM pin (`x22`). The same bug existed
@@ -214,7 +214,7 @@ explicitly if the answer is no.
 ### What changed in the test file
 
 The inline note at the top of
-`crates/lyng/vm/tests/dsl_validation_frame_context.rs` was
+`crates/vm/tests/dsl_validation_frame_context.rs` was
 extended in this cleanup commit to point readers to this
 retrospective. The test file itself is unchanged — the 4 structural
 tests still serve their (now-correctly-scoped) macro-emit /

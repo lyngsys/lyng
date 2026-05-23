@@ -38,10 +38,10 @@ This roadmap explicitly rejects two prior framings:
 Substantial parts of lyng already match JSC's data design. This
 roadmap is finishing the alignment, not starting from scratch:
 
-- **NaN-boxed `Value`** ([crates/lyng/types/src/value.rs:73-345](../../../crates/lyng/types/src/value.rs)).
+- **NaN-boxed `Value`** ([crates/types/src/value.rs:73-345](../../../crates/types/src/value.rs)).
   Matches `JSCJSValue.h`.
 - **Per-callsite FeedbackVector with Monomorphic/Polymorphic/Megamorphic
-  state machine** ([crates/lyng/vm/src/vm/feedback.rs:770-797](../../../crates/lyng/vm/src/vm/feedback.rs)).
+  state machine** ([crates/vm/src/vm/feedback.rs:770-797](../../../crates/vm/src/vm/feedback.rs)).
   This is the **LLInt-class metadata** analogue, not the JIT IC analogue.
   JSC splits IC dispatch across three tiers and our interpreter targets
   only the first:
@@ -63,7 +63,7 @@ roadmap is finishing the alignment, not starting from scratch:
   trampolines, or other JIT-prep machinery on the interpreter path —
   there is no JIT to amortize that cost.
 - **Shape transition tree with inline + out-of-object slots**
-  ([crates/lyng/objects/src/object_metadata.rs:333-397](../../../crates/lyng/objects/src/object_metadata.rs)).
+  ([crates/objects/src/object_metadata.rs:333-397](../../../crates/objects/src/object_metadata.rs)).
   Matches `Structure.h`.
 - **32-bit ShapeId** (already u32 by `define_runtime_id!`). Conceptually
   matches JSC's compressed `StructureID`.
@@ -168,7 +168,7 @@ By making the dispatch mechanism a single point of variation — the
 ### The unified API
 
 Handler signature, dispatch table, and `Step` enum live in
-`crates/lyng/vm/src/vm/dispatch_state.rs` (new):
+`crates/vm/src/vm/dispatch_state.rs` (new):
 
 ```rust
 pub struct DispatchState<'vm> { /* pc, bytes, regs, agent, frame, … */ }
@@ -320,15 +320,15 @@ trampoline. This is the structural foundation; every other phase
 assumes it.
 
 **Files:**
-- `crates/lyng/vm/src/vm/dispatch_state.rs` (new) — `DispatchState`
+- `crates/vm/src/vm/dispatch_state.rs` (new) — `DispatchState`
   struct, `Handler` typedef, `Step` enum, `DISPATCH_TABLE` static,
   the `dispatch_next!` macro.
-- `crates/lyng/vm/src/vm/dispatch_handlers/` (new module
+- `crates/vm/src/vm/dispatch_handlers/` (new module
   hierarchy) — one file per opcode family (`arithmetic.rs`,
   `property.rs`, `calls.rs`, `control_flow.rs`, `loads.rs`, `scope.rs`,
   `generators.rs`, `exceptions.rs`, etc.). Each opcode is an
   `extern "C" fn` handler.
-- `crates/lyng/vm/src/vm/dispatch.rs` — rewritten to a thin
+- `crates/vm/src/vm/dispatch.rs` — rewritten to a thin
   trampoline + module-glue. The 3300-line monolithic match goes away;
   what remains is `run()` and the `mod dispatch_handlers;` declaration.
 
@@ -456,9 +456,9 @@ overhead. Replace `Vec<ObjectRecord>` with `Box<[ObjectRecord]>` of fixed
 or grow-with-known-base layout. Object records become same-size for the
 fast path (variable-size payloads moved to side tables).
 
-- `crates/lyng/gc/src/object_records.rs` (or wherever the pool
+- `crates/gc/src/object_records.rs` (or wherever the pool
   lives) — replace `Vec<ObjectRecord>` with a slab allocator.
-- `crates/lyng/objects/src/internal_methods/property_cache.rs:113-280`
+- `crates/objects/src/internal_methods/property_cache.rs:113-280`
   — rewrite so `heap.object(holder_id)` is a single load (no
   `Option` on the hot path).
 
@@ -504,7 +504,7 @@ single-load (vs being free / cached). 2b might turn out unnecessary.
 into a flat block inside each IC-shaped opcode handler. This is what
 makes Track H's always-allocate machinery actually pay back.
 
-**Today's chain** (`crates/lyng/vm/src/vm/dispatch/property.rs:68-127`
+**Today's chain** (`crates/vm/src/vm/dispatch/property.rs:68-127`
 → `feedback.rs:1859` → `feedback.rs:779` →
 `property_cache.rs:113-140` → `property_cache.rs:228-280`):
 
@@ -585,9 +585,9 @@ Matches JSC's `performGetByIDHelper`.
 
 **Files:**
 - All `op_*` handlers introduced in Phase 1's `dispatch_handlers/property.rs`.
-- `crates/lyng/vm/src/vm/feedback.rs` — collapse the
+- `crates/vm/src/vm/feedback.rs` — collapse the
   `try_load`/`load_from_named_property_cache`/`entry_valid` chain.
-- `crates/lyng/objects/src/internal_methods/property_cache.rs` —
+- `crates/objects/src/internal_methods/property_cache.rs` —
   rewrite slot decode as a `const fn` that takes the bit-packed
   handler.
 
@@ -698,8 +698,8 @@ that pair well with the new dispatch shape.
 **Status: landed** — commit `835c19f6`. See
 [`reports/lyng/phase-4a-status.md`](phase-4a-status.md).
 
-`crates/lyng/compiler/src/script/calls.rs` `materialize_argument_block` +
-`crates/lyng/compiler/src/script/expr.rs` `lower_call_target`.
+`crates/compiler/src/script/calls.rs` `materialize_argument_block` +
+`crates/compiler/src/script/expr.rs` `lower_call_target`.
 
 Compiler currently emits `LoadX Rtemp; Move Rdst, Rtemp` chains for
 each call argument. ~27–50% of dispatches were Move opcodes
@@ -765,10 +765,10 @@ exceed the roadmap's per-phase target; the roadmap explicitly permits
 deferring 4c when measurement does not justify the cost.
 
 **Files:**
-- `crates/lyng/compiler/src/script/calls.rs`
-- `crates/lyng/compiler/src/script/expr.rs`
-- `crates/lyng/vm/src/vm/dispatch_handlers/*.rs` (Star fusion)
-- `crates/lyng/compiler/src/script/script.rs` (Star/Ldar emission
+- `crates/compiler/src/script/calls.rs`
+- `crates/compiler/src/script/expr.rs`
+- `crates/vm/src/vm/dispatch_handlers/*.rs` (Star fusion)
+- `crates/compiler/src/script/script.rs` (Star/Ldar emission
   audit)
 
 **Verification:**
@@ -801,7 +801,7 @@ Wasmtime, well-supported). Wire up a tiny smoke test that compiles
 
 ### 5b — Tier-up counters
 
-The `TierStatus` enum exists in `crates/lyng/vm/src/tiering.rs` but
+The `TierStatus` enum exists in `crates/vm/src/tiering.rs` but
 is dead. Reanimate:
 
 - Increment a per-function execution counter at each `LoopHeader` and
@@ -810,8 +810,8 @@ is dead. Reanimate:
   `ReadyForNative` and queue the function for JIT compilation.
 - Counter increment: branchless `addi` in the loop-header handler.
 
-Files: `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs`,
-`crates/lyng/vm/src/tiering.rs`.
+Files: `crates/vm/src/vm/dispatch_handlers/control_flow.rs`,
+`crates/vm/src/tiering.rs`.
 
 ### 5c — JIT calling convention
 
@@ -993,7 +993,7 @@ deltas are documented in the phase status report.
 ### Structural regression tests
 
 Each phase adds source-level structural assertions to
-`crates/lyng/vm/src/vm/dispatch.rs` (or its successor) that fail
+`crates/vm/src/vm/dispatch.rs` (or its successor) that fail
 the build if the structural property the phase delivered gets
 accidentally reverted. Examples:
 

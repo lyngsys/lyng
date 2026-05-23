@@ -12,7 +12,7 @@ bailout-on-overflow branch.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -199,7 +199,7 @@ This is the known measurement artifact, not a real regression: every
 fast-path SMI right-shift calls
 `call_slow!(op_shift_right_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope). The result: feedback-recording fast-path
 entries are counted as if they were full slow-path entries.
@@ -212,7 +212,7 @@ per-opcode gate should remain enforced **once the substrate
 distinguishes "feedback-recording shim" from "true slow path"** —
 that work is a substrate fix tracked as a Phase 1.C followup (gate
 counter-injection on label-boundary state in
-`crates/lyng/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is
+`crates/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is
 not scheduled within Phase 1.C scope.
 
 Crypto's 448M (5-run aggregate) ShiftRight dispatches are dominated
@@ -245,7 +245,7 @@ section should be re-measured.
   ToInt32(lhs) + ToUint32(rhs) + 5-bit-mask + sign-preserving
   arithmetic-shift invariants.
 - Pre-existing failures in
-  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
+  `crates/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `45c552f6` (Task 6 close) with the op_shift_right

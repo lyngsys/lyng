@@ -429,7 +429,7 @@ The single-implementation invariant (§10) includes prefix decoding: prefix logi
 ### Crate and module layout
 
 ```
-crates/lyng/vm-dsl/                  -- proc-macro crate, new
+crates/vm-dsl/                  -- proc-macro crate, new
 ├── Cargo.toml                          -- proc-macro = true
 └── src/
     ├── lib.rs                          -- llint_handler! entry point
@@ -437,7 +437,7 @@ crates/lyng/vm-dsl/                  -- proc-macro crate, new
     ├── layouts.rs                      -- operand-layout descriptors
     └── lower.rs                        -- AST → asm string assembly
 
-crates/lyng/vm/src/dsl/              -- runtime-side support
+crates/vm/src/dsl/              -- runtime-side support
 ├── mod.rs                              -- re-exports llint_handler!, declares backend
 ├── reg_convention.rs                   -- pinned-register docs + LlIntState const offsets
 ├── llint_state.rs                      -- LlIntState repr(C), LlIntRustContext, LlIntExitSlot, ExitKind
@@ -714,7 +714,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 
 **DSL-0a exit criterion:** every opcode has its semantic body extracted into a free function. Alpha handlers are wrappers only. The invariant is enforced by a **structural manifest**, not by source-grep alone:
 
-- `crates/lyng/vm/src/dsl/opcode_manifest.rs` declares `const OPCODES: &[OpcodeEntry]` with one entry per `Opcode` variant (`opcode`, `semantic_symbol: &'static str`, `dsl_handler_symbol: &'static str`, `category: OpcodeCategory`).
+- `crates/vm/src/dsl/opcode_manifest.rs` declares `const OPCODES: &[OpcodeEntry]` with one entry per `Opcode` variant (`opcode`, `semantic_symbol: &'static str`, `dsl_handler_symbol: &'static str`, `category: OpcodeCategory`).
 - Test 1: `OPCODES` length equals `Opcode` variant count (exhaustive coverage).
 - Test 2: each `semantic_symbol` resolves to a real Rust function in the binary (linker reference).
 - Test 3: each `dsl_handler_symbol` resolves to a real handler (linker reference, applies after DSL-0b).
@@ -751,7 +751,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 - Re-run all behavioral tests; re-run microbench + V8 v7.
 - **Verify the single-implementation invariant via the manifest (§10 DSL-0a):**
   - Test 5: every `OpcodeEntry.dsl_handler_symbol` resolves to a function in the binary (linker check).
-  - Test 6: `dispatch_handlers` module path does not exist in `crates/lyng/vm/src/`; source-grep confirms no `dispatch_next!`, `Step`, or `DISPATCH_TABLE` references in opcode semantic modules.
+  - Test 6: `dispatch_handlers` module path does not exist in `crates/vm/src/`; source-grep confirms no `dispatch_next!`, `Step`, or `DISPATCH_TABLE` references in opcode semantic modules.
   - Test 7: opcode-counter mode (when compiled with `--features opcode-counters`) produces correct per-opcode dispatch counts under the DSL substrate, matching alpha-path counts within a documented per-handler instrumentation delta.
 
 **DSL-0 exit criteria (no waivers):**
@@ -866,14 +866,14 @@ Orthogonal to the DSL work. Spec compliance is about *semantics* (does `Array.pr
 
 ## 12. Policy and issue-tracker alignment (must land with the design)
 
-The current `crates/lyng/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future agents see consistent guidance.
+The current `crates/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future agents see consistent guidance.
 
 **Required updates:**
 
-- **`crates/lyng/AGENTS.md`** — replace the blanket no-unsafe rule with a scoped exception: `unsafe` is allowed only in (a) the `lyng-vm-dsl` crate, (b) `crates/lyng/vm/src/dsl/` (the DSL backend, entry/exit shims, slow-path bridge module), and (c) bridge modules explicitly named in this design. Hand-written `unsafe` outside these locations remains forbidden.
+- **`crates/AGENTS.md`** — replace the blanket no-unsafe rule with a scoped exception: `unsafe` is allowed only in (a) the `lyng-vm-dsl` crate, (b) `crates/vm/src/dsl/` (the DSL backend, entry/exit shims, slow-path bridge module), and (c) bridge modules explicitly named in this design. Hand-written `unsafe` outside these locations remains forbidden.
 - **`docs/lyng/engineering-standards.md`** — add a section on the DSL substrate boundary, the unsafe surface within it, and the audit/review expectations for changes to those modules.
 - **`docs/lyng/architecture.md`** — reflect the new dispatch substrate (DSL handlers, tail-jump dispatch, `LlIntState` ABI) replacing the α trampoline description.
-- **Lint or source-level test** — a `cargo test` that walks `crates/lyng/**/*.rs` and fails if `unsafe` appears outside the approved module paths. Mechanical enforcement of the policy.
+- **Lint or source-level test** — a `cargo test` that walks `crates/**/*.rs` and fails if `unsafe` appears outside the approved module paths. Mechanical enforcement of the policy.
 
 **Issue-tracker alignment:**
 
@@ -912,16 +912,16 @@ These don't block the design but should be answered with data, not speculation:
   - `offlineasm/` — Ruby DSL compiler (architectural reference for our DSL's design).
 - **JSC IC metadata reference:** `Source/JavaScriptCore/bytecode/GetByIdMetadata.h` — the `GetByIdMode` enum design our `op_get_named_property` mode-byte refactor mirrors.
 - **JSC value layout reference:** `Source/JavaScriptCore/runtime/JSCJSValue.h` — for the R-0 `llint-dsl-value-layout.md` comparison.
-- **Our current Value implementation:** [`crates/lyng/types/src/value.rs`](../../crates/lyng/types/src/value.rs) — the source of truth for the value-layout report.
+- **Our current Value implementation:** [`crates/types/src/value.rs`](../../crates/types/src/value.rs) — the source of truth for the value-layout report.
 - **Our current dispatch substrate (to be replaced):**
-  - [`crates/lyng/vm/src/vm/dispatch_state.rs`](../../crates/lyng/vm/src/vm/dispatch_state.rs)
-  - [`crates/lyng/vm/src/vm/dispatch_handlers/`](../../crates/lyng/vm/src/vm/dispatch_handlers/)
-  - [`crates/lyng/vm/src/vm/dispatch/`](../../crates/lyng/vm/src/vm/dispatch/)
-  - [`crates/lyng/vm/src/vm/feedback.rs`](../../crates/lyng/vm/src/vm/feedback.rs)
+  - [`crates/vm/src/vm/dispatch_state.rs`](../../crates/vm/src/vm/dispatch_state.rs)
+  - [`crates/vm/src/vm/dispatch_handlers/`](../../crates/vm/src/vm/dispatch_handlers/)
+  - [`crates/vm/src/vm/dispatch/`](../../crates/vm/src/vm/dispatch/)
+  - [`crates/vm/src/vm/feedback.rs`](../../crates/vm/src/vm/feedback.rs)
 - **Existing bench tool to be extended:** [`tools/lyng-bench/src/cli.rs`](../../tools/lyng-bench/src/cli.rs) — currently has `runtime`, `density`, `test262`, `compare`, `v8suite`. R-0 adds `microbench`, `asm-diff`, `capture-llint`.
 - **Project standards (subject to update per §12):**
   - [`AGENTS.md`](../../AGENTS.md) — repo-level guide.
-  - [`crates/lyng/AGENTS.md`](../../crates/lyng/AGENTS.md) — Lyng JS operating guide. **Update required**: scope-allow `unsafe` in DSL modules.
+  - [`crates/AGENTS.md`](../../crates/AGENTS.md) — Lyng JS operating guide. **Update required**: scope-allow `unsafe` in DSL modules.
   - [`docs/lyng/engineering-standards.md`](engineering-standards.md) — code quality bar. **Update required**: DSL boundary review expectations.
   - [`docs/lyng/architecture.md`](architecture.md) — system architecture. **Update required**: reflect new dispatch substrate.
   - [`docs/lyng/performance-workflow.md`](performance-workflow.md) — existing perf measurement conventions; the DSL workflow extends these.

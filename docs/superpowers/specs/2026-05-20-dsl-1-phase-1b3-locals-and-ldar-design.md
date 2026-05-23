@@ -289,6 +289,6 @@ Both A/B reports include:
 - **Followups doc:** [`reports/lyng/dsl-1/phase-1b-followups.md`](../../../reports/lyng/dsl-1/phase-1b-followups.md).
 - **Phase 1.B.1 retrospective (structural-test lesson):** [`reports/lyng/dsl-1/phase-1b1-summary.md`](../../../reports/lyng/dsl-1/phase-1b1-summary.md) — "Retrospective: structural-only validation tests insufficient for substrate macros."
 - **Top-30:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv).
-- **Existing backend macros:** `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs` (lines 34, 84, 106, 116, 126, 136).
-- **Current cold stubs:** `crates/lyng/vm/src/dsl/handlers/cold.rs` (lines 342, 3959, 4255, 4284, 4313, 4342, 4371, 4400, 4429, 4458).
-- **Semantic bodies:** `crates/lyng/vm/src/vm/semantics/loads.rs` (lines 322-333, 431-448, 483-495).
+- **Existing backend macros:** `crates/vm/src/dsl/backend/aarch64/operands.rs` (lines 34, 84, 106, 116, 126, 136).
+- **Current cold stubs:** `crates/vm/src/dsl/handlers/cold.rs` (lines 342, 3959, 4255, 4284, 4313, 4342, 4371, 4400, 4429, 4458).
+- **Semantic bodies:** `crates/vm/src/vm/semantics/loads.rs` (lines 322-333, 431-448, 483-495).

@@ -16,14 +16,14 @@ The architecture uses:
 
 - **Pinned registers** (AArch64: x19=PC, x20=REGS, x21=FV, x22=VM, x23=TABLE, x24=STATE) across the whole handler chain.
 - **`#[repr(C)] LlIntState`** as the asm-visible state record — a fixed-layout struct read directly by handlers via offset constants.
-- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/lyng/vm/src/dsl/backend/aarch64/`.
+- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/vm/src/dsl/backend/aarch64/`.
 - **Slow-path bridge** (`crate::dsl::slow_path::LlIntDispatchState`) for opcodes that can't (or shouldn't) inline. Each bridge call goes through a uniform shim that snapshots PC + register window, runs the existing semantic body, and returns one of {Continue, Refresh, ExitDone, ExitError}.
 - **Mirror discipline** for arena pointers (instruction bytes, constants array, register window, feedback slab): the `LlIntState` fields are pointers into GC-or-arena-allocated storage, refreshed by the Refresh arm of `translate_outcome` after any slow-path call.
 
 The DSL is implemented across two crates:
 
-- `crates/lyng/vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
-- `crates/lyng/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
+- `crates/vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
+- `crates/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
 
 ---
 
@@ -131,7 +131,7 @@ All 9 handlers: 7 instructions total each (1 decode + 2 body + 4 dispatch). All 
 
 **LoadEnvSlot deferred** to a future substrate sub-phase. Investigation revealed it requires a new `frame_lexical_env` mirror on `LlIntState` (Phase-1.B.1-style refactor) plus inline depth-walk for the common `depth==0` case. Substrate work, not a mechanical port. Recorded in [`reports/lyng/dsl-1/phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
 
-**StoreLocal0 functional unreachability:** the bytecode-builder peephole at `crates/lyng/bytecode/src/builder.rs:150-166` rewrites `Move dst=0, src=B` → `Ldar B` before the `store_local_opcode` branch fires. So StoreLocal0 cannot be emitted from compiled JS source. Inline port retained for symmetry; 0 V8 v7 dispatches in practice.
+**StoreLocal0 functional unreachability:** the bytecode-builder peephole at `crates/bytecode/src/builder.rs:150-166` rewrites `Move dst=0, src=B` → `Ldar B` before the `store_local_opcode` branch fires. So StoreLocal0 cannot be emitted from compiled JS source. Inline port retained for symmetry; 0 V8 v7 dispatches in practice.
 
 Summaries: [`phase-1b3-summary.md`](dsl-1/phase-1b3-summary.md), umbrella [`phase-1b-summary.md`](dsl-1/phase-1b-summary.md), direct cumulative A/B [`phase-1b3-cumulative-ab.md`](dsl-1/phase-1b3-cumulative-ab.md).
 
@@ -232,7 +232,7 @@ Counters (in `counters.rs`, Phase 1.B.0):
 - **Microbench snippets** (Phase 1.B.0 + 1.B.2 backfill + 1.B.3): 19 snippets total. All verified via `verify_opcodes_per_iter` test.
 - **`lyng-bench v8suite --count-slow-path-share`**: produces per-opcode slow-path-share percentages from v8 v7 runs.
 - **`lyng-bench asm-diff`**: produces asm baselines and checks against committed baselines. **Limitation:** doesn't yet auto-discover the `dsl::handlers::cold::*` symbol namespace; the Phase 1.B.2 + 1.B.3 baselines were captured manually via `cargo rustc --emit=asm` extraction. Tracked in [`phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
-- **GC integration**: mirror-discipline invariant for `LlIntState` arena pointers; debug-only stability assertion in the Refresh arm; gc-stress integration test at `crates/lyng/tests/src/gc_stress_frame_context.rs`. GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
+- **GC integration**: mirror-discipline invariant for `LlIntState` arena pointers; debug-only stability assertion in the Refresh arm; gc-stress integration test at `crates/tests/src/gc_stress_frame_context.rs`. GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
 
 ---
 
@@ -361,8 +361,8 @@ Phase 1.B.3: 9 reports — `op_load_local_{0,1,2,3}.md`, `op_store_local_{0,1,2,
 
 ### Source code anchors
 
-- DSL substrate: `crates/lyng/vm/src/dsl/`
-- AArch64 backend macros: `crates/lyng/vm/src/dsl/backend/aarch64/`
-- Opcode handlers: `crates/lyng/vm/src/dsl/handlers/{cold,warm,hot}.rs`
-- Lowerer proc-macro: `crates/lyng/vm-dsl/src/`
+- DSL substrate: `crates/vm/src/dsl/`
+- AArch64 backend macros: `crates/vm/src/dsl/backend/aarch64/`
+- Opcode handlers: `crates/vm/src/dsl/handlers/{cold,warm,hot}.rs`
+- Lowerer proc-macro: `crates/vm-dsl/src/`
 - Bench tool: `tools/lyng-bench/`

@@ -21,13 +21,13 @@ Both ports are unary (single src register, no rhs operand). Asm shape is the **s
 
 This sub-phase introduced a correctness subtlety not present in any prior Phase 1.C port:
 
-The semantic body `op_update_register_semantic` (at `crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`) shared by both opcodes writes the ToNumeric-coerced source back to the src register BEFORE writing the post-update value to dst. The inline fast path can safely SKIP this writeback when src is SMI because `ToNumeric(SMI) == SMI` is identity — verified by reading:
+The semantic body `op_update_register_semantic` (at `crates/vm/src/vm/semantics/arithmetic.rs:796-833`) shared by both opcodes writes the ToNumeric-coerced source back to the src register BEFORE writing the post-update value to dst. The inline fast path can safely SKIP this writeback when src is SMI because `ToNumeric(SMI) == SMI` is identity — verified by reading:
 - `to_primitive` (`conversions.rs:90-92`) — short-circuits for non-objects (SMI is a non-object), returns value as-is
 - `to_number` (`read.rs:296-298`) — short-circuits when `value.is_number()`, returns value identically
 
 For non-SMI src (string, BigInt, Object with `valueOf`), the fast path bails to `.slow` which calls `op_increment_slow_rs` / `op_decrement_slow_rs`, which invokes the full semantic body — preserving the writeback semantics.
 
-**The SMI-elision claim is verified end-to-end by the new `dsl_increment_writeback` unit test** (Task 11, `crates/lyng/tests/src/dsl_increment_writeback.rs`). The 4 tests exercise postfix and prefix increment/decrement with string source values, asserting both that the slow path produces the correct numeric result AND that the src register is written back with the ToNumeric-coerced value (the assertion uses `typeof r === "number"` on the postfix return value, which can only hold if the writeback happened — proven by tracing the compiler's `lower_update_expression`).
+**The SMI-elision claim is verified end-to-end by the new `dsl_increment_writeback` unit test** (Task 11, `crates/tests/src/dsl_increment_writeback.rs`). The 4 tests exercise postfix and prefix increment/decrement with string source values, asserting both that the slow path produces the correct numeric result AND that the src register is written back with the ToNumeric-coerced value (the assertion uses `typeof r === "number"` on the postfix return value, which can only hold if the writeback happened — proven by tracing the compiler's `lower_update_expression`).
 
 ## A/B vs pre-1.C.3 HEAD
 
@@ -55,7 +55,7 @@ Per spec §1.6 + §5, per-workload waivers are documented in op_increment.md / o
 
 - [`reports/lyng/dsl-handlers/op_increment.md`](../dsl-handlers/op_increment.md) (Task 9, commit `2e7de038`)
 - [`reports/lyng/dsl-handlers/op_decrement.md`](../dsl-handlers/op_decrement.md) (Task 10, commit `970f4e84`)
-- [`crates/lyng/tests/src/dsl_increment_writeback.rs`](../../../crates/lyng/tests/src/dsl_increment_writeback.rs) (Task 11, commit `ed2f3a63`) — 4 tests, all passing
+- [`crates/tests/src/dsl_increment_writeback.rs`](../../../crates/tests/src/dsl_increment_writeback.rs) (Task 11, commit `ed2f3a63`) — 4 tests, all passing
 
 ## Gates passed
 
@@ -71,7 +71,7 @@ Per spec §1.6 + §5, per-workload waivers are documented in op_increment.md / o
 ## Followups (continuing from 1.C.1 + 1.C.2)
 
 Pinned, unchanged from prior sub-phase summaries:
-1. `inject_opcode_byte` counter-injection discipline (substrate fix at `crates/lyng/vm-dsl/src/lower.rs`)
+1. `inject_opcode_byte` counter-injection discipline (substrate fix at `crates/vm-dsl/src/lower.rs`)
 2. `verify_opcodes_per_iter` coverage (add Sub/Mul/BitAnd/ShiftLeft/ShiftRight/Increment/Decrement)
 3. op_mul float-workload trade-off (consider a faster bail for non-SMI)
 4. Cumulative Phase 1.C cross-day A/B sanity (Task 13)

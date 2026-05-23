@@ -103,4 +103,4 @@ Sub-phase A/B and cumulative-A/B measurements deferred to Task 5
 - Snippets: `tools/lyng-bench/src/microbench/snippets.rs`.
 - StoreLocal0 unreachability finding:
   `reports/lyng/dsl-handlers/op_store_local_0.md` and inline
-  comment at `crates/lyng/bytecode/src/builder.rs:150-166`.
+  comment at `crates/bytecode/src/builder.rs:150-166`.

@@ -6,47 +6,47 @@
 
 **Architecture:** Start with mechanically separable representation and table data, then move semantic files only after direct owner-layer tests are in place. Each split keeps the parent module as the public orchestration surface and moves cohesive domains into child files re-exported through the existing crate API.
 
-**Tech Stack:** Rust workspace crates under `crates/lyng/*`, dcat issue `lyng-kb1k`, Cargo unit tests, focused crate checks, and targeted Test262 slices for semantic dispatch/bootstrap moves.
+**Tech Stack:** Rust workspace crates under `crates/*`, dcat issue `lyng-kb1k`, Cargo unit tests, focused crate checks, and targeted Test262 slices for semantic dispatch/bootstrap moves.
 
 ---
 
 ## File Structure
 
-- `crates/lyng/types/src/lib.rs`: remains the thin public facade for copyable runtime-facing types.
-- `crates/lyng/types/src/ids.rs`: owns typed runtime handles, native function lane IDs, and well-known symbol IDs.
-- `crates/lyng/types/src/builtin_ids.rs`: owns stable builtin ID namespace constants and re-exports constructor helpers.
-- `crates/lyng/types/src/builtin_ids/*.rs`: owns builtin helper constructors by namespace or object family.
-- `crates/lyng/types/src/builtin_ids/binary_data/*.rs`: owns binary-data, object-reflection, JSON, Proxy, Reflect, and Atomics helper constructors by builtin family.
-- `crates/lyng/types/src/builtin_ids/collections/*.rs`: owns collection and weak/finalization helper constructors by builtin family.
-- `crates/lyng/types/src/builtin_ids/core_ids/*.rs`: owns core public builtin helper constructors by builtin family.
-- `crates/lyng/types/src/builtin_ids/disposal/*.rs`: owns explicit-resource-management helper constructors by builtin family.
-- `crates/lyng/types/src/builtin_ids/internal/*.rs`: owns internal builtin helper constructors by VM/runtime owner.
-- `crates/lyng/types/src/builtin_ids/promises/*.rs`: owns promise, aggregate-error, async-function, and async-generator helper constructors.
-- `crates/lyng/types/src/builtin_ids/temporal/*.rs`: owns Temporal builtin helper constructors by Temporal object family.
-- `crates/lyng/types/src/builtin_ids/typed_arrays/*.rs`: owns abstract typed-array and typed-array instance helper constructors.
-- `crates/lyng/types/src/marker.rs`: owns `TypeOwnershipMarker`.
-- `crates/lyng/builtins/src/public/metadata.rs`: remains the public metadata lookup facade.
-- `crates/lyng/builtins/src/public/metadata/*.rs`: owns metadata rows by builtin family.
-- `crates/lyng/builtins/src/public/metadata/core/*.rs`: owns core metadata row tables by builtin family.
-- `crates/lyng/builtins/src/public/metadata/temporal/*.rs`: owns Temporal metadata lookup by Temporal object family.
-- `crates/lyng/builtins/src/public/families/binary_data.rs`: remains the binary-data family bootstrap facade.
-- `crates/lyng/builtins/src/public/families/binary_data/*.rs`: owns binary-data bootstrap lookup, installation, and descriptor-table wiring.
-- `crates/lyng/builtins/src/public/dispatch/binary_data.rs`: remains the binary-data public dispatch facade.
-- `crates/lyng/builtins/src/public/dispatch/binary_data/*.rs`: owns ArrayBuffer, DataView, Atomics, and typed-array dispatch families.
-- `crates/lyng/builtins/src/public/temporal.rs`: remains the Temporal public bootstrap coordinator while object-family installers move into child modules.
-- `crates/lyng/builtins/src/public/temporal/*.rs`: owns Temporal object-family public bootstrap wiring.
-- `crates/lyng/builtins/src/public/dispatch/temporal.rs`: planned follow-on split into Temporal object-family dispatch modules after helper visibility is audited.
-- `crates/lyng/vm/src/vm/builtin_dispatch.rs`: planned follow-on split by VM builtin owner after builtin/public dispatch is stable.
-- `crates/lyng/gc/src/arena.rs`: planned follow-on split for allocation, tracing, weak/finalization, and backing-store ownership after direct GC tests are identified.
+- `crates/types/src/lib.rs`: remains the thin public facade for copyable runtime-facing types.
+- `crates/types/src/ids.rs`: owns typed runtime handles, native function lane IDs, and well-known symbol IDs.
+- `crates/types/src/builtin_ids.rs`: owns stable builtin ID namespace constants and re-exports constructor helpers.
+- `crates/types/src/builtin_ids/*.rs`: owns builtin helper constructors by namespace or object family.
+- `crates/types/src/builtin_ids/binary_data/*.rs`: owns binary-data, object-reflection, JSON, Proxy, Reflect, and Atomics helper constructors by builtin family.
+- `crates/types/src/builtin_ids/collections/*.rs`: owns collection and weak/finalization helper constructors by builtin family.
+- `crates/types/src/builtin_ids/core_ids/*.rs`: owns core public builtin helper constructors by builtin family.
+- `crates/types/src/builtin_ids/disposal/*.rs`: owns explicit-resource-management helper constructors by builtin family.
+- `crates/types/src/builtin_ids/internal/*.rs`: owns internal builtin helper constructors by VM/runtime owner.
+- `crates/types/src/builtin_ids/promises/*.rs`: owns promise, aggregate-error, async-function, and async-generator helper constructors.
+- `crates/types/src/builtin_ids/temporal/*.rs`: owns Temporal builtin helper constructors by Temporal object family.
+- `crates/types/src/builtin_ids/typed_arrays/*.rs`: owns abstract typed-array and typed-array instance helper constructors.
+- `crates/types/src/marker.rs`: owns `TypeOwnershipMarker`.
+- `crates/builtins/src/public/metadata.rs`: remains the public metadata lookup facade.
+- `crates/builtins/src/public/metadata/*.rs`: owns metadata rows by builtin family.
+- `crates/builtins/src/public/metadata/core/*.rs`: owns core metadata row tables by builtin family.
+- `crates/builtins/src/public/metadata/temporal/*.rs`: owns Temporal metadata lookup by Temporal object family.
+- `crates/builtins/src/public/families/binary_data.rs`: remains the binary-data family bootstrap facade.
+- `crates/builtins/src/public/families/binary_data/*.rs`: owns binary-data bootstrap lookup, installation, and descriptor-table wiring.
+- `crates/builtins/src/public/dispatch/binary_data.rs`: remains the binary-data public dispatch facade.
+- `crates/builtins/src/public/dispatch/binary_data/*.rs`: owns ArrayBuffer, DataView, Atomics, and typed-array dispatch families.
+- `crates/builtins/src/public/temporal.rs`: remains the Temporal public bootstrap coordinator while object-family installers move into child modules.
+- `crates/builtins/src/public/temporal/*.rs`: owns Temporal object-family public bootstrap wiring.
+- `crates/builtins/src/public/dispatch/temporal.rs`: planned follow-on split into Temporal object-family dispatch modules after helper visibility is audited.
+- `crates/vm/src/vm/builtin_dispatch.rs`: planned follow-on split by VM builtin owner after builtin/public dispatch is stable.
+- `crates/gc/src/arena.rs`: planned follow-on split for allocation, tracing, weak/finalization, and backing-store ownership after direct GC tests are identified.
 
 ## Task 1: Split `lyng-types` Facade
 
 **Files:**
-- Modify: `crates/lyng/types/src/lib.rs`
-- Create: `crates/lyng/types/src/ids.rs`
-- Create: `crates/lyng/types/src/builtin_ids.rs`
-- Create: `crates/lyng/types/src/builtin_ids/*.rs`
-- Create: `crates/lyng/types/src/marker.rs`
+- Modify: `crates/types/src/lib.rs`
+- Create: `crates/types/src/ids.rs`
+- Create: `crates/types/src/builtin_ids.rs`
+- Create: `crates/types/src/builtin_ids/*.rs`
+- Create: `crates/types/src/marker.rs`
 
 - [x] Move `define_runtime_id!`, handle declarations, `NativeFunctionId`, and `WellKnownSymbolId` into `ids.rs`.
 - [x] Move builtin namespace constants and `is_*_builtin` classifiers into `builtin_ids.rs`.
@@ -66,12 +66,12 @@
 ## Task 2: Split Public Builtin Metadata Tables
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/metadata.rs`
-- Create: `crates/lyng/builtins/src/public/metadata/core.rs`
-- Create: `crates/lyng/builtins/src/public/metadata/core/*.rs`
-- Create: `crates/lyng/builtins/src/public/metadata/binary_data.rs`
-- Create: `crates/lyng/builtins/src/public/metadata/temporal.rs`
-- Create: `crates/lyng/builtins/src/public/metadata/temporal/*.rs`
+- Modify: `crates/builtins/src/public/metadata.rs`
+- Create: `crates/builtins/src/public/metadata/core.rs`
+- Create: `crates/builtins/src/public/metadata/core/*.rs`
+- Create: `crates/builtins/src/public/metadata/binary_data.rs`
+- Create: `crates/builtins/src/public/metadata/temporal.rs`
+- Create: `crates/builtins/src/public/metadata/temporal/*.rs`
 
 - [x] Keep `PublicBuiltinMetadataRow`, lookup helpers, and `public_builtin_metadata` in `metadata.rs`.
 - [x] Move object/function/array/collection/weak-ref/object-reflection/text/regexp/date/primitive/module/language-support rows into `metadata/core.rs`.
@@ -84,15 +84,15 @@
 ## Task 3: Split Temporal Public Bootstrap By Object Family
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/temporal.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/instant.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/duration.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/plain_date.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/plain_time.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/plain_date_time.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/plain_year_month.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/plain_month_day.rs`
-- Create: `crates/lyng/builtins/src/public/temporal/zoned_date_time.rs`
+- Modify: `crates/builtins/src/public/temporal.rs`
+- Create: `crates/builtins/src/public/temporal/instant.rs`
+- Create: `crates/builtins/src/public/temporal/duration.rs`
+- Create: `crates/builtins/src/public/temporal/plain_date.rs`
+- Create: `crates/builtins/src/public/temporal/plain_time.rs`
+- Create: `crates/builtins/src/public/temporal/plain_date_time.rs`
+- Create: `crates/builtins/src/public/temporal/plain_year_month.rs`
+- Create: `crates/builtins/src/public/temporal/plain_month_day.rs`
+- Create: `crates/builtins/src/public/temporal/zoned_date_time.rs`
 
 - [x] Use the existing Temporal bootstrap smoke coverage through the integration surface.
 - [x] Extract one object family at a time into a small installer that receives the already allocated Temporal namespace, prototypes, root shape, realm, and shared builtin prototypes.
@@ -110,16 +110,16 @@
 ## Task 4: Split Temporal Dispatch By Object Family
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/temporal.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/instant.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/duration.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/plain_date.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/plain_time.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/plain_date_time.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/plain_year_month.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/plain_month_day.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/zoned_date_time.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/temporal/now.rs`
+- Modify: `crates/builtins/src/public/dispatch/temporal.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/instant.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/duration.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/plain_date.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/plain_time.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/plain_date_time.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/plain_year_month.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/plain_month_day.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/zoned_date_time.rs`
+- Create: `crates/builtins/src/public/dispatch/temporal/now.rs`
 
 - [x] Add focused Temporal dispatch tests or Test262 slices for the families being moved.
 - [x] Move shared parsing, rounding, calendar, and time-zone helpers into private child modules before moving family algorithms.
@@ -152,8 +152,8 @@
 ## Task 5: Split VM Builtin Dispatch By Runtime Owner
 
 **Files:**
-- Modify: `crates/lyng/vm/src/vm/builtin_dispatch.rs`
-- Create: `crates/lyng/vm/src/vm/builtin_dispatch/*.rs`
+- Modify: `crates/vm/src/vm/builtin_dispatch.rs`
+- Create: `crates/vm/src/vm/builtin_dispatch/*.rs`
 
 - [x] Map existing match arms to owning semantic areas: public builtins, internal helpers, dynamic compilation, generators/async, promises/jobs, and object/private-field helpers.
 - [x] Move `import.meta`, dynamic import capability creation, import-attribute normalization, dynamic-import job settlement, and dynamic-import error conversion into `builtin_dispatch/dynamic_import.rs`.
@@ -185,8 +185,8 @@
 ## Task 6: Split GC Arena By Storage Responsibility
 
 **Files:**
-- Modify: `crates/lyng/gc/src/arena.rs`
-- Create: `crates/lyng/gc/src/arena/*.rs`
+- Modify: `crates/gc/src/arena.rs`
+- Create: `crates/gc/src/arena/*.rs`
 
 - [x] Identify direct tests for allocation handles, tracing roots, weak/finalization records, and backing stores before moving code.
 - [x] Move storage record definitions separately from allocation APIs.
@@ -202,8 +202,8 @@
 ## Task 7: Split Builtin Bootstrap By Ownership Layer
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/bootstrap.rs`
-- Create: `crates/lyng/builtins/src/bootstrap/*.rs`
+- Modify: `crates/builtins/src/bootstrap.rs`
+- Create: `crates/builtins/src/bootstrap/*.rs`
 
 - [x] Map bootstrap responsibilities before moving code: intrinsic handles, public registry allocation, prototype linking, and installation helpers.
 - [x] Move descriptor table installation and resolution helpers into `bootstrap/descriptors.rs`.
@@ -224,8 +224,8 @@
 ## Task 8: Split Object Internal Methods By Operation Family
 
 **Files:**
-- Modify: `crates/lyng/objects/src/internal_methods.rs`
-- Create: `crates/lyng/objects/src/internal_methods/*.rs`
+- Modify: `crates/objects/src/internal_methods.rs`
+- Create: `crates/objects/src/internal_methods/*.rs`
 
 - [x] Map ordinary, function, proxy, array/exotic, descriptor-related, and named-property-cache internal method ownership.
 - [x] Move named-property cache planning/load/store and cache-validation helpers into `internal_methods/property_cache.rs`.
@@ -247,8 +247,8 @@
 ## Task 9: Split Agent Runtime State By Domain
 
 **Files:**
-- Modify: `crates/lyng/env/src/agent.rs`
-- Create: `crates/lyng/env/src/agent/*.rs`
+- Modify: `crates/env/src/agent.rs`
+- Create: `crates/env/src/agent/*.rs`
 
 - [x] Map heap access, realms/contexts, jobs/promises, module state, shared memory, and accounting responsibilities.
 - [x] Move cluster backing-store/shared-memory handles and Agent forwarding methods into `agent/cluster_handles.rs`.
@@ -279,8 +279,8 @@
 ## Task 10: Split Object Operations By Semantic Group
 
 **Files:**
-- Modify: `crates/lyng/ops/src/object.rs`
-- Create: `crates/lyng/ops/src/object/*.rs`
+- Modify: `crates/ops/src/object.rs`
+- Create: `crates/ops/src/object/*.rs`
 
 - [x] Map property access, descriptor conversion, construction/calls, prototype/integrity, and private-field operation groups.
 - [x] Move embedded object-operation tests into `object/tests.rs` before behavior-owner splits.
@@ -304,10 +304,10 @@
 ## Task 11: Split Binary Data Builtins By Runtime Family
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/families/binary_data.rs`
-- Create: `crates/lyng/builtins/src/public/families/binary_data/*.rs`
-- Modify: `crates/lyng/builtins/src/public/dispatch/binary_data.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/binary_data/*.rs`
+- Modify: `crates/builtins/src/public/families/binary_data.rs`
+- Create: `crates/builtins/src/public/families/binary_data/*.rs`
+- Modify: `crates/builtins/src/public/dispatch/binary_data.rs`
+- Create: `crates/builtins/src/public/dispatch/binary_data/*.rs`
 
 - [x] Map binary-data bootstrap and dispatch responsibilities across ArrayBuffer/SharedArrayBuffer, DataView, Atomics, and typed arrays.
 - [x] Move binary-data family bootstrap lookup, installation, and descriptor-table wiring into `public/families/binary_data/{lookup,install,descriptors}.rs`.
@@ -341,8 +341,8 @@
 ## Task 12: Split Env Execution Intrinsics
 
 **Files:**
-- Modify: `crates/lyng/env/src/execution.rs`
-- Create: `crates/lyng/env/src/execution/intrinsics.rs`
+- Modify: `crates/env/src/execution.rs`
+- Create: `crates/env/src/execution/intrinsics.rs`
 
 - [x] Move the realm-owned `Intrinsics` table and accessors into `execution/intrinsics.rs`.
 - [x] Keep `execution.rs` as the public facade by re-exporting `Intrinsics`.
@@ -351,8 +351,8 @@
 ## Task 13: Split Array Iteration Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/arrays.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/arrays/iteration.rs`
+- Modify: `crates/builtins/src/public/dispatch/arrays.rs`
+- Create: `crates/builtins/src/public/dispatch/arrays/iteration.rs`
 
 - [x] Move Array callback iteration, search, reduce, filter, flat/flatMap, forEach, and map dispatch into `public/dispatch/arrays/iteration.rs`.
 - [x] Keep `arrays.rs` as the Array family router and re-export `array_index_of_builtin` for internal shim callers.
@@ -361,8 +361,8 @@
 ## Task 14: Split Primitive Math Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/primitives.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/primitives/math.rs`
+- Modify: `crates/builtins/src/public/dispatch/primitives.rs`
+- Create: `crates/builtins/src/public/dispatch/primitives/math.rs`
 
 - [x] Move `Math` dispatcher, numeric builtin algorithms, float16 rounding, and `Math.sumPrecise` helpers into `public/dispatch/primitives/math.rs`.
 - [x] Keep `primitives.rs` as the primitive-family router and leave Number, BigInt, Boolean, and Symbol dispatch in the parent.
@@ -371,8 +371,8 @@
 ## Task 15: Split String Basic Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/strings.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/strings/basic.rs`
+- Modify: `crates/builtins/src/public/dispatch/strings.rs`
+- Create: `crates/builtins/src/public/dispatch/strings/basic.rs`
 
 - [x] Move String constructor/static dispatch, String iterator dispatch, primitive wrapper access, concatenation, char/at/code-point, and `String.raw` helpers into `public/dispatch/strings/basic.rs`.
 - [x] Keep `strings.rs` as the String family router and leave search/regexp and transform algorithms in the parent for follow-up splits.
@@ -381,8 +381,8 @@
 ## Task 16: Split String Normalization Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/strings.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/strings/normalization.rs`
+- Modify: `crates/builtins/src/public/dispatch/strings.rs`
+- Create: `crates/builtins/src/public/dispatch/strings/normalization.rs`
 
 - [x] Move `String.prototype.localeCompare`, `String.prototype.normalize`, and the normalization/collation helper cluster into `public/dispatch/strings/normalization.rs`.
 - [x] Keep search/regexp and remaining transform algorithms in `strings.rs` for follow-up owner splits.
@@ -391,8 +391,8 @@
 ## Task 17: Split RegExp Escape Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/regexp.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/regexp/escape.rs`
+- Modify: `crates/builtins/src/public/dispatch/regexp.rs`
+- Create: `crates/builtins/src/public/dispatch/regexp/escape.rs`
 
 - [x] Move `RegExp.escape` and its encoding helper cluster into `public/dispatch/regexp/escape.rs`.
 - [x] Keep `regexp.rs` as the RegExp family router and leave constructor/prototype/symbol algorithms in the parent.
@@ -401,8 +401,8 @@
 ## Task 18: Split Collection Iteration Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/collections.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/collections/iteration.rs`
+- Modify: `crates/builtins/src/public/dispatch/collections.rs`
+- Create: `crates/builtins/src/public/dispatch/collections/iteration.rs`
 
 - [x] Move Map/Set `forEach`, iterator factory, and iterator `next` algorithms into `public/dispatch/collections/iteration.rs`.
 - [x] Keep `collections.rs` as the collection-family router and leave collection construction, storage mutation, weak collections, WeakRef, and FinalizationRegistry dispatch in the parent.
@@ -411,8 +411,8 @@
 ## Task 19: Split Primitive BigInt Dispatch
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/primitives.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/primitives/bigint.rs`
+- Modify: `crates/builtins/src/public/dispatch/primitives.rs`
+- Create: `crates/builtins/src/public/dispatch/primitives/bigint.rs`
 
 - [x] Move BigInt constructor, width-limiting, wrapper, string conversion, and helper algorithms into `public/dispatch/primitives/bigint.rs`.
 - [x] Keep `primitives.rs` as the primitive-family router and expose only BigInt dispatch plus the BigInt-to-Number conversion helper back to the parent.
@@ -421,8 +421,8 @@
 ## Task 20: Split Date Parsing Support
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/date.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/date/parsing.rs`
+- Modify: `crates/builtins/src/public/dispatch/date.rs`
+- Create: `crates/builtins/src/public/dispatch/date/parsing.rs`
 
 - [x] Move `Date.parse` ISO/text parsing helpers into `public/dispatch/date/parsing.rs`.
 - [x] Keep date calendar, local-time conversion, formatting, getters, setters, and object allocation in `date.rs` for follow-up splits.
@@ -431,8 +431,8 @@
 ## Task 21: Split RegExp Symbol Methods
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/regexp.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/regexp/symbols.rs`
+- Modify: `crates/builtins/src/public/dispatch/regexp.rs`
+- Create: `crates/builtins/src/public/dispatch/regexp/symbols.rs`
 
 - [x] Move RegExp well-known symbol dispatch and `@@match`, `@@replace`, `@@search`, `@@split`, and `@@matchAll` entrypoints into `public/dispatch/regexp/symbols.rs`.
 - [x] Keep RegExp construction, prototype accessors, execution helpers, and shared match/search/replace algorithms in `regexp.rs` for follow-up splits.
@@ -441,8 +441,8 @@
 ## Task 22: Split RegExp Accessor Methods
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/regexp.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/regexp/accessors.rs`
+- Modify: `crates/builtins/src/public/dispatch/regexp.rs`
+- Create: `crates/builtins/src/public/dispatch/regexp/accessors.rs`
 
 - [x] Move RegExp prototype flag, source, flags, and has-indices accessor algorithms into `public/dispatch/regexp/accessors.rs`.
 - [x] Keep RegExp construction, execution, symbol methods, and shared matcher helpers in their existing owner modules for follow-up splits.
@@ -451,8 +451,8 @@
 ## Task 23: Split RegExp Construction
 
 **Files:**
-- Modify: `crates/lyng/builtins/src/public/dispatch/regexp.rs`
-- Create: `crates/lyng/builtins/src/public/dispatch/regexp/construction.rs`
+- Modify: `crates/builtins/src/public/dispatch/regexp.rs`
+- Create: `crates/builtins/src/public/dispatch/regexp/construction.rs`
 
 - [x] Move the RegExp constructor algorithm, constructor pattern normalization, and species getter into `public/dispatch/regexp/construction.rs`.
 - [x] Keep `RegExp.escape` routing in the parent constructor dispatcher and leave allocation/execution helpers in `regexp.rs` for follow-up splits.

@@ -4,8 +4,8 @@
 /docs/ECMA-262_16th_edition_june_2025.pdf
 /.worktrees
 /.claude
-/crates/lyng/fuzz/target
-/crates/lyng/fuzz/Cargo.lock
-/crates/lyng/fuzz/corpus
+/crates/fuzz/target
+/crates/fuzz/Cargo.lock
+/crates/fuzz/corpus
 .dogcats/config.local.toml
 .dogcats/.issues.lock

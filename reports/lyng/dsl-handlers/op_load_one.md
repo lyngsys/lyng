@@ -14,7 +14,7 @@ full tagged Value is `0x7ff8_0004_0000_0001`.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -28,7 +28,7 @@ llint_handler! {
 
 ## Backend macro (reused from Task 5)
 
-`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`:
+`crates/vm/src/dsl/backend/aarch64/values.rs`:
 
 ```rust
 #[macro_export]
@@ -212,7 +212,7 @@ Both green; behavioral parity preserved.
   macros, no new imports, no codegen-side changes — pure handler-body
   swap + slow-shim deletion.
 - **`tag_smi_const!` macro reused from Task 5.** No source change to
-  `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` in this task.
+  `crates/vm/src/dsl/backend/aarch64/values.rs` in this task.
   The macro covers both `op_load_zero` (payload = 0) and `op_load_one`
   (payload = 1). Larger SMI payloads (op_load_smi8 sign-extension,
   op_load_smi 16-bit) need different handling — out of scope here;

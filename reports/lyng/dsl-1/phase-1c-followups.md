@@ -12,11 +12,11 @@ tracking. Pick up opportunistically or schedule into Phase 1.D / 1.E / 1.F or a 
 **Surfaced in:** Task 2 (op_sub) spec review (commit `e7a6cfab`+follow-ups).
 **Affects:** All Phase 1.C ports (slow-path-share readings); will affect Phase 1.D comparison opcodes which use the same record-smi shim pattern.
 
-**Problem.** The proc-macro `llint_handler!` lowerer auto-injects `inc_slow_semantic_counter!` on every `call_slow!` call site via `crates/lyng/vm-dsl/src/lower.rs::inject_opcode_byte`. The injection has no awareness of label-scope state: when a handler has both a fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` (for feedback recording) AND a `.slow:` label scope with `call_slow!(op_xxx_slow_rs, ...)` (for the actual slow path), the lowerer instruments BOTH call sites. The fast-path invocation's counter bump incorrectly attributes successful inline executions as slow-path semantic entries.
+**Problem.** The proc-macro `llint_handler!` lowerer auto-injects `inc_slow_semantic_counter!` on every `call_slow!` call site via `crates/vm-dsl/src/lower.rs::inject_opcode_byte`. The injection has no awareness of label-scope state: when a handler has both a fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` (for feedback recording) AND a `.slow:` label scope with `call_slow!(op_xxx_slow_rs, ...)` (for the actual slow path), the lowerer instruments BOTH call sites. The fast-path invocation's counter bump incorrectly attributes successful inline executions as slow-path semantic entries.
 
 **Consequence.** All `record-smi-shim-pattern` opcodes report ~100% slow-path-share regardless of actual fast-path hit rate. Per-opcode `<20%` gate (spec §1.6 + §5) cannot be honestly enforced. Phase 1.C documented per-workload waivers for each ported opcode.
 
-**Fix (estimated 10-30 lines).** In `crates/lyng/vm-dsl/src/lower.rs`, the body parser already separates `BodyStmt::MacroCall` from `BodyStmt::Label` entries. Track a `seen_label: bool` flag during the body-token walk in `inject_opcode_byte`; flip to `true` when the first `BodyStmt::Label` is encountered. Skip the `opcode_byte = N` (or equivalent counter-injection) parameter when emitting `call_slow!` invocations *before* the first label boundary — those are fast-path tail invocations, not slow-path entries.
+**Fix (estimated 10-30 lines).** In `crates/vm-dsl/src/lower.rs`, the body parser already separates `BodyStmt::MacroCall` from `BodyStmt::Label` entries. Track a `seen_label: bool` flag during the body-token walk in `inject_opcode_byte`; flip to `true` when the first `BodyStmt::Label` is encountered. Skip the `opcode_byte = N` (or equivalent counter-injection) parameter when emitting `call_slow!` invocations *before* the first label boundary — those are fast-path tail invocations, not slow-path entries.
 
 **Verification.** Add a regression test that exercises a handler with both fast-path `call_slow!(record_shim)` and slow-path `.slow: call_slow!(slow_rs)`, measures `inc_slow_semantic_counter!` on both code paths, and asserts only the slow-path invocation bumped the counter. The existing op_add / op_sub / op_mul handlers can serve as the test fixture after the fix lands.
 
@@ -70,7 +70,7 @@ The Phase 1.C cumulative A/B shows the float workloads recovered to net-positive
 
 **Problem.** Phase 1.C added 7 per-opcode `op_xxx_record_smi_rs` shims, each ~19 lines and structurally identical apart from the symbol name. Plus the original `op_add_record_smi_rs` in `hot.rs`. Total: 8 nearly-identical shims, ~152 lines of repetition.
 
-**Fix.** Introduce a single shared shim `op_record_smi_arith_6_rs(state, slot)` in a new file `crates/lyng/vm/src/dsl/handlers/shared.rs` (or as a module of `cold.rs`). It returns `Continue { pc_advance: 6 }`. All 8 record-shim call sites in Phase 1.A-1.C ports use the same `pc_advance: 6` (AbcSlot length), so a single shared shim is sufficient.
+**Fix.** Introduce a single shared shim `op_record_smi_arith_6_rs(state, slot)` in a new file `crates/vm/src/dsl/handlers/shared.rs` (or as a module of `cold.rs`). It returns `Continue { pc_advance: 6 }`. All 8 record-shim call sites in Phase 1.A-1.C ports use the same `pc_advance: 6` (AbcSlot length), so a single shared shim is sufficient.
 
 **Effort.** ~1 hour (write shim, migrate 8 call sites, update asm baselines if the symbol name changes).
 
@@ -145,7 +145,7 @@ The Phase 1.C cumulative A/B shows the float workloads recovered to net-positive
 **Surfaced in:** Tasks 2-3 implementer reports.
 **Affects:** `cargo test -p lyng-vm`.
 
-**Status.** Two test failures in `crates/lyng/vm/tests/feedback_flat_consistency.rs` (`dual_write_keeps_smi_add_legacy_and_flat_in_sync`, `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`) reproduce at all pre-Task-2 HEADs. They trace back to commit `fe631a70` (DSL-0b B17: dual-write FeedbackEntry from existing record paths). The legacy/flat divergence is on Call-feedback, not on the arithmetic or property paths Phase 1.C touched.
+**Status.** Two test failures in `crates/vm/tests/feedback_flat_consistency.rs` (`dual_write_keeps_smi_add_legacy_and_flat_in_sync`, `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`) reproduce at all pre-Task-2 HEADs. They trace back to commit `fe631a70` (DSL-0b B17: dual-write FeedbackEntry from existing record paths). The legacy/flat divergence is on Call-feedback, not on the arithmetic or property paths Phase 1.C touched.
 
 **Fix.** Investigate the dual-write divergence on Call-feedback; may need to align the call-recording bookkeeping between legacy `FeedbackVector` and the new flat `FeedbackEntry` array.
 

@@ -64,7 +64,7 @@ Possibilities to investigate:
   cross-check at `-j 1`). Test262 contains timing-sensitive cases
   whose flakiness depends on harness scheduling.
 - **Code drift.** R-0's only runtime-touching changes are in
-  `tools/lyng-bench/` (bench-tool code), `crates/lyng/vm/src/slow_path_counts.rs`
+  `tools/lyng-bench/` (bench-tool code), `crates/vm/src/slow_path_counts.rs`
   (a new counter store, *not* wired into hot dispatch this milestone),
   and `--count-slow-path-share` plumbing. None of these are executed by
   the Test262 harness. They should not affect Test262 — but a focused
@@ -132,7 +132,7 @@ currently closed; all R-0 tickets are `in_review` or `in_progress`.
   - `tools/lyng-bench/src/capture_llint.rs` (12.8 KB) — Task 17–19.
   - `tools/lyng-bench/src/microbench/mod.rs` (11.7 KB) — Task 12–16.
   - `tools/lyng-bench/hot-opcodes.toml` (4.5 KB) — Task 4–5.
-  - `crates/lyng/vm/src/slow_path_counts.rs` (2.9 KB) — Task 20–22.
+  - `crates/vm/src/slow_path_counts.rs` (2.9 KB) — Task 20–22.
 - **Major new evidence paths:**
   - `reports/lyng/microbench-baseline.md` — Task 16.
   - `reports/lyng/dsl-asm-baseline-aarch64/` (30 baselines +

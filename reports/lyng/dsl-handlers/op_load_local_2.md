@@ -6,7 +6,7 @@ V8 v7 aggregate (3 samples × 6 workloads) = **144,349,854 dispatches**.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -71,7 +71,7 @@ dispatches** with **0** slow-path entries.
 
 vm 418 / lyng-tests 1209. Integration test
 `load_local_2_returns_third_parameter` in
-`crates/lyng/tests/src/op_locals_inline.rs` covers direct
+`crates/tests/src/op_locals_inline.rs` covers direct
 third-parameter access.
 
 ## Notes

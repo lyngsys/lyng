@@ -4,7 +4,7 @@ This file is the repo-level operating guide for coding agents working in `lyng`.
 
 ## What This Repo Is
 
-`lyng` is a Rust workspace containing a single active implementation track: the Lyng JavaScript engine in `crates/lyng/*`, the proc-macro asm-DSL substrate in `crates/lyng/vm-dsl/`, and the tooling around them under `tools/`.
+`lyng` is a Rust workspace containing a single active implementation track: the Lyng JavaScript engine in `crates/*`, the proc-macro asm-DSL substrate in `crates/vm-dsl/`, and the tooling around them under `tools/`.
 
 The root workspace members are defined in `Cargo.toml`.
 
@@ -19,31 +19,31 @@ Start here before making non-trivial changes:
 
 If you are changing a specific subsystem, read the crate-local sources and tests for that subsystem before editing.
 
-For any Lyng JS work, also read `crates/lyng/AGENTS.md`. This applies even when the
+For any Lyng JS work, also read `crates/AGENTS.md`. This applies even when the
 files being edited live outside `crates/lyng`, such as `docs/lyng`,
 `tools/lyng-test262`, `tools/lyng-bench`, `reports/lyng`, or
 `testdata/test262`.
 
 ## Workspace Map
 
-- `crates/lyng/common`: shared Lyng JS value/string/source-location types and interning
-- `crates/lyng/lexer`: hand-written lexer
-- `crates/lyng/parser`: parser and parse errors
-- `crates/lyng/ast`: arena-backed AST nodes
-- `crates/lyng/sema`: semantic analysis tables and resolution metadata
-- `crates/lyng/bytecode`: bytecode IR, opcodes, disassembler
-- `crates/lyng/compiler`: AST/sema -> bytecode lowering
-- `crates/lyng/gc`: GC-adjacent runtime storage primitives
-- `crates/lyng/types`: shared runtime and builtin ids/types
-- `crates/lyng/host`: host hooks and embedding interfaces
-- `crates/lyng/objects`: object model/runtime objects
-- `crates/lyng/env`: environments and execution-context substrate
-- `crates/lyng/ops`: runtime semantic operations
-- `crates/lyng/vm`: bytecode interpreter
-- `crates/lyng/builtins`: builtin bootstrap, constructors, prototypes, and globals
-- `crates/lyng/cli`: CLI entrypoint for parse/compile/evaluate flows
-- `crates/lyng/tests`: Lyng JS integration, conformance, and regression coverage
-- `crates/lyng/vm-dsl`: proc-macro crate for the asm-DSL interpreter substrate
+- `crates/common`: shared Lyng JS value/string/source-location types and interning
+- `crates/lexer`: hand-written lexer
+- `crates/parser`: parser and parse errors
+- `crates/ast`: arena-backed AST nodes
+- `crates/sema`: semantic analysis tables and resolution metadata
+- `crates/bytecode`: bytecode IR, opcodes, disassembler
+- `crates/compiler`: AST/sema -> bytecode lowering
+- `crates/gc`: GC-adjacent runtime storage primitives
+- `crates/types`: shared runtime and builtin ids/types
+- `crates/host`: host hooks and embedding interfaces
+- `crates/objects`: object model/runtime objects
+- `crates/env`: environments and execution-context substrate
+- `crates/ops`: runtime semantic operations
+- `crates/vm`: bytecode interpreter
+- `crates/builtins`: builtin bootstrap, constructors, prototypes, and globals
+- `crates/cli`: CLI entrypoint for parse/compile/evaluate flows
+- `crates/tests`: Lyng JS integration, conformance, and regression coverage
+- `crates/vm-dsl`: proc-macro crate for the asm-DSL interpreter substrate
 - `tools/lyng-bench`: unified Lyng JS benchmark, memory-report, and bytecode-density runner
 - `tools/lyng-dsl-codegen`: codegen for VM DSL cold-handler stubs
 - `tools/lyng-test262`: external whole-corpus Test262 embedding and report entrypoint with path-based filtering
@@ -61,7 +61,7 @@ Follow these project-specific constraints when making changes:
 
 ## Lyng JS Priorities
 
-See `crates/lyng/AGENTS.md` for the detailed Lyng JS operating guide.
+See `crates/AGENTS.md` for the detailed Lyng JS operating guide.
 
 - Lyng JS remains focused on ECMA-262 semantics and conformance.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
@@ -153,13 +153,13 @@ If you do not run verification, say so clearly in your handoff.
 
 Useful files when tracing behavior:
 
-- `crates/lyng/lexer/src/lexer.rs`
-- `crates/lyng/parser/src/lib.rs`
-- `crates/lyng/compiler/src/lib.rs`
-- `crates/lyng/env/src/lib.rs`
-- `crates/lyng/objects/src/lib.rs`
-- `crates/lyng/vm/src/lib.rs`
-- `crates/lyng/tests/src/lib.rs`
+- `crates/lexer/src/lexer.rs`
+- `crates/parser/src/lib.rs`
+- `crates/compiler/src/lib.rs`
+- `crates/env/src/lib.rs`
+- `crates/objects/src/lib.rs`
+- `crates/vm/src/lib.rs`
+- `crates/tests/src/lib.rs`
 
 ## Avoid These Mistakes
 

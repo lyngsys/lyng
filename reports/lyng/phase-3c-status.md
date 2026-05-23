@@ -13,7 +13,7 @@ now use the same packed-handler inline IC fast path as Phase 3a/3b.
 Globals share `NamedPropertyFeedback` — the helpers
 `load_global_with_feedback`, `store_global_with_feedback`, and
 `assign_global_with_feedback` in
-[crates/lyng/vm/src/vm/names.rs](crates/lyng/vm/src/vm/names.rs)
+[crates/vm/src/vm/names.rs](crates/vm/src/vm/names.rs)
 were already calling `try_named_property_load_inline_cache_hit` and
 `try_named_property_store_inline_cache` with `global_object` as the
 receiver. Phase 3c just replaces those calls with the inlined fast
@@ -122,7 +122,7 @@ Report:
 
 ## Files changed
 
-- `crates/lyng/vm/src/vm/names.rs` — added `lyng_gc::ValueStoreTarget` and `lyng_objects::SlotLocation` imports; inlined fast path in `load_global_with_feedback`, `store_global_with_feedback`, `assign_global_with_feedback`. Slow chain (existing IC helpers + global property lookup) untouched.
+- `crates/vm/src/vm/names.rs` — added `lyng_gc::ValueStoreTarget` and `lyng_objects::SlotLocation` imports; inlined fast path in `load_global_with_feedback`, `store_global_with_feedback`, `assign_global_with_feedback`. Slow chain (existing IC helpers + global property lookup) untouched.
 
 No changes elsewhere — Phase 3a/3b infrastructure reused verbatim.
 

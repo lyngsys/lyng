@@ -6,7 +6,7 @@ V8 v7 aggregate (3 samples × 6 workloads) = **376,824,184 dispatches**.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -104,7 +104,7 @@ Gate (< 20%) satisfied with maximum headroom.
 - `cargo test -p lyng-tests --release` — **1209 passed**.
 
 Integration test `load_local_1_returns_second_parameter` in
-`crates/lyng/tests/src/op_locals_inline.rs` directly exercises
+`crates/tests/src/op_locals_inline.rs` directly exercises
 LoadLocal1 via parameter access (`(function(a, b) { return b; })(10, 20)`).
 
 ## Notes

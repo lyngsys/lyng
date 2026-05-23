@@ -26,9 +26,9 @@ shape has to land before DSL-0a starts.
 - Reference for comparison only: WebKit `Source/JavaScriptCore/llint/`
   (read-only; not vendored, not quoted verbatim).
 - Phase-3 baseline this ABI replaces: the inline IC fast path in
-  [crates/lyng/vm/src/dispatch.rs](../../../crates/lyng/vm/src/dispatch.rs)
+  [crates/vm/src/dispatch.rs](../../../crates/vm/src/dispatch.rs)
   and the per-opcode handlers under
-  [crates/lyng/vm/src/handlers/](../../../crates/lyng/vm/src/handlers/),
+  [crates/vm/src/handlers/](../../../crates/vm/src/handlers/),
   which currently take `&mut Vm` directly and rely on Rust function-call
   conventions rather than register pinning.
 
@@ -125,7 +125,7 @@ test (below) enforces these values as hard constants.
 ### How offsets reach `naked_asm!`
 
 Offsets are exposed as `pub const` items in
-`crates/lyng/vm/src/dsl/reg_convention.rs`, e.g.:
+`crates/vm/src/dsl/reg_convention.rs`, e.g.:
 
 ```rust
 pub const LLINTSTATE_FRAME_PC_OFFSET_OFFSET:    usize = offset_of!(LlIntState, frame_pc_offset);

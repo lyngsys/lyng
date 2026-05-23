@@ -146,11 +146,11 @@ Report:
 
 ## Files changed
 
-- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyHandler` writable bit (bit 30 of low half); `from_entry` extracts `entry.attrs().writable()`; new `writable()` accessor; `slot_location()` masks bit 30 off the offset.
-- `crates/lyng/objects/src/tests.rs` — `synthesize_own_data_entry` takes a `writable` parameter; 2 new tests (`packs_writable_bit_for_read_only_entry`, `writable_bit_does_not_alias_slot_offset`); 6 existing tests updated to pass `writable: true`.
-- `crates/lyng/vm/src/vm/dispatch/property.rs` — `ValueStoreTarget` import added; cache-hit branch of `execute_set_named_property_opcode` rewritten as the inlined fast path; slow chain (lines below the new block) unchanged.
+- `crates/objects/src/shapes.rs` — `NamedPropertyHandler` writable bit (bit 30 of low half); `from_entry` extracts `entry.attrs().writable()`; new `writable()` accessor; `slot_location()` masks bit 30 off the offset.
+- `crates/objects/src/tests.rs` — `synthesize_own_data_entry` takes a `writable` parameter; 2 new tests (`packs_writable_bit_for_read_only_entry`, `writable_bit_does_not_alias_slot_offset`); 6 existing tests updated to pass `writable: true`.
+- `crates/vm/src/vm/dispatch/property.rs` — `ValueStoreTarget` import added; cache-hit branch of `execute_set_named_property_opcode` rewritten as the inlined fast path; slow chain (lines below the new block) unchanged.
 
-No changes in `crates/lyng/vm/src/vm/feedback.rs` — the
+No changes in `crates/vm/src/vm/feedback.rs` — the
 `monomorphic_fast`, `monomorphic_fast_dependency_epoch`,
 `named_property_fast_handler`, and `refresh_monomorphic_fast`
 infrastructure from Phase 3a is reused unchanged.

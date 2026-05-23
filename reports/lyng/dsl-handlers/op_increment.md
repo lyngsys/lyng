@@ -10,7 +10,7 @@ port of Phase 1.C, behind only op_mul among inline-ported opcodes).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -55,13 +55,13 @@ the semantic body. The reasoning, verified by reading the semantic
 source before writing the asm:
 
 The shared semantic body `op_update_register_semantic`
-(`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`) executes
+(`crates/vm/src/vm/semantics/arithmetic.rs:796-833`) executes
 the following sequence for both op_increment and op_decrement:
 
 1. Call `vm.update_register_value(...)` (line 812) which returns a
    `(numeric, value)` pair where `numeric = ToNumeric(src)` and
    `value = numeric ± 1`. The Vm helper itself is at
-   `crates/lyng/vm/src/vm/dispatch/arithmetic.rs:746-758` and reads
+   `crates/vm/src/vm/dispatch/arithmetic.rs:746-758` and reads
    as:
    ```rust
    let numeric = self.numeric_register_value(...)?;
@@ -236,7 +236,7 @@ op_mul.md / op_bit_and.md / op_shift_left.md / op_shift_right.md, not
 a real regression: every fast-path SMI increment calls
 `call_slow!(op_increment_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The result:
 feedback-recording fast-path entries are counted as if they were full
 slow-path entries.
@@ -278,7 +278,7 @@ instr).
 
 ## Files changed
 
-- `crates/lyng/vm/src/dsl/handlers/cold.rs`
+- `crates/vm/src/dsl/handlers/cold.rs`
   - Added `inc_smi_overflow` to the alphabetically-ordered import list.
   - Replaced the `op_increment_dsl` cold-stub body (line 1893) with
     the SMI inline fast path described above.

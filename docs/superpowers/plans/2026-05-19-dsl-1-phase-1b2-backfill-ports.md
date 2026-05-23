@@ -23,12 +23,12 @@
 - `reports/lyng/dsl-1/phase-1b2-summary.md` — sub-phase summary
 
 ### Modified
-- `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` — add `VALUE_UNINIT_LEX_BITS` const
-- `crates/lyng/vm-dsl/src/lower.rs` — add `value_uninit_lex_bits` universal binding (mirroring `state_this_value` precedent from 1.B.1)
-- `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (or `frame.rs` if more natural) — add `load_uninit_lex_sentinel!` macro
-- `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902` — replace `op_load_this_dsl` cold stub with inline port (keep `op_load_this_slow_rs` as bail target)
-- `crates/lyng/vm/src/dsl/handlers/cold.rs:4184-4210` — replace `op_load_const8_dsl` cold stub with inline port (delete `op_load_const8_slow_rs` if no longer reachable)
-- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — delete the 3 `#[ignore]`-d forward-pointer tests; keep the 3 structural compiles-and-links tests
+- `crates/vm/src/dsl/backend/aarch64/prelude.rs` — add `VALUE_UNINIT_LEX_BITS` const
+- `crates/vm-dsl/src/lower.rs` — add `value_uninit_lex_bits` universal binding (mirroring `state_this_value` precedent from 1.B.1)
+- `crates/vm/src/dsl/backend/aarch64/values.rs` (or `frame.rs` if more natural) — add `load_uninit_lex_sentinel!` macro
+- `crates/vm/src/dsl/handlers/cold.rs:879-902` — replace `op_load_this_dsl` cold stub with inline port (keep `op_load_this_slow_rs` as bail target)
+- `crates/vm/src/dsl/handlers/cold.rs:4184-4210` — replace `op_load_const8_dsl` cold stub with inline port (delete `op_load_const8_slow_rs` if no longer reachable)
+- `crates/vm/tests/dsl_validation_frame_context.rs` — delete the 3 `#[ignore]`-d forward-pointer tests; keep the 3 structural compiles-and-links tests
 - New integration tests in `crates/lyng-tests/` per the per-opcode-gate convention
 
 ---
@@ -47,13 +47,13 @@
 ## Task 1: Add `load_uninit_lex_sentinel!` backend macro
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` (add `VALUE_UNINIT_LEX_BITS` const)
-- Modify: `crates/lyng/vm-dsl/src/lower.rs` (add `value_uninit_lex_bits` universal binding)
-- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (add macro)
+- Modify: `crates/vm/src/dsl/backend/aarch64/prelude.rs` (add `VALUE_UNINIT_LEX_BITS` const)
+- Modify: `crates/vm-dsl/src/lower.rs` (add `value_uninit_lex_bits` universal binding)
+- Modify: `crates/vm/src/dsl/backend/aarch64/values.rs` (add macro)
 
 - [ ] **Step 1: Add the sentinel-bits const to prelude.rs**
 
-In `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with other Value-related constants (look for `VALUE_TAG_HEADER`, `VALUE_PAYLOAD_MASK`, etc. — around lines 40-50). Add after the existing kind constants:
+In `crates/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with other Value-related constants (look for `VALUE_TAG_HEADER`, `VALUE_PAYLOAD_MASK`, etc. — around lines 40-50). Add after the existing kind constants:
 
 ```rust
 /// 64-bit bit pattern of `Value::uninitialized_lexical()`. Used by
@@ -63,7 +63,7 @@ In `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with ot
 pub const VALUE_UNINIT_LEX_BITS: u64 = Value::uninitialized_lexical().bits();
 ```
 
-Note: `Value::uninitialized_lexical()` is a `const fn` (per `crates/lyng/types/src/value.rs:186-188`), so this works at const-eval time. If `.bits()` is not const, expose it via a helper `pub const fn bits_const(self) -> u64` on `Value` in `types/src/value.rs` and use that. The refactor worker investigates at impl time.
+Note: `Value::uninitialized_lexical()` is a `const fn` (per `crates/types/src/value.rs:186-188`), so this works at const-eval time. If `.bits()` is not const, expose it via a helper `pub const fn bits_const(self) -> u64` on `Value` in `types/src/value.rs` and use that. The refactor worker investigates at impl time.
 
 - [ ] **Step 2: Add a unit test for the const**
 
@@ -79,7 +79,7 @@ fn value_uninit_lex_bits_matches_runtime() {
 }
 ```
 
-If the `tests` mod doesn't already exist in prelude.rs, add it. If `Value::bits()` is not public, replace it with whatever public accessor exposes the u64 (`.to_bits()`, `.raw()`, etc.) — the refactor worker discovers via `grep "pub fn.*Value.*u64" crates/lyng/types/src/value.rs`.
+If the `tests` mod doesn't already exist in prelude.rs, add it. If `Value::bits()` is not public, replace it with whatever public accessor exposes the u64 (`.to_bits()`, `.raw()`, etc.) — the refactor worker discovers via `grep "pub fn.*Value.*u64" crates/types/src/value.rs`.
 
 - [ ] **Step 3: Run the unit test to verify it passes**
 
@@ -88,7 +88,7 @@ Expected: PASS (or "no tests" if rust-analyzer is stale — run `cargo test -p l
 
 - [ ] **Step 4: Add `value_uninit_lex_bits` to the lowerer's universal binding set**
 
-Open `crates/lyng/vm-dsl/src/lower.rs`. Find the section that injects universal `naked_asm!` named bindings (look for `state_this_value`, `state_pb`, `state_fv`, `state_regs`, `state_prefix` — added during Phase 1.B.1 Task 5). Add an analogous binding:
+Open `crates/vm-dsl/src/lower.rs`. Find the section that injects universal `naked_asm!` named bindings (look for `state_this_value`, `state_pb`, `state_fv`, `state_regs`, `state_prefix` — added during Phase 1.B.1 Task 5). Add an analogous binding:
 
 ```rust
 // Phase 1.B.2: sentinel bit pattern for op_load_this's bail comparison.
@@ -105,7 +105,7 @@ Expected: clean. The new const is exposed; the new binding is wired through the 
 
 - [ ] **Step 6: Add the `load_uninit_lex_sentinel!` macro**
 
-In `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (this is where Value-related backend macros live; if a different file is more conventional for sentinel/constant-materialization, the refactor worker picks based on the existing module organization — `prelude.rs` is also reasonable), add:
+In `crates/vm/src/dsl/backend/aarch64/values.rs` (this is where Value-related backend macros live; if a different file is more conventional for sentinel/constant-materialization, the refactor worker picks based on the existing module organization — `prelude.rs` is also reasonable), add:
 
 ```rust
 /// Materialize the `Value::uninitialized_lexical()` 64-bit sentinel
@@ -165,7 +165,7 @@ The refactor worker writes one form, tries to compile a test handler in Step 7, 
 
 - [ ] **Step 7: Add a structural validation test in `dsl_validation_frame_context.rs`**
 
-Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing three structural "compiles-and-links" handlers, add a fourth:
+Open `crates/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing three structural "compiles-and-links" handlers, add a fourth:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -204,7 +204,7 @@ Expected: 417+ vm, 1187+ tests (unchanged from Phase 1.B.1 close + 1 from the co
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs crates/lyng/vm/src/dsl/backend/aarch64/values.rs crates/lyng/vm-dsl/src/lower.rs crates/lyng/vm/tests/dsl_validation_frame_context.rs
+git add crates/vm/src/dsl/backend/aarch64/prelude.rs crates/vm/src/dsl/backend/aarch64/values.rs crates/vm-dsl/src/lower.rs crates/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 1: load_uninit_lex_sentinel! backend macro
 
@@ -237,7 +237,7 @@ EOF
 ## Task 2: Inline-port `op_load_const8`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:4179-4188` (handler) and `:4190-4210` (slow_rs)
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:4179-4188` (handler) and `:4190-4210` (slow_rs)
 - Create: `reports/lyng/dsl-handlers/op_load_const8.md`
 - Test: extend an existing integration test file in `crates/lyng-tests/tests/` or add a new one
 
@@ -299,7 +299,7 @@ This is the value: when Task 2 lands the inline port, the same tests must contin
 
 - [ ] **Step 3: Replace the `op_load_const8_dsl` cold stub with the inline port**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 4182-4188):
+In `crates/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 4182-4188):
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -358,7 +358,7 @@ Expected: 417+/1187+ (parity maintained, plus the new tests from Step 1 added th
 
 The inline port doesn't `call_slow!` anymore. If `op_load_const8_slow_rs` has no callers, it's dead code. Check:
 ```bash
-grep -rn "op_load_const8_slow_rs" crates/lyng/
+grep -rn "op_load_const8_slow_rs" crates/
 ```
 If no callers remain outside the function definition itself, delete the function. If it's still referenced (e.g., the prefix-wide variant uses it), keep it.
 
@@ -387,7 +387,7 @@ Some sections (microbench, slow-path-share) are filled in during Task 4 once the
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs reports/lyng/dsl-handlers/op_load_const8.md crates/lyng-tests/tests/op_load_const8_inline.rs
+git add crates/vm/src/dsl/handlers/cold.rs reports/lyng/dsl-handlers/op_load_const8.md crates/lyng-tests/tests/op_load_const8_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 2: op_load_const8 inline port
 
@@ -418,7 +418,7 @@ EOF
 ## Task 3: Inline-port `op_load_this`
 
 **Files:**
-- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:874-882` (handler) — keep `op_load_this_slow_rs` as bail target
+- Modify: `crates/vm/src/dsl/handlers/cold.rs:874-882` (handler) — keep `op_load_this_slow_rs` as bail target
 - Create: `reports/lyng/dsl-handlers/op_load_this.md`
 - Test: `crates/lyng-tests/tests/op_load_this_inline.rs` (new)
 
@@ -493,7 +493,7 @@ Expected: all passing (cold stub correctly produces these values). If any test f
 
 - [ ] **Step 3: Replace the `op_load_this_dsl` cold stub with the inline port**
 
-In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 877-882):
+In `crates/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 877-882):
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -545,7 +545,7 @@ llint_handler! {
 
 Look at existing DSL handlers that have similar conditional-bail patterns. For example, type-check macros likely have `b.ne fast_path; b.eq slow_path; ...` patterns; mirror that.
 
-If no precedent exists, the cleanest approach is to introduce a minimal `cmp_and_bail_eq!($reg_a, $reg_b, $slow_fn, args = [$($a:tt)*])` macro in `crates/lyng/vm/src/dsl/backend/aarch64/control.rs` (where dispatch and branch macros live). The refactor worker either finds a precedent and uses it directly, or adds the macro as a tiny helper here.
+If no precedent exists, the cleanest approach is to introduce a minimal `cmp_and_bail_eq!($reg_a, $reg_b, $slow_fn, args = [$($a:tt)*])` macro in `crates/vm/src/dsl/backend/aarch64/control.rs` (where dispatch and branch macros live). The refactor worker either finds a precedent and uses it directly, or adds the macro as a tiny helper here.
 
 - [ ] **Step 4: Build to verify the inline port compiles**
 
@@ -569,7 +569,7 @@ Mirror Task 2 Steps 8 + 9. Asm baseline → `reports/lyng/asm-baselines/op_load_
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_load_this_inline.rs reports/lyng/dsl-handlers/op_load_this.md reports/lyng/asm-baselines/op_load_this.txt
+git add crates/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_load_this_inline.rs reports/lyng/dsl-handlers/op_load_this.md reports/lyng/asm-baselines/op_load_this.txt
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 3: op_load_this inline port with sentinel bail
 
@@ -608,7 +608,7 @@ EOF
 ## Task 4: Cleanup, V8 v7 A/B, microbench, slow-path-share
 
 **Files:**
-- Modify: `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (delete the 3 ignored forward-pointer tests)
+- Modify: `crates/vm/tests/dsl_validation_frame_context.rs` (delete the 3 ignored forward-pointer tests)
 - Modify: `reports/lyng/dsl-handlers/op_load_const8.md` (fill in TBDs from Task 2)
 - Modify: `reports/lyng/dsl-handlers/op_load_this.md` (fill in TBDs from Task 3)
 - Create: `reports/lyng/dsl-1/phase-1b2-microbench.md`
@@ -616,7 +616,7 @@ EOF
 
 - [ ] **Step 1: Delete the 3 ignored forward-pointer tests in dsl_validation_frame_context.rs**
 
-Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Find the three tests marked `#[ignore]` (added in Phase 1.B.1 Task 6, commit `0605a407`):
+Open `crates/vm/tests/dsl_validation_frame_context.rs`. Find the three tests marked `#[ignore]` (added in Phase 1.B.1 Task 6, commit `0605a407`):
 - `load_constant_reads_pre_resolved_constants_array`
 - `load_this_value_reads_real_this_binding`
 - `load_this_value_reads_sentinel_for_uninitialized`
@@ -730,7 +730,7 @@ Open `reports/lyng/dsl-handlers/op_load_const8.md` and `reports/lyng/dsl-handler
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng/vm/tests/dsl_validation_frame_context.rs reports/lyng/dsl-1/phase-1b2-microbench.md reports/lyng/dsl-1/phase-1b2-ab-comparison.md reports/lyng/dsl-handlers/op_load_const8.md reports/lyng/dsl-handlers/op_load_this.md
+git add crates/vm/tests/dsl_validation_frame_context.rs reports/lyng/dsl-1/phase-1b2-microbench.md reports/lyng/dsl-1/phase-1b2-ab-comparison.md reports/lyng/dsl-handlers/op_load_const8.md reports/lyng/dsl-handlers/op_load_this.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 4: cleanup + microbench + V8 v7 A/B
 

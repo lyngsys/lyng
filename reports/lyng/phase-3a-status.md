@@ -130,15 +130,15 @@ ECMA-262-core categories (annexB, built-ins, harness, language).
 
 ## Files changed
 
-- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyHandler` struct + accessors (+68 lines).
-- `crates/lyng/objects/src/lib.rs` — pub use of new type (+1 line edit).
-- `crates/lyng/objects/src/tests.rs` — 6 unit tests for handler packing (+93 lines).
-- `crates/lyng/vm/src/vm/feedback.rs` — `monomorphic_fast` and
+- `crates/objects/src/shapes.rs` — `NamedPropertyHandler` struct + accessors (+68 lines).
+- `crates/objects/src/lib.rs` — pub use of new type (+1 line edit).
+- `crates/objects/src/tests.rs` — 6 unit tests for handler packing (+93 lines).
+- `crates/vm/src/vm/feedback.rs` — `monomorphic_fast` and
   `monomorphic_fast_dependency_epoch` sidecar fields on
   `NamedPropertyFeedback`; `refresh_monomorphic_fast()` maintenance;
   `Vm::named_property_fast_handler()` and
   `Vm::record_named_property_fast_hit()` `#[inline(always)]` helpers.
-- `crates/lyng/vm/src/vm/dispatch/property.rs` — inlined fast-path
+- `crates/vm/src/vm/dispatch/property.rs` — inlined fast-path
   block in `execute_get_named_property_opcode` cache-hit branch.
 
 Total Phase 3a diff: ~270 added lines + small modifications across 5 files.

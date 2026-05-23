@@ -251,7 +251,7 @@ Recorded formally in [`phase-1b-followups.md`](phase-1b-followups.md).
 
 **StoreLocal0 functional unreachability** was discovered during
 Phase 1.B.3 Task 1-4 implementation. The bytecode-builder peephole at
-`crates/lyng/bytecode/src/builder.rs:150-166` rewrites `Move dst=0,
+`crates/bytecode/src/builder.rs:150-166` rewrites `Move dst=0,
 src=B` → `Ldar B` before the `store_local_opcode` branch fires, so
 StoreLocal0 cannot be emitted from compiled JS source. The inline
 port is correct and cheap; it just has 0 V8 v7 dispatches in practice.

@@ -58,17 +58,17 @@ Phase 1.B.1 landed the substrate. Recap what's available:
 
 | Substrate piece | Location | Status |
 |------------------|----------|--------|
-| `frame_const_base: *const Value` field on `LlIntState` (offset 32) | `crates/lyng/vm/src/dsl/llint_state.rs:31` | ✅ |
-| `frame_this_value: Value` field on `LlIntState` (offset 40) | `crates/lyng/vm/src/dsl/llint_state.rs:32` | ✅ |
-| `LLINT_STATE_FRAME_CONST_BASE` + `LLINT_STATE_FRAME_THIS_VALUE` consts | `crates/lyng/vm/src/dsl/reg_convention.rs:43-44` | ✅ |
-| `load_constant!` macro (2-instruction indexed load) | `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` | ✅ |
-| `load_state_value!` macro (1-instruction fixed-offset load) | `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` | ✅ |
-| `resolve_initial_this_value` helper (populates `frame_this_value`) | `crates/lyng/vm/src/dsl/llint_state.rs` | ✅ |
-| Population at trampoline entry (`run_via_dsl`) | `crates/lyng/vm/src/dsl/entry.rs` | ✅ |
-| Refresh in Refresh arm (`translate_outcome`) | `crates/lyng/vm/src/dsl/slow_path.rs:293-312` | ✅ |
+| `frame_const_base: *const Value` field on `LlIntState` (offset 32) | `crates/vm/src/dsl/llint_state.rs:31` | ✅ |
+| `frame_this_value: Value` field on `LlIntState` (offset 40) | `crates/vm/src/dsl/llint_state.rs:32` | ✅ |
+| `LLINT_STATE_FRAME_CONST_BASE` + `LLINT_STATE_FRAME_THIS_VALUE` consts | `crates/vm/src/dsl/reg_convention.rs:43-44` | ✅ |
+| `load_constant!` macro (2-instruction indexed load) | `crates/vm/src/dsl/backend/aarch64/constants.rs` | ✅ |
+| `load_state_value!` macro (1-instruction fixed-offset load) | `crates/vm/src/dsl/backend/aarch64/frame.rs` | ✅ |
+| `resolve_initial_this_value` helper (populates `frame_this_value`) | `crates/vm/src/dsl/llint_state.rs` | ✅ |
+| Population at trampoline entry (`run_via_dsl`) | `crates/vm/src/dsl/entry.rs` | ✅ |
+| Refresh in Refresh arm (`translate_outcome`) | `crates/vm/src/dsl/slow_path.rs:293-312` | ✅ |
 | Microbench snippets for LoadConst8 + LoadThis | `tools/lyng-bench/src/microbench/snippets.rs` | ✅ |
-| Sentinel `Value::uninitialized_lexical()` const | `crates/lyng/types/src/value.rs:186` | ✅ |
-| Slow-path stubs for both opcodes (kept as bail targets for op_load_this) | `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902, 4184-4210` | ✅ |
+| Sentinel `Value::uninitialized_lexical()` const | `crates/types/src/value.rs:186` | ✅ |
+| Slow-path stubs for both opcodes (kept as bail targets for op_load_this) | `crates/vm/src/dsl/handlers/cold.rs:879-902, 4184-4210` | ✅ |
 
 Phase 1.B.2 just consumes the substrate; no substrate additions.
 
@@ -161,7 +161,7 @@ L_slow:
 
 **Decision:** prefer `ldr {dst}, =literal` (1 instruction, assembler-managed literal pool) if `naked_asm!` accepts it; otherwise fall back to `movz {dst}, #imm16; movk {dst}, #imm16, lsl #16` (up to 4 instructions for a full 64-bit constant). The Phase 1.B.0 counter macros use `ldr` against a fixed offset successfully; literal-pool `ldr` is the natural extension. The refactor worker tries `ldr =literal` first; if rejected by the rustc inline-asm parser, switches to `movz/movk` and notes the deviation in the commit message. Either way, total inline budget stays ≤ 12 instructions.
 
-**Backend macro decision:** introduce a new tiny macro `load_uninit_lex_sentinel!($dst)` in `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` (or `values.rs` — wherever Value-related constants live). This keeps the handler body clean and centralizes the sentinel materialization so future opcodes (e.g., `op_throw_uninitialized`) can reuse it. **One new backend macro is OK in 1.B.2** — it's a tiny utility (single ldr/movz sequence) tied directly to the in-scope opcodes.
+**Backend macro decision:** introduce a new tiny macro `load_uninit_lex_sentinel!($dst)` in `crates/vm/src/dsl/backend/aarch64/prelude.rs` (or `values.rs` — wherever Value-related constants live). This keeps the handler body clean and centralizes the sentinel materialization so future opcodes (e.g., `op_throw_uninitialized`) can reuse it. **One new backend macro is OK in 1.B.2** — it's a tiny utility (single ldr/movz sequence) tied directly to the in-scope opcodes.
 
 **Slow-path-share expectation:** very low (< 5%) on V8 v7. The sentinel fires only for `ThisState::Uninitialized` (TDZ for derived constructors before `super()`) or `ThisState::Lexical` (arrow functions captured from a lexical environment). V8 v7 workloads (Richards, DeltaBlue, etc.) are written in pre-class style; they rarely hit either case.
 
@@ -268,5 +268,5 @@ Each task is one commit. Behavioral parity at every commit (≥417 + ≥1187).
 - **Phase 1.B.1 closure:** [`reports/lyng/dsl-1/phase-1b1-summary.md`](../../../reports/lyng/dsl-1/phase-1b1-summary.md).
 - **Phase 1.B.1 spec (substrate design):** [`2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`](2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md).
 - **Top-30 reference:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv) (op_load_this is #12 at 256M dispatches; op_load_const8 is #21 at 104M dispatches).
-- **Phase 1.A analog port (template):** `op_load_smi8_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:4171-4176`.
-- **Existing slow-path stubs:** `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902` (op_load_this), `4184-4210` (op_load_const8).
+- **Phase 1.A analog port (template):** `op_load_smi8_dsl` at `crates/vm/src/dsl/handlers/cold.rs:4171-4176`.
+- **Existing slow-path stubs:** `crates/vm/src/dsl/handlers/cold.rs:879-902` (op_load_this), `4184-4210` (op_load_const8).

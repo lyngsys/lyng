@@ -27,7 +27,7 @@ New substrate (Task 1, 1.C.0 prep): `inc_smi_overflow!`, `dec_smi_overflow!` mac
 
 Substrate refactor (Task 3): `mul_smi_overflow!` extended from 4 → 7 instructions to add ECMAScript -0 deferral (`cbnz + orr + tbnz` for `(-1)*0`-style cases). Driven by the pre-existing `script_core_specialized_smi_arithmetic_preserves_negative_zero` test failing at first compile.
 
-New unit test (Task 11): [`crates/lyng/tests/src/dsl_increment_writeback.rs`](../../../crates/lyng/tests/src/dsl_increment_writeback.rs) — 4 tests verifying the SMI-elision-of-src-writeback claim for non-SMI source values forced through the slow path. All passing.
+New unit test (Task 11): [`crates/tests/src/dsl_increment_writeback.rs`](../../../crates/tests/src/dsl_increment_writeback.rs) — 4 tests verifying the SMI-elision-of-src-writeback claim for non-SMI source values forced through the slow path. All passing.
 
 ---
 
@@ -85,7 +85,7 @@ Unchanged from Phase 1.B close (72 bytes; no new fields).
 - `inc_smi_overflow!` (3 instructions; `adds wD, wS, #1` + `b.vs` + `sxtw`)
 - `dec_smi_overflow!` (3 instructions; `subs wD, wS, #1` + `b.vs` + `sxtw`)
 
-Both in `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs`. Use the 12-bit immediate form of `adds`/`subs` to avoid materializing the literal 1 in a scratch register. Documented in `ops.md`.
+Both in `crates/vm/src/dsl/backend/aarch64/arithmetic.rs`. Use the 12-bit immediate form of `adds`/`subs` to avoid materializing the literal 1 in a scratch register. Documented in `ops.md`.
 
 ### Backend macros modified
 
@@ -109,7 +109,7 @@ Seven `aarch64_max_instructions` budgets calibrated from real measurements + 2 h
 
 Carrying forward Phase 1.B's 5 lessons (loadavg overlap, sub-phase A/B composition, substrate runtime verification, grep over summary tables, bytecode-builder peephole analysis). Phase 1.C adds:
 
-6. **The `call_slow!` counter-injection artifact.** The DSL substrate's `call_slow!` macro auto-injects `inc_slow_semantic_counter!` for ALL call sites via `crates/lyng/vm-dsl/src/lower.rs::inject_opcode_byte`, regardless of label scope. Fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocations therefore incorrectly count as slow-path semantic entries, giving 100% slow-path-share readings for all opcodes using the record-smi shim pattern (op_add since DSL-0, then all 7 Phase 1.C ports). **Discovered in Task 2 (op_sub) review; verified in Task 2 spec review's lower.rs read; documented per-port via per-workload waivers per spec §1.6 + §5.** The substrate fix (gate the counter-injection on a `seen_label: bool` flag) is the top followup for Phase 1.D. The strongly positive A/B results (+13.66% cumulative) prove the artifact is purely instrumentation — actual execution correctly takes the inline fast path.
+6. **The `call_slow!` counter-injection artifact.** The DSL substrate's `call_slow!` macro auto-injects `inc_slow_semantic_counter!` for ALL call sites via `crates/vm-dsl/src/lower.rs::inject_opcode_byte`, regardless of label scope. Fast-path `call_slow!(op_xxx_record_smi_rs, args = [slot])` invocations therefore incorrectly count as slow-path semantic entries, giving 100% slow-path-share readings for all opcodes using the record-smi shim pattern (op_add since DSL-0, then all 7 Phase 1.C ports). **Discovered in Task 2 (op_sub) review; verified in Task 2 spec review's lower.rs read; documented per-port via per-workload waivers per spec §1.6 + §5.** The substrate fix (gate the counter-injection on a `seen_label: bool` flag) is the top followup for Phase 1.D. The strongly positive A/B results (+13.66% cumulative) prove the artifact is purely instrumentation — actual execution correctly takes the inline fast path.
 
 7. **Sub-phase A/B composition vs direct cumulative measurement diverges in both directions.** Phase 1.B retrospective lesson #2 noted that mid-phase composition predicted +3.4% but the direct measurement landed +8.51%. Phase 1.C shows the opposite direction: mini-A/B compositions (1.0031 × 1.0304 × 1.0319 = +6.7%) UNDERESTIMATED the direct cumulative +13.66%. The rule generalizes: **per-sub-phase A/Bs are informational only; always measure the umbrella gate directly at phase close.**
 
@@ -211,10 +211,10 @@ All under [`reports/lyng/dsl-handlers/`](../dsl-handlers/).
 
 ### Source code anchors
 
-- DSL substrate: `crates/lyng/vm/src/dsl/`
-- AArch64 backend macros: `crates/lyng/vm/src/dsl/backend/aarch64/`
-- Opcode handlers (hot.rs, warm.rs, cold.rs): `crates/lyng/vm/src/dsl/handlers/`
-- Lowerer proc-macro: `crates/lyng/vm-dsl/src/`
+- DSL substrate: `crates/vm/src/dsl/`
+- AArch64 backend macros: `crates/vm/src/dsl/backend/aarch64/`
+- Opcode handlers (hot.rs, warm.rs, cold.rs): `crates/vm/src/dsl/handlers/`
+- Lowerer proc-macro: `crates/vm-dsl/src/`
 - Bench tool: `tools/lyng-bench/`
 - Test262 runner: `tools/lyng-test262/`
-- New writeback unit test: `crates/lyng/tests/src/dsl_increment_writeback.rs`
+- New writeback unit test: `crates/tests/src/dsl_increment_writeback.rs`

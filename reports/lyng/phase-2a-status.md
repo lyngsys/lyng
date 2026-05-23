@@ -8,11 +8,11 @@
 
 ## What landed
 
-Two changes in `crates/lyng/gc/`, scoped to durable infrastructure that
+Two changes in `crates/gc/`, scoped to durable infrastructure that
 Phase 3 (`lyng-2pgt`) will consume:
 
 1. **`Vec<SlotPage<Record>>` → `Vec<Box<SlotPage<Record>>>`** in
-   `crates/lyng/gc/src/arena/storage.rs:176`. Each `SlotPage` is ~5KB; a
+   `crates/gc/src/arena/storage.rs:176`. Each `SlotPage` is ~5KB; a
    `Vec::push` that grew the slab previously moved all pages inline. Boxing
    makes page bodies pointer-stable, which is the precondition for handing out
    borrow-based record accessors.
@@ -160,9 +160,9 @@ Phase 3 can begin without any further `gc` crate work.
 
 ## Files changed
 
-- `crates/lyng/gc/src/arena/storage.rs` — `Vec<Box<SlotPage>>`, +
+- `crates/gc/src/arena/storage.rs` — `Vec<Box<SlotPage>>`, +
   `SlotArena::get_ref`, + `SlotPage::get_ref`.
-- `crates/lyng/gc/src/arena.rs` — + `PrimitiveHeap::object_ref`.
-- `crates/lyng/gc/src/mutator.rs` — + `PrimitiveHeapView::object_ref`.
+- `crates/gc/src/arena.rs` — + `PrimitiveHeap::object_ref`.
+- `crates/gc/src/mutator.rs` — + `PrimitiveHeapView::object_ref`.
 
 Total diff: 18 added lines, 2 modified lines across 3 files.

@@ -19,15 +19,15 @@ Design: [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../../docs
 
 Current code (cited line numbers below):
 
-- `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs` — `op_jump`,
+- `crates/vm/src/vm/dispatch_handlers/control_flow.rs` — `op_jump`,
   `op_jump8`, `op_loop_header`, conditional jump handlers
-- `crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs` — `op_wide`,
+- `crates/vm/src/vm/dispatch_handlers/prefix.rs` — `op_wide`,
   `op_extra_wide`, `dispatch_prefixed`
-- `crates/lyng/vm/src/vm/tiering.rs` — `observe_tier_backedge_event`
-- `crates/lyng/vm/src/vm.rs` — `request_debug_pause`,
+- `crates/vm/src/vm/tiering.rs` — `observe_tier_backedge_event`
+- `crates/vm/src/vm.rs` — `request_debug_pause`,
   `request_debug_pause_at`, `debug_poll_enabled`, `poll_debug_safepoint`,
   `poll_incremental_mark_safepoint`
-- `crates/lyng/vm/src/vm/debugger.rs` — `should_poll`, `consume_pause`
+- `crates/vm/src/vm/debugger.rs` — `should_poll`, `consume_pause`
 
 ## Today's safepoint surface (alpha path)
 
@@ -43,7 +43,7 @@ observation goes away with DSL-0c (see "Deferred work" below).
 
 ### `op_loop_header`
 
-[crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs:75-93]
+[crates/vm/src/vm/dispatch_handlers/control_flow.rs:75-93]
 
 ```rust
 pub extern "C" fn op_loop_header(state: &mut DispatchState) -> Step {
@@ -69,7 +69,7 @@ is allowed to mutate frame state.
 
 ### `op_jump`, `op_jump8` (backward only)
 
-[crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs:39-73]
+[crates/vm/src/vm/dispatch_handlers/control_flow.rs:39-73]
 
 Both jump handlers branch on `ax < 0` and run the tier-backedge plus
 incremental-mark poll only on negative offsets:
@@ -86,7 +86,7 @@ today.
 
 ### `op_jump_if_true` / `op_jump_if_false` (both i24 and i8 variants)
 
-[crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs:117-200]
+[crates/vm/src/vm/dispatch_handlers/control_flow.rs:117-200]
 
 The shared `op_jump_if_impl` handler polls only when the jump is both
 taken and negative:
@@ -107,7 +107,7 @@ DSL-0a preserves this exact shape on the alpha path; DSL-0b adds the
 
 ### `poll_incremental_mark_safepoint`
 
-[crates/lyng/vm/src/vm.rs:598-601]
+[crates/vm/src/vm.rs:598-601]
 
 ```rust
 pub(super) fn poll_incremental_mark_safepoint(agent: &mut Agent) {
@@ -122,7 +122,7 @@ that takes `&mut Agent` plus whatever VM state it needs through the
 
 ### `observe_tier_backedge_event`
 
-[crates/lyng/vm/src/vm/tiering.rs:211-219]
+[crates/vm/src/vm/tiering.rs:211-219]
 
 ```rust
 pub(super) fn observe_tier_backedge_event(&mut self, code: CodeRef) {
@@ -251,7 +251,7 @@ jumps, since they are independent handlers sharing the dispatch table.
 
 ## Prefix dispatch semantics
 
-[crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs:16-48]
+[crates/vm/src/vm/dispatch_handlers/prefix.rs:16-48]
 
 The current alpha trampoline implements prefix dispatch as:
 

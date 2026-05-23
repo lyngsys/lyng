@@ -69,7 +69,7 @@ Reports: `reports/lyng/dsl-0c-v8.md`, `dsl-0c-microbench.md`.
 ## 4. α deletion summary
 
 Deleted (~3,000+ lines):
-- `crates/lyng/vm/src/vm/dispatch_handlers/` (entire directory, 13 files)
+- `crates/vm/src/vm/dispatch_handlers/` (entire directory, 13 files)
 - `dispatch_state.rs`: `run_trampoline`, `run_trampoline_counted`, `still_active`, `Step`, `Handler`, `try_step!`, `current_bytes`, `next_opcode_byte`, `advance` methods
 - `dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, 7 α-only decoders
 - `tiering.rs`: `observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
@@ -126,4 +126,4 @@ DSL-1 priorities (per design §10):
 
 The DSL-0c phase achieved its primary goals: DSL substrate active, α fully deleted, Test262 100% pass rate preserved, all surgical bugs fixed and root-caused. The V8 v7 deficit is documented and well-understood — it's the cold-stub bridge tax that DSL-1 systematically addresses.
 
-DSL-0c dcat sub-epic `lyng-4cdz` and 13 task tickets are `in_review` awaiting user approval to close. Per `crates/lyng/AGENTS.md`, tickets NEVER close without explicit user approval.
+DSL-0c dcat sub-epic `lyng-4cdz` and 13 task tickets are `in_review` awaiting user approval to close. Per `crates/AGENTS.md`, tickets NEVER close without explicit user approval.

@@ -6,7 +6,7 @@ symmetric pair of `op_store_local_3`. V8 v7 aggregate dispatches:
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -74,7 +74,7 @@ share). Gate (< 20%) satisfied.
 
 vm 418 / lyng-tests 1209. Integration test
 `store_local_0_1_2_via_assignments` in
-`crates/lyng/tests/src/op_locals_inline.rs` exercises StoreLocal1
+`crates/tests/src/op_locals_inline.rs` exercises StoreLocal1
 via `b = b * 3` parameter mutation.
 
 ## Notes

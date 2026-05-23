@@ -94,7 +94,7 @@ Full microbench + slow-path-share data at
 
 ### Latent x22→x24 register-pin bug in Phase 1.B.1 substrate macros
 
-The `load_constant!` macro in `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`
+The `load_constant!` macro in `crates/vm/src/dsl/backend/aarch64/constants.rs`
 (landed in Phase 1.B.1 Task 5, commit `3d2bfccc`) initially emitted
 `ldr x16, [x22, ...]` to read the `frame_const_base` field — but the
 field lives on `LlIntState`, accessed via the **STATE pin (x24)**, not

@@ -31,8 +31,8 @@ Combined: ~1.75B inlined dispatches per V8 v7 run.
 
 ### In scope
 
-- Seven inline ports replacing cold stubs in `crates/lyng/vm/src/dsl/handlers/cold.rs`.
-- Two new backend macros (`inc_smi_overflow!`, `dec_smi_overflow!`) under `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` with `ops.md` entries.
+- Seven inline ports replacing cold stubs in `crates/vm/src/dsl/handlers/cold.rs`.
+- Two new backend macros (`inc_smi_overflow!`, `dec_smi_overflow!`) under `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` with `ops.md` entries.
 - Per-opcode microbench, slow-path-share check, asm baseline, ported report under [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/) (per epic spec §3 8-step workflow).
 - Per-sub-phase mini A/B (informational) and phase-close cumulative A/B vs pre-DSL-0 `d850f261` (umbrella gate).
 - Updated `aarch64_max_instructions` budgets in `tools/lyng-bench/hot-opcodes.toml` for the 7 ports (currently 0 placeholders).
@@ -156,7 +156,7 @@ Per Phase 1.B retrospective lesson #3 ("structural compile-and-link tests are no
 
 - Setup: function with `let s = "1"; let r = ++s;` (string src forces slow path).
 - Assertion: after execution, `s === 1` (writeback) and `r === 2` (post-update value).
-- Lives at `crates/lyng/tests/src/dsl_increment_writeback.rs` or similar.
+- Lives at `crates/tests/src/dsl_increment_writeback.rs` or similar.
 
 If lyng doesn't yet support prefix `++` on a string lvalue, the test uses the most concise JS expression that compiles to `op_increment` with non-SMI src. The 1.C.3 worker confirms what compiles to op_increment before writing the test.
 
@@ -185,7 +185,7 @@ Phase 1.C summary documents the actual number against both the epic-spec target 
 
 ## 4. New substrate (1.C.0 or first 1.C.3 task)
 
-Two new macros in `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs`. Each is 3 instructions:
+Two new macros in `crates/vm/src/dsl/backend/aarch64/arithmetic.rs`. Each is 3 instructions:
 
 ```rust
 /// 32-bit signed increment by 1 with overflow detection.
@@ -309,11 +309,11 @@ User deny rules continue: no `git -C`, no `cd && git`, no `--no-verify`, no dest
 
 ## 10. Deliverables checklist
 
-- [ ] 7 new inline DSL handler implementations replacing existing cold stubs in `crates/lyng/vm/src/dsl/handlers/cold.rs`.
-- [ ] 2 new backend macros (`inc_smi_overflow!`, `dec_smi_overflow!`) in `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` + `ops.md` entries.
+- [ ] 7 new inline DSL handler implementations replacing existing cold stubs in `crates/vm/src/dsl/handlers/cold.rs`.
+- [ ] 2 new backend macros (`inc_smi_overflow!`, `dec_smi_overflow!`) in `crates/vm/src/dsl/backend/aarch64/arithmetic.rs` + `ops.md` entries.
 - [ ] 7 ported reports in `reports/lyng/dsl-handlers/op_{sub,mul,bit_and,shift_left,shift_right,increment,decrement}.md`.
 - [ ] 7 asm baselines in `reports/lyng/dsl-asm-baseline-aarch64/`.
-- [ ] 1 unit test for inc/dec non-SMI-src writeback at `crates/lyng/tests/src/dsl_increment_writeback.rs` (or equivalent location).
+- [ ] 1 unit test for inc/dec non-SMI-src writeback at `crates/tests/src/dsl_increment_writeback.rs` (or equivalent location).
 - [ ] Updated `tools/lyng-bench/hot-opcodes.toml` with calibrated `aarch64_max_instructions` budgets for the 7 ports (replacing 0 placeholders).
 - [ ] 3 sub-phase summaries at `reports/lyng/dsl-1/phase-1c{1,2,3}-summary.md`.
 - [ ] 1 phase summary at `reports/lyng/dsl-1/phase-1c-summary.md` with re-baselining commentary per §3.
@@ -340,19 +340,19 @@ User deny rules continue: no `git -C`, no `cd && git`, no `--no-verify`, no dest
 ### Predecessor port (the SMI shape prototype)
 
 - op_add ported report: [`reports/lyng/dsl-handlers/op_add.md`](../../../reports/lyng/dsl-handlers/op_add.md).
-- op_add handler source: [`crates/lyng/vm/src/dsl/handlers/hot.rs`](../../../crates/lyng/vm/src/dsl/handlers/hot.rs) lines 38-72.
+- op_add handler source: [`crates/vm/src/dsl/handlers/hot.rs`](../../../crates/vm/src/dsl/handlers/hot.rs) lines 38-72.
 
 ### Substrate
 
-- Arithmetic backend macros: [`crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs).
-- Value tag macros: [`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/values.rs).
-- Feedback macros: [`crates/lyng/vm/src/dsl/backend/aarch64/feedback.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/feedback.rs).
-- Operand decode: [`crates/lyng/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/operands.rs).
-- Backend ops vocab: [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md).
+- Arithmetic backend macros: [`crates/vm/src/dsl/backend/aarch64/arithmetic.rs`](../../../crates/vm/src/dsl/backend/aarch64/arithmetic.rs).
+- Value tag macros: [`crates/vm/src/dsl/backend/aarch64/values.rs`](../../../crates/vm/src/dsl/backend/aarch64/values.rs).
+- Feedback macros: [`crates/vm/src/dsl/backend/aarch64/feedback.rs`](../../../crates/vm/src/dsl/backend/aarch64/feedback.rs).
+- Operand decode: [`crates/vm/src/dsl/backend/aarch64/operands.rs`](../../../crates/vm/src/dsl/backend/aarch64/operands.rs).
+- Backend ops vocab: [`crates/vm/src/dsl/ops.md`](../../../crates/vm/src/dsl/ops.md).
 
 ### Semantic bodies
 
-- Arithmetic semantics: [`crates/lyng/vm/src/vm/semantics/arithmetic.rs`](../../../crates/lyng/vm/src/vm/semantics/arithmetic.rs).
+- Arithmetic semantics: [`crates/vm/src/vm/semantics/arithmetic.rs`](../../../crates/vm/src/vm/semantics/arithmetic.rs).
   - `op_sub_semantic` lines 249-281.
   - `op_mul_semantic` lines 283-313.
   - `op_bit_and_semantic` lines 537-567.
@@ -361,12 +361,12 @@ User deny rules continue: no `git -C`, no `cd && git`, no `--no-verify`, no dest
 
 ### Current cold-stub handlers (to replace)
 
-- `op_sub_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:1050`.
-- `op_mul_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:1120`.
-- `op_bit_and_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:1435`.
+- `op_sub_dsl` at `crates/vm/src/dsl/handlers/cold.rs:1050`.
+- `op_mul_dsl` at `crates/vm/src/dsl/handlers/cold.rs:1120`.
+- `op_bit_and_dsl` at `crates/vm/src/dsl/handlers/cold.rs:1435`.
 - `op_shift_left_dsl`, `op_shift_right_dsl` (locate during 1.C.2 task 1).
-- `op_increment_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:1678`.
-- `op_decrement_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:1712`.
+- `op_increment_dsl` at `crates/vm/src/dsl/handlers/cold.rs:1678`.
+- `op_decrement_dsl` at `crates/vm/src/dsl/handlers/cold.rs:1712`.
 
 ### Measurement infrastructure
 
@@ -381,4 +381,4 @@ User deny rules continue: no `git -C`, no `cd && git`, no `--no-verify`, no dest
 
 ### Engineering standards
 
-- [`AGENTS.md`](../../../AGENTS.md), [`crates/lyng/AGENTS.md`](../../../crates/lyng/AGENTS.md), [`docs/lyng/engineering-standards.md`](../../lyng/engineering-standards.md).
+- [`AGENTS.md`](../../../AGENTS.md), [`crates/AGENTS.md`](../../../crates/AGENTS.md), [`docs/lyng/engineering-standards.md`](../../lyng/engineering-standards.md).

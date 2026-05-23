@@ -8,7 +8,7 @@ path is one instruction shorter than op_sub's.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -169,7 +169,7 @@ This is the known measurement artifact, not a real regression: every
 fast-path SMI bit-AND calls
 `call_slow!(op_bit_and_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope). The result: feedback-recording fast-path
 entries are counted as if they were full slow-path entries.
@@ -181,7 +181,7 @@ Phase 1.C.1 summary's Followups #1, the per-opcode gate should
 remain enforced **once the substrate distinguishes
 "feedback-recording shim" from "true slow path"** — that work is a
 substrate fix tracked as a Phase 1.C followup (gate counter-injection
-on label-boundary state in `crates/lyng/vm-dsl/src/lower.rs`
+on label-boundary state in `crates/vm-dsl/src/lower.rs`
 `inject_opcode_byte`) and is not scheduled within Phase 1.C scope.
 
 Crypto's 152M BitAnd dispatches are dominated by 32-bit modular
@@ -212,7 +212,7 @@ should be re-measured.
   passed across 30 files** (100% pass rate). Includes the
   `S11.10.1_*` and `bigint-*` bitwise-and semantics tests.
 - Two pre-existing failures in
-  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
+  `crates/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `e1c45c0b` (Task 4 Phase 1.C.1 close) with the

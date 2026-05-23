@@ -13,7 +13,7 @@ ones).
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -54,7 +54,7 @@ op_shift_left, op_shift_right):
 
 Identical to op_increment's elision (see `op_increment.md` SMI-elision
 section for the full derivation): the shared semantic body
-`op_update_register_semantic` (`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`)
+`op_update_register_semantic` (`crates/vm/src/vm/semantics/arithmetic.rs:796-833`)
 writes `numeric = ToNumeric(src)` back to `args.src` before writing
 the post-update value to `args.dst`. For SMI src, `ToNumeric` is
 identity (`Value::from_smi` round-trips), so the writeback is
@@ -250,7 +250,7 @@ op_mul.md / op_bit_and.md / op_shift_left.md / op_shift_right.md /
 op_increment.md, not a real regression: every fast-path SMI
 decrement calls `call_slow!(op_decrement_record_smi_rs, args = [slot])`
 which is instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The
 result: feedback-recording fast-path entries are counted as if they
 were full slow-path entries.
@@ -295,7 +295,7 @@ identical shape with op_increment (only `subs` vs `adds` differs).
 
 ## Files changed
 
-- `crates/lyng/vm/src/dsl/handlers/cold.rs`
+- `crates/vm/src/dsl/handlers/cold.rs`
   - Added `dec_smi_overflow` to the alphabetically-ordered import list
     (between `cmp_branch_eq` and `decode_a`).
   - Replaced the `op_decrement_dsl` cold-stub body (line 1969) with

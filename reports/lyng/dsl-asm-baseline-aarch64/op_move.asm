@@ -3,7 +3,7 @@
 // then extracted from target/release/deps/lyng_vm-<hash>.s.
 //
 // Symbol: lyng_vm::dsl::handlers::hot::op_move
-// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B39)
+// Source: crates/vm/src/dsl/handlers/hot.rs (B39)
 // Layout: Ab (two register-index byte operands), length = 3 bytes.
 
 op_move:

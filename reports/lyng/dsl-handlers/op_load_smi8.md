@@ -14,7 +14,7 @@ for the tag — saves an explicit `mov` from `b` to a fresh scratch.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/cold.rs`:
+`crates/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -34,7 +34,7 @@ in-place. `store_reg!(a, b)` then writes that register to `REGS[a]`.
 
 ## Backend macro (new in this task)
 
-`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`:
+`crates/vm/src/dsl/backend/aarch64/values.rs`:
 
 ```rust
 #[macro_export]
@@ -193,7 +193,7 @@ in the system JSC binary or offlineasm sources. Reference taken from
 ## Backend macro (new in this task)
 
 `tag_smi_from_signed_byte!($reg)` was added to
-`crates/lyng/vm/src/dsl/backend/aarch64/values.rs` immediately
+`crates/vm/src/dsl/backend/aarch64/values.rs` immediately
 after `tag_smi_const!`. The macro is `#[macro_export]`-d and re-exported
 into the `cold.rs` import list:
 

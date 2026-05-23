@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 publish = false
 
-# B46: codegen tool that emits the 140-stub `crates/lyng/vm/src/dsl/handlers/cold.rs`
+# B46: codegen tool that emits the 140-stub `crates/vm/src/dsl/handlers/cold.rs`
 # from a metadata table embedded in `main.rs`. Run via
 # `cargo run -p lyng-dsl-codegen` from the workspace root. The output
 # replaces the existing `cold.rs` file (which after B45 contains only a
@@ -13,7 +13,7 @@ publish = false
 #
 # The metadata table is the single source of truth for per-opcode layout
 # / length / args-struct shape. Keep it in sync with the manifest in
-# `crates/lyng/vm/src/dsl/opcode_manifest.rs` — adding a Cold opcode
+# `crates/vm/src/dsl/opcode_manifest.rs` — adding a Cold opcode
 # means adding a row here too.
 
 [dependencies]

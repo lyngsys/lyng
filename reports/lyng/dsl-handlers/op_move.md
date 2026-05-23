@@ -6,7 +6,7 @@ a minimal opcode.
 
 ## DSL source
 
-`crates/lyng/vm/src/dsl/handlers/hot.rs`:
+`crates/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {
@@ -90,13 +90,13 @@ Phase-C dispatch flip to be meaningful. Tracked at DSL-0c.
 - `tests/dsl_validation_empty.rs` continues to pass (the load-bearing
   proc-macro integration test from B30 isn't broken by the new
   lowerer behavior).
-- Lyng's existing `op_move` semantic tests in `crates/lyng/vm/tests/`
+- Lyng's existing `op_move` semantic tests in `crates/vm/tests/`
   continue to pass — the alpha dispatch is still active.
 
 ## Lowerer changes that landed alongside this port
 
 To get `op_move` to compile correctly the proc-macro lowerer
-(`crates/lyng/vm-dsl/src/`) gained:
+(`crates/vm-dsl/src/`) gained:
 
 1. **Operand-decode prologue emission.** `Layout::decode_prologue_tokens`
    now emits `decode_a!(...)`, `decode_ab!(...)`, ..., `decode_ax!(...)`

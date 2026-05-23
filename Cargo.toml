@@ -2,25 +2,25 @@
 resolver = "2"
 members = [
     # Lyng JS engine
-    "crates/lyng/common",
-    "crates/lyng/lexer",
-    "crates/lyng/ast",
-    "crates/lyng/parser",
-    "crates/lyng/sema",
-    "crates/lyng/types",
-    "crates/lyng/gc",
-    "crates/lyng/ops",
-    "crates/lyng/host",
-    "crates/lyng/objects",
-    "crates/lyng/env",
-    "crates/lyng/bytecode",
-    "crates/lyng/compiler",
-    "crates/lyng/vm",
-    "crates/lyng/builtins",
-    "crates/lyng/cli",
-    "crates/lyng/test262-harness",
-    "crates/lyng/tests",
-    "crates/lyng/vm-dsl",
+    "crates/common",
+    "crates/lexer",
+    "crates/ast",
+    "crates/parser",
+    "crates/sema",
+    "crates/types",
+    "crates/gc",
+    "crates/ops",
+    "crates/host",
+    "crates/objects",
+    "crates/env",
+    "crates/bytecode",
+    "crates/compiler",
+    "crates/vm",
+    "crates/builtins",
+    "crates/cli",
+    "crates/test262-harness",
+    "crates/tests",
+    "crates/vm-dsl",
     # Tools
     "tools/lyng-bench",
     "tools/lyng-dsl-codegen",
@@ -43,25 +43,25 @@ smallvec = "1"
 unicode-id-start = "1"
 
 # Lyng JS engine
-lyng-common = { path = "crates/lyng/common" }
-lyng-lexer = { path = "crates/lyng/lexer" }
-lyng-ast = { path = "crates/lyng/ast" }
-lyng-parser = { path = "crates/lyng/parser" }
-lyng-sema = { path = "crates/lyng/sema" }
-lyng-types = { path = "crates/lyng/types" }
-lyng-gc = { path = "crates/lyng/gc" }
-lyng-ops = { path = "crates/lyng/ops" }
-lyng-host = { path = "crates/lyng/host" }
-lyng-objects = { path = "crates/lyng/objects" }
-lyng-env = { path = "crates/lyng/env" }
-lyng-bytecode = { path = "crates/lyng/bytecode" }
-lyng-compiler = { path = "crates/lyng/compiler" }
-lyng-vm = { path = "crates/lyng/vm" }
-lyng-vm-dsl = { path = "crates/lyng/vm-dsl" }
-lyng-builtins = { path = "crates/lyng/builtins" }
-lyng-cli = { path = "crates/lyng/cli" }
-lyng-test262-harness = { path = "crates/lyng/test262-harness" }
-lyng-tests = { path = "crates/lyng/tests" }
+lyng-common = { path = "crates/common" }
+lyng-lexer = { path = "crates/lexer" }
+lyng-ast = { path = "crates/ast" }
+lyng-parser = { path = "crates/parser" }
+lyng-sema = { path = "crates/sema" }
+lyng-types = { path = "crates/types" }
+lyng-gc = { path = "crates/gc" }
+lyng-ops = { path = "crates/ops" }
+lyng-host = { path = "crates/host" }
+lyng-objects = { path = "crates/objects" }
+lyng-env = { path = "crates/env" }
+lyng-bytecode = { path = "crates/bytecode" }
+lyng-compiler = { path = "crates/compiler" }
+lyng-vm = { path = "crates/vm" }
+lyng-vm-dsl = { path = "crates/vm-dsl" }
+lyng-builtins = { path = "crates/builtins" }
+lyng-cli = { path = "crates/cli" }
+lyng-test262-harness = { path = "crates/test262-harness" }
+lyng-tests = { path = "crates/tests" }
 
 [profile.release]
 # Thin LTO enables cross-crate inlining of the VM dispatch helpers

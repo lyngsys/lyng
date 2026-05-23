@@ -62,7 +62,7 @@ non-PrototypeData states still fall through to the slow chain.
 
 ### New infrastructure
 
-- `NamedPropertyProtoHandler` in `crates/lyng/objects/src/shapes.rs`
+- `NamedPropertyProtoHandler` in `crates/objects/src/shapes.rs`
   — two-word packed handler: `receiver_word` carries receiver shape;
   `proto_word` mirrors `NamedPropertyHandler`'s layout but for the
   prototype (prototype shape + slot offset + writable + inline-tag).
@@ -82,10 +82,10 @@ non-PrototypeData states still fall through to the slow chain.
   for keyed-NamedAtom feedback.
 - Two `Vm::named_property_proto_fast_handler` /
   `Vm::keyed_property_named_proto_fast_handler` lookup helpers in
-  `crates/lyng/vm/src/vm/feedback.rs` (inline-always).
+  `crates/vm/src/vm/feedback.rs` (inline-always).
 - Two `Vm::try_named_property_proto_fast_load` /
   `Vm::try_keyed_named_proto_fast_load` fast-path helpers in
-  `crates/lyng/vm/src/vm/dispatch/property.rs` (inline-always).
+  `crates/vm/src/vm/dispatch/property.rs` (inline-always).
 
 ### Reused infrastructure
 
@@ -186,25 +186,25 @@ Reports:
 
 Single-commit delivery (matching the Phase 3b / 3c cadence):
 
-- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyProtoHandler`
+- `crates/objects/src/shapes.rs` — `NamedPropertyProtoHandler`
   packed type + `from_entry` constructor + accessor methods.
-- `crates/lyng/objects/src/lib.rs` — re-export
+- `crates/objects/src/lib.rs` — re-export
   `NamedPropertyProtoHandler`.
-- `crates/lyng/objects/src/tests.rs` — 6 unit tests covering
+- `crates/objects/src/tests.rs` — 6 unit tests covering
   handler packing, multi-hop / single-hop / OwnData rejection, and
   the NONE sentinel.
-- `crates/lyng/vm/src/vm/feedback.rs` — 3 sidecar fields on
+- `crates/vm/src/vm/feedback.rs` — 3 sidecar fields on
   `NamedPropertyFeedback`, 3 sidecar fields on `KeyedPropertyFeedback`,
   extended `refresh_monomorphic_fast` for both, 2 new `Vm` lookup
   helpers, all reset paths cleared on cache transitions.
-- `crates/lyng/vm/src/vm/dispatch/property.rs` — 2 new
+- `crates/vm/src/vm/dispatch/property.rs` — 2 new
   `#[inline(always)]` fast-path helpers
   (`try_named_property_proto_fast_load`,
   `try_keyed_named_proto_fast_load`) + 2 inline call sites
   (`execute_get_named_property_opcode`, keyed-named-atom Get).
-- `crates/lyng/vm/src/vm/names.rs` — 1 inline call site in
+- `crates/vm/src/vm/names.rs` — 1 inline call site in
   `load_global_with_feedback`.
-- `crates/lyng/vm/src/tests/inline_caches.rs` — 4 integration tests
+- `crates/vm/src/tests/inline_caches.rs` — 4 integration tests
   (one-hop PrototypeData hit, prototype-swap invalidation, keyed
   variant, three-hop chain fall-through).
 
