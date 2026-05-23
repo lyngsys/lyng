@@ -564,8 +564,7 @@ impl FunctionCompiler<'_, '_> {
                 if let Some(result_register) = self.result_register {
                     self.lower_expr_into(expression, result_register)
                 } else {
-                    let temp = self.alloc_temp()?;
-                    self.lower_expr_into(expression, temp)
+                    self.lower_expr_for_effect(expression)
                 }
             }
             Stmt::Labeled { label, body, .. } => {

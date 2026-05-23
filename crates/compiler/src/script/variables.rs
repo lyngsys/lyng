@@ -116,6 +116,38 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
+    pub(super) fn frame_local_read_register(
+        &mut self,
+        expr_id: ExprId,
+        name: AtomId,
+    ) -> LoweringResult<Option<u16>> {
+        let use_site = self.use_site(expr_id)?;
+        if self.arguments_access_for_use(use_site)?.is_some() {
+            return Ok(None);
+        }
+        if !matches!(
+            use_site.resolution_kind,
+            ResolutionKind::Local | ResolutionKind::Captured
+        ) {
+            return Ok(None);
+        }
+        let binding_id =
+            use_site
+                .resolved_binding
+                .ok_or(LoweringError::MissingResolvedBinding {
+                    expr: expr_id,
+                    name,
+                })?;
+        let binding = self.binding(binding_id)?;
+        if binding.has_tdz || binding.storage_class != StorageClass::FrameLocal {
+            return Ok(None);
+        }
+        if self.binding_env_access(binding_id)?.is_some() {
+            return Ok(None);
+        }
+        self.ensure_local_register(binding_id).map(Some)
+    }
+
     pub(super) fn lower_assignment_expression(
         &mut self,
         operator: AssignOp,

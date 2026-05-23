@@ -203,6 +203,30 @@ impl FunctionCompiler<'_, '_> {
         self.lower_expr_into(*last, dest)
     }
 
+    pub(super) fn lower_expr_for_effect(&mut self, expr_id: ExprId) -> LoweringResult<()> {
+        match self.ast().get_expr(expr_id).clone() {
+            Expr::ParenthesizedExpression { expression, .. } => {
+                self.lower_expr_for_effect(expression)
+            }
+            Expr::SequenceExpression { expressions, .. } => {
+                for expression in self.ast().get_expr_list(expressions).to_vec() {
+                    self.lower_expr_for_effect(expression)?;
+                }
+                Ok(())
+            }
+            Expr::UpdateExpression {
+                operator,
+                argument,
+                prefix,
+                ..
+            } => self.lower_update_expression_for_effect(expr_id, operator, argument, prefix),
+            _ => {
+                let temp = self.alloc_temp()?;
+                self.lower_expr_into(expr_id, temp)
+            }
+        }
+    }
+
     pub(super) fn lower_dynamic_import_expression(
         &mut self,
         phase: ImportExpressionPhase,
@@ -464,6 +488,46 @@ impl FunctionCompiler<'_, '_> {
         let temp = self.alloc_temp()?;
         self.lower_expr_into(expr, temp)?;
         Ok(temp)
+    }
+
+    pub(super) fn lower_expr_to_source_or_temp(&mut self, expr: ExprId) -> LoweringResult<u16> {
+        if let Some(register) = self.frame_local_source_for_expr(expr)? {
+            return Ok(register);
+        }
+        self.lower_expr_to_temp(expr)
+    }
+
+    pub(super) fn frame_local_source_for_expr(
+        &mut self,
+        expr_id: ExprId,
+    ) -> LoweringResult<Option<u16>> {
+        let mut current = expr_id;
+        while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
+            current = *expression;
+        }
+        let Expr::Identifier { name, .. } = self.ast().get_expr(current).clone() else {
+            return Ok(None);
+        };
+        self.frame_local_read_register(current, name)
+    }
+
+    pub(super) fn expr_preserves_frame_local_read(
+        &mut self,
+        expr_id: ExprId,
+    ) -> LoweringResult<bool> {
+        let mut current = expr_id;
+        while let Expr::ParenthesizedExpression { expression, .. } = self.ast().get_expr(current) {
+            current = *expression;
+        }
+        Ok(match self.ast().get_expr(current).clone() {
+            Expr::This { .. }
+            | Expr::NullLiteral { .. }
+            | Expr::BooleanLiteral { .. }
+            | Expr::NumericLiteral { .. }
+            | Expr::StringLiteral { .. } => true,
+            Expr::Identifier { .. } => self.frame_local_source_for_expr(current)?.is_some(),
+            _ => false,
+        })
     }
 
     pub(super) fn lower_regexp_literal(

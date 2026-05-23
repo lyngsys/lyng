@@ -44,10 +44,7 @@ impl FunctionCompiler<'_, '_> {
     fn lower_for_init(&mut self, init: ForInit) -> LoweringResult<()> {
         match init {
             ForInit::Declaration(decl) => self.lower_declaration(decl),
-            ForInit::Expression(expr) => {
-                let temp = self.alloc_temp()?;
-                self.lower_expr_into(expr, temp)
-            }
+            ForInit::Expression(expr) => self.lower_expr_for_effect(expr),
         }
     }
 
@@ -176,8 +173,7 @@ impl FunctionCompiler<'_, '_> {
             self.emit_recreate_loop_iteration_environment(plan)?;
         }
         if let Some(update) = update {
-            let update_register = self.alloc_temp()?;
-            self.lower_expr_into(update, update_register)?;
+            self.lower_expr_for_effect(update)?;
         }
         let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         self.attach_safepoint(jump_back, span, SafepointKind::LoopBackedge)?;

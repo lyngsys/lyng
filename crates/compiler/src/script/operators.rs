@@ -13,17 +13,17 @@ impl FunctionCompiler<'_, '_> {
     ) -> LoweringResult<()> {
         match operator {
             lyng_ast::UnaryOp::Minus => {
-                let argument_register = self.lower_expr_to_temp(argument)?;
+                let argument_register = self.lower_expr_to_source_or_temp(argument)?;
                 self.emit_profiled_negate(dest, argument_register)
             }
             lyng_ast::UnaryOp::Plus => {
-                let argument_register = self.lower_expr_to_temp(argument)?;
+                let argument_register = self.lower_expr_to_source_or_temp(argument)?;
                 let zero = self.alloc_temp()?;
                 self.emit_load_smi(zero, 0)?;
                 self.emit_profiled_binary(Opcode::Sub, dest, argument_register, zero)
             }
             lyng_ast::UnaryOp::Not => {
-                let argument_register = self.lower_expr_to_temp(argument)?;
+                let argument_register = self.lower_expr_to_source_or_temp(argument)?;
                 let jump_false = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
                     self.encode_register(argument_register)?,
@@ -38,7 +38,7 @@ impl FunctionCompiler<'_, '_> {
                 Ok(())
             }
             lyng_ast::UnaryOp::BitNot => {
-                let argument_register = self.lower_expr_to_temp(argument)?;
+                let argument_register = self.lower_expr_to_source_or_temp(argument)?;
                 self.emit_profiled_bit_not(dest, argument_register)
             }
             lyng_ast::UnaryOp::Void => {
@@ -98,11 +98,11 @@ impl FunctionCompiler<'_, '_> {
         if let Some(opcode) = Self::smi_binary_opcode(operator)
             && let Some(immediate) = self.smi_i16_literal(right)
         {
-            let left_register = self.lower_expr_to_temp(left)?;
+            let left_register = self.lower_binary_left_operand(left, right)?;
             return self.emit_profiled_smi_binary(opcode, dest, left_register, immediate);
         }
         if operator == BinaryOp::StrictEq && self.smi_i16_literal(right) == Some(0) {
-            let left_register = self.lower_expr_to_temp(left)?;
+            let left_register = self.lower_binary_left_operand(left, right)?;
             return self.emit_profiled_smi_binary(Opcode::EqualZero, dest, left_register, 0);
         }
 
@@ -125,8 +125,8 @@ impl FunctionCompiler<'_, '_> {
             | BinaryOp::LtEq
             | BinaryOp::Gt
             | BinaryOp::GtEq => {
-                let left_register = self.lower_expr_to_temp(left)?;
-                let right_register = self.lower_expr_to_temp(right)?;
+                let left_register = self.lower_binary_left_operand(left, right)?;
+                let right_register = self.lower_expr_to_source_or_temp(right)?;
                 self.emit_profiled_binary(
                     Self::binary_opcode(operator)?,
                     dest,
@@ -139,8 +139,8 @@ impl FunctionCompiler<'_, '_> {
                 self.lower_inverted_binary(Opcode::StrictEqual, left, right, dest)
             }
             BinaryOp::In => {
-                let left_register = self.lower_expr_to_temp(left)?;
-                let right_register = self.lower_expr_to_temp(right)?;
+                let left_register = self.lower_binary_left_operand(left, right)?;
+                let right_register = self.lower_expr_to_source_or_temp(right)?;
                 self.emit_profiled_binary(Opcode::In, dest, left_register, right_register)
             }
             BinaryOp::Instanceof => self.lower_internal_binary_builtin(
@@ -181,8 +181,8 @@ impl FunctionCompiler<'_, '_> {
         right: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
-        let left_register = self.lower_expr_to_temp(left)?;
-        let right_register = self.lower_expr_to_temp(right)?;
+        let left_register = self.lower_binary_left_operand(left, right)?;
+        let right_register = self.lower_expr_to_source_or_temp(right)?;
         self.emit_profiled_binary(opcode, dest, left_register, right_register)?;
         let false_register = self.alloc_temp()?;
         self.emit_load_bool(false_register, false)?;
@@ -193,6 +193,15 @@ impl FunctionCompiler<'_, '_> {
             self.encode_register(false_register)?,
         )?;
         Ok(())
+    }
+
+    fn lower_binary_left_operand(&mut self, left: ExprId, right: ExprId) -> LoweringResult<u16> {
+        if self.expr_preserves_frame_local_read(right)?
+            && let Some(register) = self.frame_local_source_for_expr(left)?
+        {
+            return Ok(register);
+        }
+        self.lower_expr_to_temp(left)
     }
 
     fn lower_internal_binary_builtin(

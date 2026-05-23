@@ -55,6 +55,25 @@ fn has_move_to_register(instructions: &[lyng_bytecode::Instruction], dest: u16) 
     })
 }
 
+fn copy_register_pair(instruction: lyng_bytecode::Instruction) -> Option<(u16, u16)> {
+    match instruction {
+        lyng_bytecode::Instruction::Abc { opcode, a, b, .. }
+        | lyng_bytecode::Instruction::AbcSlot { opcode, a, b, .. } => match opcode {
+            Opcode::Move => Some((a, b)),
+            Opcode::Ldar => Some((0, a)),
+            _ => opcode.accumulator_store_index().map(|dest| (dest, 0)),
+        },
+        lyng_bytecode::Instruction::Abx { opcode, a, .. }
+        | lyng_bytecode::Instruction::AbxSlot { opcode, a, .. } => opcode
+            .local_load_index()
+            .map(|src| (a, src))
+            .or_else(|| opcode.local_store_index().map(|dest| (dest, a))),
+        lyng_bytecode::Instruction::Ax { .. } | lyng_bytecode::Instruction::CallRange { .. } => {
+            None
+        }
+    }
+}
+
 fn has_writer_with_opcode(
     instructions: &[lyng_bytecode::Instruction],
     dest: u16,
@@ -88,6 +107,18 @@ fn has_small_call_result_in_register(
         | lyng_bytecode::Instruction::Ax { .. }
         | lyng_bytecode::Instruction::CallRange { .. } => false,
     })
+}
+
+fn function_named<'a>(
+    unit: &'a lyng_bytecode::CompiledScriptUnit,
+    atoms: &mut AtomTable,
+    name: &str,
+) -> &'a lyng_bytecode::BytecodeFunction {
+    let atom = atoms.intern(name);
+    unit.functions()
+        .iter()
+        .find(|function| function.name() == Some(atom))
+        .unwrap_or_else(|| panic!("compiled unit should contain function {name:?}"))
 }
 
 #[test]
@@ -1248,12 +1279,12 @@ fn compile_script_emits_short_local_move_opcodes() {
         &mut atoms,
         lyng_common::SourceId::new(903),
         r"
-            function passthrough(seed) {
-                var first = seed + 1;
-                seed = first;
-                return seed;
+            function passthrough(seed, other) {
+                var first = other + (seed = 1);
+                other = first;
+                return other;
             }
-            passthrough(1);
+            passthrough(1, 2);
         ",
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -2513,4 +2544,182 @@ fn compile_script_lowers_direct_eval_call_arguments_directly_into_call_slots() {
             "direct-eval call slot r{slot} should not be written by Move:\n{disassembly}"
         );
     }
+}
+
+#[test]
+fn move_reduction_uses_frame_local_sources_for_binary_operands() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_300),
+        "function add(a, b) { return a + b; } add(1, 2);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "add");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (_dest, left, right) = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::Add,
+                a,
+                b,
+                c,
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::Add,
+                a,
+                b,
+                c,
+                ..
+            } => Some((a, b, c)),
+            _ => None,
+        })
+        .expect("function should contain an Add instruction");
+
+    assert_eq!(
+        (left, right),
+        (0, 1),
+        "Add should consume parameter registers directly:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_preserves_binary_left_value_across_rhs_assignment() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_303),
+        "function add(a) { return a + (a = 1); } add(2);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "add");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let left = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::Add,
+                b,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::Add,
+                b,
+                ..
+            } => Some(b),
+            _ => None,
+        })
+        .expect("function should contain an Add instruction");
+
+    assert_ne!(
+        left, 0,
+        "left operand must be copied before the RHS assignment mutates parameter r0:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_does_not_copy_unused_update_expression_results() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_301),
+        "function bump(i) { i++; return i; } bump(0);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "bump");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (increment_index, current_register) = instructions
+        .iter()
+        .copied()
+        .enumerate()
+        .find_map(|(index, instruction)| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::Increment,
+                b,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::Increment,
+                b,
+                ..
+            } => Some((index, b)),
+            _ => None,
+        })
+        .expect("function should contain an Increment instruction");
+    let unused_result_copy = instructions
+        .iter()
+        .copied()
+        .skip(increment_index + 1)
+        .filter_map(copy_register_pair)
+        .any(|(dest, src)| src == current_register && dest != 0);
+
+    assert!(
+        !unused_result_copy,
+        "postfix update used for effect should not copy the old value into an unused result register:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_does_not_copy_unused_for_update_results() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_302),
+        "function loop(i) { for (; i < 3; i++) {} return i; } loop(0);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "loop");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (increment_index, current_register) = instructions
+        .iter()
+        .copied()
+        .enumerate()
+        .find_map(|(index, instruction)| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::Increment,
+                b,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::Increment,
+                b,
+                ..
+            } => Some((index, b)),
+            _ => None,
+        })
+        .expect("function should contain an Increment instruction");
+    let unused_result_copy = instructions
+        .iter()
+        .copied()
+        .skip(increment_index + 1)
+        .filter_map(copy_register_pair)
+        .any(|(dest, src)| src == current_register && dest != 0);
+
+    assert!(
+        !unused_result_copy,
+        "for-loop update used for effect should not copy the old value into an unused result register:\n{disassembly}"
+    );
 }

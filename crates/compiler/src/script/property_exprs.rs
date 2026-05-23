@@ -17,6 +17,27 @@ impl FunctionCompiler<'_, '_> {
         prefix: bool,
         dest: u16,
     ) -> LoweringResult<()> {
+        self.lower_update_expression_with_dest(expr_id, operator, argument, prefix, Some(dest))
+    }
+
+    pub(super) fn lower_update_expression_for_effect(
+        &mut self,
+        expr_id: ExprId,
+        operator: lyng_ast::UpdateOp,
+        argument: ExprId,
+        prefix: bool,
+    ) -> LoweringResult<()> {
+        self.lower_update_expression_with_dest(expr_id, operator, argument, prefix, None)
+    }
+
+    fn lower_update_expression_with_dest(
+        &mut self,
+        expr_id: ExprId,
+        operator: lyng_ast::UpdateOp,
+        argument: ExprId,
+        prefix: bool,
+        dest: Option<u16>,
+    ) -> LoweringResult<()> {
         let target = self.delete_target(argument);
         if self.lower_annex_b_call_assignment_target_reference_error(target)? {
             return Ok(());
@@ -29,7 +50,10 @@ impl FunctionCompiler<'_, '_> {
         self.load_prepared_reference(target, current)?;
         let result = self.lower_updated_value(current, operator)?;
         self.store_prepared_reference(target, result)?;
-        self.emit_move(dest, if prefix { result } else { current })
+        if let Some(dest) = dest {
+            self.emit_move(dest, if prefix { result } else { current })?;
+        }
+        Ok(())
     }
 
     fn lower_updated_value(
