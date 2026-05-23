@@ -347,6 +347,86 @@ fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
+fn smi_equal_hit_avoids_semantic_slow_path() {
+    let unit = compile_test_unit(545, "left == right;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let left_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "left"));
+    let right_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "right"));
+    install_global_value(agent, &realm, left_name, Value::from_smi(7));
+    install_global_value(agent, &realm, right_name, Value::from_smi(7));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_bool(true)
+    );
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::Equal), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::Equal),
+        0,
+        "SMI Equal fast hit should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
+    let unit = compile_test_unit(546, "left === right;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let left_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "left"));
+    let right_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "right"));
+    install_global_value(agent, &realm, left_name, Value::from_bool(true));
+    install_global_value(agent, &realm, right_name, Value::from_bool(true));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_bool(true)
+    );
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::StrictEqual), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::StrictEqual),
+        0,
+        "primitive StrictEqual fast hit should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
 fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     let unit = compile_test_unit(
         153,

@@ -2089,9 +2089,59 @@ pub extern "C" fn op_decrement_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_equal_dsl, opcode_byte = 53, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        call_fast!(op_equal_fast_rs, args = [a, b, c, slot]);
+        branch_nonzero!(0, .slow);
+        dispatch_from_payload!();
+        .slow:
+        // The Rust fast helper can clobber caller-saved operand registers.
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(unused_variables)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_equal_fast_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    a: u32,
+    b: u32,
+    c: u32,
+    slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: `state` is the live trampoline state pointer supplied by
+    // the asm bridge for the duration of this helper call.
+    let rust_context = unsafe {
+        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
+    };
+    let dispatch = &mut rust_context.dispatch;
+    // Keep the Rust frame snapshot aligned with the asm PC before
+    // invoking the VM-side fast helper. This mirrors `sync_from_asm`
+    // without constructing the full slow-path wrapper.
+    let entry_pc = unsafe { (*state).frame_pc_offset };
+    dispatch.frame.set_instruction_offset(entry_pc);
+    let hit = dispatch.vm.try_equal_fast_for_dsl(
+        &mut dispatch.frame,
+        6,
+        lyng_types::FeedbackSlotId::from_raw(slot),
+        a as u16,
+        b as u16,
+        c as u16,
+    );
+    if hit {
+        let next_pc = dispatch.frame.instruction_offset();
+        // SAFETY: same live-state guarantee as above. Refresh the asm
+        // mirror so later slow paths observe the advanced frame PC.
+        unsafe {
+            (*state).frame_pc_offset = next_pc;
+        }
+        return crate::dsl::slow_path::SlowPathReturn {
+            tag: crate::dsl::slow_path::SlowPathTag::Continue as u64,
+            payload: u64::from(next_pc),
+        };
+    }
+    crate::dsl::slow_path::SlowPathReturn { tag: 1, payload: 0 }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -2124,9 +2174,59 @@ pub extern "C" fn op_equal_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_strict_equal_dsl, opcode_byte = 54, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        call_fast!(op_strict_equal_fast_rs, args = [a, b, c, slot]);
+        branch_nonzero!(0, .slow);
+        dispatch_from_payload!();
+        .slow:
+        // The Rust fast helper can clobber caller-saved operand registers.
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_strict_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(unused_variables)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_strict_equal_fast_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    a: u32,
+    b: u32,
+    c: u32,
+    slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: `state` is the live trampoline state pointer supplied by
+    // the asm bridge for the duration of this helper call.
+    let rust_context = unsafe {
+        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
+    };
+    let dispatch = &mut rust_context.dispatch;
+    // Keep the Rust frame snapshot aligned with the asm PC before
+    // invoking the VM-side fast helper. This mirrors `sync_from_asm`
+    // without constructing the full slow-path wrapper.
+    let entry_pc = unsafe { (*state).frame_pc_offset };
+    dispatch.frame.set_instruction_offset(entry_pc);
+    let hit = dispatch.vm.try_strict_equal_fast_for_dsl(
+        &mut dispatch.frame,
+        6,
+        lyng_types::FeedbackSlotId::from_raw(slot),
+        a as u16,
+        b as u16,
+        c as u16,
+    );
+    if hit {
+        let next_pc = dispatch.frame.instruction_offset();
+        // SAFETY: same live-state guarantee as above. Refresh the asm
+        // mirror so later slow paths observe the advanced frame PC.
+        unsafe {
+            (*state).frame_pc_offset = next_pc;
+        }
+        return crate::dsl::slow_path::SlowPathReturn {
+            tag: crate::dsl::slow_path::SlowPathTag::Continue as u64,
+            payload: u64::from(next_pc),
+        };
+    }
+    crate::dsl::slow_path::SlowPathReturn { tag: 1, payload: 0 }
 }
 
 #[cfg(target_arch = "aarch64")]
