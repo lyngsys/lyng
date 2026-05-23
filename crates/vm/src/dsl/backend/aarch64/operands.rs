@@ -118,6 +118,19 @@ macro_rules! decode_ax {
     };
 }
 
+#[macro_export]
+macro_rules! mask_u24 {
+    ($reg:tt) => {
+        concat!(
+            "ubfx   x",
+            stringify!($reg),
+            ", x",
+            stringify!($reg),
+            ", #0, #24\n",
+        )
+    };
+}
+
 /// Load a Value from the register file at index in `$idx` into `$dst`.
 /// Compiles to `ldr xDst, [x20, xIdx, lsl #3]` — single instruction.
 #[macro_export]

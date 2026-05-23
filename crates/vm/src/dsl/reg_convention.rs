@@ -34,7 +34,7 @@
 
 use core::mem::offset_of;
 
-use crate::dsl::llint_state::LlIntState;
+use crate::dsl::llint_state::{LlIntFrameInfo, LlIntState};
 
 pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_offset);
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
@@ -47,7 +47,20 @@ pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_s
 // in the slow-path Refresh arm (slow_path.rs::translate_outcome).
 pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
 pub const LLINT_STATE_FRAME_THIS_VALUE: usize = offset_of!(LlIntState, frame_this_value);
+pub const LLINT_STATE_FRAME_DEPTH: usize = offset_of!(LlIntState, frame_depth);
+pub const LLINT_STATE_FRAME_INFO_BASE: usize = offset_of!(LlIntState, frame_info_base);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
+
+pub const LLINT_FRAME_INFO_PB_BASE: usize = offset_of!(LlIntFrameInfo, pb_base);
+pub const LLINT_FRAME_INFO_REGS_BASE: usize = offset_of!(LlIntFrameInfo, regs_base);
+pub const LLINT_FRAME_INFO_FV_BASE: usize = offset_of!(LlIntFrameInfo, fv_base);
+pub const LLINT_FRAME_INFO_CONST_BASE: usize = offset_of!(LlIntFrameInfo, const_base);
+pub const LLINT_FRAME_INFO_THIS_VALUE: usize = offset_of!(LlIntFrameInfo, this_value);
+pub const LLINT_FRAME_INFO_PC_OFFSET: usize = offset_of!(LlIntFrameInfo, pc_offset);
+pub const LLINT_FRAME_INFO_RETURN_REGISTER: usize = offset_of!(LlIntFrameInfo, return_register);
+pub const LLINT_FRAME_INFO_FLAGS: usize = offset_of!(LlIntFrameInfo, flags);
+pub const LLINT_FRAME_INFO_STRIDE_SHIFT: u32 = 6;
+pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE_BIT: u32 = 0;
 
 // VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
 // added in DSL-0c to give `poll_safepoint!` a known-zero byte to

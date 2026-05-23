@@ -5,8 +5,50 @@ use lyng_types::Value;
 use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
+use lyng_env::ExecutableId;
+
+pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE: u32 = 1;
+pub const LLINT_RETURN_REGISTER_NONE: u32 = u32::MAX;
+
+/// Compact asm-facing frame metadata for frame-return `LLInt` paths.
+///
+/// The canonical `FrameRecord` stays Rust-owned. This mirror contains
+/// only fields a no-cleanup nested `Return` needs in order to restore
+/// the caller frame and store the result without crossing into Rust.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LlIntFrameInfo {
+    pub pb_base: *const u8,
+    pub regs_base: *mut Value,
+    pub fv_base: *mut FeedbackEntry,
+    pub const_base: *const Value,
+    pub this_value: Value,
+    pub pc_offset: u32,
+    pub return_register: u32,
+    pub flags: u32,
+    pub pad1: u32,
+    pub pad2: u64,
+}
+
+impl Default for LlIntFrameInfo {
+    fn default() -> Self {
+        Self {
+            pb_base: std::ptr::null(),
+            regs_base: std::ptr::null_mut(),
+            fv_base: std::ptr::null_mut(),
+            const_base: std::ptr::null(),
+            this_value: Value::undefined(),
+            pc_offset: 0,
+            return_register: LLINT_RETURN_REGISTER_NONE,
+            flags: 0,
+            pad1: 0,
+            pad2: 0,
+        }
+    }
+}
 
 /// Opaque marker for the Rust-side context pointer in [`LlIntState`].
+///
 /// The asm layer never reads through this pointer — it round-trips
 /// the value through `state.rust_context` so the slow-path bridge can
 /// reconstruct `&mut LlIntRustContext<'vm>`.
@@ -24,7 +66,7 @@ pub struct LlIntRustContextOpaque {
 #[repr(C)]
 pub struct LlIntState {
     pub frame_pc_offset: u32,
-    pub _pad1: u32,
+    pub pad1: u32,
     pub frame_pb_base: *const u8,
     pub frame_regs_base: *mut Value,
     pub frame_fv_base: *mut FeedbackEntry,
@@ -46,15 +88,17 @@ pub struct LlIntState {
     pub frame_this_value: Value,
     pub frame_depth: u32,
     pub frame_check_epoch: u32,
+    pub frame_info_base: *mut LlIntFrameInfo,
     pub rust_context: *mut LlIntRustContextOpaque,
     pub prefix: u8,
-    pub _pad2: [u8; 7],
+    pub pad2: [u8; 7],
 }
 
-/// Rust-only per-call context the asm trampoline cannot observe
-/// directly. The asm bridge gets to this struct through
-/// `LlIntState::rust_context` (an opaque pointer), and only via the
-/// reconstruction in `LlIntDispatchState::from_raw`.
+/// Rust-only per-call context the asm trampoline cannot observe directly.
+///
+/// The asm bridge gets to this struct through `LlIntState::rust_context`
+/// (an opaque pointer), and only via the reconstruction in
+/// `LlIntDispatchState::from_raw`.
 ///
 /// DSL-0c restructure: the per-call Rust state lives inside a
 /// [`DispatchState`] held here, rather than as flat fields on the
@@ -71,6 +115,8 @@ pub struct LlIntState {
 pub struct LlIntRustContext<'vm> {
     pub(crate) dispatch: DispatchState<'vm>,
     pub(crate) exit: LlIntExitSlot,
+    pub(crate) frame_infos: Vec<LlIntFrameInfo>,
+    pub(crate) frame_info_register_stack_base: *mut Value,
 }
 
 /// Slot the slow-path bridge writes when a semantic body chooses to
@@ -114,13 +160,13 @@ impl Default for LlIntExitSlot {
 /// in Phase 1.B.2); on match the handler bails to the slow path,
 /// which handles the throw / lex-env walk as appropriate.
 #[inline]
-pub(crate) fn resolve_this_state_to_mirror(
+pub(crate) const fn resolve_this_state_to_mirror(
     this_state: Option<lyng_env::ThisState>,
     fallback_frame_this: Value,
 ) -> Value {
     match this_state {
         Some(lyng_env::ThisState::Value(v)) => v,
-        Some(lyng_env::ThisState::Uninitialized) | Some(lyng_env::ThisState::Lexical) => {
+        Some(lyng_env::ThisState::Uninitialized | lyng_env::ThisState::Lexical) => {
             Value::uninitialized_lexical()
         }
         None => fallback_frame_this,
@@ -141,9 +187,79 @@ pub(crate) fn resolve_initial_this_value(
     agent: &lyng_env::Agent,
     frame: &crate::FrameRecord,
 ) -> Value {
-    let this_state = agent.current_execution_context().map(|ec| ec.this_state());
+    let this_state = agent
+        .current_execution_context()
+        .map(lyng_env::ExecutionContext::this_state);
     let fallback = frame.this_value();
     resolve_this_state_to_mirror(this_state, fallback)
+}
+
+pub(crate) fn refresh_frame_infos(
+    frame_infos: &mut Vec<LlIntFrameInfo>,
+    vm: &mut crate::Vm,
+    agent: &lyng_env::Agent,
+) -> *mut Value {
+    let register_stack_base = vm.register_stack_storage_mut_ptr();
+    let mut bytecode_contexts = agent
+        .execution_contexts()
+        .iter()
+        .copied()
+        .filter(|context| matches!(context.executable(), ExecutableId::Bytecode(_)));
+    frame_infos.clear();
+    frame_infos.reserve(vm.frames().len());
+    for frame in vm.frames() {
+        let context_this_state = bytecode_contexts
+            .next()
+            .filter(|context| context.executable() == ExecutableId::Bytecode(frame.code()))
+            .map(lyng_env::ExecutionContext::this_state);
+        let Some(installed) = vm.installed_for_dsl_runtime(frame.code()) else {
+            frame_infos.push(LlIntFrameInfo::default());
+            continue;
+        };
+        let pb_base = installed.function().instruction_bytes().as_ptr();
+        let fv_base = {
+            let index = crate::vm::code_index_for_dsl(frame.code());
+            vm.feedback_flat_storage[index].as_ptr().cast_mut()
+        };
+        let const_base = agent
+            .heap()
+            .view()
+            .code(frame.code())
+            .and_then(lyng_gc::RuntimeCodeRecord::constants)
+            .and_then(|slots| agent.heap().view().code_slots(slots))
+            .map_or(std::ptr::null(), <[_]>::as_ptr);
+        let regs_base = {
+            let base = frame.registers().base() as usize;
+            // SAFETY: the register window belongs to an installed live
+            // frame and is within the reserved register stack storage.
+            unsafe { register_stack_base.add(base) }
+        };
+        let return_register = frame
+            .return_register()
+            .map_or(LLINT_RETURN_REGISTER_NONE, u32::from);
+        let simple_return_safe = installed.llint_simple_return_safe()
+            && !frame.flags().contains(crate::FrameFlags::construct())
+            && !frame
+                .flags()
+                .contains(crate::FrameFlags::derived_construct());
+        frame_infos.push(LlIntFrameInfo {
+            pb_base,
+            regs_base,
+            fv_base,
+            const_base,
+            this_value: resolve_this_state_to_mirror(context_this_state, frame.this_value()),
+            pc_offset: frame.instruction_offset(),
+            return_register,
+            flags: if simple_return_safe {
+                LLINT_FRAME_INFO_FAST_RETURN_SAFE
+            } else {
+                0
+            },
+            pad1: 0,
+            pad2: 0,
+        });
+    }
+    register_stack_base
 }
 
 #[cfg(test)]
@@ -169,8 +285,11 @@ mod tests {
         // slots before the scalar block.
         assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
         assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
-        assert_eq!(r::LLINT_STATE_PREFIX, 80);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 88);
+        assert_eq!(r::LLINT_STATE_FRAME_DEPTH, 64);
+        assert_eq!(r::LLINT_STATE_FRAME_INFO_BASE, 72);
+        assert_eq!(r::LLINT_STATE_PREFIX, 88);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 96);
+        assert_eq!(core::mem::size_of::<LlIntFrameInfo>(), 64);
     }
 
     #[test]

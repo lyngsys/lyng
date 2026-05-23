@@ -66,7 +66,7 @@ pub(crate) fn run_via_dsl(
         // boxed slice's `as_ptr()` is still a valid (non-dangling)
         // pointer; the asm trampoline never dereferences past the
         // slot count anyway.
-        vm.feedback_flat_storage[index].as_ptr() as *mut crate::dsl::feedback_flat::FeedbackEntry
+        vm.feedback_flat_storage[index].as_ptr().cast_mut()
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -103,8 +103,7 @@ pub(crate) fn run_via_dsl(
         .code(frame.code())
         .and_then(lyng_gc::RuntimeCodeRecord::constants)
         .and_then(|slots| agent.heap().view().code_slots(slots))
-        .map(|s| s.as_ptr())
-        .unwrap_or(std::ptr::null());
+        .map_or(std::ptr::null(), <[_]>::as_ptr);
 
     // Phase 1.B.1: derive `frame_this_value`. Pre-resolves the
     // active execution context's ThisState into either the real
@@ -116,6 +115,10 @@ pub(crate) fn run_via_dsl(
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
+
+    let mut frame_infos = Vec::new();
+    let frame_info_register_stack_base =
+        crate::dsl::llint_state::refresh_frame_infos(&mut frame_infos, vm, agent);
 
     // Build a DispatchState directly so the asm-path slow-path bridge
     // can call `LlIntDispatchState::dispatch_state()` and get the same
@@ -136,11 +139,13 @@ pub(crate) fn run_via_dsl(
     let mut rust_ctx = LlIntRustContext {
         dispatch,
         exit: LlIntExitSlot::default(),
+        frame_infos,
+        frame_info_register_stack_base,
     };
 
     let mut state = LlIntState {
         frame_pc_offset,
-        _pad1: 0,
+        pad1: 0,
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
@@ -150,11 +155,12 @@ pub(crate) fn run_via_dsl(
         // installed/frame move into DispatchState.
         frame_const_base: const_base,
         frame_this_value: this_value,
-        frame_depth: frame_depth as u32,
+        frame_depth: u32::try_from(frame_depth).unwrap_or(u32::MAX),
         frame_check_epoch: 0,
-        rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_> as *mut LlIntRustContextOpaque,
+        frame_info_base: rust_ctx.frame_infos.as_mut_ptr(),
+        rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
         prefix: 0,
-        _pad2: [0; 7],
+        pad2: [0; 7],
     };
 
     // SAFETY: `state` is a valid mutable pointer to a stack-local
@@ -166,11 +172,7 @@ pub(crate) fn run_via_dsl(
     // static [DslHandler; 256]` with stable storage for the entire
     // program lifetime.
     unsafe {
-        run_dsl_trampoline(
-            &mut state as *mut LlIntState,
-            vm_ptr,
-            DSL_DISPATCH_TABLE.as_ptr(),
-        )
+        run_dsl_trampoline(&raw mut state, vm_ptr, DSL_DISPATCH_TABLE.as_ptr());
     };
 
     match rust_ctx.exit.kind {

@@ -3,7 +3,9 @@ use super::{
     BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
     RealmRef, TieringState, Value, Vm, VmError, VmResult,
 };
-use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
+use lyng_bytecode::{
+    decode_instruction_bytes, ArgumentsMode, CallRange, Instruction, Opcode, WideAbxOperands,
+};
 use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
@@ -18,6 +20,7 @@ pub(crate) struct InstalledFunction {
     direct_eval_lexical_sites: Vec<lyng_bytecode::DirectEvalLexicalSite>,
     loop_iteration_sites: Vec<lyng_bytecode::LoopIterationEnvironmentSite>,
     feedback_sites_by_slot: Vec<Option<lyng_bytecode::FeedbackSiteDescriptor>>,
+    llint_simple_return_safe: bool,
 }
 
 impl InstalledFunction {
@@ -43,6 +46,7 @@ impl InstalledFunction {
                 *slot = Some(*descriptor);
             }
         }
+        let llint_simple_return_safe = llint_simple_return_safe(&function);
         Self {
             function,
             child_codes,
@@ -50,6 +54,7 @@ impl InstalledFunction {
             direct_eval_lexical_sites,
             loop_iteration_sites,
             feedback_sites_by_slot,
+            llint_simple_return_safe,
         }
     }
 
@@ -58,8 +63,13 @@ impl InstalledFunction {
     /// trampoline's `frame_pb_base` pointer and to expose feedback /
     /// constant tables to semantic bodies.
     #[inline]
-    pub(crate) fn function(&self) -> &BytecodeFunction {
+    pub(crate) const fn function(&self) -> &BytecodeFunction {
         &self.function
+    }
+
+    #[inline]
+    pub(crate) const fn llint_simple_return_safe(&self) -> bool {
+        self.llint_simple_return_safe
     }
 
     #[inline]
@@ -176,6 +186,46 @@ impl InstalledFunction {
     const fn cold_metadata_index_footprint(&self) -> usize {
         self.direct_eval_lexical_sites.len() + self.loop_iteration_sites.len()
     }
+}
+
+fn llint_simple_return_safe(function: &BytecodeFunction) -> bool {
+    let flags = function.flags();
+    if flags.class_constructor()
+        || flags.derived_class_constructor()
+        || flags.generator()
+        || flags.async_function()
+        || function.arguments_mode() != ArgumentsMode::None
+        || function.has_rest_parameter()
+        || function.needs_environment()
+        || !function.exception_handlers().is_empty()
+    {
+        return false;
+    }
+
+    !function.instructions().iter().any(|instruction| {
+        matches!(
+            instruction.opcode(),
+            Opcode::CreateForIn
+                | Opcode::AdvanceForIn
+                | Opcode::CloseForIn
+                | Opcode::CreateIterator
+                | Opcode::AdvanceIterator
+                | Opcode::CloseIterator
+                | Opcode::PushClosureEnv
+                | Opcode::PopClosureEnv
+                | Opcode::EnterEnvScope
+                | Opcode::LeaveEnvScope
+                | Opcode::PushWithEnv
+                | Opcode::PopWithEnv
+                | Opcode::Throw
+                | Opcode::EnterHandler
+                | Opcode::LeaveHandler
+                | Opcode::SuspendGeneratorStart
+                | Opcode::Yield
+                | Opcode::Await
+                | Opcode::DelegateYield
+        )
+    })
 }
 
 fn canonical_direct_eval_site(

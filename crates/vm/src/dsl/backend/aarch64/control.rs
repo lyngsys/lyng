@@ -546,6 +546,63 @@ macro_rules! jump_relative_i8_and_dispatch {
     };
 }
 
+/// Complete a simple nested function return in `LLInt` asm.
+///
+/// This path is deliberately narrow: it only handles non-top-level
+/// frames whose `LlIntFrameInfo` entry was marked no-cleanup return
+/// safe by the Rust installer. More complex returns keep using the
+/// semantic slow path.
+#[macro_export]
+macro_rules! return_to_caller_or_branch {
+    ($value:tt, $label:tt) => {
+        concat!(
+            "ldr    w0, [x24, {state_frame_depth}]\n",
+            "cmp    w0, #1\n",
+            "b.ls   ",
+            stringify!($label),
+            "\n",
+            "ldr    x1, [x24, {state_frame_info_base}]\n",
+            "cbz    x1, ",
+            stringify!($label),
+            "\n",
+            "sub    w2, w0, #1\n",
+            "add    x2, x1, x2, lsl #6\n",
+            "ldr    w3, [x2, {frame_info_flags}]\n",
+            "tbz    w3, #0, ",
+            stringify!($label),
+            "\n",
+            "ldr    w3, [x2, {frame_info_return_register}]\n",
+            "cmn    w3, #1\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+            "sub    w0, w0, #1\n",
+            "str    w0, [x24, {state_frame_depth}]\n",
+            "sub    w4, w0, #1\n",
+            "add    x4, x1, x4, lsl #6\n",
+            "ldr    x20, [x4, {frame_info_regs_base}]\n",
+            "str    x",
+            stringify!($value),
+            ", [x20, x3, lsl #3]\n",
+            "ldr    x2, [x4, {frame_info_pb_base}]\n",
+            "ldr    w5, [x4, {frame_info_pc_offset}]\n",
+            "add    x19, x2, x5\n",
+            "ldr    x21, [x4, {frame_info_fv_base}]\n",
+            "ldr    x6, [x4, {frame_info_const_base}]\n",
+            "ldr    x7, [x4, {frame_info_this_value}]\n",
+            "str    w5, [x24, {state_pc}]\n",
+            "str    x2, [x24, {state_pb}]\n",
+            "str    x20, [x24, {state_regs}]\n",
+            "str    x21, [x24, {state_fv}]\n",
+            "str    x6, [x24, {vm_const_base}]\n",
+            "str    x7, [x24, {state_this_value}]\n",
+            "ldrb   w8, [x19]\n",
+            "ldr    x16, [x23, x8, lsl #3]\n",
+            "br     x16\n",
+        )
+    };
+}
+
 /// Emit a local label inside the handler body.
 #[macro_export]
 macro_rules! label {

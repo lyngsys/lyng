@@ -481,15 +481,10 @@ pub extern "C" fn op_load_global_rust_probe_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     // SAFETY: `state` is the live trampoline state pointer supplied by
     // the asm bridge for the duration of this helper call.
-    let rust_context = unsafe {
-        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
-    };
-    let dispatch = &mut rust_context.dispatch;
-    // Keep the Rust frame snapshot aligned with the asm PC before
-    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
-    // without constructing the full slow-path wrapper.
-    let entry_pc = unsafe { (*state).frame_pc_offset };
-    dispatch.frame.set_instruction_offset(entry_pc);
+    let mut llint = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    llint.sync_from_asm();
+    let dispatch = llint.dispatch_state();
+    let entry_pc = dispatch.frame.instruction_offset();
     let feedback_slot = {
         let bytes = dispatch.installed.function().instruction_bytes();
         let offset = (entry_pc + 4) as usize;
@@ -2749,15 +2744,9 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     // SAFETY: `state` is the live trampoline state pointer supplied by
     // the asm bridge for the duration of this helper call.
-    let rust_context = unsafe {
-        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
-    };
-    let dispatch = &mut rust_context.dispatch;
-    // Keep the Rust frame snapshot aligned with the asm PC before
-    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
-    // without constructing the full slow-path wrapper.
-    let entry_pc = unsafe { (*state).frame_pc_offset };
-    dispatch.frame.set_instruction_offset(entry_pc);
+    let mut llint = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    llint.sync_from_asm();
+    let dispatch = llint.dispatch_state();
     let hit = dispatch.vm.try_assign_named_property_rust_probe_for_dsl(
         dispatch.agent,
         &mut dispatch.frame,

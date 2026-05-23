@@ -561,6 +561,40 @@ impl Vm {
         self.release_register_stack_to(top);
     }
 
+    pub(crate) fn reconcile_llint_fast_return_depth(
+        &mut self,
+        agent: &mut Agent,
+        target_depth: usize,
+    ) {
+        if target_depth >= self.frames.len() {
+            return;
+        }
+
+        while self.frames.len() > target_depth {
+            let Some(frame) = self.frames.pop() else {
+                break;
+            };
+            let depth = self.frames.len();
+            self.close_loop_iteration_frames(depth);
+            self.close_with_environment_frames(depth);
+            self.close_direct_eval_frames(depth);
+            self.close_env_scope_frames(depth);
+            self.for_in_states.clear_window(frame.registers());
+            self.iterator_states.clear_window(frame.registers());
+            self.captured_name_references
+                .clear_window(frame.registers());
+            let _ = agent.pop_execution_context();
+        }
+
+        let top = self
+            .frames
+            .last()
+            .map_or(0, |frame| frame.registers().end() as usize);
+        self.release_register_stack_to(top);
+        let _ = self.current_exception.take();
+        self.request_dispatch_frame_check();
+    }
+
     #[cfg(test)]
     #[inline]
     pub(crate) const fn register_stack_storage_len_for_tests(&self) -> usize {

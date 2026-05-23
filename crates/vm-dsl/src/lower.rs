@@ -237,7 +237,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_named_aux_bits={feedback_named_aux_bits} fb_named_aux_epoch={feedback_named_aux_epoch} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} depth={state_frame_depth} frame_infos={state_frame_info_base} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_named_aux_bits={feedback_named_aux_bits} fb_named_aux_epoch={feedback_named_aux_epoch} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} frame_pb={frame_info_pb_base} frame_regs={frame_info_regs_base} frame_fv={frame_info_fv_base} frame_const={frame_info_const_base} frame_this={frame_info_this_value} frame_pc={frame_info_pc_offset} frame_ret={frame_info_return_register} frame_flags={frame_info_flags} frame_stride_shift={frame_info_stride_shift} fast_return_bit={frame_info_fast_return_safe_bit} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -246,6 +246,8 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
                 state_object_records = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_RECORDS_BASE,
                 state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
+                state_frame_depth = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_DEPTH,
+                state_frame_info_base = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_INFO_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
                 entry_stride_shift = const 6_u32,
@@ -286,6 +288,16 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // Universally bound; unused-binding warning is suppressed by
                 // the reference comment above.
                 state_this_value = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
+                frame_info_pb_base = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_PB_BASE,
+                frame_info_regs_base = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_REGS_BASE,
+                frame_info_fv_base = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_FV_BASE,
+                frame_info_const_base = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_CONST_BASE,
+                frame_info_this_value = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_THIS_VALUE,
+                frame_info_pc_offset = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_PC_OFFSET,
+                frame_info_return_register = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_RETURN_REGISTER,
+                frame_info_flags = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_FLAGS,
+                frame_info_stride_shift = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_STRIDE_SHIFT,
+                frame_info_fast_return_safe_bit = const ::lyng_vm::dsl::reg_convention::LLINT_FRAME_INFO_FAST_RETURN_SAFE_BIT,
                 // Phase 1.B.2: 64-bit bit pattern of
                 // `Value::uninitialized_lexical()`, used by
                 // `load_uninit_lex_sentinel!` (backend/aarch64/values.rs)
