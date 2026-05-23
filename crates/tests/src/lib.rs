@@ -7,9 +7,6 @@
 mod atom_lifetime;
 
 #[cfg(test)]
-mod end_to_end;
-
-#[cfg(test)]
 mod diagnostics;
 
 #[cfg(test)]

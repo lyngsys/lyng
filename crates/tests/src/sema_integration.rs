@@ -533,3 +533,79 @@ fn unrelated_functions_do_not_share_captures() {
         );
     }
 }
+
+// === End-to-end pipeline coverage (consolidated from end_to_end.rs) ===
+
+#[test]
+fn strict_mode_propagates_via_use_strict() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, sid(), "\"use strict\"; var x = 1;");
+    assert!(parsed.strict);
+    let s = analyze_script(&parsed, &atoms);
+    assert!(!s.diagnostics.has_errors());
+    let root_scope = s.scope_table.get(ScopeId::new(0));
+    assert!(root_scope.strict);
+}
+
+#[test]
+fn syntax_errors_have_correct_spans() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, sid(), "var = ;");
+    assert!(parsed.diagnostics.has_errors());
+    let diag = &parsed.diagnostics.as_slice()[0];
+    assert!(diag.span.range.start.raw() < 7);
+}
+
+#[test]
+fn multiple_scripts_share_atoms() {
+    let mut atoms = AtomTable::new();
+    let p1 = parse_script(&mut atoms, SourceId::new(0), "var foo = 1;");
+    let p2 = parse_script(&mut atoms, SourceId::new(1), "var foo = 2;");
+    assert!(!p1.diagnostics.has_errors());
+    assert!(!p2.diagnostics.has_errors());
+    let s1 = analyze_script(&p1, &atoms);
+    let s2 = analyze_script(&p2, &atoms);
+    let foo1 = s1
+        .binding_table
+        .as_slice()
+        .iter()
+        .find(|b| atoms.resolve(b.name) == "foo");
+    let foo2 = s2
+        .binding_table
+        .as_slice()
+        .iter()
+        .find(|b| atoms.resolve(b.name) == "foo");
+    assert_eq!(foo1.unwrap().name, foo2.unwrap().name);
+}
+
+#[test]
+fn complex_program_end_to_end() {
+    let src = r#"
+        'use strict';
+        let counter = 0;
+        function increment() {
+            counter++;
+            return counter;
+        }
+        const result = increment();
+        if (result > 0) {
+            let msg = "positive";
+        }
+        for (let i = 0; i < 10; i++) {
+            increment();
+        }
+    "#;
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(&mut atoms, sid(), src);
+    assert!(!parsed.diagnostics.has_errors());
+    assert!(parsed.strict);
+    let s = analyze_script(&parsed, &atoms);
+    assert!(!s.diagnostics.has_errors());
+    let counter_atom = atoms.intern("counter");
+    let counter_b = s
+        .binding_table
+        .as_slice()
+        .iter()
+        .find(|b| b.name == counter_atom);
+    assert!(counter_b.unwrap().is_captured);
+}
