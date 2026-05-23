@@ -1,5 +1,4 @@
 use crate::error::VmResult;
-use crate::vm::dispatch::advance_dispatch_frame;
 use crate::vm::property_access::ToPrimitiveHint;
 use crate::vm::values::{
     bigint_bitwise_and_values, bigint_bitwise_or_values, bigint_bitwise_xor_values,
@@ -11,7 +10,7 @@ use lyng_env::Agent;
 use lyng_host::HostHooks;
 use lyng_objects::NativeFunctionRegistry;
 use lyng_ops::{errors, object, pure, read};
-use lyng_types::{AbruptCompletion, FeedbackSlotId, Value};
+use lyng_types::{AbruptCompletion, Value};
 
 #[inline]
 pub(in crate::vm) const fn decode_smi_immediate(raw: u16) -> i16 {
@@ -378,26 +377,6 @@ impl Vm {
         )?))
     }
 
-    pub(crate) fn try_equal_fast_for_dsl(
-        &mut self,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        feedback_slot: Option<FeedbackSlotId>,
-        target: u16,
-        left: u16,
-        right: u16,
-    ) -> bool {
-        let Some(value) =
-            self.try_primitive_number_binary_opcode(frame, Opcode::Equal, left, right)
-        else {
-            return false;
-        };
-        self.record_feedback_slot(frame.code(), feedback_slot);
-        self.write_register(frame.registers(), target, value);
-        advance_dispatch_frame(frame, instruction_len);
-        true
-    }
-
     pub(in crate::vm) fn execute_strict_equal_opcode(
         &self,
         agent: &Agent,
@@ -418,33 +397,6 @@ impl Vm {
         Ok(Value::from_bool(
             read::is_strictly_equal(agent.heap().view(), left, right).map_err(VmError::Abrupt)?,
         ))
-    }
-
-    pub(crate) fn try_strict_equal_fast_for_dsl(
-        &mut self,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        feedback_slot: Option<FeedbackSlotId>,
-        target: u16,
-        left: u16,
-        right: u16,
-    ) -> bool {
-        let value = if let Some(value) =
-            self.try_primitive_number_binary_opcode(frame, Opcode::StrictEqual, left, right)
-        {
-            value
-        } else {
-            let left = self.read_register(frame.registers(), left);
-            let right = self.read_register(frame.registers(), right);
-            let Some(result) = pure::is_strictly_equal(left, right) else {
-                return false;
-            };
-            Value::from_bool(result)
-        };
-        self.record_feedback_slot(frame.code(), feedback_slot);
-        self.write_register(frame.registers(), target, value);
-        advance_dispatch_frame(frame, instruction_len);
-        true
     }
 
     pub(in crate::vm) fn execute_equal_zero_opcode(

@@ -1,4 +1,4 @@
-//! SMI fast-path arithmetic asm fragments for AArch64.
+//! SMI arithmetic asm fragments for AArch64.
 //!
 //! Each macro operates on **already-untagged** SMI payloads (32-bit
 //! signed integers in the low half of an X-register, sign-extended).

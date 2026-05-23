@@ -1,6 +1,6 @@
 //! Dispatch, branches, and slow-path bridge fragments for AArch64.
 //!
-//! This module is the most-used backend file: every fast-path handler
+//! This module is the most-used backend file: every inline LLInt handler
 //! ends in [`dispatch!`], every slow-path handler ends in
 //! [`dispatch_after_slow!`], and the prefix opcodes (`op_wide` /
 //! `op_extra_wide`) use [`dispatch_prefixed!`].
@@ -101,7 +101,7 @@ macro_rules! dispatch {
 /// from its `llint_handler!` signature. The macro emits
 /// `inc_slow_semantic_counter!(N)` before the rest of the bridge,
 /// bumping the slow-semantic bank slot for this opcode whenever the
-/// fast-path falls through (or always, for cold-stub-only opcodes).
+/// inline hit path falls through (or always, for cold-stub-only opcodes).
 ///
 /// Each arity has two match arms:
 /// - With `opcode_byte = N` (preferred — emitted by the lowerer).
@@ -348,16 +348,16 @@ macro_rules! call_slow {
     };
 }
 
-/// Call into a Rust fast-path helper without incrementing semantic
-/// slow-path counters. The helper returns `tag == 0` on hit with the
+/// Call into a Rust probe without incrementing semantic slow-path
+/// counters. The probe returns `tag == 0` on hit with the
 /// next PC offset in `payload`; non-zero means the handler should fall
 /// through to its counted semantic slow path.
 ///
-/// This mirrors `call_slow!`'s pre-call PC sync so the helper can inspect
+/// This mirrors `call_slow!`'s pre-call PC sync so the probe can inspect
 /// the current bytecode offset, but it deliberately does not bump the
 /// semantic slow-path counter.
 #[macro_export]
-macro_rules! call_fast {
+macro_rules! call_rust_probe {
     ($shim:ident, args = [$a:tt, $b:tt]) => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
@@ -460,9 +460,9 @@ macro_rules! dispatch_after_slow {
     };
 }
 
-/// Dispatch after a fast helper returned `tag == 0` with the next-PC
+/// Dispatch after a Rust probe returned `tag == 0` with the next-PC
 /// offset in `x1`. This is the Continue arm of `dispatch_after_slow!`
-/// split out for handlers that branch non-zero fast-helper tags to a
+/// split out for handlers that branch non-zero probe tags to a
 /// normal counted slow path.
 #[macro_export]
 macro_rules! dispatch_from_payload {
@@ -538,6 +538,27 @@ macro_rules! cmp_branch_eq {
             "b.eq   ",
             stringify!($label),
             "\n",
+        )
+    };
+}
+
+/// Compare two registers and materialize the equality result as a 0/1
+/// payload in `$dst`.
+///
+/// Pair with `tag_bool_payload!($dst)` before storing the result as a
+/// JavaScript Boolean `Value`.
+#[macro_export]
+macro_rules! cmp_eq_payload {
+    ($a:tt, $b:tt => $dst:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($a),
+            ", x",
+            stringify!($b),
+            "\n",
+            "cset   w",
+            stringify!($dst),
+            ", eq\n",
         )
     };
 }

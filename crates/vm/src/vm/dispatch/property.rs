@@ -226,9 +226,9 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
-        reason = "DSL fast helper keeps opcode operands explicit while reusing the existing named-load IC machinery"
+        reason = "DSL Rust probe keeps opcode operands explicit while reusing the existing named-load IC machinery"
     )]
-    pub(crate) fn try_get_named_property_fast_for_dsl(
+    pub(crate) fn try_get_named_property_rust_probe_for_dsl(
         &mut self,
         agent: &Agent,
         frame: &mut FrameRecord,
@@ -305,9 +305,9 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
-        reason = "DSL fast helper keeps opcode operands explicit while reusing the existing named-store IC machinery"
+        reason = "DSL Rust probe keeps opcode operands explicit while reusing the existing named-store IC machinery"
     )]
-    pub(crate) fn try_assign_named_property_fast_for_dsl(
+    pub(crate) fn try_assign_named_property_rust_probe_for_dsl(
         &mut self,
         agent: &mut Agent,
         frame: &mut FrameRecord,

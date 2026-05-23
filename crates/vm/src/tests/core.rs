@@ -381,7 +381,7 @@ fn smi_equal_hit_avoids_semantic_slow_path() {
     assert_eq!(
         slow_path.semantic(Opcode::Equal),
         0,
-        "SMI Equal fast hit should avoid the semantic slow bridge"
+        "SMI Equal LLInt hit should avoid the semantic slow bridge"
     );
 }
 
@@ -421,7 +421,7 @@ fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
     assert_eq!(
         slow_path.semantic(Opcode::StrictEqual),
         0,
-        "primitive StrictEqual fast hit should avoid the semantic slow bridge"
+        "primitive StrictEqual LLInt hit should avoid the semantic slow bridge"
     );
 }
 

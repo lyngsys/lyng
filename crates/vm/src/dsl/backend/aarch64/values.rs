@@ -160,7 +160,94 @@ macro_rules! check_double {
             "lsr    x16, x",
             stringify!($reg),
             ", #48\n",
-            "cmp    x16, #0x7ff8\n",
+            "movz   x17, #0x7ff8\n",
+            "cmp    x16, x17\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// After a raw `Value` equality match, branch to `$true_label` when the
+/// value is known to be strictly equal to itself, or `$false_label` for
+/// the canonical NaN value.
+///
+/// Raw-equal non-NaN doubles are true. Tagged values are true because
+/// the raw identity already matched. The only raw-equal value that is
+/// not strictly equal to itself is the canonical NaN encoding, whose
+/// high word is the NaN tag header and whose kind field is zero.
+#[macro_export]
+macro_rules! branch_raw_equal_strict_result {
+    ($reg:tt, true = $true_label:tt, false = $false_label:tt) => {
+        concat!(
+            "lsr    x16, x",
+            stringify!($reg),
+            ", #48\n",
+            "movz   x17, #0x7ff8\n",
+            "cmp    x16, x17\n",
+            "b.ne   ",
+            stringify!($true_label),
+            "\n",
+            "ubfx   x16, x",
+            stringify!($reg),
+            ", #32, #16\n",
+            "cbz    x16, ",
+            stringify!($false_label),
+            "\n",
+            "b      ",
+            stringify!($true_label),
+            "\n",
+        )
+    };
+}
+
+/// Extract a non-double tag kind into `$kind` or branch to `$label`.
+///
+/// Tagged values use the `0x7ff8` high-word header and a non-zero
+/// 16-bit kind field. Doubles either use another high word or, for the
+/// canonical NaN encoding, use the `0x7ff8` header with kind zero.
+#[macro_export]
+macro_rules! tagged_kind_or_branch {
+    ($reg:tt => $kind:tt, $label:tt) => {
+        concat!(
+            "lsr    x16, x",
+            stringify!($reg),
+            ", #48\n",
+            "movz   x17, #0x7ff8\n",
+            "cmp    x16, x17\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+            "ubfx   x",
+            stringify!($kind),
+            ", x",
+            stringify!($reg),
+            ", #32, #16\n",
+            "cbz    x",
+            stringify!($kind),
+            ", ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// Branch when a tag kind may require heap content comparison for
+/// strict equality even though the raw handles differ.
+#[macro_export]
+macro_rules! branch_if_string_or_bigint_kind {
+    ($kind:tt, $label:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($kind),
+            ", #6\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+            "cmp    x",
+            stringify!($kind),
+            ", #8\n",
             "b.eq   ",
             stringify!($label),
             "\n",
@@ -286,6 +373,32 @@ macro_rules! tag_bool_const {
             "movk   x",
             stringify!($reg),
             ", #0x7ff8, lsl #48\n",
+        )
+    };
+}
+
+/// Tag a Boolean payload already materialized as 0/1 in `$reg`.
+///
+/// AArch64 W-register writes zero-extend into the paired X-register, so
+/// callers can feed this directly from `cset w{reg}, cond`. The macro
+/// masks the payload to keep the value representation tight, then ORs
+/// in the Boolean tag/header bits.
+#[macro_export]
+macro_rules! tag_bool_payload {
+    ($reg:tt) => {
+        concat!(
+            "and    x",
+            stringify!($reg),
+            ", x",
+            stringify!($reg),
+            ", #0x1\n",
+            "movz   x16, #0x3, lsl #32\n",
+            "movk   x16, #0x7ff8, lsl #48\n",
+            "orr    x",
+            stringify!($reg),
+            ", x16, x",
+            stringify!($reg),
+            "\n",
         )
     };
 }

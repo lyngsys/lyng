@@ -5,7 +5,7 @@
 //! - [`operands`] — operand-byte decode + register-file access.
 //! - [`values`]   — NaN-tag checks and tag manipulation.
 //! - [`objects`]  — ObjectRecord access via `ObjectRef` handles.
-//! - [`arithmetic`] — SMI fast-path arithmetic + bitwise.
+//! - [`arithmetic`] — SMI arithmetic + bitwise.
 //! - [`constants`] — Phase 1.B.1 indexed load from `frame_const_base`.
 //! - [`control`]  — dispatch, branches, slow-path bridge, prefix.
 //! - [`feedback`] — IC-site lookups + observed-type recording.

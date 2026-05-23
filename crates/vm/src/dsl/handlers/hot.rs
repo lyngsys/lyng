@@ -1,8 +1,7 @@
 //! Hot DSL handlers. Populated by tasks B39–B42.
 //!
 //! Per the design (§10), hot handlers are the highest-frequency opcodes
-//! and ship with inline fast paths (SMI arithmetic, register moves, fast
-//! object access). The `llint_handler!` proc-macro lowers each handler
+//! and ship with inline LLInt bodies. The `llint_handler!` proc-macro lowers each handler
 //! body into a single `naked_asm!` block; the backend `macro_rules!`
 //! macros (under `crates/vm/src/dsl/backend/aarch64/`) supply the
 //! asm fragments for individual DSL ops (`decode_ab!`, `load_reg!`,
@@ -35,20 +34,20 @@ llint_handler! {
 }
 
 // =====================================================================
-// op_add (B40) — Abc layout with feedback slot, SMI fast path.
+// op_add (B40) — Abc layout with feedback slot, SMI inline hit path.
 // =====================================================================
 //
-// Fast path: 2x check_smi + 2x untag + add + tag + store_reg +
+// Hit path: 2x check_smi + 2x untag + add + tag + store_reg +
 // call_slow!(op_add_record_smi_rs) + dispatch. The slot-recording
 // shim bumps the warmup counter and execution count through
 // `Vm::record_feedback_slot` (which also mirrors the legacy state to
 // the flat array). Inline `record_smi!` was dropped in DSL-0c because
 // the `entry_observed` offset binding is still a placeholder (offset
 // 0) — writing at offset 0 would corrupt the `Option<FeedbackSiteState>`
-// discriminant. Slow path: call_slow into the op_add semantic body,
+// discriminant. Semantic slow path: call_slow into the op_add semantic body,
 // which performs the same feedback recording itself.
 //
-// The extra `call_slow!` on the fast path adds one Rust function call
+// The extra `call_slow!` on the hit path adds one Rust function call
 // per SMI add, but preserves the warmup/execution-count bookkeeping
 // the tiering machinery relies on. A future task can re-introduce
 // inline observed-types recording once the `entry_observed` offset
@@ -74,7 +73,7 @@ llint_handler! {
     }
 }
 
-/// Slow-path shim for the SMI fast path's feedback recording. The
+/// Rust shim for the SMI hit path's feedback recording. The
 /// inline `record_smi!` macro would write the observed-types bit into
 /// the flat-array entry, but its offset binding (`entry_observed`) is
 /// still a placeholder (offset 0). Routing through
@@ -82,7 +81,7 @@ llint_handler! {
 /// warmup counter, allocates the legacy vector at threshold, mirrors
 /// the legacy state to the flat array, and observes the tier feedback
 /// event — all the bookkeeping `op_add_semantic`'s slow path performs.
-/// The fast path returns `Continue { pc_advance: 6 }` so the asm
+/// The shim returns `Continue { pc_advance: 6 }` so the asm
 /// bridge advances PC by the encoded op_add length without going
 /// through `op_add_semantic`.
 #[cfg(target_arch = "aarch64")]

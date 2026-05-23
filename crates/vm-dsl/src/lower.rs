@@ -54,7 +54,7 @@
 //! symbol. The lowerer always supplies the layout-stable bindings; the
 //! per-call-site `{shim}` binding is collected by scanning the body
 //! for bridge invocations such as `call_slow!(shim_name, ...)` and
-//! `call_fast!(shim_name, ...)`.
+//! `call_rust_probe!(shim_name, ...)`.
 //!
 //! An "unused" comment fragment at the top of the asm template
 //! unconditionally references every named binding, keeping rustc
@@ -129,18 +129,18 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let mut shim_names: BTreeSet<String> = BTreeSet::new();
     let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
     // Track whether we've crossed the first `.label:` declaration. The
-    // counter-injection discipline differs for labeled fast-path
-    // handlers vs label-free cold stubs:
+    // counter-injection discipline differs for labeled inline handlers
+    // vs label-free cold stubs:
     //
     // - `call_slow!` BEFORE any label in a handler that later declares
-    //   a label: these are fast-path tail invocations (e.g.
+    //   a label: these are hit-side tail invocations (e.g.
     //   `call_slow!(op_xxx_record_smi_rs, args = [slot])` for feedback
     //   recording). They run on every successful inline dispatch, NOT
     //   just on slow-path entry. Injecting `opcode_byte = N` here would
     //   emit `inc_slow_semantic_counter!` on every dispatch and falsely
     //   report ~100% slow-path-share for every record-smi-shim opcode.
     // - `call_slow!` AFTER the first label: these are inside a label
-    //   scope (typically `.slow:`), executed only when the fast path
+    //   scope (typically `.slow:`), executed only when the inline hit path
     //   bails. Counter-injection here is semantically correct.
     // - `call_slow!` in a label-free handler: this is a pure cold stub,
     //   so every dispatch is a semantic slow-path entry and must be
@@ -167,9 +167,9 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // `opcode_byte = N` explicitly, the injection is skipped.
                 //
                 // `gate_call_slow` suppresses injection into
-                // `call_slow!` invocations on the fast-path tail
+                // `call_slow!` invocations on the hit-side tail
                 // (before any `.label:` in a handler that has labels)
-                // to avoid double-counting fast-path record-smi shim
+                // to avoid double-counting hit-side record-smi shim
                 // calls as slow-path entries. Label-free cold stubs are
                 // always semantic slow-path entries, so they are not
                 // gated.
@@ -189,7 +189,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
 
     // Emission order: counter-inc → operand-decode prologue → body
     // statements. The counter increment must precede the prologue so
-    // it bumps the dispatch counter regardless of which fast-path
+    // it bumps the dispatch counter regardless of which inline
     // branch the body's later `dispatch!`/`dispatch_after_slow!` takes
     // (slow-path round-trips re-enter the dispatch table; their target
     // handler's own counter increment fires on entry there).
@@ -354,12 +354,12 @@ fn substitute_idents(
 /// `gate_call_slow` controls whether `call_slow!` injection is
 /// suppressed. The caller (`lower_handler`) sets this to `true` for
 /// statements emitted BEFORE the first `.label:` declaration — those
-/// `call_slow!`s are fast-path tail invocations (e.g. record-smi shim
+/// `call_slow!`s are hit-side tail invocations (e.g. record-smi shim
 /// calls for feedback recording) and must not be counted as slow-path
 /// semantic entries. When `gate_call_slow` is `true`, only
 /// `poll_safepoint!` invocations receive injection (their asm shape
 /// branches on a runtime flag, so counter-bumping is naturally
-/// fast-path-safe — see `safepoint.rs`). When `false`, both macros are
+/// hit-side safe — see `safepoint.rs`). When `false`, both macros are
 /// rewritten (the original DSL-1 Phase 1.B.0 Task 5 behavior).
 ///
 /// Each statement passed in is a single macro call of the shape
@@ -386,7 +386,7 @@ fn inject_opcode_byte(
                 continue;
             }
         };
-        // `call_slow!` is suppressed when `gate_call_slow` (fast-path
+        // `call_slow!` is suppressed when `gate_call_slow` (hit-side
         // tail); `poll_safepoint!` is always a candidate.
         let is_target = match name.as_str() {
             "call_slow" => !gate_call_slow,
@@ -444,7 +444,7 @@ fn inject_opcode_byte(
 /// the inner stream. Non-group trees pass through unchanged. The
 /// `gate_call_slow` flag is propagated so the label-scope discipline is
 /// preserved inside nested groups (a `call_slow!` nested inside another
-/// macro's args still respects the fast-path-tail suppression).
+/// macro's args still respects the hit-side-tail suppression).
 fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt, gate_call_slow: bool) -> TokenTree {
     match tt {
         TokenTree::Group(g) => {
@@ -472,18 +472,18 @@ fn arg_group_has_opcode_byte(stream: TokenStream) -> bool {
 
 /// Scan `tokens` for bridge invocations of the shape
 /// `call_slow!(<shim_name>, args = [...])` or
-/// `call_fast!(<shim_name>, args = [...])` and collect the shim name.
+/// `call_rust_probe!(<shim_name>, args = [...])` and collect the shim name.
 /// The shim name is a bare ident; we treat it as a linker symbol that
 /// must be supplied as `<name> = sym <name>` to `naked_asm!`.
 fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
     // Heuristic: walk the stream looking for
-    // `(call_slow|call_fast) ! ( IDENT , ...)`.
+    // `(call_slow|call_rust_probe) ! ( IDENT , ...)`.
     let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
     for i in 0..trees.len() {
         let TokenTree::Ident(id) = &trees[i] else {
             continue;
         };
-        if id != "call_slow" && id != "call_fast" {
+        if id != "call_slow" && id != "call_rust_probe" {
             continue;
         }
         // Followed by `!`?
@@ -588,15 +588,15 @@ mod tests {
     }
 
     #[test]
-    fn fast_path_call_slow_skipped_when_gated() {
+    fn hit_side_recording_call_slow_skipped_when_gated() {
         // The shape of a record-smi shim invocation as it appears in
-        // an op_add-style fast-path tail: `call_slow!(shim, args = [slot])`.
+        // an op_add-style hit-side tail: `call_slow!(shim, args = [slot])`.
         let tokens: TokenStream = syn::parse_str("call_slow!(op_add_record_smi_rs, args = [slot])")
-            .expect("parse fast-path call_slow!");
+            .expect("parse hit-side call_slow!");
         let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ true);
         assert!(
             !output_has_opcode_byte_for("call_slow", &rewritten),
-            "fast-path `call_slow!` must NOT receive `opcode_byte = N` \
+            "hit-side `call_slow!` must NOT receive `opcode_byte = N` \
              when gate_call_slow is true (would over-count slow-path \
              semantic entries). Got: {}",
             rewritten,
@@ -639,21 +639,22 @@ mod tests {
     }
 
     #[test]
-    fn call_fast_shim_name_is_collected() {
-        let tokens: TokenStream =
-            syn::parse_str("call_fast!(op_get_named_property_fast_rs, args = [a, b, c, slot])")
-                .expect("parse call_fast!");
+    fn rust_probe_shim_name_is_collected() {
+        let tokens: TokenStream = syn::parse_str(
+            "call_rust_probe!(op_get_named_property_rust_probe_rs, args = [a, b, c, slot])",
+        )
+        .expect("parse call_rust_probe!");
         let mut names = BTreeSet::new();
         collect_shim_names(&tokens, &mut names);
         assert!(
-            names.contains("op_get_named_property_fast_rs"),
-            "call_fast! bridge shims must be emitted as naked_asm named symbols. Got: {names:?}",
+            names.contains("op_get_named_property_rust_probe_rs"),
+            "call_rust_probe! bridge shims must be emitted as naked_asm named symbols. Got: {names:?}",
         );
     }
 
     #[test]
     fn poll_safepoint_always_injected() {
-        // `poll_safepoint!` is structurally fast-path-safe: the
+        // `poll_safepoint!` is structurally hit-side safe: the
         // counter-bump emission sits behind a runtime `cbz`/`cbnz`
         // branch on `vm.poll_pending`. Injection is correct in both
         // pre- and post-label contexts.

@@ -615,9 +615,9 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
-        reason = "DSL fast helper keeps opcode operands explicit while preserving global lexical precedence"
+        reason = "DSL Rust probe keeps opcode operands explicit while preserving global lexical precedence"
     )]
-    pub(crate) fn try_load_global_fast_for_dsl(
+    pub(crate) fn try_load_global_rust_probe_for_dsl(
         &mut self,
         agent: &Agent,
         frame: &mut FrameRecord,
