@@ -255,6 +255,57 @@ macro_rules! branch_if_string_or_bigint_kind {
     };
 }
 
+/// Branch when a tag kind is `undefined` or `null`.
+#[macro_export]
+macro_rules! branch_if_nullish_kind {
+    ($kind:tt, $label:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($kind),
+            ", #1\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+            "cmp    x",
+            stringify!($kind),
+            ", #2\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// Branch when a tag kind is an ObjectRef.
+#[macro_export]
+macro_rules! branch_if_object_kind {
+    ($kind:tt, $label:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($kind),
+            ", #5\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// Branch when a tag kind belongs to the VM-internal range.
+#[macro_export]
+macro_rules! branch_if_internal_kind {
+    ($kind:tt, $label:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($kind),
+            ", #9\n",
+            "b.hs   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 // ===========================================================================
 // Untag macros — extract payload from the tagged Value.
 // ===========================================================================

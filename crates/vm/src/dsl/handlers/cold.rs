@@ -30,19 +30,20 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    add_smi_overflow, bit_and_smi, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
+    add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
+    branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
     branch_named_proto_inline_mode, branch_nonzero, branch_raw_equal_strict_result,
     call_rust_probe, call_slow, check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne,
-    cmp_eq_payload, dec_smi_overflow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, dispatch_from_payload, inc_smi_overflow, load_acc,
+    dec_smi_overflow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax,
+    dispatch, dispatch_after_slow, dispatch_from_payload, inc_smi_overflow, load_acc,
     load_constant, load_feedback_site, load_local_fixed, load_named_aux_bits, load_named_aux_epoch,
     load_named_epoch, load_named_handler_bits, load_named_handler_shape,
     load_named_inline_slot_index_or_branch, load_object_record_from_state_or_branch,
     load_record_inline_slot, load_record_last_epoch, load_record_prototype_or_branch,
     load_record_shape, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
     record_smi, shift_left_smi, shift_right_smi, store_acc, store_local_fixed, store_reg,
-    sub_smi_overflow, tag_bool_const, tag_bool_payload, tag_null, tag_smi, tag_smi_const,
-    tag_smi_from_signed_byte, tag_undefined, tagged_kind_or_branch, untag_object_ref, untag_smi,
+    sub_smi_overflow, tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte,
+    tag_undefined, tagged_kind_or_branch, untag_object_ref, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -1914,14 +1915,43 @@ pub extern "C" fn op_decrement_slow_rs(
 llint_handler! {
     op_equal_dsl, opcode_byte = 53, layout = AbcSlot, length = 6, |a, b, c, slot| {
         load_reg!(b => t0);
-        check_smi!(t0, .slow);
         load_reg!(c => t1);
-        check_smi!(t1, .slow);
-        cmp_eq_payload!(t0, t1 => t2);
-        tag_bool_payload!(t2);
+        cmp_branch_eq!(t0, t1, .raw_equal);
+        tagged_kind_or_branch!(t0 => t2, .slow);
+        tagged_kind_or_branch!(t1 => slot, .slow);
+        cmp_branch_eq!(t2, slot, .same_tag);
+        branch_if_nullish_kind!(t2, .left_nullish);
+        branch_if_nullish_kind!(slot, .right_nullish);
+        branch!(.slow);
+        .same_tag:
+        branch_if_string_or_bigint_kind!(t2, .slow);
+        branch_if_internal_kind!(t2, .slow);
+        tag_bool_const!(t2, 0);
+        store_reg!(a, t2);
+        dispatch!();
+        .left_nullish:
+        branch_if_nullish_kind!(slot, .abstract_true);
+        branch_if_object_kind!(slot, .slow);
+        tag_bool_const!(t2, 0);
+        store_reg!(a, t2);
+        dispatch!();
+        .right_nullish:
+        branch_if_object_kind!(t2, .slow);
+        tag_bool_const!(t2, 0);
+        store_reg!(a, t2);
+        dispatch!();
+        .raw_equal:
+        branch_raw_equal_strict_result!(t0, true = .abstract_true, false = .abstract_false);
+        .abstract_true:
+        tag_bool_const!(t2, 1);
+        store_reg!(a, t2);
+        dispatch!();
+        .abstract_false:
+        tag_bool_const!(t2, 0);
         store_reg!(a, t2);
         dispatch!();
         .slow:
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_equal_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
