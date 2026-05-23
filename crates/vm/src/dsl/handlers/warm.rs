@@ -9,8 +9,9 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    call_slow, decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
-    poll_safepoint,
+    branch_i8_negative, branch_nonzero, call_slow, check_bool, decode_a, decode_ab, decode_abx,
+    decode_ax, dispatch, dispatch_after_slow, jump_relative_i8_and_dispatch, load_reg,
+    poll_safepoint, untag_bool,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -174,6 +175,18 @@ pub extern "C" fn op_jump_if_true8_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_false8, opcode_byte = 143, layout = Ab, length = 3, |condition, offset| {
+        load_reg!(condition => t0);
+        check_bool!(t0, .slow);
+        untag_bool!(t0);
+        branch_nonzero!(t0, .not_taken);
+        branch_i8_negative!(offset, .taken_backward);
+        jump_relative_i8_and_dispatch!(offset, advance = 3);
+        .taken_backward:
+        poll_safepoint!(.slow);
+        jump_relative_i8_and_dispatch!(offset, advance = 3);
+        .not_taken:
+        dispatch!(advance = 3);
+        .slow:
         call_slow!(op_jump_if_false8_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }

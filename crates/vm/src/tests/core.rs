@@ -326,6 +326,80 @@ fn add_smi_hit_avoids_semantic_slow_path() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
+fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(19).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadFalse, 0, 0)
+        .expect("test bytecode should build");
+    let jump = builder
+        .emit_cond_jump_placeholder(Opcode::JumpIfFalse, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abx(Opcode::LoadOne, 1, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    let target = builder
+        .current_offset()
+        .expect("test bytecode offset should build");
+    builder
+        .emit_abx(Opcode::LoadSmi, 1, 42)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    builder
+        .patch_jump_to(jump, target)
+        .expect("test bytecode jump should patch");
+
+    let function = builder.finish().expect("test bytecode should build");
+    assert!(
+        function
+            .instructions()
+            .iter()
+            .any(|instruction| instruction.opcode() == Opcode::JumpIfFalse8),
+        "short boolean branch test should encode a JumpIfFalse8"
+    );
+    let unit = CompiledScriptUnit::new(SourceId::new(19), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::JumpIfFalse8), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::JumpIfFalse8),
+        0,
+        "JumpIfFalse8 boolean hit should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
 fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
     // Originally Phase 4b's `vm_star_fusion_elides_star_dispatch_after_lda`
     // regression: the α dispatch loop's `dispatch_next_with_value!` peephole
