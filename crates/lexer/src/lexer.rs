@@ -45,6 +45,25 @@ impl CookedStringBuffer {
         }
     }
 
+    /// Append a run of bytes known by the caller to be ASCII (< 0x80).
+    /// Used by the string and template fast paths to batch contiguous
+    /// ordinary characters instead of calling `push_char` per byte.
+    fn push_ascii(&mut self, bytes: &[u8]) {
+        debug_assert!(bytes.iter().all(|&b| b < 0x80));
+        match self {
+            Self::Utf8(value) => {
+                // ASCII bytes are valid UTF-8 by definition; the
+                // validator branch-predicts perfectly on the ASCII path.
+                if let Ok(s) = std::str::from_utf8(bytes) {
+                    value.push_str(s);
+                }
+            }
+            Self::Utf16(units) => {
+                units.extend(bytes.iter().map(|&b| u16::from(b)));
+            }
+        }
+    }
+
     fn push_code_unit(&mut self, unit: u16) {
         match self {
             Self::Utf8(value) => {
@@ -1202,6 +1221,19 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         let mut result_flags = flags;
 
         loop {
+            // Batch contiguous ordinary ASCII bytes in one push.
+            let plain_start = self.pos;
+            while self.pos < self.source.len() {
+                let b = self.source[self.pos];
+                if b == quote || b == b'\\' || b == b'\n' || b == b'\r' || b >= 0x80 {
+                    break;
+                }
+                self.pos += 1;
+            }
+            if self.pos > plain_start {
+                value.push_ascii(&self.source[plain_start..self.pos]);
+            }
+
             if self.at_end() {
                 self.error(start, self.pos, "unterminated string literal");
                 break;
@@ -1225,8 +1257,10 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     self.error(start, self.pos, "unterminated string literal");
                     break;
                 }
-                0x80..=0xFF => {
-                    // Multi-byte UTF-8
+                _ => {
+                    // 0x80..=0xFF — multi-byte UTF-8 leading byte. Decode
+                    // and push as a single `char`. Other ASCII bytes are
+                    // consumed by the fast-scan above.
                     let rest = &self.source[self.pos..];
                     if let Some(ch) = std::str::from_utf8(rest)
                         .ok()
@@ -1237,10 +1271,6 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                     } else {
                         self.advance();
                     }
-                }
-                _ => {
-                    value.push_char(ch as char);
-                    self.advance();
                 }
             }
         }
@@ -1495,6 +1525,34 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
         let mut raw = String::new();
 
         loop {
+            // Batch contiguous ordinary bytes (ASCII without `\``, `\\`,
+            // `${`, `\r`, and not a multi-byte UTF-8 lead). `\n` is included:
+            // raw and cooked both receive it verbatim. `\r` must exit so it
+            // can be normalised to `\n`.
+            let plain_start = self.pos;
+            while self.pos < self.source.len() {
+                let b = self.source[self.pos];
+                if b == b'`' || b == b'\\' || b == b'\r' || b >= 0x80 {
+                    break;
+                }
+                if b == b'$'
+                    && self.pos + 1 < self.source.len()
+                    && self.source[self.pos + 1] == b'{'
+                {
+                    break;
+                }
+                self.pos += 1;
+            }
+            if self.pos > plain_start {
+                let slice = &self.source[plain_start..self.pos];
+                if let Ok(s) = std::str::from_utf8(slice) {
+                    raw.push_str(s);
+                }
+                if let Some(ref mut c) = cooked {
+                    c.extend(slice.iter().map(|&b| u16::from(b)));
+                }
+            }
+
             if self.at_end() {
                 return (cooked, raw, TemplateEnd::Eof);
             }
@@ -1640,7 +1698,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                     cooked = None;
                                 }
                             } else {
-                                let mut hex = String::new();
+                                let hex_start = self.pos;
                                 for _ in 0..4 {
                                     if self.at_end()
                                         || self.current() == b'`'
@@ -1648,15 +1706,15 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                                     {
                                         break;
                                     }
-                                    raw.push(self.current() as char);
-                                    hex.push(self.current() as char);
                                     self.advance();
                                 }
+                                let hex = self.text(hex_start, self.pos);
+                                raw.push_str(hex);
 
                                 if hex.len() == 4
                                     && hex.as_bytes().iter().all(u8::is_ascii_hexdigit)
                                 {
-                                    if let Ok(code_unit) = u16::from_str_radix(&hex, 16) {
+                                    if let Ok(code_unit) = u16::from_str_radix(hex, 16) {
                                         if (0xD800..=0xDBFF).contains(&code_unit)
                                             && self.pos + 6 <= self.source.len()
                                             && self.source[self.pos] == b'\\'
@@ -1734,33 +1792,20 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                         self.advance();
                     }
                 }
-                b'\n' => {
-                    self.advance();
-                    raw.push('\n');
-                    if let Some(ref mut c) = cooked {
-                        c.push(u16::from(b'\n'));
-                    }
-                }
                 _ => {
-                    if ch >= 0x80 {
-                        let rest = &self.source[self.pos..];
-                        if let Some(c) = std::str::from_utf8(rest)
-                            .ok()
-                            .and_then(|s| s.chars().next())
-                        {
-                            raw.push(c);
-                            if let Some(ref mut ck) = cooked {
-                                push_utf16_char(ck, c);
-                            }
-                            self.advance_n(c.len_utf8());
-                        } else {
-                            self.advance();
+                    // 0x80..=0xFF — multi-byte UTF-8 leading byte. Other
+                    // ASCII bytes are consumed by the fast-scan above.
+                    let rest = &self.source[self.pos..];
+                    if let Some(c) = std::str::from_utf8(rest)
+                        .ok()
+                        .and_then(|s| s.chars().next())
+                    {
+                        raw.push(c);
+                        if let Some(ref mut ck) = cooked {
+                            push_utf16_char(ck, c);
                         }
+                        self.advance_n(c.len_utf8());
                     } else {
-                        raw.push(ch as char);
-                        if let Some(ref mut c) = cooked {
-                            c.push(u16::from(ch));
-                        }
                         self.advance();
                     }
                 }
