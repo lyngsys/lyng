@@ -220,6 +220,12 @@ impl FunctionCompiler<'_, '_> {
                 prefix,
                 ..
             } => self.lower_update_expression_for_effect(expr_id, operator, argument, prefix),
+            Expr::AssignmentExpression {
+                operator,
+                left,
+                right,
+                ..
+            } => self.lower_assignment_expression_for_effect(operator, left, right),
             _ => {
                 let temp = self.alloc_temp()?;
                 self.lower_expr_into(expr_id, temp)

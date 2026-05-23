@@ -72,7 +72,7 @@ impl FunctionCompiler<'_, '_> {
                 self.lower_tail_sequence_expression(expressions)
             }
             _ => {
-                let value = self.lower_expr_to_temp(expr)?;
+                let value = self.lower_expr_to_source_or_temp(expr)?;
                 self.builder.emit_ax(Opcode::Return, i32::from(value))?;
                 Ok(())
             }

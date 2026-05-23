@@ -43,6 +43,13 @@ impl FunctionCompiler<'_, '_> {
             return Ok(());
         }
 
+        if dest.is_none()
+            && let Some(register) = self.frame_local_source_for_expr(target)?
+        {
+            self.emit_updated_value_into(register, register, operator)?;
+            return Ok(());
+        }
+
         let Some(target) = self.prepare_reference_target(target, ReferenceUsage::ReadWrite)? else {
             return Err(LoweringError::UnsupportedExpression { expr: expr_id });
         };
@@ -62,12 +69,21 @@ impl FunctionCompiler<'_, '_> {
         operator: lyng_ast::UpdateOp,
     ) -> LoweringResult<u16> {
         let result = self.alloc_temp()?;
+        self.emit_updated_value_into(result, current, operator)?;
+        Ok(result)
+    }
+
+    fn emit_updated_value_into(
+        &mut self,
+        result: u16,
+        current: u16,
+        operator: lyng_ast::UpdateOp,
+    ) -> LoweringResult<()> {
         let opcode = match operator {
             lyng_ast::UpdateOp::Increment => Opcode::Increment,
             lyng_ast::UpdateOp::Decrement => Opcode::Decrement,
         };
-        self.emit_profiled_update(opcode, result, current)?;
-        Ok(result)
+        self.emit_profiled_update(opcode, result, current)
     }
 
     pub(super) fn lower_static_member_get(

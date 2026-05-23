@@ -155,6 +155,25 @@ impl FunctionCompiler<'_, '_> {
         right: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
+        self.lower_assignment_expression_with_dest(operator, left, right, Some(dest))
+    }
+
+    pub(super) fn lower_assignment_expression_for_effect(
+        &mut self,
+        operator: AssignOp,
+        left: ExprId,
+        right: ExprId,
+    ) -> LoweringResult<()> {
+        self.lower_assignment_expression_with_dest(operator, left, right, None)
+    }
+
+    fn lower_assignment_expression_with_dest(
+        &mut self,
+        operator: AssignOp,
+        left: ExprId,
+        right: ExprId,
+        dest: Option<u16>,
+    ) -> LoweringResult<()> {
         let original_left = left;
         let left = self.assignment_target(left);
         if self.lower_annex_b_call_assignment_target_reference_error(left)? {
@@ -167,7 +186,10 @@ impl FunctionCompiler<'_, '_> {
             {
                 let value = self.lower_expr_to_temp(right)?;
                 self.lower_destructuring_assignment_from_register(left, value)?;
-                self.emit_move(dest, value)
+                if let Some(dest) = dest {
+                    self.emit_move(dest, value)?;
+                }
+                Ok(())
             }
             _ => {
                 let usage = if operator == AssignOp::Assign {
@@ -188,12 +210,17 @@ impl FunctionCompiler<'_, '_> {
                             self.lower_expr_into(right, value)?;
                         }
                         self.assign_prepared_reference(target, value)?;
-                        self.emit_move(dest, value)
+                        if let Some(dest) = dest {
+                            self.emit_move(dest, value)?;
+                        }
+                        Ok(())
                     }
                     AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign => {
                         let current = self.alloc_temp()?;
                         self.load_prepared_reference(target, current)?;
-                        self.emit_move(dest, current)?;
+                        if let Some(dest) = dest {
+                            self.emit_move(dest, current)?;
+                        }
                         let jump_end =
                             self.emit_logical_assignment_short_circuit(operator, current)?;
                         let value = self.alloc_temp()?;
@@ -203,7 +230,9 @@ impl FunctionCompiler<'_, '_> {
                             self.lower_expr_into(right, value)?;
                         }
                         self.assign_prepared_reference(target, value)?;
-                        self.emit_move(dest, value)?;
+                        if let Some(dest) = dest {
+                            self.emit_move(dest, value)?;
+                        }
                         let end = self.builder.current_offset()?;
                         self.builder.patch_jump_to(jump_end, end)?;
                         Ok(())
@@ -220,7 +249,10 @@ impl FunctionCompiler<'_, '_> {
                             self.encode_register(rhs)?,
                         )?;
                         self.assign_prepared_reference(target, result)?;
-                        self.emit_move(dest, result)
+                        if let Some(dest) = dest {
+                            self.emit_move(dest, result)?;
+                        }
+                        Ok(())
                     }
                 }
             }

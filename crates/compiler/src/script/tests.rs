@@ -2723,3 +2723,127 @@ fn move_reduction_does_not_copy_unused_for_update_results() {
         "for-loop update used for effect should not copy the old value into an unused result register:\n{disassembly}"
     );
 }
+
+#[test]
+fn move_reduction_does_not_copy_effect_only_assignment_result() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_304),
+        "function set(o, v) { o.x = v; return o; } set({}, 1);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "set");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (assign_index, value_register) = instructions
+        .iter()
+        .copied()
+        .enumerate()
+        .find_map(|(index, instruction)| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::AssignNamedProperty,
+                b,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::AssignNamedProperty,
+                b,
+                ..
+            } => Some((index, b)),
+            _ => None,
+        })
+        .expect("function should contain an AssignNamedProperty instruction");
+    let unused_result_copy = instructions
+        .iter()
+        .copied()
+        .skip(assign_index + 1)
+        .filter_map(copy_register_pair)
+        .any(|(_dest, src)| src == value_register);
+
+    assert!(
+        !unused_result_copy,
+        "assignment used for effect should not copy the assigned value into an unused result register:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_updates_frame_local_for_effect_in_place() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_305),
+        "function bump(i) { i++; return i; } bump(0);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "bump");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (dest, source) = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::Increment,
+                a,
+                b,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::Increment,
+                a,
+                b,
+                ..
+            } => Some((a, b)),
+            _ => None,
+        })
+        .expect("function should contain an Increment instruction");
+
+    assert_eq!(
+        (dest, source),
+        (0, 0),
+        "effect-only frame-local update should update parameter r0 in place:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_returns_safe_frame_local_source_directly() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_306),
+        "function id(x) { return x; } id(1);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "id");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let return_register = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Ax {
+                opcode: Opcode::Return,
+                ax,
+            } => Some(ax),
+            _ => None,
+        })
+        .expect("function should contain a Return instruction");
+
+    assert_eq!(
+        return_register, 0,
+        "safe frame-local return should use parameter r0 directly:\n{disassembly}"
+    );
+}
