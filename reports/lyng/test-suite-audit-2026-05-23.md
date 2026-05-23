@@ -343,3 +343,58 @@ Add to `crates/AGENTS.md` (or wherever the engineering standards live):
 | Outlier tests (>250ms) | 4 in default run | 0 in default run; gated behind `--features=stress` |
 
 The combination of (a) deletion of layered duplication, (b) consolidation of integration-test files in `lyng-vm/tests/`, and (c) gating the slowest 4 outliers behind a feature flag is what produces most of the wall-time saving. Parameterization gives LOC and maintenance savings but only modest runtime savings.
+
+---
+
+## 10. What was actually shipped (2026-05-23)
+
+Commits on this branch implementing the plan:
+
+| Commit | Phase | Effect |
+|---|---|---|
+| 5a771f06 | 0 | Audit and plan committed |
+| 21a411b5 | 1.2 | Consolidate 10 `crates/vm/tests/dsl_validation_*.rs` files into one binary via `#[path]` submodules — `cargo test -p lyng-vm` drops 13.4s → 2.0s |
+| 752b636b | 1.3 | Gate 4 slow tests with `#[ignore]` (run with `--ignored`) — `cargo test -p lyng-tests` drops 9.8s → 2.7s |
+| 9cb9bfdc | 1.5 | Fold `end_to_end.rs` into `sema_integration.rs` — keep 4 unique tests, drop 9 duplicates |
+| 0d594a74 | 2.1 | Collapse `parser_coverage.rs` from 193 single tests to 6 table-driven tests (834 → 263 LOC) |
+| dca85832 | 2.3+5.1 | `crates/AGENTS.md` Test Organization section: canonical-home rule + standing rules |
+| a64bf559 | 4 | Demonstrate parameterization on lexer numeric cluster (11 → 2 tests) |
+| 95572af5 | 5 | `tools/check-test-count.sh` guard against test-count growth |
+
+### Measured results (workstation, warm cache)
+
+| Metric | Baseline | After |
+|---|---|---|
+| `cargo test --workspace --no-fail-fast` wall | **17.9s** | **14.7s** |
+| `cargo test -p lyng-vm` wall | **13.4s** | **2.0s** (6.6× faster) |
+| `cargo test -p lyng-tests` wall | **9.8s** | **2.7s** (3.7× faster) |
+| `#[test]` count (raw, both indented and unindented) | 2,766 | **2,577** (−189) |
+| Pre-existing failures | 13 | 13 (unchanged set; same names) |
+| New failures introduced | — | 0 |
+
+The targeted-crate workflow improved dramatically; the full-workspace wall changed less because cargo already parallelizes crate compilation. The biggest wins for daily dev work are when running `-p lyng-vm` or `-p lyng-tests` directly.
+
+### Phases not shipped this pass
+
+| Phase | Status | Reason |
+|---|---|---|
+| 1.1 (re-export smoke tests) | Investigated; deferred | Tests despite their names actually exercise real code paths (algorithm coverage). Audit was wrong about this. |
+| 1.4 (lyng-test262 harness subprocess reduction) | Deferred | Each subprocess does real JS execution, not just fork overhead. The 3s saving estimate assumed sub-fork was dominant; reality is ~100 ms per subprocess of real work. Refactoring to in-process is multi-day work. |
+| 2.2 (sema/src/tests.rs slimming) | Deferred | On closer inspection, AST-by-hand tests assert different specifics (`scope_table.len()`, children linkage) than the integration tests (scope kind, binding kind). They're related but not pure duplicates. LOC-only win not worth the coverage risk. |
+| 3.1 (move VM tests to execution_semantics) | Deferred | Cross-crate move needs helper-API bridging (`crates/vm/src/tests/support.rs` uses `pub(super)` internals; `crates/tests/src/execution_semantics/support.rs` is public-API only). Multi-day refactor that should be its own pass. AGENTS.md now documents the canonical home. |
+| 3.2 (prune `_matches_test262_*` tests) | Deferred | Only 6 tests workspace-wide actually have this naming (audit estimated 150–250). They are real regression tests against pre-existing bugs, not pure reproductions, and since `cargo test` does *not* include test262, deleting them removes the only CI-level protection against those specific behaviors. |
+| 4 (full parameterization sweep) | Demonstrated, not exhaustive | Lexer numeric cluster collapsed (11 → 2). The pattern is now in `AGENTS.md`. Remaining clusters (objects::tests `named_property_handler_*`, parser/src/tests/statements loop forms, builtins::bootstrap constructor shapes) follow the same template — left for future passes. |
+
+### Honest reassessment of the audit's estimates
+
+| Estimate from §6 | Reality |
+|---|---|
+| ~800–1,000 tests removable | ~189 in this pass (~6.8%). Reaching the 800–1,000 figure requires the deferred Phase 3.1 cross-crate migration. |
+| Workspace wall 32s → ~12–15s | 17.9s → 14.7s. The 32s figure in the audit was from a colder cache or different machine; warm-cache baseline was already 17.9s. Real saving is ~18%. |
+| `cargo test -p lyng-vm` 13.4s → ~3s | ✅ Achieved: 2.0s. |
+| `cargo test -p lyng-tests` 9.8s → ~5s | ✅ Beaten: 2.7s. |
+| 4 outlier tests gated | ✅ Done. |
+| Canonical-home rule documented | ✅ `crates/AGENTS.md`. |
+| Test-count CI guard | ✅ `tools/check-test-count.sh` (threshold 2600, current 2577). |
+
+The audit's "80% removable" pushback in the TL;DR turned out to be roughly right in direction but my followup estimate of "30–40% removable in this pass" was still too optimistic for the time available. A more accurate framing: the *structural* wins (1.2, 1.3, 1.5, 2.1, 2.3, 4, 5) deliver the bulk of the per-developer wall-time improvement and the rule documentation. The *test-count* reductions beyond Phase 2.1 require the deferred cross-crate work in Phase 3, which is genuinely 1–2 weeks of focused effort.
