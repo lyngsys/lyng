@@ -128,23 +128,30 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let mut shim_names: BTreeSet<String> = BTreeSet::new();
     let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
     // Track whether we've crossed the first `.label:` declaration. The
-    // counter-injection discipline differs for `call_slow!` before vs
-    // after the first label (DSL-1 Phase 1.C followup #1):
+    // counter-injection discipline differs for labeled fast-path
+    // handlers vs label-free cold stubs:
     //
-    // - `call_slow!` BEFORE any label: these are fast-path tail
-    //   invocations (e.g. `call_slow!(op_xxx_record_smi_rs, args = [slot])`
-    //   for feedback recording). They run on every successful inline
-    //   dispatch, NOT just on slow-path entry. Injecting
-    //   `opcode_byte = N` here would emit `inc_slow_semantic_counter!`
-    //   on every dispatch and falsely report ~100% slow-path-share for
-    //   every record-smi-shim opcode (op_add, all Phase 1.C ports).
+    // - `call_slow!` BEFORE any label in a handler that later declares
+    //   a label: these are fast-path tail invocations (e.g.
+    //   `call_slow!(op_xxx_record_smi_rs, args = [slot])` for feedback
+    //   recording). They run on every successful inline dispatch, NOT
+    //   just on slow-path entry. Injecting `opcode_byte = N` here would
+    //   emit `inc_slow_semantic_counter!` on every dispatch and falsely
+    //   report ~100% slow-path-share for every record-smi-shim opcode.
     // - `call_slow!` AFTER the first label: these are inside a label
     //   scope (typically `.slow:`), executed only when the fast path
     //   bails. Counter-injection here is semantically correct.
+    // - `call_slow!` in a label-free handler: this is a pure cold stub,
+    //   so every dispatch is a semantic slow-path entry and must be
+    //   counted.
     //
     // `poll_safepoint!` is unaffected — its asm shape uses a runtime
     // `cbz`/`cbnz` so the counter-bump fires only on the pending-poll
     // branch regardless of label position; injection is safe everywhere.
+    let handler_has_label = ast
+        .body
+        .iter()
+        .any(|stmt| matches!(stmt, BodyStmt::Label(_)));
     let mut seen_label = false;
     for stmt in &ast.body {
         match stmt {
@@ -158,11 +165,15 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // accounting. Idempotent — if the user already wrote
                 // `opcode_byte = N` explicitly, the injection is skipped.
                 //
-                // `gate_call_slow = !seen_label` suppresses injection
-                // into `call_slow!` invocations on the fast-path tail
-                // (before any `.label:`) to avoid double-counting fast
-                // path record-smi shim calls as slow-path entries.
-                let injected = inject_opcode_byte(tokens.clone(), opcode_byte, !seen_label);
+                // `gate_call_slow` suppresses injection into
+                // `call_slow!` invocations on the fast-path tail
+                // (before any `.label:` in a handler that has labels)
+                // to avoid double-counting fast-path record-smi shim
+                // calls as slow-path entries. Label-free cold stubs are
+                // always semantic slow-path entries, so they are not
+                // gated.
+                let gate_call_slow = handler_has_label && !seen_label;
+                let injected = inject_opcode_byte(tokens.clone(), opcode_byte, gate_call_slow);
                 let rewritten = substitute_idents(injected, &mut scratch, &label_prefix)?;
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
@@ -553,6 +564,22 @@ mod tests {
         false
     }
 
+    fn output_has_opcode_byte_for_recursive(name: &str, tokens: &TokenStream) -> bool {
+        if output_has_opcode_byte_for(name, tokens) {
+            return true;
+        }
+        tokens.clone().into_iter().any(|tt| match tt {
+            TokenTree::Group(group) => output_has_opcode_byte_for_recursive(name, &group.stream()),
+            _ => false,
+        })
+    }
+
+    fn lower_handler_tokens(source: &str) -> TokenStream {
+        let input: TokenStream = syn::parse_str(source).expect("parse handler tokens");
+        let ast = crate::parse::parse_handler(input).expect("parse handler ast");
+        lower_handler(ast).expect("lower handler")
+    }
+
     fn lit31() -> LitInt {
         syn::parse_str("31").expect("parse u8 literal")
     }
@@ -588,6 +615,23 @@ mod tests {
              when gate_call_slow is false (correctly counts a slow \
              entry). Got: {}",
             rewritten,
+        );
+    }
+
+    #[test]
+    fn label_free_cold_stub_call_slow_is_injected() {
+        let lowered = lower_handler_tokens(
+            "op_get_named_property_dsl, opcode_byte = 77, layout = AbcSlot, length = 6, |a, b, c, slot| {
+                call_slow!(op_get_named_property_slow_rs, args = [a, b, c, slot]);
+                dispatch_after_slow!();
+            }",
+        );
+
+        assert!(
+            output_has_opcode_byte_for_recursive("call_slow", &lowered),
+            "label-free cold stubs must receive opcode_byte injection so \
+             slow-path counters count semantic entries. Got: {}",
+            lowered,
         );
     }
 
