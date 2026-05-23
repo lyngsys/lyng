@@ -361,20 +361,18 @@ impl FunctionCompiler<'_, '_> {
         if has_spread {
             let next_index = self.alloc_temp()?;
             self.emit_load_smi(next_index, 0)?;
-            let one = self.alloc_temp()?;
-            self.emit_load_smi(one, 1)?;
             for element in elements {
                 match element {
-                    None => self.bump_array_literal_index(next_index, one)?,
+                    None => self.bump_array_literal_index(next_index)?,
                     Some(element) => {
                         if let Expr::SpreadElement { argument, .. } =
                             self.ast().get_expr(element).clone()
                         {
-                            self.lower_array_spread_element(dest, next_index, one, argument)?;
+                            self.lower_array_spread_element(dest, next_index, argument)?;
                         } else {
                             let value_register = self.lower_expr_to_temp(element)?;
                             self.emit_set_keyed_property(dest, value_register, next_index)?;
-                            self.bump_array_literal_index(next_index, one)?;
+                            self.bump_array_literal_index(next_index)?;
                         }
                     }
                 }
@@ -443,7 +441,6 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         array_register: u16,
         index_register: u16,
-        one_register: u16,
         argument: ExprId,
     ) -> LoweringResult<()> {
         let iterable_register = self.lower_expr_to_temp(argument)?;
@@ -467,7 +464,7 @@ impl FunctionCompiler<'_, '_> {
             .builder
             .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         self.emit_set_keyed_property(array_register, value_register, index_register)?;
-        self.bump_array_literal_index(index_register, one_register)?;
+        self.bump_array_literal_index(index_register)?;
         let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         self.builder.patch_jump_to(jump_back, loop_start)?;
         let close_offset = self.builder.current_offset()?;
@@ -480,14 +477,8 @@ impl FunctionCompiler<'_, '_> {
         Ok(())
     }
 
-    fn bump_array_literal_index(
-        &mut self,
-        index_register: u16,
-        one_register: u16,
-    ) -> LoweringResult<()> {
-        let next_index = self.alloc_temp()?;
-        self.emit_profiled_binary(Opcode::Add, next_index, index_register, one_register)?;
-        self.emit_move(index_register, next_index)
+    fn bump_array_literal_index(&mut self, index_register: u16) -> LoweringResult<()> {
+        self.emit_profiled_smi_binary(Opcode::AddSmi, index_register, index_register, 1)
     }
 
     pub(super) fn lower_expr_to_temp(&mut self, expr: ExprId) -> LoweringResult<u16> {

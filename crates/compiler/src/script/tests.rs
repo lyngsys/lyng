@@ -74,6 +74,58 @@ fn copy_register_pair(instruction: lyng_bytecode::Instruction) -> Option<(u16, u
     }
 }
 
+fn keyed_write_counter_bump(
+    instructions: &[lyng_bytecode::Instruction],
+) -> Option<(u16, usize, Opcode, u16)> {
+    instructions.iter().copied().enumerate().find_map(
+        |(write_index, instruction)| match instruction {
+            lyng_bytecode::Instruction::Abc {
+                opcode: Opcode::SetKeyedProperty,
+                c: key,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbcSlot {
+                opcode: Opcode::SetKeyedProperty,
+                c: key,
+                ..
+            } => instructions
+                .iter()
+                .copied()
+                .enumerate()
+                .skip(write_index + 1)
+                .find_map(|(add_index, instruction)| match instruction {
+                    lyng_bytecode::Instruction::Abc {
+                        opcode: Opcode::Add,
+                        a,
+                        b,
+                        ..
+                    }
+                    | lyng_bytecode::Instruction::AbcSlot {
+                        opcode: Opcode::Add,
+                        a,
+                        b,
+                        ..
+                    } if b == key => Some((key, add_index, Opcode::Add, a)),
+                    lyng_bytecode::Instruction::Abc {
+                        opcode: Opcode::AddSmi,
+                        a,
+                        b,
+                        c: immediate,
+                    }
+                    | lyng_bytecode::Instruction::AbcSlot {
+                        opcode: Opcode::AddSmi,
+                        a,
+                        b,
+                        c: immediate,
+                        ..
+                    } if b == key && immediate == 1 => Some((key, add_index, Opcode::AddSmi, a)),
+                    _ => None,
+                }),
+            _ => None,
+        },
+    )
+}
+
 fn has_writer_with_opcode(
     instructions: &[lyng_bytecode::Instruction],
     dest: u16,
@@ -2845,5 +2897,149 @@ fn move_reduction_returns_safe_frame_local_source_directly() {
     assert_eq!(
         return_register, 0,
         "safe frame-local return should use parameter r0 directly:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_bumps_array_spread_index_in_place() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_307),
+        "function copy(input) { return [...input]; } copy([1, 2]);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "copy");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (index_register, add_index, bump_opcode, add_dest) =
+        keyed_write_counter_bump(&instructions)
+            .expect("array spread should bump the keyed-write index");
+
+    assert_eq!(
+        bump_opcode,
+        Opcode::AddSmi,
+        "array spread should bump the index by immediate 1:\n{disassembly}"
+    );
+    assert_eq!(
+        add_dest, index_register,
+        "array spread should bump the index register in place:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .take(add_index)
+            .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadOne),
+        "array spread should not materialize a one register for the index bump:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .skip(add_index + 1)
+            .filter_map(copy_register_pair)
+            .any(|(dest, src)| dest == index_register && src == add_dest),
+        "array spread should not copy a temporary Add result back into the index register:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_bumps_array_rest_binding_index_in_place() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_308),
+        "function rest(input) { let [...tail] = input; return tail.length; } rest([1, 2]);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "rest");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (index_register, add_index, bump_opcode, add_dest) =
+        keyed_write_counter_bump(&instructions)
+            .expect("array rest binding should bump the keyed-write index");
+
+    assert_eq!(
+        bump_opcode,
+        Opcode::AddSmi,
+        "array rest binding should bump the index by immediate 1:\n{disassembly}"
+    );
+    assert_eq!(
+        add_dest, index_register,
+        "array rest binding should bump the index register in place:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .take(add_index)
+            .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadOne),
+        "array rest binding should not materialize a one register for the index bump:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .skip(add_index + 1)
+            .filter_map(copy_register_pair)
+            .any(|(dest, src)| dest == index_register && src == add_dest),
+        "array rest binding should not copy a temporary Add result back into the index register:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_bumps_array_rest_assignment_index_in_place() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_309),
+        "function rest(input) { let tail; [...tail] = input; return tail.length; } rest([1, 2]);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "rest");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let (index_register, add_index, bump_opcode, add_dest) =
+        keyed_write_counter_bump(&instructions)
+            .expect("array rest assignment should bump the keyed-write index");
+
+    assert_eq!(
+        bump_opcode,
+        Opcode::AddSmi,
+        "array rest assignment should bump the index by immediate 1:\n{disassembly}"
+    );
+    assert_eq!(
+        add_dest, index_register,
+        "array rest assignment should bump the index register in place:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .take(add_index)
+            .any(|instruction| instruction_semantic_opcode(instruction) == Opcode::LoadOne),
+        "array rest assignment should not materialize a one register for the index bump:\n{disassembly}"
+    );
+    assert!(
+        !instructions
+            .iter()
+            .copied()
+            .skip(add_index + 1)
+            .filter_map(copy_register_pair)
+            .any(|(dest, src)| dest == index_register && src == add_dest),
+        "array rest assignment should not copy a temporary Add result back into the index register:\n{disassembly}"
     );
 }

@@ -817,8 +817,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         let rest_index = self.alloc_temp()?;
         self.emit_load_smi(rest_index, 0)?;
-        let one_register = self.alloc_temp()?;
-        self.emit_load_smi(one_register, 1)?;
         let value_register = self.alloc_temp()?;
         let done_register = self.alloc_temp()?;
 
@@ -833,9 +831,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .builder
             .emit_cond_jump_placeholder(Opcode::JumpIfTrue, self.encode_register(done_register)?)?;
         self.emit_set_keyed_property(rest_value, value_register, rest_index)?;
-        let next_rest = self.alloc_temp()?;
-        self.emit_profiled_binary(Opcode::Add, next_rest, rest_index, one_register)?;
-        self.emit_move(rest_index, next_rest)?;
+        self.emit_profiled_smi_binary(Opcode::AddSmi, rest_index, rest_index, 1)?;
         let jump_back = self.builder.emit_jump_placeholder(Opcode::Jump)?;
         self.builder.patch_jump_to(jump_back, loop_start)?;
         let end = self.builder.current_offset()?;
