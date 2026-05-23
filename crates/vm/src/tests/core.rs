@@ -498,7 +498,7 @@ fn spread_call_still_materializes_into_argument_scratch() {
         .expect("enabled call argument copy counters should produce a snapshot");
     assert!(
         counts.scratch_pushes() > 0,
-        "spread calls must materialize into argument_scratch; the fast path does not handle spread"
+        "spread calls must materialize into argument_scratch; the shortcut does not handle spread"
     );
 }
 
@@ -571,10 +571,10 @@ fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
 }
 
 #[test]
-fn fast_path_handles_iife_closure_helpers_calling_each_other() {
+fn specialized_path_handles_iife_closure_helpers_calling_each_other() {
     // Repro for Test262 harness deepEqual failure: tight pattern of small
     // arrow + named helpers calling each other through `||` short-circuit
-    // chains. All eligible for the call-arg fast path.
+    // chains. All eligible for the call-arg direct path.
     let unit = compile_test_unit(
         158,
         r"

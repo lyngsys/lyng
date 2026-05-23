@@ -49,7 +49,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // Add: SMI fast-path arithmetic.
+    // Add: SMI hit-path arithmetic.
     map.insert(
         "Add",
         Snippet {
@@ -67,7 +67,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // Sub: SMI fast-path arithmetic (DSL-1 Phase 1.C.1).
+    // Sub: SMI hit-path arithmetic (DSL-1 Phase 1.C.1).
     // Two locals + `x - y` keeps the rhs as a register (Sub) rather
     // than collapsing to `SubSmi` for a literal RHS.
     map.insert(
@@ -88,11 +88,11 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // Mul: SMI fast-path arithmetic (DSL-1 Phase 1.C.1 Task 3).
+    // Mul: SMI hit-path arithmetic (DSL-1 Phase 1.C.1 Task 3).
     // Two locals + `x * y` keeps the rhs as a register (Mul) rather
     // than collapsing to `MulSmi` for a literal RHS. The reduction
     // (`x = (x * y) | 0`) keeps `x` bounded as a 32-bit signed int
-    // so the SMI fast path can stay on every iteration; the trailing
+    // so the SMI hit path can stay on every iteration; the trailing
     // `| 0` emits a `BitOr` per iter but it executes the inline shape
     // and is excluded from the per-opcode timing (we measure Mul).
     map.insert(
@@ -113,12 +113,12 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // BitAnd: SMI fast-path bitwise AND (DSL-1 Phase 1.C.2 Task 5).
+    // BitAnd: SMI hit-path bitwise AND (DSL-1 Phase 1.C.2 Task 5).
     // Two locals + `x & y` keeps the rhs as a register (BitAnd) rather
     // than collapsing to `BitAndSmi` for a literal RHS. `bit_and_smi!`
-    // has no overflow branch so the fast path is shorter than op_sub's
+    // has no overflow branch so the hit path is shorter than op_sub's
     // by one instruction. `x` is reset each iteration to a positive SMI
-    // so the SMI fast path stays armed indefinitely.
+    // so the SMI hit path stays armed indefinitely.
     map.insert(
         "BitAnd",
         Snippet {
@@ -137,7 +137,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // ShiftLeft: SMI fast-path left shift (DSL-1 Phase 1.C.2 Task 6).
+    // ShiftLeft: SMI hit-path left shift (DSL-1 Phase 1.C.2 Task 6).
     // Two locals + `x << y` keeps the rhs as a register (ShiftLeft) —
     // no ShiftLeftSmi peephole exists in the bytecode-builder so a
     // literal-RHS form would still emit ShiftLeft, but two locals
@@ -145,7 +145,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // `shift_left_smi!` emits 3 instructions (and + lsl + sxtw) — one
     // more than `bit_and_smi!` because ECMAScript `<<` masks the rhs
     // to its low 5 bits. `y = 3` is a small SMI shift that keeps the
-    // result well within the i32 range so the fast path stays armed.
+    // result well within the i32 range so the hit path stays armed.
     map.insert(
         "ShiftLeft",
         Snippet {
@@ -164,7 +164,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // ShiftRight: SMI fast-path arithmetic right shift (DSL-1 Phase
+    // ShiftRight: SMI hit-path arithmetic right shift (DSL-1 Phase
     // 1.C.2 Task 7). Mirrors the ShiftLeft snippet's shape (two locals
     // + `x >> y`) so the cross-opcode microbench A/B is directly
     // comparable. `shift_right_smi!` emits 3 instructions (and + asr +
@@ -173,7 +173,7 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // semantics. The distinction from op_unsigned_shift_right is in
     // the shift mnemonic: `asr` is sign-preserving (matches `>>`),
     // while `>>>` would use `lsr`. `y = 3` keeps the result well
-    // within the i32 range so the fast path stays armed.
+    // within the i32 range so the hit path stays armed.
     map.insert(
         "ShiftRight",
         Snippet {
@@ -192,11 +192,11 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // Increment: SMI fast-path unary update (DSL-1 Phase 1.C.3 Task 9).
+    // Increment: SMI hit-path unary update (DSL-1 Phase 1.C.3 Task 9).
     // The `for (let i = 0; i < iters; i++)` header drives one Increment
     // per loop iteration via `i++`, and the body's `x++` drives a second
     // one. `x` is reset to `0` each iter so it never escapes the SMI
-    // range; both increments hit the inline fast path on every iter.
+    // range; both increments hit the inline SMI path on every iter.
     // Two locals → 2 Increment dispatches per iter, declared via
     // `opcodes_per_iter = 2`.
     map.insert(
@@ -217,12 +217,12 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
         },
     );
 
-    // Decrement: SMI fast-path unary update (DSL-1 Phase 1.C.3 Task 10).
+    // Decrement: SMI hit-path unary update (DSL-1 Phase 1.C.3 Task 10).
     // Mirrors the Increment snippet: the loop header's `i++` drives one
     // Increment per iter (excluded from the Decrement count), and the
     // body's `x--` drives one Decrement per iter. `x` is reset to a
     // positive SMI each iter so the result never approaches `i32::MIN`
-    // (the only overflow case for `subs wD, wS, #1`); the fast path
+    // (the only overflow case for `subs wD, wS, #1`); the hit path
     // stays armed indefinitely. One local → 1 Decrement dispatch per
     // iter, declared via `opcodes_per_iter = 1`.
     map.insert(
@@ -905,7 +905,7 @@ mod verify_counts {
             // optimization passes that surface Increment / LoadZero in
             // their dispatch top. Those snippets are still useful for
             // microbench timing comparisons (they exercise the SMI
-            // fast-path tagging shape) but the per-iter count of the
+            // SMI hit-path tagging shape) but the per-iter count of the
             // named opcode is 0, so they can't be auto-verified by
             // this test.
             //

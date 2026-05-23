@@ -13,7 +13,7 @@ const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 ///
 /// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
 /// space for the full byte range even though Lyng uses ~157 opcodes,
-/// to keep offset math fast (compile-time bank offsets are 0, 2048,
+/// to keep offset math cheap (compile-time bank offsets are 0, 2048,
 /// 4096 — all encodable as AArch64 LDR/STR immediates).
 ///
 /// Box-allocated so the Vm pointer stays stable across struct moves

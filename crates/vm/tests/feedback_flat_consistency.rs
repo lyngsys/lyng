@@ -1,24 +1,18 @@
-//! DSL-0b (B17/B18) dual-write invariant test for the flat
-//! `FeedbackEntry` array vs the legacy
-//! `Vec<Option<FeedbackSiteState>>`.
+//! Flat LLInt feedback-header invariant tests.
 //!
-//! After the α path runs a hot loop, the legacy `FeedbackVector`
-//! slot and the new flat `FeedbackEntry` slot must observe the same
-//! IC state — including all Phase 3f packed sidecars. This test
-//! exercises:
+//! After the VM mutates legacy feedback, each flat `FeedbackEntry`
+//! must expose the compact LLInt header expected by asm readers. The
+//! legacy `FeedbackVector` remains the semantic source of truth; the
+//! flat array deliberately mirrors only small mode-specific header
+//! words, not the full `FeedbackSiteState` enum.
 //!
-//! - **SMI-add hot loop** (B17): drives `record_feedback_slot`
-//!   through the arithmetic feedback path and confirms flat ==
-//!   legacy after warmup + steady-state.
+//! - **SMI-add hot loop:** drives arithmetic feedback and confirms the
+//!   flat entries stay empty for unsupported IC modes.
 //!
-//! - **Polymorphic property-access hot loop** (B18): drives the
+//! - **Polymorphic property-access hot loop:** drives the
 //!   named-property IC through enough receiver shapes to enter the
-//!   polymorphic state, exercising `observe_named_property_slow_path`
-//!   and the packed `polymorphic_fast` sidecar. The invariant check
-//!   is identical (legacy bits == flat bits) because both storages
-//!   hold the same `FeedbackSiteState` per slot — the wrap into
-//!   `FeedbackEntry { state }` carries every sidecar automatically
-//!   per design §9.
+//!   polymorphic state and confirms the monomorphic LLInt header is
+//!   cleared when the site is no longer eligible.
 
 use lyng_common::{AtomTable, SourceId};
 use lyng_compiler::compile_script;
@@ -45,7 +39,7 @@ fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_types::CodeR
         .expect("install");
 
     // Run enough iterations to cross the feedback warmup threshold
-    // and exercise the IC fast / slow paths.
+    // and exercise the  IC cache-hit/ slow paths.
     for _ in 0..iterations {
         let _ = vm
             .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -55,11 +49,11 @@ fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_types::CodeR
 }
 
 #[test]
-fn dual_write_keeps_smi_add_legacy_and_flat_in_sync() {
+fn flat_header_stays_empty_for_smi_add_feedback() {
     // SMI-add hot loop. The inner `+` exercises arithmetic feedback
     // via `record_feedback_slot`; iteration count must clear the
     // FEEDBACK_ALLOCATION_THRESHOLD so the legacy vector allocates
-    // and the dual-write mirror kicks in.
+    // and the flat-header mirror kicks in.
     let (vm, code) = run_script_n_times(
         r"
             (function add(a, b) {
@@ -83,15 +77,14 @@ fn dual_write_keeps_smi_add_legacy_and_flat_in_sync() {
 }
 
 #[test]
-fn dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync() {
+fn flat_header_clears_for_polymorphic_property_access() {
     // Polymorphic property-access hot loop. The body's `obj.x`
     // walks three distinct receiver shapes (`{x}`, `{x, y}`,
     // `{x, y, z}`), driving the named-property IC into the
     // polymorphic state and exercising the Phase 3f packed
-    // `polymorphic_fast` sidecar. Both legacy and flat storages
-    // hold the same `FeedbackSiteState`, so the wrap into
-    // `FeedbackEntry { state }` carries every sidecar automatically
-    // per design §9.
+    // `polymorphic_own_data_handlers` sidecar. The flat LLInt header must clear
+    // because this initial port only handles monomorphic OwnData
+    // inline-slot loads.
     let (vm, code) = run_script_n_times(
         r"
             (function poly() {
@@ -118,7 +111,7 @@ fn dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync() {
 }
 
 #[test]
-fn dual_write_holds_on_cold_install_with_unallocated_legacy_vector() {
+fn flat_header_is_empty_on_cold_install_with_unallocated_legacy_vector() {
     // Compile + install but execute zero times: the legacy vector
     // stays in its unallocated sentinel (sites.len() == 0) while
     // the flat array carries `function.feedback_slot_count()`

@@ -221,7 +221,7 @@ fn function_apply_builtin<Cx: PublicBuiltinDispatchContext>(
         .get(1)
         .copied()
         .unwrap_or(Value::undefined());
-    if let Some(result) = cx.try_fast_apply_builtin(target, rebound_this, arguments_value)? {
+    if let Some(result) = cx.try_specialized_apply_builtin(target, rebound_this, arguments_value)? {
         return Ok(result);
     }
     let apply_arguments = cx.collect_array_like_arguments(cx.builtin_realm(), arguments_value)?;

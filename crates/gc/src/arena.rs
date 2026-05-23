@@ -37,6 +37,7 @@ pub struct PrimitiveHeap {
     bigint_payloads: SideAllocator,
     value_cells: SlotArena<PrimitiveValueCellRecord, PrimitiveValueCellRef>,
     objects: SlotArena<RuntimeObjectRecord, ObjectRef>,
+    object_record_ptrs: Vec<*const RuntimeObjectRecord>,
     function_payloads: SlotArena<RuntimeFunctionRecord, FunctionPayloadRef>,
     object_slots: ValueSlotAllocator<ObjectSlotsRef>,
     suspended_executions: SlotArena<RuntimeSuspendedExecutionRecord, SuspendedExecutionRef>,
@@ -587,8 +588,24 @@ impl PrimitiveHeap {
             lifetime,
         );
         let id = self.objects.allocate(record, lifetime, generation);
+        let index = id.get() as usize;
+        if self.object_record_ptrs.len() <= index {
+            self.object_record_ptrs.resize(index + 1, std::ptr::null());
+        }
+        self.object_record_ptrs[index] = self.objects.get_ptr(id).unwrap_or(std::ptr::null());
         self.mark_object_card_if_old_points_to_young(id, record);
         id
+    }
+
+    #[inline]
+    pub(crate) const fn object_record_ptr_table(&self) -> *const *const RuntimeObjectRecord {
+        self.object_record_ptrs.as_ptr()
+    }
+
+    #[cfg(test)]
+    #[inline]
+    fn object_record_ptr_table_for_test(&self) -> &[*const RuntimeObjectRecord] {
+        &self.object_record_ptrs
     }
 
     #[inline]
@@ -1523,6 +1540,7 @@ impl Default for PrimitiveHeap {
             bigint_payloads: SideAllocator::default(),
             value_cells: SlotArena::default(),
             objects: SlotArena::default(),
+            object_record_ptrs: Vec::new(),
             function_payloads: SlotArena::default(),
             object_slots: ValueSlotAllocator::default(),
             suspended_executions: SlotArena::default(),
@@ -1716,6 +1734,49 @@ mod tests {
         assert_eq!(replacement, freed);
         assert!(heap.symbol_allocation_requires_growth());
         assert_eq!(heap.symbol_stats().pages, 2);
+    }
+
+    #[test]
+    fn object_record_pointer_table_tracks_allocated_objects() {
+        let mut heap = PrimitiveHeap::new();
+        let first = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+        let second = heap.alloc_object(
+            RuntimeObjectRecord::new(None, None, None, None, None),
+            AllocationLifetime::Default,
+        );
+
+        let table = heap.object_record_ptr_table_for_test();
+        assert!(!heap.object_record_ptr_table().is_null());
+        assert_eq!(
+            table[first.get() as usize],
+            std::ptr::from_ref(heap.object_ref(first).unwrap())
+        );
+        assert_eq!(
+            table[second.get() as usize],
+            std::ptr::from_ref(heap.object_ref(second).unwrap())
+        );
+        let first_ptr = table[first.get() as usize];
+
+        for _ in 0..=(PRIMITIVE_SLOTS_PER_PAGE * 2) {
+            let _ = heap.alloc_object(
+                RuntimeObjectRecord::new(None, None, None, None, None),
+                AllocationLifetime::Default,
+            );
+        }
+
+        let grown_table = heap.object_record_ptr_table_for_test();
+        assert_eq!(grown_table[first.get() as usize], first_ptr);
+        assert_eq!(
+            grown_table[first.get() as usize],
+            std::ptr::from_ref(heap.object_ref(first).unwrap())
+        );
+        assert_eq!(
+            grown_table[second.get() as usize],
+            std::ptr::from_ref(heap.object_ref(second).unwrap())
+        );
     }
 
     #[test]

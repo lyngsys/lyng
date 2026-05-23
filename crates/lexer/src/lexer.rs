@@ -46,7 +46,7 @@ impl CookedStringBuffer {
     }
 
     /// Append a run of bytes known by the caller to be ASCII (< 0x80).
-    /// Used by the string and template fast paths to batch contiguous
+    /// Used by the string and template contiguous scans to batch contiguous
     /// ordinary characters instead of calling `push_char` per byte.
     fn push_ascii(&mut self, bytes: &[u8]) {
         debug_assert!(bytes.iter().all(|&b| b < 0x80));
@@ -223,7 +223,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
         let ch = self.current();
 
-        // Fast dispatch on first byte.
+        // Byte dispatch on first byte.
         let token = match ch {
             // Identifiers and keywords
             b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'$' => self.scan_identifier(start, flags),
@@ -1260,7 +1260,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                 _ => {
                     // 0x80..=0xFF — multi-byte UTF-8 leading byte. Decode
                     // and push as a single `char`. Other ASCII bytes are
-                    // consumed by the fast-scan above.
+                    // consumed by the bulk scan above.
                     let rest = &self.source[self.pos..];
                     if let Some(ch) = std::str::from_utf8(rest)
                         .ok()
@@ -1794,7 +1794,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
                 }
                 _ => {
                     // 0x80..=0xFF — multi-byte UTF-8 leading byte. Other
-                    // ASCII bytes are consumed by the fast-scan above.
+                    // ASCII bytes are consumed by the bulk scan above.
                     let rest = &self.source[self.pos..];
                     if let Some(c) = std::str::from_utf8(rest)
                         .ok()

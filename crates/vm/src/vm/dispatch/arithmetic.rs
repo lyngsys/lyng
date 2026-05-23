@@ -1111,7 +1111,7 @@ mod tests {
     }
 
     #[test]
-    fn number_binary_opcode_fast_path_handles_double_operands() {
+    fn number_binary_opcode_smi_shortcut_handles_double_operands() {
         let mut vm = Vm::new();
         vm.register_stack = vec![Value::from_f64(1.5), Value::from_f64(2.25)];
         vm.register_stack_top = vm.register_stack.len();
@@ -1126,14 +1126,14 @@ mod tests {
     }
 
     #[test]
-    fn smi_mul_fast_path_defers_negative_zero_results() {
+    fn smi_mul_smi_shortcut_defers_negative_zero_results() {
         assert_eq!(smi_mul_result(-1, 0), None);
         assert_eq!(smi_mul_result(0, -1), None);
         assert_eq!(smi_mul_result(6, -7), Some(Value::from_smi(-42)));
     }
 
     #[test]
-    fn smi_mod_fast_path_defers_negative_zero_results() {
+    fn smi_mod_smi_shortcut_defers_negative_zero_results() {
         assert_eq!(smi_mod_result(-4, 2), None);
         assert_eq!(smi_mod_result(-4, -2), None);
         assert_eq!(smi_mod_result(4, 2), Some(Value::from_smi(0)));

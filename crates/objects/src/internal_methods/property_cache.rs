@@ -2,7 +2,7 @@ use super::*;
 
 impl ObjectRuntime {
     /// Builds one substrate-owned named-property inline-cache record when the current access path
-    /// is compatible with the shape-based fast path.
+    /// is compatible with the shape-based cache hit path.
     ///
     /// # Errors
     /// Returns an error when the receiver or a traversed prototype object is missing or when the
@@ -110,7 +110,7 @@ impl ObjectRuntime {
     /// The cached `slot_offset` carries an inline/out-of-line bit
     /// ([`super::SlotLocation::decode`]). Inline slots read directly from the holder's
     /// `RuntimeObjectRecord.inline_named_slots` (one indexed load past the object header), matching
-    /// V8's in-object property fast path; out-of-line slots read from the heap-allocated
+    /// V8's in-object property cache hit path; out-of-line slots read from the heap-allocated
     /// `named_slots` array as before.
     ///
     /// # Errors
@@ -141,17 +141,17 @@ impl ObjectRuntime {
     /// Directly probes ordinary shape-stable named data properties without materializing a
     /// `PropertyDescriptor`.
     ///
-    /// Returns `None` when the path is not safely serviceable by the fast probe: proxies,
+    /// Returns `None` when the path is not safely serviceable by the direct probe: proxies,
     /// dictionary-backed/exotic objects, or accessor properties. Returns
-    /// [`NamedPropertyFastGet::Absent`] only after proving the full ordinary prototype chain has
+    /// [`NamedPropertyDirectGet::Absent`] only after proving the full ordinary prototype chain has
     /// no matching property.
     #[inline]
-    pub fn try_fast_get_named_data_property(
+    pub fn try_direct_get_named_data_property(
         &self,
         heap: PrimitiveHeapView<'_>,
         receiver: ObjectRef,
         key: PropertyKey,
-    ) -> Option<NamedPropertyFastGet> {
+    ) -> Option<NamedPropertyDirectGet> {
         if key.is_index() {
             return None;
         }
@@ -166,11 +166,11 @@ impl ObjectRuntime {
                     return None;
                 }
                 let value = self.read_named_property_slot(heap, object, property.slot_offset())?;
-                return Some(NamedPropertyFastGet::Data(value));
+                return Some(NamedPropertyDirectGet::Data(value));
             }
             current = header.prototype();
         }
-        Some(NamedPropertyFastGet::Absent)
+        Some(NamedPropertyDirectGet::Absent)
     }
 
     /// Attempts to store one value through a previously planned named-property cache entry.
@@ -537,7 +537,7 @@ impl ObjectRuntime {
 
     #[inline]
     fn transition_store_object_is_cacheable(&self, header: ObjectHeader) -> bool {
-        self.has_plain_fast_named_properties(header)
+        self.has_shape_stable_named_properties(header)
             && header.flags().is_extensible()
             && !header.flags().uses_named_property_dictionary()
             && !header.flags().is_engine_array()
@@ -549,7 +549,7 @@ impl ObjectRuntime {
 
     #[inline]
     fn named_data_get_object_is_cacheable(&self, header: ObjectHeader) -> bool {
-        self.has_plain_fast_named_properties(header)
+        self.has_shape_stable_named_properties(header)
             && !header.flags().uses_named_property_dictionary()
             && !header.flags().is_engine_array()
             && !header.flags().is_arguments_object()
@@ -559,7 +559,7 @@ impl ObjectRuntime {
     }
 
     #[inline]
-    fn has_plain_fast_named_properties(&self, header: ObjectHeader) -> bool {
+    fn has_shape_stable_named_properties(&self, header: ObjectHeader) -> bool {
         matches!(
             self.object_metadata(header.id())
                 .map(|metadata| &metadata.cold),

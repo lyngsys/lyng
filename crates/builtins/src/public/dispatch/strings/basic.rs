@@ -451,7 +451,7 @@ mod tests {
         ];
 
         let (units, len) = collect_small_smi_char_code_units(&arguments)
-            .expect("all-small-SMI arguments should use the stack fast path");
+            .expect("all-small-SMI arguments should use the stack specialized path");
 
         assert_eq!(len, 3);
         assert_eq!(&units[..len], &[0xD83D, 0xDE00, 0xFFFF]);

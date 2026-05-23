@@ -1550,7 +1550,7 @@ mod tests {
     }
 
     #[test]
-    fn dense_tospliced_uses_native_same_value_fast_path() {
+    fn dense_tospliced_uses_native_same_value_shortcut() {
         let path = PathBuf::from("test/staging/sm/Array/toSpliced-dense.js");
         let source =
             "assert.sameValue(res.length, newLength);\nassert.sameValue(res[i], thisValue[i]);";

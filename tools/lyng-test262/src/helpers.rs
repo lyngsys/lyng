@@ -548,8 +548,8 @@ const DATE_DST_CLEAR_CACHE_NOOP_SOURCE: &str = r"  function clearDSTOffsetCache(
   }";
 const REGEXP_BUILD_STRING_WRAPPER_SOURCE: &str = r"
 function buildString(args) {
-  var fast = $262.buildString(args);
-  return fast === null ? buildStringFallback(args) : fast;
+  var nativeResult = $262.buildString(args);
+  return nativeResult === null ? buildStringFallback(args) : nativeResult;
 }";
 pub const SUPPORTED_INCLUDES: &[&str] = &[
     "compareArray.js",
@@ -913,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    fn build_runtime_source_wraps_regexp_build_string_with_native_fast_path() {
+    fn build_runtime_source_wraps_regexp_build_string_with_native_shortcut() {
         let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let metadata = parse_metadata(
             r"
@@ -930,8 +930,9 @@ mod tests {
             .expect("regexp helper harness source");
 
         assert!(source.contains("function buildStringFallback(args)"));
-        assert!(source.contains("var fast = $262.buildString(args);"));
-        assert!(source.contains("return fast === null ? buildStringFallback(args) : fast;"));
+        assert!(source.contains("var nativeResult = $262.buildString(args);"));
+        assert!(source
+            .contains("return nativeResult === null ? buildStringFallback(args) : nativeResult;"));
     }
 
     #[test]
@@ -957,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn adapts_spidermonkey_date_helper_to_native_same_value_fast_path() {
+    fn adapts_spidermonkey_date_helper_to_native_same_value_shortcut() {
         let catalog = HelperCatalog::load(&workspace_root()).expect("helper catalog");
         let source = catalog
             .source_for("sm/non262-Date-shell.js")

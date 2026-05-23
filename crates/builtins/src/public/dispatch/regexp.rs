@@ -1382,9 +1382,9 @@ pub(super) fn regexp_replace_with_string<Cx: PublicBuiltinDispatchContext>(
             && replacement_template_units
                 .as_deref()
                 .is_some_and(regexp_replacement_template_is_literal)
-            && regexp_object_supports_literal_global_replace_fast_path(cx, regexp_object)
+            && regexp_object_supports_literal_global_replace_shortcut(cx, regexp_object)
             && regexp_uses_builtin_exec(cx, regexp_value)?
-            && let Some(value) = regexp_literal_global_replace_fast_path(
+            && let Some(value) = regexp_literal_global_replace_shortcut(
                 cx,
                 regexp_object,
                 source_ref,
@@ -1539,7 +1539,7 @@ fn regexp_replacement_template_is_literal(units: &[u16]) -> bool {
     !units.contains(&u16::from(b'$'))
 }
 
-fn regexp_object_supports_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
+fn regexp_object_supports_literal_global_replace_shortcut<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     regexp_object: ObjectRef,
 ) -> bool {
@@ -1547,10 +1547,10 @@ fn regexp_object_supports_literal_global_replace_fast_path<Cx: PublicBuiltinDisp
     agent
         .objects()
         .regexp_payload(regexp_object)
-        .is_some_and(lyng_objects::RegExpPayload::supports_literal_global_replace_fast_path)
+        .is_some_and(lyng_objects::RegExpPayload::supports_literal_global_replace_shortcut)
 }
 
-fn regexp_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
+fn regexp_literal_global_replace_shortcut<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     regexp_object: ObjectRef,
     source_ref: StringRef,
@@ -1558,7 +1558,7 @@ fn regexp_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
     replacement_units: &[u16],
 ) -> Result<Option<Value>, Cx::Error> {
     if let Some(ranges) = regexp_literal_global_replace_ranges(cx, regexp_object, source_units) {
-        return regexp_literal_global_replace_ranges_fast_path(
+        return regexp_literal_global_replace_ranges_shortcut(
             cx,
             regexp_object,
             source_ref,
@@ -1602,7 +1602,7 @@ fn regexp_literal_global_replace_ranges<Cx: PublicBuiltinDispatchContext>(
         .literal_global_replace_ranges(source_units)
 }
 
-fn regexp_literal_global_replace_ranges_fast_path<Cx: PublicBuiltinDispatchContext>(
+fn regexp_literal_global_replace_ranges_shortcut<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     regexp_object: ObjectRef,
     source_ref: StringRef,

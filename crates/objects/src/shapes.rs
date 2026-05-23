@@ -91,7 +91,7 @@ pub enum NamedPropertyCachePurpose {
     Store,
 }
 
-/// Fast-path path kind for one named-property cache entry.
+/// Direct path kind for one named-property cache entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NamedPropertyCachePath {
     OwnData,
@@ -101,7 +101,7 @@ pub enum NamedPropertyCachePath {
 
 /// Result of a direct named-data-property probe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum NamedPropertyFastGet {
+pub enum NamedPropertyDirectGet {
     Data(Value),
     Absent,
 }
@@ -192,35 +192,46 @@ impl NamedPropertyCacheEntry {
     }
 }
 
-/// Bit-packed monomorphic OwnData inline-cache handler.
+/// Bit-packed monomorphic `OwnData` inline-cache handler.
 ///
 /// Layout (LSB-first):
-///   bit   31     inline_slot flag (1 = Inline, 0 = OutOfLine — same convention as
+///   bit   31     `inline_slot` flag (1 = `Inline`, 0 = `OutOfLine` — same convention as
 ///                [`INLINE_SLOT_OFFSET_FLAG`])
 ///   bit   30     writable flag (1 = property is writable, 0 = read-only).
 ///                Stores short-circuit on read-only entries; loads ignore it.
-///   bits  0..30  slot_offset (30 bits — 1B values, well above any practical slot count)
-///   bits 32..64  receiver shape raw `u32` (NonZero — `0` in the high half
-///                means "no fast path available")
+///   bits  0..30  `slot_offset` (30 bits — 1B values, well above any practical slot count)
+///   bits 32..64  receiver shape raw `u32` (`NonZero` — `0` in the high half
+///                means "no cache hit path available")
 ///
-/// A whole-word value of `0` is the canonical "no fast path" sentinel, made
+/// A whole-word value of `0` is the canonical "no cache hit path" sentinel, made
 /// possible by `ShapeId` being `NonZeroU32`. This matches V8's `LoadHandler`
-/// bit-field pattern and lets the IC fast path do a single 64-bit load +
+/// bit-field pattern and lets the IC cache hit path do a single 64-bit load +
 /// zero-check before unpacking.
+#[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NamedPropertyHandler(u64);
 
 const HANDLER_WRITABLE_FLAG: u32 = 0x4000_0000;
 const HANDLER_SLOT_OFFSET_MASK: u32 = 0x3FFF_FFFF;
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "handler words intentionally unpack fixed-width bit fields"
+)]
 impl NamedPropertyHandler {
-    /// Sentinel value indicating "no fast handler available". Set when the
+    /// Sentinel value indicating "no cache handler available". Set when the
     /// cache is uninitialized, polymorphic, megamorphic, or installed with a
-    /// `PrototypeData` entry that the inline fast path cannot service.
+    /// `PrototypeData` entry that the inline cache hit path cannot service.
     pub const NONE: Self = Self(0);
 
-    /// Build a fast handler from a cache entry. Returns [`Self::NONE`] for
-    /// entries that the inline fast path cannot service:
+    #[inline]
+    #[must_use]
+    pub const fn bits(self) -> u64 {
+        self.0
+    }
+
+    /// Build a cache handler from a cache entry. Returns [`Self::NONE`] for
+    /// entries that the inline cache hit path cannot service:
     /// `PrototypeData` paths, multi-dependency entries, any entry whose
     /// `holder_shape` differs from its `receiver_shape`, and any entry whose
     /// slot offset doesn't fit in 30 bits (defensive — never seen in
@@ -288,7 +299,7 @@ impl NamedPropertyHandler {
         (self.0 as u32) & HANDLER_WRITABLE_FLAG != 0
     }
 
-    /// `true` when this handler carries a valid monomorphic-OwnData fast
+    /// `true` when this handler carries a valid monomorphic-OwnData cache
     /// path. `false` for [`Self::NONE`].
     #[inline]
     #[must_use]
@@ -297,24 +308,24 @@ impl NamedPropertyHandler {
     }
 }
 
-/// Bit-packed monomorphic one-hop PrototypeData inline-cache handler.
+/// Bit-packed monomorphic one-hop `PrototypeData` inline-cache handler.
 ///
 /// Phase 3e extension of [`NamedPropertyHandler`] for `PrototypeData` cache
 /// entries with `dependency_count == 2` — receiver → one prototype object
 /// (the dominant class-method-dispatch / `Object.prototype` pattern). The
-/// inline fast path validates receiver shape + receiver epoch + prototype
+/// inline cache hit path validates receiver shape + receiver epoch + prototype
 /// shape + prototype epoch, then reads the cached slot from the prototype
 /// without touching the slow chain.
 ///
 /// Layout — two 64-bit words, both required for a valid handler:
-///   `receiver_word`: receiver shape in the low 32 bits (NonZeroU32; `0` ⇒
+///   `receiver_word`: receiver shape in the low 32 bits (`NonZeroU32`; `0` ⇒
 ///   NONE sentinel). High 32 bits reserved (currently always zero).
 ///   `proto_word`: mirrors [`NamedPropertyHandler`]'s u64 layout — prototype
 ///   shape in the high 32 bits, slot offset / inline / writable flags in the
 ///   low 32 bits.
 ///
 /// The whole-handler `NONE` sentinel is `(0, 0)`. Because both shape IDs
-/// are NonZeroU32, a non-zero `receiver_word` implies a populated handler.
+/// are `NonZeroU32`, a non-zero `receiver_word` implies a populated handler.
 ///
 /// Receiver-epoch invalidation covers prototype swaps: `set_prototype()`
 /// bumps the receiver's `invalidation_epoch` with cause
@@ -327,8 +338,12 @@ pub struct NamedPropertyProtoHandler {
     proto_word: u64,
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "handler words intentionally unpack fixed-width bit fields"
+)]
 impl NamedPropertyProtoHandler {
-    /// Sentinel value indicating "no proto fast handler available". Set when
+    /// Sentinel value indicating "no proto cache handler available". Set when
     /// the cache is uninitialized, polymorphic, megamorphic, an `OwnData`
     /// entry (Phase 3a–3d covers those), or a `PrototypeData` entry whose
     /// dependency chain isn't exactly the one-hop case.
@@ -337,8 +352,8 @@ impl NamedPropertyProtoHandler {
         proto_word: 0,
     };
 
-    /// Build a fast handler from a cache entry. Returns [`Self::NONE`] for
-    /// entries the one-hop proto fast path cannot service:
+    /// Build a cache handler from a cache entry. Returns [`Self::NONE`] for
+    /// entries the one-hop proto cache hit path cannot service:
     /// `OwnData` paths (Phase 3a–3d's [`NamedPropertyHandler`] handles
     /// these), any `PrototypeData` entry with `dependency_count != 2`
     /// (multi-hop chains fall through to the slow path), entries missing
@@ -419,14 +434,14 @@ impl NamedPropertyProtoHandler {
     }
 
     /// `true` when the cached property is writable. Loads ignore this bit;
-    /// it's reserved for a potential future setter-aware store fast path.
+    /// it's reserved for a potential future setter-aware store cache hit path.
     #[inline]
     #[must_use]
     pub const fn writable(self) -> bool {
         (self.proto_word as u32) & HANDLER_WRITABLE_FLAG != 0
     }
 
-    /// `true` when this handler carries a valid one-hop PrototypeData fast
+    /// `true` when this handler carries a valid one-hop `PrototypeData` cache
     /// path. `false` for [`Self::NONE`].
     #[inline]
     #[must_use]
@@ -437,21 +452,25 @@ impl NamedPropertyProtoHandler {
 
 /// Bit-packed monomorphic dense-index keyed IC handler.
 ///
-/// Used by the Phase 3d keyed-property fast path for the dense-index family
+/// Used by the Phase 3d keyed-property cache hit path for the dense-index family
 /// (numeric SMI keys against array-shaped receivers). Encodes the receiver
 /// shape and flag snapshot the IC needs to compare against — the slot
 /// offset is the runtime SMI index itself, not part of the handler.
 ///
 /// Layout (LSB-first):
-///   bits  0..32  receiver shape raw `u32` (NonZeroU32; `0` in the low half
+///   bits  0..32  receiver shape raw `u32` (`NonZeroU32`; `0` in the low half
 ///                ⇒ NONE sentinel)
 ///   bits 32..48  receiver flags ([`ObjectFlags`] u16 bits)
 ///   bits 48..64  reserved (always zero)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct KeyedDenseIndexHandler(u64);
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "handler words intentionally unpack fixed-width bit fields"
+)]
 impl KeyedDenseIndexHandler {
-    /// Sentinel value indicating "no fast handler available".
+    /// Sentinel value indicating "no cache handler available".
     pub const NONE: Self = Self(0);
 
     /// Pack a `(receiver_shape, receiver_flags)` pair into a single 64-bit
@@ -482,7 +501,7 @@ impl KeyedDenseIndexHandler {
         ObjectFlags::from_bits((self.0 >> 32) as u16)
     }
 
-    /// `true` when this handler carries a valid monomorphic-DenseIndex fast
+    /// `true` when this handler carries a valid monomorphic-DenseIndex cache
     /// path. `false` for [`Self::NONE`].
     #[inline]
     #[must_use]

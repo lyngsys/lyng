@@ -17,8 +17,37 @@ LLInt fast path.
   - `StrictEqual` now handles raw-equal primitives, `NaN`, and most
     raw-unequal primitive false cases inside DSL asm.
   - `Equal` now handles SMI-vs-SMI equality inside DSL asm.
+- Removed the `GetNamedProperty` Rust probe bridge for the monomorphic
+  OwnData inline-slot case.
+  - The LLInt handler now reads the flat IC header, validates receiver
+    shape and invalidation epoch, loads the object record through the
+    asm-visible object-record table, and reads the inline named slot in
+    DSL asm.
+  - Polymorphic, prototype, out-of-line, non-object, invalidated, and
+    uncached cases intentionally fall back to the counted semantic slow path.
 - Added VM architecture tests that reject legacy fast-bridge terminology and
   pin the known Rust-probe bridge count.
+- Renamed the Rust-dispatch IC/cache helpers and direct object probes so they
+  no longer claim LLInt fast-path status:
+  - `monomorphic_fast` / `polymorphic_fast` sidecars are now named
+    `*_own_data_handler`, `*_proto_data_handler`, or
+    `*_own_data_handlers`.
+  - Rust IC helper entry points are now named as cache/direct paths, for
+    example `named_property_own_data_handler`,
+    `try_named_property_polymorphic_own_data_load`, and
+    `record_named_property_cache_hit`.
+  - Object/builtin shortcuts are now named as direct/specialized probes, for
+    example `try_direct_get_named_data_property`,
+    `direct_set_engine_array_index`, and `try_specialized_apply_builtin`.
+  - The RegExp recognized-pattern shortcuts no longer use fast-path names.
+- Added a VM architecture test that scans the Rust VM hot-path files and fails
+  if they reintroduce `fast path`, `fast_`, or `_fast` terminology outside the
+  DSL/LLInt code.
+- Updated the live architecture doc so it reserves fast-path terminology for
+  LLInt asm and describes Rust hit paths as probes, shortcuts, cache hits, or
+  direct/specialized paths.
+- Cleaned tool/test wording for Rust helper shortcuts and hybrid SMI
+  arithmetic hit paths so they no longer use fast-path labels.
 
 ## Remaining Rust Probes From LLInt
 
@@ -28,7 +57,6 @@ dispatch from the returned payload.
 | Opcode | LLInt bridge | Rust entry point | Required replacement |
 | --- | --- | --- | --- |
 | `LoadGlobal` | `call_rust_probe!(op_load_global_rust_probe_rs, ...)` | `Vm::try_load_global_rust_probe_for_dsl` | LLInt-readable global/property IC metadata and inline load-global checks |
-| `GetNamedProperty` | `call_rust_probe!(op_get_named_property_rust_probe_rs, ...)` | `Vm::try_get_named_property_rust_probe_for_dsl` | LLInt mode-byte property IC probe and inline value load |
 | `AssignNamedProperty` | `call_rust_probe!(op_assign_named_property_rust_probe_rs, ...)` | `Vm::try_assign_named_property_rust_probe_for_dsl` | LLInt mode-byte property IC probe and inline store |
 
 ## Hybrid SMI Paths That Still Call Rust
@@ -52,49 +80,64 @@ writing at offset `0` would corrupt the legacy `Option<FeedbackSiteState>`
 discriminant. This needs a real LLInt-readable feedback header or a deliberate
 policy that the LLInt hit path does not record this feedback.
 
-## Rust IC Cache Terminology To Clean Up
+## Terminology Sweep
 
-The Rust dispatch layer still uses "fast" names for inline-cache sidecars and
-helper lookups. These are not LLInt fast paths:
+Source audit command:
 
-- `NamedPropertyFeedback::monomorphic_fast`
-- `NamedPropertyFeedback::monomorphic_proto_fast`
-- `NamedPropertyFeedback::polymorphic_fast`
-- `KeyedPropertyFeedback::monomorphic_named_proto_fast`
-- `*_fast_handler`
-- `try_*_fast_load` / `try_*_fast_store`
-- `record_named_property_fast_hit`
+```sh
+rg -n "fast path|fast-path|Fast path|Fast-path|proto-fast|fast_|_fast|\\bfast\\b|Fast" crates tools --glob '*.rs' --glob '!target'
+```
 
-These names came from the older Rust-dispatch IC work. They should either be
-renamed to cache/sidecar terminology (`*_handler_cache`, `record_*_ic_hit`,
-etc.) or retired as each IC family is ported to true LLInt mode-byte dispatch.
+Current result: the remaining source hits are confined to:
+
+- `crates/vm/src/dsl/**`, where the term describes real DSL-emitted LLInt
+  hit paths or DSL helper comments.
+- DSL-specific tests that assert the behavior of those handlers.
+- `crates/vm/src/tests/llint_architecture.rs`, which contains the guard
+  strings for the terminology test itself.
+- Test262 helper names such as `checkToTemporalPlainDateTimeFastPath`, which
+  are external harness API names rather than Lyng path labels.
+- Generic non-path wording such as Cargo's `--no-fail-fast`.
+
+The Rust VM dispatch layer, feedback layer, object direct probes, builtin
+specializations, and RegExp recognized-pattern shortcuts no longer use fast-path
+terminology.
 
 ## Current Richards Evidence
 
-The current counted Richards run after the equality changes shows:
+The current counted Richards run after the equality and `GetNamedProperty`
+changes shows:
 
 | Opcode | Dispatches | Semantic slow-path hits | Semantic share |
 | --- | ---: | ---: | ---: |
-| `StrictEqual` | 31,408,973 | 0 | 0.00% |
-| `Equal` | 69,702,579 | 36,206,028 | 51.94% |
+| `GetNamedProperty` | 193,595,668 | 127,299,374 | 65.76% |
+| `AssignNamedProperty` | 48,609,118 | 94,467 | 0.19% |
+| `LoadGlobal` | 39,622,359 | 655 | 0.00% |
+| `StrictEqual` | 27,659,513 | 0 | 0.00% |
+| `Equal` | 61,381,799 | 31,883,918 | 51.94% |
 
-`StrictEqual` is now clean on this workload. `Equal` is not: the SMI path is
-inline, but non-SMI equality still falls through to Rust.
+`GetNamedProperty` is now a real LLInt hit path for monomorphic OwnData inline
+slots, but Richards still has a large semantic slow share because prototype,
+polymorphic, out-of-line, non-object, and cold/miss cases are intentionally
+still semantic slow-path entries. `StrictEqual` is clean on this workload.
+`Equal` is not: the SMI path is inline, but non-SMI equality still falls
+through to Rust.
 
-The release score for this build is 294 on Richards
-(`cargo run --release -p lyng-bench -- v8suite --filter Richards --timeout-secs 120`).
+The current release samples for this tree are 290, 289, and 291 on Richards:
+
+```sh
+cargo run --release -p lyng-bench -- v8suite --filter Richards --timeout-secs 120
+```
+
+The `baseline=234` and `target=260` numbers are the local bench harness gate
+values printed by `lyng-bench`; they are not QJS parity targets.
 
 ## Suggested Next Steps
 
-1. Land the terminology/test correction separately so Rust probes cannot be
-   presented as LLInt fast paths again.
-2. Add a real LLInt-readable feedback/IC header before porting the property IC
-   bridges. The current Rust enum-backed feedback state is the main reason the
-   LLInt handlers still need Rust probes.
-3. Port `GetNamedProperty`, `LoadGlobal`, and `AssignNamedProperty` from Rust
-   probes to DSL asm in that order.
-4. Replace or remove the arithmetic `*_record_smi_rs` shims so the SMI hit
+1. Extend the LLInt-readable feedback/IC header to cover store and global-load
+   modes. The Rust enum-backed feedback state should remain the semantic source
+   of truth, but the LLInt needs compact mode-specific header words.
+2. Port `LoadGlobal` and `AssignNamedProperty` from Rust probes to DSL asm in
+   that order.
+3. Replace or remove the arithmetic `*_record_smi_rs` shims so the SMI hit
    paths no longer call Rust.
-5. Rename the remaining Rust IC cache terminology once the mode-byte path is in
-   place, or explicitly mark it as Rust-dispatch cache terminology while it
-   exists.

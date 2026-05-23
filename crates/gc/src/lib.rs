@@ -33,7 +33,9 @@ pub use arena::{
     RuntimeBoundFunctionRecord, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeFunctionRecord,
     RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord,
     SideAllocationClass, SideAllocationRef, SideAllocationStats, SuspendedRegistersRef,
-    SymbolFlags, PRIMITIVE_SLOTS_PER_PAGE, RUNTIME_OBJECT_INLINE_SLOT_COUNT,
+    SymbolFlags, PRIMITIVE_SLOTS_PER_PAGE, RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET,
+    RUNTIME_OBJECT_INLINE_SLOT_COUNT, RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET,
+    RUNTIME_OBJECT_NAMED_SLOTS_OFFSET, RUNTIME_OBJECT_SHAPE_OFFSET,
 };
 pub use collection::{
     PrimitiveCollectionKind, PrimitiveCollectionReport, PrimitiveCollectionTrigger,

@@ -645,7 +645,7 @@ impl Vm {
         // truncate the Vec. So `register_stack.len()` can sit anywhere in
         // `[start..]` with stale values from past frames in `[start..len)`.
         // Reset that range to `undefined` before extending so a re-entered
-        // window starts clean — callers (especially the fast call path)
+        // window starts clean — callers (especially the direct call path)
         // may not rewrite every slot.
         if self.register_stack.len() > start {
             let reset_end = end.min(self.register_stack.len());

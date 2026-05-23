@@ -2,40 +2,44 @@
 //!
 //! Per the value-layout report §"Irreducible deltas vs LLInt", every
 //! object load is a **two-load indirection**: the `ObjectRef` (u32) is
-//! a side-table index into the VM's `heap_pool_base`, which yields a
-//! `*const ObjectRecord`; the record then carries the shape pointer
-//! and inline / outline slots. When the pointer-identity-cell refactor
-//! lands (design §9 DSL-3), these macros are renamed `load_cell_*!`
-//! and emit one fewer instruction each.
+//! a side-table index into `LlIntState.object_records_base`, which
+//! yields a `*const RuntimeObjectRecord`; the record then carries the
+//! shape id and inline / outline slots. When the pointer-identity-cell
+//! refactor lands (design §9 DSL-3), these macros are renamed
+//! `load_cell_*!` and emit one fewer instruction each.
 //!
 //! Bindings expected from the proc-macro lowerer:
 //!
-//! - `{vm_heap_pool}` — offset of `Vm::heap_pool_base` inside `Vm`
-//!   (provided by `reg_convention::VM_HEAP_POOL_OFFSET`, currently a
-//!   placeholder until Task B41 lands the real field).
-//! - `{record_shape}` — offset of the shape pointer inside
-//!   `ObjectRecord`. Concrete value lands when the record-shape
-//!   loader is first invoked (Batch 6).
-//! - `{record_inline_slots}` — offset of the first inline slot.
-//! - `{record_outline_slots}` — offset of the outline-slots pointer.
+//! - `{state_object_records}` — offset of
+//!   `LlIntState::object_records_base`.
+//! - `{object_shape}` — offset of the raw `Option<ShapeId>` word
+//!   inside `RuntimeObjectRecord`.
+//! - `{object_last_epoch}` — offset of `last_invalidation_epoch`.
+//! - `{object_inline_slots}` — offset of the first inline named slot.
 //!
-//! Scratch convention: `x9` is owned by the macro for arithmetic.
+//! Scratch convention: macros use `x16`/`x17` only.
 
 /// Resolve an `ObjectRef` handle (id in `$ref`) to a `*const
-/// ObjectRecord` pointer in `$dst`. Two-load indirection — see
-/// module doc.
+/// RuntimeObjectRecord` pointer in `$dst`. Branches to `$label` if
+/// the table base or table entry is null.
 #[macro_export]
-macro_rules! load_object_record {
-    ($ref:ident => $dst:ident) => {
+macro_rules! load_object_record_from_state_or_branch {
+    ($ref:tt => $dst:tt, $label:tt) => {
         concat!(
-            // x9 := VM->heap_pool_base
-            "ldr    x9, [x22, {vm_heap_pool}]\n",
-            // dst := heap_pool_base[ref] (each entry is 8 bytes)
+            "ldr    x16, [x24, {state_object_records}]\n",
+            "cbz    x16, ",
+            stringify!($label),
+            "\n",
             "ldr    x",
             stringify!($dst),
-            ", [x9, x",
+            ", [x16, x",
             stringify!($ref),
             ", lsl #3]\n",
+            "cbz    x",
+            stringify!($dst),
+            ", ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -46,13 +50,26 @@ macro_rules! load_object_record {
 /// caller widen if needed.
 #[macro_export]
 macro_rules! load_record_shape {
-    ($rec:ident => $dst:ident) => {
+    ($rec:tt => $dst:tt) => {
         concat!(
             "ldr    w",
             stringify!($dst),
             ", [x",
             stringify!($rec),
-            ", {record_shape}]\n",
+            ", {object_shape}]\n",
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! load_record_last_epoch {
+    ($rec:tt => $dst:tt) => {
+        concat!(
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($rec),
+            ", {object_last_epoch}]\n",
         )
     };
 }
@@ -61,16 +78,14 @@ macro_rules! load_record_shape {
 /// as a `Value` (full 64 bits).
 #[macro_export]
 macro_rules! load_record_inline_slot {
-    ($rec:ident, $idx:ident => $dst:ident) => {
+    ($rec:tt, $idx:tt => $dst:tt) => {
         concat!(
-            // x9 := record_base + inline_slots_offset
-            "add    x9, x",
+            "add    x16, x",
             stringify!($rec),
-            ", {record_inline_slots}\n",
-            // dst := *(x9 + idx * 8)
+            ", {object_inline_slots}\n",
             "ldr    x",
             stringify!($dst),
-            ", [x9, x",
+            ", [x16, x",
             stringify!($idx),
             ", lsl #3]\n",
         )
@@ -80,14 +95,14 @@ macro_rules! load_record_inline_slot {
 /// Store `$src` into inline slot `$idx` of an ObjectRecord at `$rec`.
 #[macro_export]
 macro_rules! store_record_inline_slot {
-    ($rec:ident, $idx:ident, $src:ident) => {
+    ($rec:tt, $idx:tt, $src:tt) => {
         concat!(
-            "add    x9, x",
+            "add    x16, x",
             stringify!($rec),
-            ", {record_inline_slots}\n",
+            ", {object_inline_slots}\n",
             "str    x",
             stringify!($src),
-            ", [x9, x",
+            ", [x16, x",
             stringify!($idx),
             ", lsl #3]\n",
         )
@@ -99,13 +114,13 @@ macro_rules! store_record_inline_slot {
 /// whose base pointer hangs off the record.
 #[macro_export]
 macro_rules! load_record_outline_slots {
-    ($rec:ident => $dst:ident) => {
+    ($rec:tt => $dst:tt) => {
         concat!(
             "ldr    x",
             stringify!($dst),
             ", [x",
             stringify!($rec),
-            ", {record_outline_slots}]\n",
+            ", {object_named_slots}]\n",
         )
     };
 }
@@ -114,7 +129,7 @@ macro_rules! load_record_outline_slots {
 /// `$base` (typically the result of `load_record_outline_slots!`).
 #[macro_export]
 macro_rules! load_outline_slot {
-    ($base:ident, $idx:ident => $dst:ident) => {
+    ($base:tt, $idx:tt => $dst:tt) => {
         concat!(
             "ldr    x",
             stringify!($dst),

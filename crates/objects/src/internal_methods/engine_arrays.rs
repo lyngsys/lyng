@@ -1,7 +1,7 @@
 use super::*;
 
 impl ObjectRuntime {
-    /// Fast-path indexed assignment for an existing dense element on an engine-owned array object.
+    /// Direct indexed assignment for an existing dense element on an engine-owned array object.
     ///
     /// Existing ordinary data elements are receiver-owned, so updating them does not need a
     /// prototype-chain scan. Misses, holes, sparse entries, and length-extending writes are left to
@@ -10,7 +10,7 @@ impl ObjectRuntime {
     /// # Errors
     /// Returns [`InternalMethodError`] when the receiver metadata or dense element storage is
     /// corrupt.
-    pub fn fast_update_engine_array_existing_index(
+    pub fn direct_update_engine_array_existing_index(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
@@ -56,12 +56,12 @@ impl ObjectRuntime {
         }
     }
 
-    /// Fast-path indexed assignment for engine-owned array objects.
+    /// Direct indexed assignment for engine-owned array objects.
     ///
     /// # Errors
     /// Returns [`InternalMethodError`] when the receiver metadata, dense element storage, or length
     /// descriptor state is corrupt.
-    pub fn fast_set_engine_array_index(
+    pub fn direct_set_engine_array_index(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
@@ -70,14 +70,14 @@ impl ObjectRuntime {
         lifetime: AllocationLifetime,
     ) -> InternalMethodResult<Option<bool>> {
         if let Some(result) =
-            self.try_fast_set_shape_stable_engine_array_index(heap, id, index, value, lifetime)?
+            self.try_direct_set_shape_stable_engine_array_index(heap, id, index, value, lifetime)?
         {
             return Ok(Some(result));
         }
-        self.fast_set_engine_array_index_fallback(heap, id, index, value, lifetime)
+        self.set_engine_array_index_fallback(heap, id, index, value, lifetime)
     }
 
-    fn try_fast_set_shape_stable_engine_array_index(
+    fn try_direct_set_shape_stable_engine_array_index(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
@@ -178,7 +178,7 @@ impl ObjectRuntime {
         Ok(Some(true))
     }
 
-    fn fast_set_engine_array_index_fallback(
+    fn set_engine_array_index_fallback(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
@@ -197,14 +197,14 @@ impl ObjectRuntime {
         if !length_writable || !self.ordinary_is_extensible(id)? {
             return Ok(None);
         }
-        if !self.can_fast_set_engine_array_index(heap.view(), id, index)? {
+        if !self.can_direct_set_engine_array_index(heap.view(), id, index)? {
             return Ok(None);
         }
         if !self.set_element(heap, id, index, value, lifetime) {
             return Err(InternalMethodError::CorruptObjectState);
         }
         if index >= old_len {
-            self.fast_update_engine_array_length(heap, id, index.saturating_add(1))?;
+            self.direct_update_engine_array_length(heap, id, index.saturating_add(1))?;
         }
         Ok(Some(true))
     }
@@ -357,7 +357,7 @@ impl ObjectRuntime {
         array_length_descriptor_state(descriptor)
     }
 
-    fn can_fast_set_engine_array_index(
+    fn can_direct_set_engine_array_index(
         &self,
         heap: PrimitiveHeapView<'_>,
         id: ObjectRef,
@@ -393,7 +393,7 @@ impl ObjectRuntime {
         }
     }
 
-    fn fast_update_engine_array_length(
+    fn direct_update_engine_array_length(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,

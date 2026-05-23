@@ -545,7 +545,7 @@ impl Vm {
         self.set_property_on_object(agent, host, registry, frame, object, receiver, key, value)
     }
 
-    pub(super) fn try_fast_set_engine_array_index(
+    pub(super) fn try_direct_set_engine_array_index(
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -554,7 +554,12 @@ impl Vm {
         if let Some(updated) = agent
             .with_heap_and_objects(|heap, objects| {
                 let mut mutator = heap.mutator();
-                objects.fast_update_engine_array_existing_index(&mut mutator, object, index, value)
+                objects.direct_update_engine_array_existing_index(
+                    &mut mutator,
+                    object,
+                    index,
+                    value,
+                )
             })
             .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?
         {
@@ -566,7 +571,7 @@ impl Vm {
         agent
             .with_heap_and_objects(|heap, objects| {
                 let mut mutator = heap.mutator();
-                objects.fast_set_engine_array_index(
+                objects.direct_set_engine_array_index(
                     &mut mutator,
                     object,
                     index,
@@ -577,7 +582,7 @@ impl Vm {
             .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
-    pub(super) fn try_fast_set_ordinary_index_data_property(
+    pub(super) fn try_direct_set_ordinary_index_data_property(
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -596,7 +601,7 @@ impl Vm {
         agent
             .with_heap_and_objects(|heap, objects| {
                 let mut mutator = heap.mutator();
-                objects.fast_set_ordinary_index_data_property(
+                objects.direct_set_ordinary_index_data_property(
                     &mut mutator,
                     object,
                     index,
@@ -1104,18 +1109,18 @@ impl Vm {
         Ok(descriptor)
     }
 
-    pub(super) fn try_fast_own_index_value(
+    pub(super) fn try_direct_own_index_value(
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
     ) -> VmResult<Option<Value>> {
         agent
             .objects()
-            .fast_own_index_data_value(agent.heap().view(), object, index)
+            .direct_own_index_data_value(agent.heap().view(), object, index)
             .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
-    pub(super) fn try_fast_typed_array_index_value(
+    pub(super) fn try_direct_typed_array_index_value(
         agent: &mut Agent,
         object: ObjectRef,
         index: u32,
@@ -1129,7 +1134,7 @@ impl Vm {
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
-    pub(super) fn try_fast_set_typed_array_index(
+    pub(super) fn try_direct_set_typed_array_index(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,

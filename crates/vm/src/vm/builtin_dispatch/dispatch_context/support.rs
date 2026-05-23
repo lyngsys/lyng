@@ -126,7 +126,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             return Ok(default_prototype);
         };
         if let Some(prototype) =
-            self.fast_ordinary_constructor_prototype(source_realm, default_prototype, new_target)?
+            self.direct_ordinary_constructor_prototype(source_realm, default_prototype, new_target)?
         {
             return Ok(prototype);
         }
@@ -146,7 +146,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             .unwrap_or(default_prototype))
     }
 
-    fn fast_ordinary_constructor_prototype(
+    fn direct_ordinary_constructor_prototype(
         &mut self,
         source_realm: RealmRef,
         default_prototype: ObjectRef,

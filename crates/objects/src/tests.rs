@@ -333,7 +333,7 @@ fn named_property_handler_packs_writable_bit_for_read_only_entry() {
     let handler = NamedPropertyHandler::from_entry(entry);
     assert!(
         handler.is_valid(),
-        "non-writable own-data still gets a fast handler"
+        "non-writable own-data still gets a cache handler"
     );
     assert_eq!(handler.receiver_shape(), Some(shape));
     assert_eq!(handler.slot_location(), SlotLocation::Inline(1));
@@ -1145,7 +1145,7 @@ fn regexp_payload_non_unicode_astral_source_matches_surrogate_code_units() {
 }
 
 #[test]
-fn regexp_payload_fast_digit_class_scan_handles_large_generated_strings() {
+fn regexp_payload_recognized_digit_class_scan_handles_large_generated_strings() {
     use std::time::{Duration, Instant};
 
     let text = (0u16..=u16::MAX)
@@ -1299,7 +1299,7 @@ fn named_property_load_cache_rejects_same_shaped_receivers_with_different_protot
 }
 
 #[test]
-fn fast_named_data_property_probe_reads_data_and_rejects_accessors() {
+fn direct_named_data_property_probe_reads_data_and_rejects_accessors() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -1328,16 +1328,16 @@ fn fast_named_data_property_probe_reads_data_and_rejects_accessors() {
     );
 
     assert_eq!(
-        runtime.try_fast_get_named_data_property(mutator.view(), object, key),
-        Some(NamedPropertyFastGet::Data(Value::from_smi(31)))
+        runtime.try_direct_get_named_data_property(mutator.view(), object, key),
+        Some(NamedPropertyDirectGet::Data(Value::from_smi(31)))
     );
     assert_eq!(
-        runtime.try_fast_get_named_data_property(
+        runtime.try_direct_get_named_data_property(
             mutator.view(),
             object,
             PropertyKey::from_atom(AtomId::from_raw(909)),
         ),
-        Some(NamedPropertyFastGet::Absent)
+        Some(NamedPropertyDirectGet::Absent)
     );
 
     let mut accessor = PropertyDescriptor::new();
@@ -1356,7 +1356,7 @@ fn fast_named_data_property_probe_reads_data_and_rejects_accessors() {
         .unwrap());
 
     assert_eq!(
-        runtime.try_fast_get_named_data_property(mutator.view(), object, accessor_key),
+        runtime.try_direct_get_named_data_property(mutator.view(), object, accessor_key),
         None
     );
 
@@ -1368,7 +1368,7 @@ fn fast_named_data_property_probe_reads_data_and_rejects_accessors() {
         AllocationLifetime::Default,
     );
     assert_eq!(
-        runtime.try_fast_get_named_data_property(mutator.view(), data_view_like, key),
+        runtime.try_direct_get_named_data_property(mutator.view(), data_view_like, key),
         None
     );
 }
@@ -2267,7 +2267,7 @@ fn dense_elements_grow_preserve_holes_and_sparse_fallback_carries_attrs() {
 }
 
 #[test]
-fn fast_own_index_queries_cover_dense_sparse_holes_and_accessors() {
+fn direct_own_index_queries_cover_dense_sparse_holes_and_accessors() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -2295,25 +2295,25 @@ fn fast_own_index_queries_cover_dense_sparse_holes_and_accessors() {
 
     assert_eq!(
         runtime
-            .fast_own_index_data_value(mutator.view(), object, 0)
+            .direct_own_index_data_value(mutator.view(), object, 0)
             .unwrap(),
         Some(Value::from_smi(10))
     );
     assert_eq!(
         runtime
-            .fast_own_index_data_value(mutator.view(), object, 1)
+            .direct_own_index_data_value(mutator.view(), object, 1)
             .unwrap(),
         None
     );
     assert_eq!(
         runtime
-            .fast_has_own_index_property(mutator.view(), object, 0)
+            .direct_has_own_index_property(mutator.view(), object, 0)
             .unwrap(),
         Some(true)
     );
     assert_eq!(
         runtime
-            .fast_has_own_index_property(mutator.view(), object, 1)
+            .direct_has_own_index_property(mutator.view(), object, 1)
             .unwrap(),
         Some(false)
     );
@@ -2329,13 +2329,13 @@ fn fast_own_index_queries_cover_dense_sparse_holes_and_accessors() {
     ));
     assert_eq!(
         runtime
-            .fast_own_index_data_value(mutator.view(), object, 32)
+            .direct_own_index_data_value(mutator.view(), object, 32)
             .unwrap(),
         Some(Value::from_smi(32))
     );
     assert_eq!(
         runtime
-            .fast_has_own_index_property(mutator.view(), object, 32)
+            .direct_has_own_index_property(mutator.view(), object, 32)
             .unwrap(),
         Some(true)
     );
@@ -2361,13 +2361,13 @@ fn fast_own_index_queries_cover_dense_sparse_holes_and_accessors() {
 
     assert_eq!(
         runtime
-            .fast_own_index_data_value(mutator.view(), object, 64)
+            .direct_own_index_data_value(mutator.view(), object, 64)
             .unwrap(),
         None
     );
     assert_eq!(
         runtime
-            .fast_has_own_index_property(mutator.view(), object, 64)
+            .direct_has_own_index_property(mutator.view(), object, 64)
             .unwrap(),
         Some(true)
     );
@@ -2570,7 +2570,7 @@ fn engine_array_index_definitions_extend_length() {
 }
 
 #[test]
-fn engine_array_fast_index_store_extends_dense_array_and_length() {
+fn engine_array_direct_index_store_extends_dense_array_and_length() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -2579,7 +2579,7 @@ fn engine_array_fast_index_store_extends_dense_array_and_length() {
 
     assert_eq!(
         runtime
-            .fast_set_engine_array_index(
+            .direct_set_engine_array_index(
                 &mut mutator,
                 array,
                 0,
@@ -2591,7 +2591,7 @@ fn engine_array_fast_index_store_extends_dense_array_and_length() {
     );
     assert_eq!(
         runtime
-            .fast_set_engine_array_index(
+            .direct_set_engine_array_index(
                 &mut mutator,
                 array,
                 1,
@@ -2616,7 +2616,7 @@ fn engine_array_fast_index_store_extends_dense_array_and_length() {
 }
 
 #[test]
-fn engine_array_fast_index_store_fills_dense_holes() {
+fn engine_array_direct_index_store_fills_dense_holes() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -2646,7 +2646,7 @@ fn engine_array_fast_index_store_fills_dense_holes() {
 
     assert_eq!(
         runtime
-            .fast_set_engine_array_index(
+            .direct_set_engine_array_index(
                 &mut mutator,
                 array,
                 0,
@@ -2668,7 +2668,7 @@ fn engine_array_fast_index_store_fills_dense_holes() {
 }
 
 #[test]
-fn engine_array_fast_index_store_defers_for_non_writable_length() {
+fn engine_array_direct_index_store_defers_for_non_writable_length() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -2677,7 +2677,7 @@ fn engine_array_fast_index_store_defers_for_non_writable_length() {
 
     assert_eq!(
         runtime
-            .fast_set_engine_array_index(
+            .direct_set_engine_array_index(
                 &mut mutator,
                 array,
                 0,

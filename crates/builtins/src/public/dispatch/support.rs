@@ -1313,7 +1313,7 @@ pub(super) fn try_create_data_property<Cx: PublicBuiltinDispatchContext>(
     value: Value,
 ) -> Result<bool, Cx::Error> {
     if let Some(index) = key.as_index()
-        && cx.try_fast_create_data_property(object_ref, index, value)?
+        && cx.try_direct_create_data_property(object_ref, index, value)?
     {
         return Ok(true);
     }

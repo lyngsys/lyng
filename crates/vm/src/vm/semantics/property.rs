@@ -24,7 +24,7 @@
 //! The IC-heavy opcodes (`GetNamedProperty`, `SetNamedProperty`,
 //! `GetKeyedProperty`, `SetKeyedProperty`) defer entirely to the existing
 //! `Vm::execute_*_opcode` helpers in `vm/dispatch/property.rs`. Those
-//! helpers carry the Phase 3a/3e/3f inline-cache fast paths (monomorphic
+//! helpers carry the Phase 3a/3e/3f inline-cache cache hit paths (monomorphic
 //! handler load, polymorphic shape probe, megamorphic table), the
 //! ToObject coercion, the prototype-chain walk, and the feedback-slot
 //! recording. DSL-0a's job is only to lift the call site out of the α

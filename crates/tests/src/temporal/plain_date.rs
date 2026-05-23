@@ -1033,7 +1033,7 @@ fn temporal_plain_date_to_zoned_date_time_normalizes_time_zone_like_strings() {
 }
 
 #[test]
-fn temporal_zoned_date_time_prototype_getters_are_redefinable_for_slot_fast_path_tests() {
+fn temporal_zoned_date_time_prototype_getters_are_redefinable_for_slot_cache_hit_tests() {
     let result = compile_and_run_string_with_host(
         r#"
         let descriptor = Object.getOwnPropertyDescriptor(
@@ -1101,7 +1101,7 @@ fn temporal_plain_date_from_zoned_date_time_uses_slots_without_getters() {
 }
 
 #[test]
-fn temporal_zoned_date_time_slot_fast_path_probe() {
+fn temporal_zoned_date_time_slot_cache_hit_probe() {
     let result = compile_and_run_string_with_host(
         r#"
         const prototypeDescrs = Object.getOwnPropertyDescriptors(Temporal.ZonedDateTime.prototype);

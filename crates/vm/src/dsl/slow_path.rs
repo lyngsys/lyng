@@ -212,6 +212,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
                             as *mut crate::dsl::feedback_flat::FeedbackEntry
                     };
+                    let object_records_base =
+                        rust.dispatch.agent.heap().view().object_record_ptr_table();
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
@@ -224,13 +226,14 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_pc_offset = new_offset;
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
+                        (**state).object_records_base = object_records_base;
                     }
                 }
                 // The asm bridge's `dispatch_after_slow!` Continue
                 // arm reads the new pc_offset from `x1` (`payload`)
-                // directly to skip the memory round-trip on the fast
-                // path. Mirror it here for the asm side. (The α
-                // variant ignores `payload`.)
+                // directly to skip the memory round-trip on the
+                // Continue arm. Mirror it here for the asm side. (The
+                // α variant ignores `payload`.)
                 SlowPathReturn {
                     tag: SlowPathTag::Continue as u64,
                     payload: new_offset_u64,
@@ -291,6 +294,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
                             as *mut crate::dsl::feedback_flat::FeedbackEntry
                     };
+                    let object_records_base =
+                        rust.dispatch.agent.heap().view().object_record_ptr_table();
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
@@ -318,6 +323,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_pb_base = pb_base;
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
+                        (**state).object_records_base = object_records_base;
                         // Phase 1.B.1: refresh the new fields.
                         (**state).frame_const_base = const_base;
                         (**state).frame_this_value = this_value;

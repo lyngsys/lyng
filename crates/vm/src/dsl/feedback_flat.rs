@@ -1,10 +1,8 @@
 //! Flat-array feedback storage for the DSL `FV` pin per design §9.
 //!
-//! Each [`FeedbackEntry`] is a fixed-size, pointer-stable IC slot whose
-//! content mirrors today's [`FeedbackSiteState`] (including all Phase 3f
-//! packed sidecars). Only the *vector storage* changes from
-//! `Vec<Option<FeedbackSiteState>>` to `Box<[FeedbackEntry]>` so the
-//! asm `FV` pin can be a single pointer with computed offset.
+//! Each [`FeedbackEntry`] is a fixed-size, pointer-stable IC slot. The
+//! asm-visible prefix is intentionally small and layout-pinned; the
+//! legacy [`FeedbackSiteState`] remains the semantic source of truth.
 //!
 //! Storage placement decision (Task B17):
 //!
@@ -33,42 +31,84 @@
 //!   reallocate, but that only moves the `Box` smart pointer, not
 //!   the heap buffer it owns).
 //!
-//! Per-entry layout: `state: Option<FeedbackSiteState>` mirrors the
-//! legacy `Vec<Option<FeedbackSiteState>>` element type exactly — an
-//! unallocated/unused slot is `None`, and the same
-//! `FeedbackSiteState::for_descriptor` factory populates `Some(...)`
-//! at warmup. Dual-write at every legacy record site keeps the two
-//! storages bit-identical during DSL-0b; DSL-0c removes the legacy
-//! vector after every reader migrates to the flat array.
-//!
-//! **Phase 3f sidecar parity (B18):** the design §9 invariant says
-//! "the flattening is about vector storage, not entry content —
-//! Phase 3f's packed sidecars stay inside each entry". This holds by
-//! construction because the per-entry payload is the *same*
-//! `FeedbackSiteState`. All Phase 3f sidecars
-//! (`monomorphic_fast`, `monomorphic_fast_dependency_epoch`,
-//! `monomorphic_proto_fast`, `monomorphic_proto_fast_*_epoch`,
-//! `polymorphic_fast`, `polymorphic_fast_dependency_epochs`, and the
-//! keyed-property equivalents) are inline fields of
-//! `NamedPropertyFeedback` / `KeyedPropertyFeedback` — variants of
-//! `FeedbackSiteState`. `#[derive(Clone)]` on those structs carries
-//! every sidecar through `mirror_flat_slot`; no per-sidecar
-//! plumbing is needed. The polymorphic-property test in
-//! `tests/feedback_flat_consistency.rs` exercises this end-to-end.
+//! Per-entry layout: the first 24 bytes are the LLInt IC header. The
+//! trailing `state` field is kept only for the older flat-storage
+//! consistency harness; production mirroring no longer clones the
+//! large legacy enum into this field.
 
 pub(crate) use crate::vm::FeedbackSiteState;
 
+pub const LLINT_IC_MODE_EMPTY: u8 = 0;
+pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LlIntIcMode {
+    Empty = LLINT_IC_MODE_EMPTY,
+    NamedOwnInlineLoad = LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
+}
+
 /// Single feedback entry. Pointer-stable for the lifetime of the
-/// owning `InstalledFunction`. The `state` field is `None` for
-/// unallocated / descriptor-absent slots — matching the legacy
-/// `Vec<Option<FeedbackSiteState>>` per-element type.
+/// owning `InstalledFunction`.
 #[repr(C)]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedbackEntry {
+    pub(crate) mode: u8,
+    pub(crate) _pad: [u8; 7],
+    pub(crate) named_handler_bits: u64,
+    pub(crate) named_epoch: u64,
     pub(crate) state: Option<FeedbackSiteState>,
 }
 
+pub const FEEDBACK_ENTRY_MODE_OFFSET: usize = core::mem::offset_of!(FeedbackEntry, mode);
+pub const FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET: usize =
+    core::mem::offset_of!(FeedbackEntry, named_handler_bits);
+pub const FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET: usize =
+    core::mem::offset_of!(FeedbackEntry, named_epoch);
+pub const FEEDBACK_ENTRY_STRIDE: usize = core::mem::size_of::<FeedbackEntry>();
+
+impl Default for FeedbackEntry {
+    fn default() -> Self {
+        Self {
+            mode: LlIntIcMode::Empty as u8,
+            _pad: [0; 7],
+            named_handler_bits: 0,
+            named_epoch: 0,
+            state: None,
+        }
+    }
+}
+
 impl FeedbackEntry {
+    #[inline]
+    pub(crate) fn clear_ic_header(&mut self) {
+        self.mode = LlIntIcMode::Empty as u8;
+        self.named_handler_bits = 0;
+        self.named_epoch = 0;
+    }
+
+    #[inline]
+    pub(crate) fn set_named_own_inline_load(&mut self, handler_bits: u64, epoch: u64) {
+        self.mode = LlIntIcMode::NamedOwnInlineLoad as u8;
+        self.named_handler_bits = handler_bits;
+        self.named_epoch = epoch;
+    }
+
+    #[inline]
+    pub(crate) const fn mode(&self) -> u8 {
+        self.mode
+    }
+
+    #[inline]
+    pub(crate) const fn named_handler_bits(&self) -> u64 {
+        self.named_handler_bits
+    }
+
+    #[inline]
+    pub(crate) const fn named_epoch(&self) -> u64 {
+        self.named_epoch
+    }
+
     /// Returns the inner [`FeedbackSiteState`] when the slot is
     /// populated. Used by the dual-write invariant test to compare
     /// against the legacy vector slot.

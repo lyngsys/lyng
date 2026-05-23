@@ -111,6 +111,7 @@ pub(crate) fn run_via_dsl(
     // Value or Value::uninitialized_lexical() sentinel.
     // See spec §3.3.
     let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
+    let object_records_base = agent.heap().view().object_record_ptr_table();
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
@@ -142,6 +143,7 @@ pub(crate) fn run_via_dsl(
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
+        object_records_base,
         // Phase 1.B.1 Task 3: real values derived above before the
         // installed/frame move into DispatchState.
         frame_const_base: const_base,

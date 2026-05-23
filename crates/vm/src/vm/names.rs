@@ -540,47 +540,51 @@ impl Vm {
         let global_object = agent
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
-        // Phase 3c inline IC fast path (mirrors Phase 3a's load-side inlining):
+        // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
         // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
         // PrototypeData / megamorphic still fall through to the chain below.
-        if let Some((handler, cached_epoch)) = self.named_property_fast_handler(code, feedback_slot)
+        if let Some((handler, cached_epoch)) =
+            self.named_property_own_data_handler(code, feedback_slot)
         {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object) {
                 if record.shape() == handler.receiver_shape()
                     && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
                 {
-                    let fast_value = match handler.slot_location() {
+                    let cached_value = match handler.slot_location() {
                         SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
                         SlotLocation::OutOfLine(offset) => record
                             .named_slots()
                             .and_then(|slots| view.object_slots(slots))
                             .and_then(|slots| slots.get(offset as usize).copied()),
                     };
-                    if let Some(value) = fast_value {
+                    if let Some(value) = cached_value {
                         if let Some(slot) = feedback_slot {
-                            self.record_named_property_fast_hit(code, slot);
+                            self.record_named_property_cache_hit(code, slot);
                         }
                         return Ok(value);
                     }
                 }
             }
         }
-        // Phase 3f polymorphic OwnData fast path on the global object.
+        // Phase 3f polymorphic OwnData cache hit path on the global object.
         // Same packed-handler walk as the named-property load above, just
         // applied to the global object's IC site.
-        if let Some(value) =
-            self.try_named_property_polymorphic_fast_load(agent, code, feedback_slot, global_object)
-        {
+        if let Some(value) = self.try_named_property_polymorphic_own_data_load(
+            agent,
+            code,
+            feedback_slot,
+            global_object,
+        ) {
             return Ok(value);
         }
-        // Phase 3e one-hop PrototypeData inline fast path. Globals frequently
+        // Phase 3e one-hop PrototypeData inline cache hit path. Globals frequently
         // resolve through the global object's prototype chain (e.g.
         // `Math` accessed via the window proto), so this is the second
         // tier before the slow chain.
         if let Some(value) =
-            self.try_named_property_proto_fast_load(agent, code, feedback_slot, global_object)
+            self.try_named_property_proto_data_load(agent, code, feedback_slot, global_object)
         {
             return Ok(value);
         }
@@ -613,10 +617,6 @@ impl Vm {
         Ok(value)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "DSL Rust probe keeps opcode operands explicit while preserving global lexical precedence"
-    )]
     pub(crate) fn try_load_global_rust_probe_for_dsl(
         &mut self,
         agent: &Agent,
@@ -640,23 +640,23 @@ impl Vm {
         };
 
         if let Some((handler, cached_epoch)) =
-            self.named_property_fast_handler(frame.code(), feedback_slot)
+            self.named_property_own_data_handler(frame.code(), feedback_slot)
         {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object) {
                 if record.shape() == handler.receiver_shape()
                     && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
                 {
-                    let fast_value = match handler.slot_location() {
+                    let cached_value = match handler.slot_location() {
                         SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
                         SlotLocation::OutOfLine(offset) => record
                             .named_slots()
                             .and_then(|slots| view.object_slots(slots))
                             .and_then(|slots| slots.get(offset as usize).copied()),
                     };
-                    if let Some(value) = fast_value {
+                    if let Some(value) = cached_value {
                         if let Some(slot) = feedback_slot {
-                            self.record_named_property_fast_hit(frame.code(), slot);
+                            self.record_named_property_cache_hit(frame.code(), slot);
                         }
                         self.write_register(frame.registers(), target, value);
                         advance_dispatch_frame(frame, instruction_len);
@@ -666,7 +666,7 @@ impl Vm {
             }
         }
 
-        if let Some(value) = self.try_named_property_polymorphic_fast_load(
+        if let Some(value) = self.try_named_property_polymorphic_own_data_load(
             agent,
             frame.code(),
             feedback_slot,
@@ -677,7 +677,7 @@ impl Vm {
             return true;
         }
 
-        if let Some(value) = self.try_named_property_proto_fast_load(
+        if let Some(value) = self.try_named_property_proto_data_load(
             agent,
             frame.code(),
             feedback_slot,
@@ -724,11 +724,11 @@ impl Vm {
             return self.write_environment_slot(agent, environment, binding.slot(), value);
         }
         let global_object = global.global_object();
-        // Phase 3c inline IC fast path (store side, mirrors Phase 3b). Non-writable
+        // Phase 3c inline IC cache hit path (store side, mirrors Phase 3b). Non-writable
         // own-data hit short-circuits to stored=false; for SetNamedProperty this
         // is a silent no-op (just like the slow chain).
         if let Some(target_opt) = self
-            .named_property_fast_handler(code, feedback_slot)
+            .named_property_own_data_handler(code, feedback_slot)
             .and_then(|(handler, cached_epoch)| {
                 let view = agent.heap().view();
                 let record = view.object_ref(global_object)?;
@@ -761,12 +761,12 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Phase 3f polymorphic OwnData store fast path on the global object.
+        // Phase 3f polymorphic OwnData store cache hit path on the global object.
         // The inner `Option<bool>` matches the slow-chain semantics —
         // `Some(true|false)` is a writable hit; `None` is non-writable.
         // For SetGlobal the result is discarded (silent no-op on miss),
         // matching the Phase 3c monomorphic branch above.
-        if let Some(target_opt) = self.try_named_property_polymorphic_fast_store(
+        if let Some(target_opt) = self.try_named_property_polymorphic_own_data_store(
             agent,
             code,
             feedback_slot,
@@ -842,11 +842,11 @@ impl Vm {
 
         let key = PropertyKey::from_atom(name);
         let global_object = global.global_object();
-        // Phase 3c inline IC fast path (assign side). Same as store, but on
+        // Phase 3c inline IC cache hit path (assign side). Same as store, but on
         // !stored in strict mode we throw a TypeError (sloppy mode silently
         // ignores the failed store) — preserving the slow chain's behavior.
         if let Some(target_opt) = self
-            .named_property_fast_handler(code, feedback_slot)
+            .named_property_own_data_handler(code, feedback_slot)
             .and_then(|(handler, cached_epoch)| {
                 let view = agent.heap().view();
                 let record = view.object_ref(global_object)?;
@@ -884,12 +884,12 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Phase 3f polymorphic OwnData assign fast path on the global object.
+        // Phase 3f polymorphic OwnData assign cache hit path on the global object.
         // Same Option<Option<bool>> encoding as the monomorphic branch
-        // above: outer Some = take fast path; inner Some(true|false) = stored
+        // above: outer Some = take cache hit path; inner Some(true|false) = stored
         // bool from the writable hit; inner None = non-writable hit. Strict
         // mode throws TypeError when stored=false.
-        if let Some(target_opt) = self.try_named_property_polymorphic_fast_store(
+        if let Some(target_opt) = self.try_named_property_polymorphic_own_data_store(
             agent,
             code,
             feedback_slot,

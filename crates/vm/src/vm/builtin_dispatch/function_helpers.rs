@@ -6,7 +6,7 @@ use super::{
     ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
 };
 
-const MAX_FAST_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
+const MAX_SPECIALIZED_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
 
 impl Vm {
     #[expect(
@@ -162,7 +162,7 @@ impl Vm {
         let object = value
             .as_object_ref()
             .ok_or_else(|| Self::abrupt_intrinsic_error(agent, realm, errors::ErrorKind::Type))?;
-        if let Some(arguments) = Self::try_collect_fast_engine_array_arguments(agent, object)? {
+        if let Some(arguments) = Self::try_collect_direct_engine_array_arguments(agent, object)? {
             return Ok(arguments);
         }
         let length = self.get_property_from_object(
@@ -222,7 +222,7 @@ impl Vm {
         ))
     }
 
-    fn try_collect_fast_engine_array_arguments(
+    fn try_collect_direct_engine_array_arguments(
         agent: &mut Agent,
         object: ObjectRef,
     ) -> VmResult<Option<Vec<Value>>> {
@@ -271,7 +271,7 @@ impl Vm {
         Ok(Some(arguments))
     }
 
-    pub(super) fn try_fast_apply_builtin(
+    pub(super) fn try_specialized_apply_builtin(
         &mut self,
         agent: &mut Agent,
         target: ObjectRef,
@@ -323,27 +323,27 @@ impl Vm {
                 .element(agent.heap().view(), object, index)
                 .unwrap_or(Value::array_hole());
             let Some(value) = value.as_smi() else {
-                self.recycle_fast_apply_string_code_units(units);
+                self.recycle_specialized_apply_string_code_units(units);
                 return Ok(None);
             };
             let Ok(code_point) = u32::try_from(value) else {
-                self.recycle_fast_apply_string_code_units(units);
+                self.recycle_specialized_apply_string_code_units(units);
                 return Err(VmError::Abrupt(errors::throw_range_error(agent)));
             };
             if code_point > 0x0010_FFFF {
-                self.recycle_fast_apply_string_code_units(units);
+                self.recycle_specialized_apply_string_code_units(units);
                 return Err(VmError::Abrupt(errors::throw_range_error(agent)));
             }
             append_code_point_units(&mut units, code_point);
         }
 
         let string = alloc_code_unit_string(agent, &units, None);
-        self.recycle_fast_apply_string_code_units(units);
+        self.recycle_specialized_apply_string_code_units(units);
         Ok(Some(Value::from_string_ref(string)))
     }
 
-    fn recycle_fast_apply_string_code_units(&mut self, mut units: Vec<u16>) {
-        if units.capacity() > MAX_FAST_APPLY_STRING_CODE_UNITS {
+    fn recycle_specialized_apply_string_code_units(&mut self, mut units: Vec<u16>) {
+        if units.capacity() > MAX_SPECIALIZED_APPLY_STRING_CODE_UNITS {
             return;
         }
         units.clear();
@@ -530,7 +530,7 @@ fn bound_target_function_data(
 fn number_to_u32_length(value: f64) -> Option<u32> {
     #[allow(
         clippy::float_cmp,
-        reason = "array-like fast path accepts only exactly integral Number lengths"
+        reason = "array-like specialized path accepts only exactly integral Number lengths"
     )]
     if !value.is_finite() || value < 0.0 || value.trunc() != value || value > f64::from(u32::MAX) {
         return None;

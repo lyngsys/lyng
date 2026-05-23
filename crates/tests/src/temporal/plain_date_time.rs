@@ -104,7 +104,7 @@ fn temporal_plain_date_time_from_clones_date_times_and_normalizes_property_bags(
 }
 
 #[test]
-fn temporal_plain_date_time_from_defaults_to_constrain_and_reads_options_for_fast_paths() {
+fn temporal_plain_date_time_from_defaults_to_constrain_and_reads_options_for_shortcuts() {
     let result = compile_and_run_string_with_host(
         r#"
         let log = [];

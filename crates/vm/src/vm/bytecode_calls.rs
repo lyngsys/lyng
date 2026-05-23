@@ -404,7 +404,7 @@ impl Vm {
         )
     }
 
-    /// Mirror of [`Self::install_prepared_bytecode_call`] for the fast
+    /// Mirror of [`Self::install_prepared_bytecode_call`] for the cache
     /// path: copies arguments directly from caller register slots into
     /// the callee frame instead of consuming a `&[Value]` slice. Only
     /// safe when the prepared call has `arguments_mode == None` and no
@@ -495,7 +495,7 @@ impl Vm {
         };
         debug_assert!(
             dest_start >= src_end,
-            "fast-path caller arg window must sit entirely before the callee frame"
+            "direct caller arg window must sit entirely before the callee frame"
         );
         self.register_stack
             .copy_within(src_start..src_end, dest_start);

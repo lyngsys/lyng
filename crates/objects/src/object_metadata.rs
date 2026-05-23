@@ -21,7 +21,7 @@ const INLINE_SHAPE_TRANSITION_LIMIT: usize = 3;
 /// one enum match)".
 ///
 /// **Inline-or-box choice.** Hot pure-`Copy` kinds whose data is small enough to keep
-/// the enum cache-friendly stay inline so the IC fast path can read them without a
+/// the enum cache-friendly stay inline so the IC shortcut can read them without a
 /// second heap dereference: `ArrayBuffer` (24 B), `DataView` (40 B), `Generator` (4 B).
 /// The remaining kinds with owned heap payloads (`Map`, `Set`, `ClassRecord`,
 /// `ModuleNamespace`, `Temporal`, `RegExp`) are boxed so the variant footprint stays

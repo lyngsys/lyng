@@ -114,7 +114,7 @@ fn regexp_replace_rejects_oversized_static_replacement_expansion() {
 }
 
 #[test]
-fn regexp_literal_and_whitespace_fast_paths_preserve_exec_and_replace_semantics() {
+fn regexp_literal_and_whitespace_shortcuts_preserve_exec_and_replace_semantics() {
     let result = compile_and_run_string(
         r#"
         let literal = /=/g;
@@ -283,7 +283,7 @@ fn regexp_raw_surrogate_literals_match_staging_semantics() {
 }
 
 #[test]
-fn regexp_unicode_literal_fast_paths_preserve_surrogate_and_case_folding_edges() {
+fn regexp_unicode_literal_shortcuts_preserve_surrogate_and_case_folding_edges() {
     let result = compile_and_run_string(
         r#"
         [

@@ -347,6 +347,7 @@ impl PrimitiveValueCellRecord {
 /// `trace_object_edges`, so their reachability is naturally tied to the object's lifetime.
 pub const RUNTIME_OBJECT_INLINE_SLOT_COUNT: usize = 4;
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RuntimeObjectRecord {
     pub(super) prototype: Option<ObjectRef>,
@@ -363,6 +364,14 @@ pub struct RuntimeObjectRecord {
     /// hold [`Value::empty_internal_slot`].
     pub(super) inline_named_slots: [Value; RUNTIME_OBJECT_INLINE_SLOT_COUNT],
 }
+
+pub const RUNTIME_OBJECT_SHAPE_OFFSET: usize = core::mem::offset_of!(RuntimeObjectRecord, shape);
+pub const RUNTIME_OBJECT_NAMED_SLOTS_OFFSET: usize =
+    core::mem::offset_of!(RuntimeObjectRecord, named_slots);
+pub const RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET: usize =
+    core::mem::offset_of!(RuntimeObjectRecord, last_invalidation_epoch);
+pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
+    core::mem::offset_of!(RuntimeObjectRecord, inline_named_slots);
 
 impl RuntimeObjectRecord {
     #[inline]

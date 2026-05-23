@@ -16,7 +16,7 @@
 //! #[unsafe(naked)]
 //! pub extern "C" fn op_xxx() -> ! {
 //!     ::core::arch::naked_asm!(
-//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_prefix}{vm_poll}{entry_stride_shift}{entry_observed} */\n",
+//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_object_records}{state_prefix}{vm_poll}{feedback_entry_stride}{entry_observed} */\n",
 //!         decode_<layout>!(<operand idents as scratch regs>),
 //!         m1!(...),                  // macro call returning &'static str (via concat!)
 //!         m2!(...),                  // ditto
@@ -238,17 +238,26 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_observed={entry_observed} obj_shape={object_shape} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
                 state_pb = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
                 state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
                 state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+                state_object_records = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_RECORDS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
                 entry_stride_shift = const 6_u32,
+                feedback_entry_stride = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_STRIDE,
+                feedback_mode = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_MODE_OFFSET,
+                feedback_named_handler_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET,
+                feedback_named_epoch = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
                 entry_observed = const 0_u32,
+                object_shape = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_SHAPE_OFFSET,
+                object_named_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET,
+                object_last_epoch = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET,
+                object_inline_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET,
                 // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
                 // (a `Box<DispatchCounters>` whose raw pointer reads through the
                 // `*mut DispatchCounters` repr-equivalence). When the
@@ -640,14 +649,13 @@ mod tests {
 
     #[test]
     fn rust_probe_shim_name_is_collected() {
-        let tokens: TokenStream = syn::parse_str(
-            "call_rust_probe!(op_get_named_property_rust_probe_rs, args = [a, b, c, slot])",
-        )
-        .expect("parse call_rust_probe!");
+        let tokens: TokenStream =
+            syn::parse_str("call_rust_probe!(op_load_global_rust_probe_rs, args = [a, bx])")
+                .expect("parse call_rust_probe!");
         let mut names = BTreeSet::new();
         collect_shim_names(&tokens, &mut names);
         assert!(
-            names.contains("op_get_named_property_rust_probe_rs"),
+            names.contains("op_load_global_rust_probe_rs"),
             "call_rust_probe! bridge shims must be emitted as naked_asm named symbols. Got: {names:?}",
         );
     }

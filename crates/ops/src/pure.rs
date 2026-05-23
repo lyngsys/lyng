@@ -233,7 +233,7 @@ pub fn is_negative_zero(value: Value) -> bool {
         .is_some_and(|number| number == 0.0 && number.is_sign_negative())
 }
 
-/// Heap-free `ToBoolean` fast path.
+/// Heap-free `ToBoolean` shortcut.
 ///
 /// Returns `None` for heap-backed strings and bigints, which require the
 /// shared primitive heap to inspect their contents.
@@ -255,7 +255,7 @@ pub fn to_boolean(value: Value) -> Option<bool> {
     }
 }
 
-/// Heap-free `IsStrictlyEqual` fast path.
+/// Heap-free `IsStrictlyEqual` shortcut.
 ///
 /// Returns `None` when both values are distinct heap-backed strings or bigints,
 /// which require content comparison through the shared primitive heap.
@@ -273,7 +273,7 @@ pub fn is_strictly_equal(left: Value, right: Value) -> Option<bool> {
     }
 }
 
-/// Heap-free `SameValue` fast path.
+/// Heap-free `SameValue` shortcut.
 ///
 /// Returns `None` when both values are distinct heap-backed strings or bigints,
 /// which require content comparison through the shared primitive heap.
@@ -291,7 +291,7 @@ pub fn same_value(left: Value, right: Value) -> Option<bool> {
     }
 }
 
-/// Heap-free `SameValueZero` fast path.
+/// Heap-free `SameValueZero` shortcut.
 ///
 /// Returns `None` when both values are distinct heap-backed strings or bigints,
 /// which require content comparison through the shared primitive heap.
@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn to_boolean_exposes_heap_free_fast_paths() {
+    fn to_boolean_exposes_heap_free_shortcuts() {
         assert_eq!(to_boolean(Value::undefined()), Some(false));
         assert_eq!(to_boolean(Value::null()), Some(false));
         assert_eq!(to_boolean(Value::from_bool(false)), Some(false));
@@ -410,7 +410,7 @@ mod tests {
     }
 
     #[test]
-    fn strict_equality_exposes_heap_free_fast_paths() {
+    fn strict_equality_exposes_heap_free_shortcuts() {
         let object = ObjectRef::from_raw(11).unwrap();
         let string = StringRef::from_raw(12).unwrap();
         let symbol = SymbolRef::from_raw(13).unwrap();
@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    fn same_value_exposes_heap_free_fast_paths() {
+    fn same_value_exposes_heap_free_shortcuts() {
         let shared_string = StringRef::from_raw(16).unwrap();
         let shared_bigint = BigIntRef::from_raw(17).unwrap();
 
@@ -537,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn same_value_zero_exposes_heap_free_fast_paths() {
+    fn same_value_zero_exposes_heap_free_shortcuts() {
         let shared_string = StringRef::from_raw(18).unwrap();
         let shared_bigint = BigIntRef::from_raw(19).unwrap();
 

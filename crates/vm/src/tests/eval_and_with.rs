@@ -20,7 +20,7 @@ fn evaluate_script_eval_executes_string_source_in_the_current_realm() {
 }
 
 #[test]
-fn evaluate_script_eval_fast_paths_regexp_literal_source() {
+fn evaluate_script_eval_shortcuts_regexp_literal_source() {
     let unit = compile_test_unit(
         23801,
         r#"

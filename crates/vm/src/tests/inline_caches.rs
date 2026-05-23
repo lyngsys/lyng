@@ -227,7 +227,7 @@ fn named_property_load_ic_caches_prototype_data_one_hop() {
 }
 
 #[test]
-fn named_property_load_ic_invalidates_proto_fast_on_prototype_swap() {
+fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
     let unit = compile_test_unit(151, "source.value;");
 
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -296,7 +296,7 @@ fn named_property_load_ic_invalidates_proto_fast_on_prototype_swap() {
 
     // Swap the prototype to one with a different value at the same shape.
     // The receiver epoch bump (cause = PrototypeMutation) must invalidate
-    // the proto fast path so the next access observes the new value.
+    // the proto shortcut so the next access observes the new value.
     agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects
@@ -376,7 +376,7 @@ fn keyed_named_property_load_ic_caches_prototype_data_one_hop() {
 }
 
 #[test]
-fn named_property_load_ic_does_not_engage_proto_fast_path_for_three_hop_chain() {
+fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_chain() {
     let unit = compile_test_unit(153, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let value_atom = unit_atom(&unit, "value");
@@ -446,7 +446,7 @@ fn named_property_load_ic_does_not_engage_proto_fast_path_for_three_hop_chain() 
         Value::from_smi(77)
     );
     // The IC still records the entry as PrototypeData — but with three
-    // dependencies, the proto fast handler stays NONE and the slow chain
+    // dependencies, the proto cache handler stays NONE and the slow chain
     // services the access.
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),
@@ -1596,7 +1596,7 @@ fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
 }
 
 #[test]
-fn ordinary_object_dense_index_store_uses_fast_path_without_feedback_slow_path() {
+fn ordinary_object_dense_index_store_uses_specialized_path_without_feedback_slow_path() {
     let unit = compile_test_unit(44, "source[0] = 9;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -1725,7 +1725,7 @@ fn engine_array_existing_index_store_skips_prototype_setter_scan() {
 }
 
 #[test]
-fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
+fn engine_array_sparse_index_store_uses_specialized_path_without_feedback_slow_path() {
     let unit = compile_test_unit(
         46,
         r"
@@ -1768,7 +1768,7 @@ fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
 }
 
 // -----------------------------------------------------------------------------
-// Phase 3f: polymorphic-OwnData inline IC fast path
+// Phase 3f: polymorphic-OwnData inline IC shortcut
 // -----------------------------------------------------------------------------
 
 fn make_object_with_value(
@@ -1808,9 +1808,63 @@ fn make_object_with_value(
 }
 
 #[test]
-fn named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
-    // After the polymorphic transition the inline fast path walks the
-    // `polymorphic_fast` sidecar (Phase 3f). Two distinct shapes both
+fn flat_named_property_header_tracks_monomorphic_inline_load() {
+    let unit = compile_test_unit(543, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(33));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(33)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    let (mode, handler_bits, epoch) = vm
+        .flat_named_property_header_snapshot(installed.code(), slot)
+        .expect("flat header should exist for named-load slot");
+    assert_eq!(
+        mode,
+        crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
+    );
+    assert_ne!(handler_bits, 0);
+    assert_eq!(epoch, 0);
+}
+
+#[test]
+fn named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_two_shapes() {
+    // After the polymorphic transition the inline shortcut walks the
+    // `polymorphic_own_data_handlers` sidecar (Phase 3f). Two distinct shapes both
     // resolve to `.value`; each evaluation must return its receiver's
     // value, not the other shape's.
     let unit = compile_test_unit(540, "source.value;");
@@ -1956,7 +2010,7 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
 }
 
 #[test]
-fn named_property_load_ic_polymorphic_fast_load_falls_through_beyond_poly_limit() {
+fn named_property_load_ic_polymorphic_own_data_handlers_load_falls_through_beyond_poly_limit() {
     // With POLY_LIMIT=4, six distinct shapes leave entries 4..6 reachable
     // only via the slow chain. Semantic correctness must hold regardless
     // of which path serves each evaluation. This is a tighter version of
@@ -2032,8 +2086,8 @@ fn named_property_load_ic_polymorphic_fast_load_falls_through_beyond_poly_limit(
 }
 
 #[test]
-fn named_property_store_ic_polymorphic_fast_store_writes_correct_slot() {
-    // Phase 3f store-side polymorphic fast path: two distinct shapes
+fn named_property_store_ic_polymorphic_own_data_handlers_store_writes_correct_slot() {
+    // Phase 3f store-side polymorphic shortcut: two distinct shapes
     // both have a writable `.value` slot. After the polymorphic
     // transition, writes through each shape must land in that shape's
     // slot (not the other shape's). The load that follows must read the
@@ -2104,13 +2158,13 @@ fn named_property_store_ic_polymorphic_fast_store_writes_correct_slot() {
 }
 
 #[test]
-fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() {
+fn named_property_load_ic_polymorphic_own_data_handlers_load_invalidates_on_prototype_swap() {
     // After the polymorphic transition, mutating a cached receiver's
     // prototype bumps that receiver's invalidation_epoch even though
-    // the shape ID stays the same. The polymorphic_fast hit must miss
+    // the shape ID stays the same. The polymorphic_own_data_handlers hit must miss
     // on the affected receiver and fall through to the slow chain,
     // which re-resolves the own-data slot (still correct, just no
-    // longer eligible for the fast hit until the cache refreshes).
+    // longer eligible for the cache hit until the cache refreshes).
     let unit = compile_test_unit(543, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let value_atom = unit_atom(&unit, "value");
@@ -2167,7 +2221,7 @@ fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() 
     );
 
     // Swap shape_a's prototype. This bumps shape_a's invalidation
-    // epoch with cause = PrototypeMutation. The polymorphic_fast hit
+    // epoch with cause = PrototypeMutation. The polymorphic_own_data_handlers hit
     // for shape_a must now miss the epoch check and fall through.
     agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
@@ -2188,7 +2242,7 @@ fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() 
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .unwrap(),
         Value::from_smi(20),
-        "shape_b's polymorphic_fast hit is unaffected by shape_a's epoch bump"
+        "shape_b's polymorphic_own_data_handlers hit is unaffected by shape_a's epoch bump"
     );
 
     assert_eq!(
@@ -2202,8 +2256,8 @@ fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() 
 }
 
 #[test]
-fn keyed_named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
-    // Phase 3f keyed-named polymorphic fast path: a keyed access
+fn keyed_named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_two_shapes() {
+    // Phase 3f keyed-named polymorphic shortcut: a keyed access
     // `source[key]` (with key = "value") on two distinct receiver
     // shapes. After the polymorphic transition the keyed sidecar walk
     // must match both atom AND receiver shape per entry.

@@ -77,7 +77,7 @@ pub struct Analyzer<'a> {
     pub(crate) diagnostics: DiagnosticList,
     ctx: WalkContext,
     suppressed_function_name_bindings: HashSet<FunctionId>,
-    /// Fast name-to-binding lookup per scope, avoiding O(n) linear scans
+    /// O(1) name-to-binding lookup per scope, avoiding O(n) linear scans
     /// in `declare_binding` and `declare_var_binding`.
     scope_binding_names: HashMap<(ScopeId, AtomId), SemanticBindingId>,
 }

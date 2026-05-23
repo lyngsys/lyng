@@ -186,7 +186,7 @@ fn script_core_if_statement_completion_uses_a_fresh_undefined_seed() {
 }
 
 #[test]
-fn script_core_eval_fast_paths_repeated_empty_blocks() {
+fn script_core_eval_shortcuts_repeated_empty_blocks() {
     let result = compile_and_run_string(
         r#"
         var source = "{}";

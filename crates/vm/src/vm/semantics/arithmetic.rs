@@ -8,7 +8,7 @@
 //! from the asm-DSL path.
 //!
 //! Family coverage (29 opcodes):
-//! - Binary with feedback + SMI fast path: `Add`, `Sub`, `Mul`, `Mod`,
+//! - Binary with feedback + SMI cache hit path: `Add`, `Sub`, `Mul`, `Mod`,
 //!   `BitAnd`.
 //! - SMI-immediate variants (`*Smi`): `AddSmi`, `SubSmi`, `MulSmi`, `ModSmi`,
 //!   `BitAndSmi`.
@@ -209,7 +209,7 @@ fn op_binary_general(
 }
 
 // =====================================================================
-// Add / Sub / Mul — two-register Abc with SMI fast path and feedback slot
+// Add / Sub / Mul — two-register Abc with SMI cache hit path and feedback slot
 // =====================================================================
 
 pub(crate) fn op_add_semantic(
@@ -423,7 +423,7 @@ pub(crate) fn op_mul_smi_semantic(
 }
 
 // =====================================================================
-// Div / DivSmi / Exp — always delegate, no inline SMI fast path
+// Div / DivSmi / Exp — always delegate, no inline SMI cache hit path
 // =====================================================================
 
 pub(crate) fn op_div_semantic(
@@ -460,7 +460,7 @@ pub(crate) fn op_exp_semantic(
 }
 
 // =====================================================================
-// Mod / ModSmi — SMI fast path via smi_mod_result, then delegate
+// Mod / ModSmi — SMI cache hit path via smi_mod_result, then delegate
 // =====================================================================
 
 pub(crate) fn op_mod_semantic(
@@ -530,7 +530,7 @@ pub(crate) fn op_mod_smi_semantic(
 }
 
 // =====================================================================
-// Bitwise — BitAnd / BitAndSmi have inline SMI fast paths; the rest always
+// Bitwise — BitAnd / BitAndSmi have inline SMI cache hit paths; the rest always
 // delegate.
 // =====================================================================
 

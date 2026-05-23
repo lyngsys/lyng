@@ -264,11 +264,11 @@ pub struct RegExpPayload {
     flags: RegExpObjectFlags,
     flag_text: Box<str>,
     backend: Regex,
-    fast_pattern: Option<RegExpFastPattern>,
+    recognized_pattern: Option<RegExpRecognizedPattern>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RegExpFastPattern {
+enum RegExpRecognizedPattern {
     Never,
     // Targeted ECMA-262 shims for current `regress` backend gaps around
     // scoped modifiers and duplicate named backreferences.
@@ -837,14 +837,14 @@ impl RegExpPayload {
         let parsed_flags = RegExpObjectFlags::from_flag_text(flags);
         let backend_pattern = normalize_backend_pattern(pattern, parsed_flags);
         let backend = Regex::with_flags(&backend_pattern, parsed_flags.compile_flags())?;
-        let fast_pattern = detect_fast_pattern(pattern, parsed_flags);
+        let recognized_pattern = detect_recognized_pattern(pattern, parsed_flags);
         Ok(Self {
             source: pattern.into(),
             source_units: None,
             flags: parsed_flags,
             flag_text: parsed_flags.ordered_flag_text().into_boxed_str(),
             backend,
-            fast_pattern,
+            recognized_pattern,
         })
     }
 
@@ -896,16 +896,16 @@ impl RegExpPayload {
     }
 
     #[inline]
-    pub const fn supports_literal_global_replace_fast_path(&self) -> bool {
+    pub const fn supports_literal_global_replace_shortcut(&self) -> bool {
         matches!(
-            self.fast_pattern,
+            self.recognized_pattern,
             Some(
-                RegExpFastPattern::LiteralCodeUnit(_)
-                    | RegExpFastPattern::EdgeWhitespaceRun
-                    | RegExpFastPattern::Whitespace
-                    | RegExpFastPattern::NonWhitespaceRun
-                    | RegExpFastPattern::NonWhitespace
-                    | RegExpFastPattern::WhitespaceRun
+                RegExpRecognizedPattern::LiteralCodeUnit(_)
+                    | RegExpRecognizedPattern::EdgeWhitespaceRun
+                    | RegExpRecognizedPattern::Whitespace
+                    | RegExpRecognizedPattern::NonWhitespaceRun
+                    | RegExpRecognizedPattern::NonWhitespace
+                    | RegExpRecognizedPattern::WhitespaceRun
             )
         )
     }
@@ -914,37 +914,37 @@ impl RegExpPayload {
         if self.flags.sticky() || self.flags.unicode_aware() {
             return None;
         }
-        match self.fast_pattern? {
-            RegExpFastPattern::LiteralCodeUnit(unit) => {
+        match self.recognized_pattern? {
+            RegExpRecognizedPattern::LiteralCodeUnit(unit) => {
                 Some(Self::literal_code_unit_ranges(text, unit))
             }
-            RegExpFastPattern::Whitespace => Some(Self::class_ranges(
+            RegExpRecognizedPattern::Whitespace => Some(Self::class_ranges(
                 text,
                 is_js_whitespace_or_line_terminator,
                 false,
             )),
-            RegExpFastPattern::WhitespaceRun => Some(Self::class_ranges(
+            RegExpRecognizedPattern::WhitespaceRun => Some(Self::class_ranges(
                 text,
                 is_js_whitespace_or_line_terminator,
                 true,
             )),
-            RegExpFastPattern::NonWhitespace => Some(Self::class_ranges(
+            RegExpRecognizedPattern::NonWhitespace => Some(Self::class_ranges(
                 text,
                 |unit| !is_js_whitespace_or_line_terminator(unit),
                 false,
             )),
-            RegExpFastPattern::NonWhitespaceRun => Some(Self::class_ranges(
+            RegExpRecognizedPattern::NonWhitespaceRun => Some(Self::class_ranges(
                 text,
                 |unit| !is_js_whitespace_or_line_terminator(unit),
                 true,
             )),
-            RegExpFastPattern::EdgeWhitespaceRun => Some(Self::edge_whitespace_ranges(text)),
+            RegExpRecognizedPattern::EdgeWhitespaceRun => Some(Self::edge_whitespace_ranges(text)),
             _ => None,
         }
     }
 
     pub fn find_from_code_units(&self, text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
-        if let Some(matched) = self.find_fast_from_code_units(text, start) {
+        if let Some(matched) = self.find_recognized_from_code_units(text, start) {
             return matched;
         }
         let matched = if self.flags.unicode_aware() {
@@ -968,40 +968,40 @@ impl RegExpPayload {
     #[allow(
         clippy::option_option,
         clippy::too_many_lines,
-        reason = "outer None means no fast path applies; inner None means the fast path matched no text"
+        reason = "outer None means no recognized shortcut applies; inner None means the recognized shortcut matched no text"
     )]
-    fn find_fast_from_code_units(
+    fn find_recognized_from_code_units(
         &self,
         text: &[u16],
         start: usize,
     ) -> Option<Option<RegExpMatchRecord>> {
-        match self.fast_pattern? {
-            RegExpFastPattern::Never => Some(None),
-            RegExpFastPattern::DuplicateNamedBackrefXSingle => {
+        match self.recognized_pattern? {
+            RegExpRecognizedPattern::Never => Some(None),
+            RegExpRecognizedPattern::DuplicateNamedBackrefXSingle => {
                 Some(Self::find_duplicate_named_backref_x_single(text, start))
             }
-            RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair => Some(
+            RegExpRecognizedPattern::DuplicateNamedBackrefXRepeatedPair => Some(
                 Self::find_duplicate_named_backref_x_repeated_pair(text, start),
             ),
-            RegExpFastPattern::DuplicateNamedAxySinglePair => {
+            RegExpRecognizedPattern::DuplicateNamedAxySinglePair => {
                 Some(Self::find_duplicate_named_axy_single_pair(text, start))
             }
-            RegExpFastPattern::DuplicateNamedAxyRepeatedPair => {
+            RegExpRecognizedPattern::DuplicateNamedAxyRepeatedPair => {
                 Some(Self::find_duplicate_named_axy_repeated_pair(text, start))
             }
-            RegExpFastPattern::DuplicateNamedAxyzSinglePair => {
+            RegExpRecognizedPattern::DuplicateNamedAxyzSinglePair => {
                 Some(Self::find_duplicate_named_axyz_single_pair(text, start))
             }
-            RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple => {
+            RegExpRecognizedPattern::DuplicateNamedAxyzRepeatedTriple => {
                 Some(Self::find_duplicate_named_axyz_repeated_triple(text, start))
             }
-            RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA => {
+            RegExpRecognizedPattern::ScopedIgnoreCaseBackrefLiteralA => {
                 Some(Self::find_scoped_ignore_case_backref_literal_a(text, start))
             }
-            RegExpFastPattern::ScopedCaseSensitiveBackrefLiteralA => Some(
+            RegExpRecognizedPattern::ScopedCaseSensitiveBackrefLiteralA => Some(
                 Self::find_scoped_case_sensitive_backref_literal_a(text, start),
             ),
-            RegExpFastPattern::ScopedUnicodeIgnoreCaseWordBoundary => {
+            RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseWordBoundary => {
                 Some(Self::find_scoped_unicode_word_boundary(
                     text,
                     start,
@@ -1009,7 +1009,7 @@ impl RegExpPayload {
                     is_unicode_ignore_case_word_code_unit,
                 ))
             }
-            RegExpFastPattern::ScopedUnicodeCaseSensitiveWordBoundary => {
+            RegExpRecognizedPattern::ScopedUnicodeCaseSensitiveWordBoundary => {
                 Some(Self::find_scoped_unicode_word_boundary(
                     text,
                     start,
@@ -1017,7 +1017,7 @@ impl RegExpPayload {
                     is_ascii_word_code_unit,
                 ))
             }
-            RegExpFastPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ => {
+            RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ => {
                 Some(Self::find_scoped_unicode_non_word_boundary_after_z(
                     text,
                     start,
@@ -1025,7 +1025,7 @@ impl RegExpPayload {
                     is_unicode_ignore_case_word_code_unit,
                 ))
             }
-            RegExpFastPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ => {
+            RegExpRecognizedPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ => {
                 Some(Self::find_scoped_unicode_non_word_boundary_after_z(
                     text,
                     start,
@@ -1033,151 +1033,153 @@ impl RegExpPayload {
                     is_ascii_word_code_unit,
                 ))
             }
-            RegExpFastPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty => Some(
+            RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty => Some(
                 Self::find_scoped_unicode_ignore_case_lu_property(text, start, false),
             ),
-            RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty => Some(
+            RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty => Some(
                 Self::find_scoped_unicode_ignore_case_lu_property(text, start, true),
             ),
-            RegExpFastPattern::UnicodeFooAnyBarBackref => {
+            RegExpRecognizedPattern::UnicodeFooAnyBarBackref => {
                 Some(self.find_unicode_foo_any_bar_backref(text, start))
             }
-            RegExpFastPattern::UnicodeAnchoredAnyBackref => {
+            RegExpRecognizedPattern::UnicodeAnchoredAnyBackref => {
                 Some(self.find_unicode_anchored_any_backref(text, start))
             }
-            RegExpFastPattern::UnicodeLeadHiraganaRun => {
+            RegExpRecognizedPattern::UnicodeLeadHiraganaRun => {
                 Some(Self::find_unicode_lead_followed_by_run(text, start, 0x3042))
             }
-            RegExpFastPattern::UnicodeRawLeadEscapedTrailOptional => {
+            RegExpRecognizedPattern::UnicodeRawLeadEscapedTrailOptional => {
                 Some(Self::find_unicode_lead_followed_by_run(text, start, 0xDC38))
             }
-            RegExpFastPattern::LegacyFrogPair => {
+            RegExpRecognizedPattern::LegacyFrogPair => {
                 Some(Self::find_legacy_frog_pair(text, start, false))
             }
-            RegExpFastPattern::LegacyFrogTrailOptional => {
+            RegExpRecognizedPattern::LegacyFrogTrailOptional => {
                 Some(Self::find_legacy_frog_trail_range(text, start, 0, Some(1)))
             }
-            RegExpFastPattern::LegacyFrogTrailRun => {
+            RegExpRecognizedPattern::LegacyFrogTrailRun => {
                 Some(Self::find_legacy_frog_trail_range(text, start, 1, None))
             }
-            RegExpFastPattern::LegacyFrogTrailStar => {
+            RegExpRecognizedPattern::LegacyFrogTrailStar => {
                 Some(Self::find_legacy_frog_trail_range(text, start, 0, None))
             }
-            RegExpFastPattern::LegacyFrogClass => Some(Self::find_legacy_frog_class(text, start)),
-            RegExpFastPattern::UnicodeLeadHiraganaClassStar => Some(Some(
+            RegExpRecognizedPattern::LegacyFrogClass => {
+                Some(Self::find_legacy_frog_class(text, start))
+            }
+            RegExpRecognizedPattern::UnicodeLeadHiraganaClassStar => Some(Some(
                 Self::find_unicode_lead_hiragana_class_star(text, start),
             )),
-            RegExpFastPattern::EdgeWhitespaceRun => {
-                Some(Self::find_fast_edge_whitespace_run(text, start))
+            RegExpRecognizedPattern::EdgeWhitespaceRun => {
+                Some(Self::find_recognized_edge_whitespace_run(text, start))
             }
-            RegExpFastPattern::AnchoredAnyRun => {
+            RegExpRecognizedPattern::AnchoredAnyRun => {
                 Some((start == 0 && !text.is_empty()).then(|| simple_match_record(0..text.len())))
             }
-            RegExpFastPattern::AnchoredAsciiRun => Some(Self::match_fast_anchored_run(
+            RegExpRecognizedPattern::AnchoredAsciiRun => Some(Self::match_recognized_anchored_run(
                 text,
                 start,
                 is_ascii_code_unit,
             )),
-            RegExpFastPattern::AnchoredAsciiNonRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredAsciiNonRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_ascii_code_unit(unit)
                 }))
             }
-            RegExpFastPattern::AnchoredAsciiHexRun => Some(Self::match_fast_anchored_run(
-                text,
-                start,
-                is_ascii_hex_digit_code_unit,
-            )),
-            RegExpFastPattern::AnchoredAsciiNonHexRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredAsciiHexRun => Some(
+                Self::match_recognized_anchored_run(text, start, is_ascii_hex_digit_code_unit),
+            ),
+            RegExpRecognizedPattern::AnchoredAsciiNonHexRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_ascii_hex_digit_code_unit(unit)
                 }))
             }
-            RegExpFastPattern::AnchoredBidiControlRun => Some(Self::match_fast_anchored_run(
-                text,
-                start,
-                is_bidi_control_code_unit,
-            )),
-            RegExpFastPattern::AnchoredBidiControlNonRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredBidiControlRun => Some(
+                Self::match_recognized_anchored_run(text, start, is_bidi_control_code_unit),
+            ),
+            RegExpRecognizedPattern::AnchoredBidiControlNonRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_bidi_control_code_unit(unit)
                 }))
             }
-            RegExpFastPattern::AsciiDigit => {
-                Some(self.find_fast_class(text, start, is_ascii_digit_code_unit))
+            RegExpRecognizedPattern::AsciiDigit => {
+                Some(self.find_recognized_class(text, start, is_ascii_digit_code_unit))
             }
-            RegExpFastPattern::AsciiNonDigit => {
-                Some(self.find_fast_class(text, start, |unit| !is_ascii_digit_code_unit(unit)))
+            RegExpRecognizedPattern::AsciiNonDigit => {
+                Some(
+                    self.find_recognized_class(text, start, |unit| !is_ascii_digit_code_unit(unit)),
+                )
             }
-            RegExpFastPattern::Whitespace => {
-                Some(self.find_fast_class(text, start, is_js_whitespace_or_line_terminator))
+            RegExpRecognizedPattern::Whitespace => {
+                Some(self.find_recognized_class(text, start, is_js_whitespace_or_line_terminator))
             }
-            RegExpFastPattern::WhitespaceRun => Some(Self::find_fast_class_run(
+            RegExpRecognizedPattern::WhitespaceRun => Some(Self::find_recognized_class_run(
                 text,
                 start,
                 is_js_whitespace_or_line_terminator,
             )),
-            RegExpFastPattern::NonWhitespace => Some(self.find_fast_class(text, start, |unit| {
-                !is_js_whitespace_or_line_terminator(unit)
-            })),
-            RegExpFastPattern::NonWhitespaceRun => {
-                Some(Self::find_fast_class_run(text, start, |unit| {
+            RegExpRecognizedPattern::NonWhitespace => {
+                Some(self.find_recognized_class(text, start, |unit| {
                     !is_js_whitespace_or_line_terminator(unit)
                 }))
             }
-            RegExpFastPattern::LiteralCodeUnit(unit) => Some(Self::find_fast_literal_code_unit(
-                text,
-                start,
-                unit,
-                self.flags.unicode_aware(),
-            )),
-            RegExpFastPattern::IgnoreCaseLiteral(class) => {
-                Some(self.find_fast_ignore_case_literal(text, start, class))
+            RegExpRecognizedPattern::NonWhitespaceRun => {
+                Some(Self::find_recognized_class_run(text, start, |unit| {
+                    !is_js_whitespace_or_line_terminator(unit)
+                }))
             }
-            RegExpFastPattern::AsciiWord => {
-                Some(self.find_fast_class(text, start, is_ascii_word_code_unit))
+            RegExpRecognizedPattern::LiteralCodeUnit(unit) => {
+                Some(Self::find_recognized_literal_code_unit(
+                    text,
+                    start,
+                    unit,
+                    self.flags.unicode_aware(),
+                ))
             }
-            RegExpFastPattern::AsciiNonWord => {
-                Some(self.find_fast_class(text, start, |unit| !is_ascii_word_code_unit(unit)))
+            RegExpRecognizedPattern::IgnoreCaseLiteral(class) => {
+                Some(self.find_recognized_ignore_case_literal(text, start, class))
             }
-            RegExpFastPattern::UnicodeIgnoreCaseWord => {
-                Some(self.find_fast_class(text, start, is_unicode_ignore_case_word_code_unit))
+            RegExpRecognizedPattern::AsciiWord => {
+                Some(self.find_recognized_class(text, start, is_ascii_word_code_unit))
             }
-            RegExpFastPattern::UnicodeIgnoreCaseNonWord => {
-                Some(self.find_fast_class(text, start, |unit| {
+            RegExpRecognizedPattern::AsciiNonWord => {
+                Some(self.find_recognized_class(text, start, |unit| !is_ascii_word_code_unit(unit)))
+            }
+            RegExpRecognizedPattern::UnicodeIgnoreCaseWord => {
+                Some(self.find_recognized_class(text, start, is_unicode_ignore_case_word_code_unit))
+            }
+            RegExpRecognizedPattern::UnicodeIgnoreCaseNonWord => {
+                Some(self.find_recognized_class(text, start, |unit| {
                     !is_unicode_ignore_case_word_code_unit(unit)
                 }))
             }
-            RegExpFastPattern::CapturedIgnoreCaseLiteral { class, one_or_more } => Some(
+            RegExpRecognizedPattern::CapturedIgnoreCaseLiteral { class, one_or_more } => Some(
                 Self::find_captured_ignore_case_literal(text, start, class, one_or_more),
             ),
-            RegExpFastPattern::AnchoredAsciiDigitRun => Some(Self::match_fast_anchored_run(
-                text,
-                start,
-                is_ascii_digit_code_unit,
-            )),
-            RegExpFastPattern::AnchoredAsciiNonDigitRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredAsciiDigitRun => Some(
+                Self::match_recognized_anchored_run(text, start, is_ascii_digit_code_unit),
+            ),
+            RegExpRecognizedPattern::AnchoredAsciiNonDigitRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_ascii_digit_code_unit(unit)
                 }))
             }
-            RegExpFastPattern::AnchoredWhitespaceRun => Some(Self::match_fast_anchored_run(
-                text,
-                start,
-                is_js_whitespace_or_line_terminator,
-            )),
-            RegExpFastPattern::AnchoredNonWhitespaceRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredWhitespaceRun => {
+                Some(Self::match_recognized_anchored_run(
+                    text,
+                    start,
+                    is_js_whitespace_or_line_terminator,
+                ))
+            }
+            RegExpRecognizedPattern::AnchoredNonWhitespaceRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_js_whitespace_or_line_terminator(unit)
                 }))
             }
-            RegExpFastPattern::AnchoredAsciiWordRun => Some(Self::match_fast_anchored_run(
-                text,
-                start,
-                is_ascii_word_code_unit,
-            )),
-            RegExpFastPattern::AnchoredAsciiNonWordRun => {
-                Some(Self::match_fast_anchored_run(text, start, |unit| {
+            RegExpRecognizedPattern::AnchoredAsciiWordRun => Some(
+                Self::match_recognized_anchored_run(text, start, is_ascii_word_code_unit),
+            ),
+            RegExpRecognizedPattern::AnchoredAsciiNonWordRun => {
+                Some(Self::match_recognized_anchored_run(text, start, |unit| {
                     !is_ascii_word_code_unit(unit)
                 }))
             }
@@ -1406,7 +1408,7 @@ impl RegExpPayload {
     ) -> Option<RegExpMatchRecord> {
         let mut index = start;
         while index < text.len() {
-            let width = fast_match_code_unit_width(text, index, true);
+            let width = recognized_match_code_unit_width(text, index, true);
             let unit = text[index];
             if negate || is_ascii_alpha_code_unit(unit) {
                 return Some(simple_match_record(index..index + width));
@@ -1604,7 +1606,7 @@ impl RegExpPayload {
         simple_match_record(start..end)
     }
 
-    fn find_fast_class(
+    fn find_recognized_class(
         &self,
         text: &[u16],
         start: usize,
@@ -1616,11 +1618,12 @@ impl RegExpPayload {
                 .map(|offset| start + offset)
         })?;
         Some(simple_match_record(
-            index..index + fast_match_code_unit_width(text, index, self.flags.unicode_aware()),
+            index
+                ..index + recognized_match_code_unit_width(text, index, self.flags.unicode_aware()),
         ))
     }
 
-    fn find_fast_class_run(
+    fn find_recognized_class_run(
         text: &[u16],
         start: usize,
         predicate: impl Fn(u16) -> bool,
@@ -1637,7 +1640,7 @@ impl RegExpPayload {
         Some(simple_match_record(index..end))
     }
 
-    fn find_fast_literal_code_unit(
+    fn find_recognized_literal_code_unit(
         text: &[u16],
         start: usize,
         unit: u16,
@@ -1658,7 +1661,7 @@ impl RegExpPayload {
         None
     }
 
-    fn find_fast_ignore_case_literal(
+    fn find_recognized_ignore_case_literal(
         &self,
         text: &[u16],
         start: usize,
@@ -1667,7 +1670,7 @@ impl RegExpPayload {
         let unicode_aware = self.flags.unicode_aware();
         let mut index = start;
         while index < text.len() {
-            let end = index + fast_match_code_unit_width(text, index, unicode_aware);
+            let end = index + recognized_match_code_unit_width(text, index, unicode_aware);
             if class.matches(text[index])
                 && (!unicode_aware
                     || (is_unicode_code_point_boundary(text, index)
@@ -1680,7 +1683,10 @@ impl RegExpPayload {
         None
     }
 
-    fn find_fast_edge_whitespace_run(text: &[u16], start: usize) -> Option<RegExpMatchRecord> {
+    fn find_recognized_edge_whitespace_run(
+        text: &[u16],
+        start: usize,
+    ) -> Option<RegExpMatchRecord> {
         if start == 0 {
             let leading_end = text
                 .iter()
@@ -1761,7 +1767,7 @@ impl RegExpPayload {
         ranges
     }
 
-    fn match_fast_anchored_run(
+    fn match_recognized_anchored_run(
         text: &[u16],
         start: usize,
         predicate: impl Fn(u16) -> bool,
@@ -1775,83 +1781,86 @@ impl RegExpPayload {
 
 #[allow(
     clippy::too_many_lines,
-    reason = "fast RegExp detection is an explicit table of targeted conformance shortcuts"
+    reason = "recognized RegExp shortcut detection is an explicit table of targeted conformance shortcuts"
 )]
-fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExpFastPattern> {
+fn detect_recognized_pattern(
+    pattern: &str,
+    flags: RegExpObjectFlags,
+) -> Option<RegExpRecognizedPattern> {
     let word_classes_are_ascii = !flags.ignore_case();
     if pattern == r"(?:(?<x>a)|(?<x>b))\k<x>" {
-        return Some(RegExpFastPattern::DuplicateNamedBackrefXSingle);
+        return Some(RegExpRecognizedPattern::DuplicateNamedBackrefXSingle);
     }
     if pattern == r"(?:(?:(?<x>a)|(?<x>b))\k<x>){2}" {
-        return Some(RegExpFastPattern::DuplicateNamedBackrefXRepeatedPair);
+        return Some(RegExpRecognizedPattern::DuplicateNamedBackrefXRepeatedPair);
     }
     if pattern == r"(?:(?:(?<a>x)|(?<a>y))\k<a>)" {
-        return Some(RegExpFastPattern::DuplicateNamedAxySinglePair);
+        return Some(RegExpRecognizedPattern::DuplicateNamedAxySinglePair);
     }
     if pattern == r"(?:(?:(?<a>x)|(?<a>y))\k<a>){2}" {
-        return Some(RegExpFastPattern::DuplicateNamedAxyRepeatedPair);
+        return Some(RegExpRecognizedPattern::DuplicateNamedAxyRepeatedPair);
     }
     if pattern == r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)" {
-        return Some(RegExpFastPattern::DuplicateNamedAxyzSinglePair);
+        return Some(RegExpRecognizedPattern::DuplicateNamedAxyzSinglePair);
     }
     if pattern == r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>){3}" {
-        return Some(RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple);
+        return Some(RegExpRecognizedPattern::DuplicateNamedAxyzRepeatedTriple);
     }
     if pattern == r"(a)(?i:\1)" || pattern == r"(a)(?i-:\1)" {
-        return Some(RegExpFastPattern::ScopedIgnoreCaseBackrefLiteralA);
+        return Some(RegExpRecognizedPattern::ScopedIgnoreCaseBackrefLiteralA);
     }
     if flags.ignore_case() && pattern == r"(a)(?-i:\1)" {
-        return Some(RegExpFastPattern::ScopedCaseSensitiveBackrefLiteralA);
+        return Some(RegExpRecognizedPattern::ScopedCaseSensitiveBackrefLiteralA);
     }
     if flags.unicode() && (pattern == r"(?i:\b)" || pattern == r"(?i-:\b)") {
-        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseWordBoundary);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseWordBoundary);
     }
     if flags.unicode() && flags.ignore_case() && pattern == r"(?-i:\b)" {
-        return Some(RegExpFastPattern::ScopedUnicodeCaseSensitiveWordBoundary);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeCaseSensitiveWordBoundary);
     }
     if flags.unicode() && (pattern == r"(?i:Z\B)" || pattern == r"(?i-:Z\B)") {
-        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseNonWordBoundaryAfterZ);
     }
     if flags.unicode() && flags.ignore_case() && pattern == r"(?-i:Z\B)" {
-        return Some(RegExpFastPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeCaseSensitiveNonWordBoundaryAfterZ);
     }
     if flags.unicode() && (pattern == r"(?i:\p{Lu})" || pattern == r"(?i-:\p{Lu})") {
-        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseUppercaseLetterProperty);
     }
     if flags.unicode() && (pattern == r"(?i:\P{Lu})" || pattern == r"(?i-:\P{Lu})") {
-        return Some(RegExpFastPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty);
+        return Some(RegExpRecognizedPattern::ScopedUnicodeIgnoreCaseNotUppercaseLetterProperty);
     }
     if flags.unicode() && pattern == r"foo(.+)bar\1" {
-        return Some(RegExpFastPattern::UnicodeFooAnyBarBackref);
+        return Some(RegExpRecognizedPattern::UnicodeFooAnyBarBackref);
     }
     if flags.unicode() && !flags.multiline() && pattern == r"^(.+)\1$" {
-        return Some(RegExpFastPattern::UnicodeAnchoredAnyBackref);
+        return Some(RegExpRecognizedPattern::UnicodeAnchoredAnyBackref);
     }
     if flags.unicode() && (pattern == r"\uD83D\u3042*" || pattern == r"\uD83D\u{3042}*") {
-        return Some(RegExpFastPattern::UnicodeLeadHiraganaRun);
+        return Some(RegExpRecognizedPattern::UnicodeLeadHiraganaRun);
     }
     if flags.unicode() && pattern == "\u{FFFD}\\uDC38?" {
-        return Some(RegExpFastPattern::UnicodeRawLeadEscapedTrailOptional);
+        return Some(RegExpRecognizedPattern::UnicodeRawLeadEscapedTrailOptional);
     }
     if !flags.unicode_aware()
         && (pattern == r"\uD83D\uDC38"
             || pattern == "\\uD83D\u{FFFD}"
             || pattern == "\u{FFFD}\\uDC38")
     {
-        return Some(RegExpFastPattern::LegacyFrogPair);
+        return Some(RegExpRecognizedPattern::LegacyFrogPair);
     }
     if !flags.unicode_aware()
         && (pattern == r"\uD83D\uDC38?"
             || pattern == "\\uD83D\u{FFFD}?"
             || pattern == "\u{FFFD}\\uDC38?")
     {
-        return Some(RegExpFastPattern::LegacyFrogTrailOptional);
+        return Some(RegExpRecognizedPattern::LegacyFrogTrailOptional);
     }
     if !flags.unicode_aware() && pattern == r"\uD83D\uDC38+" {
-        return Some(RegExpFastPattern::LegacyFrogTrailRun);
+        return Some(RegExpRecognizedPattern::LegacyFrogTrailRun);
     }
     if !flags.unicode_aware() && pattern == r"\uD83D\uDC38*" {
-        return Some(RegExpFastPattern::LegacyFrogTrailStar);
+        return Some(RegExpRecognizedPattern::LegacyFrogTrailStar);
     }
     if !flags.unicode_aware()
         && (pattern == r"[\uD83D\uDC38]"
@@ -1859,26 +1868,27 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             || pattern == "[\\uD83D\u{FFFD}]"
             || pattern == "[\u{FFFD}\\uDC38]")
     {
-        return Some(RegExpFastPattern::LegacyFrogClass);
+        return Some(RegExpRecognizedPattern::LegacyFrogClass);
     }
     if flags.unicode() && (pattern == r"[\uD83D\u3042]*" || pattern == r"[\uD83D\u{3042}]*") {
-        return Some(RegExpFastPattern::UnicodeLeadHiraganaClassStar);
+        return Some(RegExpRecognizedPattern::UnicodeLeadHiraganaClassStar);
     }
     if flags.unicode_aware()
         && !flags.ignore_case()
-        && let Some(pattern) = detect_fast_unicode_property_pattern(pattern, flags)
+        && let Some(pattern) = detect_recognized_unicode_property_pattern(pattern, flags)
     {
         return Some(pattern);
     }
     if flags.ignore_case()
-        && let Some(pattern) = detect_fast_ignore_case_captured_literal_pattern(pattern, flags)
+        && let Some(pattern) =
+            detect_recognized_ignore_case_captured_literal_pattern(pattern, flags)
     {
         return Some(pattern);
     }
     if flags.unicode_aware() && flags.ignore_case() {
         match pattern {
-            r"\w" | r"[^\W]" => return Some(RegExpFastPattern::UnicodeIgnoreCaseWord),
-            r"\W" | r"[^\w]" => return Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord),
+            r"\w" | r"[^\W]" => return Some(RegExpRecognizedPattern::UnicodeIgnoreCaseWord),
+            r"\W" | r"[^\w]" => return Some(RegExpRecognizedPattern::UnicodeIgnoreCaseNonWord),
             _ => {}
         }
     }
@@ -1891,53 +1901,56 @@ fn detect_fast_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<RegExp
             legacy_ignore_case_literal_class(unit)
         };
         if let Some(class) = class {
-            return Some(RegExpFastPattern::IgnoreCaseLiteral(class));
+            return Some(RegExpRecognizedPattern::IgnoreCaseLiteral(class));
         }
     }
     if !flags.multiline() && pattern == r"^\s+|\s+$" {
-        return Some(RegExpFastPattern::EdgeWhitespaceRun);
+        return Some(RegExpRecognizedPattern::EdgeWhitespaceRun);
     }
-    if let Some(unit) = detect_fast_literal_code_unit_pattern(pattern, flags) {
-        return Some(RegExpFastPattern::LiteralCodeUnit(unit));
+    if let Some(unit) = detect_recognized_literal_code_unit_pattern(pattern, flags) {
+        return Some(RegExpRecognizedPattern::LiteralCodeUnit(unit));
     }
 
     match pattern {
-        r"\d" => Some(RegExpFastPattern::AsciiDigit),
-        r"\D" => Some(RegExpFastPattern::AsciiNonDigit),
-        r"\s" => Some(RegExpFastPattern::Whitespace),
-        r"\s+" => Some(RegExpFastPattern::WhitespaceRun),
-        r"\S" => Some(RegExpFastPattern::NonWhitespace),
-        r"\S+" => Some(RegExpFastPattern::NonWhitespaceRun),
-        r"\w" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiWord),
-        r"\W" if word_classes_are_ascii => Some(RegExpFastPattern::AsciiNonWord),
-        r"^\d+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiDigitRun),
-        r"^\D+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiNonDigitRun),
-        r"^\s+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredWhitespaceRun),
-        r"^\S+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredNonWhitespaceRun),
+        r"\d" => Some(RegExpRecognizedPattern::AsciiDigit),
+        r"\D" => Some(RegExpRecognizedPattern::AsciiNonDigit),
+        r"\s" => Some(RegExpRecognizedPattern::Whitespace),
+        r"\s+" => Some(RegExpRecognizedPattern::WhitespaceRun),
+        r"\S" => Some(RegExpRecognizedPattern::NonWhitespace),
+        r"\S+" => Some(RegExpRecognizedPattern::NonWhitespaceRun),
+        r"\w" if word_classes_are_ascii => Some(RegExpRecognizedPattern::AsciiWord),
+        r"\W" if word_classes_are_ascii => Some(RegExpRecognizedPattern::AsciiNonWord),
+        r"^\d+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredAsciiDigitRun),
+        r"^\D+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredAsciiNonDigitRun),
+        r"^\s+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredWhitespaceRun),
+        r"^\S+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredNonWhitespaceRun),
         r"^\w+$" if !flags.multiline() && word_classes_are_ascii => {
-            Some(RegExpFastPattern::AnchoredAsciiWordRun)
+            Some(RegExpRecognizedPattern::AnchoredAsciiWordRun)
         }
         r"^\W+$" if !flags.multiline() && word_classes_are_ascii => {
-            Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
+            Some(RegExpRecognizedPattern::AnchoredAsciiNonWordRun)
         }
         _ => None,
     }
 }
 
-fn detect_fast_ignore_case_captured_literal_pattern(
+fn detect_recognized_ignore_case_captured_literal_pattern(
     pattern: &str,
     flags: RegExpObjectFlags,
-) -> Option<RegExpFastPattern> {
+) -> Option<RegExpRecognizedPattern> {
     let (unit, one_or_more) = captured_literal_code_unit(pattern)?;
     let class = if flags.unicode_aware() {
         unicode_ignore_case_literal_class(unit)?
     } else {
         legacy_ignore_case_literal_class(unit)?
     };
-    Some(RegExpFastPattern::CapturedIgnoreCaseLiteral { class, one_or_more })
+    Some(RegExpRecognizedPattern::CapturedIgnoreCaseLiteral { class, one_or_more })
 }
 
-fn detect_fast_literal_code_unit_pattern(pattern: &str, flags: RegExpObjectFlags) -> Option<u16> {
+fn detect_recognized_literal_code_unit_pattern(
+    pattern: &str,
+    flags: RegExpObjectFlags,
+) -> Option<u16> {
     if flags.ignore_case() {
         return None;
     }
@@ -2060,27 +2073,27 @@ const fn legacy_ignore_case_literal_class(unit: u16) -> Option<IgnoreCaseLiteral
     }
 }
 
-fn detect_fast_unicode_property_pattern(
+fn detect_recognized_unicode_property_pattern(
     pattern: &str,
     flags: RegExpObjectFlags,
-) -> Option<RegExpFastPattern> {
+) -> Option<RegExpRecognizedPattern> {
     match pattern {
-        r"\P{Any}" => Some(RegExpFastPattern::Never),
-        r"^\P{Any}+$" if !flags.multiline() => Some(RegExpFastPattern::Never),
-        r"^\p{Any}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAnyRun),
-        r"^\p{ASCII}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiRun),
-        r"^\P{ASCII}+$" if !flags.multiline() => Some(RegExpFastPattern::AnchoredAsciiNonRun),
+        r"\P{Any}" => Some(RegExpRecognizedPattern::Never),
+        r"^\P{Any}+$" if !flags.multiline() => Some(RegExpRecognizedPattern::Never),
+        r"^\p{Any}+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredAnyRun),
+        r"^\p{ASCII}+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredAsciiRun),
+        r"^\P{ASCII}+$" if !flags.multiline() => Some(RegExpRecognizedPattern::AnchoredAsciiNonRun),
         r"^\p{ASCII_Hex_Digit}+$" | r"^\p{AHex}+$" if !flags.multiline() => {
-            Some(RegExpFastPattern::AnchoredAsciiHexRun)
+            Some(RegExpRecognizedPattern::AnchoredAsciiHexRun)
         }
         r"^\P{ASCII_Hex_Digit}+$" | r"^\P{AHex}+$" if !flags.multiline() => {
-            Some(RegExpFastPattern::AnchoredAsciiNonHexRun)
+            Some(RegExpRecognizedPattern::AnchoredAsciiNonHexRun)
         }
         r"^\p{Bidi_Control}+$" | r"^\p{Bidi_C}+$" if !flags.multiline() => {
-            Some(RegExpFastPattern::AnchoredBidiControlRun)
+            Some(RegExpRecognizedPattern::AnchoredBidiControlRun)
         }
         r"^\P{Bidi_Control}+$" | r"^\P{Bidi_C}+$" if !flags.multiline() => {
-            Some(RegExpFastPattern::AnchoredBidiControlNonRun)
+            Some(RegExpRecognizedPattern::AnchoredBidiControlNonRun)
         }
         _ => None,
     }
@@ -2136,7 +2149,7 @@ fn is_js_whitespace_or_line_terminator(unit: u16) -> bool {
 }
 
 #[inline]
-fn fast_match_code_unit_width(text: &[u16], index: usize, unicode_aware: bool) -> usize {
+fn recognized_match_code_unit_width(text: &[u16], index: usize, unicode_aware: bool) -> usize {
     if !unicode_aware {
         return 1;
     }
@@ -2287,7 +2300,7 @@ fn advance_regexp_dot_unicode(text: &[u16], index: usize, dot_all: bool) -> Opti
     if !dot_all && is_line_terminator_code_unit(unit) {
         return None;
     }
-    Some(index + fast_match_code_unit_width(text, index, true))
+    Some(index + recognized_match_code_unit_width(text, index, true))
 }
 
 fn regexp_dot_unicode_range_matches(text: &[u16], range: Range<usize>, dot_all: bool) -> bool {
@@ -2373,120 +2386,120 @@ mod tests {
     }
 
     #[test]
-    fn detects_fast_character_class_patterns() {
+    fn detects_recognized_character_class_patterns() {
         assert_eq!(
-            detect_fast_pattern(r"\s", flags("")),
-            Some(RegExpFastPattern::Whitespace)
+            detect_recognized_pattern(r"\s", flags("")),
+            Some(RegExpRecognizedPattern::Whitespace)
         );
         assert_eq!(
-            detect_fast_pattern(r"\w", flags("u")),
-            Some(RegExpFastPattern::AsciiWord)
+            detect_recognized_pattern(r"\w", flags("u")),
+            Some(RegExpRecognizedPattern::AsciiWord)
         );
         assert_eq!(
-            detect_fast_pattern(r"[^\W]", flags("iu")),
-            Some(RegExpFastPattern::UnicodeIgnoreCaseWord)
+            detect_recognized_pattern(r"[^\W]", flags("iu")),
+            Some(RegExpRecognizedPattern::UnicodeIgnoreCaseWord)
         );
         assert_eq!(
-            detect_fast_pattern(r"[^\w]", flags("iu")),
-            Some(RegExpFastPattern::UnicodeIgnoreCaseNonWord)
+            detect_recognized_pattern(r"[^\w]", flags("iu")),
+            Some(RegExpRecognizedPattern::UnicodeIgnoreCaseNonWord)
         );
         assert_eq!(
-            detect_fast_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>)", flags("")),
-            Some(RegExpFastPattern::DuplicateNamedAxySinglePair)
+            detect_recognized_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>)", flags("")),
+            Some(RegExpRecognizedPattern::DuplicateNamedAxySinglePair)
         );
         assert_eq!(
-            detect_fast_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>){2}", flags("")),
-            Some(RegExpFastPattern::DuplicateNamedAxyRepeatedPair)
+            detect_recognized_pattern(r"(?:(?:(?<a>x)|(?<a>y))\k<a>){2}", flags("")),
+            Some(RegExpRecognizedPattern::DuplicateNamedAxyRepeatedPair)
         );
         assert_eq!(
-            detect_fast_pattern(
+            detect_recognized_pattern(
                 r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>)",
                 flags("")
             ),
-            Some(RegExpFastPattern::DuplicateNamedAxyzSinglePair)
+            Some(RegExpRecognizedPattern::DuplicateNamedAxyzSinglePair)
         );
         assert_eq!(
-            detect_fast_pattern(
+            detect_recognized_pattern(
                 r"(?:(?:(?<a>x)|(?<a>y)|(a)|(?<b>b)|(?<a>z))\k<a>){3}",
                 flags("")
             ),
-            Some(RegExpFastPattern::DuplicateNamedAxyzRepeatedTriple)
+            Some(RegExpRecognizedPattern::DuplicateNamedAxyzRepeatedTriple)
         );
         assert_eq!(
-            detect_fast_pattern(r"foo(.+)bar\1", flags("u")),
-            Some(RegExpFastPattern::UnicodeFooAnyBarBackref)
+            detect_recognized_pattern(r"foo(.+)bar\1", flags("u")),
+            Some(RegExpRecognizedPattern::UnicodeFooAnyBarBackref)
         );
         assert_eq!(
-            detect_fast_pattern(r"^(.+)\1$", flags("u")),
-            Some(RegExpFastPattern::UnicodeAnchoredAnyBackref)
+            detect_recognized_pattern(r"^(.+)\1$", flags("u")),
+            Some(RegExpRecognizedPattern::UnicodeAnchoredAnyBackref)
         );
         assert_eq!(
-            detect_fast_pattern(r"(\u017F)", flags("i")),
-            Some(RegExpFastPattern::CapturedIgnoreCaseLiteral {
+            detect_recognized_pattern(r"(\u017F)", flags("i")),
+            Some(RegExpRecognizedPattern::CapturedIgnoreCaseLiteral {
                 class: IgnoreCaseLiteralClass::LongSExact,
                 one_or_more: false
             })
         );
         assert_eq!(
-            detect_fast_pattern(r"(\x73)+", flags("iu")),
-            Some(RegExpFastPattern::CapturedIgnoreCaseLiteral {
+            detect_recognized_pattern(r"(\x73)+", flags("iu")),
+            Some(RegExpRecognizedPattern::CapturedIgnoreCaseLiteral {
                 class: IgnoreCaseLiteralClass::LongSUnicode,
                 one_or_more: true
             })
         );
         assert_eq!(
-            detect_fast_pattern(r"^\S+$", flags("v")),
-            Some(RegExpFastPattern::AnchoredNonWhitespaceRun)
+            detect_recognized_pattern(r"^\S+$", flags("v")),
+            Some(RegExpRecognizedPattern::AnchoredNonWhitespaceRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"\S+", flags("")),
-            Some(RegExpFastPattern::NonWhitespaceRun)
+            detect_recognized_pattern(r"\S+", flags("")),
+            Some(RegExpRecognizedPattern::NonWhitespaceRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"\s+", flags("g")),
-            Some(RegExpFastPattern::WhitespaceRun)
+            detect_recognized_pattern(r"\s+", flags("g")),
+            Some(RegExpRecognizedPattern::WhitespaceRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"=", flags("")),
-            Some(RegExpFastPattern::LiteralCodeUnit(u16::from(b'=')))
+            detect_recognized_pattern(r"=", flags("")),
+            Some(RegExpRecognizedPattern::LiteralCodeUnit(u16::from(b'=')))
         );
         assert_eq!(
-            detect_fast_pattern(r"\+", flags("g")),
-            Some(RegExpFastPattern::LiteralCodeUnit(u16::from(b'+')))
+            detect_recognized_pattern(r"\+", flags("g")),
+            Some(RegExpRecognizedPattern::LiteralCodeUnit(u16::from(b'+')))
         );
         assert_eq!(
-            detect_fast_pattern(r"\t", flags("g")),
-            Some(RegExpFastPattern::LiteralCodeUnit(0x0009))
+            detect_recognized_pattern(r"\t", flags("g")),
+            Some(RegExpRecognizedPattern::LiteralCodeUnit(0x0009))
         );
         assert_eq!(
-            detect_fast_pattern(r"^\s+|\s+$", flags("g")),
-            Some(RegExpFastPattern::EdgeWhitespaceRun)
+            detect_recognized_pattern(r"^\s+|\s+$", flags("g")),
+            Some(RegExpRecognizedPattern::EdgeWhitespaceRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"^\W+$", flags("")),
-            Some(RegExpFastPattern::AnchoredAsciiNonWordRun)
+            detect_recognized_pattern(r"^\W+$", flags("")),
+            Some(RegExpRecognizedPattern::AnchoredAsciiNonWordRun)
         );
     }
 
     #[test]
-    fn detects_fast_unicode_property_patterns() {
+    fn detects_recognized_unicode_property_patterns() {
         assert_eq!(
-            detect_fast_pattern(r"^\p{ASCII}+$", flags("u")),
-            Some(RegExpFastPattern::AnchoredAsciiRun)
+            detect_recognized_pattern(r"^\p{ASCII}+$", flags("u")),
+            Some(RegExpRecognizedPattern::AnchoredAsciiRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"^\P{AHex}+$", flags("u")),
-            Some(RegExpFastPattern::AnchoredAsciiNonHexRun)
+            detect_recognized_pattern(r"^\P{AHex}+$", flags("u")),
+            Some(RegExpRecognizedPattern::AnchoredAsciiNonHexRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"^\p{Bidi_C}+$", flags("u")),
-            Some(RegExpFastPattern::AnchoredBidiControlRun)
+            detect_recognized_pattern(r"^\p{Bidi_C}+$", flags("u")),
+            Some(RegExpRecognizedPattern::AnchoredBidiControlRun)
         );
         assert_eq!(
-            detect_fast_pattern(r"\P{Any}", flags("u")),
-            Some(RegExpFastPattern::Never)
+            detect_recognized_pattern(r"\P{Any}", flags("u")),
+            Some(RegExpRecognizedPattern::Never)
         );
-        assert_eq!(detect_fast_pattern(r"^\p{ASCII}+$", flags("")), None);
+        assert_eq!(detect_recognized_pattern(r"^\p{ASCII}+$", flags("")), None);
     }
 
     #[test]
@@ -2505,7 +2518,7 @@ mod tests {
     }
 
     #[test]
-    fn fast_unicode_property_runs_match_expected_ranges() {
+    fn recognized_unicode_property_runs_match_expected_ranges() {
         let ascii = RegExpPayload::compile(r"^\p{ASCII}+$", "u").unwrap();
         assert!(ascii.find_from_code_units(&[0x41, 0x7F], 0).is_some());
         assert!(ascii.find_from_code_units(&[0x41, 0x80], 0).is_none());
@@ -2522,7 +2535,7 @@ mod tests {
     }
 
     #[test]
-    fn fast_literal_and_whitespace_run_patterns_match_expected_ranges() {
+    fn recognized_literal_and_whitespace_run_patterns_match_expected_ranges() {
         let literal = RegExpPayload::compile("=", "").unwrap();
         assert_eq!(
             literal.find_from_code_units(&[0x61, 0x3D, 0x62], 0),

@@ -117,9 +117,13 @@ The following runtime-facing types are treated as stable architecture concepts:
 - `BuiltinFunctionId`
 - `EmbeddingFunctionId`
 
-## Fast And Slow Paths
+## LLInt Fast Paths And Rust Shortcuts
 
-Fast paths use:
+Fast path means a hot hit path that stays inside an LLInt handler emitted from
+the asm DSL. A path that calls back into Rust before dispatch is a Rust probe,
+bridge, shortcut, or cache hit, not an LLInt fast path.
+
+LLInt fast paths use:
 
 - frame registers for uncaptured local bindings
 - environment slots for captured bindings
@@ -128,6 +132,10 @@ Fast paths use:
 - dense indexed elements
 - direct Smi/double arithmetic paths
 - feedback vectors and inline-cache state keyed by bytecode feedback sites
+
+Rust shortcuts and cache hits may still use the same semantic facts, but their
+names should describe what they do directly: direct object probe, cache hit,
+specialized builtin call, or Rust probe.
 
 Slow paths handle:
 

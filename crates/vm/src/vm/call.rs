@@ -422,7 +422,7 @@ impl Vm {
                 .ordinary_bytecode_call_eligibility(agent, callee_object)
                 .is_some()
         {
-            return self.call_value_small_bytecode_fast(
+            return self.call_value_small_bytecode_direct(
                 agent,
                 frame_depth,
                 frame,
@@ -464,7 +464,7 @@ impl Vm {
     }
 
     /// Returns `Some(code)` when `callee_object` is an ordinary bytecode
-    /// callee for which the fast call path can seed the callee frame
+    /// callee for which the direct bytecode call path can seed the callee frame
     /// directly from the caller's register window — skipping
     /// `argument_scratch` materialization entirely.
     ///
@@ -501,7 +501,7 @@ impl Vm {
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
     #[inline]
-    fn call_value_small_bytecode_fast(
+    fn call_value_small_bytecode_direct(
         &mut self,
         agent: &mut Agent,
         frame_depth: usize,
@@ -528,7 +528,7 @@ impl Vm {
         )
     }
 
-    /// Shared fast-path entry for `Call0..3` and ordinary non-spread
+    /// Shared direct-call entry for `Call0..3` and ordinary non-spread
     /// generic `Call` opcodes. Translates the caller-frame-relative
     /// argument base into an absolute register-stack index, advances
     /// the caller dispatch frame, and then hands off to

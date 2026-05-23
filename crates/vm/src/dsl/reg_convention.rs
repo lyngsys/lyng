@@ -40,6 +40,7 @@ pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_o
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
 pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs_base);
 pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
+pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 // Phase 1.B.1: pre-resolved constants array base + this-mirror.
 // Populated at trampoline entry (entry.rs::run_via_dsl) and refreshed
 // in the slow-path Refresh arm (slow_path.rs::translate_outcome).
@@ -60,6 +61,13 @@ pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 pub const VM_POLL_PENDING_OFFSET: usize = offset_of!(crate::vm::Vm, dsl_poll_pending);
 pub const VM_OPCODE_COUNTER_OFFSET: usize = 0;
 pub const VM_HEAP_POOL_OFFSET: usize = 0;
+
+pub const RUNTIME_OBJECT_SHAPE_OFFSET: usize = lyng_gc::RUNTIME_OBJECT_SHAPE_OFFSET;
+pub const RUNTIME_OBJECT_NAMED_SLOTS_OFFSET: usize = lyng_gc::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET;
+pub const RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET: usize =
+    lyng_gc::RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET;
+pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
+    lyng_gc::RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET;
 
 // =============================================================================
 // VM-relative offsets (read from pinned register x22 = VM).

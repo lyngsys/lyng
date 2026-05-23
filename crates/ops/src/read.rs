@@ -195,7 +195,7 @@ pub fn is_strictly_equal(
             left.as_bigint_ref().unwrap(),
             right.as_bigint_ref().unwrap(),
         ),
-        _ => unreachable!("pure fast path should handle non-heap strict equality"),
+        _ => unreachable!("heap-free shortcut should handle non-heap strict equality"),
     }
 }
 
@@ -232,7 +232,7 @@ pub fn same_value(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -> Com
             left.as_bigint_ref().unwrap(),
             right.as_bigint_ref().unwrap(),
         ),
-        _ => unreachable!("pure fast path should handle non-heap SameValue"),
+        _ => unreachable!("heap-free shortcut should handle non-heap SameValue"),
     }
 }
 
@@ -269,7 +269,7 @@ pub fn same_value_zero(heap: PrimitiveHeapView<'_>, left: Value, right: Value) -
             left.as_bigint_ref().unwrap(),
             right.as_bigint_ref().unwrap(),
         ),
-        _ => unreachable!("pure fast path should handle non-heap SameValueZero"),
+        _ => unreachable!("heap-free shortcut should handle non-heap SameValueZero"),
     }
 }
 

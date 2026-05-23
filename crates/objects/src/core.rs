@@ -34,7 +34,7 @@ impl ObjectFlags {
     }
 
     /// Returns the raw 16-bit packed representation. Used by the Phase 3d
-    /// `KeyedDenseIndexHandler` IC fast path to compare against a cached
+    /// `KeyedDenseIndexHandler` IC shortcut to compare against a cached
     /// flags snapshot in a single u32 cmp.
     #[inline]
     pub const fn bits(self) -> u16 {

@@ -22,7 +22,7 @@
 //! The globals-with-feedback opcodes (`LoadGlobal`, `StoreGlobal`,
 //! `AssignGlobal`) defer entirely to the existing
 //! `Vm::*_with_feedback` helpers in `vm/names.rs`. Those helpers carry the
-//! Phase 3 inline-cache fast paths (monomorphic global-binding lookup,
+//! Phase 3 inline-cache cache hit paths (monomorphic global-binding lookup,
 //! shape probe, feedback-slot recording). DSL-0a's job is only to lift
 //! the call site out of the α handler — DSL-1 lands the IC mode-byte
 //! refactor and DSL-0b the flat-array refactor (per design §10). No IC

@@ -542,6 +542,23 @@ macro_rules! cmp_branch_eq {
     };
 }
 
+/// Compare two registers and branch to `$label` if not equal.
+#[macro_export]
+macro_rules! cmp_branch_ne {
+    ($a:tt, $b:tt, $label:tt) => {
+        concat!(
+            "cmp    x",
+            stringify!($a),
+            ", x",
+            stringify!($b),
+            "\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 /// Compare two registers and materialize the equality result as a 0/1
 /// payload in `$dst`.
 ///

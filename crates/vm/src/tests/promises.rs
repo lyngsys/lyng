@@ -1069,7 +1069,7 @@ fn evaluate_script_function_apply_observes_array_prototype_getter() {
 }
 
 #[test]
-fn evaluate_script_string_from_code_point_apply_uses_dense_array_fast_path() {
+fn evaluate_script_string_from_code_point_apply_uses_dense_array_specialized_path() {
     let unit = compile_test_unit(
         14_229,
         r"

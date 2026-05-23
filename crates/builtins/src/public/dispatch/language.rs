@@ -850,7 +850,7 @@ mod tests {
     #[test]
     fn exact_four_byte_percent_sequence_decodes_to_surrogate_pair() {
         let decoded = decode_exact_four_byte_percent_sequence(b"%F0%9F%98%80")
-            .expect("exact four-byte sequence should use the fast path")
+            .expect("exact four-byte sequence should use the specialized path")
             .expect("valid four-byte UTF-8 sequence should decode");
 
         assert_eq!(decoded, [0xD83D, 0xDE00]);
@@ -859,7 +859,7 @@ mod tests {
     #[test]
     fn exact_four_byte_percent_sequence_rejects_overlong_encoding() {
         let decoded = decode_exact_four_byte_percent_sequence(b"%F0%80%80%80")
-            .expect("exact malformed four-byte sequence should use the fast path");
+            .expect("exact malformed four-byte sequence should use the specialized path");
 
         assert_eq!(decoded, Err(()));
     }

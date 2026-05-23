@@ -76,7 +76,7 @@ pub use self::runtime::{
 pub use self::shapes::{
     ElementMode, InvalidationCause, InvalidationEvent, KeyedDenseIndexHandler,
     NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
-    NamedPropertyDictionaryEntry, NamedPropertyFastGet, NamedPropertyHandler,
+    NamedPropertyDictionaryEntry, NamedPropertyDirectGet, NamedPropertyHandler,
     NamedPropertyProtoHandler, NamedPropertyStorageMode, NamedPropertyValue,
     PropertyCacheDependency, ShapeAllocation, ShapeProperty, ShapePropertyKind, ShapeRecord,
     ShapeTransitionKey, SlotLocation, SparseElementEntry, INLINE_NAMED_SLOT_COUNT,

@@ -239,6 +239,10 @@ impl<Record: Copy, Handle: ArenaHandle> SlotArena<Record, Handle> {
         self.pages.get(page_index)?.get_ref(slot_index)
     }
 
+    pub(super) fn get_ptr(&self, handle: Handle) -> Option<*const Record> {
+        Some(std::ptr::from_ref(self.get_ref(handle)?))
+    }
+
     pub(super) fn free(&mut self, handle: Handle) -> Option<Record> {
         let (page_index, slot_index) = locate::<Handle>(handle)?;
         let (was_available, is_available, record) = {

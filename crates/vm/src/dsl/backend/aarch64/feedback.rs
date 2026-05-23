@@ -10,27 +10,114 @@
 //!
 //! Bindings expected from the proc-macro lowerer:
 //!
-//! - `{entry_stride_shift}` — log2 of `size_of::<FeedbackEntry>()`.
-//!   `FeedbackEntry = Option<FeedbackSiteState>`; the size is
-//!   determined at proc-macro lower time and emitted as a literal
-//!   shift count. For DSL-0b we use a placeholder `6` (= 64 bytes)
-//!   pending exact size measurement when the first IC handler lands.
+//! - `{feedback_entry_stride}` — `size_of::<FeedbackEntry>()`.
+//! - `{feedback_mode}` — byte offset of the LLInt IC mode byte.
+//! - `{feedback_named_handler_bits}` — byte offset of the packed named
+//!   property handler word.
+//! - `{feedback_named_epoch}` — byte offset of the named-property
+//!   invalidation epoch snapshot.
 //! - `{entry_observed}` — byte offset of the "observed types" word
 //!   inside `FeedbackEntry`. Resolved when the recording handlers
 //!   land in Batch 6.
 
 /// Compute a pointer to the `FeedbackEntry` at slot `$slot` and write
-/// it into `$dst`. Compiles to 2 instructions.
+/// it into `$dst`. Feedback slot ids are one-based, so the computed
+/// flat-array index is `slot - 1`.
 #[macro_export]
 macro_rules! load_feedback_site {
     ($slot:tt => $dst:tt) => {
         concat!(
-            "lsl    x16, x",
+            "sub    x17, x",
             stringify!($slot),
-            ", {entry_stride_shift}\n",
-            "add    x",
+            ", #1\n",
+            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
+            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
+            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
+            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
+            "madd   x",
             stringify!($dst),
-            ", x21, x16\n",
+            ", x17, x16, x21\n",
+        )
+    };
+}
+
+/// Branch to `$label` unless the flat feedback entry is a named
+/// monomorphic OwnData inline-slot load header.
+#[macro_export]
+macro_rules! branch_named_own_inline_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #1\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! load_named_handler_bits {
+    ($entry:tt => $dst:tt) => {
+        concat!(
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($entry),
+            ", {feedback_named_handler_bits}]\n",
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! load_named_epoch {
+    ($entry:tt => $dst:tt) => {
+        concat!(
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($entry),
+            ", {feedback_named_epoch}]\n",
+        )
+    };
+}
+
+/// Validate a packed named-property handler as an inline-slot handler
+/// and extract its low 30-bit slot index.
+#[macro_export]
+macro_rules! load_named_inline_slot_index_or_branch {
+    ($handler:tt => $slot_index:tt, $label:tt) => {
+        concat!(
+            "cbz    x",
+            stringify!($handler),
+            ", ",
+            stringify!($label),
+            "\n",
+            "tbz    x",
+            stringify!($handler),
+            ", #31, ",
+            stringify!($label),
+            "\n",
+            "ubfx   x",
+            stringify!($slot_index),
+            ", x",
+            stringify!($handler),
+            ", #0, #30\n",
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! load_named_handler_shape {
+    ($handler:tt => $dst:tt) => {
+        concat!(
+            "lsr    x",
+            stringify!($dst),
+            ", x",
+            stringify!($handler),
+            ", #32\n",
         )
     };
 }
@@ -41,10 +128,14 @@ macro_rules! load_feedback_site {
 macro_rules! record_smi {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x",
+            "sub    x17, x",
             stringify!($slot),
-            ", {entry_stride_shift}\n",
-            "add    x16, x21, x16\n",
+            ", #1\n",
+            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
+            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
+            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
+            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
+            "madd   x16, x17, x16, x21\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x1\n",
             "str    w17, [x16, {entry_observed}]\n",
@@ -57,10 +148,14 @@ macro_rules! record_smi {
 macro_rules! record_object {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x",
+            "sub    x17, x",
             stringify!($slot),
-            ", {entry_stride_shift}\n",
-            "add    x16, x21, x16\n",
+            ", #1\n",
+            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
+            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
+            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
+            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
+            "madd   x16, x17, x16, x21\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x2\n",
             "str    w17, [x16, {entry_observed}]\n",
@@ -73,10 +168,14 @@ macro_rules! record_object {
 macro_rules! record_double {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x",
+            "sub    x17, x",
             stringify!($slot),
-            ", {entry_stride_shift}\n",
-            "add    x16, x21, x16\n",
+            ", #1\n",
+            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
+            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
+            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
+            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
+            "madd   x16, x17, x16, x21\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x4\n",
             "str    w17, [x16, {entry_observed}]\n",

@@ -306,7 +306,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         lifetime: AllocationLifetime,
     ) -> Result<bool, Self::Error>;
 
-    fn try_fast_create_data_property(
+    fn try_direct_create_data_property(
         &mut self,
         _object: lyng_types::ObjectRef,
         _index: u32,
@@ -315,7 +315,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         Ok(false)
     }
 
-    fn try_fast_has_own_index_property(
+    fn try_direct_has_own_index_property(
         &mut self,
         _object: lyng_types::ObjectRef,
         _index: u32,
@@ -444,7 +444,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         arguments: &[Value],
     ) -> Result<Value, Self::Error>;
 
-    fn try_fast_apply_builtin(
+    fn try_specialized_apply_builtin(
         &mut self,
         _target: lyng_types::ObjectRef,
         _this_value: Value,
@@ -453,7 +453,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         Ok(None)
     }
 
-    fn try_fast_array_push(
+    fn try_direct_array_push(
         &mut self,
         _object: lyng_types::ObjectRef,
         _length: u64,

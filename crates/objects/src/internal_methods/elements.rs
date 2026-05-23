@@ -206,17 +206,17 @@ impl ObjectRuntime {
         }
     }
 
-    /// Return a fast-path own data value for an ordinary indexed property when possible.
+    /// Return a cache-hit own data value for an ordinary indexed property when possible.
     ///
     /// # Errors
     /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
-    pub fn fast_own_index_data_value(
+    pub fn direct_own_index_data_value(
         &self,
         heap: PrimitiveHeapView<'_>,
         id: ObjectRef,
         index: u32,
     ) -> InternalMethodResult<Option<Value>> {
-        if !self.can_fast_query_ordinary_index(id)? {
+        if !self.can_direct_query_ordinary_index(id)? {
             return Ok(None);
         }
         let record = heap.object(id).ok_or(InternalMethodError::MissingObject)?;
@@ -248,17 +248,17 @@ impl ObjectRuntime {
         }
     }
 
-    /// Return whether an ordinary object has an own indexed property when the fast path applies.
+    /// Return whether an ordinary object has an own indexed property when the cache hit path applies.
     ///
     /// # Errors
     /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
-    pub fn fast_has_own_index_property(
+    pub fn direct_has_own_index_property(
         &self,
         heap: PrimitiveHeapView<'_>,
         id: ObjectRef,
         index: u32,
     ) -> InternalMethodResult<Option<bool>> {
-        if !self.can_fast_query_ordinary_index(id)? {
+        if !self.can_direct_query_ordinary_index(id)? {
             return Ok(None);
         }
         let record = heap.object(id).ok_or(InternalMethodError::MissingObject)?;
@@ -289,7 +289,7 @@ impl ObjectRuntime {
         }
     }
 
-    /// Fast-path indexed assignment for ordinary objects with ordinary data elements.
+    /// Direct indexed assignment for ordinary objects with ordinary data elements.
     ///
     /// This intentionally excludes engine arrays, typed arrays, string exotics, module namespace
     /// objects, proxies, and sparse elements because those paths carry additional observable
@@ -297,7 +297,7 @@ impl ObjectRuntime {
     ///
     /// # Errors
     /// Returns [`InternalMethodError`] when object metadata or dense element storage is corrupt.
-    pub fn fast_set_ordinary_index_data_property(
+    pub fn direct_set_ordinary_index_data_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
@@ -373,7 +373,7 @@ impl ObjectRuntime {
         }
     }
 
-    fn can_fast_query_ordinary_index(&self, id: ObjectRef) -> InternalMethodResult<bool> {
+    fn can_direct_query_ordinary_index(&self, id: ObjectRef) -> InternalMethodResult<bool> {
         match self.require_object_kind(id)? {
             ObjectKind::Proxy => Ok(false),
             ObjectKind::Ordinary | ObjectKind::Function => Ok(!self.is_module_namespace_object(id)

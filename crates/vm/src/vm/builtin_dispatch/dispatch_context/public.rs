@@ -152,7 +152,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .define_property_on_object(self.agent, object, key, descriptor, lifetime)
     }
 
-    fn try_fast_create_data_property(
+    fn try_direct_create_data_property(
         &mut self,
         object: ObjectRef,
         index: u32,
@@ -160,7 +160,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     ) -> Result<bool, Self::Error> {
         let result = self.agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
-            objects.fast_set_engine_array_index(
+            objects.direct_set_engine_array_index(
                 &mut mutator,
                 object,
                 index,
@@ -175,14 +175,14 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         }
     }
 
-    fn try_fast_has_own_index_property(
+    fn try_direct_has_own_index_property(
         &mut self,
         object: ObjectRef,
         index: u32,
     ) -> Result<Option<bool>, Self::Error> {
         self.agent
             .objects()
-            .fast_has_own_index_property(self.agent.heap().view(), object, index)
+            .direct_has_own_index_property(self.agent.heap().view(), object, index)
             .map_err(|_| VmError::Abrupt(errors::throw_type_error(self.agent)))
     }
 
@@ -396,17 +396,17 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         )
     }
 
-    fn try_fast_apply_builtin(
+    fn try_specialized_apply_builtin(
         &mut self,
         target: ObjectRef,
         this_value: Value,
         arguments: Value,
     ) -> Result<Option<Value>, Self::Error> {
         self.vm
-            .try_fast_apply_builtin(self.agent, target, this_value, arguments)
+            .try_specialized_apply_builtin(self.agent, target, this_value, arguments)
     }
 
-    fn try_fast_array_push(
+    fn try_direct_array_push(
         &mut self,
         object: ObjectRef,
         length: u64,
@@ -419,7 +419,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         let Some(new_length) = length.checked_add(1) else {
             return Ok(None);
         };
-        match Vm::try_fast_set_engine_array_index(self.agent, object, index, arguments[0])? {
+        match Vm::try_direct_set_engine_array_index(self.agent, object, index, arguments[0])? {
             Some(true) => Ok(Some(new_length)),
             Some(false) | None => Ok(None),
         }

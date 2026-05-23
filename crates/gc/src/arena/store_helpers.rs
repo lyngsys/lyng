@@ -140,7 +140,7 @@ impl PrimitiveHeap {
     }
 
     /// Writes one `Value` into `RuntimeObjectRecord.inline_named_slots[index]`. Used by the
-    /// runtime's named-property fast path when a shape places its slot inline. Returns
+    /// runtime's named-property shortcut when a shape places its slot inline. Returns
     /// `false` when the index is out of range or the object record has been freed.
     /// Runs the incremental-marking value barrier on the holder so heap references
     /// embedded in inline slots are shaded gray when an incremental mark is in flight.

@@ -2,7 +2,7 @@
 //! `op_increment` and `op_decrement` against the non-SMI slow path.
 //!
 //! Tasks 9 / 10 (`crates/vm/src/dsl/handlers/cold.rs:1892-1909`
-//! and 1968-1985) ported the inline fast path for `op_increment` /
+//! and 1968-1985) ported the inline SMI hit path for `op_increment` /
 //! `op_decrement` to:
 //!
 //! ```text
@@ -22,7 +22,7 @@
 //! The semantic body
 //! (`crates/vm/src/vm/semantics/arithmetic.rs:796-833`) writes
 //! `numeric = ToNumeric(src)` back to `args.src` BEFORE storing the
-//! updated `value` to `args.dst`. The inline fast path ELIDES that
+//! updated `value` to `args.dst`. The inline SMI hit path ELIDES that
 //! writeback because for SMI src, `ToNumeric(SMI) == SMI` — the
 //! writeback would be a no-op. Non-SMI src (string, BigInt, Object
 //! with valueOf) takes the `.slow` branch which calls
@@ -61,7 +61,7 @@
 //!      the writeback to `current` ran)
 //!   4. `r` equals the expected pre-update integer (1 / 2)
 //!
-//! If the inline fast path had been mis-implemented to elide the
+//! If the inline SMI hit path had been mis-implemented to elide the
 //! writeback unconditionally (i.e. for non-SMI src as well), `r`
 //! would hold the original string and `typeof r === "number"` would
 //! be `false`, returning 0 and failing the assertion.
