@@ -497,6 +497,70 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
     );
 }
 
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn global_property_load_ic_hit_avoids_semantic_slow_path() {
+    let unit = compile_test_unit(544, "globalValue;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for the global access");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "globalValue"));
+    install_global_value(agent, &realm, global_value_name, Value::from_smi(11));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(11)
+    );
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::LoadGlobal), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::LoadGlobal),
+        0,
+        "cached global-object load IC hit should avoid the semantic slow bridge"
+    );
+}
+
 #[test]
 fn global_property_store_ic_caches_global_object_data_property() {
     let unit = compile_test_unit(

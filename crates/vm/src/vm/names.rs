@@ -5,6 +5,7 @@ use super::{
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
+use crate::vm::dispatch::advance_dispatch_frame;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
@@ -610,6 +611,95 @@ impl Vm {
             lyng_objects::NamedPropertyCachePurpose::Load,
         );
         Ok(value)
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "DSL fast helper keeps opcode operands explicit while preserving global lexical precedence"
+    )]
+    pub(crate) fn try_load_global_fast_for_dsl(
+        &mut self,
+        agent: &Agent,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        target: u16,
+        atom_operand: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+    ) -> bool {
+        let Ok(name) = self.read_atom_constant(frame.code(), atom_operand) else {
+            return false;
+        };
+        let Ok(global) = Self::find_global_environment_ref(agent, frame.variable_env()) else {
+            return false;
+        };
+        if Self::lookup_global_lexical_binding_ref(agent, global, name).is_some() {
+            return false;
+        }
+        let Some(global_object) = agent.global_environment_object(global) else {
+            return false;
+        };
+
+        if let Some((handler, cached_epoch)) =
+            self.named_property_fast_handler(frame.code(), feedback_slot)
+        {
+            let view = agent.heap().view();
+            if let Some(record) = view.object_ref(global_object) {
+                if record.shape() == handler.receiver_shape()
+                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+                {
+                    let fast_value = match handler.slot_location() {
+                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                        SlotLocation::OutOfLine(offset) => record
+                            .named_slots()
+                            .and_then(|slots| view.object_slots(slots))
+                            .and_then(|slots| slots.get(offset as usize).copied()),
+                    };
+                    if let Some(value) = fast_value {
+                        if let Some(slot) = feedback_slot {
+                            self.record_named_property_fast_hit(frame.code(), slot);
+                        }
+                        self.write_register(frame.registers(), target, value);
+                        advance_dispatch_frame(frame, instruction_len);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if let Some(value) = self.try_named_property_polymorphic_fast_load(
+            agent,
+            frame.code(),
+            feedback_slot,
+            global_object,
+        ) {
+            self.write_register(frame.registers(), target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        if let Some(value) = self.try_named_property_proto_fast_load(
+            agent,
+            frame.code(),
+            feedback_slot,
+            global_object,
+        ) {
+            self.write_register(frame.registers(), target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        if let Some(value) = self.try_named_property_load_inline_cache_hit(
+            agent,
+            frame.code(),
+            feedback_slot,
+            global_object,
+        ) {
+            self.write_register(frame.registers(), target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        false
     }
 
     #[expect(

@@ -358,6 +358,23 @@ macro_rules! call_slow {
 /// semantic slow-path counter.
 #[macro_export]
 macro_rules! call_fast {
+    ($shim:ident, args = [$a:tt, $b:tt]) => {
+        concat!(
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
+        )
+    };
     ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt]) => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
