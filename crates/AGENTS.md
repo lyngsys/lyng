@@ -105,6 +105,31 @@ Keep `lib.rs` thin: module declarations, intentional re-exports, and top-level w
 Avoid utility catch-all modules. Prefer names that describe the domain or algorithm they
 own.
 
+## Test Organization
+
+Tests are split by layer. Put new tests in the canonical home for the thing being verified, not wherever a similar test already lives. If something looks duplicated, it usually is — fix the bloat, do not extend it.
+
+- Lexer assertions (token shapes, numeric forms, identifier rules): `crates/lexer/src/tests.rs`.
+- Parser AST-shape assertions (each construct should have one structural test): `crates/parser/src/tests/*.rs`.
+- Parser smoke "does this construct parse cleanly": one of the six table-driven tests in `crates/tests/src/parser_coverage.rs`. Add a row, not a new test file or test fn.
+- Sema unit invariants on programmatically-built ASTs: `crates/sema/src/tests.rs`.
+- Sema on real JS source (the preferred shape): `crates/tests/src/sema_integration.rs`.
+- Compiler bytecode-shape assertions: `crates/compiler/src/script/tests.rs`.
+- VM-internal mechanics (inline caches, feedback, dispatch state, debugger hooks, prefix decoding): `crates/vm/src/tests/` and `crates/vm/tests/`. Only put a test here if it inspects VM-internal state that JS execution cannot observe.
+- JS-behavioral end-to-end coverage (compile a script, run it, assert on the result): `crates/tests/src/execution_semantics/`. This is canonical for "given this JS source, here is what the engine should produce." Do not duplicate JS-behavioral coverage in `crates/vm/src/tests/`.
+- Engine-internal data-structure tests (object storage, GC accounting, atom interning): the owning crate.
+- Spec conformance: `tools/lyng-test262` against the upstream tc39/test262 corpus.
+
+### Standing Rules
+
+- **Do not add new `_matches_test262_*` tests.** Test262 itself is the source of truth for spec conformance. When a bug is found in test262 mode, add a *regression* test that reproduces the engine-visible symptom, not a copy of the test262 fixture.
+- **Do not add new "does it parse" tests separate from the structural parser tests.** If a construct is missing structural parser coverage, add it in `crates/parser/src/tests/*.rs`. If you only want smoke coverage, add a row to `crates/tests/src/parser_coverage.rs`.
+- **Prefer table-driven tests over near-clone test functions.** When several tests differ only in input data, collect rows into a `&[(&str, ...)]` slice and assert in a loop. Aim for one test fn per behavior cluster, not one per data point.
+- **JS-behavioral tests live in one place.** `crates/vm/src/tests/` is for tests that need to inspect VM-internal state; `crates/tests/src/execution_semantics/` is for everything else.
+- **Long-running tests must be `#[ignore]`d.** Anything that runs more than ~250 ms in the default suite slows the inner loop disproportionately. Mark with `#[ignore = "Slow (...): cargo test -- --ignored"]`. CI runs them via the `--ignored` lane.
+- **Integration test files in `crates/vm/tests/` are expensive.** Each one is a separate test binary that cargo must link. Prefer a single root file that pulls in submodules via `#[path = "subdir/foo.rs"] mod foo;` when several related cases share a theme.
+- **Watch the test count over time.** A PR that grows the total `#[test]` count by more than ~10 should justify it. Most new behavior needs one or two tests, not a constellation.
+
 ## Spec Compliance
 
 - Anchor behavior to ECMA-262 Edition 16 concepts when practical.
