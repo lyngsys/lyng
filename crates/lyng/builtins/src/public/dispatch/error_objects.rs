@@ -4,9 +4,9 @@ use super::{
     PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_ops::errors;
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
+use lyng_common::WellKnownAtom;
+use lyng_ops::errors;
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
 
 pub(super) fn dispatch_error_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -40,7 +40,7 @@ pub(super) fn dispatch_error_builtin<Cx: PublicBuiltinDispatchContext>(
     if entry == super::aggregate_error_builtin() {
         return aggregate_error_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::suppressed_error_builtin() {
+    if entry == lyng_types::suppressed_error_builtin() {
         return suppressed_error_builtin(context, invocation).map(Some);
     }
     if entry == super::error_is_error_builtin() {

@@ -24,8 +24,8 @@ use crate::bootstrap::BuiltinBootstrapError;
 use crate::public::{
     allocate_builtin_function_object, public_builtin_metadata, BuiltinCache, PublicRealmBuiltins,
 };
-use lyng_js_env::Agent;
-use lyng_js_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
+use lyng_env::Agent;
+use lyng_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
 pub(super) use arrays::array_builtin_object;
 pub(super) use binary_data::binary_data_builtin_object;

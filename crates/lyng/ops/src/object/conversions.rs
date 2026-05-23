@@ -1,10 +1,8 @@
 use crate::read;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{
-    AbruptCompletion, Completion, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
-};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{AbruptCompletion, Completion, ObjectRef, PropertyKey, Value, WellKnownSymbolId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToPrimitiveHint {
@@ -24,7 +22,7 @@ impl ToPrimitiveHint {
     }
 
     #[inline]
-    pub const fn method_names(self) -> [lyng_js_common::AtomId; 2] {
+    pub const fn method_names(self) -> [lyng_common::AtomId; 2] {
         match self {
             Self::Default | Self::Number => {
                 [WellKnownAtom::valueOf.id(), WellKnownAtom::toString.id()]
@@ -70,7 +68,7 @@ pub trait ToPrimitiveContext {
     fn default_to_primitive_result(
         &mut self,
         _object: ObjectRef,
-        _method_name: lyng_js_common::AtomId,
+        _method_name: lyng_common::AtomId,
         _method_object: ObjectRef,
     ) -> Result<Option<Value>, Self::Error> {
         Ok(None)

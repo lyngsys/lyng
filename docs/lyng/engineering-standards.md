@@ -15,17 +15,17 @@ performance, memory behavior, and verification clarity.
 ## Layering Rules
 
 - Frontend crates do not depend on runtime or VM crates.
-- `lyng-js-types` remains representation-only.
-- `lyng-js-gc` owns allocation/rooting/tracing mechanics, not JavaScript semantics.
-- `lyng-js-objects` owns object storage and ordinary internal methods.
-- `lyng-js-env` owns agents, realms, execution contexts, environments, jobs, modules, and
+- `lyng-types` remains representation-only.
+- `lyng-gc` owns allocation/rooting/tracing mechanics, not JavaScript semantics.
+- `lyng-objects` owns object storage and ordinary internal methods.
+- `lyng-env` owns agents, realms, execution contexts, environments, jobs, modules, and
   backing-store coordination.
-- `lyng-js-ops` owns reusable abstract operations.
-- `lyng-js-compiler` owns lowering.
-- `lyng-js-bytecode` owns bytecode templates and metadata containers.
-- `lyng-js-vm` owns installation and interpretation.
-- `lyng-js-builtins` owns realm bootstrap and builtin dispatch.
-- `lyng-js-host` owns embedding hooks.
+- `lyng-ops` owns reusable abstract operations.
+- `lyng-compiler` owns lowering.
+- `lyng-bytecode` owns bytecode templates and metadata containers.
+- `lyng-vm` owns installation and interpretation.
+- `lyng-builtins` owns realm bootstrap and builtin dispatch.
+- `lyng-host` owns embedding hooks.
 
 ## API Ownership
 
@@ -55,7 +55,7 @@ performance, memory behavior, and verification clarity.
 ## Documentation Rules
 
 - Architecture docs describe the current engine shape and invariants.
-- Reports under `reports/js/lyng-js/` record verification output.
+- Reports under `reports/lyng/` record verification output.
 - Source comments explain non-obvious algorithms, ownership constraints, or spec mapping.
 - Avoid comments that restate obvious code.
 
@@ -66,11 +66,11 @@ performance, memory behavior, and verification clarity.
 - Rooting and tracing must be explicit around allocation paths.
 - Host callbacks and embedding functions must have clear ownership and error propagation.
 - Shared-memory behavior must remain behind backing-store and shared-memory operation APIs.
-- DSL boundary: the asm-DSL substrate (`crates/lyng-js-vm-dsl/` and
-  `crates/lyng-js/vm/src/dsl/`) is the audited home for inline assembly,
+- DSL boundary: the asm-DSL substrate (`crates/lyng/vm-dsl/` and
+  `crates/lyng/vm/src/dsl/`) is the audited home for inline assembly,
   `#[unsafe(naked)]` functions, and the slow-path bridge. Changes to those
   modules require: a `// SAFETY:` invariant comment per unsafe block, an asm
-  snapshot diff via `lyng-js-bench asm-diff` (when the DSL handler set is
+  snapshot diff via `lyng-bench asm-diff` (when the DSL handler set is
   populated), and Miri coverage for the shim layer.
 
 ## Testing Rules
@@ -78,25 +78,25 @@ performance, memory behavior, and verification clarity.
 Use focused tests first:
 
 ```sh
-cargo test -p lyng-js-parser
-cargo test -p lyng-js-compiler
-cargo test -p lyng-js-vm
-cargo test -p lyng-js-tests
+cargo test -p lyng-parser
+cargo test -p lyng-compiler
+cargo test -p lyng-vm
+cargo test -p lyng-tests
 ```
 
 Use targeted Test262 filters for semantic changes and whole-corpus reports for broad
 conformance changes:
 
 ```sh
-cargo run --release -p lyng-js-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-js-test262-temporal.md -j 4
-cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.md -j 12
+cargo run --release -p lyng-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-test262-temporal.md -j 4
+cargo run --release -p lyng-test262 -- --report /tmp/lyng-test262-report.md -j 12
 ```
 
 Use benchmark tooling for hot-path, memory, or bytecode-density changes:
 
 ```sh
-cargo run --release -p lyng-js-bench -- runtime --preset inner-loop --report /tmp/lyng-js-bench.md --json /tmp/lyng-js-bench.json
-cargo run --release -p lyng-js-bench -- density --preset inner-loop --report /tmp/lyng-js-bytecode-density.md --json /tmp/lyng-js-bytecode-density.json
+cargo run --release -p lyng-bench -- runtime --preset inner-loop --report /tmp/lyng-bench.md --json /tmp/lyng-bench.json
+cargo run --release -p lyng-bench -- density --preset inner-loop --report /tmp/lyng-bytecode-density.md --json /tmp/lyng-bytecode-density.json
 ```
 
 ## Review Checklist

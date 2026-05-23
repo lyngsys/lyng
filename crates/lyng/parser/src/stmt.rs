@@ -3,9 +3,9 @@
 mod control;
 mod loops;
 
-use lyng_js_ast::{Decl, FunctionKind, Stmt, StmtId};
-use lyng_js_common::WellKnownAtom;
-use lyng_js_lexer::{TokenKind, TokenPayload};
+use lyng_ast::{Decl, FunctionKind, Stmt, StmtId};
+use lyng_common::WellKnownAtom;
+use lyng_lexer::{TokenKind, TokenPayload};
 
 use crate::parser::Parser;
 
@@ -27,10 +27,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             TokenKind::Identifier
                 if self.at_contextual(WellKnownAtom::using) && self.peek_is_using_declaration() =>
             {
-                self.parse_using_declaration_stmt(lyng_js_ast::VariableKind::Using)
+                self.parse_using_declaration_stmt(lyng_ast::VariableKind::Using)
             }
             TokenKind::Await if self.at_await_using_declaration() => {
-                self.parse_using_declaration_stmt(lyng_js_ast::VariableKind::AwaitUsing)
+                self.parse_using_declaration_stmt(lyng_ast::VariableKind::AwaitUsing)
             }
             // `async function` declaration
             TokenKind::Identifier
@@ -69,7 +69,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         )
     }
 
-    const fn token_starts_using_binding(token: lyng_js_lexer::Token) -> bool {
+    const fn token_starts_using_binding(token: lyng_lexer::Token) -> bool {
         matches!(
             token.kind,
             TokenKind::Identifier | TokenKind::Yield | TokenKind::Await
@@ -129,13 +129,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 self.error(
                     "lexical declarations are not allowed in this statement position".to_string(),
                 );
-                self.parse_using_declaration_stmt(lyng_js_ast::VariableKind::Using)
+                self.parse_using_declaration_stmt(lyng_ast::VariableKind::Using)
             }
             TokenKind::Await if self.at_await_using_declaration() => {
                 self.error(
                     "lexical declarations are not allowed in this statement position".to_string(),
                 );
-                self.parse_using_declaration_stmt(lyng_js_ast::VariableKind::AwaitUsing)
+                self.parse_using_declaration_stmt(lyng_ast::VariableKind::AwaitUsing)
             }
             TokenKind::Semicolon => self.parse_empty_statement(),
             TokenKind::If => self.parse_if_statement(),
@@ -271,7 +271,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         matches!(
             self.ast().get_stmt(stmt_id),
             Stmt::Expression { expression, .. }
-                if matches!(self.ast().get_expr(*expression), lyng_js_ast::Expr::StringLiteral { .. })
+                if matches!(self.ast().get_expr(*expression), lyng_ast::Expr::StringLiteral { .. })
         )
     }
 
@@ -280,8 +280,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return false;
         };
 
-        let lyng_js_ast::Expr::StringLiteral { value, syntax, .. } =
-            self.ast().get_expr(*expression)
+        let lyng_ast::Expr::StringLiteral { value, syntax, .. } = self.ast().get_expr(*expression)
         else {
             return false;
         };

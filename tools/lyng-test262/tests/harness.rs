@@ -13,7 +13,7 @@ fn make_temp_dir() -> PathBuf {
         .as_nanos();
     let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
-        "lyng-js-test262-harness-{}-{}-{}",
+        "lyng-test262-harness-{}-{}-{}",
         std::process::id(),
         nonce,
         counter
@@ -27,7 +27,7 @@ fn run_passing_test(path: &Path, source: &str) -> String {
     let report_path = root.join("report.md");
     fs::write(path, source).expect("fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             path.to_str().expect("path should be utf-8"),
@@ -94,7 +94,7 @@ fn run_filtered_test_with_timeout(filter: &str, timeout_ms: u32) -> String {
     let root = make_temp_dir();
     let report_path = root.join("report.md");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             filter,
@@ -125,7 +125,7 @@ fn run_single_test(path: &Path, source: &str) -> String {
     let report_path = root.join("report.md");
     fs::write(path, source).expect("fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             path.to_str().expect("path should be utf-8"),
@@ -154,7 +154,7 @@ fn run_single_test_with_output(path: &Path, source: &str) -> (String, String) {
     let report_path = root.join("report.md");
     fs::write(path, source).expect("fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             path.to_str().expect("path should be utf-8"),
@@ -350,7 +350,7 @@ fn runner_reports_async_failure_from_single_agent_set_timeout_callback() {
     )
     .expect("fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             entry_path.to_str().expect("path should be utf-8"),

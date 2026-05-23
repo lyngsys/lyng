@@ -1,15 +1,15 @@
 use super::support::{
     compile_and_run, compile_and_run_string, compile_unit, evaluate_with_registry,
 };
-use lyng_js_builtins::{bootstrap_realm, BootstrapMode, BootstrapRequest, BuiltinCache};
-use lyng_js_common::AtomTable;
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator};
-use lyng_js_objects::{
+use lyng_builtins::{bootstrap_realm, BootstrapMode, BootstrapRequest, BuiltinCache};
+use lyng_common::AtomTable;
+use lyng_gc::{AllocationLifetime, PrimitiveMutator};
+use lyng_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectRuntime,
 };
-use lyng_js_ops::object::ordinary_create_data_property;
-use lyng_js_types::{PropertyKey, Value};
+use lyng_ops::object::ordinary_create_data_property;
+use lyng_types::{PropertyKey, Value};
 
 #[derive(Default)]
 struct RejectingRegistry;
@@ -29,7 +29,7 @@ impl NativeFunctionRegistry for RejectingRegistry {
         _runtime: &mut ObjectRuntime,
         _heap: &mut PrimitiveMutator<'_>,
         _request: NativeConstructRequest<'_>,
-    ) -> InternalMethodResult<lyng_js_types::ObjectRef> {
+    ) -> InternalMethodResult<lyng_types::ObjectRef> {
         panic!("unexpected native construct during cross-realm object test");
     }
 }

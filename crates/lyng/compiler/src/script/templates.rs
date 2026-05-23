@@ -8,7 +8,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_template_literal(
         &mut self,
         expr_id: ExprId,
-        template: lyng_js_ast::TemplateLiteralId,
+        template: lyng_ast::TemplateLiteralId,
         dest: u16,
     ) -> LoweringResult<()> {
         let quasis = self.ast().templates().get_quasis(template).to_vec();
@@ -46,7 +46,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         tag: ExprId,
-        template: lyng_js_ast::TemplateLiteralId,
+        template: lyng_ast::TemplateLiteralId,
         dest: u16,
     ) -> LoweringResult<()> {
         self.lower_tagged_template_call(expr_id, tag, template, Some(dest))
@@ -56,7 +56,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         tag: ExprId,
-        template: lyng_js_ast::TemplateLiteralId,
+        template: lyng_ast::TemplateLiteralId,
     ) -> LoweringResult<()> {
         self.lower_tagged_template_call(expr_id, tag, template, None)
     }
@@ -65,7 +65,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         tag: ExprId,
-        template: lyng_js_ast::TemplateLiteralId,
+        template: lyng_ast::TemplateLiteralId,
         dest: Option<u16>,
     ) -> LoweringResult<()> {
         let span = self.ast().get_expr(expr_id).span();
@@ -121,7 +121,7 @@ impl FunctionCompiler<'_, '_> {
     fn lower_template_object_into(
         &mut self,
         span: Span,
-        template: lyng_js_ast::TemplateLiteralId,
+        template: lyng_ast::TemplateLiteralId,
         dest: u16,
     ) -> LoweringResult<()> {
         let quasis = self.ast().templates().get_quasis(template).to_vec();

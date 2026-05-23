@@ -1,8 +1,8 @@
-use lyng_js_common::AtomId;
-use lyng_js_env::PromiseCapabilityId;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_host::ModuleSourceRequest;
-use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value};
+use lyng_common::AtomId;
+use lyng_env::PromiseCapabilityId;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_host::ModuleSourceRequest;
+use lyng_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value};
 
 use crate::frame::GeneratorResumeKind;
 use crate::name_refs::CapturedNameReference;
@@ -111,8 +111,8 @@ pub(in crate::vm) struct PendingDynamicImport {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(in crate::vm) struct SuspendedExecutionSideState {
-    pub(in crate::vm) iterator_states: Vec<(u16, lyng_js_ops::iterator::IteratorRecord)>,
-    pub(in crate::vm) for_in_states: Vec<(u16, lyng_js_ops::enumeration::ForInEnumerator)>,
+    pub(in crate::vm) iterator_states: Vec<(u16, lyng_ops::iterator::IteratorRecord)>,
+    pub(in crate::vm) for_in_states: Vec<(u16, lyng_ops::enumeration::ForInEnumerator)>,
     pub(in crate::vm) captured_name_references: Vec<(u16, CapturedNameReference)>,
     pub(in crate::vm) loop_iteration_envs: Vec<LoopIterationEnvironment>,
     pub(in crate::vm) with_environment_states: Vec<WithEnvironmentState>,

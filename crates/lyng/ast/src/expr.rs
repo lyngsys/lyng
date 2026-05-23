@@ -3,7 +3,7 @@
 //! Each variant carries a `Span` and node-specific payload. Child nodes
 //! are referenced by typed IDs, and child lists by `NodeList`.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::common::{AssignOp, BinaryOp, LogicalOp, PropertyKind, UnaryOp, UpdateOp};
 use crate::ids::{

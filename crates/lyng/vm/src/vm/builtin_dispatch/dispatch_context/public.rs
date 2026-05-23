@@ -317,15 +317,15 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
 
     fn park_agent(
         &mut self,
-        request: &lyng_js_host::ParkAgentRequest,
-    ) -> Result<lyng_js_host::ParkAgentResult, Self::Error> {
+        request: &lyng_host::ParkAgentRequest,
+    ) -> Result<lyng_host::ParkAgentResult, Self::Error> {
         self.host.park_agent(request).map_err(VmError::Host)
     }
 
     fn unpark_agent(
         &mut self,
-        request: &lyng_js_host::UnparkAgentRequest,
-    ) -> Result<lyng_js_host::UnparkAgentResult, Self::Error> {
+        request: &lyng_host::UnparkAgentRequest,
+    ) -> Result<lyng_host::UnparkAgentResult, Self::Error> {
         self.host.unpark_agent(request).map_err(VmError::Host)
     }
 
@@ -663,18 +663,18 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             .agent
             .objects()
             .function_data(function)
-            .and_then(lyng_js_objects::FunctionObjectData::entry)
+            .and_then(lyng_objects::FunctionObjectData::entry)
         else {
             return Vm::native_function_source_text(self.agent, function);
         };
         match entry {
-            lyng_js_objects::FunctionEntryIdentity::Bytecode(code) => self
+            lyng_objects::FunctionEntryIdentity::Bytecode(code) => self
                 .vm
                 .source_function_source_text(self.agent, code, function),
-            lyng_js_objects::FunctionEntryIdentity::Native(_) => {
+            lyng_objects::FunctionEntryIdentity::Native(_) => {
                 Vm::native_function_source_text(self.agent, function)
             }
-            lyng_js_objects::FunctionEntryIdentity::Bound => {
+            lyng_objects::FunctionEntryIdentity::Bound => {
                 Ok("function () { [native code] }".to_owned())
             }
         }

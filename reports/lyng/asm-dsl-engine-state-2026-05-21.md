@@ -2,28 +2,28 @@
 
 **HEAD:** `aa3ab9fc` (Phase 1.B closed; planning artifacts archived).
 **Cumulative V8 v7 vs pre-DSL-0 `d850f261`:** **+8.51% geomean** (11-sample direct measurement at Phase 1.B.3 close).
-**Behavioral parity:** 418 `lyng-js-vm --lib` + 1209 `lyng-js-tests` passing. Test262: 49729 files passing / 0 failing.
-**Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+**Behavioral parity:** 418 `lyng-vm --lib` + 1209 `lyng-tests` passing. Test262: 49729 files passing / 0 failing.
+**Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 **DSL-1 epic spec:** [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md).
 
 ---
 
 ## 1. What this engine is
 
-The asm-DSL interpreter is a hand-shaped LLInt-style fast path for lyng-js's JavaScript bytecode dispatch. Per the parent design §3, the goal is to replicate JSC's `LowLevelInterpreter64.asm` discipline — direct asm handlers tail-jumping through a dispatch table — but expressed in a Rust proc-macro DSL so the substrate stays in-language and the slow-path semantic bodies are shared with the original Rust dispatcher.
+The asm-DSL interpreter is a hand-shaped LLInt-style fast path for lyng's JavaScript bytecode dispatch. Per the parent design §3, the goal is to replicate JSC's `LowLevelInterpreter64.asm` discipline — direct asm handlers tail-jumping through a dispatch table — but expressed in a Rust proc-macro DSL so the substrate stays in-language and the slow-path semantic bodies are shared with the original Rust dispatcher.
 
 The architecture uses:
 
 - **Pinned registers** (AArch64: x19=PC, x20=REGS, x21=FV, x22=VM, x23=TABLE, x24=STATE) across the whole handler chain.
 - **`#[repr(C)] LlIntState`** as the asm-visible state record — a fixed-layout struct read directly by handlers via offset constants.
-- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/lyng-js/vm/src/dsl/backend/aarch64/`.
+- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/lyng/vm/src/dsl/backend/aarch64/`.
 - **Slow-path bridge** (`crate::dsl::slow_path::LlIntDispatchState`) for opcodes that can't (or shouldn't) inline. Each bridge call goes through a uniform shim that snapshots PC + register window, runs the existing semantic body, and returns one of {Continue, Refresh, ExitDone, ExitError}.
 - **Mirror discipline** for arena pointers (instruction bytes, constants array, register window, feedback slab): the `LlIntState` fields are pointers into GC-or-arena-allocated storage, refreshed by the Refresh arm of `translate_outcome` after any slow-path call.
 
 The DSL is implemented across two crates:
 
-- `crates/lyng-js-vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
-- `crates/lyng-js/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
+- `crates/lyng/vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
+- `crates/lyng/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
 
 ---
 
@@ -39,7 +39,7 @@ The substrate phases (DSL-0a, 0b, 0c) brought up the entire DSL infrastructure:
 
 By DSL-0 close, every opcode existed as a `cold-stub` `call_slow!` shim — semantically correct, no inline asm. The substrate could in principle replace any opcode's cold stub with a hand-asm fast path; DSL-1 is the rollout of those replacements.
 
-Reports: `reports/js/lyng-js/{dsl-0-decision.md, dsl-0a-status.md, dsl-0b-status.md, dsl-0c-status.md}`.
+Reports: `reports/lyng/{dsl-0-decision.md, dsl-0a-status.md, dsl-0b-status.md, dsl-0c-status.md}`.
 
 ### DSL-1 Phase 1.A (closed at `b680752e`)
 
@@ -63,7 +63,7 @@ V8 v7 vs pre-DSL-0 `d850f261`: **+1.7%** (corrected via same-load A/B; the origi
 
 Phase 1.A retrospective lesson, codified into the rules for 1.B+: **strict top-30 + macro-shared-pair selection** (the 5 adjacent-family ports would NOT have shipped under this rule; their per-opcode dispatch share was negligible vs. their substrate footprint).
 
-Summary: [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md).
+Summary: [`reports/lyng/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md).
 
 ### DSL-1 Phase 1.B (closed at `aa3ab9fc`)
 
@@ -76,7 +76,7 @@ Four sequential sub-phases. Combined: **substrate refactor + 11 inline ports + i
 - 14 microbench snippets covering Phase-1.A and Phase-1.B target opcodes.
 - Overhead ≈ 0% on V8 v7 (Apple Silicon wide-issue absorbs the 4-instruction counter sequence into existing slots).
 
-Summary: [`reports/js/lyng-js/dsl-1/phase-1b0-summary.md`](dsl-1/phase-1b0-summary.md).
+Summary: [`reports/lyng/dsl-1/phase-1b0-summary.md`](dsl-1/phase-1b0-summary.md).
 
 #### 1.B.1 — frame-context substrate (closed at `4ff25b9b`)
 
@@ -86,7 +86,7 @@ Summary: [`reports/js/lyng-js/dsl-1/phase-1b0-summary.md`](dsl-1/phase-1b0-summa
 - `load_constant!` and `load_state_value!` backend macros.
 - Mandatory `feature-dev:code-reviewer` dispatch (per umbrella §3); 0 findings.
 
-Summary: [`reports/js/lyng-js/dsl-1/phase-1b1-summary.md`](dsl-1/phase-1b1-summary.md). GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
+Summary: [`reports/lyng/dsl-1/phase-1b1-summary.md`](dsl-1/phase-1b1-summary.md). GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
 
 #### 1.B.2 — backfill ports (closed at `7baf5846`)
 
@@ -96,7 +96,7 @@ Summary: [`reports/js/lyng-js/dsl-1/phase-1b1-summary.md`](dsl-1/phase-1b1-summa
 
 Same-load A/B vs 1.B.1 close was originally reported as +4.89% but an audit found the loadavg overlap was 21% (just outside protocol); the 11-sample re-run landed at **+0.91%** geomean.
 
-Summary: [`reports/js/lyng-js/dsl-1/phase-1b2-summary.md`](dsl-1/phase-1b2-summary.md). Cleanup batch: integrated into [`phase-1b-summary.md`](dsl-1/phase-1b-summary.md).
+Summary: [`reports/lyng/dsl-1/phase-1b2-summary.md`](dsl-1/phase-1b2-summary.md). Cleanup batch: integrated into [`phase-1b-summary.md`](dsl-1/phase-1b-summary.md).
 
 #### Cleanup batch (between 1.B.2 and 1.B.3, at `08727f92`)
 
@@ -129,9 +129,9 @@ Findings #1, #2, #3, #6, #7 → cleanup batch 1 (`922ff5f2..2cb027b0`). Findings
 
 All 9 handlers: 7 instructions total each (1 decode + 2 body + 4 dispatch). All at **0.000% slow-path-share** on V8 v7. Combined dispatch share: **~1.26B inlined dispatches per V8 v7 run** (the 8 reachable opcodes; StoreLocal0 has 0).
 
-**LoadEnvSlot deferred** to a future substrate sub-phase. Investigation revealed it requires a new `frame_lexical_env` mirror on `LlIntState` (Phase-1.B.1-style refactor) plus inline depth-walk for the common `depth==0` case. Substrate work, not a mechanical port. Recorded in [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
+**LoadEnvSlot deferred** to a future substrate sub-phase. Investigation revealed it requires a new `frame_lexical_env` mirror on `LlIntState` (Phase-1.B.1-style refactor) plus inline depth-walk for the common `depth==0` case. Substrate work, not a mechanical port. Recorded in [`reports/lyng/dsl-1/phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
 
-**StoreLocal0 functional unreachability:** the bytecode-builder peephole at `crates/lyng-js/bytecode/src/builder.rs:150-166` rewrites `Move dst=0, src=B` → `Ldar B` before the `store_local_opcode` branch fires. So StoreLocal0 cannot be emitted from compiled JS source. Inline port retained for symmetry; 0 V8 v7 dispatches in practice.
+**StoreLocal0 functional unreachability:** the bytecode-builder peephole at `crates/lyng/bytecode/src/builder.rs:150-166` rewrites `Move dst=0, src=B` → `Ldar B` before the `store_local_opcode` branch fires. So StoreLocal0 cannot be emitted from compiled JS source. Inline port retained for symmetry; 0 V8 v7 dispatches in practice.
 
 Summaries: [`phase-1b3-summary.md`](dsl-1/phase-1b3-summary.md), umbrella [`phase-1b-summary.md`](dsl-1/phase-1b-summary.md), direct cumulative A/B [`phase-1b3-cumulative-ab.md`](dsl-1/phase-1b3-cumulative-ab.md).
 
@@ -230,9 +230,9 @@ Counters (in `counters.rs`, Phase 1.B.0):
 
 - **Counter wiring** (Phase 1.B.0): `DispatchCounters` on `Vm`, 3 banks × 256 u64. Verified: Move dispatches on Richards match reference within 0.2%.
 - **Microbench snippets** (Phase 1.B.0 + 1.B.2 backfill + 1.B.3): 19 snippets total. All verified via `verify_opcodes_per_iter` test.
-- **`lyng-js-bench v8suite --count-slow-path-share`**: produces per-opcode slow-path-share percentages from v8 v7 runs.
-- **`lyng-js-bench asm-diff`**: produces asm baselines and checks against committed baselines. **Limitation:** doesn't yet auto-discover the `dsl::handlers::cold::*` symbol namespace; the Phase 1.B.2 + 1.B.3 baselines were captured manually via `cargo rustc --emit=asm` extraction. Tracked in [`phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
-- **GC integration**: mirror-discipline invariant for `LlIntState` arena pointers; debug-only stability assertion in the Refresh arm; gc-stress integration test at `crates/lyng-js/tests/src/gc_stress_frame_context.rs`. GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
+- **`lyng-bench v8suite --count-slow-path-share`**: produces per-opcode slow-path-share percentages from v8 v7 runs.
+- **`lyng-bench asm-diff`**: produces asm baselines and checks against committed baselines. **Limitation:** doesn't yet auto-discover the `dsl::handlers::cold::*` symbol namespace; the Phase 1.B.2 + 1.B.3 baselines were captured manually via `cargo rustc --emit=asm` extraction. Tracked in [`phase-1b-followups.md`](dsl-1/phase-1b-followups.md).
+- **GC integration**: mirror-discipline invariant for `LlIntState` arena pointers; debug-only stability assertion in the Refresh arm; gc-stress integration test at `crates/lyng/tests/src/gc_stress_frame_context.rs`. GC review: [`phase-1b1-gc-review.md`](dsl-1/phase-1b1-gc-review.md).
 
 ---
 
@@ -283,10 +283,10 @@ Estimated effort: 3-4 days (mirror Phase 1.B.1's structure). Unlocks 2 top-30 op
 
 ### Followups tracked (not blocking but worth picking up opportunistically)
 
-From [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](dsl-1/phase-1b-followups.md):
+From [`reports/lyng/dsl-1/phase-1b-followups.md`](dsl-1/phase-1b-followups.md):
 
 - **`asm-diff --check` namespace expansion**: extend the bench tool to discover `dsl::handlers::cold::*` symbols automatically (currently capture is manual).
-- **`ThisState::Uninitialized` JS-coverage gap**: TDZ in derived constructor before `super()` is not directly testable from JS in lyng-js yet. The sentinel mechanism is exercised structurally; a future JS-level test once class+super support fills out.
+- **`ThisState::Uninitialized` JS-coverage gap**: TDZ in derived constructor before `super()` is not directly testable from JS in lyng yet. The sentinel mechanism is exercised structurally; a future JS-level test once class+super support fills out.
 - **`Vec<ConstantValue>` pre-resolution shape**: pre-resolution at install time works for Smi/Float; Atom/Builtin require lookup through `Vm`. Phase 1.B.1 reuses `RuntimeCodeRecord::constants` arena slot which the install pipeline already populates; further opcodes that need other forms of pre-resolution should follow this pattern.
 - **StoreLocal0 deprecation candidate**: 0 dispatches in practice (peephole rewrites to Ldar). Could be removed from the opcode set in a future cleanup; not blocking.
 
@@ -321,7 +321,7 @@ User deny rules consistently honored: no `git -C`, no `cd && git`, no `--no-veri
 
 ### Design docs
 
-- Parent design: [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md)
+- Parent design: [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md)
 - DSL-1 epic spec: [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md)
 - Phase 1.B umbrella: [`docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md)
 - Phase 1.B.1 spec: [`docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`](../../docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md)
@@ -330,9 +330,9 @@ User deny rules consistently honored: no `git -C`, no `cd && git`, no `--no-veri
 
 ### Phase summaries (chronological)
 
-- DSL-0c close: [`reports/js/lyng-js/dsl-0c-status.md`](dsl-0c-status.md)
-- Phase 1.A: [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md)
-- Phase 1.B umbrella (final): [`reports/js/lyng-js/dsl-1/phase-1b-summary.md`](dsl-1/phase-1b-summary.md)
+- DSL-0c close: [`reports/lyng/dsl-0c-status.md`](dsl-0c-status.md)
+- Phase 1.A: [`reports/lyng/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md)
+- Phase 1.B umbrella (final): [`reports/lyng/dsl-1/phase-1b-summary.md`](dsl-1/phase-1b-summary.md)
 - Phase 1.B.0: [`phase-1b0-summary.md`](dsl-1/phase-1b0-summary.md) — counter wiring + microbench infra
 - Phase 1.B.1: [`phase-1b1-summary.md`](dsl-1/phase-1b1-summary.md) — frame-context substrate
 - Phase 1.B.2: [`phase-1b2-summary.md`](dsl-1/phase-1b2-summary.md) — op_load_const8 + op_load_this
@@ -341,7 +341,7 @@ User deny rules consistently honored: no `git -C`, no `cd && git`, no `--no-veri
 
 ### Per-handler ported reports (18 opcodes)
 
-Phase 1.A: 7 reports under [`reports/js/lyng-js/dsl-handlers/`](dsl-handlers/) — `op_load_undefined.md`, `op_load_null.md`, `op_load_true.md`, `op_load_false.md`, `op_load_zero.md`, `op_load_one.md`, `op_load_smi8.md`.
+Phase 1.A: 7 reports under [`reports/lyng/dsl-handlers/`](dsl-handlers/) — `op_load_undefined.md`, `op_load_null.md`, `op_load_true.md`, `op_load_false.md`, `op_load_zero.md`, `op_load_one.md`, `op_load_smi8.md`.
 
 Phase 1.B.2: 2 reports — `op_load_const8.md`, `op_load_this.md`.
 
@@ -349,7 +349,7 @@ Phase 1.B.3: 9 reports — `op_load_local_{0,1,2,3}.md`, `op_store_local_{0,1,2,
 
 ### Asm baselines
 
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/` contains captured asm for each inline-ported handler.
+`reports/lyng/dsl-asm-baseline-aarch64/` contains captured asm for each inline-ported handler.
 
 ### Key A/B comparison artifacts
 
@@ -361,8 +361,8 @@ Phase 1.B.3: 9 reports — `op_load_local_{0,1,2,3}.md`, `op_store_local_{0,1,2,
 
 ### Source code anchors
 
-- DSL substrate: `crates/lyng-js/vm/src/dsl/`
-- AArch64 backend macros: `crates/lyng-js/vm/src/dsl/backend/aarch64/`
-- Opcode handlers: `crates/lyng-js/vm/src/dsl/handlers/{cold,warm,hot}.rs`
-- Lowerer proc-macro: `crates/lyng-js-vm-dsl/src/`
-- Bench tool: `tools/lyng-js-bench/`
+- DSL substrate: `crates/lyng/vm/src/dsl/`
+- AArch64 backend macros: `crates/lyng/vm/src/dsl/backend/aarch64/`
+- Opcode handlers: `crates/lyng/vm/src/dsl/handlers/{cold,warm,hot}.rs`
+- Lowerer proc-macro: `crates/lyng/vm-dsl/src/`
+- Bench tool: `tools/lyng-bench/`

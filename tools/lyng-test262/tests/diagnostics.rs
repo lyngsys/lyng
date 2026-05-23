@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lyng_js_test262::{prepare_diagnostic_suite, Test262DiagnosticConfig};
+use lyng_test262::{prepare_diagnostic_suite, Test262DiagnosticConfig};
 
 static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -14,7 +14,7 @@ fn make_temp_dir() -> PathBuf {
         .as_nanos();
     let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
-        "lyng-js-test262-diagnostics-{}-{}-{}",
+        "lyng-test262-diagnostics-{}-{}-{}",
         std::process::id(),
         nonce,
         counter

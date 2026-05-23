@@ -5,7 +5,7 @@ use super::{
     ObjectFlags, ObjectKind, ObjectRef, PropertyKey, RegExpPayload, SetObjectData, ShapeId,
     ShapeProperty, ShapeTransitionKey, SparseElementEntry, TemporalObjectData,
 };
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 use std::collections::HashMap;
 
 const INLINE_SHAPE_TRANSITION_LIMIT: usize = 3;

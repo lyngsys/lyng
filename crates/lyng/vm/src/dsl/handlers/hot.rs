@@ -4,7 +4,7 @@
 //! and ship with inline fast paths (SMI arithmetic, register moves, fast
 //! object access). The `llint_handler!` proc-macro lowers each handler
 //! body into a single `naked_asm!` block; the backend `macro_rules!`
-//! macros (under `crates/lyng-js/vm/src/dsl/backend/aarch64/`) supply the
+//! macros (under `crates/lyng/vm/src/dsl/backend/aarch64/`) supply the
 //! asm fragments for individual DSL ops (`decode_ab!`, `load_reg!`,
 //! `dispatch!`, etc.).
 //!
@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
@@ -98,11 +98,9 @@ pub extern "C" fn op_add_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
-        pc_advance: 6,
-    })
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
 }
 
 /// Slow-path shim for `op_add`. The asm trampoline tail-calls this
@@ -129,7 +127,7 @@ pub extern "C" fn op_add_slow_rs(
         dst: dst as u16,
         lhs: lhs as u16,
         rhs: rhs as u16,
-        feedback_slot: lyng_js_types::FeedbackSlotId::from_raw(feedback_slot),
+        feedback_slot: lyng_types::FeedbackSlotId::from_raw(feedback_slot),
         instruction_len: 6,
     };
     let outcome = crate::vm::semantics::arithmetic::op_add_semantic(&mut dispatch, args);

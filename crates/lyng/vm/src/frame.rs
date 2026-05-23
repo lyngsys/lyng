@@ -1,5 +1,5 @@
-use lyng_js_env::ExecutionContextKind;
-use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value};
+use lyng_env::ExecutionContextKind;
+use lyng_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct FrameFlags(u8);

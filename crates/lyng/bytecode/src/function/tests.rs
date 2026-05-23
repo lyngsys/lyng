@@ -1,6 +1,6 @@
 use super::{BytecodeFunction, CompiledScriptUnit};
 use crate::{ArgumentsMode, BytecodeFunctionId, ConstantValue, Instruction, Opcode};
-use lyng_js_common::{AtomId, SourceId};
+use lyng_common::{AtomId, SourceId};
 use std::num::NonZeroU32;
 
 #[test]

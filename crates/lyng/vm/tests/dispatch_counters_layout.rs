@@ -10,7 +10,7 @@
 
 use std::mem::{offset_of, size_of};
 
-use lyng_js_vm::DispatchCounters;
+use lyng_vm::DispatchCounters;
 
 #[test]
 fn dispatch_counters_size_is_expected() {

@@ -439,7 +439,7 @@ mod tests {
         RuntimeSuspendedExecutionRecord, StringEncoding, SymbolFlags, ValueStoreTarget,
         WeakHeapRef,
     };
-    use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef, Value};
+    use lyng_types::{CodeRef, EnvironmentRef, RealmRef, Value};
 
     #[test]
     fn force_collect_reports_live_and_reclaimable_bytes() {

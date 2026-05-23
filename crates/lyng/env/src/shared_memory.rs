@@ -1,6 +1,6 @@
 use super::AgentId;
-use lyng_js_host::{HostSharedBufferId, HostThreadId, WaitLocation};
-use lyng_js_types::{BackingStoreRef, ObjectRef};
+use lyng_host::{HostSharedBufferId, HostThreadId, WaitLocation};
+use lyng_types::{BackingStoreRef, ObjectRef};
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZeroU64;
 

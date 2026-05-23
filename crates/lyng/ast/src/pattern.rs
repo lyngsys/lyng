@@ -3,7 +3,7 @@
 //! Patterns are their own node family, separate from expressions.
 //! This is a frozen design decision — patterns do not reuse expression nodes.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::ids::{ExprId, NodeList, PatternId};
 

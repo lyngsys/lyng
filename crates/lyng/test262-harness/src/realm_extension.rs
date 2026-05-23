@@ -1,16 +1,16 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lyng_js_env::{
+use lyng_env::{
     Agent, ExecutableId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
     RuntimeJobPayload,
 };
-use lyng_js_host::HostJobKind;
-use lyng_js_ops::{errors, read};
-use lyng_js_types::{
+use lyng_host::HostJobKind;
+use lyng_ops::{errors, read};
+use lyng_types::{
     abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
 };
-use lyng_js_vm::{
+use lyng_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, VmError,
 };
@@ -367,7 +367,7 @@ fn read_test262_object(agent: &mut Agent, global_object: ObjectRef) -> Result<Ob
         .objects()
         .get_own_property(agent.heap().view(), global_object, key)
         .map_err(|_| VmError::Abrupt(errors::throw_type_error(agent)))?
-        .and_then(lyng_js_types::PropertyDescriptor::value)
+        .and_then(lyng_types::PropertyDescriptor::value)
         .and_then(Value::as_object_ref)
         .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
 }
@@ -519,7 +519,7 @@ fn get_test262_property(
     name: &str,
 ) -> Result<Value, VmError> {
     let key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible(name));
-    lyng_js_ops::object::ordinary_get(agent, object, key).map_err(VmError::Abrupt)
+    lyng_ops::object::ordinary_get(agent, object, key).map_err(VmError::Abrupt)
 }
 
 fn append_code_point_array(agent: &Agent, value: Value, units: &mut Vec<u16>) -> bool {

@@ -1,12 +1,12 @@
-use lyng_js_ast::Pattern;
-use lyng_js_common::Span;
+use lyng_ast::Pattern;
+use lyng_common::Span;
 
 use super::Analyzer;
 use crate::binding::DeclarationKind;
 use crate::ids::SemanticBindingId;
 
 impl Analyzer<'_> {
-    pub(crate) fn hoist_var_pattern(&mut self, pat_id: lyng_js_ast::PatternId, span: Span) {
+    pub(crate) fn hoist_var_pattern(&mut self, pat_id: lyng_ast::PatternId, span: Span) {
         let pat = self.ast.get_pattern(pat_id);
         match pat {
             Pattern::Identifier { name, span, .. } => {
@@ -42,7 +42,7 @@ impl Analyzer<'_> {
 
     pub(crate) fn declare_pattern_bindings(
         &mut self,
-        pat_id: lyng_js_ast::PatternId,
+        pat_id: lyng_ast::PatternId,
         kind: DeclarationKind,
     ) {
         let pat = self.ast.get_pattern(pat_id);
@@ -87,7 +87,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(crate) fn walk_binding_pattern_expressions(&mut self, pat_id: lyng_js_ast::PatternId) {
+    pub(crate) fn walk_binding_pattern_expressions(&mut self, pat_id: lyng_ast::PatternId) {
         let pat = self.ast.get_pattern(pat_id);
         match pat {
             Pattern::Identifier { .. } | Pattern::InvalidPattern { .. } => {}
@@ -121,11 +121,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn record_pattern_binding(
-        &mut self,
-        pattern: lyng_js_ast::PatternId,
-        binding: SemanticBindingId,
-    ) {
+    fn record_pattern_binding(&mut self, pattern: lyng_ast::PatternId, binding: SemanticBindingId) {
         let index = pattern.raw() as usize;
         if self.pattern_bindings.len() <= index {
             self.pattern_bindings.resize(index + 1, None);
@@ -133,7 +129,7 @@ impl Analyzer<'_> {
         self.pattern_bindings[index] = Some(binding);
     }
 
-    pub(crate) fn walk_pattern(&mut self, pat_id: lyng_js_ast::PatternId) {
+    pub(crate) fn walk_pattern(&mut self, pat_id: lyng_ast::PatternId) {
         let pat = self.ast.get_pattern(pat_id);
         match pat {
             Pattern::Identifier { name, span, .. } => {

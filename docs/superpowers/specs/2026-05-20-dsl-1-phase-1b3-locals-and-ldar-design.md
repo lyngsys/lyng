@@ -4,7 +4,7 @@
 **Status:** Design draft; awaiting user review.
 **Parent spec:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md) — Phase 1.B umbrella.
 **Predecessor:** Phase 1.B.2 closed at HEAD `7baf5846`; cleanup batch closed at `08727f92` (audit realignment).
-**Mid-phase state:** [`reports/js/lyng-js/dsl-1/phase-1b-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b-summary.md).
+**Mid-phase state:** [`reports/lyng/dsl-1/phase-1b-summary.md`](../../../reports/lyng/dsl-1/phase-1b-summary.md).
 
 ---
 
@@ -64,9 +64,9 @@ These three share `op_store_local_3`'s macro shape exactly — same handler body
 3. **Same-load A/B vs `08727f92`** (pre-Phase-1.B.3 HEAD): aggregate V8 v7 regression ≤ 2%; per-workload ≤ 5%; expected positive delta on the dispatch share (~1.38B for the anchors).
 4. **Cumulative V8 v7 ≥ +3% vs `d850f261`** (umbrella §1 criterion 5) — directly measured at phase close with 11+ samples and verified ≤ 20% loadavg overlap.
 5. **Test262 ≥ 49729 passing** (umbrella mid-phase baseline at `08727f92`).
-6. **Behavioral parity:** `cargo test -p lyng-js-vm --lib --release` (≥418), `cargo test -p lyng-js-tests --release` (≥1198). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
+6. **Behavioral parity:** `cargo test -p lyng-vm --lib --release` (≥418), `cargo test -p lyng-tests --release` (≥1198). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
 7. **A/B methodology rigor:** hard ±20% loadavg overlap (no rounding); ≥11 samples for any gate-bearing measurement.
-8. **Sub-phase summary** at `reports/js/lyng-js/dsl-1/phase-1b3-summary.md`.
+8. **Sub-phase summary** at `reports/lyng/dsl-1/phase-1b3-summary.md`.
 9. **Mandatory `feature-dev:code-reviewer` dispatch** over the full sub-phase commit range.
 
 ---
@@ -195,13 +195,13 @@ Some snippets already exist from Phase 1.B.0 (LoadLocal0..3, StoreLocal3, Ldar p
 
 ### 5.2 Per-opcode integration tests (Tasks 2-3)
 
-For each opcode, at least one JS-level integration test in `crates/lyng-js-tests/tests/` (or extend existing files). Examples:
+For each opcode, at least one JS-level integration test in `crates/lyng-tests/tests/` (or extend existing files). Examples:
 
 - **LoadLocalN family:** `(function(a, b, c, d) { return a + b + c + d; })(1, 2, 3, 4)` — exercises LoadLocal0..3 via parameter access. Assert returns 10.
 - **StoreLocalN family:** loops with local-variable updates: `(function() { var x = 0; for (var i = 0; i < 100; i++) { x += i; } return x; })()` — exercises StoreLocal0..3 via variable updates. Assert returns 4950.
 - **Ldar:** any expression that uses an intermediate register: `(function(a, b) { var c = a + b; return c * 2; })(1, 2)` — Ldar fires when reading the temporary into the accumulator. Assert returns 6.
 
-The existing `lyng-js-tests` suite likely already exercises these opcodes via implicit coverage; the new tests are explicit assertions documenting the inline-port contract.
+The existing `lyng-tests` suite likely already exercises these opcodes via implicit coverage; the new tests are explicit assertions documenting the inline-port contract.
 
 ### 5.3 Per-opcode microbench (Task 4)
 
@@ -213,7 +213,7 @@ Run `v8suite --count-slow-path-share` (or equivalent — discover via `--help`).
 
 ### 5.5 Behavioral parity at every commit
 
-`cargo test -p lyng-js-vm --lib --release` (≥418), `cargo test -p lyng-js-tests --release` (≥1198).
+`cargo test -p lyng-vm --lib --release` (≥418), `cargo test -p lyng-tests --release` (≥1198).
 
 ### 5.6 Test262 (Task 5)
 
@@ -281,14 +281,14 @@ Both A/B reports include:
 
 ## 9. References
 
-- **Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
+- **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
 - **Phase 1.B umbrella spec:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md).
 - **Phase 1.B.2 spec (precedent):** [`2026-05-19-dsl-1-phase-1b2-backfill-ports-design.md`](2026-05-19-dsl-1-phase-1b2-backfill-ports-design.md).
-- **Mid-phase umbrella summary:** [`reports/js/lyng-js/dsl-1/phase-1b-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b-summary.md).
-- **Test262 baseline:** [`reports/js/lyng-js/dsl-1/phase-1b-test262-baseline.md`](../../../reports/js/lyng-js/dsl-1/phase-1b-test262-baseline.md).
-- **Followups doc:** [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](../../../reports/js/lyng-js/dsl-1/phase-1b-followups.md).
-- **Phase 1.B.1 retrospective (structural-test lesson):** [`reports/js/lyng-js/dsl-1/phase-1b1-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b1-summary.md) — "Retrospective: structural-only validation tests insufficient for substrate macros."
-- **Top-30:** [`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv).
-- **Existing backend macros:** `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs` (lines 34, 84, 106, 116, 126, 136).
-- **Current cold stubs:** `crates/lyng-js/vm/src/dsl/handlers/cold.rs` (lines 342, 3959, 4255, 4284, 4313, 4342, 4371, 4400, 4429, 4458).
-- **Semantic bodies:** `crates/lyng-js/vm/src/vm/semantics/loads.rs` (lines 322-333, 431-448, 483-495).
+- **Mid-phase umbrella summary:** [`reports/lyng/dsl-1/phase-1b-summary.md`](../../../reports/lyng/dsl-1/phase-1b-summary.md).
+- **Test262 baseline:** [`reports/lyng/dsl-1/phase-1b-test262-baseline.md`](../../../reports/lyng/dsl-1/phase-1b-test262-baseline.md).
+- **Followups doc:** [`reports/lyng/dsl-1/phase-1b-followups.md`](../../../reports/lyng/dsl-1/phase-1b-followups.md).
+- **Phase 1.B.1 retrospective (structural-test lesson):** [`reports/lyng/dsl-1/phase-1b1-summary.md`](../../../reports/lyng/dsl-1/phase-1b1-summary.md) — "Retrospective: structural-only validation tests insufficient for substrate macros."
+- **Top-30:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv).
+- **Existing backend macros:** `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs` (lines 34, 84, 106, 116, 126, 136).
+- **Current cold stubs:** `crates/lyng/vm/src/dsl/handlers/cold.rs` (lines 342, 3959, 4255, 4284, 4313, 4342, 4371, 4400, 4429, 4458).
+- **Semantic bodies:** `crates/lyng/vm/src/vm/semantics/loads.rs` (lines 322-333, 431-448, 483-495).

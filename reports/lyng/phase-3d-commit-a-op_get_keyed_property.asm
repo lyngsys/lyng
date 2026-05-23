@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::property::op_get_keyed_property:
+lyng_vm::vm::dispatch_handlers::property::op_get_keyed_property:
 Lfunc_begin389:
 	.cfi_startproc
 	.cfi_personality 155, _rust_eh_personality
@@ -103,7 +103,7 @@ LBB389_5:
 	mov x3, x23
 	mov x4, x25
 	mov x5, x27
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_keyed_dense_index_load_inline_cache_hit
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_keyed_dense_index_load_inline_cache_hit
 	tbz w0, #0, LBB389_57
 LBB389_11:
 	mov x8, x1
@@ -136,7 +136,7 @@ LBB389_16:
 	mov x22, x13
 	mov x0, x13
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x26, x0
 	ldr x8, [sp, #72]
 	cbz x8, LBB389_20
@@ -159,7 +159,7 @@ LBB389_20:
 	mov x1, x21
 	mov x2, x22
 	mov x3, x26
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x8, [x29, #-152]
 	ldurb w5, [x29, #-144]
 	mov x9, #33
@@ -206,7 +206,7 @@ LBB389_27:
 	sub x1, x29, #152
 	mov x2, x27
 	mov w3, #1
-	bl lyng_js_ops::object::conversions::to_primitive
+	bl lyng_ops::object::conversions::to_primitive
 	ldp x8, x5, [x29, #-200]
 	mov x9, #33
 	movk x9, #32768, lsl #48
@@ -217,7 +217,7 @@ LBB389_27:
 	add x0, sp, #128
 	mov x1, x21
 	ldr x2, [sp, #64]
-	bl lyng_js_vm::vm::values::<impl lyng_js_vm::vm::Vm>::value_to_property_key
+	bl lyng_vm::vm::values::<impl lyng_vm::vm::Vm>::value_to_property_key
 	ldr x8, [sp, #128]
 	ldr w5, [sp, #136]
 	mov x9, #33
@@ -242,13 +242,13 @@ LBB389_33:
 	ldp x3, x4, [sp, #24]
 	ldp x5, x6, [sp, #40]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	sub x0, x29, #152
 	sub x5, x29, #248
 	mov x1, x21
 	ldp x2, x3, [sp, #64]
 	mov x4, x20
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -288,7 +288,7 @@ LBB389_44:
 	mov x1, x21
 	ldr x2, [sp, #64]
 	mov x3, x26
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x8, [x29, #-152]
 	ldurb w5, [x29, #-144]
 	mov x9, #33
@@ -321,13 +321,13 @@ LBB389_49:
 	mov x4, x23
 	mov x5, x25
 	mov x6, x27
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_keyed_property_load_inline_cache
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_keyed_property_load_inline_cache
 	tbz w0, #0, LBB389_85
 	mov x26, x1
 	ldr w1, [x20, #4]
 	mov x0, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	b LBB389_81
 LBB389_54:
 	lsr w9, w5, #8
@@ -355,7 +355,7 @@ LBB389_57:
 	ldr x2, [sp, #64]
 	mov x3, x25
 	mov x4, x27
-	bl lyng_js_vm::vm::values::<impl lyng_js_vm::vm::Vm>::mapped_arguments_get
+	bl lyng_vm::vm::values::<impl lyng_vm::vm::Vm>::mapped_arguments_get
 	ldr x8, [sp, #80]
 	mov x9, #33
 	movk x9, #32768, lsl #48
@@ -365,7 +365,7 @@ LBB389_57:
 	ldr x0, [sp, #64]
 	mov x1, x25
 	mov x2, x27
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::try_fast_typed_array_index_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::try_fast_typed_array_index_value
 	tbz w0, #0, LBB389_77
 	mov x26, x1
 	b LBB389_80
@@ -375,7 +375,7 @@ LBB389_62:
 	mov x1, x21
 	ldp x2, x3, [sp, #64]
 	mov x4, x20
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -391,14 +391,14 @@ LBB389_65:
 	mov x3, x23
 	mov x4, x25
 	mov x5, x27
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_keyed_dense_index_load_inline_cache_hit
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_keyed_dense_index_load_inline_cache_hit
 	tbnz w0, #0, LBB389_11
 	add x0, sp, #200
 	mov x1, x21
 	ldr x2, [sp, #64]
 	mov x3, x25
 	mov x4, x27
-	bl lyng_js_vm::vm::values::<impl lyng_js_vm::vm::Vm>::mapped_arguments_get
+	bl lyng_vm::vm::values::<impl lyng_vm::vm::Vm>::mapped_arguments_get
 	ldr x8, [sp, #200]
 	mov x9, #33
 	movk x9, #32768, lsl #48
@@ -408,7 +408,7 @@ LBB389_65:
 	ldr x0, [sp, #64]
 	mov x1, x25
 	mov x2, x27
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::try_fast_typed_array_index_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::try_fast_typed_array_index_value
 	tbz w0, #0, LBB389_95
 	mov x26, x1
 	b LBB389_98
@@ -421,13 +421,13 @@ LBB389_72:
 	ldp x3, x4, [sp, #24]
 	ldp x5, x6, [sp, #40]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	sub x0, x29, #152
 	add x5, sp, #344
 	mov x1, x21
 	ldp x2, x3, [sp, #64]
 	mov x4, x20
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -438,14 +438,14 @@ LBB389_72:
 	ldr w1, [x20, #4]
 	mov x0, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_keyed_generic_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_keyed_generic_slow_path
 	b LBB389_81
 LBB389_77:
 	sub x0, x29, #152
 	ldr x1, [sp, #64]
 	mov x2, x25
 	mov x3, x27
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::try_fast_own_index_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::try_fast_own_index_value
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -460,7 +460,7 @@ LBB389_80:
 	mov x3, x23
 	mov x4, x25
 	mov x5, x27
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_keyed_index_access
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_keyed_index_access
 LBB389_81:
 	ldr w8, [x20, #20]
 	ldr x1, [x21, #32]
@@ -504,13 +504,13 @@ LBB389_85:
 	ldp x3, x4, [sp, #24]
 	ldp x5, x6, [sp, #40]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	sub x0, x29, #152
 	add x5, sp, #296
 	mov x1, x21
 	ldp x2, x3, [sp, #64]
 	mov x4, x20
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -525,7 +525,7 @@ LBB389_85:
 	mov x4, x25
 	mov x5, x27
 	mov w6, #0
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_keyed_atom_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_keyed_atom_slow_path
 	b LBB389_81
 LBB389_90:
 	sub x0, x29, #152
@@ -533,7 +533,7 @@ LBB389_90:
 	mov x1, x21
 	ldp x2, x3, [sp, #64]
 	mov x4, x20
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33
@@ -548,9 +548,9 @@ LBB389_93:
 	ldr w9, [x20, #56]
 	ldrb w8, [x8, x9]
 Lloh1067:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh1068:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x10, [x9, x8, lsl #3]
 	mov x8, #33
 	movk x8, #32768, lsl #48
@@ -584,7 +584,7 @@ LBB389_95:
 	ldr x1, [sp, #64]
 	mov x2, x25
 	mov x3, x27
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::try_fast_own_index_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::try_fast_own_index_value
 	ldp x8, x5, [x29, #-152]
 	ldur x26, [x29, #-136]
 	mov x9, #33

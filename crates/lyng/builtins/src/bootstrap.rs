@@ -3,10 +3,10 @@ use crate::{
     BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec,
     BuiltinPropertyValueSpec,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{
     aggregate_error_builtin, array_buffer_builtin, array_builtin, big_int64_array_builtin,
     big_uint64_array_builtin, bigint_builtin, boolean_builtin, data_view_builtin, date_builtin,
     decode_uri_builtin, decode_uri_component_builtin, encode_uri_builtin,
@@ -99,7 +99,7 @@ pub enum BuiltinBootstrapError {
     MissingRootShape(RealmRef),
     MissingWellKnownSymbol(WellKnownSymbolId),
     MissingIntrinsic(BuiltinIntrinsic, RealmRef),
-    MissingBuiltinFunction(lyng_js_types::BuiltinFunctionId, RealmRef),
+    MissingBuiltinFunction(lyng_types::BuiltinFunctionId, RealmRef),
     DefinePropertyRejected {
         target: ObjectRef,
         key: BuiltinPropertyKeySpec,

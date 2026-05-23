@@ -16,14 +16,14 @@ Of the 9 opcodes in Phase 1.B.3 scope, **8 have measurable snippets**:
 | StoreLocal1 | **Phase 1.B.3 Task 4** | New snippet (4 ops/iter) |
 | StoreLocal2 | **Phase 1.B.3 Task 4** | New snippet (4 ops/iter) |
 | Ldar        | Phase 1.B.0    | Existing snippet (4 ops/iter) |
-| StoreLocal0 | **Intentionally omitted** | Unreachable through standard emit pipeline — peephole rewrites `Move dst=0` to `Ldar` before `store_local_opcode` fires. See `reports/js/lyng-js/dsl-handlers/op_store_local_0.md`. |
+| StoreLocal0 | **Intentionally omitted** | Unreachable through standard emit pipeline — peephole rewrites `Move dst=0` to `Ldar` before `store_local_opcode` fires. See `reports/lyng/dsl-handlers/op_store_local_0.md`. |
 
 `verify_opcodes_per_iter` confirms 18 of 18 listed snippets match
 their declared `opcodes_per_iter` within ±5% (run 2026-05-20).
 
 ## Microbench (post-port ns/dispatch, 7-sample medians)
 
-Measured via `cargo run --release -p lyng-js-bench -- microbench
+Measured via `cargo run --release -p lyng-bench -- microbench
 --samples 7` at HEAD post-Task 3.
 
 | Opcode      | Median ns | CI95 | LLInt ref (predicted) | Within 2×? |
@@ -39,7 +39,7 @@ Measured via `cargo run --release -p lyng-js-bench -- microbench
 | Ldar        |     37.56 | ±0.04 | ~60 ns | ✅ |
 
 LLInt reference values are predicted from the structural baseline asm
-in `reports/js/lyng-js/dsl-asm-baseline-aarch64/Load*.asm` (~33-50
+in `reports/lyng/dsl-asm-baseline-aarch64/Load*.asm` (~33-50
 instructions for the LLInt path including stack-frame setup + bounds
 check + slow-path bail target). The DSL inline form skips all
 framework overhead (7 instructions inline + 0 slow-path entries).
@@ -56,8 +56,8 @@ All 8 measurable opcodes within 2× LLInt reference budget with
 
 ## Slow-path-share on V8 v7
 
-Measured via `cargo run --release -p lyng-js-bench --features
-lyng-js-vm/opcode-counters -- v8suite --count-opcodes
+Measured via `cargo run --release -p lyng-bench --features
+lyng-vm/opcode-counters -- v8suite --count-opcodes
 --count-slow-path-share` (3 samples per workload):
 
 | Opcode      | Aggregate Dispatches | Semantic SP | Safepoint SP | Share   |
@@ -89,18 +89,18 @@ Per-opcode gates green:
   body is identical-shape to StoreLocal1/2/3 so the same gate is
   trivially satisfied by analogy. ✅
 - Slow-path-share < 20%: all 9 at exactly 0.000%. ✅
-- Behavioral parity: vm 418 / lyng-js-tests 1209. ✅
+- Behavioral parity: vm 418 / lyng-tests 1209. ✅
 
 Sub-phase A/B and cumulative-A/B measurements deferred to Task 5
 (coordinator-handled).
 
 ## References
 
-- Per-handler reports: `reports/js/lyng-js/dsl-handlers/op_{load,
+- Per-handler reports: `reports/lyng/dsl-handlers/op_{load,
   store}_local_{0,1,2,3}.md` + `op_ldar.md`.
-- Asm baselines: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_{load,
+- Asm baselines: `reports/lyng/dsl-asm-baseline-aarch64/op_{load,
   store}_local_{0,1,2,3}.asm` + `op_ldar.asm`.
-- Snippets: `tools/lyng-js-bench/src/microbench/snippets.rs`.
+- Snippets: `tools/lyng-bench/src/microbench/snippets.rs`.
 - StoreLocal0 unreachability finding:
-  `reports/js/lyng-js/dsl-handlers/op_store_local_0.md` and inline
-  comment at `crates/lyng-js/bytecode/src/builder.rs:150-166`.
+  `reports/lyng/dsl-handlers/op_store_local_0.md` and inline
+  comment at `crates/lyng/bytecode/src/builder.rs:150-166`.

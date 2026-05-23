@@ -12,9 +12,9 @@ use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
     async_disposable_stack_adopt_builtin, async_disposable_stack_builtin,
     async_disposable_stack_defer_builtin, async_disposable_stack_dispose_async_builtin,

@@ -5,9 +5,9 @@ use super::{
 use crate::public::{
     define_builtin_accessor_property, define_builtin_data_property, PublicRealmBuiltins,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_types::{
     abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
     BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
 };

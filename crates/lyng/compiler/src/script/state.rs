@@ -17,7 +17,7 @@ struct ComputedEnvironmentLayouts {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct ParameterSource {
     pub(super) register: u16,
-    pub(super) pattern: lyng_js_ast::PatternId,
+    pub(super) pattern: lyng_ast::PatternId,
     pub(super) binding: Option<SemanticBindingId>,
 }
 
@@ -54,29 +54,29 @@ pub(super) struct ClassFunctionMetadata {
     pub(super) has_prototype_property: bool,
     pub(super) class_constructor: bool,
     pub(super) derived_class_constructor: bool,
-    pub(super) class_source_span: Option<lyng_js_common::Span>,
-    pub(super) class_body: Option<lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>>,
+    pub(super) class_source_span: Option<lyng_common::Span>,
+    pub(super) class_body: Option<lyng_ast::NodeList<lyng_ast::ClassElementId>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum ClassInstanceElementPlan {
     PublicField {
-        key: lyng_js_ast::ExprId,
-        value: Option<lyng_js_ast::ExprId>,
+        key: lyng_ast::ExprId,
+        value: Option<lyng_ast::ExprId>,
         computed: bool,
         computed_key_index: Option<u32>,
     },
     PrivateElement {
         name: AtomId,
-        kind: lyng_js_sema::ClassPrivateElementKind,
-        value: Option<lyng_js_ast::ExprId>,
+        kind: lyng_sema::ClassPrivateElementKind,
+        value: Option<lyng_ast::ExprId>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ClassConstructorPlan {
     pub(super) derived: bool,
-    pub(super) class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+    pub(super) class_body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     pub(super) instance_elements: Vec<ClassInstanceElementPlan>,
     pub(super) needs_environment: bool,
 }
@@ -625,13 +625,13 @@ fn module_default_export_binding(program: ProgramSource<'_>) -> Option<BytecodeE
     }
 
     let has_default_export = program.ast.get_stmt_list(program.body).iter().any(|stmt| {
-        let lyng_js_ast::Stmt::Declaration { decl, .. } = program.ast.get_stmt(*stmt) else {
+        let lyng_ast::Stmt::Declaration { decl, .. } = program.ast.get_stmt(*stmt) else {
             return false;
         };
         matches!(
             program.ast.get_decl(*decl),
-            lyng_js_ast::Decl::Export {
-                kind: lyng_js_ast::ExportKind::Default { .. },
+            lyng_ast::Decl::Export {
+                kind: lyng_ast::ExportKind::Default { .. },
                 ..
             }
         )
@@ -662,8 +662,8 @@ fn collect_class_lowering_metadata(
 }
 
 fn collect_class_lowering_from_stmt_list(
-    ast: &lyng_js_ast::Ast,
-    list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ast: &lyng_ast::Ast,
+    list: lyng_ast::NodeList<lyng_ast::StmtId>,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
 ) {
@@ -677,8 +677,8 @@ fn collect_class_lowering_from_stmt_list(
     reason = "class metadata collection is an exhaustive statement visitor"
 )]
 fn collect_class_lowering_from_stmt(
-    ast: &lyng_js_ast::Ast,
-    stmt_id: lyng_js_ast::StmtId,
+    ast: &lyng_ast::Ast,
+    stmt_id: lyng_ast::StmtId,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
 ) {
@@ -862,7 +862,7 @@ fn collect_class_lowering_from_stmt(
 }
 
 fn collect_class_lowering_from_for_left(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     left: ForInOfLeft,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
@@ -881,7 +881,7 @@ fn collect_class_lowering_from_for_left(
 }
 
 fn collect_class_lowering_from_decl(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     decl_id: DeclId,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
@@ -937,8 +937,8 @@ fn collect_class_lowering_from_decl(
             );
         }
         Decl::Export { kind, .. } => match kind {
-            lyng_js_ast::ExportKind::Default { declaration } => match declaration {
-                lyng_js_ast::ExportDefaultDecl::Function(function) => {
+            lyng_ast::ExportKind::Default { declaration } => match declaration {
+                lyng_ast::ExportDefaultDecl::Function(function) => {
                     collect_class_lowering_from_function(
                         ast,
                         *function,
@@ -946,7 +946,7 @@ fn collect_class_lowering_from_decl(
                         constructor_plans,
                     );
                 }
-                lyng_js_ast::ExportDefaultDecl::Class(decl) => {
+                lyng_ast::ExportDefaultDecl::Class(decl) => {
                     collect_class_lowering_from_decl(
                         ast,
                         *decl,
@@ -954,7 +954,7 @@ fn collect_class_lowering_from_decl(
                         constructor_plans,
                     );
                 }
-                lyng_js_ast::ExportDefaultDecl::Expression(expr) => {
+                lyng_ast::ExportDefaultDecl::Expression(expr) => {
                     collect_class_lowering_from_expr(
                         ast,
                         *expr,
@@ -963,18 +963,18 @@ fn collect_class_lowering_from_decl(
                     );
                 }
             },
-            lyng_js_ast::ExportKind::Declaration { decl } => {
+            lyng_ast::ExportKind::Declaration { decl } => {
                 collect_class_lowering_from_decl(ast, *decl, function_metadata, constructor_plans);
             }
-            lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => {}
+            lyng_ast::ExportKind::Named { .. } | lyng_ast::ExportKind::All { .. } => {}
         },
         Decl::Import { .. } | Decl::InvalidDeclaration { .. } => {}
     }
 }
 
 fn collect_class_lowering_from_pattern(
-    ast: &lyng_js_ast::Ast,
-    pattern_id: lyng_js_ast::PatternId,
+    ast: &lyng_ast::Ast,
+    pattern_id: lyng_ast::PatternId,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
 ) {
@@ -1042,7 +1042,7 @@ const fn generator_function_has_prototype(kind: FunctionKind) -> bool {
     reason = "class metadata collection is an exhaustive expression visitor"
 )]
 fn collect_class_lowering_from_expr(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     expr_id: ExprId,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
@@ -1079,7 +1079,7 @@ fn collect_class_lowering_from_expr(
                         constructor_plans,
                     );
                 }
-                if property.method || !matches!(property.kind, lyng_js_ast::PropertyKind::Init) {
+                if property.method || !matches!(property.kind, lyng_ast::PropertyKind::Init) {
                     match ast.get_expr(property.value) {
                         Expr::FunctionExpression { function, .. }
                         | Expr::ArrowFunctionExpression { function, .. } => {
@@ -1256,7 +1256,7 @@ fn collect_class_lowering_from_expr(
 }
 
 fn collect_class_lowering_from_function(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     function_id: FunctionId,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
@@ -1279,10 +1279,10 @@ fn collect_class_lowering_from_function(
     reason = "class body metadata collection preserves constructor and instance element ordering"
 )]
 fn collect_class_lowering_from_class_body(
-    ast: &lyng_js_ast::Ast,
-    body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+    ast: &lyng_ast::Ast,
+    body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     has_heritage: bool,
-    class_source_span: Option<lyng_js_common::Span>,
+    class_source_span: Option<lyng_common::Span>,
     function_metadata: &mut HashMap<FunctionId, ClassFunctionMetadata>,
     constructor_plans: &mut HashMap<FunctionId, ClassConstructorPlan>,
 ) {
@@ -1292,7 +1292,7 @@ fn collect_class_lowering_from_class_body(
 
     for &element in ast.get_class_element_list(body) {
         match ast.get_class_element(element) {
-            lyng_js_ast::ClassElement::Method {
+            lyng_ast::ClassElement::Method {
                 key,
                 value,
                 computed,
@@ -1309,7 +1309,7 @@ fn collect_class_lowering_from_class_body(
                         constructor_plans,
                     );
                 }
-                let is_constructor = matches!(kind, lyng_js_ast::MethodKind::Constructor);
+                let is_constructor = matches!(kind, lyng_ast::MethodKind::Constructor);
                 let function_kind = ast.get_function(*value).kind;
                 function_metadata.insert(
                     *value,
@@ -1328,18 +1328,14 @@ fn collect_class_lowering_from_class_body(
                 }
                 if !*r#static
                     && *private
-                    && let lyng_js_ast::Expr::Identifier { name, .. } = ast.get_expr(*key)
+                    && let lyng_ast::Expr::Identifier { name, .. } = ast.get_expr(*key)
                 {
                     let element_kind = match kind {
-                        lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
-                            lyng_js_sema::ClassPrivateElementKind::Method
+                        lyng_ast::MethodKind::Method | lyng_ast::MethodKind::Constructor => {
+                            lyng_sema::ClassPrivateElementKind::Method
                         }
-                        lyng_js_ast::MethodKind::Get => {
-                            lyng_js_sema::ClassPrivateElementKind::Getter
-                        }
-                        lyng_js_ast::MethodKind::Set => {
-                            lyng_js_sema::ClassPrivateElementKind::Setter
-                        }
+                        lyng_ast::MethodKind::Get => lyng_sema::ClassPrivateElementKind::Getter,
+                        lyng_ast::MethodKind::Set => lyng_sema::ClassPrivateElementKind::Setter,
                     };
                     instance_elements.push(ClassInstanceElementPlan::PrivateElement {
                         name: *name,
@@ -1354,7 +1350,7 @@ fn collect_class_lowering_from_class_body(
                     constructor_plans,
                 );
             }
-            lyng_js_ast::ClassElement::Property {
+            lyng_ast::ClassElement::Property {
                 key,
                 value,
                 computed,
@@ -1383,14 +1379,14 @@ fn collect_class_lowering_from_class_body(
                     if let Some(backing_name) = auto_accessor_private_name {
                         instance_elements.push(ClassInstanceElementPlan::PrivateElement {
                             name: *backing_name,
-                            kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                            kind: lyng_sema::ClassPrivateElementKind::Field,
                             value: *value,
                         });
                     } else if *private {
-                        if let lyng_js_ast::Expr::Identifier { name, .. } = ast.get_expr(*key) {
+                        if let lyng_ast::Expr::Identifier { name, .. } = ast.get_expr(*key) {
                             instance_elements.push(ClassInstanceElementPlan::PrivateElement {
                                 name: *name,
-                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                                kind: lyng_sema::ClassPrivateElementKind::Field,
                                 value: *value,
                             });
                         }
@@ -1411,7 +1407,7 @@ fn collect_class_lowering_from_class_body(
                     }
                 }
             }
-            lyng_js_ast::ClassElement::StaticBlock { body, .. } => {
+            lyng_ast::ClassElement::StaticBlock { body, .. } => {
                 collect_class_lowering_from_stmt_list(
                     ast,
                     *body,
@@ -1419,7 +1415,7 @@ fn collect_class_lowering_from_class_body(
                     constructor_plans,
                 );
             }
-            lyng_js_ast::ClassElement::InvalidElement { .. } => {}
+            lyng_ast::ClassElement::InvalidElement { .. } => {}
         }
     }
 
@@ -1437,7 +1433,7 @@ fn collect_class_lowering_from_class_body(
 }
 
 fn instance_elements_need_environment(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     instance_elements: &[ClassInstanceElementPlan],
 ) -> bool {
     instance_elements.iter().any(|element| match element {
@@ -1476,7 +1472,7 @@ pub(super) struct FunctionCompiler<'a, 'b> {
     pub(super) finally_stack: Vec<FinallyContext>,
     pub(super) this_override_register: Option<u16>,
     pub(super) super_home_object_override: Option<u16>,
-    pub(super) active_class_body: Option<lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>>,
+    pub(super) active_class_body: Option<lyng_ast::NodeList<lyng_ast::ClassElementId>>,
     pub(super) active_class_span: Option<Span>,
     pub(super) active_class_contexts: Vec<ActiveClassContext>,
     pub(super) active_direct_eval_scopes: Vec<ScopeId>,
@@ -1509,12 +1505,12 @@ pub(super) struct ActiveClassContext {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct ActiveDisposalScope {
     pub(super) capability_register: u16,
-    pub(super) kind: lyng_js_env::DisposalCapabilityKind,
+    pub(super) kind: lyng_env::DisposalCapabilityKind,
 }
 
 fn scope_environment_bindings(
     sema: ProgramSemaView<'_>,
-    scope: &lyng_js_sema::ScopeRecord,
+    scope: &lyng_sema::ScopeRecord,
 ) -> Vec<BytecodeEnvironmentBinding> {
     let slot_count = scope
         .bindings
@@ -1627,7 +1623,7 @@ fn synthetic_function_environment_bindings(
 }
 
 const fn bytecode_environment_binding(
-    binding: &lyng_js_sema::BindingRecord,
+    binding: &lyng_sema::BindingRecord,
     scoped: bool,
 ) -> BytecodeEnvironmentBinding {
     let flags = BytecodeEnvironmentSlotFlags::new(
@@ -1644,7 +1640,7 @@ const fn bytecode_environment_binding(
     BytecodeEnvironmentBinding::new(Some(binding.name), flags)
 }
 
-const fn scope_environment_binding_is_scoped(scope: &lyng_js_sema::ScopeRecord) -> bool {
+const fn scope_environment_binding_is_scoped(scope: &lyng_sema::ScopeRecord) -> bool {
     !matches!(
         scope.kind,
         ScopeKind::Global | ScopeKind::Module | ScopeKind::Function | ScopeKind::Parameter

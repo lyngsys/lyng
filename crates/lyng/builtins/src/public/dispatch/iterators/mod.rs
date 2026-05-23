@@ -16,12 +16,12 @@ use super::{
     type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::{Agent, PromiseCapabilityId, PromiseReactionHandler};
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
-use lyng_js_ops::{errors, iterator, read};
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::{Agent, PromiseCapabilityId, PromiseReactionHandler};
+use lyng_gc::AllocationLifetime;
+use lyng_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_ops::{errors, iterator, read};
+use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
 };
 

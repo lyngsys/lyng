@@ -6,7 +6,7 @@ a minimal opcode.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/hot.rs`:
+`crates/lyng/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {
@@ -23,7 +23,7 @@ internal scratch `t0` -> 11 before splicing into `naked_asm!`.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_move.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_move.asm`.
 
 Effective instruction sequence (after assembler strips comments):
 
@@ -43,7 +43,7 @@ matches the design's "hot move ≈ 4 ops + 4-instr dispatch tail" target.
 
 ## LLInt reference
 
-See `reports/js/lyng-js/llint-reference/op_mov.md`.
+See `reports/lyng/llint-reference/op_mov.md`.
 
 JSC's `op_mov` body:
 
@@ -68,7 +68,7 @@ Within a 1-2 instruction tolerance of LLInt — meets the design's
 
 ## Side-by-side diff
 
-| Step          | DSL (lyng-js)                        | LLInt (JSC)                          |
+| Step          | DSL (lyng)                        | LLInt (JSC)                          |
 | ------------- | ------------------------------------ | ------------------------------------ |
 | Decode src    | `ldrb w10, [x19, #2]`                | (inline in `get(m_src, t1)`)         |
 | Decode dst    | `ldrb w9,  [x19, #1]`                | (inline in `m_dst` decode)           |
@@ -90,13 +90,13 @@ Phase-C dispatch flip to be meaningful. Tracked at DSL-0c.
 - `tests/dsl_validation_empty.rs` continues to pass (the load-bearing
   proc-macro integration test from B30 isn't broken by the new
   lowerer behavior).
-- Lyng's existing `op_move` semantic tests in `crates/lyng-js/vm/tests/`
+- Lyng's existing `op_move` semantic tests in `crates/lyng/vm/tests/`
   continue to pass — the alpha dispatch is still active.
 
 ## Lowerer changes that landed alongside this port
 
 To get `op_move` to compile correctly the proc-macro lowerer
-(`crates/lyng-js-vm-dsl/src/`) gained:
+(`crates/lyng/vm-dsl/src/`) gained:
 
 1. **Operand-decode prologue emission.** `Layout::decode_prologue_tokens`
    now emits `decode_a!(...)`, `decode_ab!(...)`, ..., `decode_ax!(...)`
@@ -122,6 +122,6 @@ To get `op_move` to compile correctly the proc-macro lowerer
    operand) was reporting 3 — corrected to 1 (the single u32 operand).
    Was masked previously because no real handler used the Ax form.
 
-The `extern crate self as lyng_js_vm;` declaration in `lyng-js-vm`'s
-`lib.rs` lets the proc-macro emit `::lyng_js_vm::...` absolute paths
+The `extern crate self as lyng_vm;` declaration in `lyng-vm`'s
+`lib.rs` lets the proc-macro emit `::lyng_vm::...` absolute paths
 that resolve from both inside the crate and external test crates.

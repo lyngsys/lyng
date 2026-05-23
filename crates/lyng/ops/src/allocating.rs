@@ -2,9 +2,9 @@ use crate::{
     convert::{bigint_view_to_string, number_to_string, primitive_type_error},
     PrimitiveContext,
 };
-use lyng_js_common::AtomId;
-use lyng_js_gc::{AllocationLifetime, PrimitiveStringView};
-use lyng_js_types::{Completion, PropertyKey, StringRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::{AllocationLifetime, PrimitiveStringView};
+use lyng_types::{Completion, PropertyKey, StringRef, Value};
 
 /// Allocates a flat Latin-1 runtime string through the explicit primitive context.
 ///
@@ -18,7 +18,7 @@ pub fn alloc_latin1_string(
     lifetime: AllocationLifetime,
 ) -> StringRef {
     context.mutator().alloc_string(
-        lyng_js_gc::StringEncoding::Latin1,
+        lyng_gc::StringEncoding::Latin1,
         u32::try_from(bytes.len()).expect("flat Latin-1 string length must fit into u32"),
         bytes,
         None,
@@ -203,9 +203,9 @@ fn string_code_units(view: &PrimitiveStringView<'_>) -> Option<Vec<u16>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomTable;
-    use lyng_js_gc::{PrimitiveHeap, StringEncoding};
-    use lyng_js_types::{AbruptCompletion, SymbolRef};
+    use lyng_common::AtomTable;
+    use lyng_gc::{PrimitiveHeap, StringEncoding};
+    use lyng_types::{AbruptCompletion, SymbolRef};
 
     #[test]
     fn allocating_helpers_take_mutable_primitive_context() {
@@ -342,7 +342,7 @@ mod tests {
         let mut context = PrimitiveContext::new(&mut heap, &mut atoms);
         let existing = alloc_latin1_string(&mut context, b"keep", AllocationLifetime::Default);
         let bigint = context.mutator().alloc_bigint(
-            lyng_js_gc::BigIntSign::Negative,
+            lyng_gc::BigIntSign::Negative,
             &[42],
             AllocationLifetime::Default,
         );
@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(
             to_string(
                 &mut context,
-                Value::from_object_ref(lyng_js_types::ObjectRef::from_raw(12).unwrap())
+                Value::from_object_ref(lyng_types::ObjectRef::from_raw(12).unwrap())
             ),
             Err(AbruptCompletion::Throw(Value::undefined()))
         );
@@ -409,7 +409,7 @@ mod tests {
         let mut atoms = AtomTable::new();
         let mut context = PrimitiveContext::new(&mut heap, &mut atoms);
         let invalid_string = StringRef::from_raw(55).unwrap();
-        let invalid_bigint = lyng_js_types::BigIntRef::from_raw(56).unwrap();
+        let invalid_bigint = lyng_types::BigIntRef::from_raw(56).unwrap();
 
         assert_eq!(string_to_property_key(&mut context, invalid_string), None);
         assert_eq!(

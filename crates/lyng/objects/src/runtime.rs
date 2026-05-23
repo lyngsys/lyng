@@ -348,7 +348,7 @@ impl ObjectRuntime {
                         {
                             assert!(
                                 heap.init_store_value(
-                                    lyng_js_gc::ValueStoreTarget::ObjectSlot(
+                                    lyng_gc::ValueStoreTarget::ObjectSlot(
                                         slots,
                                         u32::try_from(index)
                                             .expect("bound argument index should fit u32"),
@@ -374,7 +374,7 @@ impl ObjectRuntime {
         let ordinary_payload = allocation.ordinary_payload_value.map(|value| {
             let cell = heap.alloc_value_cell(lifetime);
             assert!(
-                heap.init_store_value(lyng_js_gc::ValueStoreTarget::ValueCell(cell), value),
+                heap.init_store_value(lyng_gc::ValueStoreTarget::ValueCell(cell), value),
                 "ordinary payload cell should initialize exactly once"
             );
             cell
@@ -620,7 +620,7 @@ impl ObjectRuntime {
     ) -> Option<Value> {
         let payload = heap.object(id)?.ordinary_payload()?;
         heap.value_cell(payload)
-            .map(lyng_js_gc::PrimitiveValueCellRecord::stored_value)
+            .map(lyng_gc::PrimitiveValueCellRecord::stored_value)
     }
 
     pub fn is_date_object(&self, id: ObjectRef) -> bool {
@@ -989,19 +989,19 @@ impl ObjectRuntime {
         &self,
         heap: PrimitiveHeapView<'_>,
         id: ObjectRef,
-    ) -> Option<lyng_js_types::SuspendedExecutionRef> {
+    ) -> Option<lyng_types::SuspendedExecutionRef> {
         if !self.is_generator_object(id) {
             return None;
         }
         self.ordinary_payload_value(heap, id)
-            .and_then(lyng_js_types::Value::as_suspended_execution_ref)
+            .and_then(lyng_types::Value::as_suspended_execution_ref)
     }
 
     pub fn set_generator_suspended(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
-        suspended: Option<lyng_js_types::SuspendedExecutionRef>,
+        suspended: Option<lyng_types::SuspendedExecutionRef>,
     ) -> bool {
         if !self.is_generator_object(id) {
             return false;
@@ -1009,12 +1009,12 @@ impl ObjectRuntime {
         let Some(payload) = heap
             .view()
             .object(id)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::ordinary_payload)
+            .and_then(lyng_gc::RuntimeObjectRecord::ordinary_payload)
         else {
             return false;
         };
         heap.mut_store_value(
-            lyng_js_gc::ValueStoreTarget::ValueCell(payload),
+            lyng_gc::ValueStoreTarget::ValueCell(payload),
             suspended.map_or(Value::undefined(), Value::from_suspended_execution_ref),
         )
     }

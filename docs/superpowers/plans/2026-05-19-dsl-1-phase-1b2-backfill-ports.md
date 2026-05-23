@@ -16,20 +16,20 @@
 ## File structure overview
 
 ### Created
-- `reports/js/lyng-js/dsl-handlers/op_load_const8.md` — per-handler ported report
-- `reports/js/lyng-js/dsl-handlers/op_load_this.md` — per-handler ported report
-- `reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md` — same-load V8 v7 A/B
-- `reports/js/lyng-js/dsl-1/phase-1b2-microbench.md` — microbench results vs LLInt reference + slow-path-share gate
-- `reports/js/lyng-js/dsl-1/phase-1b2-summary.md` — sub-phase summary
+- `reports/lyng/dsl-handlers/op_load_const8.md` — per-handler ported report
+- `reports/lyng/dsl-handlers/op_load_this.md` — per-handler ported report
+- `reports/lyng/dsl-1/phase-1b2-ab-comparison.md` — same-load V8 v7 A/B
+- `reports/lyng/dsl-1/phase-1b2-microbench.md` — microbench results vs LLInt reference + slow-path-share gate
+- `reports/lyng/dsl-1/phase-1b2-summary.md` — sub-phase summary
 
 ### Modified
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs` — add `VALUE_UNINIT_LEX_BITS` const
-- `crates/lyng-js-vm-dsl/src/lower.rs` — add `value_uninit_lex_bits` universal binding (mirroring `state_this_value` precedent from 1.B.1)
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs` (or `frame.rs` if more natural) — add `load_uninit_lex_sentinel!` macro
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs:879-902` — replace `op_load_this_dsl` cold stub with inline port (keep `op_load_this_slow_rs` as bail target)
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs:4184-4210` — replace `op_load_const8_dsl` cold stub with inline port (delete `op_load_const8_slow_rs` if no longer reachable)
-- `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` — delete the 3 `#[ignore]`-d forward-pointer tests; keep the 3 structural compiles-and-links tests
-- New integration tests in `crates/lyng-js-tests/` per the per-opcode-gate convention
+- `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` — add `VALUE_UNINIT_LEX_BITS` const
+- `crates/lyng/vm-dsl/src/lower.rs` — add `value_uninit_lex_bits` universal binding (mirroring `state_this_value` precedent from 1.B.1)
+- `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (or `frame.rs` if more natural) — add `load_uninit_lex_sentinel!` macro
+- `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902` — replace `op_load_this_dsl` cold stub with inline port (keep `op_load_this_slow_rs` as bail target)
+- `crates/lyng/vm/src/dsl/handlers/cold.rs:4184-4210` — replace `op_load_const8_dsl` cold stub with inline port (delete `op_load_const8_slow_rs` if no longer reachable)
+- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — delete the 3 `#[ignore]`-d forward-pointer tests; keep the 3 structural compiles-and-links tests
+- New integration tests in `crates/lyng-tests/` per the per-opcode-gate convention
 
 ---
 
@@ -37,9 +37,9 @@
 
 - **User deny rules:** NEVER use `git -C <path>` or `cd <path> && git ...`. Always run git from the worktree's working directory (you're already there).
 - **Commits:** Each task ends with a self-contained commit. Use the HEREDOC format with `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` footer.
-- **`reports/js/lyng-js/bench-v8.md`** is a bench-tool side-effect; leave unstaged throughout.
+- **`reports/lyng/bench-v8.md`** is a bench-tool side-effect; leave unstaged throughout.
 - **Untracked planning docs** (`docs/superpowers/{plans,specs}/*.md`): leave untouched.
-- **Behavioral parity at every commit:** `cargo test -p lyng-js-vm --lib --release` (≥417) AND `cargo test -p lyng-js-tests --release` (≥1187). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
+- **Behavioral parity at every commit:** `cargo test -p lyng-vm --lib --release` (≥417) AND `cargo test -p lyng-tests --release` (≥1187). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
 - **TDD discipline** for the macro (Task 1) and per-opcode integration tests (Tasks 2 + 3). The asm-handler bodies themselves are exercised via the integration tests + microbench + V8 v7 A/B.
 
 ---
@@ -47,13 +47,13 @@
 ## Task 1: Add `load_uninit_lex_sentinel!` backend macro
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs` (add `VALUE_UNINIT_LEX_BITS` const)
-- Modify: `crates/lyng-js-vm-dsl/src/lower.rs` (add `value_uninit_lex_bits` universal binding)
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs` (add macro)
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` (add `VALUE_UNINIT_LEX_BITS` const)
+- Modify: `crates/lyng/vm-dsl/src/lower.rs` (add `value_uninit_lex_bits` universal binding)
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (add macro)
 
 - [ ] **Step 1: Add the sentinel-bits const to prelude.rs**
 
-In `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with other Value-related constants (look for `VALUE_TAG_HEADER`, `VALUE_PAYLOAD_MASK`, etc. — around lines 40-50). Add after the existing kind constants:
+In `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with other Value-related constants (look for `VALUE_TAG_HEADER`, `VALUE_PAYLOAD_MASK`, etc. — around lines 40-50). Add after the existing kind constants:
 
 ```rust
 /// 64-bit bit pattern of `Value::uninitialized_lexical()`. Used by
@@ -63,7 +63,7 @@ In `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs`, find the section with
 pub const VALUE_UNINIT_LEX_BITS: u64 = Value::uninitialized_lexical().bits();
 ```
 
-Note: `Value::uninitialized_lexical()` is a `const fn` (per `crates/lyng-js/types/src/value.rs:186-188`), so this works at const-eval time. If `.bits()` is not const, expose it via a helper `pub const fn bits_const(self) -> u64` on `Value` in `types/src/value.rs` and use that. The refactor worker investigates at impl time.
+Note: `Value::uninitialized_lexical()` is a `const fn` (per `crates/lyng/types/src/value.rs:186-188`), so this works at const-eval time. If `.bits()` is not const, expose it via a helper `pub const fn bits_const(self) -> u64` on `Value` in `types/src/value.rs` and use that. The refactor worker investigates at impl time.
 
 - [ ] **Step 2: Add a unit test for the const**
 
@@ -79,33 +79,33 @@ fn value_uninit_lex_bits_matches_runtime() {
 }
 ```
 
-If the `tests` mod doesn't already exist in prelude.rs, add it. If `Value::bits()` is not public, replace it with whatever public accessor exposes the u64 (`.to_bits()`, `.raw()`, etc.) — the refactor worker discovers via `grep "pub fn.*Value.*u64" crates/lyng-js/types/src/value.rs`.
+If the `tests` mod doesn't already exist in prelude.rs, add it. If `Value::bits()` is not public, replace it with whatever public accessor exposes the u64 (`.to_bits()`, `.raw()`, etc.) — the refactor worker discovers via `grep "pub fn.*Value.*u64" crates/lyng/types/src/value.rs`.
 
 - [ ] **Step 3: Run the unit test to verify it passes**
 
-Run: `cargo test -p lyng-js-vm --lib value_uninit_lex_bits_matches_runtime`
-Expected: PASS (or "no tests" if rust-analyzer is stale — run `cargo test -p lyng-js-vm --lib --release 2>&1 | tail -10` to verify).
+Run: `cargo test -p lyng-vm --lib value_uninit_lex_bits_matches_runtime`
+Expected: PASS (or "no tests" if rust-analyzer is stale — run `cargo test -p lyng-vm --lib --release 2>&1 | tail -10` to verify).
 
 - [ ] **Step 4: Add `value_uninit_lex_bits` to the lowerer's universal binding set**
 
-Open `crates/lyng-js-vm-dsl/src/lower.rs`. Find the section that injects universal `naked_asm!` named bindings (look for `state_this_value`, `state_pb`, `state_fv`, `state_regs`, `state_prefix` — added during Phase 1.B.1 Task 5). Add an analogous binding:
+Open `crates/lyng/vm-dsl/src/lower.rs`. Find the section that injects universal `naked_asm!` named bindings (look for `state_this_value`, `state_pb`, `state_fv`, `state_regs`, `state_prefix` — added during Phase 1.B.1 Task 5). Add an analogous binding:
 
 ```rust
 // Phase 1.B.2: sentinel bit pattern for op_load_this's bail comparison.
 // Mirrors the state_this_value pattern.
-value_uninit_lex_bits = const ::lyng_js_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
+value_uninit_lex_bits = const ::lyng_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
 ```
 
 (Adjust the exact syntax to match the existing binding-list style.)
 
 - [ ] **Step 5: Build to verify it compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean. The new const is exposed; the new binding is wired through the lowerer.
 
 - [ ] **Step 6: Add the `load_uninit_lex_sentinel!` macro**
 
-In `crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs` (this is where Value-related backend macros live; if a different file is more conventional for sentinel/constant-materialization, the refactor worker picks based on the existing module organization — `prelude.rs` is also reasonable), add:
+In `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` (this is where Value-related backend macros live; if a different file is more conventional for sentinel/constant-materialization, the refactor worker picks based on the existing module organization — `prelude.rs` is also reasonable), add:
 
 ```rust
 /// Materialize the `Value::uninitialized_lexical()` 64-bit sentinel
@@ -165,7 +165,7 @@ The refactor worker writes one form, tries to compile a test handler in Step 7, 
 
 - [ ] **Step 7: Add a structural validation test in `dsl_validation_frame_context.rs`**
 
-Open `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing three structural "compiles-and-links" handlers, add a fourth:
+Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing three structural "compiles-and-links" handlers, add a fourth:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -193,18 +193,18 @@ This catches macro-emit and lowerer-binding issues without requiring runtime exe
 
 - [ ] **Step 8: Run the test to verify it compiles + symbol exists**
 
-Run: `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`
+Run: `cargo test -p lyng-vm --test dsl_validation_frame_context --release`
 Expected: 4 tests passing (3 existing + 1 new), 3 ignored (the existing forward-pointer tests; deleted in Task 4). If the macro doesn't compile, switch to the movz/movk form (Step 6 alternate) and retry.
 
 - [ ] **Step 9: Run the full vm + tests suites for parity**
 
-Run in parallel: `cargo test -p lyng-js-vm --lib --release` and `cargo test -p lyng-js-tests --release`
+Run in parallel: `cargo test -p lyng-vm --lib --release` and `cargo test -p lyng-tests --release`
 Expected: 417+ vm, 1187+ tests (unchanged from Phase 1.B.1 close + 1 from the const unit test = 418 vm).
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs crates/lyng-js-vm-dsl/src/lower.rs crates/lyng-js/vm/tests/dsl_validation_frame_context.rs
+git add crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs crates/lyng/vm/src/dsl/backend/aarch64/values.rs crates/lyng/vm-dsl/src/lower.rs crates/lyng/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 1: load_uninit_lex_sentinel! backend macro
 
@@ -237,18 +237,18 @@ EOF
 ## Task 2: Inline-port `op_load_const8`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs:4179-4188` (handler) and `:4190-4210` (slow_rs)
-- Create: `reports/js/lyng-js/dsl-handlers/op_load_const8.md`
-- Test: extend an existing integration test file in `crates/lyng-js-tests/tests/` or add a new one
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:4179-4188` (handler) and `:4190-4210` (slow_rs)
+- Create: `reports/lyng/dsl-handlers/op_load_const8.md`
+- Test: extend an existing integration test file in `crates/lyng-tests/tests/` or add a new one
 
 - [ ] **Step 1: Add integration tests for the inline port (TDD, written before the port)**
 
 Find the existing integration test file that covers numeric literal evaluation. If unclear, run:
 ```bash
-grep -rln "fn.*const8\|evaluate_script.*42\|LoadConst8" crates/lyng-js-tests/ | head -5
+grep -rln "fn.*const8\|evaluate_script.*42\|LoadConst8" crates/lyng-tests/ | head -5
 ```
 
-If a single canonical "load_const8_basics" test file doesn't exist, create `crates/lyng-js-tests/tests/op_load_const8_inline.rs`:
+If a single canonical "load_const8_basics" test file doesn't exist, create `crates/lyng-tests/tests/op_load_const8_inline.rs`:
 
 ```rust
 //! Phase 1.B.2 Task 2: integration tests for the inline op_load_const8 port.
@@ -256,7 +256,7 @@ If a single canonical "load_const8_basics" test file doesn't exist, create `crat
 //! Exercises each ConstantValue variant that the pre-resolution
 //! pipeline produces in the active code's flat constants array.
 
-use lyng_js_tests::run_script_returning_value;  // or whatever the helper is
+use lyng_tests::run_script_returning_value;  // or whatever the helper is
 
 #[test]
 fn op_load_const8_smi_constant() {
@@ -286,20 +286,20 @@ fn op_load_const8_handles_multiple_constants_in_pool() {
 
 **Note on helpers:** the exact name for `run_script_returning_value` is whatever the existing test crate uses. Search via:
 ```bash
-grep -rn "fn.*-> Value\|pub fn.*Script\|evaluate_script\|run_script" crates/lyng-js-tests/src/ | head -10
+grep -rn "fn.*-> Value\|pub fn.*Script\|evaluate_script\|run_script" crates/lyng-tests/src/ | head -10
 ```
 Match the convention used by other tests in the same directory.
 
 - [ ] **Step 2: Run the tests — they should pass even before the port (cold stub still works)**
 
-Run: `cargo test -p lyng-js-tests --test op_load_const8_inline --release`
+Run: `cargo test -p lyng-tests --test op_load_const8_inline --release`
 Expected: 4 passing (or however many tests you wrote). They pass because the COLD STUB also produces the correct values — Task 2 inline port doesn't change semantics, just speed.
 
 This is the value: when Task 2 lands the inline port, the same tests must continue to pass. They guard against semantic regression.
 
 - [ ] **Step 3: Replace the `op_load_const8_dsl` cold stub with the inline port**
 
-In `crates/lyng-js/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 4182-4188):
+In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 4182-4188):
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -341,38 +341,38 @@ llint_handler! {
 
 - [ ] **Step 4: Build to verify the inline port compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean. If `load_constant!` rejects the call syntax, adjust to match the actual macro signature (check `constants.rs` for the definition).
 
 - [ ] **Step 5: Run the integration tests — they must still pass**
 
-Run: `cargo test -p lyng-js-tests --test op_load_const8_inline --release`
+Run: `cargo test -p lyng-tests --test op_load_const8_inline --release`
 Expected: same 4+ passing as in Step 2. Inline port produces the same values.
 
 - [ ] **Step 6: Run full vm + tests suites for parity**
 
-Run in parallel: `cargo test -p lyng-js-vm --lib --release` and `cargo test -p lyng-js-tests --release`
+Run in parallel: `cargo test -p lyng-vm --lib --release` and `cargo test -p lyng-tests --release`
 Expected: 417+/1187+ (parity maintained, plus the new tests from Step 1 added the per-opcode coverage).
 
 - [ ] **Step 7: Verify the slow stub `op_load_const8_slow_rs` is still referenced (or remove it)**
 
 The inline port doesn't `call_slow!` anymore. If `op_load_const8_slow_rs` has no callers, it's dead code. Check:
 ```bash
-grep -rn "op_load_const8_slow_rs" crates/lyng-js/
+grep -rn "op_load_const8_slow_rs" crates/lyng/
 ```
 If no callers remain outside the function definition itself, delete the function. If it's still referenced (e.g., the prefix-wide variant uses it), keep it.
 
 - [ ] **Step 8: Capture asm baseline**
 
-Run: `cargo run --release -p lyng-js-bench -- asm-diff --opcode op_load_const8_dsl`
+Run: `cargo run --release -p lyng-bench -- asm-diff --opcode op_load_const8_dsl`
 
-Or whatever the equivalent command is — discover via `cargo run --release -p lyng-js-bench -- --help` and match the Phase 1.A precedent (look at Phase 1.A commits for the exact incantation).
+Or whatever the equivalent command is — discover via `cargo run --release -p lyng-bench -- --help` and match the Phase 1.A precedent (look at Phase 1.A commits for the exact incantation).
 
-Save the asm baseline to wherever the convention dictates (likely `reports/js/lyng-js/asm-baselines/op_load_const8.txt` or similar). Phase 1.A ported handlers (e.g., `op_load_smi8`) have asm baselines; mirror that pattern.
+Save the asm baseline to wherever the convention dictates (likely `reports/lyng/asm-baselines/op_load_const8.txt` or similar). Phase 1.A ported handlers (e.g., `op_load_smi8`) have asm baselines; mirror that pattern.
 
 - [ ] **Step 9: Write the per-handler ported report**
 
-Create `reports/js/lyng-js/dsl-handlers/op_load_const8.md`. Mirror an existing report — `reports/js/lyng-js/dsl-handlers/op_load_false.md` or `op_load_null.md` are good templates (Phase 1.A handlers).
+Create `reports/lyng/dsl-handlers/op_load_const8.md`. Mirror an existing report — `reports/lyng/dsl-handlers/op_load_false.md` or `op_load_null.md` are good templates (Phase 1.A handlers).
 
 Required sections:
 - Opcode byte + layout + length
@@ -387,7 +387,7 @@ Some sections (microbench, slow-path-share) are filled in during Task 4 once the
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs reports/js/lyng-js/dsl-handlers/op_load_const8.md crates/lyng-js-tests/tests/op_load_const8_inline.rs
+git add crates/lyng/vm/src/dsl/handlers/cold.rs reports/lyng/dsl-handlers/op_load_const8.md crates/lyng-tests/tests/op_load_const8_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 2: op_load_const8 inline port
 
@@ -418,13 +418,13 @@ EOF
 ## Task 3: Inline-port `op_load_this`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs:874-882` (handler) — keep `op_load_this_slow_rs` as bail target
-- Create: `reports/js/lyng-js/dsl-handlers/op_load_this.md`
-- Test: `crates/lyng-js-tests/tests/op_load_this_inline.rs` (new)
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:874-882` (handler) — keep `op_load_this_slow_rs` as bail target
+- Create: `reports/lyng/dsl-handlers/op_load_this.md`
+- Test: `crates/lyng-tests/tests/op_load_this_inline.rs` (new)
 
 - [ ] **Step 1: Add integration tests for the inline port + sentinel bail**
 
-Create `crates/lyng-js-tests/tests/op_load_this_inline.rs`:
+Create `crates/lyng-tests/tests/op_load_this_inline.rs`:
 
 ```rust
 //! Phase 1.B.2 Task 3: integration tests for the inline op_load_this port.
@@ -437,7 +437,7 @@ Create `crates/lyng-js-tests/tests/op_load_this_inline.rs`:
 //! Plus the no-EC fallback (function called without an explicit
 //! execution context push — relies on FrameRecord::this_value).
 
-use lyng_js_tests::run_script_returning_value;  // match helper from Task 2
+use lyng_tests::run_script_returning_value;  // match helper from Task 2
 
 #[test]
 fn op_load_this_value_state_returns_real_this() {
@@ -484,16 +484,16 @@ fn op_load_this_in_top_level_script_is_undefined_or_global() {
 }
 ```
 
-The exact JS syntax for triggering each ThisState arm may need adjustment based on what the lyng-js parser supports (e.g., class syntax availability). The refactor worker adjusts to match. If `class` syntax isn't fully supported, find alternative ways to construct each state (e.g., `Object.create` + manual binding rituals for Uninitialized).
+The exact JS syntax for triggering each ThisState arm may need adjustment based on what the lyng parser supports (e.g., class syntax availability). The refactor worker adjusts to match. If `class` syntax isn't fully supported, find alternative ways to construct each state (e.g., `Object.create` + manual binding rituals for Uninitialized).
 
 - [ ] **Step 2: Run the tests — they should pass with the cold stub**
 
-Run: `cargo test -p lyng-js-tests --test op_load_this_inline --release`
+Run: `cargo test -p lyng-tests --test op_load_this_inline --release`
 Expected: all passing (cold stub correctly produces these values). If any test fails before the inline port, that's an unrelated bug — investigate before proceeding.
 
 - [ ] **Step 3: Replace the `op_load_this_dsl` cold stub with the inline port**
 
-In `crates/lyng-js/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 877-882):
+In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the existing cold stub (around lines 877-882):
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -545,31 +545,31 @@ llint_handler! {
 
 Look at existing DSL handlers that have similar conditional-bail patterns. For example, type-check macros likely have `b.ne fast_path; b.eq slow_path; ...` patterns; mirror that.
 
-If no precedent exists, the cleanest approach is to introduce a minimal `cmp_and_bail_eq!($reg_a, $reg_b, $slow_fn, args = [$($a:tt)*])` macro in `crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs` (where dispatch and branch macros live). The refactor worker either finds a precedent and uses it directly, or adds the macro as a tiny helper here.
+If no precedent exists, the cleanest approach is to introduce a minimal `cmp_and_bail_eq!($reg_a, $reg_b, $slow_fn, args = [$($a:tt)*])` macro in `crates/lyng/vm/src/dsl/backend/aarch64/control.rs` (where dispatch and branch macros live). The refactor worker either finds a precedent and uses it directly, or adds the macro as a tiny helper here.
 
 - [ ] **Step 4: Build to verify the inline port compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean. If the macro signatures don't match, adjust per existing precedent.
 
 - [ ] **Step 5: Run the op_load_this integration tests — they must still pass**
 
-Run: `cargo test -p lyng-js-tests --test op_load_this_inline --release`
+Run: `cargo test -p lyng-tests --test op_load_this_inline --release`
 Expected: all passing. The Value(v) tests exercise the inline fast path; the Uninitialized + Lexical tests exercise the sentinel bail to slow path.
 
 - [ ] **Step 6: Run full vm + tests suites for parity**
 
-Run in parallel: `cargo test -p lyng-js-vm --lib --release` and `cargo test -p lyng-js-tests --release`
+Run in parallel: `cargo test -p lyng-vm --lib --release` and `cargo test -p lyng-tests --release`
 Expected: 417+/1187+ (plus the new tests from Step 1).
 
 - [ ] **Step 7: Capture asm baseline + write per-handler ported report**
 
-Mirror Task 2 Steps 8 + 9. Asm baseline → `reports/js/lyng-js/asm-baselines/op_load_this.txt` (or equivalent location). Ported report → `reports/js/lyng-js/dsl-handlers/op_load_this.md`. Mark microbench + slow-path-share `TBD-Task-4`.
+Mirror Task 2 Steps 8 + 9. Asm baseline → `reports/lyng/asm-baselines/op_load_this.txt` (or equivalent location). Ported report → `reports/lyng/dsl-handlers/op_load_this.md`. Mark microbench + slow-path-share `TBD-Task-4`.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs crates/lyng-js-tests/tests/op_load_this_inline.rs reports/js/lyng-js/dsl-handlers/op_load_this.md reports/js/lyng-js/asm-baselines/op_load_this.txt
+git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_load_this_inline.rs reports/lyng/dsl-handlers/op_load_this.md reports/lyng/asm-baselines/op_load_this.txt
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 3: op_load_this inline port with sentinel bail
 
@@ -608,15 +608,15 @@ EOF
 ## Task 4: Cleanup, V8 v7 A/B, microbench, slow-path-share
 
 **Files:**
-- Modify: `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` (delete the 3 ignored forward-pointer tests)
-- Modify: `reports/js/lyng-js/dsl-handlers/op_load_const8.md` (fill in TBDs from Task 2)
-- Modify: `reports/js/lyng-js/dsl-handlers/op_load_this.md` (fill in TBDs from Task 3)
-- Create: `reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md`
+- Modify: `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (delete the 3 ignored forward-pointer tests)
+- Modify: `reports/lyng/dsl-handlers/op_load_const8.md` (fill in TBDs from Task 2)
+- Modify: `reports/lyng/dsl-handlers/op_load_this.md` (fill in TBDs from Task 3)
+- Create: `reports/lyng/dsl-1/phase-1b2-microbench.md`
+- Create: `reports/lyng/dsl-1/phase-1b2-ab-comparison.md`
 
 - [ ] **Step 1: Delete the 3 ignored forward-pointer tests in dsl_validation_frame_context.rs**
 
-Open `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`. Find the three tests marked `#[ignore]` (added in Phase 1.B.1 Task 6, commit `0605a407`):
+Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Find the three tests marked `#[ignore]` (added in Phase 1.B.1 Task 6, commit `0605a407`):
 - `load_constant_reads_pre_resolved_constants_array`
 - `load_this_value_reads_real_this_binding`
 - `load_this_value_reads_sentinel_for_uninitialized`
@@ -629,8 +629,8 @@ Add a note at the top of the file explaining the cleanup:
 //! Phase 1.B.2 cleanup: the 3 forward-pointer #[ignore]-d tests that
 //! were placeholders for Phase 1.B.2's canonical opcodes are removed.
 //! End-to-end coverage of op_load_const8 and op_load_this now lives in
-//! `crates/lyng-js-tests/tests/op_load_const8_inline.rs` and
-//! `crates/lyng-js-tests/tests/op_load_this_inline.rs` respectively.
+//! `crates/lyng-tests/tests/op_load_const8_inline.rs` and
+//! `crates/lyng-tests/tests/op_load_this_inline.rs` respectively.
 //!
 //! The 4 structural compiles-and-links tests remain — they catch
 //! macro-emit and lowerer-binding regressions.
@@ -638,20 +638,20 @@ Add a note at the top of the file explaining the cleanup:
 
 - [ ] **Step 2: Run tests to confirm the cleanup compiles + all suites pass**
 
-Run: `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`
+Run: `cargo test -p lyng-vm --test dsl_validation_frame_context --release`
 Expected: 4 passing (the 4 structural tests), 0 ignored.
 
-Run: `cargo test -p lyng-js-vm --lib --release` and `cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-vm --lib --release` and `cargo test -p lyng-tests --release`
 Expected: 417+/1187+ (parity).
 
 - [ ] **Step 3: Run microbench**
 
 ```bash
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- microbench --samples 7 --json /tmp/phase-1b2-microbench.json 2>&1 | tail -30
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- microbench --samples 7 --json /tmp/phase-1b2-microbench.json 2>&1 | tail -30
 ```
 
-Verify the `LoadConst8` and `LoadThis` snippets report ns/dispatch with CI95. Compare against the LLInt reference (Phase 1.B.0 microbench tables for those snippets, or `tools/lyng-js-bench/hot-opcodes.toml` if a reference is listed there).
+Verify the `LoadConst8` and `LoadThis` snippets report ns/dispatch with CI95. Compare against the LLInt reference (Phase 1.B.0 microbench tables for those snippets, or `tools/lyng-bench/hot-opcodes.toml` if a reference is listed there).
 
 - [ ] **Step 4: Run V8 v7 same-load A/B vs `68dd5e89` (Phase 1.B.1 closed HEAD)**
 
@@ -661,14 +661,14 @@ Follow the protocol from Phase 1.B.1 Task 8 (which is the established pattern):
 git stash --include-untracked
 uptime
 git checkout 68dd5e89
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b2-base.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b2-base.json 2>&1 | tail -20
 uptime
-git restore reports/js/lyng-js/bench-v8.md
+git restore reports/lyng/bench-v8.md
 git checkout claude/epic-saha-8f0b96
 git stash pop
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b2-post.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b2-post.json 2>&1 | tail -20
 uptime
 ```
 
@@ -677,7 +677,7 @@ Compute per-workload deltas and geomean (mirror Phase 1.B.1's `phase-1b1-ab-comp
 - [ ] **Step 5: Run slow-path-share measurement on V8 v7**
 
 ```bash
-cargo run --release -p lyng-js-bench -- v8suite --samples 3 --count-slow-path-share --json /tmp/phase-1b2-slowshare.json 2>&1 | tail -30
+cargo run --release -p lyng-bench -- v8suite --samples 3 --count-slow-path-share --json /tmp/phase-1b2-slowshare.json 2>&1 | tail -30
 ```
 
 Or whatever the actual command-line flag is — discover via `--help` if the syntax above is wrong. The infra was added in Phase 1.B.0 Task 5.
@@ -686,7 +686,7 @@ Verify per-opcode slow-path-share for `op_load_const8` (expected ≈ 0%) and `op
 
 - [ ] **Step 6: Write the microbench summary**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`:
+Create `reports/lyng/dsl-1/phase-1b2-microbench.md`:
 
 ```markdown
 # Phase 1.B.2 — Microbench + slow-path-share results
@@ -721,16 +721,16 @@ Measured 2026-05-19 after `op_load_const8` and `op_load_this` inline ports lande
 
 - [ ] **Step 7: Write the A/B comparison**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md` mirroring `phase-1b1-ab-comparison.md`'s structure. Include per-workload deltas, geomean, loadavg overlap, verdict against the ≤2% aggregate / ≤5% per-workload gates.
+Create `reports/lyng/dsl-1/phase-1b2-ab-comparison.md` mirroring `phase-1b1-ab-comparison.md`'s structure. Include per-workload deltas, geomean, loadavg overlap, verdict against the ≤2% aggregate / ≤5% per-workload gates.
 
 - [ ] **Step 8: Fill in the TBDs in the per-handler ported reports**
 
-Open `reports/js/lyng-js/dsl-handlers/op_load_const8.md` and `reports/js/lyng-js/dsl-handlers/op_load_this.md`. Replace `TBD-Task-4` markers with the actual microbench + slow-path-share numbers from Steps 3 + 5.
+Open `reports/lyng/dsl-handlers/op_load_const8.md` and `reports/lyng/dsl-handlers/op_load_this.md`. Replace `TBD-Task-4` markers with the actual microbench + slow-path-share numbers from Steps 3 + 5.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/tests/dsl_validation_frame_context.rs reports/js/lyng-js/dsl-1/phase-1b2-microbench.md reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md reports/js/lyng-js/dsl-handlers/op_load_const8.md reports/js/lyng-js/dsl-handlers/op_load_this.md
+git add crates/lyng/vm/tests/dsl_validation_frame_context.rs reports/lyng/dsl-1/phase-1b2-microbench.md reports/lyng/dsl-1/phase-1b2-ab-comparison.md reports/lyng/dsl-handlers/op_load_const8.md reports/lyng/dsl-handlers/op_load_this.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2 Task 4: cleanup + microbench + V8 v7 A/B
 
@@ -757,11 +757,11 @@ EOF
 ## Task 5: Phase 1.B.2 sub-phase summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b2-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1b2-summary.md`
 
 - [ ] **Step 1: Draft the summary**
 
-Use `reports/js/lyng-js/dsl-1/phase-1b1-summary.md` as the template. Include:
+Use `reports/lyng/dsl-1/phase-1b1-summary.md` as the template. Include:
 - Date range, baseline-vs-HEAD SHAs
 - Status: closed
 - Scope landed table (5 tasks → commits)
@@ -786,7 +786,7 @@ If any gate is ❌, the sub-phase is NOT closed; back to the relevant task to fi
 - [ ] **Step 3: Commit the summary**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b2-summary.md
+git add reports/lyng/dsl-1/phase-1b2-summary.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.2: phase summary — backfill ports complete
 
@@ -795,7 +795,7 @@ op_load_this (#12) using the Phase 1.B.1 frame-context substrate.
 Together these handle ~360M combined dispatches per V8 v7 run.
 
 All exit gates green at HEAD <SHA>:
-- Behavioral parity: 417+ vm-lib, 1187+ lyng-js-tests + per-opcode
+- Behavioral parity: 417+ vm-lib, 1187+ lyng-tests + per-opcode
   integration tests for all ThisState arms
 - Per-opcode gates: ≤12 inline instr, microbench within 2× LLInt,
   slow-path-share < 20% on V8 v7 for both opcodes

@@ -17,9 +17,9 @@ use super::{
     valid_array_length, BuiltinIteratorBridge, PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::{BuiltinInvocation, DynamicFunctionKind};
-use lyng_js_common::WellKnownAtom;
-use lyng_js_ops::iterator;
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId};
+use lyng_common::WellKnownAtom;
+use lyng_ops::iterator;
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId};
 
 const fn array_length_as_number(length: u64) -> f64 {
     #[allow(
@@ -870,7 +870,7 @@ fn array_slice_builtin<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn compare_array_sort_values<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    compare_fn: Option<lyng_js_types::ObjectRef>,
+    compare_fn: Option<lyng_types::ObjectRef>,
     left: Value,
     right: Value,
 ) -> Result<std::cmp::Ordering, Cx::Error> {

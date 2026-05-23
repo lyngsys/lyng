@@ -1,8 +1,6 @@
 use super::{compile_and_run_string_with_host, compile_and_run_with_host};
-use lyng_js_host::{
-    HostHooks, HostResult, TemporalCurrentInstantRequest, TemporalInstant, TestHost,
-};
-use lyng_js_types::Value;
+use lyng_host::{HostHooks, HostResult, TemporalCurrentInstantRequest, TemporalInstant, TestHost};
+use lyng_types::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 struct LiveClockHost;
@@ -50,7 +48,7 @@ fn temporal_bootstrap_exposes_namespace_now_and_instant() {
             + (typeof Temporal.Now.plainDateTimeISO === "function" ? 1048576 : 0)
             + (typeof Temporal.Now.zonedDateTimeISO === "function" ? 2097152 : 0);
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, Value::from_smi(4_194_303));
@@ -64,7 +62,7 @@ fn temporal_instant_constructor_and_epoch_getters_round_trip_epoch_nanoseconds()
         (instant.epochNanoseconds === 1234567890123456789n ? 1 : 0)
             + (instant.epochMilliseconds === 1234567890123 ? 2 : 0);
         ",
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -79,7 +77,7 @@ fn temporal_instant_static_from_and_compare_accept_instant_instances() {
         (Temporal.Instant.compare(instant, later) === -1 ? 1 : 0)
             + (Temporal.Instant.from(instant).epochNanoseconds === instant.epochNanoseconds ? 2 : 0);
         ",
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, Value::from_smi(3));
@@ -102,7 +100,7 @@ fn temporal_instant_static_factories_ignore_subclassing() {
             fromEpoch.epochNanoseconds === 10n
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|false|true|true|false|true|true");
@@ -136,7 +134,7 @@ fn temporal_instant_from_compare_and_equals_accept_iso_strings() {
             invalid
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true|true|true|true|true");
@@ -159,7 +157,7 @@ fn temporal_instant_from_accepts_test262_iso_string_forms() {
             Temporal.Instant.from("1976-11-18T15:23:30.123456789Z[NotATimeZone]").epochNanoseconds === 217178610123456789n,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true|true|true|true|true|true|true");
@@ -201,7 +199,7 @@ fn temporal_instant_string_conversion_rejects_bigint_primitives() {
             equalsBigInt
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true");
@@ -235,7 +233,7 @@ fn temporal_instant_from_rejects_wrong_primitive_types() {
             throwsTypeError(() => Temporal.Instant.from(Temporal.Instant.prototype, { overflow: "reject" }))
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -269,7 +267,7 @@ fn temporal_instant_constructor_and_from_epoch_nanoseconds_reject_wrong_primitiv
             throwsTypeError(() => Temporal.Instant.fromEpochNanoseconds(Symbol()))
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true|true|true|true|true|true|true");
@@ -316,7 +314,7 @@ fn temporal_instant_from_epoch_milliseconds_converts_and_validates_number_input(
             bigintThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "function|true|true|true|true|true|true");
@@ -444,7 +442,7 @@ fn temporal_instant_to_json_matches_to_string_and_value_of_throws() {
         })();
         instant.toJSON() + "|" + threw;
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1970-01-01T00:00:00Z|true");
@@ -474,7 +472,7 @@ fn temporal_instant_to_locale_string_matches_non_intl_to_string_shape() {
             brandThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -532,7 +530,7 @@ fn temporal_instant_to_string_honors_precision_and_rounding_options() {
             flooredNonIntegerDigits
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -650,7 +648,7 @@ fn temporal_instant_to_string_supports_time_zone_and_extended_year_options() {
             invalidSmallestUnitReadTimeZone
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -686,7 +684,7 @@ fn temporal_instant_add_and_subtract_time_durations() {
             dateUnitThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "function|function|true|true|true|true|true");
@@ -722,7 +720,7 @@ fn temporal_instant_additive_results_reject_out_of_range_epoch_nanoseconds() {
             minOverflow
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true");
@@ -769,7 +767,7 @@ fn temporal_instant_round_since_and_until_are_exact_time_operations() {
             missingUnitThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -795,7 +793,7 @@ fn temporal_instant_difference_uses_number_precision_duration_fields() {
             Temporal.Duration.compare(until.add({ microseconds: 1 }), until),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -817,7 +815,7 @@ fn temporal_instant_round_accepts_day_dividing_increments() {
             instant.round({ smallestUnit: "millisecond", roundingIncrement: 86400000 }).epochNanoseconds === expected.epochNanoseconds
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true");
@@ -855,7 +853,7 @@ fn temporal_instant_round_accepts_test262_rounding_increments() {
         });
         failures.join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "");
@@ -877,7 +875,7 @@ fn temporal_instant_stringification_formats_boundary_years() {
             new Temporal.Instant(epochNsInYear(10000n)).toJSON()
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -999,7 +997,7 @@ fn temporal_instant_difference_reads_options_in_spec_order_before_validation() {
             invalidUntil,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -1034,7 +1032,7 @@ fn temporal_instant_since_until_reject_smaller_largest_unit_pairs() {
         }
         failures.join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "");
@@ -1053,7 +1051,7 @@ fn temporal_instant_to_zoned_date_time_iso_uses_named_zone() {
             zoned.calendarId,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -1076,7 +1074,7 @@ fn temporal_instant_and_zoned_date_time_equals_compare_payloads() {
             zoned.equals(new Temporal.ZonedDateTime(43n, "UTC")),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|false|true|true|false");

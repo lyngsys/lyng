@@ -13,7 +13,7 @@ use basic::{
     dispatch_string_basic_builtin, dispatch_string_constructor_builtin,
     dispatch_string_iterator_builtin,
 };
-use lyng_js_types::{BuiltinFunctionId, PropertyKey, Value, WellKnownSymbolId};
+use lyng_types::{BuiltinFunctionId, PropertyKey, Value, WellKnownSymbolId};
 use normalization::{string_locale_compare_builtin, string_normalize_builtin};
 
 pub(super) fn dispatch_string_builtin<Cx: PublicBuiltinDispatchContext>(

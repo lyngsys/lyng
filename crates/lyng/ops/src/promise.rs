@@ -1,10 +1,10 @@
 use crate::errors::throw_type_error;
-use lyng_js_env::{
+use lyng_env::{
     Agent, ExecutableId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
     PromiseState, RuntimeJobPayload,
 };
-use lyng_js_host::HostJobKind;
-use lyng_js_types::{Completion, ObjectRef, Value};
+use lyng_host::HostJobKind;
+use lyng_types::{Completion, ObjectRef, Value};
 
 #[inline]
 pub fn is_promise(agent: &Agent, value: Value) -> bool {
@@ -18,14 +18,14 @@ pub fn is_promise(agent: &Agent, value: Value) -> bool {
 pub fn promise_state(agent: &Agent, promise: ObjectRef) -> Option<PromiseState> {
     agent
         .promise_record(promise)
-        .map(lyng_js_env::PromiseRecord::state)
+        .map(lyng_env::PromiseRecord::state)
 }
 
 #[inline]
 pub fn promise_result(agent: &Agent, promise: ObjectRef) -> Option<Value> {
     agent
         .promise_record(promise)
-        .map(lyng_js_env::PromiseRecord::result)
+        .map(lyng_env::PromiseRecord::result)
 }
 
 #[inline]
@@ -33,11 +33,11 @@ pub fn create_promise_reaction(
     agent: &mut Agent,
     kind: PromiseReactionKind,
     handler: PromiseReactionHandler,
-    capability: Option<lyng_js_env::PromiseCapabilityId>,
-) -> lyng_js_env::PromiseReactionId {
+    capability: Option<lyng_env::PromiseCapabilityId>,
+) -> lyng_env::PromiseReactionId {
     let script_or_module_referrer = agent
         .current_execution_context()
-        .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+        .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
     agent.alloc_promise_reaction(
         PromiseReactionRecord::new(kind, handler, capability)
             .with_script_or_module_referrer(script_or_module_referrer),
@@ -113,7 +113,7 @@ pub fn reject_promise(agent: &mut Agent, promise: ObjectRef, reason: Value) -> C
 
 pub fn enqueue_thenable_job(
     agent: &mut Agent,
-    realm: lyng_js_types::RealmRef,
+    realm: lyng_types::RealmRef,
     promise: ObjectRef,
     thenable: ObjectRef,
     then: ObjectRef,
@@ -134,8 +134,8 @@ pub fn enqueue_thenable_job(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_env::Runtime;
-    use lyng_js_host::NoopHostHooks;
+    use lyng_env::Runtime;
+    use lyng_host::NoopHostHooks;
 
     #[test]
     fn settlement_helpers_flip_state_and_enqueue_reaction_jobs() {
@@ -156,7 +156,7 @@ mod tests {
 
         assert_eq!(promise_state(agent, promise), Some(PromiseState::Fulfilled));
         let job = agent
-            .dequeue_job(lyng_js_env::JobQueueKind::Promise)
+            .dequeue_job(lyng_env::JobQueueKind::Promise)
             .expect("reaction job should be queued");
         assert_eq!(
             job.payload(),

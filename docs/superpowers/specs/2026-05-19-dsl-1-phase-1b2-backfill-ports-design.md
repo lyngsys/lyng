@@ -3,10 +3,10 @@
 **Date:** 2026-05-19
 **Status:** Design draft; awaiting user review.
 **Parent spec:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md) — Phase 1.B umbrella.
-**Predecessor:** Phase 1.B.1 closed at HEAD `68dd5e89` ([`reports/js/lyng-js/dsl-1/phase-1b1-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b1-summary.md)).
+**Predecessor:** Phase 1.B.1 closed at HEAD `68dd5e89` ([`reports/lyng/dsl-1/phase-1b1-summary.md`](../../../reports/lyng/dsl-1/phase-1b1-summary.md)).
 **Deferral inputs:**
-- [`reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md)
-- [`reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md)
+- [`reports/lyng/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md)
+- [`reports/lyng/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)
 
 ---
 
@@ -20,9 +20,9 @@ Inline-port `op_load_const8` (#21, ~104M dispatches/V8 v7 run) and `op_load_this
 
 - **`op_load_const8_dsl` inline port** (opcode 140, layout Ab, length 3). Replaces the current `call_slow!` shim with a 4-instruction inline load via `load_constant!`.
 - **`op_load_this_dsl` inline port** (opcode 28, layout Abx, length 4). Replaces the current `call_slow!` shim with a 6-instruction inline load + sentinel-bail via `load_state_value!` + inline `cmp`+`b.eq` against `Value::uninitialized_lexical()`. Slow path retained for the bail (re-uses existing `op_load_this_slow_rs`).
-- **Per-opcode ported reports** at `reports/js/lyng-js/dsl-handlers/op_load_const8.md` and `reports/js/lyng-js/dsl-handlers/op_load_this.md`.
-- **Asm baselines** captured via `lyng-js-bench asm-diff`.
-- **Microbench snippets verification**: Phase 1.B.0 added `LoadConst8` and `LoadThis` snippets to `tools/lyng-js-bench/src/microbench/snippets.rs`. Phase 1.B.2 verifies these now report ns/dispatch within 2× LLInt reference.
+- **Per-opcode ported reports** at `reports/lyng/dsl-handlers/op_load_const8.md` and `reports/lyng/dsl-handlers/op_load_this.md`.
+- **Asm baselines** captured via `lyng-bench asm-diff`.
+- **Microbench snippets verification**: Phase 1.B.0 added `LoadConst8` and `LoadThis` snippets to `tools/lyng-bench/src/microbench/snippets.rs`. Phase 1.B.2 verifies these now report ns/dispatch within 2× LLInt reference.
 - **Slow-path-share gate**: confirm < 20% on V8 v7 via Phase 1.B.0's `--count-slow-path-share` infra.
 - **Clean up `dsl_validation_frame_context.rs`**: the 3 `#[ignore]`-d forward-pointer tests added in Phase 1.B.1 are removed — replaced by per-opcode integration tests through normal JS evaluation (which now exercise the canonical opcodes).
 - **Same-load V8 v7 A/B** vs `68dd5e89` (Phase 1.B.1 closed HEAD).
@@ -40,7 +40,7 @@ Both opcodes are top-30: `op_load_this` is #12 (256M dispatches/run), `op_load_c
 
 ### Exit criteria
 
-1. **Behavioral parity.** `cargo test -p lyng-js-vm --lib --release` ≥ 417 passing; `cargo test -p lyng-js-tests --release` ≥ 1187 passing. 2 pre-existing `feedback_flat_consistency` failures unchanged.
+1. **Behavioral parity.** `cargo test -p lyng-vm --lib --release` ≥ 417 passing; `cargo test -p lyng-tests --release` ≥ 1187 passing. 2 pre-existing `feedback_flat_consistency` failures unchanged.
 2. **Per-opcode gates** for each of `op_load_const8` + `op_load_this`:
    - ≤ 12 inline instructions (asm baseline)
    - Microbench within 2× LLInt reference
@@ -48,7 +48,7 @@ Both opcodes are top-30: `op_load_this` is #12 (256M dispatches/run), `op_load_c
    - Per-handler ported report present
    - Asm baseline passes `asm-diff --check`
 3. **Same-load A/B vs `68dd5e89`**: aggregate V8 v7 regression ≤ 2%; per-workload regression ≤ 5%; expected improvement ≥ +0.3% on V8 v7 cumulative (LoadThis is the largest single port in 1.B.2).
-4. **Sub-phase summary** at `reports/js/lyng-js/dsl-1/phase-1b2-summary.md`.
+4. **Sub-phase summary** at `reports/lyng/dsl-1/phase-1b2-summary.md`.
 
 ---
 
@@ -58,17 +58,17 @@ Phase 1.B.1 landed the substrate. Recap what's available:
 
 | Substrate piece | Location | Status |
 |------------------|----------|--------|
-| `frame_const_base: *const Value` field on `LlIntState` (offset 32) | `crates/lyng-js/vm/src/dsl/llint_state.rs:31` | ✅ |
-| `frame_this_value: Value` field on `LlIntState` (offset 40) | `crates/lyng-js/vm/src/dsl/llint_state.rs:32` | ✅ |
-| `LLINT_STATE_FRAME_CONST_BASE` + `LLINT_STATE_FRAME_THIS_VALUE` consts | `crates/lyng-js/vm/src/dsl/reg_convention.rs:43-44` | ✅ |
-| `load_constant!` macro (2-instruction indexed load) | `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs` | ✅ |
-| `load_state_value!` macro (1-instruction fixed-offset load) | `crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs` | ✅ |
-| `resolve_initial_this_value` helper (populates `frame_this_value`) | `crates/lyng-js/vm/src/dsl/llint_state.rs` | ✅ |
-| Population at trampoline entry (`run_via_dsl`) | `crates/lyng-js/vm/src/dsl/entry.rs` | ✅ |
-| Refresh in Refresh arm (`translate_outcome`) | `crates/lyng-js/vm/src/dsl/slow_path.rs:293-312` | ✅ |
-| Microbench snippets for LoadConst8 + LoadThis | `tools/lyng-js-bench/src/microbench/snippets.rs` | ✅ |
-| Sentinel `Value::uninitialized_lexical()` const | `crates/lyng-js/types/src/value.rs:186` | ✅ |
-| Slow-path stubs for both opcodes (kept as bail targets for op_load_this) | `crates/lyng-js/vm/src/dsl/handlers/cold.rs:879-902, 4184-4210` | ✅ |
+| `frame_const_base: *const Value` field on `LlIntState` (offset 32) | `crates/lyng/vm/src/dsl/llint_state.rs:31` | ✅ |
+| `frame_this_value: Value` field on `LlIntState` (offset 40) | `crates/lyng/vm/src/dsl/llint_state.rs:32` | ✅ |
+| `LLINT_STATE_FRAME_CONST_BASE` + `LLINT_STATE_FRAME_THIS_VALUE` consts | `crates/lyng/vm/src/dsl/reg_convention.rs:43-44` | ✅ |
+| `load_constant!` macro (2-instruction indexed load) | `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` | ✅ |
+| `load_state_value!` macro (1-instruction fixed-offset load) | `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` | ✅ |
+| `resolve_initial_this_value` helper (populates `frame_this_value`) | `crates/lyng/vm/src/dsl/llint_state.rs` | ✅ |
+| Population at trampoline entry (`run_via_dsl`) | `crates/lyng/vm/src/dsl/entry.rs` | ✅ |
+| Refresh in Refresh arm (`translate_outcome`) | `crates/lyng/vm/src/dsl/slow_path.rs:293-312` | ✅ |
+| Microbench snippets for LoadConst8 + LoadThis | `tools/lyng-bench/src/microbench/snippets.rs` | ✅ |
+| Sentinel `Value::uninitialized_lexical()` const | `crates/lyng/types/src/value.rs:186` | ✅ |
+| Slow-path stubs for both opcodes (kept as bail targets for op_load_this) | `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902, 4184-4210` | ✅ |
 
 Phase 1.B.2 just consumes the substrate; no substrate additions.
 
@@ -161,7 +161,7 @@ L_slow:
 
 **Decision:** prefer `ldr {dst}, =literal` (1 instruction, assembler-managed literal pool) if `naked_asm!` accepts it; otherwise fall back to `movz {dst}, #imm16; movk {dst}, #imm16, lsl #16` (up to 4 instructions for a full 64-bit constant). The Phase 1.B.0 counter macros use `ldr` against a fixed offset successfully; literal-pool `ldr` is the natural extension. The refactor worker tries `ldr =literal` first; if rejected by the rustc inline-asm parser, switches to `movz/movk` and notes the deviation in the commit message. Either way, total inline budget stays ≤ 12 instructions.
 
-**Backend macro decision:** introduce a new tiny macro `load_uninit_lex_sentinel!($dst)` in `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs` (or `values.rs` — wherever Value-related constants live). This keeps the handler body clean and centralizes the sentinel materialization so future opcodes (e.g., `op_throw_uninitialized`) can reuse it. **One new backend macro is OK in 1.B.2** — it's a tiny utility (single ldr/movz sequence) tied directly to the in-scope opcodes.
+**Backend macro decision:** introduce a new tiny macro `load_uninit_lex_sentinel!($dst)` in `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs` (or `values.rs` — wherever Value-related constants live). This keeps the handler body clean and centralizes the sentinel materialization so future opcodes (e.g., `op_throw_uninitialized`) can reuse it. **One new backend macro is OK in 1.B.2** — it's a tiny utility (single ldr/movz sequence) tied directly to the in-scope opcodes.
 
 **Slow-path-share expectation:** very low (< 5%) on V8 v7. The sentinel fires only for `ThisState::Uninitialized` (TDZ for derived constructors before `super()`) or `ThisState::Lexical` (arrow functions captured from a lexical environment). V8 v7 workloads (Richards, DeltaBlue, etc.) are written in pre-class style; they rarely hit either case.
 
@@ -174,7 +174,7 @@ These are illustrative names in §3.2's pseudo-asm; the actual implementation ca
 ## 4. Cleanup: `dsl_validation_frame_context.rs`
 
 Phase 1.B.1 added 3 `#[ignore]`-d forward-pointer tests citing "Phase 1.B.2 lands the canonical opcodes" as the unblocker. Now that Phase 1.B.2 lands them, the ignored tests become obsolete because the 3 canonical opcodes are exercised by:
-- Existing integration tests in `lyng-js-tests` that compile JS programs with `42` literals, `this` in closures, etc.
+- Existing integration tests in `lyng-tests` that compile JS programs with `42` literals, `this` in closures, etc.
 - A new per-opcode integration test per the per-opcode-gate convention.
 
 **Decision: DELETE the 3 ignored tests.** Keep the 3 structural "compiles-and-links" tests (they validate backend macro syntax + asm string formation, useful for catching macro regressions before they hit production handlers).
@@ -191,12 +191,12 @@ Per the per-opcode-gate convention (parent spec §4), each port gets:
 
 | Test | Location | Asserts |
 |------|----------|---------|
-| Smi constant load | `lyng-js-tests/...` (new integration test) | `vm.evaluate_script("42")` returns Smi 42 (forces op_load_const8 for the integer literal) |
+| Smi constant load | `lyng-tests/...` (new integration test) | `vm.evaluate_script("42")` returns Smi 42 (forces op_load_const8 for the integer literal) |
 | Float constant load | same file | `vm.evaluate_script("3.14")` returns f64 3.14 |
 | Atom constant load | same file | `vm.evaluate_script("'hello'")` returns string "hello" (atom pre-resolved at install time) |
 | Builtin constant load | same file | A builtin reference test (e.g., `Math.PI` if that triggers a Builtin constant) |
 
-Existing integration tests in `lyng-js-tests` likely cover most of these via parser/compiler tests. **Required minimum:** at least one new explicit integration test per opcode that asserts the inline-handler path produces the right result for each in-scope case (Smi, Float, Atom, Builtin for op_load_const8; Value, Uninitialized-bail, Lexical-bail for op_load_this). The refactor worker may dedupe against existing coverage if specific cases already have explicit assertions.
+Existing integration tests in `lyng-tests` likely cover most of these via parser/compiler tests. **Required minimum:** at least one new explicit integration test per opcode that asserts the inline-handler path produces the right result for each in-scope case (Smi, Float, Atom, Builtin for op_load_const8; Value, Uninitialized-bail, Lexical-bail for op_load_this). The refactor worker may dedupe against existing coverage if specific cases already have explicit assertions.
 
 ### `op_load_this`
 
@@ -210,11 +210,11 @@ Again, much of this is already covered by existing JS-test infrastructure. Refac
 
 ### Microbench
 
-Phase 1.B.0 added `LoadConst8` and `LoadThis` snippets. Run `cargo run --release -p lyng-js-bench -- microbench --samples 7 --json /tmp/phase-1b2-microbench.json` and verify each is within 2× LLInt reference. The Phase 1.B.0 microbench tables show pre-port (cold-stub) ns/dispatch for these snippets; the post-port number should be lower (we're replacing a slow-path call with inline asm). LLInt reference numbers come from the existing `tools/lyng-js-bench/hot-opcodes.toml` per-opcode configuration if listed there, otherwise from the parent design's reference table.
+Phase 1.B.0 added `LoadConst8` and `LoadThis` snippets. Run `cargo run --release -p lyng-bench -- microbench --samples 7 --json /tmp/phase-1b2-microbench.json` and verify each is within 2× LLInt reference. The Phase 1.B.0 microbench tables show pre-port (cold-stub) ns/dispatch for these snippets; the post-port number should be lower (we're replacing a slow-path call with inline asm). LLInt reference numbers come from the existing `tools/lyng-bench/hot-opcodes.toml` per-opcode configuration if listed there, otherwise from the parent design's reference table.
 
 ### Slow-path-share
 
-Run `cargo run --release -p lyng-js-bench -- v8suite --count-slow-path-share`. Both opcodes should show < 20% slow-path-share. For op_load_const8, expected ≈ 0%; for op_load_this, expected < 5%.
+Run `cargo run --release -p lyng-bench -- v8suite --count-slow-path-share`. Both opcodes should show < 20% slow-path-share. For op_load_const8, expected ≈ 0%; for op_load_this, expected < 5%.
 
 ---
 
@@ -226,7 +226,7 @@ Single refactor worker, ~1-2 days wall-clock. Task breakdown (5 tasks):
 2. **Task 2: Inline-port `op_load_const8`.** Replace cold stub with inline body. Run integration tests. Capture asm baseline + write ported report. ~1-2 hours.
 3. **Task 3: Inline-port `op_load_this`.** Replace cold stub with inline + sentinel bail. Run integration tests covering the three ThisState arms. Capture asm baseline + write ported report. ~2-3 hours.
 4. **Task 4: Cleanup + V8 v7 A/B.** Delete the 3 ignored tests in `dsl_validation_frame_context.rs`. Run same-load A/B vs `68dd5e89`. Write A/B comparison + microbench summary. ~1 hour bench time.
-5. **Task 5: Sub-phase summary.** Write `reports/js/lyng-js/dsl-1/phase-1b2-summary.md` mirroring 1.B.0/1.B.1 format. ~30 min.
+5. **Task 5: Sub-phase summary.** Write `reports/lyng/dsl-1/phase-1b2-summary.md` mirroring 1.B.0/1.B.1 format. ~30 min.
 
 Each task is one commit. Behavioral parity at every commit (≥417 + ≥1187).
 
@@ -263,10 +263,10 @@ Each task is one commit. Behavioral parity at every commit (≥417 + ≥1187).
 
 ## 9. References
 
-- **Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
+- **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
 - **Phase 1.B umbrella:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md).
-- **Phase 1.B.1 closure:** [`reports/js/lyng-js/dsl-1/phase-1b1-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b1-summary.md).
+- **Phase 1.B.1 closure:** [`reports/lyng/dsl-1/phase-1b1-summary.md`](../../../reports/lyng/dsl-1/phase-1b1-summary.md).
 - **Phase 1.B.1 spec (substrate design):** [`2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`](2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md).
-- **Top-30 reference:** [`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv) (op_load_this is #12 at 256M dispatches; op_load_const8 is #21 at 104M dispatches).
-- **Phase 1.A analog port (template):** `op_load_smi8_dsl` at `crates/lyng-js/vm/src/dsl/handlers/cold.rs:4171-4176`.
-- **Existing slow-path stubs:** `crates/lyng-js/vm/src/dsl/handlers/cold.rs:879-902` (op_load_this), `4184-4210` (op_load_const8).
+- **Top-30 reference:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv) (op_load_this is #12 at 256M dispatches; op_load_const8 is #21 at 104M dispatches).
+- **Phase 1.A analog port (template):** `op_load_smi8_dsl` at `crates/lyng/vm/src/dsl/handlers/cold.rs:4171-4176`.
+- **Existing slow-path stubs:** `crates/lyng/vm/src/dsl/handlers/cold.rs:879-902` (op_load_this), `4184-4210` (op_load_const8).

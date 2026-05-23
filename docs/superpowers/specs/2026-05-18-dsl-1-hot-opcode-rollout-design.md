@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 **Status:** Design approved; ready for implementation planning.
-**Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) — §10 DSL-1 phase.
+**Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) — §10 DSL-1 phase.
 **Predecessor work:** DSL-0c complete (α dispatch deleted, all 152 opcodes on DSL substrate, 12 opcodes shipped — 3 with true inline fast paths: `op_move`, `op_add`, `op_loop_header`; 9 as cold-stub delegators in `hot.rs`/`warm.rs`).
 
 ---
@@ -19,11 +19,11 @@ Complete the substrate win started by DSL-0. Port the remaining 28 top-30 hot op
 - **Adjacent family members rounded out for completeness** (~15-17 additional opcodes that fall outside the measured top-30 but belong to families being ported — e.g., `op_store_local_0..2` to match `op_load_local_0..3`, `op_jump_if_true8` to match `op_jump_if_false8`, `op_call_*` family, the trivial constant-loaders `op_load_undefined`/`_null`/`_true`/`_false`/`_one`). Total port count: **~45 opcodes**.
 - **IC mode-byte refactor** — replaces today's Phase 3a/3e/3f layered fast paths with LLInt-style mode-byte dispatch (parent §9 + §10 weeks 8-9).
 - **Pointer-identity cells refactor** — `ObjectRef = u32` → `*mut Cell`, eliminating the side-table indirection on every object-record access (parent §9, ~3-4 weeks).
-- Per-handler ported reports under [`reports/js/lyng-js/dsl-handlers/`](../../../reports/js/lyng-js/dsl-handlers/).
-- Per-handler asm baselines under [`reports/js/lyng-js/dsl-asm-baseline-aarch64/`](../../../reports/js/lyng-js/dsl-asm-baseline-aarch64/).
-- New DSL ops added to [`crates/lyng-js/vm/src/dsl/backend/aarch64/`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/) as ports demand them, documented in `ops.md`.
-- Phase summary reports under `reports/js/lyng-js/dsl-1/`.
-- Final DSL-1 decision document at `reports/js/lyng-js/dsl-1/dsl-1-completion.md`.
+- Per-handler ported reports under [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
+- Per-handler asm baselines under [`reports/lyng/dsl-asm-baseline-aarch64/`](../../../reports/lyng/dsl-asm-baseline-aarch64/).
+- New DSL ops added to [`crates/lyng/vm/src/dsl/backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/) as ports demand them, documented in `ops.md`.
+- Phase summary reports under `reports/lyng/dsl-1/`.
+- Final DSL-1 decision document at `reports/lyng/dsl-1/dsl-1-completion.md`.
 
 ### Out of scope
 
@@ -42,7 +42,7 @@ From parent §10 DSL-1:
 2. **Cumulative V8 v7 geomean ≥ +80% over pre-DSL-0 baseline.** Richards specifically ≥ ~570 against today's 318.
 3. No workload regresses > 5% vs pre-DSL-0 baseline.
 4. Test262 pass count ≥ pre-DSL-1 baseline (no regression from DSL-0c state).
-5. Every per-handler asm-diff report exists in [`reports/js/lyng-js/dsl-handlers/`](../../../reports/js/lyng-js/dsl-handlers/).
+5. Every per-handler asm-diff report exists in [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
 6. **Slow-path-share < 20% per hot opcode** on V8 v7 workloads. Per-opcode waivers allowed; each must be justified in the ported report against an LLInt-on-same-workload baseline.
 
 ---
@@ -74,7 +74,7 @@ Phase 1.A and 1.B together cover roughly 19 of the top-30 by dispatch share — 
 
 **Response:**
 - Pause the phase; do not start the next opcode.
-- Coordinator writes a diagnostic report to `reports/js/lyng-js/dsl-1/off-ramp-<date>-<phase>.md` documenting the failure pattern.
+- Coordinator writes a diagnostic report to `reports/lyng/dsl-1/off-ramp-<date>-<phase>.md` documenting the failure pattern.
 - Decision options: (a) deepen scope into a sub-investigation; (b) defer affected opcodes to DSL-3 or beyond; (c) abort DSL-1 with the wins already banked. Every committed handler stays in production regardless.
 
 ---
@@ -101,21 +101,21 @@ User selection: **conservative — one worker subagent at a time**. The main ses
 
 The worker subagent's brief follows the parent design's canonical workflow:
 
-1. Read JSC's matching handler in `LowLevelInterpreter64.asm` (or the captured reference at `reports/js/lyng-js/llint-reference/`). Understand the fast-path shape.
+1. Read JSC's matching handler in `LowLevelInterpreter64.asm` (or the captured reference at `reports/lyng/llint-reference/`). Understand the fast-path shape.
 2. Identify any data-layout dependency. If a refactor is surfaced that isn't already done in DSL-1, **abort and report**. Coordinator decides whether to schedule the refactor or skip the opcode.
 3. Replace the cold-stub body in `dsl/handlers/cold.rs` (or `warm.rs` / `hot.rs` if previously cold-stubbed there) with a full inline DSL fast path. Add new DSL ops to `backend/aarch64/` if needed (with `ops.md` entry + `mod.rs` re-export).
-4. Run `cargo run --release -p lyng-js-bench -- asm-diff --check`; inspect output; iterate until shape is within budget.
+4. Run `cargo run --release -p lyng-bench -- asm-diff --check`; inspect output; iterate until shape is within budget.
 5. Run microbench for the opcode; capture ns/dispatch with confidence interval; compare to LLInt reference.
 6. Run isolated V8 v7 sweep with `--require-isolation`; capture slow-path-share; verify < 20% (or document a justified waiver).
-7. Write `reports/js/lyng-js/dsl-handlers/op_xxx.md` with: DSL source excerpt, current asm output, LLInt reference asm, side-by-side annotated diff, microbench results, behavioral test references.
+7. Write `reports/lyng/dsl-handlers/op_xxx.md` with: DSL source excerpt, current asm output, LLInt reference asm, side-by-side annotated diff, microbench results, behavioral test references.
 8. Commit handler source + new asm baseline + ported report + any new DSL op as one cohesive change.
 
 ### What the worker gets in its dispatch prompt
 
 Each worker subagent is briefed with the standard self-contained context:
 
-- Opcode name and its top-30 dispatch share (from [`v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv)).
-- Path to its JSC reference asm (or instructions to capture via `lyng-js-bench capture-llint`).
+- Opcode name and its top-30 dispatch share (from [`v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv)).
+- Path to its JSC reference asm (or instructions to capture via `lyng-bench capture-llint`).
 - Current cold-stub location (file path and approximate line).
 - Path to the matching semantic body in `vm/src/vm/semantics/`.
 - Pointers to one or two previously-completed similar opcodes as exemplars.
@@ -131,12 +131,12 @@ Each worker subagent is briefed with the standard self-contained context:
 
 | Gate | Criterion | Source |
 |------|-----------|--------|
-| Behavioral | `cargo test -p lyng-js-vm -p lyng-js-tests` passes | Existing test suite |
+| Behavioral | `cargo test -p lyng-vm -p lyng-tests` passes | Existing test suite |
 | Asm shape | Within 5 instructions of LLInt's matching handler, plus any documented `Value`/`ObjectRef` delta from the R-0 value-layout report | Per-opcode ported report quantifies the delta |
-| Microbench | ns/dispatch within 2× of JSC LLInt's matching opcode, isolated, 7-sample median | `lyng-js-bench microbench` |
-| Slow-path-share | <20% on V8 v7 (per-opcode waivers allowed; must be justified in ported report against an LLInt-on-same-workload baseline) | `lyng-js-bench v8suite --count-slow-path-share` |
-| Asm baseline | Updated and committed; passes `asm-diff --check` | `lyng-js-bench asm-diff` |
-| Ported report | Exists with DSL source, current asm, LLInt reference, side-by-side diff, microbench data | `reports/js/lyng-js/dsl-handlers/` |
+| Microbench | ns/dispatch within 2× of JSC LLInt's matching opcode, isolated, 7-sample median | `lyng-bench microbench` |
+| Slow-path-share | <20% on V8 v7 (per-opcode waivers allowed; must be justified in ported report against an LLInt-on-same-workload baseline) | `lyng-bench v8suite --count-slow-path-share` |
+| Asm baseline | Updated and committed; passes `asm-diff --check` | `lyng-bench asm-diff` |
+| Ported report | Exists with DSL source, current asm, LLInt reference, side-by-side diff, microbench data | `reports/lyng/dsl-handlers/` |
 
 If a worker can't satisfy any gate, it reports back rather than commits.
 
@@ -148,7 +148,7 @@ After every opcode in a phase lands:
 2. Run Test262 slice for affected opcode families; verify no regression.
 3. Inspect per-opcode slow-path-share table across the phase.
 4. Compare aggregate microbench data against the phase's targeted V8 v7 cumulative threshold (table in §2).
-5. If passed, write a phase-completion note to `reports/js/lyng-js/dsl-1/phase-1X-summary.md` and proceed.
+5. If passed, write a phase-completion note to `reports/lyng/dsl-1/phase-1X-summary.md` and proceed.
 6. If failed, off-ramp protocol fires (§2 above).
 
 ### Per-opcode verification cadence (worker)
@@ -156,10 +156,10 @@ After every opcode in a phase lands:
 Per parent §8 cadence:
 
 1. `cargo build --release` — builds with new handler.
-2. `cargo run --release -p lyng-js-bench -- asm-diff --check` — verifies asm baselines.
-3. `cargo run --release -p lyng-js-bench -- microbench --opcodes <name>` — captures ns/dispatch.
-4. `cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share` — captures slow-path-share if affected.
-5. `cargo test -p lyng-js-vm -p lyng-js-tests` — behavioral tests.
+2. `cargo run --release -p lyng-bench -- asm-diff --check` — verifies asm baselines.
+3. `cargo run --release -p lyng-bench -- microbench --opcodes <name>` — captures ns/dispatch.
+4. `cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share` — captures slow-path-share if affected.
+5. `cargo test -p lyng-vm -p lyng-tests` — behavioral tests.
 6. Focused Test262 slice for affected opcode family.
 7. Commit asm baseline + ported report + handler source as one change.
 
@@ -167,13 +167,13 @@ No CI; developer-driven discipline. The coordinator checks each worker's commit 
 
 ### Measurement infrastructure (already exists from R-0)
 
-- `lyng-js-bench microbench` ✓
-- `lyng-js-bench asm-diff` ✓
-- `lyng-js-bench capture-llint` ✓
-- `lyng-js-bench v8suite --count-slow-path-share` ✓
+- `lyng-bench microbench` ✓
+- `lyng-bench asm-diff` ✓
+- `lyng-bench capture-llint` ✓
+- `lyng-bench v8suite --count-slow-path-share` ✓
 - `--count-opcodes` for per-opcode dispatch counts ✓
 - `--require-isolation` ✓
-- Hot-opcodes config ✓ ([`tools/lyng-js-bench/hot-opcodes.toml`](../../../tools/lyng-js-bench/hot-opcodes.toml))
+- Hot-opcodes config ✓ ([`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml))
 
 If a worker discovers a gap (e.g., missing microbench scaffold for a specific opcode shape), it reports back; the coordinator schedules an infra task before resuming.
 
@@ -202,11 +202,11 @@ Both refactors are the highest-risk pieces of DSL-1. Each gets its own implement
 - JIT integration — cells must work when JIT lands, but JIT integration is DSL-3+.
 
 **Exit criteria:**
-1. Behavioral parity — `cargo test -p lyng-js-vm -p lyng-js-tests` passes.
+1. Behavioral parity — `cargo test -p lyng-vm -p lyng-tests` passes.
 2. Test262 pass count ≥ pre-refactor baseline.
 3. Aggregate V8 v7 sweep regresses no more than 2% (cells is a layout change; opcode-level wins come in 1.F).
-4. `Value` and `Cell` type definitions documented in updated [`docs/lyng-js/runtime-primitives.md`](../../lyng-js/runtime-primitives.md).
-5. Cells refactor design doc at `docs/lyng-js/2026-MM-DD-pointer-identity-cells-design.md` exists and is committed.
+4. `Value` and `Cell` type definitions documented in updated [`docs/lyng/runtime-primitives.md`](../../lyng/runtime-primitives.md).
+5. Cells refactor design doc at `docs/lyng/2026-MM-DD-pointer-identity-cells-design.md` exists and is committed.
 
 **Off-ramp:**
 - If Test262 regresses unfixably; if GC integration produces use-after-free; if behavioral tests show heisenbugs — abort 1.E. Reset to pre-refactor branch. Re-evaluate whether cells refactor stays in DSL-1 or moves to its own epic.
@@ -262,7 +262,7 @@ Each port follows the standard 8-step workflow. Per-opcode slow-path-share waive
 | Per-opcode review backlog stalls dispatch | medium | low | Reviewer subagent is optional; coordinator self-reviews mechanical ports. Reviewer fired for ports surfacing new DSL ops, new layout interactions, or off-pattern asm. |
 | Asm-diff churn from rustc upgrade mid-DSL-1 | low | medium | Pin a known-good rustc for the duration of DSL-1. Document the version in `rust-toolchain.toml`. Refresh deliberately at a phase boundary if needed. |
 | DSL ops vocabulary grows unsustainably | medium | low | Per-arch directory budget: ~50 ops total (today ~25-30 in `backend/aarch64/`). New op added only on third occurrence of pattern. Coordinator audits at each phase boundary. |
-| Per-opcode ported reports become busywork | low | low | Use a template generator (`lyng-js-bench gen-port-report --opcode <name>` — schedule into Phase 1.A if not already present). |
+| Per-opcode ported reports become busywork | low | low | Use a template generator (`lyng-bench gen-port-report --opcode <name>` — schedule into Phase 1.A if not already present). |
 
 Pre-existing risks from parent §11 (DSL-0a expansion, `naked_asm` ergonomics, `LlIntState` layout instability, slow-path panic, GC starvation) are retired by DSL-0c being shipped.
 
@@ -271,15 +271,15 @@ Pre-existing risks from parent §11 (DSL-0a expansion, `naked_asm` ergonomics, `
 ## 7. Deliverables checklist (must exist at DSL-1 completion)
 
 - **~45 new DSL handler implementations** with inline fast paths (28 top-30 + ~17 adjacent family members).
-- One per-handler ported report per implementation in [`reports/js/lyng-js/dsl-handlers/`](../../../reports/js/lyng-js/dsl-handlers/).
-- One asm baseline file per implementation in [`reports/js/lyng-js/dsl-asm-baseline-aarch64/`](../../../reports/js/lyng-js/dsl-asm-baseline-aarch64/) (updated; some legacy `CamelCase.asm` files from α era need refreshing or retiring).
-- Updated [`tools/lyng-js-bench/hot-opcodes.toml`](../../../tools/lyng-js-bench/hot-opcodes.toml) with calibrated per-opcode `aarch64_max_instructions` budgets (currently 0 placeholders — DSL-1 calibrates them from real measurements).
-- Cells refactor design doc at `docs/lyng-js/2026-MM-DD-pointer-identity-cells-design.md`.
-- IC mode-byte refactor design doc at `docs/lyng-js/2026-MM-DD-ic-mode-byte-design.md` (or section in updated `llint-dsl-abi.md`).
-- 7 phase summary reports at `reports/js/lyng-js/dsl-1/phase-1X-summary.md`.
-- Final DSL-1 decision document at `reports/js/lyng-js/dsl-1/dsl-1-completion.md`.
-- Updated [`docs/lyng-js/runtime-primitives.md`](../../lyng-js/runtime-primitives.md) reflecting cells layout.
-- Updated [`docs/lyng-js/architecture.md`](../../lyng-js/architecture.md) only if dispatch substrate behavior changed (it shouldn't — that was DSL-0).
+- One per-handler ported report per implementation in [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
+- One asm baseline file per implementation in [`reports/lyng/dsl-asm-baseline-aarch64/`](../../../reports/lyng/dsl-asm-baseline-aarch64/) (updated; some legacy `CamelCase.asm` files from α era need refreshing or retiring).
+- Updated [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml) with calibrated per-opcode `aarch64_max_instructions` budgets (currently 0 placeholders — DSL-1 calibrates them from real measurements).
+- Cells refactor design doc at `docs/lyng/2026-MM-DD-pointer-identity-cells-design.md`.
+- IC mode-byte refactor design doc at `docs/lyng/2026-MM-DD-ic-mode-byte-design.md` (or section in updated `llint-dsl-abi.md`).
+- 7 phase summary reports at `reports/lyng/dsl-1/phase-1X-summary.md`.
+- Final DSL-1 decision document at `reports/lyng/dsl-1/dsl-1-completion.md`.
+- Updated [`docs/lyng/runtime-primitives.md`](../../lyng/runtime-primitives.md) reflecting cells layout.
+- Updated [`docs/lyng/architecture.md`](../../lyng/architecture.md) only if dispatch substrate behavior changed (it shouldn't — that was DSL-0).
 
 ---
 
@@ -299,20 +299,20 @@ These don't block DSL-1 but should be answered with data during the phases:
 2. **Slow-path-share threshold per IC opcode** (parent §13.8) — derive baseline from LLInt on the same workload; document per-opcode threshold methodology in 1.F.2 ported reports.
 3. **Compiler invariant for backedges** (parent §13.10) — audit after Phase 1.D; if all generated code passes through `op_loop_header`, simplify the warm-handler set (delete backward-jump poll branches from `op_jump*`).
 4. **Cell 8-byte header layout** — settle exact layout (kind tag bits, shape pointer width, flag bits, GC bits) during Phase 1.E. Likely lands in the cells refactor design doc.
-5. **Per-opcode `aarch64_max_instructions` budgets** — currently 0 placeholders in [`hot-opcodes.toml`](../../../tools/lyng-js-bench/hot-opcodes.toml). Calibrate during Phase 1.A from real ported handlers + LLInt baselines.
+5. **Per-opcode `aarch64_max_instructions` budgets** — currently 0 placeholders in [`hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml). Calibrate during Phase 1.A from real ported handlers + LLInt baselines.
 
 ---
 
 ## 10. References
 
-- **Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) — full substrate design; this spec is a faithful execution of its §10 DSL-1 phase.
-- **Measured top-30 dispatch shares:** [`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv).
-- **Hot-opcodes config:** [`tools/lyng-js-bench/hot-opcodes.toml`](../../../tools/lyng-js-bench/hot-opcodes.toml).
-- **DSL backend:** [`crates/lyng-js/vm/src/dsl/`](../../../crates/lyng-js/vm/src/dsl/) — substrate from DSL-0.
-- **Existing DSL handlers (12 from DSL-0):** [`crates/lyng-js/vm/src/dsl/handlers/hot.rs`](../../../crates/lyng-js/vm/src/dsl/handlers/hot.rs), [`warm.rs`](../../../crates/lyng-js/vm/src/dsl/handlers/warm.rs), [`cold.rs`](../../../crates/lyng-js/vm/src/dsl/handlers/cold.rs).
-- **Semantic bodies (all 152):** [`crates/lyng-js/vm/src/vm/semantics/`](../../../crates/lyng-js/vm/src/vm/semantics/).
-- **DSL ops vocabulary:** [`crates/lyng-js/vm/src/dsl/ops.md`](../../../crates/lyng-js/vm/src/dsl/ops.md), [`backend/aarch64/`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/).
-- **Existing ported reports (12 from DSL-0):** [`reports/js/lyng-js/dsl-handlers/`](../../../reports/js/lyng-js/dsl-handlers/).
-- **Existing asm baselines:** [`reports/js/lyng-js/dsl-asm-baseline-aarch64/`](../../../reports/js/lyng-js/dsl-asm-baseline-aarch64/).
+- **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) — full substrate design; this spec is a faithful execution of its §10 DSL-1 phase.
+- **Measured top-30 dispatch shares:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv).
+- **Hot-opcodes config:** [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml).
+- **DSL backend:** [`crates/lyng/vm/src/dsl/`](../../../crates/lyng/vm/src/dsl/) — substrate from DSL-0.
+- **Existing DSL handlers (12 from DSL-0):** [`crates/lyng/vm/src/dsl/handlers/hot.rs`](../../../crates/lyng/vm/src/dsl/handlers/hot.rs), [`warm.rs`](../../../crates/lyng/vm/src/dsl/handlers/warm.rs), [`cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs).
+- **Semantic bodies (all 152):** [`crates/lyng/vm/src/vm/semantics/`](../../../crates/lyng/vm/src/vm/semantics/).
+- **DSL ops vocabulary:** [`crates/lyng/vm/src/dsl/ops.md`](../../../crates/lyng/vm/src/dsl/ops.md), [`backend/aarch64/`](../../../crates/lyng/vm/src/dsl/backend/aarch64/).
+- **Existing ported reports (12 from DSL-0):** [`reports/lyng/dsl-handlers/`](../../../reports/lyng/dsl-handlers/).
+- **Existing asm baselines:** [`reports/lyng/dsl-asm-baseline-aarch64/`](../../../reports/lyng/dsl-asm-baseline-aarch64/).
 - **JSC LLInt reference:** `/Users/sondre/dev/WebKit/Source/JavaScriptCore/llint/LowLevelInterpreter64.asm` (read-only reference, not vendored).
-- **Engineering standards:** [`docs/lyng-js/engineering-standards.md`](../../lyng-js/engineering-standards.md), [`AGENTS.md`](../../../AGENTS.md), [`crates/lyng-js/AGENTS.md`](../../../crates/lyng-js/AGENTS.md).
+- **Engineering standards:** [`docs/lyng/engineering-standards.md`](../../lyng/engineering-standards.md), [`AGENTS.md`](../../../AGENTS.md), [`crates/lyng/AGENTS.md`](../../../crates/lyng/AGENTS.md).

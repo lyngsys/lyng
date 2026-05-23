@@ -24,7 +24,7 @@ fn temporal_plain_year_month_constructor_getters_and_serialization() {
             threw,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -45,7 +45,7 @@ fn temporal_plain_year_month_to_string_honors_calendar_name_and_reference_day() 
             yearMonth.toString({ calendarName: "critical" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -65,7 +65,7 @@ fn temporal_plain_year_month_calendar_always_matches_test262_examples() {
             parsed.toString({ calendarName: "always" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2019-10-31[u-ca=iso8601]|2019-10-01[u-ca=iso8601]");
@@ -78,7 +78,7 @@ fn temporal_plain_year_month_to_string_uses_reference_day_from_string_input() {
         let yearMonth = Temporal.PlainYearMonth.from("2019-10-31");
         yearMonth.toString({ calendarName: "always" });
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2019-10-01[u-ca=iso8601]");
@@ -100,7 +100,7 @@ fn temporal_plain_year_month_to_json_ignores_argument_properties() {
             new Temporal.PlainYearMonth(1972, 12).toJSON(options),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1972-01|1972-01|1972-12|1972-12");
@@ -123,7 +123,7 @@ fn temporal_plain_year_month_iso_derived_getters() {
             commonDecember.inLeapYear,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "29|366|12|true|31|365|12|false");
@@ -145,7 +145,7 @@ fn temporal_plain_year_month_from_clones_and_normalizes_property_bags() {
             bag.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2024-02|1976|11|M11|1976-11");
@@ -165,7 +165,7 @@ fn temporal_plain_year_month_from_preserves_reference_day_for_stringification() 
             Temporal.PlainYearMonth.compare(clone, new Temporal.PlainYearMonth(2000, 5, undefined, 7)),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -209,7 +209,7 @@ fn temporal_plain_year_month_from_reads_options_before_validation_and_constrains
             constrained.monthCode,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -238,7 +238,7 @@ fn temporal_plain_year_month_from_requires_string_month_code() {
         }
         String(typeErrors);
         ",
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "6");
@@ -266,7 +266,7 @@ fn temporal_plain_year_month_from_validates_month_code_syntax_before_year_type()
         })();
         [badSyntax, badIsoMonthCode].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|TypeError");
@@ -299,7 +299,7 @@ fn temporal_plain_year_month_calendar_strings_reject_constructor_date_strings() 
         })();
         [constructorRangeErrors, propertyBagCalendar, invalidAnnotation].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "3|iso8601|true");
@@ -348,7 +348,7 @@ fn temporal_plain_year_month_string_parsing_handles_offsets_and_limits() {
         }
         validResults.concat(invalidResults).join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -407,7 +407,7 @@ fn temporal_plain_year_month_with_replaces_iso_fields() {
             timeZoneField,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|1976-11|2024-12|2024-02|true|true|true|true");
@@ -507,7 +507,7 @@ fn temporal_plain_year_month_with_rejects_temporal_objects_and_reads_fields_befo
             overflowIndex > actual.indexOf("get fields.monthCode"),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true,true,true|true|true|true");
@@ -536,7 +536,7 @@ fn temporal_plain_year_month_add_accepts_years_months_only() {
             lowerUnitThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2020-01|2020-11|2019-11|true");
@@ -565,7 +565,7 @@ fn temporal_plain_year_month_subtract_accepts_years_months_only() {
             lowerUnitThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2019-09|2018-11|2019-11|true");
@@ -613,7 +613,7 @@ fn temporal_plain_year_month_add_subtract_validate_overflow_options() {
             rejectedSubtract,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -641,7 +641,7 @@ fn temporal_plain_year_month_since_and_until_return_iso_month_durations() {
             until.months,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "since|1|until|1|1|2|0|14");
@@ -668,7 +668,7 @@ fn temporal_plain_year_month_since_until_default_to_balanced_years_and_months() 
             untilObject.months,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1|2|1|2|1|2|1|2");
@@ -709,7 +709,7 @@ fn temporal_plain_year_month_difference_rounds_month_remainder_when_balanced() {
             untilMixed.months,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "4|0|2|5|0|30|2|5");
@@ -736,7 +736,7 @@ fn temporal_plain_year_month_difference_rejects_rounded_month_boundary_outside_r
         }
         `${sinceError}|${untilError}`;
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|RangeError");
@@ -786,7 +786,7 @@ fn temporal_plain_year_month_to_plain_date_defaults_to_constrain_and_checks_limi
             max.toPlainDate({ day: 13 }).toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -808,7 +808,7 @@ fn temporal_plain_year_month_from_accepts_string_limits() {
             max.toString({ calendarName: "always" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -825,7 +825,7 @@ fn temporal_plain_year_month_from_accepts_object_limits_without_plain_date_range
         let max = Temporal.PlainYearMonth.from({ year: 275760, month: 9 });
         [min.toString(), max.toString()].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "-271821-04|+275760-09");
@@ -854,7 +854,7 @@ fn temporal_plain_year_month_with_validates_bad_fields_before_bad_options() {
         })();
         [validFields, invalidFields].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "TypeError|RangeError");
@@ -881,7 +881,7 @@ fn temporal_plain_year_month_add_validates_reference_date_after_options() {
         })();
         [threw, log.join(",")].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|get options.overflow");

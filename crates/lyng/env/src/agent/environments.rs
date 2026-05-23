@@ -7,9 +7,9 @@ use crate::{
     ObjectEnvironmentRecord, ObjectHandleStoreTarget, PrivateEnvironmentRecord,
     RuntimeEnvironmentRecord, ThisBindingStatus, ValueStoreTarget,
 };
-use lyng_js_common::AtomId;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{ObjectRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{ObjectRef, Value};
 use std::collections::HashSet;
 
 impl Agent {
@@ -579,7 +579,7 @@ impl Agent {
     }
 
     fn alloc_environment_slots_for_layout(
-        mutator: &mut lyng_js_gc::PrimitiveMutator<'_>,
+        mutator: &mut lyng_gc::PrimitiveMutator<'_>,
         layout: &EnvironmentLayout,
         lifetime: AllocationLifetime,
     ) -> Option<EnvironmentSlotsRef> {

@@ -9,7 +9,7 @@ already handle backward-edge polling and PC arithmetic.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/warm.rs`:
+`crates/lyng/vm/src/dsl/handlers/warm.rs`:
 
 ```rust
 llint_handler! { op_jump8, layout = A, length = 2, |offset| { ... } }
@@ -34,7 +34,7 @@ validation cases is honored without inline asm.
 
 ## Current asm
 
-See per-opcode files in `reports/js/lyng-js/dsl-asm-baseline-aarch64/`:
+See per-opcode files in `reports/lyng/dsl-asm-baseline-aarch64/`:
 - `op_jump8.asm`
 - `op_jump_if_true.asm` / `op_jump_if_true8.asm`
 - `op_jump_if_false.asm` / `op_jump_if_false8.asm`
@@ -46,9 +46,9 @@ prologue differ.
 
 ## LLInt reference
 
-- `reports/js/lyng-js/llint-reference/op_jmp.md` (for op_jump8 shape)
-- `reports/js/lyng-js/llint-reference/op_jtrue.md`
-- `reports/js/lyng-js/llint-reference/op_jfalse.md`
+- `reports/lyng/llint-reference/op_jmp.md` (for op_jump8 shape)
+- `reports/lyng/llint-reference/op_jtrue.md`
+- `reports/lyng/llint-reference/op_jfalse.md`
 
 JSC inlines the condition test + branch into the asm — Lyng's
 DSL-0b form pays a slow-path call per dispatch. DSL-1 can inline

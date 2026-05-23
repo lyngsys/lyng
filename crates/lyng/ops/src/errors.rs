@@ -1,7 +1,7 @@
-use lyng_js_env::{Agent, Intrinsics, RealmRecord};
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{InternalMethodError, ObjectAllocation, ObjectFlags};
-use lyng_js_types::{
+use lyng_env::{Agent, Intrinsics, RealmRecord};
+use lyng_gc::AllocationLifetime;
+use lyng_objects::{InternalMethodError, ObjectAllocation, ObjectFlags};
+use lyng_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
 
@@ -20,7 +20,7 @@ pub enum ErrorKind {
 fn current_realm(agent: &Agent) -> Option<RealmRecord> {
     let realm = agent
         .current_execution_context()
-        .map(lyng_js_env::ExecutionContext::realm)
+        .map(lyng_env::ExecutionContext::realm)
         .or_else(|| agent.default_realm_id())?;
     agent.realm(realm)
 }
@@ -207,9 +207,9 @@ pub(crate) fn internal_method_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_env::Runtime;
-    use lyng_js_gc::AllocationLifetime;
-    use lyng_js_host::NoopHostHooks;
+    use lyng_env::Runtime;
+    use lyng_gc::AllocationLifetime;
+    use lyng_host::NoopHostHooks;
 
     fn install_test_error_prototypes(agent: &mut Agent) {
         let default_realm = agent.default_realm().expect("default realm should exist");

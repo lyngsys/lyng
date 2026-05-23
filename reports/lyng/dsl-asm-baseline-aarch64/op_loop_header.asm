@@ -1,6 +1,6 @@
 // DSL-0b op_loop_header handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::warm::op_loop_header
-// Source: crates/lyng-js/vm/src/dsl/handlers/warm.rs (B43)
+// Symbol: lyng_vm::dsl::handlers::warm::op_loop_header
+// Source: crates/lyng/vm/src/dsl/handlers/warm.rs (B43)
 // Layout: Ax (single u32 operand at PC+1; unused for the loop header
 // — it's a backward-jump target for tools, but the handler itself
 // only polls the safepoint and advances), length = 4 bytes.

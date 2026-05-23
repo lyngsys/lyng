@@ -43,9 +43,9 @@
 //! simple register writes; only `LoadThis` can throw (uninitialized
 //! lexical `this`), so the others bypass `handle_dispatch_result` entirely.
 
-use lyng_js_env::ThisState;
-use lyng_js_ops::errors;
-use lyng_js_types::Value;
+use lyng_env::ThisState;
+use lyng_ops::errors;
+use lyng_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
@@ -69,7 +69,7 @@ pub struct OpAtomArgs {
     pub a: u16,
     pub bx: u32,
     pub instruction_len: u32,
-    pub feedback_slot: Option<lyng_js_types::FeedbackSlotId>,
+    pub feedback_slot: Option<lyng_types::FeedbackSlotId>,
 }
 
 /// Operands for the captured-name opcodes (`CaptureName`,
@@ -477,10 +477,7 @@ pub(crate) fn op_capture_name_semantic(
 /// Convert the `bx` field of a captured-name opcode into a `u16` register
 /// index. Mirrors the α handler's `captured_name_register` helper.
 #[inline]
-fn captured_name_register(
-    inner: &DispatchState<'_>,
-    bx: u32,
-) -> Result<u16, SemanticOutcome> {
+fn captured_name_register(inner: &DispatchState<'_>, bx: u32) -> Result<u16, SemanticOutcome> {
     u16::try_from(bx).map_err(|_| SemanticOutcome::ExitError {
         error: VmError::RegisterOutOfBounds {
             code: inner.frame.code(),
@@ -604,9 +601,10 @@ pub(crate) fn op_load_this_semantic(
     let inner = state.dispatch_state();
     let load_this = {
         let DispatchState { agent, frame, .. } = &mut *inner;
-        let this_state = agent
-            .current_execution_context()
-            .map_or_else(|| ThisState::Value(frame.this_value()), |ec| ec.this_state());
+        let this_state = agent.current_execution_context().map_or_else(
+            || ThisState::Value(frame.this_value()),
+            |ec| ec.this_state(),
+        );
         match this_state {
             ThisState::Value(value) => Ok(value),
             ThisState::Uninitialized => Err(VmError::Abrupt(errors::throw_reference_error(agent))),

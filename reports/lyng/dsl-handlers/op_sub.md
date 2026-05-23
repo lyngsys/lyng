@@ -5,7 +5,7 @@ mirroring the op_add shape from DSL-0 / Phase 1.A.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -43,7 +43,7 @@ llint_handler! {
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm`.
 
 Fast path (from `op_sub_dsl:` through `bl _op_sub_record_smi_rs`
 inclusive): **36 instructions** — identical to op_add's shape (4 ldrb/
@@ -91,7 +91,7 @@ Notes:
 - Loadavg was 2.3 (just over the 2.0 isolation gate) — the standard
   measurement floor; rerun if higher precision needed.
 - The microbench snippet for Sub was added in this task at
-  `tools/lyng-js-bench/src/microbench/snippets.rs` (using
+  `tools/lyng-bench/src/microbench/snippets.rs` (using
   `x = x - y` with two locals to keep the rhs as a register, avoiding
   the SubSmi peephole).
 
@@ -115,7 +115,7 @@ This is a known measurement artifact, not a real regression: every
 fast-path SMI subtract calls
 `call_slow!(op_sub_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The
 result: feedback-recording fast-path entries are counted as if they
 were full slow-path entries.
@@ -140,9 +140,9 @@ re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
-- Two pre-existing failures in `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
+- Two pre-existing failures in `crates/lyng/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `64e3e5cb` with the op_sub changes reverted —
@@ -151,7 +151,7 @@ re-measured.
   vs flat=None at slot 0); the Sub inline path doesn't touch Call
   feedback dual-write.
 - Test262 subtraction slice: covered by the embedded test262 runner
-  in `cargo test -p lyng-js-tests`. The full 49729 test262 file
+  in `cargo test -p lyng-tests`. The full 49729 test262 file
   count is a quarterly snapshot from the engine-state report; an
   isolated subtraction-only filter run was not invoked in this
   task (no dedicated `cargo test test262_subtraction`-style filter
@@ -188,4 +188,4 @@ Per-workload gate status per spec §1.6 + §5:
   unchanged. Crypto's elevation reflects a specific arithmetic
   pattern, not a regression.
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

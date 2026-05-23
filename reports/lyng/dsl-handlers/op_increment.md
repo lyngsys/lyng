@@ -10,7 +10,7 @@ port of Phase 1.C, behind only op_mul among inline-ported opcodes).
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -55,13 +55,13 @@ the semantic body. The reasoning, verified by reading the semantic
 source before writing the asm:
 
 The shared semantic body `op_update_register_semantic`
-(`crates/lyng-js/vm/src/vm/semantics/arithmetic.rs:796-833`) executes
+(`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`) executes
 the following sequence for both op_increment and op_decrement:
 
 1. Call `vm.update_register_value(...)` (line 812) which returns a
    `(numeric, value)` pair where `numeric = ToNumeric(src)` and
    `value = numeric ± 1`. The Vm helper itself is at
-   `crates/lyng-js/vm/src/vm/dispatch/arithmetic.rs:746-758` and reads
+   `crates/lyng/vm/src/vm/dispatch/arithmetic.rs:746-758` and reads
    as:
    ```rust
    let numeric = self.numeric_register_value(...)?;
@@ -142,7 +142,7 @@ If Task 11 surfaces a divergence, this report should be re-evaluated.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm`.
 
 Fast path (from `op_increment_dsl:` through `bl _op_increment_record_smi_rs`
 inclusive): **27 instructions** — substantially shorter than the binary
@@ -187,7 +187,7 @@ ns/dispatch on Increment microbench (7-sample median, post-warmup,
 ARM64): **61.84 ns** (min 61.68, max 62.07, CI95 ±0.14, 2 ops/iter).
 
 The Increment snippet was added in this task at
-`tools/lyng-js-bench/src/microbench/snippets.rs` using a body of
+`tools/lyng-bench/src/microbench/snippets.rs` using a body of
 `x = 0; x++;` inside a `for (let i = 0; i < iters; i++)` loop. The
 loop header's `i++` and the body's `x++` both lower to op_increment,
 so two Increment dispatches execute per iter — declared as
@@ -236,7 +236,7 @@ op_mul.md / op_bit_and.md / op_shift_left.md / op_shift_right.md, not
 a real regression: every fast-path SMI increment calls
 `call_slow!(op_increment_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The result:
 feedback-recording fast-path entries are counted as if they were full
 slow-path entries.
@@ -258,13 +258,13 @@ be re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
 - Test262 postfix-increment slice
-  (`cargo run --release -p lyng-js-test262 -- --filter language/expressions/postfix-increment`):
+  (`cargo run --release -p lyng-test262 -- --filter language/expressions/postfix-increment`):
   **38 files / 66 variants passed, 0 failed, 0 panicked, 0 skipped**.
 - Test262 prefix-increment slice
-  (`cargo run --release -p lyng-js-test262 -- --filter language/expressions/prefix-increment`):
+  (`cargo run --release -p lyng-test262 -- --filter language/expressions/prefix-increment`):
   **33 files / 57 variants passed, 0 failed, 0 panicked, 0 skipped**.
 
 No behavioral regression from baseline `521c35af` (Phase 1.C.2 close).
@@ -272,27 +272,27 @@ No behavioral regression from baseline `521c35af` (Phase 1.C.2 close).
 ## hot-opcodes.toml
 
 Budget calibrated to **measured + 2 = 27 + 2 = 29 instructions** at
-`tools/lyng-js-bench/hot-opcodes.toml`. Comment block explains the
+`tools/lyng-bench/hot-opcodes.toml`. Comment block explains the
 unary-shape reduction (27 instr) vs the binary inline ports (34–40
 instr).
 
 ## Files changed
 
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs`
+- `crates/lyng/vm/src/dsl/handlers/cold.rs`
   - Added `inc_smi_overflow` to the alphabetically-ordered import list.
   - Replaced the `op_increment_dsl` cold-stub body (line 1893) with
     the SMI inline fast path described above.
   - Added the `op_increment_record_smi_rs` shim adjacent to the new
     fast path.
-- `tools/lyng-js-bench/hot-opcodes.toml`
+- `tools/lyng-bench/hot-opcodes.toml`
   - Set `aarch64_max_instructions = 29` for `Increment` with a comment
     explaining the unary-shape reduction.
-- `tools/lyng-js-bench/src/microbench/snippets.rs`
+- `tools/lyng-bench/src/microbench/snippets.rs`
   - Added the `Increment` snippet (2 ops/iter via `i++` from the loop
     header and `x++` from the body, with `x` reset each iter to keep
     the SMI fast path armed).
-- `reports/js/lyng-js/dsl-handlers/op_increment.md` (this file).
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm` (NEW).
+- `reports/lyng/dsl-handlers/op_increment.md` (this file).
+- `reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm` (NEW).
 
 ## Self-review
 
@@ -356,4 +356,4 @@ Per-workload gate status per spec §1.6 + §5:
 - ⚠ Workloads requiring waiver: none
 - — N/A: none
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

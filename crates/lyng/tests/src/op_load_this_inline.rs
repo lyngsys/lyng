@@ -9,7 +9,7 @@
 //!   `this`; the inline path observes the sentinel-or-resolved value
 //!   that `resolve_initial_this_value` produced at trampoline entry.
 //! - `ThisState::Uninitialized`: derived-constructor TDZ scenario.
-//!   Coverage depends on lyng-js class-syntax support — if class extends
+//!   Coverage depends on lyng class-syntax support — if class extends
 //!   isn't fully executable yet, this arm is documented but skipped in
 //!   the JS-visible tests below (the slow-path bridge still routes
 //!   through `op_load_this_semantic` for any case the inline fast path
@@ -21,14 +21,14 @@
 //! plan's TDD discipline) confirms no semantic regression when the
 //! inline body replaces the cold stub.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Compile + execute `src` in a fresh realm, returning the script's
 /// completion value. Mirrors the helper shape used by
@@ -91,9 +91,7 @@ fn op_load_this_arrow_function_captures_lexical_this() {
     // function and writes the resolved Value into `frame_this_value`.
     // The inline fast path then reads it directly — no sentinel
     // bail because the resolution happened before the inline read.
-    let value = run_script(
-        "(function() { return (() => this.y)(); }).call({y: 7});"
-    );
+    let value = run_script("(function() { return (() => this.y)(); }).call({y: 7});");
     assert_eq!(value, Value::from_smi(7));
 }
 
@@ -103,9 +101,7 @@ fn op_load_this_chained_property_access() {
     // inline path twice in succession with a fresh property each
     // time. If the mirror were ever stale between the two reads,
     // the second would observe a different identity.
-    let value = run_script(
-        "(function() { return this.a + this.b; }).call({a: 10, b: 32});"
-    );
+    let value = run_script("(function() { return this.a + this.b; }).call({a: 10, b: 32});");
     assert_eq!(value, Value::from_smi(42));
 }
 
@@ -127,7 +123,7 @@ fn op_load_this_in_nested_call_preserves_outer_this() {
                 (function() { return this.kind; }).call({kind: 'inner'});
                 return this.kind;
             }).call({kind: 'outer'});
-        "#
+        "#,
     );
     // The outer's `this.kind` is 'outer'; assert the value is a
     // string and (looser, since we can't directly inspect string
@@ -158,7 +154,7 @@ fn op_load_this_in_arrow_inside_loop_remains_stable() {
                 }
                 return total;
             }).call({unit: 1});
-        "#
+        "#,
     );
     assert_eq!(value, Value::from_smi(100));
 }

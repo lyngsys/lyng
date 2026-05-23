@@ -6,7 +6,7 @@
 //! W/X register slot (`t0..t6` → `w9..w15` / `x9..x15`); the macro
 //! arguments here are the bare scratch indices (passed as literals
 //! after the lowerer's ident-substitution pass — see
-//! `lyng_js_vm_dsl::lower::substitute_idents`).
+//! `lyng_vm_dsl::lower::substitute_idents`).
 //!
 //! Per the pinned-register convention (`reg_convention.rs`):
 //!
@@ -33,9 +33,7 @@ macro_rules! decode_none {
 #[macro_export]
 macro_rules! decode_a {
     ($a:tt) => {
-        concat!(
-            "ldrb   w", stringify!($a), ", [x19, #1]\n",
-        )
+        concat!("ldrb   w", stringify!($a), ", [x19, #1]\n",)
     };
 }
 
@@ -46,8 +44,12 @@ macro_rules! decode_a {
 macro_rules! decode_ab {
     ($a:tt, $b:tt) => {
         concat!(
-            "ldrb   w", stringify!($a), ", [x19, #1]\n",
-            "ldrb   w", stringify!($b), ", [x19, #2]\n",
+            "ldrb   w",
+            stringify!($a),
+            ", [x19, #1]\n",
+            "ldrb   w",
+            stringify!($b),
+            ", [x19, #2]\n",
         )
     };
 }
@@ -58,9 +60,15 @@ macro_rules! decode_ab {
 macro_rules! decode_abc {
     ($a:tt, $b:tt, $c:tt) => {
         concat!(
-            "ldrb   w", stringify!($a), ", [x19, #1]\n",
-            "ldrb   w", stringify!($b), ", [x19, #2]\n",
-            "ldrb   w", stringify!($c), ", [x19, #3]\n",
+            "ldrb   w",
+            stringify!($a),
+            ", [x19, #1]\n",
+            "ldrb   w",
+            stringify!($b),
+            ", [x19, #2]\n",
+            "ldrb   w",
+            stringify!($c),
+            ", [x19, #3]\n",
         )
     };
 }
@@ -71,10 +79,18 @@ macro_rules! decode_abc {
 macro_rules! decode_abc_slot {
     ($a:tt, $b:tt, $c:tt, $slot:tt) => {
         concat!(
-            "ldrb   w", stringify!($a), ", [x19, #1]\n",
-            "ldrb   w", stringify!($b), ", [x19, #2]\n",
-            "ldrb   w", stringify!($c), ", [x19, #3]\n",
-            "ldrh   w", stringify!($slot), ", [x19, #4]\n",
+            "ldrb   w",
+            stringify!($a),
+            ", [x19, #1]\n",
+            "ldrb   w",
+            stringify!($b),
+            ", [x19, #2]\n",
+            "ldrb   w",
+            stringify!($c),
+            ", [x19, #3]\n",
+            "ldrh   w",
+            stringify!($slot),
+            ", [x19, #4]\n",
         )
     };
 }
@@ -84,8 +100,12 @@ macro_rules! decode_abc_slot {
 macro_rules! decode_abx {
     ($a:tt, $bx:tt) => {
         concat!(
-            "ldrb   w", stringify!($a), ", [x19, #1]\n",
-            "ldrh   w", stringify!($bx), ", [x19, #2]\n",
+            "ldrb   w",
+            stringify!($a),
+            ", [x19, #1]\n",
+            "ldrh   w",
+            stringify!($bx),
+            ", [x19, #2]\n",
         )
     };
 }
@@ -94,9 +114,7 @@ macro_rules! decode_abx {
 #[macro_export]
 macro_rules! decode_ax {
     ($ax:tt) => {
-        concat!(
-            "ldr    w", stringify!($ax), ", [x19, #1]\n",
-        )
+        concat!("ldr    w", stringify!($ax), ", [x19, #1]\n",)
     };
 }
 
@@ -106,7 +124,11 @@ macro_rules! decode_ax {
 macro_rules! load_reg {
     ($idx:tt => $dst:tt) => {
         concat!(
-            "ldr    x", stringify!($dst), ", [x20, x", stringify!($idx), ", lsl #3]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x20, x",
+            stringify!($idx),
+            ", lsl #3]\n",
         )
     };
 }
@@ -116,7 +138,11 @@ macro_rules! load_reg {
 macro_rules! store_reg {
     ($idx:tt, $src:tt) => {
         concat!(
-            "str    x", stringify!($src), ", [x20, x", stringify!($idx), ", lsl #3]\n",
+            "str    x",
+            stringify!($src),
+            ", [x20, x",
+            stringify!($idx),
+            ", lsl #3]\n",
         )
     };
 }
@@ -125,9 +151,7 @@ macro_rules! store_reg {
 #[macro_export]
 macro_rules! load_acc {
     ($dst:tt) => {
-        concat!(
-            "ldr    x", stringify!($dst), ", [x20]\n",
-        )
+        concat!("ldr    x", stringify!($dst), ", [x20]\n",)
     };
 }
 
@@ -135,8 +159,6 @@ macro_rules! load_acc {
 #[macro_export]
 macro_rules! store_acc {
     ($src:tt) => {
-        concat!(
-            "str    x", stringify!($src), ", [x20]\n",
-        )
+        concat!("str    x", stringify!($src), ", [x20]\n",)
     };
 }

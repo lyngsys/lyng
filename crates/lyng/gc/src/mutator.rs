@@ -8,8 +8,8 @@ use crate::{
     RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, StringEncoding,
     SuspendedRegistersRef, WeakHeapRef,
 };
-use lyng_js_common::AtomId;
-use lyng_js_types::{
+use lyng_common::AtomId;
+use lyng_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef, Value,
 };
@@ -1212,7 +1212,7 @@ mod tests {
         ShapeHandleStoreTarget, StringHandleStoreTarget, SymbolFlags, ValueStoreTarget,
         PRIMITIVE_SLOTS_PER_PAGE,
     };
-    use lyng_js_common::AtomId;
+    use lyng_common::AtomId;
 
     #[test]
     fn read_only_views_and_mutators_split_access_paths() {

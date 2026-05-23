@@ -1,6 +1,6 @@
 //! Private-name analysis: track definitions and resolve uses of `#name`.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::ids::{PrivateNameId, ScopeId};
 

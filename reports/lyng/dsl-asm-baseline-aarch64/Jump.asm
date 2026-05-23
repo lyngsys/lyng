@@ -1,4 +1,4 @@
-__ZN10lyng_js_vm2vm17dispatch_handlers12control_flow7op_jump17h74722142eaf9e80dE:
+__ZN10lyng_vm2vm17dispatch_handlers12control_flow7op_jump17h74722142eaf9e80dE:
 L0:
 	.loc	185 39 0
 	sub	sp, sp, #112
@@ -123,7 +123,7 @@ L37:
 L38:
 	.loc	66 567 34
 	mov	x8, sp
-	bl	__ZN10lyng_js_gc7rooting50_$LT$impl$u20$lyng_js_gc..arena..PrimitiveHeap$GT$26poll_incremental_mark_step17h6c3f408ffd773f7eE
+	bl	__ZN10lyng_gc7rooting50_$LT$impl$u20$lyng_gc..arena..PrimitiveHeap$GT$26poll_incremental_mark_step17h6c3f408ffd773f7eE
 L39:
 L40:
 	.loc	66 0 34 is_stmt 0
@@ -201,10 +201,10 @@ L61:
 L62:
 	.loc	1 244 13
 L63:
-	adrp	x10, __ZN10lyng_js_vm2vm14dispatch_state14DISPATCH_TABL64@PAGE
+	adrp	x10, __ZN10lyng_vm2vm14dispatch_state14DISPATCH_TABL64@PAGE
 L65:
 L66:
-	add	x10, x10, __ZN10lyng_js_vm2vm14dispatch_state14DISPATCH_TABL64@PAGEOFF
+	add	x10, x10, __ZN10lyng_vm2vm14dispatch_state14DISPATCH_TABL64@PAGEOFF
 	ldr	x9, [x10, x9, lsl #3]
 	mov	x10, #21
 	movk	x10, #32768, lsl #48

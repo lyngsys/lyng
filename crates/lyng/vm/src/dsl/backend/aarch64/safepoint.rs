@@ -50,7 +50,9 @@ macro_rules! poll_safepoint {
             // Slow path: bump slow_safepoint bank slot for this opcode,
             // then branch to the pending-poll target.
             $crate::inc_slow_safepoint_counter!($op),
-            "b      ", stringify!($label_pending), "\n",
+            "b      ",
+            stringify!($label_pending),
+            "\n",
             "9:\n",
         )
     };
@@ -59,7 +61,9 @@ macro_rules! poll_safepoint {
     ($label_pending:tt) => {
         concat!(
             "ldrb   w16, [x22, {vm_poll}]\n",
-            "cbnz   w16, ", stringify!($label_pending), "\n",
+            "cbnz   w16, ",
+            stringify!($label_pending),
+            "\n",
         )
     };
 }
@@ -72,13 +76,17 @@ macro_rules! poll_safepoint {
     ($label_pending:tt, opcode_byte = $op:literal) => {
         concat!(
             "ldrb   w16, [x22, {vm_poll}]\n",
-            "cbnz   w16, ", stringify!($label_pending), "\n",
+            "cbnz   w16, ",
+            stringify!($label_pending),
+            "\n",
         )
     };
     ($label_pending:tt) => {
         concat!(
             "ldrb   w16, [x22, {vm_poll}]\n",
-            "cbnz   w16, ", stringify!($label_pending), "\n",
+            "cbnz   w16, ",
+            stringify!($label_pending),
+            "\n",
         )
     };
 }

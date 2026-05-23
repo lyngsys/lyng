@@ -1,17 +1,17 @@
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_gc::PrimitiveMutator;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::{
+use lyng_builtins::BootstrapMode;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_gc::PrimitiveMutator;
+use lyng_host::NoopHostHooks;
+use lyng_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectRuntime,
 };
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::{ObjectRef, Value};
-use lyng_js_vm::Vm;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::{ObjectRef, Value};
+use lyng_vm::Vm;
 
 #[derive(Default)]
 struct RejectingRegistry;
@@ -36,7 +36,7 @@ impl NativeFunctionRegistry for RejectingRegistry {
     }
 }
 
-fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_js_bytecode::CompiledScriptUnit {
+fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_bytecode::CompiledScriptUnit {
     let parsed = parse_script(atoms, SourceId::new(0), source);
     assert!(
         !parsed.diagnostics.has_errors(),

@@ -11,9 +11,9 @@ use crate::public::{
     allocate_builtin_function_object, allocate_builtin_ordinary_object,
     allocate_builtin_primitive_wrapper_object, public_builtin_metadata, reparent_builtin_object,
 };
-use lyng_js_env::{Agent, Intrinsics};
-use lyng_js_objects::{ObjectFlags, PrimitiveWrapperKind};
-use lyng_js_types::{
+use lyng_env::{Agent, Intrinsics};
+use lyng_objects::{ObjectFlags, PrimitiveWrapperKind};
+use lyng_types::{
     function_prototype_builtin, internal_throw_type_error_builtin, EnvironmentRef, ObjectRef,
     RealmRef, ShapeId, Value,
 };

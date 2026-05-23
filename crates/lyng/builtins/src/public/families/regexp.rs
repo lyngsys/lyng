@@ -12,9 +12,9 @@ use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     regexp_builtin, regexp_compile_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin,
     regexp_exec_builtin, regexp_flags_getter_builtin, regexp_global_getter_builtin,
     regexp_has_indices_getter_builtin, regexp_ignore_case_getter_builtin,

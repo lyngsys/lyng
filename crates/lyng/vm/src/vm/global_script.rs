@@ -1,9 +1,9 @@
 use super::{
     Agent, AllocationLifetime, AtomId, ObjectRef, RealmRecord, Value, Vm, VmError, VmResult,
 };
-use lyng_js_bytecode::GlobalScriptInstantiationPlan;
-use lyng_js_ops::{errors, object};
-use lyng_js_types::{PropertyDescriptor, PropertyKey};
+use lyng_bytecode::GlobalScriptInstantiationPlan;
+use lyng_ops::{errors, object};
+use lyng_types::{PropertyDescriptor, PropertyKey};
 
 const BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD: usize = 64;
 

@@ -15,7 +15,7 @@ shape has to land before DSL-0a starts.
 
 ## Source citations
 
-- Authoritative design: [docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](../../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md),
+- Authoritative design: [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md),
   §5 ("Register-pin convention, `LlIntState` ABI, and
   `LlIntRustContext`") and §6 ("Slow-path bridge protocol").
 - Companion R-0 reports: [llint-dsl-value-layout.md](./llint-dsl-value-layout.md)
@@ -26,9 +26,9 @@ shape has to land before DSL-0a starts.
 - Reference for comparison only: WebKit `Source/JavaScriptCore/llint/`
   (read-only; not vendored, not quoted verbatim).
 - Phase-3 baseline this ABI replaces: the inline IC fast path in
-  [crates/lyng-js/vm/src/dispatch.rs](../../../crates/lyng-js/vm/src/dispatch.rs)
+  [crates/lyng/vm/src/dispatch.rs](../../../crates/lyng/vm/src/dispatch.rs)
   and the per-opcode handlers under
-  [crates/lyng-js/vm/src/handlers/](../../../crates/lyng-js/vm/src/handlers/),
+  [crates/lyng/vm/src/handlers/](../../../crates/lyng/vm/src/handlers/),
   which currently take `&mut Vm` directly and rely on Rust function-call
   conventions rather than register pinning.
 
@@ -125,7 +125,7 @@ test (below) enforces these values as hard constants.
 ### How offsets reach `naked_asm!`
 
 Offsets are exposed as `pub const` items in
-`crates/lyng-js/vm/src/dsl/reg_convention.rs`, e.g.:
+`crates/lyng/vm/src/dsl/reg_convention.rs`, e.g.:
 
 ```rust
 pub const LLINTSTATE_FRAME_PC_OFFSET_OFFSET:    usize = offset_of!(LlIntState, frame_pc_offset);
@@ -286,7 +286,7 @@ The DSL surface is identical across arches: every operation
 (`load_reg!`, `check_smi!`, `call_slow!`, `dispatch!`) exists on both
 arches with the same name and semantics. Arch-specific instruction
 counts diverge — that's covered by per-arch asm baselines under
-[reports/js/lyng-js/dsl-asm-baseline-aarch64/](./dsl-asm-baseline-aarch64/),
+[reports/lyng/dsl-asm-baseline-aarch64/](./dsl-asm-baseline-aarch64/),
 not by branching DSL code.
 
 ## Slow-path return ABI
@@ -639,7 +639,7 @@ tests must exist before any DSL-0c work begins:
    exercised by unit tests that construct a `LlIntState` and a
    `LlIntRustContext`, perform the pointer dance manually, and check
    round-trip equality. Tests run under `cargo +nightly miri test
-   -p lyng-js-vm slow_path` to catch UB in the pointer casts.
+   -p lyng-vm slow_path` to catch UB in the pointer casts.
 
 3. **Post-dispatch PC-sync invariant test** — a cold-stub opcode whose
    semantic body reads `state.frame.instruction_offset()` and asserts

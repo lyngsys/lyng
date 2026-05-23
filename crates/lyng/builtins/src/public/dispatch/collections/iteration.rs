@@ -10,8 +10,8 @@ use super::super::{
 };
 use super::{map_this_object, set_this_object};
 use crate::BuiltinInvocation;
-use lyng_js_objects::OrdinaryObjectData;
-use lyng_js_types::{PropertyKey, Value};
+use lyng_objects::OrdinaryObjectData;
+use lyng_types::{PropertyKey, Value};
 
 pub(super) fn map_for_each_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,

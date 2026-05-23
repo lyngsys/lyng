@@ -11,12 +11,12 @@ use iteration::{
     map_for_each_builtin, map_iterator_factory_builtin, map_iterator_next_builtin,
     set_for_each_builtin, set_iterator_factory_builtin, set_iterator_next_builtin,
 };
-use lyng_js_gc::{AllocationLifetime, WeakHeapRef};
-use lyng_js_objects::{
+use lyng_gc::{AllocationLifetime, WeakHeapRef};
+use lyng_objects::{
     MapEntry, MapObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData, SetObjectData,
 };
-use lyng_js_ops::{iterator, pure, read};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
+use lyng_ops::{iterator, pure, read};
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
 
 pub(super) fn dispatch_collection_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -223,8 +223,8 @@ fn dispatch_weak_collection_builtin<Cx: PublicBuiltinDispatchContext>(
 fn allocate_map_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -248,8 +248,8 @@ fn allocate_map_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_set_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -273,8 +273,8 @@ fn allocate_set_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_weak_map_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -301,8 +301,8 @@ fn allocate_weak_map_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_weak_set_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -329,9 +329,9 @@ fn allocate_weak_set_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_weak_ref_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     target: WeakHeapRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -358,9 +358,9 @@ fn allocate_weak_ref_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_finalization_registry_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     callback: ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -1299,7 +1299,7 @@ fn get_set_record<Cx: PublicBuiltinDispatchContext>(
 fn set_record_iterator<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     record: &SetRecord,
-) -> Result<lyng_js_ops::iterator::IteratorRecord, Cx::Error> {
+) -> Result<lyng_ops::iterator::IteratorRecord, Cx::Error> {
     let iterator_value =
         cx.call_to_completion(record.keys, Value::from_object_ref(record.object), &[])?;
     let iterator_object = iterator_value
@@ -1308,7 +1308,7 @@ fn set_record_iterator<Cx: PublicBuiltinDispatchContext>(
     let next_key = property_key_from_text(cx, "next");
     let next_value = cx.get_property_value(Value::from_object_ref(iterator_object), next_key)?;
     let next_method = cx.require_callable_object(next_value)?;
-    Ok(lyng_js_ops::iterator::IteratorRecord::new(
+    Ok(lyng_ops::iterator::IteratorRecord::new(
         iterator_object,
         next_method,
     ))
@@ -1769,10 +1769,10 @@ fn set_is_superset_of_builtin<Cx: PublicBuiltinDispatchContext>(
         if !in_this {
             let close_result = {
                 let mut bridge = BuiltinIteratorBridge { cx };
-                lyng_js_ops::iterator::iterator_close(
+                lyng_ops::iterator::iterator_close(
                     &mut bridge,
                     &mut iterator_record,
-                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                    Ok::<(), lyng_types::AbruptCompletion>(()),
                 )
             };
             close_result?;
@@ -1855,10 +1855,10 @@ fn set_is_disjoint_from_builtin<Cx: PublicBuiltinDispatchContext>(
             if in_this {
                 let close_result = {
                     let mut bridge = BuiltinIteratorBridge { cx };
-                    lyng_js_ops::iterator::iterator_close(
+                    lyng_ops::iterator::iterator_close(
                         &mut bridge,
                         &mut iterator_record,
-                        Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                        Ok::<(), lyng_types::AbruptCompletion>(()),
                     )
                 };
                 close_result?;

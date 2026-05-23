@@ -3,11 +3,11 @@
 **Date:** 2026-05-19
 **Status:** Design draft; awaiting user review.
 **Parent spec:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md) — Phase 1.B umbrella.
-**Sibling specs:** [`2026-05-18-dsl-1-hot-opcode-rollout-design.md`](2026-05-18-dsl-1-hot-opcode-rollout-design.md) (epic), [`reports/js/lyng-js/dsl-1/phase-1b0-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b0-summary.md) (predecessor sub-phase).
+**Sibling specs:** [`2026-05-18-dsl-1-hot-opcode-rollout-design.md`](2026-05-18-dsl-1-hot-opcode-rollout-design.md) (epic), [`reports/lyng/dsl-1/phase-1b0-summary.md`](../../../reports/lyng/dsl-1/phase-1b0-summary.md) (predecessor sub-phase).
 **Baseline HEAD:** `ae8b7766` (Phase 1.B.0 closed).
 **Deferral inputs:**
-- [`reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md)
-- [`reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md)
+- [`reports/lyng/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md)
+- [`reports/lyng/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)
 
 ---
 
@@ -44,11 +44,11 @@ This sub-phase is substrate-only. **No opcode handlers are ported in 1.B.1.**
 ### Exit criteria
 
 1. **Layout stable.** `ll_int_state_offsets_stable` asserts new offsets and updated total size.
-2. **Behavioral parity.** `cargo test -p lyng-js-vm --lib --release` (≥413 passing), `cargo test -p lyng-js-tests --release` (≥1186 passing). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
+2. **Behavioral parity.** `cargo test -p lyng-vm --lib --release` (≥413 passing), `cargo test -p lyng-tests --release` (≥1186 passing). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
 3. **Test262 ≥ baseline.** Pass count ≥ what's recorded at Phase 1.B.0 closure (captured at sub-phase kickoff).
 4. **GC stress clean.** New `gc-stress` test with `this`-binding + closure tight loop passes. No use-after-free if Miri can run the slow-path bridge.
 5. **Same-load A/B vs `ae8b7766`.** Aggregate V8 v7 regression ≤ 2% (per parent §4 protocol).
-6. **GC review documented.** `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md` covers both new fields and is signed off by the reviewer dispatch.
+6. **GC review documented.** `reports/lyng/dsl-1/phase-1b1-gc-review.md` covers both new fields and is signed off by the reviewer dispatch.
 7. **Reviewer pass.** `feature-dev:code-reviewer` against the full sub-phase commit range; major findings addressed before sub-phase close.
 
 ---
@@ -59,7 +59,7 @@ The deferral notes for `op_load_const8` and `op_load_this` define the requiremen
 
 ### 2.1 Constants are already pre-resolved at install time
 
-`Vm::install_constants` (in `crates/lyng-js/vm/src/vm/install.rs:715-754`) walks each `BytecodeFunction::constants: Vec<ConstantValue>` and produces a flat `Box<[Value]>`-equivalent stored in `RuntimeCodeRecord::constants: Option<CodeSlotsRef>` (an arena-allocated slot in the GC heap). The `Atom`/`Builtin` resolution and any required allocations happen there; the resulting `&[Value]` is reachable via `heap.view().code_slots(id)`.
+`Vm::install_constants` (in `crates/lyng/vm/src/vm/install.rs:715-754`) walks each `BytecodeFunction::constants: Vec<ConstantValue>` and produces a flat `Box<[Value]>`-equivalent stored in `RuntimeCodeRecord::constants: Option<CodeSlotsRef>` (an arena-allocated slot in the GC heap). The `Atom`/`Builtin` resolution and any required allocations happen there; the resulting `&[Value]` is reachable via `heap.view().code_slots(id)`.
 
 **Implication:** we don't need new install-time work. The pre-resolved Values already exist; we only need to expose a pointer to them on `LlIntState`.
 
@@ -71,7 +71,7 @@ The deferral notes for `op_load_const8` and `op_load_this` define the requiremen
 
 ### 2.3 `Value::uninitialized_lexical()` is an existing const sentinel
 
-`Value` is 8 bytes (NaN-tagged `u64`). `Value::uninitialized_lexical()` is already defined in `crates/lyng-js/types/src/value.rs` (line 186-188) as a const sentinel value — it's used for TDZ checks in the lexical environment system, so it can never appear as a legitimate `this` binding.
+`Value` is 8 bytes (NaN-tagged `u64`). `Value::uninitialized_lexical()` is already defined in `crates/lyng/types/src/value.rs` (line 186-188) as a const sentinel value — it's used for TDZ checks in the lexical environment system, so it can never appear as a legitimate `this` binding.
 
 **Implication:** the sentinel for "bail to slow path on `this` load" is already designed, named, and asserted unique. We reuse it.
 
@@ -129,7 +129,7 @@ The existing `LLINT_STATE_PREFIX` const shifts; the test `ll_int_state_offsets_s
 ### 3.3 The `resolve_initial_this_value` helper
 
 ```rust
-// In crates/lyng-js/vm/src/dsl/llint_state.rs or a new module.
+// In crates/lyng/vm/src/dsl/llint_state.rs or a new module.
 #[inline]
 pub(crate) fn resolve_initial_this_value(agent: &Agent, frame: &FrameRecord) -> Value {
     let this_state = agent.current_execution_context()
@@ -196,11 +196,11 @@ The Continue arm runs when a slow-path bridge returned to the SAME frame (e.g. s
 
 ### 3.5 Backend macros
 
-Both macros live under `crates/lyng-js/vm/src/dsl/backend/aarch64/`:
+Both macros live under `crates/lyng/vm/src/dsl/backend/aarch64/`:
 
 #### `load_constant!($idx_reg:expr => $dst_reg:expr)`
 
-New file: `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs`. Or extended into `frame.rs` if more frame-context macros land later — refactor worker's judgement.
+New file: `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`. Or extended into `frame.rs` if more frame-context macros land later — refactor worker's judgement.
 
 Body emits:
 ```asm
@@ -212,7 +212,7 @@ The scratch register is one of the standard scratch register pool (the DSL macro
 
 #### `load_state_value!($offset:expr => $dst_reg:expr)`
 
-Extension to `crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs` (or a new `state.rs` if `frame.rs` is already crowded — refactor worker's judgement).
+Extension to `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` (or a new `state.rs` if `frame.rs` is already crowded — refactor worker's judgement).
 
 Body emits a single instruction:
 ```asm
@@ -302,7 +302,7 @@ This invariant is identical to what already holds for `frame_pb_base`, `frame_re
 
 ### 5.3 GC review deliverable
 
-A standalone document at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md` will cover:
+A standalone document at `reports/lyng/dsl-1/phase-1b1-gc-review.md` will cover:
 - Per-field reachability proof (canonical source → trace path).
 - Mirror-staleness argument (Refresh egress = safe point).
 - Stability of arena slot data pointer (matches `frame_pb_base` precedent).
@@ -313,7 +313,7 @@ A standalone document at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md` will 
 
 ## 6. Test plan
 
-### 6.1 Unit tests (in `crates/lyng-js/vm/src/dsl/llint_state.rs`)
+### 6.1 Unit tests (in `crates/lyng/vm/src/dsl/llint_state.rs`)
 
 | Test | Asserts |
 |------|---------|
@@ -327,13 +327,13 @@ A standalone document at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md` will 
 
 | File | Tests |
 |------|-------|
-| `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` (new) | Three synthetic handlers, modeled on existing `dsl_validation_*.rs` test handlers: (1) reads `frame_const_base[0]` via `load_constant!` and asserts the value matches a known-pre-resolved constant; (2) reads `frame_this_value` via `load_state_value!` in a frame with `ThisState::Value(v)` and asserts the value equals `v`; (3) reads `frame_this_value` in a frame with `ThisState::Uninitialized` and asserts the value equals `Value::uninitialized_lexical()`. |
-| `crates/lyng-js-tests/` (`lyng-js-tests` crate) | GC-stress test: tight loop with a closure that reads `this` and allocates new objects. Uses whatever GC-stress mechanism the repo currently supports (refactor worker investigates: e.g., `--cfg gc_stress_force_collect`, or explicit `force_minor_gc()` calls between iterations). Asserts the loop completes correctly and `this` is observed correctly each iteration. The reviewer dispatch confirms the test actually exercises a frame-context refresh across a GC event. |
+| `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (new) | Three synthetic handlers, modeled on existing `dsl_validation_*.rs` test handlers: (1) reads `frame_const_base[0]` via `load_constant!` and asserts the value matches a known-pre-resolved constant; (2) reads `frame_this_value` via `load_state_value!` in a frame with `ThisState::Value(v)` and asserts the value equals `v`; (3) reads `frame_this_value` in a frame with `ThisState::Uninitialized` and asserts the value equals `Value::uninitialized_lexical()`. |
+| `crates/lyng-tests/` (`lyng-tests` crate) | GC-stress test: tight loop with a closure that reads `this` and allocates new objects. Uses whatever GC-stress mechanism the repo currently supports (refactor worker investigates: e.g., `--cfg gc_stress_force_collect`, or explicit `force_minor_gc()` calls between iterations). Asserts the loop completes correctly and `this` is observed correctly each iteration. The reviewer dispatch confirms the test actually exercises a frame-context refresh across a GC event. |
 
 ### 6.3 Behavioral parity
 
-- `cargo test -p lyng-js-vm --lib --release` — ≥413 passing.
-- `cargo test -p lyng-js-tests --release` — ≥1186 passing.
+- `cargo test -p lyng-vm --lib --release` — ≥413 passing.
+- `cargo test -p lyng-tests --release` — ≥1186 passing.
 - 2 pre-existing `feedback_flat_consistency` failures are unchanged (stay unrelated).
 
 ### 6.4 Test262
@@ -348,7 +348,7 @@ Per parent spec §4 protocol:
 - 7-sample medians, `uptime` within ±20%.
 - Aggregate V8 v7 regression must be ≤ 2% (parent §4 gate for 1.B.1).
 - Per-workload tolerance: no workload regresses > 5% (per §4 of parent epic spec).
-- Output committed to `reports/js/lyng-js/dsl-1/phase-1b1-ab-comparison.md`.
+- Output committed to `reports/lyng/dsl-1/phase-1b1-ab-comparison.md`.
 
 ### 6.6 Reviewer dispatch
 
@@ -370,10 +370,10 @@ Single refactor worker subagent, ~3-4 days wall-clock. Suggested commit sequence
 4. **Task 4: Refresh arm wiring** — wire refresh in `slow_path.rs`. Include debug-only stability assertion. Behavioral parity check.
 5. **Task 5: backend macros** — add `load_constant!` and `load_state_value!`. Skeleton; no opcode uses them.
 6. **Task 6: synthetic validation handler** — add `dsl_validation_frame_context.rs`. Exercises both macros end-to-end through a test-only handler. Catches macro-emit bugs without depending on 1.B.2 opcodes.
-7. **Task 7: gc-stress test** — add the closure-this allocation-pressure test in `lyng-js-tests`. Run with whatever stress mechanism the repo currently supports.
+7. **Task 7: gc-stress test** — add the closure-this allocation-pressure test in `lyng-tests`. Run with whatever stress mechanism the repo currently supports.
 8. **Task 8: GC review doc + V8 v7 A/B** — write `phase-1b1-gc-review.md`, run same-load A/B, commit comparison.
 9. **Task 9: reviewer dispatch** — dispatch `feature-dev:code-reviewer`. Address major findings.
-10. **Task 10: sub-phase summary** — write `reports/js/lyng-js/dsl-1/phase-1b1-summary.md` mirroring the 1.B.0 format. Close sub-phase.
+10. **Task 10: sub-phase summary** — write `reports/lyng/dsl-1/phase-1b1-summary.md` mirroring the 1.B.0 format. Close sub-phase.
 
 Each task is a single commit. Behavioral parity (and the existing 413 + 1186 test suites) must pass at every commit boundary.
 
@@ -414,23 +414,23 @@ Each task is a single commit. Behavioral parity (and the existing 413 + 1186 tes
 
 ## 10. References
 
-- **Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
+- **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1.
 - **Phase 1.B umbrella spec:** [`2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md).
 - **Epic spec:** [`2026-05-18-dsl-1-hot-opcode-rollout-design.md`](2026-05-18-dsl-1-hot-opcode-rollout-design.md).
-- **Predecessor sub-phase:** [`reports/js/lyng-js/dsl-1/phase-1b0-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1b0-summary.md).
+- **Predecessor sub-phase:** [`reports/lyng/dsl-1/phase-1b0-summary.md`](../../../reports/lyng/dsl-1/phase-1b0-summary.md).
 - **Deferral notes:**
-  - [`reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md)
-  - [`reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md)
+  - [`reports/lyng/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md)
+  - [`reports/lyng/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)
 - **Key source files:**
-  - `crates/lyng-js/vm/src/dsl/llint_state.rs` — struct + tests
-  - `crates/lyng-js/vm/src/dsl/reg_convention.rs` — offset consts
-  - `crates/lyng-js/vm/src/dsl/entry.rs` — trampoline entry
-  - `crates/lyng-js/vm/src/dsl/slow_path.rs` — Refresh/Continue arms
-  - `crates/lyng-js/vm/src/dsl/backend/aarch64/` — new macros land here
-  - `crates/lyng-js/vm/src/vm/install.rs` — existing constants pipeline
-  - `crates/lyng-js/vm/src/vm/semantics/names.rs` — `op_load_this` semantic body (reference for resolve helper)
-  - `crates/lyng-js/types/src/value.rs` — `Value::uninitialized_lexical()` sentinel
-  - `crates/lyng-js/env/src/execution.rs` — `ThisState` enum
+  - `crates/lyng/vm/src/dsl/llint_state.rs` — struct + tests
+  - `crates/lyng/vm/src/dsl/reg_convention.rs` — offset consts
+  - `crates/lyng/vm/src/dsl/entry.rs` — trampoline entry
+  - `crates/lyng/vm/src/dsl/slow_path.rs` — Refresh/Continue arms
+  - `crates/lyng/vm/src/dsl/backend/aarch64/` — new macros land here
+  - `crates/lyng/vm/src/vm/install.rs` — existing constants pipeline
+  - `crates/lyng/vm/src/vm/semantics/names.rs` — `op_load_this` semantic body (reference for resolve helper)
+  - `crates/lyng/types/src/value.rs` — `Value::uninitialized_lexical()` sentinel
+  - `crates/lyng/env/src/execution.rs` — `ThisState` enum
 - **GC scanning:**
-  - `crates/lyng-js/gc/src/rooting.rs:1637-1643` — `RuntimeCodeRecord::trace_heap_edges`
-  - `crates/lyng-js/vm/src/vm/state.rs:204-291` — `ActiveVmRoots`, `trace_frame_record`
+  - `crates/lyng/gc/src/rooting.rs:1637-1643` — `RuntimeCodeRecord::trace_heap_edges`
+  - `crates/lyng/vm/src/vm/state.rs:204-291` — `ActiveVmRoots`, `trace_frame_record`

@@ -1,8 +1,8 @@
 //! V8 v7 benchmark suite driver (lyng-5xdt).
 //!
 //! Wires the six V8 v7 workloads — Richards, DeltaBlue, Crypto, RayTrace,
-//! NavierStokes, Splay — into `lyng-js-bench` as a `v8suite` subcommand.
-//! Each benchmark is executed inside `target/release/lyng-js --shell` as
+//! NavierStokes, Splay — into `lyng-bench` as a `v8suite` subcommand.
+//! Each benchmark is executed inside `target/release/lyng --shell` as
 //! an isolated subprocess per sample so warmup state, JIT tier transitions,
 //! GC heaps, and feedback caches don't leak between samples. The driver
 //! collects `--samples` runs per benchmark (default 5), computes the
@@ -17,15 +17,15 @@
 //! formatted)` callback prints `SCORE\t<name>\t<value>` lines to stdout
 //! that the parent driver parses.
 
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_vm::{OpcodeDispatchCounts, SlowPathCounts, Vm};
+use lyng_builtins::BootstrapMode;
+use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_vm::{OpcodeDispatchCounts, SlowPathCounts, Vm};
 use serde_json::{json, Value};
 use std::fs;
 use std::hint::black_box;
@@ -33,11 +33,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
 
-pub const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/bench-v8.md";
-pub const DEFAULT_JSON_PATH: &str = "reports/js/lyng-js/bench-v8.json";
+pub const DEFAULT_REPORT_PATH: &str = "reports/lyng/bench-v8.md";
+pub const DEFAULT_JSON_PATH: &str = "reports/lyng/bench-v8.json";
 const DEFAULT_SAMPLES: usize = 5;
 const DEFAULT_PER_SAMPLE_TIMEOUT_SECS: u64 = 120;
-const DEFAULT_LYNG_BIN: &str = "target/release/lyng-js";
+const DEFAULT_LYNG_BIN: &str = "target/release/lyng";
 
 /// Static catalog of V8 v7 workloads. The reference µs/iteration must match
 /// what each benchmark file declares to `new BenchmarkSuite(name, reference,
@@ -46,7 +46,7 @@ const DEFAULT_LYNG_BIN: &str = "target/release/lyng-js";
 ///
 /// `phase1_baseline` / `phase1_target` come from the JSC-aligned engine
 /// roadmap (Phase 1 benchmark gates table in
-/// `reports/js/lyng-js/jsc-aligned-engine-roadmap.md`). The baseline is the
+/// `reports/lyng/jsc-aligned-engine-roadmap.md`). The baseline is the
 /// pre-Phase-1 score on the legacy match dispatcher; the target is the
 /// Phase 1 exit-gate score that the trampoline + per-handler ABI was
 /// expected to achieve.
@@ -121,7 +121,7 @@ pub(crate) struct Options {
 /// Runs the v8suite benchmark and writes Markdown + JSON reports.
 ///
 /// # Errors
-/// Returns an error when CLI parsing fails, the lyng-js binary is missing,
+/// Returns an error when CLI parsing fails, the lyng binary is missing,
 /// or a benchmark times out / fails on every sample.
 pub fn run(args: &[String]) -> Result<(), String> {
     let options = parse_options(args)?;
@@ -134,7 +134,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         return run_opcode_counts(&options);
     }
 
-    ensure_path_exists(&options.lyng_bin, "lyng-js binary")?;
+    ensure_path_exists(&options.lyng_bin, "lyng binary")?;
     ensure_path_exists(&options.v8_root, "v8 benchmark root")?;
     let base_js = read_file(&Path::new(&options.v8_root).join("base.js"))?;
 
@@ -224,7 +224,7 @@ impl SlowPathCountTotals {
 /// In-process driver that runs each V8 v7 workload with opcode dispatch
 /// counters enabled and emits per-workload per-opcode counts as JSON. Used by
 /// the R-0 hot-opcode measurement (lyng-5obc) — the regular score path runs
-/// each sample as a subprocess of `target/release/lyng-js`, which doesn't
+/// each sample as a subprocess of `target/release/lyng`, which doesn't
 /// carry the counter feature.
 fn run_opcode_counts(options: &Options) -> Result<(), String> {
     ensure_path_exists(&options.v8_root, "v8 benchmark root")?;
@@ -272,7 +272,7 @@ fn run_opcode_counts(options: &Options) -> Result<(), String> {
     let counts_path = options
         .counts_json_path
         .clone()
-        .unwrap_or_else(|| "reports/js/lyng-js/bench-v8-opcode-counts.json".to_string());
+        .unwrap_or_else(|| "reports/lyng/bench-v8-opcode-counts.json".to_string());
     write_output(
         &counts_path,
         &serde_json::to_string_pretty(&json)
@@ -336,7 +336,10 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
                 options.counts_json_path = Some(take_string_arg(&mut args, "--counts-json")?);
             }
             other => {
-                return Err(format!("unknown v8suite argument: {other}\n\n{}", help_text()));
+                return Err(format!(
+                    "unknown v8suite argument: {other}\n\n{}",
+                    help_text()
+                ));
             }
         }
     }
@@ -375,21 +378,21 @@ fn default_v8_root() -> String {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench v8suite [options]",
+        "Usage: lyng-bench v8suite [options]",
         "",
         "Runs the V8 v7 benchmark suite (Richards, DeltaBlue, Crypto, RayTrace,",
-        "NavierStokes, Splay) inside the lyng-js shell, one isolated subprocess",
+        "NavierStokes, Splay) inside the lyng shell, one isolated subprocess",
         "per sample. Emits per-benchmark median scores (V8 standard formula:",
         "100 × reference_µs / mean_µs).",
         "",
         "Options:",
         "  --samples N         Samples per benchmark (default: 5).",
         "  --report PATH       Markdown report path",
-        "                      (default: reports/js/lyng-js/bench-v8.md).",
+        "                      (default: reports/lyng/bench-v8.md).",
         "  --json PATH         JSON report path",
-        "                      (default: reports/js/lyng-js/bench-v8.json).",
-        "  --lyng-bin PATH     Path to the lyng-js executable",
-        "                      (default: target/release/lyng-js).",
+        "                      (default: reports/lyng/bench-v8.json).",
+        "  --lyng-bin PATH     Path to the lyng executable",
+        "                      (default: target/release/lyng).",
         "  --v8-root DIR       Directory containing the V8 v7 .js sources",
         "                      (default: testdata/js-benchmarks/v8-v7).",
         "  --timeout-secs N    Per-sample timeout in seconds (default: 120).",
@@ -405,7 +408,7 @@ pub fn help_text() -> String {
         "                      call sites — the flag wires the infrastructure.",
         "  --counts-json PATH  Path for the opcode-counts JSON output when",
         "                      --count-opcodes is on (default:",
-        "                      reports/js/lyng-js/bench-v8-opcode-counts.json).",
+        "                      reports/lyng/bench-v8-opcode-counts.json).",
         "  -h, --help          Show this help.",
     ]
     .join("\n")
@@ -423,7 +426,7 @@ fn read_file(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|error| format!("failed to read {}: {error}", path.display()))
 }
 
-/// Build the JS source we feed to `lyng-js --shell`. base.js installs the
+/// Build the JS source we feed to `lyng --shell`. base.js installs the
 /// benchmark framework; the per-workload .js file registers a
 /// `BenchmarkSuite`; the trailing script kicks off `RunSuites` and prints
 /// `SCORE\t<name>\t<value>` for each suite via the `NotifyResult` callback.
@@ -492,7 +495,7 @@ fn run_workload(
 fn persist_harness(workload: &V8Workload, source: &str) -> Result<PathBuf, String> {
     let mut path = std::env::temp_dir();
     path.push(format!(
-        "lyng-js-bench-v8-{}-{}.js",
+        "lyng-bench-v8-{}-{}.js",
         workload.name.to_ascii_lowercase(),
         std::process::id(),
     ));
@@ -531,7 +534,7 @@ fn run_single_sample(
             Ok(Some(_)) => {
                 let output = child
                     .wait_with_output()
-                    .map_err(|error| format!("failed to collect lyng-js output: {error}"))?;
+                    .map_err(|error| format!("failed to collect lyng output: {error}"))?;
                 return parse_sample_output(workload, &output);
             }
             Ok(None) if start.elapsed() >= options.per_sample_timeout => {
@@ -545,7 +548,7 @@ fn run_single_sample(
             Ok(None) => {
                 std::thread::sleep(Duration::from_millis(50));
             }
-            Err(error) => return Err(format!("lyng-js wait failed: {error}")),
+            Err(error) => return Err(format!("lyng wait failed: {error}")),
         }
     }
 }
@@ -553,7 +556,7 @@ fn run_single_sample(
 fn parse_sample_output(workload: &V8Workload, output: &Output) -> Result<f64, String> {
     if !output.status.success() {
         return Err(format!(
-            "lyng-js exit status {status}\nstdout:\n{stdout}\nstderr:\n{stderr}",
+            "lyng exit status {status}\nstdout:\n{stdout}\nstderr:\n{stderr}",
             status = output.status,
             stdout = String::from_utf8_lossy(&output.stdout),
             stderr = String::from_utf8_lossy(&output.stderr)
@@ -568,8 +571,10 @@ fn parse_sample_output(workload: &V8Workload, output: &Output) -> Result<f64, St
             let score_str = parts.next().unwrap_or("");
             if name == workload.name {
                 let parsed: f64 = score_str.trim().parse().map_err(|error| {
-                    format!("could not parse {workload} score {score_str:?}: {error}",
-                        workload = workload.name)
+                    format!(
+                        "could not parse {workload} score {score_str:?}: {error}",
+                        workload = workload.name
+                    )
                 })?;
                 value = Some(parsed);
             }
@@ -602,16 +607,19 @@ fn median(values: &[f64]) -> Option<f64> {
 fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
     let mut out = String::new();
     out.push_str("# Lyng JS V8 v7 Benchmark Report\n\n");
-    out.push_str(
-        "This report is generated by `cargo run --release -p lyng-js-bench -- v8suite`.\n\n",
-    );
-    out.push_str("Each benchmark runs in an isolated `lyng-js --shell` subprocess per sample so\n");
+    out.push_str("This report is generated by `cargo run --release -p lyng-bench -- v8suite`.\n\n");
+    out.push_str("Each benchmark runs in an isolated `lyng --shell` subprocess per sample so\n");
     out.push_str("warmup, GC, feedback caches, and tier transitions don't leak between samples.\n");
-    out.push_str("Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is better.\n\n");
+    out.push_str(
+        "Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is better.\n\n",
+    );
     out.push_str("## Configuration\n\n");
     out.push_str(&format!("- Samples per benchmark: `{}`\n", options.samples));
-    out.push_str(&format!("- Per-sample timeout: `{}s`\n", options.per_sample_timeout.as_secs()));
-    out.push_str(&format!("- lyng-js binary: `{}`\n", options.lyng_bin));
+    out.push_str(&format!(
+        "- Per-sample timeout: `{}s`\n",
+        options.per_sample_timeout.as_secs()
+    ));
+    out.push_str(&format!("- lyng binary: `{}`\n", options.lyng_bin));
     out.push_str(&format!("- V8 v7 sources: `{}`\n\n", options.v8_root));
     out.push_str("## Scores\n\n");
     out.push_str("| Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |\n");
@@ -672,7 +680,10 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
         out.push_str("\n## Errors\n\n");
         for report in reports {
             if let Some(error) = &report.error {
-                out.push_str(&format!("- `{name}`: {error}\n", name = report.workload.name));
+                out.push_str(&format!(
+                    "- `{name}`: {error}\n",
+                    name = report.workload.name
+                ));
             }
         }
     }
@@ -701,7 +712,7 @@ fn render_json(options: &Options, reports: &[WorkloadReport]) -> Value {
         })
         .collect();
     json!({
-        "schema": "lyng-js-bench/v8suite/v1",
+        "schema": "lyng-bench/v8suite/v1",
         "samples_per_benchmark": options.samples,
         "per_sample_timeout_secs": options.per_sample_timeout.as_secs(),
         "lyng_bin": options.lyng_bin,
@@ -732,7 +743,11 @@ fn print_summary(reports: &[WorkloadReport]) {
                 let target = report.workload.phase1_target;
                 let baseline = report.workload.phase1_baseline;
                 let delta = ((score - f64::from(baseline)) / f64::from(baseline)) * 100.0;
-                let gate = if score >= f64::from(target) { "✓" } else { "✗" };
+                let gate = if score >= f64::from(target) {
+                    "✓"
+                } else {
+                    "✗"
+                };
                 println!(
                     "{name:<14} score={score:>5.0} baseline={baseline:>4} target={target:>4} \
                      Δ={delta:+5.1}% gate={gate}",
@@ -755,7 +770,7 @@ fn print_summary(reports: &[WorkloadReport]) {
 
 /// Build the JS source we feed to an in-process VM run under
 /// `--count-opcodes`. Same shape as `build_harness`, except `print` is
-/// stubbed out (the lyng-js binary's CLI `print` isn't installed in-process,
+/// stubbed out (the lyng binary's CLI `print` isn't installed in-process,
 /// and the score is irrelevant for opcode-count measurement). If a benchmark
 /// reports a `NotifyError`, the harness re-throws so the driver surfaces it
 /// instead of silently swallowing it under the counted suite run.
@@ -830,21 +845,19 @@ fn run_workload_opcode_counts(
         )
     })?;
 
-    let mut aggregate_pairs: Vec<(lyng_js_bytecode::Opcode, u64)> = Vec::new();
+    let mut aggregate_pairs: Vec<(lyng_bytecode::Opcode, u64)> = Vec::new();
     let mut slow_path_totals = collect_slow_path.then(SlowPathCountTotals::zeroed);
     for sample_index in 0..samples {
-        let (counts, slow_path_sample) = run_workload_opcode_counts_once(
-            workload,
-            &unit,
-            collect_slow_path,
-        )
-        .map_err(|error| {
-            format!(
-                "sample {idx} failed for {name}: {error}",
-                idx = sample_index + 1,
-                name = workload.name
-            )
-        })?;
+        let (counts, slow_path_sample) =
+            run_workload_opcode_counts_once(workload, &unit, collect_slow_path).map_err(
+                |error| {
+                    format!(
+                        "sample {idx} failed for {name}: {error}",
+                        idx = sample_index + 1,
+                        name = workload.name
+                    )
+                },
+            )?;
         for entry in counts.iter() {
             if entry.count() == 0 {
                 continue;
@@ -864,7 +877,7 @@ fn run_workload_opcode_counts(
 
 fn run_workload_opcode_counts_once(
     workload: &V8Workload,
-    unit: &lyng_js_bytecode::CompiledScriptUnit,
+    unit: &lyng_bytecode::CompiledScriptUnit,
     collect_slow_path: bool,
 ) -> Result<(OpcodeDispatchCounts, Option<SlowPathCounts>), String> {
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -878,14 +891,12 @@ fn run_workload_opcode_counts_once(
     let _ = vm
         .bootstrap_realm(agent, realm_id, BootstrapMode::SpecOnly)
         .map_err(|error| format!("spec bootstrap failed: {error:?}"))?;
-    let installed = vm
-        .install_script(agent, realm_id, unit)
-        .map_err(|error| {
-            format!(
-                "script install failed for {name}: {error:?}",
-                name = workload.name
-            )
-        })?;
+    let installed = vm.install_script(agent, realm_id, unit).map_err(|error| {
+        format!(
+            "script install failed for {name}: {error:?}",
+            name = workload.name
+        )
+    })?;
     Vm::instantiate_global_script(agent, &realm_record, unit.instantiation_plan()).map_err(
         |error| {
             format!(
@@ -903,7 +914,12 @@ fn run_workload_opcode_counts_once(
     }
 
     let value = vm
-        .evaluate_installed(agent, installed, realm_record.global_env(), realm_record.global_env())
+        .evaluate_installed(
+            agent,
+            installed,
+            realm_record.global_env(),
+            realm_record.global_env(),
+        )
         .map_err(|error| {
             format!(
                 "execution failed for {name}: {error:?}",
@@ -919,7 +935,11 @@ fn run_workload_opcode_counts_once(
 
 fn render_opcode_counts_json(
     options: &Options,
-    entries: &[(V8Workload, OpcodeDispatchCounts, Option<SlowPathCountTotals>)],
+    entries: &[(
+        V8Workload,
+        OpcodeDispatchCounts,
+        Option<SlowPathCountTotals>,
+    )],
 ) -> Value {
     let workloads: Vec<Value> = entries
         .iter()
@@ -954,7 +974,7 @@ fn render_opcode_counts_json(
     // what Task 5 (lyng-5obc / hot-opcodes.toml) consumes — the hot-list comes
     // from cumulative dispatch share across the whole V8 v7 suite, not from
     // any single workload.
-    let mut totals_pairs: Vec<(lyng_js_bytecode::Opcode, u64)> = Vec::new();
+    let mut totals_pairs: Vec<(lyng_bytecode::Opcode, u64)> = Vec::new();
     for (_, counts, _) in entries {
         for entry in counts.iter() {
             if entry.count() == 0 {
@@ -969,9 +989,8 @@ fn render_opcode_counts_json(
         .filter(|entry| entry.count() != 0)
         .map(|entry| (entry.opcode().name(), entry.count()))
         .collect();
-    aggregate_pairs.sort_unstable_by(|left, right| {
-        right.1.cmp(&left.1).then_with(|| left.0.cmp(right.0))
-    });
+    aggregate_pairs
+        .sort_unstable_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(right.0)));
     let totals_object: serde_json::Map<String, Value> = aggregate_pairs
         .iter()
         .map(|(name, count)| ((*name).to_string(), json!(*count)))
@@ -986,10 +1005,10 @@ fn render_opcode_counts_json(
             if let Some(totals) = slow.as_ref() {
                 for raw in 0..OPCODE_COUNT {
                     let index = usize::from(raw);
-                    aggregate_totals.semantic[index] = aggregate_totals.semantic[index]
-                        .saturating_add(totals.semantic[index]);
-                    aggregate_totals.safepoint[index] = aggregate_totals.safepoint[index]
-                        .saturating_add(totals.safepoint[index]);
+                    aggregate_totals.semantic[index] =
+                        aggregate_totals.semantic[index].saturating_add(totals.semantic[index]);
+                    aggregate_totals.safepoint[index] =
+                        aggregate_totals.safepoint[index].saturating_add(totals.safepoint[index]);
                 }
             }
         }
@@ -999,7 +1018,7 @@ fn render_opcode_counts_json(
     };
 
     json!({
-        "schema": "lyng-js-bench/v8suite/opcode-counts/v1",
+        "schema": "lyng-bench/v8suite/opcode-counts/v1",
         "samples_per_benchmark": options.samples,
         "v8_root": options.v8_root,
         "workloads": workloads,
@@ -1066,7 +1085,11 @@ fn slow_path_workload_json(
 }
 
 fn print_opcode_counts_summary(
-    entries: &[(V8Workload, OpcodeDispatchCounts, Option<SlowPathCountTotals>)],
+    entries: &[(
+        V8Workload,
+        OpcodeDispatchCounts,
+        Option<SlowPathCountTotals>,
+    )],
     output_path: &str,
 ) {
     println!("\n========== V8 v7 Opcode Counts ==========");

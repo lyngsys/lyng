@@ -7,7 +7,7 @@
 //! emitted `Move` is register 0).
 //!
 //! The semantic body lives in
-//! `crates/lyng-js/vm/src/vm/semantics/loads.rs:322-333`. The inline
+//! `crates/lyng/vm/src/vm/semantics/loads.rs:322-333`. The inline
 //! port replaces the cold-stub `call_slow!(op_ldar_slow_rs, …)` shim
 //! with a 2-instruction body:
 //!
@@ -26,14 +26,14 @@
 //! plan's TDD discipline) confirms no semantic regression when the
 //! inline body replaces the cold stub.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Compile + execute `src` in a fresh realm, returning the script's
 /// completion value. Mirrors the helper shape used by
@@ -71,9 +71,7 @@ fn ldar_via_intermediate_temporary() {
     // accumulator's Value must equal `a + b` (3) when the multiply
     // executes; the inline path's `load_reg!(a => 10); store_acc!(10);`
     // sequence must preserve that.
-    let value = run_script(
-        "(function(a, b) { var c = a + b; return c * 2; })(1, 2);",
-    );
+    let value = run_script("(function(a, b) { var c = a + b; return c * 2; })(1, 2);");
     assert_eq!(value, Value::from_smi(6));
 }
 

@@ -4,7 +4,7 @@
 )]
 
 use super::*;
-use lyng_js_common::WellKnownAtom;
+use lyng_common::WellKnownAtom;
 
 mod elements;
 mod engine_arrays;

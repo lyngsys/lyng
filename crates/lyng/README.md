@@ -23,7 +23,7 @@ Intl, browser APIs, Node APIs, or native-code execution.
   realms, agents, host hooks, and shared backing-store coordination.
 - `builtins` bootstraps default realms, constructors, prototypes, globals, intrinsic
   tables, builtin descriptor metadata, and native builtin dispatch.
-- `cli`, `crates/lyng-js/tests`, `tools/lyng-js-test262`, and `tools/lyng-js-bench`
+- `cli`, `crates/lyng/tests`, `tools/lyng-test262`, and `tools/lyng-bench`
   provide local entrypoints for evaluation, regression tests, conformance runs, runtime
   reports, and bytecode-density reports.
 
@@ -45,8 +45,8 @@ The crate tree is organized around ownership boundaries:
 - Frontend: `common`, `lexer`, `ast`, `parser`, `sema`
 - Runtime and execution: `types`, `gc`, `ops`, `host`, `objects`, `env`, `bytecode`,
   `compiler`, `vm`, `builtins`
-- Entry points and verification: `cli`, `tests`, `tools/lyng-js-test262`,
-  `tools/lyng-js-bench`
+- Entry points and verification: `cli`, `tests`, `tools/lyng-test262`,
+  `tools/lyng-bench`
 
 The main engineering constraints are stable crate boundaries, spec-traceable behavior,
 minimal dependency growth, explicit ownership of abstract operations, and hot-path
@@ -57,32 +57,32 @@ discipline in the VM/runtime layers.
 Focused crate tests:
 
 ```sh
-cargo test -p lyng-js-parser
-cargo test -p lyng-js-compiler
-cargo test -p lyng-js-vm
-cargo test -p lyng-js-tests
+cargo test -p lyng-parser
+cargo test -p lyng-compiler
+cargo test -p lyng-vm
+cargo test -p lyng-tests
 ```
 
 Targeted and whole-corpus Test262:
 
 ```sh
-cargo run --release -p lyng-js-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-js-test262-temporal.md -j 4
-cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.md -j 12
+cargo run --release -p lyng-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-test262-temporal.md -j 4
+cargo run --release -p lyng-test262 -- --report /tmp/lyng-test262-report.md -j 12
 ```
 
 Runtime and bytecode reporting:
 
 ```sh
-cargo run --release -p lyng-js-bench -- runtime --report /tmp/lyng-js-bench.md
-cargo run --release -p lyng-js-bench -- density --report /tmp/lyng-js-bytecode-density.md
+cargo run --release -p lyng-bench -- runtime --report /tmp/lyng-bench.md
+cargo run --release -p lyng-bench -- density --report /tmp/lyng-bytecode-density.md
 ```
 
-Checked-in reports live under [`../../reports/js/lyng-js/`](../../reports/js/lyng-js/).
+Checked-in reports live under [`../../reports/lyng/`](../../reports/lyng/).
 
 ## Read Next
 
-- [Docs Index](../../docs/lyng-js/README.md)
-- [Architecture](../../docs/lyng-js/architecture.md)
-- [Engineering Standards](../../docs/lyng-js/engineering-standards.md)
-- [Runtime Model](../../docs/lyng-js/runtime-model.md)
-- [Bytecode And VM](../../docs/lyng-js/bytecode-and-vm.md)
+- [Docs Index](../../docs/lyng/README.md)
+- [Architecture](../../docs/lyng/architecture.md)
+- [Engineering Standards](../../docs/lyng/engineering-standards.md)
+- [Runtime Model](../../docs/lyng/runtime-model.md)
+- [Bytecode And VM](../../docs/lyng/bytecode-and-vm.md)

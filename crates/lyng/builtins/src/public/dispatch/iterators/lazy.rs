@@ -250,7 +250,7 @@ pub(super) fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
             iterator::iterator_close(
                 &mut bridge,
                 &mut inner_record,
-                Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                Ok::<(), lyng_types::AbruptCompletion>(()),
             )
         };
         if let Err(error) = inner_close {
@@ -264,7 +264,7 @@ pub(super) fn iterator_helper_return_builtin<Cx: PublicBuiltinDispatchContext>(
         iterator::iterator_close(
             &mut bridge,
             &mut iterator_record,
-            Ok::<(), lyng_js_types::AbruptCompletion>(()),
+            Ok::<(), lyng_types::AbruptCompletion>(()),
         )
     };
     let result = match close_result {
@@ -381,7 +381,7 @@ fn iterator_helper_take_next<Cx: PublicBuiltinDispatchContext>(
             iterator::iterator_close(
                 &mut bridge,
                 &mut iterator_record,
-                Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                Ok::<(), lyng_types::AbruptCompletion>(()),
             )
         };
         close_result?;

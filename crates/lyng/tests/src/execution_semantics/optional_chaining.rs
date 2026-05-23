@@ -1,5 +1,5 @@
 use super::support::{compile_and_run, compile_and_run_string};
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 #[test]
 fn optional_chaining_short_circuits_continuations_and_preserves_this() {

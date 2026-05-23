@@ -3,13 +3,13 @@ use super::{
     Agent, CodeRef, FrameFlags, FrameRecord, InstalledCode, NativeFunctionRegistry, RealmRecord,
     RegisterWindow, Vm, VmError, VmResult,
 };
-use lyng_js_env::{
+use lyng_env::{
     ExecutableId, JobQueueKind, PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind,
     PromiseReactionRecord, PromiseState, RuntimeJob, RuntimeJobPayload, WaiterToken,
 };
-use lyng_js_host::{HostError, HostHooks, HostJobPhase, JobObservation, WaitLocation};
-use lyng_js_ops::{errors, iterator, object, promise as promise_ops};
-use lyng_js_types::{
+use lyng_host::{HostError, HostHooks, HostJobPhase, JobObservation, WaitLocation};
+use lyng_ops::{errors, iterator, object, promise as promise_ops};
+use lyng_types::{
     promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion, ObjectRef,
     PropertyKey, Value,
 };
@@ -115,7 +115,7 @@ impl Vm {
         let script_or_module_referrer = match job.payload() {
             RuntimeJobPayload::PromiseReaction { reaction, .. } => agent
                 .promise_reaction(reaction)
-                .and_then(lyng_js_env::PromiseReactionRecord::script_or_module_referrer),
+                .and_then(lyng_env::PromiseReactionRecord::script_or_module_referrer),
             RuntimeJobPayload::DynamicImportEvaluate {
                 script_or_module_referrer,
                 ..
@@ -130,7 +130,7 @@ impl Vm {
             | RuntimeJobPayload::FinalizationCleanup { .. } => None,
         };
         agent.push_execution_context(
-            lyng_js_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)
+            lyng_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)
                 .with_script_or_module_referrer(script_or_module_referrer),
         );
         let result = match job.payload() {
@@ -210,7 +210,7 @@ impl Vm {
         let value = Value::from_string_ref(agent.alloc_runtime_string(
             "timed-out",
             None,
-            lyng_js_gc::AllocationLifetime::Default,
+            lyng_gc::AllocationLifetime::Default,
         ));
         promise_ops::fulfill_promise(agent, promise, value).map_err(VmError::Abrupt)
     }
@@ -255,7 +255,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         realm: &RealmRecord,
-        reaction_id: lyng_js_env::PromiseReactionId,
+        reaction_id: lyng_env::PromiseReactionId,
         argument: Value,
     ) -> VmResult<()> {
         let reaction = agent
@@ -298,7 +298,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         realm: &RealmRecord,
-        reaction: lyng_js_env::PromiseReactionRecord,
+        reaction: lyng_env::PromiseReactionRecord,
         argument: Value,
     ) -> VmResult<PromiseReactionOutcome> {
         match reaction.handler() {
@@ -537,7 +537,7 @@ impl Vm {
     ) -> VmResult<()> {
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
         let fulfill_reaction = agent.alloc_promise_reaction(
             PromiseReactionRecord::new(PromiseReactionKind::Fulfill, on_fulfilled, capability)
                 .with_script_or_module_referrer(script_or_module_referrer),
@@ -552,7 +552,7 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let _ = agent.set_promise_handled(promise, true);
         match record.state() {
-            lyng_js_env::PromiseState::Pending => {
+            lyng_env::PromiseState::Pending => {
                 let _ = agent.push_promise_reaction(
                     promise,
                     PromiseReactionKind::Fulfill,
@@ -564,10 +564,10 @@ impl Vm {
                     reject_reaction,
                 );
             }
-            lyng_js_env::PromiseState::Fulfilled => {
+            lyng_env::PromiseState::Fulfilled => {
                 Self::enqueue_promise_reaction_job(agent, realm, fulfill_reaction, record.result());
             }
-            lyng_js_env::PromiseState::Rejected => {
+            lyng_env::PromiseState::Rejected => {
                 Self::enqueue_promise_reaction_job(agent, realm, reject_reaction, record.result());
             }
         }
@@ -577,11 +577,11 @@ impl Vm {
     pub(super) fn enqueue_promise_reaction_job(
         agent: &mut Agent,
         realm: &RealmRecord,
-        reaction: lyng_js_env::PromiseReactionId,
+        reaction: lyng_env::PromiseReactionId,
         argument: Value,
     ) {
         let _ = agent.enqueue_job_with_payload(
-            lyng_js_host::HostJobKind::Promise,
+            lyng_host::HostJobKind::Promise,
             ExecutableId::Builtin,
             RuntimeJobPayload::PromiseReaction { reaction, argument },
             Some(realm.id()),
@@ -691,15 +691,15 @@ impl Vm {
         )?;
         let _ = agent.alloc_promise_resolving_function(
             resolve,
-            lyng_js_env::PromiseResolvingFunctionRecord::new(
-                lyng_js_env::PromiseResolvingFunctionKind::Resolve,
+            lyng_env::PromiseResolvingFunctionRecord::new(
+                lyng_env::PromiseResolvingFunctionKind::Resolve,
                 capability,
             ),
         );
         let _ = agent.alloc_promise_resolving_function(
             reject,
-            lyng_js_env::PromiseResolvingFunctionRecord::new(
-                lyng_js_env::PromiseResolvingFunctionKind::Reject,
+            lyng_env::PromiseResolvingFunctionRecord::new(
+                lyng_env::PromiseResolvingFunctionKind::Reject,
                 capability,
             ),
         );
@@ -734,7 +734,7 @@ impl Vm {
             realm.id(),
             realm.global_env(),
             realm.global_env(),
-            lyng_js_env::ExecutionContextKind::Job,
+            lyng_env::ExecutionContextKind::Job,
         )
         .with_flags(FrameFlags::entry())
     }

@@ -2,7 +2,7 @@ use crate::{
     CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef, ObjectSlotsRef, PrimitiveHeap,
     PrimitiveValueCellRef, SideAllocationRef, SuspendedRegistersRef, TraceHeapEdges,
 };
-use lyng_js_types::{
+use lyng_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef, Value,
 };

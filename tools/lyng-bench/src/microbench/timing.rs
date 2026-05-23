@@ -70,7 +70,10 @@ pub fn time_once<F: FnOnce() -> ()>(dispatches: u64, f: F) -> Sample {
     let start = Instant::now();
     f();
     let elapsed = start.elapsed();
-    Sample { elapsed, dispatches }
+    Sample {
+        elapsed,
+        dispatches,
+    }
 }
 
 #[cfg(test)]
@@ -89,11 +92,26 @@ mod tests {
     #[test]
     fn stats_from_samples_basic() {
         let samples = vec![
-            Sample { elapsed: Duration::from_nanos(100), dispatches: 10 },  // 10 ns
-            Sample { elapsed: Duration::from_nanos(200), dispatches: 10 },  // 20 ns
-            Sample { elapsed: Duration::from_nanos(300), dispatches: 10 },  // 30 ns
-            Sample { elapsed: Duration::from_nanos(400), dispatches: 10 },  // 40 ns
-            Sample { elapsed: Duration::from_nanos(500), dispatches: 10 },  // 50 ns
+            Sample {
+                elapsed: Duration::from_nanos(100),
+                dispatches: 10,
+            }, // 10 ns
+            Sample {
+                elapsed: Duration::from_nanos(200),
+                dispatches: 10,
+            }, // 20 ns
+            Sample {
+                elapsed: Duration::from_nanos(300),
+                dispatches: 10,
+            }, // 30 ns
+            Sample {
+                elapsed: Duration::from_nanos(400),
+                dispatches: 10,
+            }, // 40 ns
+            Sample {
+                elapsed: Duration::from_nanos(500),
+                dispatches: 10,
+            }, // 50 ns
         ];
         let stats = SampleStats::from_samples(samples);
         assert!((stats.median_ns_per_dispatch - 30.0).abs() < 1e-9);

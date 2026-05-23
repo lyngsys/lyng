@@ -21,9 +21,9 @@
 //! binding which lands in Batch 7 alongside the cold-port wiring.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::dispatch;
+use lyng_vm::dispatch;
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
@@ -35,7 +35,7 @@ llint_handler! {
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn op_extra_wide_prefix_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_validation_extra_wide_prefix);
 }
 

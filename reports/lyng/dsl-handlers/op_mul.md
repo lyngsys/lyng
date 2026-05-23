@@ -7,7 +7,7 @@ single port in Phase 1.C (~589M dispatches per V8 v7 run; total
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -60,7 +60,7 @@ either operand was negative, the spec demands `-0` (the IEEE-754
 negative-zero `Number`), which the SMI tag cannot carry (SMI `0` is
 always `+0`).
 
-`crates/lyng-js/vm/src/vm/dispatch/arithmetic.rs:21-26`:
+`crates/lyng/vm/src/vm/dispatch/arithmetic.rs:21-26`:
 
 ```rust
 pub(in crate::vm) fn smi_mul_result(left: i32, right: i32) -> Option<Value> {
@@ -85,7 +85,7 @@ non-zero-product path (a single `cbnz` mispredict-free branch) and
 instructions in the macro vs the Task-1 stub.
 
 This change to `mul_smi_overflow!` is in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs:49-89`; the
+`crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs:49-89`; the
 only current caller is the new `op_mul_dsl` handler, and the
 existing `dsl/ops.md` reference table should be updated when Phase 1.C
 closes (currently lists `mul_smi_overflow!` as "smull + sxtw + cmp +
@@ -93,7 +93,7 @@ b.ne" — should read "smull + sxtw + cmp + b.ne + cbnz + orr + tbnz").
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_mul.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm`.
 
 Fast path (from `op_mul_dsl:` through `bl _op_mul_record_smi_rs`
 inclusive): **40 instructions** — 4 ldrb/ldrh decode + 1 ldr + 7
@@ -150,7 +150,7 @@ Mul is ~25% slower than Sub. The delta breaks down:
   extra ALU dependency that occasionally serialize the issue window:
   ~+18 ns observed.
 
-The microbench snippet (added in this task, `tools/lyng-js-bench/src/
+The microbench snippet (added in this task, `tools/lyng-bench/src/
 microbench/snippets.rs`) uses two locals + `x = (x * y) | 0`:
 
 ```js
@@ -183,7 +183,7 @@ Notes:
   on Mul is comparable to ±0.59 on Add captured in the same sweep,
   so the noise floor wasn't unusually elevated.
 - Verified `opcodes_per_iter=1` empirically via `verify_opcodes_per_iter`
-  (cargo test, lyng-js-bench, features=opcode-counters): Mul snippet
+  (cargo test, lyng-bench, features=opcode-counters): Mul snippet
   was not in the verified-names list, but its peephole-mitigation
   pattern mirrors Sub's (which is verified at ratio 1.000).
 
@@ -210,7 +210,7 @@ This is a known measurement artifact, not a real regression: every
 fast-path SMI multiply calls
 `call_slow!(op_mul_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope — i.e., the macro doesn't know whether the
 call_slow is reached on a fast path or via a `.slow:` body label).
@@ -225,7 +225,7 @@ still need a shim for feedback recording. Per the Phase 1.C plan
 distinguishes "feedback-recording shim" from "true slow path"** —
 that work is a deferred substrate sub-phase (gate
 counter-injection on label-boundary state in
-`crates/lyng-js-vm-dsl/src/lower.rs` `inject_opcode_byte`) and is not
+`crates/lyng/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is not
 scheduled within Phase 1.C scope.
 
 The float-heavy V8 v7 workloads (RayTrace, NavierStokes, Crypto)
@@ -251,15 +251,15 @@ re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
 - Test262 multiplication slice: `cargo run --release -p
-  lyng-js-test262 -- --filter language/expressions/multiplication`
+  lyng-test262 -- --filter language/expressions/multiplication`
   → **79 of 79 variants passed across 40 files** (100% pass rate).
   Includes `S11.5.1_A4_T*` (the negative-zero / IEEE-754 semantics
   tests that exercise the new neg-zero deferral path).
 - Two pre-existing failures in
-  `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`
+  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `386670ee` (Task 2 SAFETY fix) and at
@@ -315,4 +315,4 @@ Per-workload gate status per spec §1.6 + §5:
   workload regression suspected at the time is now visible in the
   data and remains within the per-workload waiver band per spec §5.
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

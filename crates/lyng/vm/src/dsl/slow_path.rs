@@ -5,7 +5,7 @@
 //! transitional `LlIntDispatchState` alias are populated. The asm-facing
 //! shim layer and `SlowPathReturn`/`SlowPathTag` lands in DSL-0b.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 use crate::error::VmError;
 
@@ -61,7 +61,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// Construct from a live α `DispatchState`. The α handler in
     /// `dispatch_handlers/` calls this to forward into `op_xxx_semantic`.
     pub fn from_alpha(state: &'borrow mut DispatchState<'vm>) -> Self {
-        Self { inner: LlIntDispatchInner::Alpha(state) }
+        Self {
+            inner: LlIntDispatchInner::Alpha(state),
+        }
     }
 
     /// Construct from a raw `*mut LlIntState` passed by the asm shim.
@@ -77,9 +79,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// - No other live `&mut LlIntRustContext` aliases the same
     ///   pointer for the duration of the returned wrapper.
     pub unsafe fn from_raw(state: *mut LlIntState) -> Self {
-        let rust = unsafe {
-            &mut *((*state).rust_context as *mut LlIntRustContext<'vm>)
-        };
+        let rust = unsafe { &mut *((*state).rust_context as *mut LlIntRustContext<'vm>) };
         Self {
             inner: LlIntDispatchInner::Asm { state, rust },
         }
@@ -280,26 +280,28 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         // active frame; one-past-the-end is well-defined.
                         unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
-                    let pb_base = rust.dispatch.installed.function().instruction_bytes().as_ptr();
+                    let pb_base = rust
+                        .dispatch
+                        .installed
+                        .function()
+                        .instruction_bytes()
+                        .as_ptr();
                     let fv_base = {
-                        let index =
-                            crate::vm::code_index_for_dsl(active_frame.code());
+                        let index = crate::vm::code_index_for_dsl(active_frame.code());
                         rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
                             as *mut crate::dsl::feedback_flat::FeedbackEntry
                     };
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
-                    let const_base: *const lyng_js_types::Value = rust
+                    let const_base: *const lyng_types::Value = rust
                         .dispatch
                         .agent
                         .heap()
                         .view()
                         .code(active_frame.code())
-                        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
-                        .and_then(|slots| {
-                            rust.dispatch.agent.heap().view().code_slots(slots)
-                        })
+                        .and_then(lyng_gc::RuntimeCodeRecord::constants)
+                        .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
                         .map(|s| s.as_ptr())
                         .unwrap_or(std::ptr::null());
 
@@ -328,16 +330,14 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     // `frame_pb_base` already relies on. See spec §3.6.
                     #[cfg(debug_assertions)]
                     {
-                        let recomputed: *const lyng_js_types::Value = rust
+                        let recomputed: *const lyng_types::Value = rust
                             .dispatch
                             .agent
                             .heap()
                             .view()
                             .code(active_frame.code())
-                            .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
-                            .and_then(|slots| {
-                                rust.dispatch.agent.heap().view().code_slots(slots)
-                            })
+                            .and_then(lyng_gc::RuntimeCodeRecord::constants)
+                            .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
                             .map(|s| s.as_ptr())
                             .unwrap_or(std::ptr::null());
                         debug_assert_eq!(

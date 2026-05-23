@@ -1,8 +1,8 @@
 use super::ids::{
     AsyncDisposalOperationId, AsyncDisposalResumeId, DisposalCapabilityId, PromiseCapabilityId,
 };
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{ObjectRef, Value};
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_types::{ObjectRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DisposalCapabilityKind {

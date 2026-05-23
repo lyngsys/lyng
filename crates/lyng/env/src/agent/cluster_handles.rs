@@ -3,8 +3,8 @@ use crate::{
     AgentId, AsyncWaiterRecord, BackingStoreRuntime, ParkedAgentRecord, SharedBackingStoreRecord,
     SharedMemoryRuntime, WaiterRecord, WaiterToken,
 };
-use lyng_js_host::{HostSharedBufferId, WaitLocation};
-use lyng_js_types::BackingStoreRef;
+use lyng_host::{HostSharedBufferId, WaitLocation};
+use lyng_types::BackingStoreRef;
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
@@ -374,7 +374,7 @@ impl Agent {
     pub fn cache_shared_backing_store_handle(
         &mut self,
         backing_store: BackingStoreRef,
-        shared_buffer: lyng_js_host::HostSharedBufferId,
+        shared_buffer: lyng_host::HostSharedBufferId,
     ) -> bool {
         self.shared_memory
             .cache_shared_backing_store_handle(backing_store, shared_buffer)

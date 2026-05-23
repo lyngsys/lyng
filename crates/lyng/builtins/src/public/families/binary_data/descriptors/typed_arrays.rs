@@ -2,8 +2,8 @@ use crate::public::PublicRealmBuiltins;
 use crate::{
     BuiltinAttributes, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_types::{
     array_species_getter_builtin, array_to_string_builtin, typed_array_at_builtin,
     typed_array_copy_within_builtin, typed_array_every_builtin, typed_array_fill_builtin,
     typed_array_filter_builtin, typed_array_find_builtin, typed_array_find_index_builtin,

@@ -1,5 +1,5 @@
-use lyng_js_ast::{FunctionId, ParsedModule, ParsedScript, PatternId};
-use lyng_js_common::{AtomId, AtomTable, DiagnosticList};
+use lyng_ast::{FunctionId, ParsedModule, ParsedScript, PatternId};
+use lyng_common::{AtomId, AtomTable, DiagnosticList};
 
 use crate::{
     analyzer, BindingTable, ClassPrivateElementRecord, ClassPrivateLayoutTable, FunctionSemaTable,

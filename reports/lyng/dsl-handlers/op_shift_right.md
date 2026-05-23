@@ -12,7 +12,7 @@ bailout-on-overflow branch.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -72,7 +72,7 @@ zero-fill) which implements `>>>`.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_right.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm`.
 
 Fast path (from `op_shift_right_dsl:` through
 `bl _op_shift_right_record_smi_rs` inclusive): **36 instructions** —
@@ -157,7 +157,7 @@ Notes:
   bypassed per spec §1.6 same-machine A/B convention used by op_sub /
   op_mul / op_bit_and / op_shift_left.
 - The microbench snippet for ShiftRight was added in this task at
-  `tools/lyng-js-bench/src/microbench/snippets.rs` (using
+  `tools/lyng-bench/src/microbench/snippets.rs` (using
   `x = i >> y` with two locals to mirror the ShiftLeft snippet
   shape). No `ShiftRightSmi` opcode exists in the bytecode-builder,
   so the two-locals form is for direct shape comparison with
@@ -199,7 +199,7 @@ This is the known measurement artifact, not a real regression: every
 fast-path SMI right-shift calls
 `call_slow!(op_shift_right_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope). The result: feedback-recording fast-path
 entries are counted as if they were full slow-path entries.
@@ -212,7 +212,7 @@ per-opcode gate should remain enforced **once the substrate
 distinguishes "feedback-recording shim" from "true slow path"** —
 that work is a substrate fix tracked as a Phase 1.C followup (gate
 counter-injection on label-boundary state in
-`crates/lyng-js-vm-dsl/src/lower.rs` `inject_opcode_byte`) and is
+`crates/lyng/vm-dsl/src/lower.rs` `inject_opcode_byte`) and is
 not scheduled within Phase 1.C scope.
 
 Crypto's 448M (5-run aggregate) ShiftRight dispatches are dominated
@@ -236,16 +236,16 @@ section should be re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
-- Test262 right-shift slice: `cargo run --release -p lyng-js-test262
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
+- Test262 right-shift slice: `cargo run --release -p lyng-test262
   -- --filter language/expressions/right-shift` → **73/73 variants
   passed across 37 files** (100% pass rate). Includes the
   `S11.7.2_*` and `bigint-*` right-shift semantics tests covering
   ToInt32(lhs) + ToUint32(rhs) + 5-bit-mask + sign-preserving
   arithmetic-shift invariants.
 - Pre-existing failures in
-  `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`
+  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `45c552f6` (Task 6 close) with the op_shift_right
@@ -281,4 +281,4 @@ Per-workload gate status per spec §1.6 + §5:
 - ⚠ Workloads requiring waiver: none
 - — N/A: DeltaBlue, NavierStokes, Splay (don't emit ShiftRight)
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

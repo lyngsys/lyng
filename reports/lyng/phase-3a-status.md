@@ -40,7 +40,7 @@ follow-up sub-issues 3b/3c/3d.
 
 | Check | Pre-change (Phase 2a) | Post-change (Phase 3a) | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-gc -p lyng-js-objects -p lyng-js-vm -p lyng-js-tests` | 1701 passed, 1 ignored | 1707 passed, 1 ignored | +6 (new NamedPropertyHandler packing tests) |
+| `cargo test -p lyng-gc -p lyng-objects -p lyng-vm -p lyng-tests` | 1701 passed, 1 ignored | 1707 passed, 1 ignored | +6 (new NamedPropertyHandler packing tests) |
 | `cargo clippy --workspace --all-targets` | 0 errors, 62 warnings | 0 errors, 62 warnings | unchanged |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
@@ -63,14 +63,14 @@ Phase 2a baseline 272 → 277). The epic-level +35% geomean target
 remains open; that's cumulative across all 10 IC opcodes (3b–3d).
 
 Reports:
-- `reports/js/lyng-js/phase-3a-bench.md`
-- `reports/js/lyng-js/phase-3a-bench.json`
+- `reports/lyng/phase-3a-bench.md`
+- `reports/lyng/phase-3a-bench.json`
 
 ### `cargo asm` on `op_get_named_property`
 
 | Variant | Lines | `bl` count | Key `bl` targets on hit path |
 |---|---:|---:|---|
-| Phase 2a final (`reports/js/lyng-js/phase-2a-final-…asm`) | 438 | 11 | `try_named_property_load_inline_cache_hit` |
+| Phase 2a final (`reports/lyng/phase-2a-final-…asm`) | 438 | 11 | `try_named_property_load_inline_cache_hit` |
 | Commit A (no consumer) | 438 | 11 | unchanged — byte-identical to Phase 2a |
 | Commit B (fast path inlined) | 547 | 13 | `FeedbackSiteState::record_execution` + `observe_tier_feedback_event` only — both pre-existing tier bookkeeping |
 
@@ -83,15 +83,15 @@ bookkeeping calls that were previously hidden inside the now-bypassed
 chain helper.
 
 Reports:
-- `reports/js/lyng-js/phase-3a-commit-a-op_get_named_property.asm`
-- `reports/js/lyng-js/phase-3a-commit-b-op_get_named_property.asm`
+- `reports/lyng/phase-3a-commit-a-op_get_named_property.asm`
+- `reports/lyng/phase-3a-commit-b-op_get_named_property.asm`
 
 ### Test262
 
 | | Files runnable | Files passed | Pass rate | Δ vs Phase 2a (files) |
 |---|---:|---:|---:|---:|
-| Phase 2a (`reports/js/lyng-js/phase-2a-test262.md`) | 49729 | 49722 | 99.99% | — |
-| Phase 3a (`reports/js/lyng-js/phase-3a-test262.md`) | 49729 | 49720 | 99.98% | **−2 files** |
+| Phase 2a (`reports/lyng/phase-2a-test262.md`) | 49729 | 49722 | 99.99% | — |
+| Phase 3a (`reports/lyng/phase-3a-test262.md`) | 49729 | 49720 | 99.98% | **−2 files** |
 
 The 2 new failures vs Phase 2a (both regressions surface on Commit A
 alone; Commit B's fast path does not cause them — confirmed by
@@ -99,8 +99,8 @@ running with the fast path branch disabled):
 
 1. `staging/sm/expressions/object-literal-__proto__.js` (2 variants):
    `runtime error: Test262Error`. Reproduces deterministically under
-   `lyng-js-test262` but the test passes when run standalone via
-   `lyng-js --test262` with the assembled (`assert.js` + `sta.js` +
+   `lyng-test262` but the test passes when run standalone via
+   `lyng --test262` with the assembled (`assert.js` + `sta.js` +
    test) source. The two execution paths differ only in
    `Test262RealmExtension` setup. The failure surfaces on Commit A's
    infrastructure layout change (a +8-byte addition to
@@ -130,15 +130,15 @@ ECMA-262-core categories (annexB, built-ins, harness, language).
 
 ## Files changed
 
-- `crates/lyng-js/objects/src/shapes.rs` — `NamedPropertyHandler` struct + accessors (+68 lines).
-- `crates/lyng-js/objects/src/lib.rs` — pub use of new type (+1 line edit).
-- `crates/lyng-js/objects/src/tests.rs` — 6 unit tests for handler packing (+93 lines).
-- `crates/lyng-js/vm/src/vm/feedback.rs` — `monomorphic_fast` and
+- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyHandler` struct + accessors (+68 lines).
+- `crates/lyng/objects/src/lib.rs` — pub use of new type (+1 line edit).
+- `crates/lyng/objects/src/tests.rs` — 6 unit tests for handler packing (+93 lines).
+- `crates/lyng/vm/src/vm/feedback.rs` — `monomorphic_fast` and
   `monomorphic_fast_dependency_epoch` sidecar fields on
   `NamedPropertyFeedback`; `refresh_monomorphic_fast()` maintenance;
   `Vm::named_property_fast_handler()` and
   `Vm::record_named_property_fast_hit()` `#[inline(always)]` helpers.
-- `crates/lyng-js/vm/src/vm/dispatch/property.rs` — inlined fast-path
+- `crates/lyng/vm/src/vm/dispatch/property.rs` — inlined fast-path
   block in `execute_get_named_property_opcode` cache-hit branch.
 
 Total Phase 3a diff: ~270 added lines + small modifications across 5 files.

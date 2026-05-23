@@ -1,5 +1,5 @@
-use lyng_js_ast::{CatchClause, Stmt, StmtId, SwitchCase};
-use lyng_js_lexer::TokenKind;
+use lyng_ast::{CatchClause, Stmt, StmtId, SwitchCase};
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 

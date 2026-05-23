@@ -1,6 +1,6 @@
 //! Constants-access backend macro for Phase 1.B.1.
 //!
-//! [`load_constant!`] loads a [`lyng_js_types::Value`] from the
+//! [`load_constant!`] loads a [`lyng_types::Value`] from the
 //! pre-resolved constants array via
 //! [`LlIntState::frame_const_base`](crate::dsl::llint_state::LlIntState::frame_const_base).
 //!
@@ -46,10 +46,10 @@
 //! - `{vm_const_base}` resolves to
 //!   [`reg_convention::LLINT_STATE_FRAME_CONST_BASE`](crate::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE).
 //!
-//! See spec §3.5 and `crates/lyng-js-vm-dsl/src/lower.rs` for the
+//! See spec §3.5 and `crates/lyng/vm-dsl/src/lower.rs` for the
 //! injection.
 
-/// Load a [`lyng_js_types::Value`] (8 bytes) from
+/// Load a [`lyng_types::Value`] (8 bytes) from
 /// `frame_const_base[$idx_reg]` into `$dst_reg`.
 ///
 /// Two instructions; uses x16 (IP0) as macro-internal scratch.
@@ -67,7 +67,11 @@ macro_rules! load_constant {
     ($idx_reg:tt => $dst_reg:tt) => {
         concat!(
             "ldr    x16, [x24, {vm_const_base}]\n",
-            "ldr    x", stringify!($dst_reg), ", [x16, x", stringify!($idx_reg), ", lsl #3]\n",
+            "ldr    x",
+            stringify!($dst_reg),
+            ", [x16, x",
+            stringify!($idx_reg),
+            ", lsl #3]\n",
         )
     };
 }

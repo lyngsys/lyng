@@ -1,14 +1,14 @@
 [package]
-name = "lyng-js-ops"
+name = "lyng-ops"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lyng-js-common = { workspace = true }
-lyng-js-types = { workspace = true }
-lyng-js-gc = { workspace = true }
-lyng-js-env = { workspace = true }
-lyng-js-objects = { workspace = true }
-lyng-js-host = { workspace = true }
+lyng-common = { workspace = true }
+lyng-types = { workspace = true }
+lyng-gc = { workspace = true }
+lyng-env = { workspace = true }
+lyng-objects = { workspace = true }
+lyng-host = { workspace = true }
 
 [dev-dependencies]

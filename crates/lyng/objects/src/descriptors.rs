@@ -3,8 +3,8 @@ use super::{
     ObjectRuntime, ShapeProperty, ShapePropertyKind, SlotLocation, Value,
     MIN_DENSE_ELEMENT_CAPACITY, SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
 };
-use lyng_js_gc::{PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
-use lyng_js_types::{PropertyDescriptor, PropertyKey};
+use lyng_gc::{PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
+use lyng_types::{PropertyDescriptor, PropertyKey};
 use std::collections::HashMap;
 
 #[inline]

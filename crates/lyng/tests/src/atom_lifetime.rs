@@ -1,8 +1,8 @@
 //! Integration coverage for atom lifetime behavior across the frontend pipeline.
 
-use lyng_js_common::{AtomLifetime, AtomTable, SourceId};
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
+use lyng_common::{AtomLifetime, AtomTable, SourceId};
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
 
 #[test]
 fn parser_and_sema_keep_frontend_atoms_permanent() {

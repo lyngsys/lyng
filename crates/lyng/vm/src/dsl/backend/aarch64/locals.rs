@@ -16,7 +16,7 @@
 //!
 //! `x20` is the REGS pin (register-window base per
 //! [`crate::dsl::reg_convention`]). `N * 8` is the byte offset because
-//! each register-window slot is a 64-bit [`lyng_js_types::Value`]. The
+//! each register-window slot is a 64-bit [`lyng_types::Value`]. The
 //! AArch64 `ldr/str (immediate)` post-indexed form accepts a
 //! `#imm12 * 8` byte offset directly when the destination is an x-reg;
 //! N in 0..=3 fits trivially.
@@ -43,7 +43,7 @@
 //!
 //! Spec §2 (Phase 1.B.3 design).
 
-/// Load a [`lyng_js_types::Value`] from the register-window slot at
+/// Load a [`lyng_types::Value`] from the register-window slot at
 /// fixed index `$n` into `$dst_reg`.
 ///
 /// `$n` is a numeric literal (typically 0..=3 from Phase 1.B.3 ports;
@@ -64,12 +64,16 @@
 macro_rules! load_local_fixed {
     ($n:literal => $dst_reg:tt) => {
         concat!(
-            "ldr    x", stringify!($dst_reg), ", [x20, #", stringify!($n), " * 8]\n",
+            "ldr    x",
+            stringify!($dst_reg),
+            ", [x20, #",
+            stringify!($n),
+            " * 8]\n",
         )
     };
 }
 
-/// Store the [`lyng_js_types::Value`] in `$src_reg` into the
+/// Store the [`lyng_types::Value`] in `$src_reg` into the
 /// register-window slot at fixed index `$n`. Mirror of
 /// [`load_local_fixed!`].
 ///
@@ -78,7 +82,11 @@ macro_rules! load_local_fixed {
 macro_rules! store_local_fixed {
     ($src_reg:tt, $n:literal) => {
         concat!(
-            "str    x", stringify!($src_reg), ", [x20, #", stringify!($n), " * 8]\n",
+            "str    x",
+            stringify!($src_reg),
+            ", [x20, #",
+            stringify!($n),
+            " * 8]\n",
         )
     };
 }

@@ -24,25 +24,25 @@ interpreter built from small Rust crates with explicit ownership boundaries.
 
 ```text
 source text
-  -> lyng-js-lexer
-  -> lyng-js-parser
-  -> lyng-js-sema
-  -> lyng-js-compiler
-  -> lyng-js-bytecode
-  -> lyng-js-vm
-  -> lyng-js-builtins / lyng-js-host / lyng-js-cli
+  -> lyng-lexer
+  -> lyng-parser
+  -> lyng-sema
+  -> lyng-compiler
+  -> lyng-bytecode
+  -> lyng-vm
+  -> lyng-builtins / lyng-host / lyng-cli
 ```
 
 Runtime-facing crates sit below and beside that pipeline:
 
 ```text
-lyng-js-common
-  -> lyng-js-types
-  -> lyng-js-gc
-  -> lyng-js-objects
-  -> lyng-js-env
-  -> lyng-js-ops
-  -> lyng-js-host
+lyng-common
+  -> lyng-types
+  -> lyng-gc
+  -> lyng-objects
+  -> lyng-env
+  -> lyng-ops
+  -> lyng-host
 ```
 
 The compiler consumes frontend metadata and emits bytecode. The VM installs bytecode and
@@ -53,7 +53,7 @@ or host hooks live outside the VM.
 
 - The engine currently executes through an interpreter. A JSC-aligned threaded-dispatch
   interpreter and a Sparkplug-style Baseline JIT are planned as the next phases —
-  see [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md).
+  see [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md).
   Today's substrate is interpreter-only; new code should not assume native-code
   execution exists yet, but the data model (FeedbackVector, Structures, NaN-boxed
   Value, 32-bit ShapeId) is being maintained as forward-compatible with the JIT.
@@ -63,7 +63,7 @@ or host hooks live outside the VM.
 - Normal property access uses atoms, shapes, slots, elements, and feedback data, not string
   maps in the hot path.
 - Guest-visible object operations route through the object-operation context APIs in
-  `lyng-js-ops` unless a path is proven ordinary-only bootstrap code.
+  `lyng-ops` unless a path is proven ordinary-only bootstrap code.
 - Builtin implementations call shared abstract operations instead of duplicating spec logic.
 - Test262 harness extensions such as `$262` are embedding behavior, not default realm
   bootstrap behavior.
@@ -72,22 +72,22 @@ or host hooks live outside the VM.
 
 The dispatch substrate is moving from today's α (extern "C" handlers
 returning `Step`) to an asm-DSL substrate documented in
-[docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
+[docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
 R-0 (tooling and evidence reports) is the first milestone; see
-[reports/js/lyng-js/r0/status.md](../../reports/js/lyng-js/r0/status.md)
+[reports/lyng/r0/status.md](../../reports/lyng/r0/status.md)
 for current progress.
 
 ## Runtime Pipeline
 
-1. `lyng-js-lexer` tokenizes source text into compact tokens with spans and contextual flags.
-2. `lyng-js-parser` builds typed-ID ASTs in arena storage.
-3. `lyng-js-sema` performs early errors and computes scope, binding, capture, and layout data.
-4. `lyng-js-compiler` lowers AST plus semantic metadata into bytecode templates.
-5. `lyng-js-vm` installs templates as `CodeRef` records and executes them with register
+1. `lyng-lexer` tokenizes source text into compact tokens with spans and contextual flags.
+2. `lyng-parser` builds typed-ID ASTs in arena storage.
+3. `lyng-sema` performs early errors and computes scope, binding, capture, and layout data.
+4. `lyng-compiler` lowers AST plus semantic metadata into bytecode templates.
+5. `lyng-vm` installs templates as `CodeRef` records and executes them with register
    windows and call frames.
-6. `lyng-js-builtins` creates the default realm shape by installing intrinsics,
+6. `lyng-builtins` creates the default realm shape by installing intrinsics,
    constructors, prototypes, global bindings, and native builtin dispatch tables.
-7. `lyng-js-host` supplies embedding hooks for jobs, modules, dynamic import, and realm
+7. `lyng-host` supplies embedding hooks for jobs, modules, dynamic import, and realm
    extensions.
 
 ## Core Runtime Types

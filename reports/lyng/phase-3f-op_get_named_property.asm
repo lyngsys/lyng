@@ -2,7 +2,7 @@
 
 .section __TEXT,__text,regular,pure_instructions
 	.p2align	2
-lyng_js_vm::vm::dispatch_handlers::property::op_get_named_property:
+lyng_vm::vm::dispatch_handlers::property::op_get_named_property:
 Lfunc_begin390:
 	.cfi_startproc
 	.cfi_personality 155, _rust_eh_personality
@@ -121,7 +121,7 @@ LBB390_13:
 	ldp x3, x4, [sp, #40]
 	ldp x5, x6, [sp, #56]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	ldr x23, [sp, #72]
 	ldr x9, [sp, #128]
 	cmp x9, x25
@@ -216,7 +216,7 @@ LBB390_32:
 	mov x1, x22
 	mov x2, x21
 	mov x3, x23
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x9, [x29, #-144]
 	ldurb w11, [x29, #-136]
 	cmp x9, x25
@@ -368,7 +368,7 @@ LBB390_63:
 	mov w3, #1
 	mov x4, x21
 	mov x5, x23
-	bl lyng_js_vm::vm::dispatch::decode_abc_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abc_operands_wide
 	ldur x8, [x29, #-144]
 	cmp x8, x25
 	b.ne LBB390_20
@@ -535,10 +535,10 @@ LBB390_96:
 	sub x8, x29, #176
 LBB390_98:
 	ldr x26, [x8, x10, lsl #3]
-	bl lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution
+	bl lyng_vm::vm::feedback::FeedbackSiteState::record_execution
 	ldp x0, x1, [x22, #120]
 	mov x2, x21
-	bl lyng_js_vm::vm::tiering::<impl lyng_js_vm::vm::Vm>::observe_tier_feedback_event
+	bl lyng_vm::vm::tiering::<impl lyng_vm::vm::Vm>::observe_tier_feedback_event
 	ldr x8, [sp, #72]
 	cmp x24, x8
 	b.hi LBB390_139
@@ -563,7 +563,7 @@ LBB390_102:
 	mov x2, x21
 	mov x3, x26
 	mov x24, x4
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_load_inline_cache_hit
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_load_inline_cache_hit
 	ldr x23, [sp, #72]
 	tbz w0, #0, LBB390_109
 	ldr x24, [x22, #32]
@@ -583,9 +583,9 @@ LBB390_108:
 	ldr w9, [x20, #56]
 	ldrb w8, [x8, x9]
 Lloh1103:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh1104:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x25, x8, [x19]
 	b LBB390_25
@@ -599,7 +599,7 @@ LBB390_109:
 	ldp x3, x4, [sp, #40]
 	ldp x5, x6, [sp, #56]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	ldr x9, [sp, #80]
 	cmp x9, x25
 	b.ne LBB390_112
@@ -611,7 +611,7 @@ LBB390_109:
 	mov x4, x24
 	mov x5, x27
 	mov w6, #0
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 	b LBB390_17
 LBB390_112:
 	mov x8, #-9223372036854775808
@@ -641,7 +641,7 @@ LBB390_117:
 	mov x1, x22
 	ldr x2, [sp, #24]
 	mov x3, x23
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x9, [x29, #-144]
 	ldurb w11, [x29, #-136]
 	cmp x9, x25
@@ -680,10 +680,10 @@ LBB390_125:
 	add x8, x9, x8, lsl #3
 LBB390_126:
 	ldr x26, [x8]
-	bl lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution
+	bl lyng_vm::vm::feedback::FeedbackSiteState::record_execution
 	ldp x0, x1, [x22, #120]
 	mov x2, x21
-	bl lyng_js_vm::vm::tiering::<impl lyng_js_vm::vm::Vm>::observe_tier_feedback_event
+	bl lyng_vm::vm::tiering::<impl lyng_vm::vm::Vm>::observe_tier_feedback_event
 	ldr x8, [sp, #72]
 	cmp x24, x8
 	b.hi LBB390_139
@@ -728,10 +728,10 @@ LBB390_136:
 	sub x8, x29, #144
 LBB390_138:
 	ldr x26, [x8, x9, lsl #3]
-	bl lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution
+	bl lyng_vm::vm::feedback::FeedbackSiteState::record_execution
 	ldp x0, x1, [x22, #120]
 	mov x2, x21
-	bl lyng_js_vm::vm::tiering::<impl lyng_js_vm::vm::Vm>::observe_tier_feedback_event
+	bl lyng_vm::vm::tiering::<impl lyng_vm::vm::Vm>::observe_tier_feedback_event
 	ldr x8, [sp, #72]
 	cmp x24, x8
 	b.ls LBB390_144

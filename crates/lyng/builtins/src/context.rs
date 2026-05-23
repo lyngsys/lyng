@@ -1,5 +1,5 @@
 use crate::BuiltinPropertyDescriptor;
-use lyng_js_types::{
+use lyng_types::{
     BuiltinFunctionId, CodeRef, Completion, EnvironmentRef, ObjectRef, RealmRef, Value,
 };
 

@@ -169,7 +169,7 @@ by direct measurement against the *more conservative* pre-DSL-0 base.
 
 ## Methodology notes
 
-- Bench command: `cargo run --release -p lyng-js-bench -- v8suite
+- Bench command: `cargo run --release -p lyng-bench -- v8suite
   --samples 11 --json /tmp/phase-1b3-cum-{base,post}.json`.
 - Each subprocess timeout: 120s (default).
 - `bench-v8.md` restored after each measurement; only JSON artifacts

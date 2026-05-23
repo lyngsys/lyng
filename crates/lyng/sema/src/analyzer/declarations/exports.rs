@@ -1,5 +1,5 @@
-use lyng_js_ast::{Decl, Pattern};
-use lyng_js_common::{AtomId, Span, WellKnownAtom};
+use lyng_ast::{Decl, Pattern};
+use lyng_common::{AtomId, Span, WellKnownAtom};
 
 use super::Analyzer;
 
@@ -12,9 +12,9 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn walk_export_kind(&mut self, kind: &lyng_js_ast::ExportKind, span: Span) {
+    pub(super) fn walk_export_kind(&mut self, kind: &lyng_ast::ExportKind, span: Span) {
         match kind {
-            lyng_js_ast::ExportKind::Named {
+            lyng_ast::ExportKind::Named {
                 specifiers, source, ..
             } => {
                 let specs = self.ast.get_export_spec_list(*specifiers);
@@ -30,22 +30,22 @@ impl Analyzer<'_> {
                     }
                 }
             }
-            lyng_js_ast::ExportKind::Default { declaration } => {
+            lyng_ast::ExportKind::Default { declaration } => {
                 self.record_export_name(WellKnownAtom::default.id(), span);
                 match declaration {
-                    lyng_js_ast::ExportDefaultDecl::Function(func_id) => {
+                    lyng_ast::ExportDefaultDecl::Function(func_id) => {
                         self.walk_function(*func_id);
                     }
-                    lyng_js_ast::ExportDefaultDecl::Class(decl_id) => self.walk_decl(*decl_id),
-                    lyng_js_ast::ExportDefaultDecl::Expression(expr_id) => self.walk_expr(*expr_id),
+                    lyng_ast::ExportDefaultDecl::Class(decl_id) => self.walk_decl(*decl_id),
+                    lyng_ast::ExportDefaultDecl::Expression(expr_id) => self.walk_expr(*expr_id),
                 }
             }
-            lyng_js_ast::ExportKind::All { exported, .. } => {
+            lyng_ast::ExportKind::All { exported, .. } => {
                 if let Some(name) = exported {
                     self.record_export_name(*name, span);
                 }
             }
-            lyng_js_ast::ExportKind::Declaration { decl } => {
+            lyng_ast::ExportKind::Declaration { decl } => {
                 let d = self.ast.get_decl(*decl);
                 match d {
                     Decl::Variable { declarators, .. } => {
@@ -72,7 +72,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn collect_export_names_from_pattern(&mut self, pat_id: lyng_js_ast::PatternId) {
+    fn collect_export_names_from_pattern(&mut self, pat_id: lyng_ast::PatternId) {
         let pat = self.ast.get_pattern(pat_id);
         if let Pattern::Identifier { name, span, .. } = pat {
             self.record_export_name(*name, *span);

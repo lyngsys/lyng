@@ -1,9 +1,9 @@
 //! Parser coverage tests — verifying all major expression, statement,
 //! declaration, and pattern forms parse without errors.
 
-use lyng_js_ast::ParsedScript;
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_parser::parse_script;
+use lyng_ast::ParsedScript;
+use lyng_common::{AtomTable, SourceId};
+use lyng_parser::parse_script;
 
 fn sid() -> SourceId {
     SourceId::new(0)
@@ -22,7 +22,7 @@ fn ok(src: &str) -> ParsedScript {
 
 fn ok_module(src: &str) {
     let mut atoms = AtomTable::new();
-    let p = lyng_js_parser::parse_module(&mut atoms, sid(), src);
+    let p = lyng_parser::parse_module(&mut atoms, sid(), src);
     assert!(
         !p.diagnostics.has_errors(),
         "expected no errors for module: {src}\ngot: {:?}",

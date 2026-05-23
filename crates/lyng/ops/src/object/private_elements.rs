@@ -1,9 +1,9 @@
 use crate::errors::{internal_method_error, throw_type_error};
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::ClassPrivateElementKind;
-use lyng_js_types::{Completion, ObjectRef, Value};
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::ClassPrivateElementKind;
+use lyng_types::{Completion, ObjectRef, Value};
 
 /// Defines a private field descriptor layout for a class.
 ///

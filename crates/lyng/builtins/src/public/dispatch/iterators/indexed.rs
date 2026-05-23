@@ -41,10 +41,10 @@ pub(in crate::public::dispatch) fn create_iterator_result_value<
 
 pub(in crate::public::dispatch) fn allocate_iterator_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     cold_data: OrdinaryObjectData,
     slot_values: &[Value],
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let realm = cx.builtin_realm();
     let root_shape = {
         let agent = cx.agent();
@@ -78,7 +78,7 @@ pub(in crate::public::dispatch) fn allocate_iterator_object<Cx: PublicBuiltinDis
 
 fn iterator_slot_value(
     agent: &Agent,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     expected_kind: OrdinaryObjectData,
     slot_index: u32,
 ) -> Option<Value> {
@@ -106,7 +106,7 @@ pub(in crate::public::dispatch) fn iterator_slot_value_for_builtin<
     Cx: PublicBuiltinDispatchContext,
 >(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     expected_kind: OrdinaryObjectData,
     slot_index: u32,
 ) -> Result<Value, Cx::Error> {
@@ -122,7 +122,7 @@ pub(in crate::public::dispatch) fn set_iterator_slot_value_for_builtin<
     Cx: PublicBuiltinDispatchContext,
 >(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     expected_kind: OrdinaryObjectData,
     slot_index: u32,
     value: Value,

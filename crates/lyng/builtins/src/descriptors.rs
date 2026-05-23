@@ -1,5 +1,5 @@
-use lyng_js_common::AtomId;
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value, WellKnownSymbolId};
+use lyng_common::AtomId;
+use lyng_types::{BuiltinFunctionId, ObjectRef, Value, WellKnownSymbolId};
 
 /// Typed descriptor-install target used by the shared JS3 bootstrap tables.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

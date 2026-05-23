@@ -2,8 +2,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_lexer::{Lexer, TokenKind};
+use lyng_common::{AtomTable, SourceId};
+use lyng_lexer::{Lexer, TokenKind};
 
 fuzz_target!(|data: &[u8]| {
     // Only fuzz valid UTF-8 — the lexer expects &str.

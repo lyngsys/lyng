@@ -529,7 +529,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -553,7 +553,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -577,7 +577,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -601,7 +601,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/duplicate-named-capturing-groups-syntax.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -625,7 +625,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/named-groups/duplicate-names-exec.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -649,7 +649,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/prototype/unicodeSets/this-val-regexp.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -673,7 +673,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/prototype/flags/this-val-regexp.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -698,7 +698,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/prototype/exec/regexp-builtin-exec-v-u-flag.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -722,7 +722,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/prototype/unicodeSets/cross-realm.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -748,7 +748,7 @@ mod tests {
                 "/tmp/test/built-ins/RegExp/prototype/unicodeSets/breaking-change-from-u-to-v-01.js",
             ),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -774,7 +774,7 @@ mod tests {
                 "/tmp/test/built-ins/RegExp/unicodeSets/generated/character-union-character.js",
             ),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -800,7 +800,7 @@ mod tests {
                 "/tmp/test/built-ins/RegExp/property-escapes/generated/strings/Basic_Emoji.js",
             ),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -826,7 +826,7 @@ mod tests {
                 "/tmp/test/built-ins/RegExp/unicodeSets/generated/string-literal-union-string-literal.js",
             ),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -850,7 +850,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/early-err-modifiers-other-code-point-g.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -874,7 +874,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test/built-ins/RegExp/regexp-modifiers/add-ignoreCase.js"),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -900,7 +900,7 @@ mod tests {
                 "/tmp/test/built-ins/RegExp/regexp-modifiers/add-ignoreCase-affects-backreferences.js",
             ),
             Path::new("/tmp/test"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -924,7 +924,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -946,7 +946,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -968,7 +968,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -990,7 +990,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1012,7 +1012,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1034,7 +1034,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1058,7 +1058,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1076,7 +1076,7 @@ mod tests {
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
         let helpers = HelperCatalog::load(&root).expect("helper catalog");
-        let manifest = load_manifest(&root, "reports/js/lyng-js/test262-exclusions.txt")
+        let manifest = load_manifest(&root, "reports/lyng/test262-exclusions.txt")
             .expect("checked-in manifest should load");
 
         let decision = skip_decision(
@@ -1104,7 +1104,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1129,7 +1129,7 @@ mod tests {
             let decision = skip_decision(
                 Path::new("/tmp/test.js"),
                 Path::new("/tmp"),
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1156,7 +1156,7 @@ mod tests {
             let decision = skip_decision(
                 &path,
                 &test_dir,
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1182,7 +1182,7 @@ mod tests {
             let decision = skip_decision(
                 Path::new("/tmp/test.js"),
                 Path::new("/tmp"),
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1205,7 +1205,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1230,7 +1230,7 @@ mod tests {
             let decision = skip_decision(
                 Path::new("/tmp/test.js"),
                 Path::new("/tmp"),
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1253,7 +1253,7 @@ mod tests {
         let decision = skip_decision(
             &path,
             &test_dir,
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1277,7 +1277,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1309,7 +1309,7 @@ mod tests {
             let decision = skip_decision(
                 Path::new("/tmp/test.js"),
                 Path::new("/tmp"),
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1339,7 +1339,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1363,7 +1363,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1392,7 +1392,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             false,
@@ -1422,7 +1422,7 @@ mod tests {
             let decision = skip_decision(
                 Path::new("/tmp/test.js"),
                 Path::new("/tmp"),
-                &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+                &disabled_manifest("reports/lyng/test262-exclusions.txt"),
                 &metadata,
                 &helpers,
                 false,
@@ -1453,7 +1453,7 @@ mod tests {
         let decision = skip_decision(
             Path::new("/tmp/test.js"),
             Path::new("/tmp"),
-            &disabled_manifest("reports/js/lyng-js/test262-exclusions.txt"),
+            &disabled_manifest("reports/lyng/test262-exclusions.txt"),
             &metadata,
             &helpers,
             true,

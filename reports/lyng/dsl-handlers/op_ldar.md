@@ -3,12 +3,12 @@
 "Load Accumulator from Register" — copies `registers[a]` into the
 accumulator (`registers[0]`). Emitted by the bytecode-builder
 peephole when a `Move dst=0, src=B` is produced (see
-`crates/lyng-js/bytecode/src/builder.rs:159-161`). V8 v7 aggregate
+`crates/lyng/bytecode/src/builder.rs:159-161`). V8 v7 aggregate
 dispatches: **89,313,894** (3 samples × 6 workloads).
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -26,7 +26,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_ldar.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_ldar.asm`.
 
 ```asm
 op_ldar_dsl:
@@ -45,13 +45,13 @@ op_ldar_dsl:
 ## Slow path
 
 **Deleted.** `op_ldar_slow_rs` had no callers after this port landed.
-Semantic body at `crates/lyng-js/vm/src/vm/semantics/loads.rs:322-333`
+Semantic body at `crates/lyng/vm/src/vm/semantics/loads.rs:322-333`
 is `registers[0] = registers[args.a]` with no bail conditions.
 
 ## LLInt reference
 
 Structural baseline at
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/Ldar.asm` shows the
+`reports/lyng/dsl-asm-baseline-aarch64/Ldar.asm` shows the
 LLInt path: function call into `op_ldar` with stack-frame setup +
 bounds check + indexed load + store + Star-fusion peephole check
 (JSC LLInt fuses Ldar+Star into a single Move at runtime; lyng's
@@ -94,10 +94,10 @@ Crypto dominates (96% of aggregate Ldar share). Gate (< 20%) satisfied.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **418 passed**.
-- `cargo test -p lyng-js-tests --release` — **1209 passed**.
+- `cargo test -p lyng-vm --lib --release` — **418 passed**.
+- `cargo test -p lyng-tests --release` — **1209 passed**.
 
-Integration tests in `crates/lyng-js/tests/src/op_ldar_inline.rs`
+Integration tests in `crates/lyng/tests/src/op_ldar_inline.rs`
 cover:
 1. `ldar_via_intermediate_temporary` — `(a + b) * 2`: the temp is
    Ldar'd into the accumulator before the multiply.

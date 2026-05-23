@@ -28,14 +28,14 @@ on backedges, and verify the substrate end-to-end.
 | 15 | `mirror_flat_slot` no-op (eliminates 30% V8 v7 regression from FV dual-write) | (post-deletion perf fix) | DONE (`c9ea0ed1`) |
 | 16 | C7-C8: Post-deletion microbench + V8 v7 + Test262 captures | C7-C8 | DONE |
 | 17 | C9-C11: Manifest Tests 3/5/6/7 | C9-C11 | **Partial** — Test fixtures need updating to assert post-α state. Deferred to DSL-1's "Manifest Tests" follow-up. |
-| 18 | C12: DSL-0 decision document | C12 | DONE — `reports/js/lyng-js/dsl-0-decision.md` |
+| 18 | C12: DSL-0 decision document | C12 | DONE — `reports/lyng/dsl-0-decision.md` |
 | 19 | C13: DSL-0 exit gate | C13 | DONE — this report |
 
 ## 2. Test results
 
-`cargo test -p lyng-js-vm --lib`: **413 passed, 0 failed.**
+`cargo test -p lyng-vm --lib`: **413 passed, 0 failed.**
 
-`cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler`: all pass (cross-crate count varies by run; consistently no failures).
+`cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler`: all pass (cross-crate count varies by run; consistently no failures).
 
 **Test262: 49729/49729 file pass rate (100% on runnable files).** Zero failures. Matches DSL-0a's gold standard. Per-category breakdown:
 - language: 44347 / 44347 (100%)
@@ -64,12 +64,12 @@ The DSL substrate activation initially produced a 60-70% V8 v7 regression (Richa
 
 Fix: `mirror_flat_slot` made a no-op (commit `c9ea0ed1`). Flat array stays allocated for asm `FV` pin validity but is no longer written. Richards recovered from 87 to 240 (+176%). Full discussion in `dsl-0-decision.md` §3.
 
-Reports: `reports/js/lyng-js/dsl-0c-v8.md`, `dsl-0c-microbench.md`.
+Reports: `reports/lyng/dsl-0c-v8.md`, `dsl-0c-microbench.md`.
 
 ## 4. α deletion summary
 
 Deleted (~3,000+ lines):
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/` (entire directory, 13 files)
+- `crates/lyng/vm/src/vm/dispatch_handlers/` (entire directory, 13 files)
 - `dispatch_state.rs`: `run_trampoline`, `run_trampoline_counted`, `still_active`, `Step`, `Handler`, `try_step!`, `current_bytes`, `next_opcode_byte`, `advance` methods
 - `dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, 7 α-only decoders
 - `tiering.rs`: `observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
@@ -113,7 +113,7 @@ DSL-1's entry conditions are clean:
 4. **V8 v7 deficit (-11% geomean)** is the cold-stub bridge overhead — addressed by porting more hot opcodes in DSL-1
 
 DSL-1 priorities (per design §10):
-- Week 1+: Port hot opcodes by dispatch share (`tools/lyng-js-bench/hot-opcodes.toml`)
+- Week 1+: Port hot opcodes by dispatch share (`tools/lyng-bench/hot-opcodes.toml`)
 - Week N: IC mode-byte refactor for `op_get_named_property` / `op_set_named_property` (biggest wins)
 - Week N+M: Inline forward-jump fast paths for op_jump variants
 - Re-introduce `mirror_flat_slot` with reduced payload (or delete `feedback_flat_storage` entirely)
@@ -126,4 +126,4 @@ DSL-1 priorities (per design §10):
 
 The DSL-0c phase achieved its primary goals: DSL substrate active, α fully deleted, Test262 100% pass rate preserved, all surgical bugs fixed and root-caused. The V8 v7 deficit is documented and well-understood — it's the cold-stub bridge tax that DSL-1 systematically addresses.
 
-DSL-0c dcat sub-epic `lyng-4cdz` and 13 task tickets are `in_review` awaiting user approval to close. Per `crates/lyng-js/AGENTS.md`, tickets NEVER close without explicit user approval.
+DSL-0c dcat sub-epic `lyng-4cdz` and 13 task tickets are `in_review` awaiting user approval to close. Per `crates/lyng/AGENTS.md`, tickets NEVER close without explicit user approval.

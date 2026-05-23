@@ -18,7 +18,7 @@
 //! Until then we land a structural-only test plus an `#[ignore]`d
 //! forward-pointer.
 
-use lyng_js_vm::dsl::test_helpers::DslHarness;
+use lyng_vm::dsl::test_helpers::DslHarness;
 
 #[test]
 fn dsl_harness_bootstraps_for_backward_jump_safepoint_case() {

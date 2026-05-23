@@ -40,7 +40,7 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
     let record = agent
         .promise_record(promise)
         .expect("dynamic import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let namespace = record
         .result()
         .as_object_ref()
@@ -141,7 +141,7 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
     let record = agent
         .promise_record(promise)
         .expect("dynamic import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let namespace = record
         .result()
         .as_object_ref()
@@ -308,7 +308,7 @@ fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
     let record = agent
         .promise_record(promise)
         .expect("script result promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
 
     let expected = HostCall::LoadModule(ModuleSourceRequest {
         specifier: "./dep.mjs".into(),
@@ -480,7 +480,7 @@ fn dynamic_import_waits_for_current_top_level_await_evaluation() {
         .promise_record(promise)
         .expect("run promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -624,7 +624,7 @@ fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
         .promise_record(promise)
         .expect("script promise should stay tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -713,7 +713,7 @@ fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
         .promise_record(promise)
         .expect("script promise should stay tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -756,7 +756,7 @@ fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let record = agent
         .promise_record(promise)
         .expect("dynamic import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
     let reason = record
         .result()
         .as_object_ref()
@@ -804,7 +804,7 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
     let record = agent
         .promise_record(promise)
         .expect("dynamic source import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
     let reason = record
         .result()
         .as_object_ref()
@@ -1173,7 +1173,7 @@ fn static_import_defer_preserves_prior_evaluation_error_identity() {
     let record = agent
         .promise_record(promise)
         .expect("script result promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(
         global_value(agent, &realm, "deferredErrorIdentity"),
         Value::from_bool(true)
@@ -1281,7 +1281,7 @@ fn dynamic_import_attributes_reject_non_object_and_non_string_values() {
         let record = agent
             .promise_record(promise)
             .expect("dynamic import promise should stay tracked");
-        assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+        assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
         let reason = record
             .result()
             .as_object_ref()
@@ -1357,7 +1357,7 @@ fn dynamic_import_rejects_ambiguous_module_exports_with_syntax_error() {
     let record = agent
         .promise_record(promise)
         .expect("dynamic import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
     let reason = record
         .result()
         .as_object_ref()
@@ -1414,7 +1414,7 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
     let record = agent
         .promise_record(promise)
         .expect("nested import promise should stay tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let namespace = record
         .result()
         .as_object_ref()

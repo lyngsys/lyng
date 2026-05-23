@@ -1,6 +1,6 @@
-//! Runtime-wide environment substrate for lyng-js.
+//! Runtime-wide environment substrate for lyng.
 //!
-//! Ownership: `lyng_js_env` owns the runtime topology above primitive values:
+//! Ownership: `lyng_env` owns the runtime topology above primitive values:
 //! runtime, agents, cluster-owned shared coordination, job queues, and the
 //! realm and execution-context owners layered on top of that topology.
 
@@ -11,17 +11,17 @@
     reason = "runtime substrate APIs use explicit domain names and lightweight accessors across crate boundaries"
 )]
 
-use lyng_js_common::AtomTable;
-use lyng_js_gc::{
+use lyng_common::AtomTable;
+use lyng_gc::{
     AllocationLifetime, EnvironmentSlotsRef, ObjectHandleStoreTarget, PrimitiveHeap,
     PrimitiveRoots, RuntimeEnvironmentRecord, RuntimeRealmRecord, ValueStoreTarget,
 };
-use lyng_js_host::{
+use lyng_host::{
     HostAgentId, HostHooks, HostJobKind, HostJobPhase, HostResult, HostThreadId, JobObservation,
     WaitLocation,
 };
-use lyng_js_objects::ObjectRuntime;
-use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef};
+use lyng_objects::ObjectRuntime;
+use lyng_types::{CodeRef, EnvironmentRef, RealmRef};
 
 mod accounting;
 mod agent;

@@ -3,11 +3,11 @@ use super::super::{
     to_index_for_builtin, type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, BigIntSign};
-use lyng_js_objects::PrimitiveWrapperKind;
-use lyng_js_ops::object;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, BigIntSign};
+use lyng_objects::PrimitiveWrapperKind;
+use lyng_ops::object;
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(super) fn dispatch_bigint_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

@@ -31,7 +31,11 @@ macro_rules! load_object_record {
             // x9 := VM->heap_pool_base
             "ldr    x9, [x22, {vm_heap_pool}]\n",
             // dst := heap_pool_base[ref] (each entry is 8 bytes)
-            "ldr    x", stringify!($dst), ", [x9, x", stringify!($ref), ", lsl #3]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x9, x",
+            stringify!($ref),
+            ", lsl #3]\n",
         )
     };
 }
@@ -44,7 +48,11 @@ macro_rules! load_object_record {
 macro_rules! load_record_shape {
     ($rec:ident => $dst:ident) => {
         concat!(
-            "ldr    w", stringify!($dst), ", [x", stringify!($rec), ", {record_shape}]\n",
+            "ldr    w",
+            stringify!($dst),
+            ", [x",
+            stringify!($rec),
+            ", {record_shape}]\n",
         )
     };
 }
@@ -56,9 +64,15 @@ macro_rules! load_record_inline_slot {
     ($rec:ident, $idx:ident => $dst:ident) => {
         concat!(
             // x9 := record_base + inline_slots_offset
-            "add    x9, x", stringify!($rec), ", {record_inline_slots}\n",
+            "add    x9, x",
+            stringify!($rec),
+            ", {record_inline_slots}\n",
             // dst := *(x9 + idx * 8)
-            "ldr    x", stringify!($dst), ", [x9, x", stringify!($idx), ", lsl #3]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x9, x",
+            stringify!($idx),
+            ", lsl #3]\n",
         )
     };
 }
@@ -68,8 +82,14 @@ macro_rules! load_record_inline_slot {
 macro_rules! store_record_inline_slot {
     ($rec:ident, $idx:ident, $src:ident) => {
         concat!(
-            "add    x9, x", stringify!($rec), ", {record_inline_slots}\n",
-            "str    x", stringify!($src), ", [x9, x", stringify!($idx), ", lsl #3]\n",
+            "add    x9, x",
+            stringify!($rec),
+            ", {record_inline_slots}\n",
+            "str    x",
+            stringify!($src),
+            ", [x9, x",
+            stringify!($idx),
+            ", lsl #3]\n",
         )
     };
 }
@@ -81,7 +101,11 @@ macro_rules! store_record_inline_slot {
 macro_rules! load_record_outline_slots {
     ($rec:ident => $dst:ident) => {
         concat!(
-            "ldr    x", stringify!($dst), ", [x", stringify!($rec), ", {record_outline_slots}]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($rec),
+            ", {record_outline_slots}]\n",
         )
     };
 }
@@ -92,7 +116,13 @@ macro_rules! load_record_outline_slots {
 macro_rules! load_outline_slot {
     ($base:ident, $idx:ident => $dst:ident) => {
         concat!(
-            "ldr    x", stringify!($dst), ", [x", stringify!($base), ", x", stringify!($idx), ", lsl #3]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($base),
+            ", x",
+            stringify!($idx),
+            ", lsl #3]\n",
         )
     };
 }

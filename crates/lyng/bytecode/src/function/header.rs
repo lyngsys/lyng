@@ -1,6 +1,6 @@
 use crate::ids::{BytecodeFunctionId, EnvironmentLayoutRef};
 use crate::metadata::{ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, ThisMode};
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 /// Header metadata frozen for one immutable bytecode template.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

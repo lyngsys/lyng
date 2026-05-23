@@ -13,7 +13,7 @@ ones).
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -54,7 +54,7 @@ op_shift_left, op_shift_right):
 
 Identical to op_increment's elision (see `op_increment.md` SMI-elision
 section for the full derivation): the shared semantic body
-`op_update_register_semantic` (`crates/lyng-js/vm/src/vm/semantics/arithmetic.rs:796-833`)
+`op_update_register_semantic` (`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`)
 writes `numeric = ToNumeric(src)` back to `args.src` before writing
 the post-update value to `args.dst`. For SMI src, `ToNumeric` is
 identity (`Value::from_smi` round-trips), so the writeback is
@@ -135,7 +135,7 @@ If Task 11 surfaces a divergence, this report should be re-evaluated.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm`.
 
 Fast path (from `op_decrement_dsl:` through `bl _op_decrement_record_smi_rs`
 inclusive): **27 instructions** — identical to op_increment:
@@ -178,7 +178,7 @@ ns/dispatch on Decrement microbench (7-sample median, post-warmup,
 ARM64): **124.12 ns** (min 123.85, max 124.34, CI95 ±0.07, 1 op/iter).
 
 The Decrement snippet was added in this task at
-`tools/lyng-js-bench/src/microbench/snippets.rs` mirroring the
+`tools/lyng-bench/src/microbench/snippets.rs` mirroring the
 Increment snippet's shape:
 
 ```js
@@ -250,7 +250,7 @@ op_mul.md / op_bit_and.md / op_shift_left.md / op_shift_right.md /
 op_increment.md, not a real regression: every fast-path SMI
 decrement calls `call_slow!(op_decrement_record_smi_rs, args = [slot])`
 which is instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter). The
 result: feedback-recording fast-path entries are counted as if they
 were full slow-path entries.
@@ -275,13 +275,13 @@ distinction lands, this section should be re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
 - Test262 postfix-decrement slice
-  (`cargo run --release -p lyng-js-test262 -- --filter language/expressions/postfix-decrement`):
+  (`cargo run --release -p lyng-test262 -- --filter language/expressions/postfix-decrement`):
   **37 files / 65 variants passed, 0 failed, 0 panicked, 0 skipped**.
 - Test262 prefix-decrement slice
-  (`cargo run --release -p lyng-js-test262 -- --filter language/expressions/prefix-decrement`):
+  (`cargo run --release -p lyng-test262 -- --filter language/expressions/prefix-decrement`):
   **34 files / 58 variants passed, 0 failed, 0 panicked, 0 skipped**.
 
 No behavioral regression from baseline `2e7de038` (Phase 1.C.3 Task 9
@@ -290,26 +290,26 @@ close — op_increment port).
 ## hot-opcodes.toml
 
 Budget calibrated to **measured + 2 = 27 + 2 = 29 instructions** at
-`tools/lyng-js-bench/hot-opcodes.toml`. Comment block notes the
+`tools/lyng-bench/hot-opcodes.toml`. Comment block notes the
 identical shape with op_increment (only `subs` vs `adds` differs).
 
 ## Files changed
 
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs`
+- `crates/lyng/vm/src/dsl/handlers/cold.rs`
   - Added `dec_smi_overflow` to the alphabetically-ordered import list
     (between `cmp_branch_eq` and `decode_a`).
   - Replaced the `op_decrement_dsl` cold-stub body (line 1969) with
     the SMI inline fast path described above.
   - Added the `op_decrement_record_smi_rs` shim adjacent to the new
     fast path.
-- `tools/lyng-js-bench/hot-opcodes.toml`
+- `tools/lyng-bench/hot-opcodes.toml`
   - Set `aarch64_max_instructions = 29` for `Decrement` with a comment
     explaining the identity-with-op_increment + subs-vs-adds difference.
-- `tools/lyng-js-bench/src/microbench/snippets.rs`
+- `tools/lyng-bench/src/microbench/snippets.rs`
   - Added the `Decrement` snippet (1 op/iter via `x--` in the loop
     body; `x` reset to 100 each iter to keep the SMI fast path armed).
-- `reports/js/lyng-js/dsl-handlers/op_decrement.md` (this file).
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm` (NEW).
+- `reports/lyng/dsl-handlers/op_decrement.md` (this file).
+- `reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm` (NEW).
 
 ## Self-review
 
@@ -376,4 +376,4 @@ Per-workload gate status per spec §1.6 + §5:
 - ⚠ Workloads requiring waiver: none
 - — N/A: DeltaBlue, RayTrace, Splay (don't emit Decrement)
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

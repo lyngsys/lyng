@@ -40,7 +40,7 @@ dispatch time. Update when sub-tickets are created or closed.
 | A18 | lyng-3vd1 | Extract `prefix` family (2 opcodes) + close out remaining |
 | A19 | lyng-2sly | Manifest Test 2 — `semantic_symbol` linker resolution |
 | A20 | lyng-2mit | DSL-0a exit gate |
-| B1 | lyng-2y40 | Create `lyng-js-vm-dsl` proc-macro crate |
+| B1 | lyng-2y40 | Create `lyng-vm-dsl` proc-macro crate |
 | B2 | lyng-1p5j | Proc-macro — handler-body parser |
 | B3 | lyng-10ss | Proc-macro — operand-layout descriptors |
 | B4 | lyng-4myc | Proc-macro — scratch-register allocator |

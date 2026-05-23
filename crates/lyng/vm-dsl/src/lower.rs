@@ -4,7 +4,7 @@
 //! pays out: each body statement is one DSL-op invocation, and the
 //! lowerer composes them all into a single `naked_asm!` template. Each
 //! per-arch DSL-op `macro_rules!` macro (under
-//! `crates/lyng-js/vm/src/dsl/backend/aarch64/`, added in Batch 4 /
+//! `crates/lyng/vm/src/dsl/backend/aarch64/`, added in Batch 4 /
 //! tasks B20–B28) expands at the *consumer crate's* call site into a
 //! `concat!`-produced `&'static str` fragment.
 //!
@@ -60,8 +60,8 @@
 //! quiet about unused named args regardless of which backend macros
 //! the body actually uses.
 
-use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use proc_macro2::Spacing;
+use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream, TokenTree};
 use quote::quote;
 use std::collections::BTreeSet;
 use syn::{LitInt, Result};
@@ -105,7 +105,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     // when the feature is off — see `reg_convention.rs`) so rustc
     // never complains about an unused named arg.
     let counter_increment = quote! {
-        ::lyng_js_vm::inc_dispatch_counter!(#opcode_byte)
+        ::lyng_vm::inc_dispatch_counter!(#opcode_byte)
     };
     let prologue_raw = layout.decode_prologue_tokens(&operands);
     // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
@@ -162,8 +162,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // into `call_slow!` invocations on the fast-path tail
                 // (before any `.label:`) to avoid double-counting fast
                 // path record-smi shim calls as slow-path entries.
-                let injected =
-                    inject_opcode_byte(tokens.clone(), opcode_byte, !seen_label);
+                let injected = inject_opcode_byte(tokens.clone(), opcode_byte, !seen_label);
                 let rewritten = substitute_idents(injected, &mut scratch, &label_prefix)?;
                 collect_shim_names(&rewritten, &mut shim_names);
                 body_tokens.push(rewritten);
@@ -230,12 +229,12 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} prefix={state_prefix} poll={vm_poll} fb_stride={entry_stride_shift} fb_observed={entry_observed} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
-                state_pc = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
-                state_pb = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
-                state_regs = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
-                state_fv = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
-                state_prefix = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
-                vm_poll = const ::lyng_js_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
+                state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
+                state_pb = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
+                state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
+                state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+                state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
+                vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
                 entry_stride_shift = const 6_u32,
                 entry_observed = const 0_u32,
                 // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
@@ -245,14 +244,14 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // via the sentinel const in `reg_convention.rs`; the counter
                 // macros themselves emit empty strings in that config, so the
                 // binding is referenced only by the leading comment.
-                vm_counter_base = const ::lyng_js_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET,
+                vm_counter_base = const ::lyng_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET,
                 // Phase 1.B.1: byte offset of `LlIntState::frame_const_base`,
                 // the pre-resolved constants-array pointer. Read by
                 // `load_constant!` (backend/aarch64/constants.rs). Universally
                 // bound even when no handler in this translation unit uses the
                 // macro — the leading reference comment keeps rustc quiet about
                 // unused named args.
-                vm_const_base = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE,
+                vm_const_base = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE,
                 // Phase 1.B.1: byte offset of `LlIntState::frame_this_value`,
                 // the asm-side `this` mirror (either the real `this` Value or
                 // `Value::uninitialized_lexical()` sentinel — see
@@ -261,7 +260,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // `load_state_value!(dst, vm_state_offset = state_this_value)`.
                 // Universally bound; unused-binding warning is suppressed by
                 // the reference comment above.
-                state_this_value = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
+                state_this_value = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
                 // Phase 1.B.2: 64-bit bit pattern of
                 // `Value::uninitialized_lexical()`, used by
                 // `load_uninit_lex_sentinel!` (backend/aarch64/values.rs)
@@ -271,8 +270,8 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 // referenced by the leading comment so unused-binding
                 // warnings stay silent in translation units that don't
                 // expand the macro.
-                value_uninit_lex_bits = const ::lyng_js_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
-                exit = sym ::lyng_js_vm::dsl::entry::_interpreter_exit,
+                value_uninit_lex_bits = const ::lyng_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
+                exit = sym ::lyng_vm::dsl::entry::_interpreter_exit,
                 #(#shim_bindings)*
             )
         }
@@ -306,7 +305,10 @@ fn substitute_idents(
                     let prefixed = Ident::new(&format!("{label_prefix}{id}"), id.span());
                     out.push(TokenTree::Ident(prefixed));
                 } else {
-                    out.push(TokenTree::Punct(proc_macro2::Punct::new('.', Spacing::Alone)));
+                    out.push(TokenTree::Punct(proc_macro2::Punct::new(
+                        '.',
+                        Spacing::Alone,
+                    )));
                 }
             }
             TokenTree::Ident(id) => {
@@ -464,17 +466,23 @@ fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
     // Heuristic: walk the stream looking for `call_slow ! ( IDENT , ...)`.
     let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
     for i in 0..trees.len() {
-        let TokenTree::Ident(id) = &trees[i] else { continue };
+        let TokenTree::Ident(id) = &trees[i] else {
+            continue;
+        };
         if id != "call_slow" {
             continue;
         }
         // Followed by `!`?
-        let Some(TokenTree::Punct(p)) = trees.get(i + 1) else { continue };
+        let Some(TokenTree::Punct(p)) = trees.get(i + 1) else {
+            continue;
+        };
         if p.as_char() != '!' {
             continue;
         }
         // Followed by a delimited group `(...)`.
-        let Some(TokenTree::Group(g)) = trees.get(i + 2) else { continue };
+        let Some(TokenTree::Group(g)) = trees.get(i + 2) else {
+            continue;
+        };
         if g.delimiter() != Delimiter::Parenthesis {
             continue;
         }
@@ -520,15 +528,21 @@ mod tests {
     fn output_has_opcode_byte_for(name: &str, tokens: &TokenStream) -> bool {
         let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
         for i in 0..trees.len() {
-            let TokenTree::Ident(id) = &trees[i] else { continue };
+            let TokenTree::Ident(id) = &trees[i] else {
+                continue;
+            };
             if id != name {
                 continue;
             }
-            let Some(TokenTree::Punct(p)) = trees.get(i + 1) else { continue };
+            let Some(TokenTree::Punct(p)) = trees.get(i + 1) else {
+                continue;
+            };
             if p.as_char() != '!' {
                 continue;
             }
-            let Some(TokenTree::Group(g)) = trees.get(i + 2) else { continue };
+            let Some(TokenTree::Group(g)) = trees.get(i + 2) else {
+                continue;
+            };
             if g.delimiter() != Delimiter::Parenthesis {
                 continue;
             }
@@ -547,9 +561,8 @@ mod tests {
     fn fast_path_call_slow_skipped_when_gated() {
         // The shape of a record-smi shim invocation as it appears in
         // an op_add-style fast-path tail: `call_slow!(shim, args = [slot])`.
-        let tokens: TokenStream =
-            syn::parse_str("call_slow!(op_add_record_smi_rs, args = [slot])")
-                .expect("parse fast-path call_slow!");
+        let tokens: TokenStream = syn::parse_str("call_slow!(op_add_record_smi_rs, args = [slot])")
+            .expect("parse fast-path call_slow!");
         let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ true);
         assert!(
             !output_has_opcode_byte_for("call_slow", &rewritten),
@@ -584,8 +597,8 @@ mod tests {
         // counter-bump emission sits behind a runtime `cbz`/`cbnz`
         // branch on `vm.poll_pending`. Injection is correct in both
         // pre- and post-label contexts.
-        let tokens: TokenStream = syn::parse_str("poll_safepoint!(.poll_pending)")
-            .expect("parse poll_safepoint!");
+        let tokens: TokenStream =
+            syn::parse_str("poll_safepoint!(.poll_pending)").expect("parse poll_safepoint!");
         let gated = inject_opcode_byte(tokens.clone(), &lit31(), true);
         let ungated = inject_opcode_byte(tokens, &lit31(), false);
         assert!(
@@ -607,10 +620,9 @@ mod tests {
         // Hand-written call sites can opt out by spelling
         // `opcode_byte = N` explicitly. The injection must be a no-op
         // in both gating modes.
-        let tokens: TokenStream = syn::parse_str(
-            "call_slow!(op_add_slow_rs, args = [a, b, c, slot], opcode_byte = 99)",
-        )
-        .expect("parse call_slow! with explicit opcode_byte");
+        let tokens: TokenStream =
+            syn::parse_str("call_slow!(op_add_slow_rs, args = [a, b, c, slot], opcode_byte = 99)")
+                .expect("parse call_slow! with explicit opcode_byte");
         let rewritten = inject_opcode_byte(tokens.clone(), &lit31(), false);
         // The output stream should still contain exactly one
         // `opcode_byte = 99` (no duplicate `opcode_byte = 31` appended).

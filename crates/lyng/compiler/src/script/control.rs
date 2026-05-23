@@ -99,17 +99,17 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn lower_tail_logical_expression(
         &mut self,
-        operator: lyng_js_ast::LogicalOp,
+        operator: lyng_ast::LogicalOp,
         left: ExprId,
         right: ExprId,
     ) -> LoweringResult<()> {
         let left_register = self.lower_expr_to_temp(left)?;
         match operator {
-            lyng_js_ast::LogicalOp::And | lyng_js_ast::LogicalOp::Or => {
+            lyng_ast::LogicalOp::And | lyng_ast::LogicalOp::Or => {
                 let short_circuit = match operator {
-                    lyng_js_ast::LogicalOp::And => Opcode::JumpIfFalse,
-                    lyng_js_ast::LogicalOp::Or => Opcode::JumpIfTrue,
-                    lyng_js_ast::LogicalOp::NullishCoalescing => unreachable!(),
+                    lyng_ast::LogicalOp::And => Opcode::JumpIfFalse,
+                    lyng_ast::LogicalOp::Or => Opcode::JumpIfTrue,
+                    lyng_ast::LogicalOp::NullishCoalescing => unreachable!(),
                 };
                 let jump_short = self.builder.emit_cond_jump_placeholder(
                     short_circuit,
@@ -122,7 +122,7 @@ impl FunctionCompiler<'_, '_> {
                     .emit_ax(Opcode::Return, i32::from(left_register))?;
                 Ok(())
             }
-            lyng_js_ast::LogicalOp::NullishCoalescing => {
+            lyng_ast::LogicalOp::NullishCoalescing => {
                 let null_value = self.alloc_temp()?;
                 self.emit_load_null(null_value)?;
                 let is_null = self.alloc_temp()?;
@@ -161,7 +161,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn lower_tail_sequence_expression(
         &mut self,
-        expressions: lyng_js_ast::NodeList<ExprId>,
+        expressions: lyng_ast::NodeList<ExprId>,
     ) -> LoweringResult<()> {
         let expressions = self.ast().get_expr_list(expressions).to_vec();
         let Some((last, rest)) = expressions.split_last() else {

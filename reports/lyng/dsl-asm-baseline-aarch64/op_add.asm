@@ -1,8 +1,8 @@
 // DSL-0b op_add handler asm (AArch64), captured from
-//   cargo rustc --release -p lyng-js-vm --lib -- --emit=asm
+//   cargo rustc --release -p lyng-vm --lib -- --emit=asm
 //
-// Symbol: lyng_js_vm::dsl::handlers::hot::op_add
-// Source: crates/lyng-js/vm/src/dsl/handlers/hot.rs (B40)
+// Symbol: lyng_vm::dsl::handlers::hot::op_add
+// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B40)
 // Layout: AbcSlot (a, b, c byte operands + 16-bit feedback slot),
 // length = 6 bytes.
 //

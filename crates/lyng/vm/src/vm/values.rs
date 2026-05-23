@@ -4,9 +4,9 @@ use super::{
     VmResult,
 };
 use crate::vm::property_access::ToPrimitiveHint;
-use lyng_js_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
-use lyng_js_ops::{errors, number_to_string, object, read};
-use lyng_js_types::{AbruptCompletion, PropertyKey, StringRef};
+use lyng_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
+use lyng_ops::{errors, number_to_string, object, read};
+use lyng_types::{AbruptCompletion, PropertyKey, StringRef};
 
 impl Vm {
     #[inline]
@@ -697,12 +697,12 @@ impl Vm {
         agent: &Agent,
         environment: EnvironmentRef,
         slot: u32,
-    ) -> Option<lyng_js_env::EnvironmentSlotFlags> {
+    ) -> Option<lyng_env::EnvironmentSlotFlags> {
         let layout = agent.environment(environment)?.layout()?;
         agent
             .environment_layout(layout)?
             .binding(slot)
-            .map(lyng_js_env::EnvironmentBindingLayout::flags)
+            .map(lyng_env::EnvironmentBindingLayout::flags)
     }
 
     pub(in crate::vm) fn property_key_to_enumeration_value(
@@ -796,7 +796,7 @@ impl Vm {
             .heap()
             .view()
             .code(code)
-            .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+            .and_then(lyng_gc::RuntimeCodeRecord::constants)
             .and_then(|slots| agent.heap().view().code_slots(slots))
             .and_then(|slots| slots.get(index_usize))
             .copied()
@@ -844,7 +844,7 @@ impl Vm {
         code: CodeRef,
         instruction_offset: u32,
         value: Value,
-        string: lyng_js_types::StringRef,
+        string: lyng_types::StringRef,
     ) -> VmResult<PropertyKey> {
         let (array_index, cached_atom, latin1_bytes, utf16_units) =
             {
@@ -1040,7 +1040,7 @@ pub(super) fn alloc_atom_string(
     agent: &mut Agent,
     atom: AtomId,
     text: &str,
-) -> lyng_js_types::StringRef {
+) -> lyng_types::StringRef {
     alloc_string(agent, text, Some(atom))
 }
 
@@ -1049,7 +1049,7 @@ pub(super) fn alloc_atom_utf16_string(
     agent: &mut Agent,
     atom: AtomId,
     units: &[u16],
-) -> lyng_js_types::StringRef {
+) -> lyng_types::StringRef {
     alloc_utf16_string(agent, units, Some(atom))
 }
 
@@ -1057,7 +1057,7 @@ pub(super) fn alloc_string(
     agent: &mut Agent,
     text: &str,
     atom: Option<AtomId>,
-) -> lyng_js_types::StringRef {
+) -> lyng_types::StringRef {
     if text.chars().all(|ch| u32::from(ch) <= 0xff) {
         let bytes: Vec<u8> = text.chars().map(|ch| ch as u8).collect();
         return agent.heap_mut().mutator().alloc_string(
@@ -1088,7 +1088,7 @@ pub(super) fn alloc_code_unit_string(
     agent: &mut Agent,
     units: &[u16],
     atom: Option<AtomId>,
-) -> lyng_js_types::StringRef {
+) -> lyng_types::StringRef {
     if atom.is_none() && units.len() == 1 && units[0] <= 0x00ff {
         return agent.latin1_single_code_unit_string(
             u8::try_from(units[0]).expect("Latin-1 code unit should fit into u8"),
@@ -1165,7 +1165,7 @@ fn alloc_utf16_string(
     agent: &mut Agent,
     units: &[u16],
     atom: Option<AtomId>,
-) -> lyng_js_types::StringRef {
+) -> lyng_types::StringRef {
     let mut bytes = Vec::with_capacity(units.len() * 2);
     for unit in units {
         bytes.extend_from_slice(&unit.to_le_bytes());

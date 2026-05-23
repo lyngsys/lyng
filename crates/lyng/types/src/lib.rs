@@ -1,7 +1,7 @@
-//! Copyable runtime-facing data types for the lyng-js runtime.
+//! Copyable runtime-facing data types for the lyng runtime.
 //!
-//! Ownership: `lyng_js_types` owns representation-only runtime data. Allocation,
-//! rooting, tracing, and heap dereference remain in `lyng_js_gc`.
+//! Ownership: `lyng_types` owns representation-only runtime data. Allocation,
+//! rooting, tracing, and heap dereference remain in `lyng_gc`.
 
 #![allow(
     clippy::module_name_repetitions,

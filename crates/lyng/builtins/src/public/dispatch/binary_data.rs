@@ -26,7 +26,7 @@ use super::{
     to_uint32_for_builtin, to_uint8_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(super) fn dispatch_binary_data_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

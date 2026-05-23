@@ -1,7 +1,7 @@
 # DSL-0a Status Report
 
 DSL-0a is the first sub-phase of the DSL-0 milestone documented in
-[`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+[`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 Its scope is semantic extraction — moving every opcode's semantic
 body out of its α `extern "C"` handler into a free `op_xxx_semantic`
 function reachable through a transitional `LlIntDispatchState`
@@ -38,9 +38,9 @@ and concerns / observations from execution.
 
 Real semantic extractions: 148. Stubs (delegating to `op_unimplemented`): 4 (`InstanceOf`, `CallMethod`, `Wide`, `ExtraWide` — though `Wide` and `ExtraWide` have real semantic bodies; only `InstanceOf` and `CallMethod` are stubs because their α handlers are themselves stubs).
 
-Files added under `crates/lyng-js/vm/src/vm/semantics/`: 12 (`loads.rs`, `arithmetic.rs`, `control_flow.rs`, `property.rs`, `names.rs`, `scope.rs`, `calls.rs`, `iterators.rs`, `generators.rs`, `exceptions.rs`, `prefix.rs`, `misc.rs`) plus `mod.rs`.
+Files added under `crates/lyng/vm/src/vm/semantics/`: 12 (`loads.rs`, `arithmetic.rs`, `control_flow.rs`, `property.rs`, `names.rs`, `scope.rs`, `calls.rs`, `iterators.rs`, `generators.rs`, `exceptions.rs`, `prefix.rs`, `misc.rs`) plus `mod.rs`.
 
-α handler files in `crates/lyng-js/vm/src/vm/dispatch_handlers/` thinned to operand-decode + `LlIntDispatchState::from_alpha(...)` + call-semantic + `translate_outcome_to_step(...)` — each handler is now 5-15 lines.
+α handler files in `crates/lyng/vm/src/vm/dispatch_handlers/` thinned to operand-decode + `LlIntDispatchState::from_alpha(...)` + call-semantic + `translate_outcome_to_step(...)` — each handler is now 5-15 lines.
 
 ## 2. Exit-criterion verification (§10 DSL-0a)
 
@@ -48,11 +48,11 @@ The design lists five exit criteria:
 
 | # | Criterion | Status | Evidence |
 |--:|---|---|---|
-| 1 | Every `Opcode` variant appears in `OPCODES` (Manifest Test 1) | ✓ | `crates/lyng-js/vm/src/dsl/opcode_manifest.rs::manifest_tests::opcodes_manifest_is_exhaustive` passes; `OPCODES.len() == OPCODE_COUNT == 152` |
-| 2 | Every `semantic_symbol` resolves to a real function (Manifest Test 2) | ✓ | `crates/lyng-js/vm/src/dsl/opcode_manifest.rs::manifest_tests::semantic_fn_ptrs_resolve` passes; `SEMANTIC_FN_PTRS.len() == 152`, all non-null |
-| 3 | Source-grep smoke test passes (Manifest Test 4) | ✓ | `crates/lyng-js/vm/tests/dsl_manifest_grep.rs::no_op_functions_outside_semantics_and_handlers` passes |
-| 4 | `cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler` passes at same count as Pre-flight 4 | ✓ | 1796 passed (was 1793 at Pre-flight 4; +3 from new manifest tests), 1 ignored (was 1; the un-ignored gains are accounted by `+2`, and the remaining ignored is an unrelated doctest) |
-| 5 | Test262 pass count ≥ Pre-flight 7 baseline (49728/49729) | ✓ — **gained** | 49729/49729 passing — 100% pass rate, **gained 1 test vs Pre-flight baseline.** See `reports/js/lyng-js/dsl-0a-test262.md`. |
+| 1 | Every `Opcode` variant appears in `OPCODES` (Manifest Test 1) | ✓ | `crates/lyng/vm/src/dsl/opcode_manifest.rs::manifest_tests::opcodes_manifest_is_exhaustive` passes; `OPCODES.len() == OPCODE_COUNT == 152` |
+| 2 | Every `semantic_symbol` resolves to a real function (Manifest Test 2) | ✓ | `crates/lyng/vm/src/dsl/opcode_manifest.rs::manifest_tests::semantic_fn_ptrs_resolve` passes; `SEMANTIC_FN_PTRS.len() == 152`, all non-null |
+| 3 | Source-grep smoke test passes (Manifest Test 4) | ✓ | `crates/lyng/vm/tests/dsl_manifest_grep.rs::no_op_functions_outside_semantics_and_handlers` passes |
+| 4 | `cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler` passes at same count as Pre-flight 4 | ✓ | 1796 passed (was 1793 at Pre-flight 4; +3 from new manifest tests), 1 ignored (was 1; the un-ignored gains are accounted by `+2`, and the remaining ignored is an unrelated doctest) |
+| 5 | Test262 pass count ≥ Pre-flight 7 baseline (49728/49729) | ✓ — **gained** | 49729/49729 passing — 100% pass rate, **gained 1 test vs Pre-flight baseline.** See `reports/lyng/dsl-0a-test262.md`. |
 
 ## 3. V8 v7 evidence
 
@@ -67,7 +67,7 @@ Although the DSL-0a exit criterion only requires "geomean within ±2% of pre-DSL
 | NavierStokes | 457 | 478 | +4.6% |
 | Splay | 1342 | 1488 | +10.9% |
 
-Reports: `reports/js/lyng-js/dsl-0a-v8.md` + `dsl-0a-v8.json`.
+Reports: `reports/lyng/dsl-0a-v8.md` + `dsl-0a-v8.json`.
 
 Hypothesis: the macro-driven thinning in several α families (arithmetic, names, scope, iterators) produces tighter codegen than the inline-everything α form had — LLVM gets a clearer view of which paths are hot vs cold. This is a happy side-effect of DSL-0a's structural refactor and not a designed-for outcome; the win is preserved into DSL-0b regardless of whether it survives the alpha-deletion in DSL-0c.
 
@@ -130,24 +130,24 @@ The pre-A18 α handler rejected `Wide; Wide; ...` with `VmError::InstructionOutO
 
 **Major new paths:**
 
-- `crates/lyng-js/vm/src/dsl/mod.rs`
-- `crates/lyng-js/vm/src/dsl/opcode_manifest.rs` (~1500 lines — OpcodeEntry + OPCODES + SEMANTIC_FN_PTRS + Tests 1, 2)
-- `crates/lyng-js/vm/src/dsl/slow_path.rs` (~70 lines — SemanticOutcome, LlIntDispatchState)
-- `crates/lyng-js/vm/src/vm/semantics/{mod.rs, loads.rs, arithmetic.rs, control_flow.rs, property.rs, names.rs, scope.rs, calls.rs, iterators.rs, generators.rs, exceptions.rs, prefix.rs, misc.rs}` (~5000 lines total)
-- `crates/lyng-js/vm/tests/dsl_manifest_grep.rs` (~70 lines)
+- `crates/lyng/vm/src/dsl/mod.rs`
+- `crates/lyng/vm/src/dsl/opcode_manifest.rs` (~1500 lines — OpcodeEntry + OPCODES + SEMANTIC_FN_PTRS + Tests 1, 2)
+- `crates/lyng/vm/src/dsl/slow_path.rs` (~70 lines — SemanticOutcome, LlIntDispatchState)
+- `crates/lyng/vm/src/vm/semantics/{mod.rs, loads.rs, arithmetic.rs, control_flow.rs, property.rs, names.rs, scope.rs, calls.rs, iterators.rs, generators.rs, exceptions.rs, prefix.rs, misc.rs}` (~5000 lines total)
+- `crates/lyng/vm/tests/dsl_manifest_grep.rs` (~70 lines)
 
 **Touched policy:**
 
-- `crates/lyng-js/vm/src/error.rs` — added `VmError::DoublePrefix` variant.
-- `crates/lyng-js/vm/src/lib.rs` — `pub mod dsl;` and `pub(crate) mod vm;` (visibility widening for cross-module access).
-- `crates/lyng-js/vm/src/vm.rs` — `pub(crate) mod dispatch_state;`, `pub(crate) mod semantics;`.
-- `crates/lyng-js/vm/src/vm/install.rs` — `pub(crate) struct InstalledFunction` (transitive visibility from `DispatchState::installed`).
+- `crates/lyng/vm/src/error.rs` — added `VmError::DoublePrefix` variant.
+- `crates/lyng/vm/src/lib.rs` — `pub mod dsl;` and `pub(crate) mod vm;` (visibility widening for cross-module access).
+- `crates/lyng/vm/src/vm.rs` — `pub(crate) mod dispatch_state;`, `pub(crate) mod semantics;`.
+- `crates/lyng/vm/src/vm/install.rs` — `pub(crate) struct InstalledFunction` (transitive visibility from `DispatchState::installed`).
 
 ## 6. Hand-off to DSL-0b
 
 DSL-0b lands the asm-DSL substrate:
 
-- `lyng-js-vm-dsl` proc-macro crate
+- `lyng-vm-dsl` proc-macro crate
 - `vm/src/dsl/` runtime ABI (`LlIntState`, `LlIntRustContext`, slow-path bridge types)
 - FeedbackVector flat-array refactor (eager allocation, `Box<[FeedbackEntry]>` storage)
 - AArch64 backend operation macros (~25 ops: operand decode, value-tag checks, object access, SMI arithmetic, dispatch, slow-path bridge, feedback, safepoint poll, opcode counter)
@@ -159,7 +159,7 @@ DSL-0b lands the asm-DSL substrate:
 
 The α handlers retain their thin shape during DSL-0b. DSL-0c flips the dispatch path and deletes alpha + tier-accounting machinery.
 
-DSL-0a dcat ticket (`lyng-3ne7`) and all 19 sub-tickets are in `in_review` awaiting user approval to close. **Per `crates/lyng-js/AGENTS.md`: tickets are NEVER closed without explicit user approval.**
+DSL-0a dcat ticket (`lyng-3ne7`) and all 19 sub-tickets are in `in_review` awaiting user approval to close. **Per `crates/lyng/AGENTS.md`: tickets are NEVER closed without explicit user approval.**
 
 ## 7. Status
 

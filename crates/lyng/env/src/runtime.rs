@@ -3,8 +3,8 @@ use super::{
     HostHooks, HostJobKind, HostJobPhase, HostResult, HostThreadId, JobId, JobObservation,
     RealmRef, RuntimeDomainAccounting, RuntimePhase6Accounting,
 };
-use lyng_js_gc::PrimitiveHeapAccounting;
-use lyng_js_host::{
+use lyng_gc::PrimitiveHeapAccounting;
+use lyng_host::{
     AgentSpawnKind, AgentThreadStartKind, CreateAgentRequest, HostError, StartAgentThreadRequest,
 };
 

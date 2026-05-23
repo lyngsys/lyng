@@ -1,5 +1,5 @@
 // DSL-0b op_jump_if_true8 handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::warm::op_jump_if_true8
+// Symbol: lyng_vm::dsl::handlers::warm::op_jump_if_true8
 // Layout: Ab in the DSL (1-byte condition register + 1-byte i8 delta),
 // length = 3.
 

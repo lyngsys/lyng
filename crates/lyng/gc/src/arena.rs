@@ -14,8 +14,8 @@ use crate::{
     NurseryStats, PrimitiveAllocationProfile, PrimitiveStringRecord, PrimitiveStringView,
     StringEncoding, WeakHeapRef,
 };
-use lyng_js_common::AtomId;
-use lyng_js_types::{
+use lyng_common::AtomId;
+use lyng_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef, Value,
 };
@@ -1599,7 +1599,7 @@ fn append_flat_string_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomId;
+    use lyng_common::AtomId;
 
     #[test]
     fn string_slots_and_side_allocations_reuse_freed_storage() {

@@ -3,10 +3,10 @@ use super::typed_array_indices::{
     TypedArrayNumericKey,
 };
 use crate::errors::{internal_method_error, throw_type_error};
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_types::{Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::NativeFunctionRegistry;
+use lyng_types::{Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 /// Ordinary-only `HasProperty` over the object substrate.
 ///
@@ -62,7 +62,7 @@ pub fn ordinary_get_with_receiver(
         return match numeric_key {
             TypedArrayNumericKey::Valid(index) => {
                 Ok(typed_array_index_descriptor(agent, object, index)
-                    .and_then(lyng_js_types::PropertyDescriptor::value)
+                    .and_then(lyng_types::PropertyDescriptor::value)
                     .unwrap_or(Value::undefined()))
             }
             TypedArrayNumericKey::Invalid => Ok(Value::undefined()),

@@ -2,7 +2,7 @@
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/hot.rs`:
+`crates/lyng/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {
@@ -36,7 +36,7 @@ already polls the incremental-mark safepoint on `delta < 0`, so the
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_jump.asm`.
 
 13 instructions on the fast path through the slow-path call:
 - 1 `ldr` (operand decode)
@@ -46,7 +46,7 @@ See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump.asm`.
 
 ## LLInt reference
 
-See `reports/js/lyng-js/llint-reference/op_jmp.md`.
+See `reports/lyng/llint-reference/op_jmp.md`.
 
 JSC's `op_jmp` is a single inline branch — `dispatch(targetOffset)`.
 For DSL-0b we're paying ~10 extra instructions for the slow-path call;

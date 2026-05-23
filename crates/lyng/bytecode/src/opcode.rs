@@ -1,4 +1,4 @@
-/// Bytecode opcodes for the lyng-js register VM.
+/// Bytecode opcodes for the lyng register VM.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Opcode {

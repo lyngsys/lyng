@@ -4,8 +4,8 @@ use super::super::{
     type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_ops::iterator;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_ops::iterator;
+use lyng_types::{BuiltinFunctionId, Value};
 use std::f64::consts::LN_2;
 use std::time::{SystemTime, UNIX_EPOCH};
 

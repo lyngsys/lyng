@@ -105,7 +105,7 @@ pub(super) enum IteratorZipKey {
     None,
     Index(u32),
     Atom(AtomId),
-    Symbol(lyng_js_types::SymbolRef),
+    Symbol(lyng_types::SymbolRef),
 }
 
 #[derive(Clone, Copy, Debug)]

@@ -35,13 +35,13 @@ This roadmap explicitly rejects two prior framings:
 
 ## What's Already Aligned With JSC
 
-Substantial parts of lyng-js already match JSC's data design. This
+Substantial parts of lyng already match JSC's data design. This
 roadmap is finishing the alignment, not starting from scratch:
 
-- **NaN-boxed `Value`** ([crates/lyng-js/types/src/value.rs:73-345](../../../crates/lyng-js/types/src/value.rs)).
+- **NaN-boxed `Value`** ([crates/lyng/types/src/value.rs:73-345](../../../crates/lyng/types/src/value.rs)).
   Matches `JSCJSValue.h`.
 - **Per-callsite FeedbackVector with Monomorphic/Polymorphic/Megamorphic
-  state machine** ([crates/lyng-js/vm/src/vm/feedback.rs:770-797](../../../crates/lyng-js/vm/src/vm/feedback.rs)).
+  state machine** ([crates/lyng/vm/src/vm/feedback.rs:770-797](../../../crates/lyng/vm/src/vm/feedback.rs)).
   This is the **LLInt-class metadata** analogue, not the JIT IC analogue.
   JSC splits IC dispatch across three tiers and our interpreter targets
   only the first:
@@ -63,7 +63,7 @@ roadmap is finishing the alignment, not starting from scratch:
   trampolines, or other JIT-prep machinery on the interpreter path —
   there is no JIT to amortize that cost.
 - **Shape transition tree with inline + out-of-object slots**
-  ([crates/lyng-js/objects/src/object_metadata.rs:333-397](../../../crates/lyng-js/objects/src/object_metadata.rs)).
+  ([crates/lyng/objects/src/object_metadata.rs:333-397](../../../crates/lyng/objects/src/object_metadata.rs)).
   Matches `Structure.h`.
 - **32-bit ShapeId** (already u32 by `define_runtime_id!`). Conceptually
   matches JSC's compressed `StructureID`.
@@ -168,7 +168,7 @@ By making the dispatch mechanism a single point of variation — the
 ### The unified API
 
 Handler signature, dispatch table, and `Step` enum live in
-`crates/lyng-js/vm/src/vm/dispatch_state.rs` (new):
+`crates/lyng/vm/src/vm/dispatch_state.rs` (new):
 
 ```rust
 pub struct DispatchState<'vm> { /* pc, bytes, regs, agent, frame, … */ }
@@ -320,15 +320,15 @@ trampoline. This is the structural foundation; every other phase
 assumes it.
 
 **Files:**
-- `crates/lyng-js/vm/src/vm/dispatch_state.rs` (new) — `DispatchState`
+- `crates/lyng/vm/src/vm/dispatch_state.rs` (new) — `DispatchState`
   struct, `Handler` typedef, `Step` enum, `DISPATCH_TABLE` static,
   the `dispatch_next!` macro.
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/` (new module
+- `crates/lyng/vm/src/vm/dispatch_handlers/` (new module
   hierarchy) — one file per opcode family (`arithmetic.rs`,
   `property.rs`, `calls.rs`, `control_flow.rs`, `loads.rs`, `scope.rs`,
   `generators.rs`, `exceptions.rs`, etc.). Each opcode is an
   `extern "C" fn` handler.
-- `crates/lyng-js/vm/src/vm/dispatch.rs` — rewritten to a thin
+- `crates/lyng/vm/src/vm/dispatch.rs` — rewritten to a thin
   trampoline + module-glue. The 3300-line monolithic match goes away;
   what remains is `run()` and the `mod dispatch_handlers;` declaration.
 
@@ -372,10 +372,10 @@ should fit in L1i comfortably.
 
 **Verification:**
 
-- `cargo build --release -p lyng-js-cli` — green.
-- `cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler` — full pass.
+- `cargo build --release -p lyng-cli` — green.
+- `cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler` — full pass.
 - `cargo asm` evidence per phase:
-  - Each opcode is a separate symbol in `nm target/release/lyng-js`.
+  - Each opcode is a separate symbol in `nm target/release/lyng`.
   - Hot handlers (e.g., `op_add`, `op_move`, `op_get_named_property`)
     are < 200 bytes of asm each.
   - `op_add`'s tail is `mov w<N>, [DISPATCH_TABLE + ...]; ret` — the
@@ -383,12 +383,12 @@ should fit in L1i comfortably.
     loops on it.
   - The central trampoline `run()` has exactly one indirect call
     (`blr` / `call`) reachable from the dispatch loop.
-- Per-handler binary size dumped into `reports/js/lyng-js/phase-1-asm.md`.
+- Per-handler binary size dumped into `reports/lyng/phase-1-asm.md`.
 - Structural regression test added: assert that `dispatch.rs`
   contains no `match opcode` over more than (say) 10 arms, ensuring
   no opcode dispatch creeps back into the trampoline.
 
-**Benchmarks** (5-sample median via `lyng-js-bench compare` in
+**Benchmarks** (5-sample median via `lyng-bench compare` in
 isolation, no concurrent build or Test262):
 
 | Bench | Pre-phase | Phase 1 (α) target |
@@ -456,9 +456,9 @@ overhead. Replace `Vec<ObjectRecord>` with `Box<[ObjectRecord]>` of fixed
 or grow-with-known-base layout. Object records become same-size for the
 fast path (variable-size payloads moved to side tables).
 
-- `crates/lyng-js/gc/src/object_records.rs` (or wherever the pool
+- `crates/lyng/gc/src/object_records.rs` (or wherever the pool
   lives) — replace `Vec<ObjectRecord>` with a slab allocator.
-- `crates/lyng-js/objects/src/internal_methods/property_cache.rs:113-280`
+- `crates/lyng/objects/src/internal_methods/property_cache.rs:113-280`
   — rewrite so `heap.object(holder_id)` is a single load (no
   `Option` on the hot path).
 
@@ -490,7 +490,7 @@ single-load (vs being free / cached). 2b might turn out unnecessary.
 
 **Risks:**
 
-- Heap-pool restructure affects GC. Coordinate with `lyng-js-gc`.
+- Heap-pool restructure affects GC. Coordinate with `lyng-gc`.
 - Variable-size object records currently exist; the slab needs a fixed
   fast-path size with overflow handling.
 
@@ -504,7 +504,7 @@ single-load (vs being free / cached). 2b might turn out unnecessary.
 into a flat block inside each IC-shaped opcode handler. This is what
 makes Track H's always-allocate machinery actually pay back.
 
-**Today's chain** (`crates/lyng-js/vm/src/vm/dispatch/property.rs:68-127`
+**Today's chain** (`crates/lyng/vm/src/vm/dispatch/property.rs:68-127`
 → `feedback.rs:1859` → `feedback.rs:779` →
 `property_cache.rs:113-140` → `property_cache.rs:228-280`):
 
@@ -585,9 +585,9 @@ Matches JSC's `performGetByIDHelper`.
 
 **Files:**
 - All `op_*` handlers introduced in Phase 1's `dispatch_handlers/property.rs`.
-- `crates/lyng-js/vm/src/vm/feedback.rs` — collapse the
+- `crates/lyng/vm/src/vm/feedback.rs` — collapse the
   `try_load`/`load_from_named_property_cache`/`entry_valid` chain.
-- `crates/lyng-js/objects/src/internal_methods/property_cache.rs` —
+- `crates/lyng/objects/src/internal_methods/property_cache.rs` —
   rewrite slot decode as a `const fn` that takes the bit-packed
   handler.
 
@@ -696,10 +696,10 @@ that pair well with the new dispatch shape.
 ### 4a — Direct argument lowering (real Track C)
 
 **Status: landed** — commit `835c19f6`. See
-[`reports/js/lyng-js/phase-4a-status.md`](phase-4a-status.md).
+[`reports/lyng/phase-4a-status.md`](phase-4a-status.md).
 
-`crates/lyng-js/compiler/src/script/calls.rs` `materialize_argument_block` +
-`crates/lyng-js/compiler/src/script/expr.rs` `lower_call_target`.
+`crates/lyng/compiler/src/script/calls.rs` `materialize_argument_block` +
+`crates/lyng/compiler/src/script/expr.rs` `lower_call_target`.
 
 Compiler currently emits `LoadX Rtemp; Move Rdst, Rtemp` chains for
 each call argument. ~27–50% of dispatches were Move opcodes
@@ -715,7 +715,7 @@ string-heavy.concat −16%, typed-array −15%, class-heavy −10%).
 ### 4b — Star fusion lookahead
 
 **Status: landed** — commit `631ec709`. See
-[`reports/js/lyng-js/phase-4b-status.md`](phase-4b-status.md).
+[`reports/lyng/phase-4b-status.md`](phase-4b-status.md).
 
 V8 Ignition pattern (`src/interpreter/interpreter-assembler.cc:1324-1380`):
 when a handler that produces a value is followed by `StarN` in the
@@ -765,10 +765,10 @@ exceed the roadmap's per-phase target; the roadmap explicitly permits
 deferring 4c when measurement does not justify the cost.
 
 **Files:**
-- `crates/lyng-js/compiler/src/script/calls.rs`
-- `crates/lyng-js/compiler/src/script/expr.rs`
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/*.rs` (Star fusion)
-- `crates/lyng-js/compiler/src/script/script.rs` (Star/Ldar emission
+- `crates/lyng/compiler/src/script/calls.rs`
+- `crates/lyng/compiler/src/script/expr.rs`
+- `crates/lyng/vm/src/vm/dispatch_handlers/*.rs` (Star fusion)
+- `crates/lyng/compiler/src/script/script.rs` (Star/Ldar emission
   audit)
 
 **Verification:**
@@ -797,11 +797,11 @@ Add Cranelift as a dependency (already in the Rust ecosystem, used by
 Wasmtime, well-supported). Wire up a tiny smoke test that compiles
 `fn() -> i32 { 42 }` via Cranelift and runs it.
 
-`crates/lyng-js-jit` (new crate) — backend interface.
+`crates/lyng-jit` (new crate) — backend interface.
 
 ### 5b — Tier-up counters
 
-The `TierStatus` enum exists in `crates/lyng-js/vm/src/tiering.rs` but
+The `TierStatus` enum exists in `crates/lyng/vm/src/tiering.rs` but
 is dead. Reanimate:
 
 - Increment a per-function execution counter at each `LoopHeader` and
@@ -810,8 +810,8 @@ is dead. Reanimate:
   `ReadyForNative` and queue the function for JIT compilation.
 - Counter increment: branchless `addi` in the loop-header handler.
 
-Files: `crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs`,
-`crates/lyng-js/vm/src/tiering.rs`.
+Files: `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs`,
+`crates/lyng/vm/src/tiering.rs`.
 
 ### 5c — JIT calling convention
 
@@ -821,7 +821,7 @@ takes the receiver register, the argument range, a `&mut Agent`. The
 JIT'd code can call back into interpreter helpers (slow paths) via the
 same `extern "C"` ABI as interpreter handlers.
 
-Document this in `docs/lyng-js/jit-abi.md`.
+Document this in `docs/lyng/jit-abi.md`.
 
 ### 5d — Deopt / fallback path
 
@@ -923,7 +923,7 @@ After each sub-phase:
 | NavierStokes | 424 | ≥ 1350 |
 | Splay | 1198 | ≥ 2300 |
 
-These targets put lyng-js into JSC-Baseline / V8-Sparkplug territory:
+These targets put lyng into JSC-Baseline / V8-Sparkplug territory:
 roughly half of full V8, several times QuickJS. The JIT cost gap
 between α and β is small (~5%) because the JIT bypasses interpreter
 dispatch entirely for hot code; the α tax matters mostly for
@@ -958,11 +958,11 @@ until Phase 6 ships and you can measure where the remaining cost is.
 ## Verification Methodology (Across All Phases)
 
 For each phase the same evidence is captured. Reports go in
-`reports/js/lyng-js/`.
+`reports/lyng/`.
 
 ### Bench harness setup
 
-Use `lyng-js-bench compare` with `--samples 5 --warmup-samples 2` per
+Use `lyng-bench compare` with `--samples 5 --warmup-samples 2` per
 workload, run individually (not full-suite — the harness's full-suite
 mode currently produces one row).
 
@@ -975,16 +975,16 @@ the machine is shared, schedule bench runs at off-hours.
 For each new phase's hot opcodes:
 
 ```sh
-cargo asm --release 'lyng_js_vm::vm::dispatch_handlers::arithmetic::op_add'
-cargo asm --release 'lyng_js_vm::vm::dispatch_handlers::property::op_get_named_property'
+cargo asm --release 'lyng_vm::vm::dispatch_handlers::arithmetic::op_add'
+cargo asm --release 'lyng_vm::vm::dispatch_handlers::property::op_get_named_property'
 ```
 
-Capture before/after into `reports/js/lyng-js/phase-N-asm.md`.
+Capture before/after into `reports/lyng/phase-N-asm.md`.
 
 ### Test262
 
 ```sh
-cargo run --release -p lyng-js-test262 -- --report /tmp/t262-phase-N.md -j 4
+cargo run --release -p lyng-test262 -- --report /tmp/t262-phase-N.md -j 4
 ```
 
 Pass count must not decrease vs. the phase-entry baseline. Cluster
@@ -993,7 +993,7 @@ deltas are documented in the phase status report.
 ### Structural regression tests
 
 Each phase adds source-level structural assertions to
-`crates/lyng-js/vm/src/vm/dispatch.rs` (or its successor) that fail
+`crates/lyng/vm/src/vm/dispatch.rs` (or its successor) that fail
 the build if the structural property the phase delivered gets
 accidentally reverted. Examples:
 
@@ -1090,7 +1090,7 @@ Architecture (Decided)." α is the substrate; β and γ are documented
 future swaps gated on profile evidence.
 
 1. Lock the verification methodology in CI:
-   - Isolated bench harness (`lyng-js-bench compare` with 5-sample
+   - Isolated bench harness (`lyng-bench compare` with 5-sample
      warmup + 2-sample median, run sequentially, fail-on-concurrent-load
      check).
    - Automated `cargo asm` capture for each opcode handler post-Phase-1.
@@ -1098,11 +1098,11 @@ future swaps gated on profile evidence.
      committed baseline.
 2. Snapshot Phase-0 evidence:
    - Full V8 v7 sweep, isolated. Commit to
-     `reports/js/lyng-js/phase-0-bench.md`.
+     `reports/lyng/phase-0-bench.md`.
    - Full Test262 run with the current submodule revision.
-     Commit to `reports/js/lyng-js/phase-0-test262.md`.
+     Commit to `reports/lyng/phase-0-test262.md`.
    - `cargo asm` of current `run_dispatch_loop` (all 4 monomorphs).
-     Commit to `reports/js/lyng-js/phase-0-asm.md`.
+     Commit to `reports/lyng/phase-0-asm.md`.
 3. Prototype the `DispatchState` struct and the `Step` enum
    independently (without rewriting handlers yet). Verify the
    trampoline emits clean asm: load fn pointer, indirect call, no

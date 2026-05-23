@@ -1,5 +1,5 @@
 // DSL-0b op_jump8 handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::warm::op_jump8
+// Symbol: lyng_vm::dsl::handlers::warm::op_jump8
 // Layout: A (1-byte i8 delta operand), length = 2.
 
 op_jump8:

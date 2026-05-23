@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land the asm-DSL substrate behind every opcode — semantic-extracted alpha handlers (DSL-0a), DSL proc-macro + AArch64 backend + 5 hot + 5 warm + ~140 cold ports (DSL-0b), alpha trampoline deletion with single-implementation invariant verified (DSL-0c) — meeting the seven exit criteria in §10 of [docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+**Goal:** Land the asm-DSL substrate behind every opcode — semantic-extracted alpha handlers (DSL-0a), DSL proc-macro + AArch64 backend + 5 hot + 5 warm + ~140 cold ports (DSL-0b), alpha trampoline deletion with single-implementation invariant verified (DSL-0c) — meeting the seven exit criteria in §10 of [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 
-**Architecture:** Three sequential sub-phases. **DSL-0a** extracts every opcode's semantic body out of its α `extern "C"` handler into a free `op_xxx_semantic` function reachable through a transitional `LlIntDispatchState` wrapper that aliases today's `DispatchState`. **DSL-0b** lands the `lyng-js-vm-dsl` proc-macro crate, the `vm/src/dsl/` runtime support (`LlIntState`, `LlIntRustContext`, slow-path bridge, entry/exit shims, FeedbackVector flat-array refactor, AArch64 backend ops), 9 validation cases, 5 hot ports (`op_move`, `op_add`, `op_jump`, `op_return`, `op_loop_header`), 5 warm ports (`op_jump8`, `op_jump_if_true(/8)`, `op_jump_if_false(/8)`, `op_wide`, `op_extra_wide`), and the ~140 cold-stub bulk generation. **DSL-0c** switches active dispatch to the DSL table, deletes the alpha trampoline / `Step` / `DispatchState` / tier-accounting machinery, and verifies single-implementation invariants via the structural manifest.
+**Architecture:** Three sequential sub-phases. **DSL-0a** extracts every opcode's semantic body out of its α `extern "C"` handler into a free `op_xxx_semantic` function reachable through a transitional `LlIntDispatchState` wrapper that aliases today's `DispatchState`. **DSL-0b** lands the `lyng-vm-dsl` proc-macro crate, the `vm/src/dsl/` runtime support (`LlIntState`, `LlIntRustContext`, slow-path bridge, entry/exit shims, FeedbackVector flat-array refactor, AArch64 backend ops), 9 validation cases, 5 hot ports (`op_move`, `op_add`, `op_jump`, `op_return`, `op_loop_header`), 5 warm ports (`op_jump8`, `op_jump_if_true(/8)`, `op_jump_if_false(/8)`, `op_wide`, `op_extra_wide`), and the ~140 cold-stub bulk generation. **DSL-0c** switches active dispatch to the DSL table, deletes the alpha trampoline / `Step` / `DispatchState` / tier-accounting machinery, and verifies single-implementation invariants via the structural manifest.
 
-**Tech Stack:** Rust stable ≥ 1.88 (needed for `naked_asm!`), `syn` 2.x + `proc-macro2` + `quote` (proc-macro crate), `core::arch::naked_asm!` + `#[unsafe(naked)]` (AArch64 backend), existing `lyng-js-bench` subcommands `microbench` / `asm-diff` / `v8suite` (R-0 deliverables). Target arch is AArch64 only; x86_64 is deferred per design §10 DSL-2.
+**Tech Stack:** Rust stable ≥ 1.88 (needed for `naked_asm!`), `syn` 2.x + `proc-macro2` + `quote` (proc-macro crate), `core::arch::naked_asm!` + `#[unsafe(naked)]` (AArch64 backend), existing `lyng-bench` subcommands `microbench` / `asm-diff` / `v8suite` (R-0 deliverables). Target arch is AArch64 only; x86_64 is deferred per design §10 DSL-2.
 
 ---
 
@@ -27,13 +27,13 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
 
   Run:
   ```sh
-  ls reports/js/lyng-js/llint-dsl-value-layout.md \
-     reports/js/lyng-js/llint-dsl-abi.md \
-     reports/js/lyng-js/llint-dsl-safepoints.md \
-     reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md \
-     reports/js/lyng-js/microbench-baseline.md \
-     reports/js/lyng-js/r0/status.md \
-     tools/lyng-js-bench/hot-opcodes.toml
+  ls reports/lyng/llint-dsl-value-layout.md \
+     reports/lyng/llint-dsl-abi.md \
+     reports/lyng/llint-dsl-safepoints.md \
+     reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md \
+     reports/lyng/microbench-baseline.md \
+     reports/lyng/r0/status.md \
+     tools/lyng-bench/hot-opcodes.toml
   ```
   Expected: every file exists. If any are missing, R-0 is incomplete — stop and finish R-0 before starting DSL-0.
 
@@ -51,7 +51,7 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
 
   Run:
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler 2>&1 | tail -30
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler 2>&1 | tail -30
   ```
   Expected: all tests pass. Record the total pass count — DSL-0a must not regress it.
 
@@ -59,7 +59,7 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
 
   Run:
   ```sh
-  cargo build --release -p lyng-js-vm -p lyng-js-bench
+  cargo build --release -p lyng-vm -p lyng-bench
   ```
   Expected: clean build, no warnings. Note compile time as a baseline for the proc-macro crate's impact later.
 
@@ -68,12 +68,12 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
   These become the regression-reference for DSL-0b and DSL-0c exit gates.
 
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --report /tmp/pre-dsl-0-v8.md --json /tmp/pre-dsl-0-v8.json
-  cargo run --release -p lyng-js-bench -- microbench --report /tmp/pre-dsl-0-microbench.md --samples 7 --iters 5000000 || echo "WARN: microbench needs isolated machine — re-run if loadavg gate fails"
-  cp /tmp/pre-dsl-0-v8.md reports/js/lyng-js/pre-dsl-0-v8-baseline.md
-  cp /tmp/pre-dsl-0-v8.json reports/js/lyng-js/pre-dsl-0-v8-baseline.json
-  cp /tmp/pre-dsl-0-microbench.md reports/js/lyng-js/pre-dsl-0-microbench-baseline.md 2>/dev/null || true
-  git add reports/js/lyng-js/pre-dsl-0-*
+  cargo run --release -p lyng-bench -- v8suite --report /tmp/pre-dsl-0-v8.md --json /tmp/pre-dsl-0-v8.json
+  cargo run --release -p lyng-bench -- microbench --report /tmp/pre-dsl-0-microbench.md --samples 7 --iters 5000000 || echo "WARN: microbench needs isolated machine — re-run if loadavg gate fails"
+  cp /tmp/pre-dsl-0-v8.md reports/lyng/pre-dsl-0-v8-baseline.md
+  cp /tmp/pre-dsl-0-v8.json reports/lyng/pre-dsl-0-v8-baseline.json
+  cp /tmp/pre-dsl-0-microbench.md reports/lyng/pre-dsl-0-microbench-baseline.md 2>/dev/null || true
+  git add reports/lyng/pre-dsl-0-*
   git commit -m "DSL-0 pre-flight: capture pre-DSL-0 V8 v7 + microbench baselines"
   ```
   Expected: V8 v7 report committed. If microbench fails the isolation gate, re-run on a quiesced machine before relying on the numbers (still commit the run output for record).
@@ -81,9 +81,9 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
 - [ ] **Pre-flight 7: Capture pre-DSL-0 Test262 baseline**
 
   ```sh
-  cargo run --release -p lyng-js-test262 -- --report /tmp/pre-dsl-0-test262.md -j 4
-  cp /tmp/pre-dsl-0-test262.md reports/js/lyng-js/pre-dsl-0-test262-baseline.md
-  git add reports/js/lyng-js/pre-dsl-0-test262-baseline.md
+  cargo run --release -p lyng-test262 -- --report /tmp/pre-dsl-0-test262.md -j 4
+  cp /tmp/pre-dsl-0-test262.md reports/lyng/pre-dsl-0-test262-baseline.md
+  git add reports/lyng/pre-dsl-0-test262-baseline.md
   git commit -m "DSL-0 pre-flight: capture pre-DSL-0 Test262 baseline"
   ```
   Expected: Test262 ≥ 49711/49729 (per R-0 `test262-after-r0.md`). Record exact pass count — this is the floor for DSL-0a / DSL-0b / DSL-0c exit gates.
@@ -94,10 +94,10 @@ Verify R-0 is landed and the worktree is ready before starting Task A1.
 
 DSL-0 lands the following new directories and files. References are forward-looking — actual content is filled in by the relevant tasks.
 
-### New: `crates/lyng-js-vm-dsl/` (proc-macro crate, DSL-0b)
+### New: `crates/lyng/vm-dsl/` (proc-macro crate, DSL-0b)
 
 ```
-crates/lyng-js-vm-dsl/
+crates/lyng/vm-dsl/
 ├── Cargo.toml                  # proc-macro = true; deps: syn, quote, proc-macro2
 └── src/
     ├── lib.rs                  # #[proc_macro] llint_handler! entry
@@ -107,10 +107,10 @@ crates/lyng-js-vm-dsl/
     └── lower.rs                # AST → naked_asm! string assembly
 ```
 
-### New: `crates/lyng-js/vm/src/dsl/` (DSL runtime support, DSL-0a + DSL-0b)
+### New: `crates/lyng/vm/src/dsl/` (DSL runtime support, DSL-0a + DSL-0b)
 
 ```
-crates/lyng-js/vm/src/dsl/
+crates/lyng/vm/src/dsl/
 ├── mod.rs                      # re-exports, backend cfg-dispatch
 ├── opcode_manifest.rs          # OpcodeEntry + OPCODES + structural Tests 1, 2, 3, 4, 5, 6, 7
 ├── slow_path.rs                # SemanticOutcome, OpXxxArgs, LlIntDispatchState, SlowPathReturn, SlowPathTag, shim helpers
@@ -140,10 +140,10 @@ crates/lyng-js/vm/src/dsl/
         └── safepoint.rs        # poll_safepoint!
 ```
 
-### New: `crates/lyng-js/vm/src/vm/semantics/` (DSL-0a — semantic free functions)
+### New: `crates/lyng/vm/src/vm/semantics/` (DSL-0a — semantic free functions)
 
 ```
-crates/lyng-js/vm/src/vm/semantics/
+crates/lyng/vm/src/vm/semantics/
 ├── mod.rs                      # re-exports + OpXxxArgs structs
 ├── loads.rs                    # op_move_semantic, op_load_*_semantic, op_lda_*_semantic, op_star_*_semantic, op_ldar_semantic, op_load_local_*_semantic, op_store_local_*_semantic
 ├── arithmetic.rs               # op_add_semantic, op_sub_semantic, ..., op_equal_semantic, op_strict_equal_semantic, op_less_than_semantic, ...
@@ -161,7 +161,7 @@ crates/lyng-js/vm/src/vm/semantics/
 ### Modified during DSL-0a (then deleted in DSL-0c)
 
 ```
-crates/lyng-js/vm/src/vm/dispatch_handlers/
+crates/lyng/vm/src/vm/dispatch_handlers/
 ├── arithmetic.rs               # thinned: each α handler is decode → call op_xxx_semantic → translate Step
 ├── calls.rs                    # likewise
 ├── control_flow.rs             # likewise
@@ -178,18 +178,18 @@ crates/lyng-js/vm/src/vm/dispatch_handlers/
 ### Deleted in DSL-0c
 
 ```
-crates/lyng-js/vm/src/vm/dispatch_state.rs   # DispatchState, Step, DISPATCH_TABLE, run_trampoline
-crates/lyng-js/vm/src/vm/dispatch_handlers/  # α handlers (all of them)
-crates/lyng-js/vm/src/vm/dispatch/           # α-only execute_*_opcode helpers (moved into semantics/)
-crates/lyng-js/vm/src/vm/tiering.rs          # tier-accounting on backedges
+crates/lyng/vm/src/vm/dispatch_state.rs   # DispatchState, Step, DISPATCH_TABLE, run_trampoline
+crates/lyng/vm/src/vm/dispatch_handlers/  # α handlers (all of them)
+crates/lyng/vm/src/vm/dispatch/           # α-only execute_*_opcode helpers (moved into semantics/)
+crates/lyng/vm/src/vm/tiering.rs          # tier-accounting on backedges
 ```
 
 ### Modified for FV-pin / dispatch-switch
 
 ```
-crates/lyng-js/vm/src/vm/feedback.rs         # FV flat-array refactor (eager alloc, Box<[FeedbackEntry]>)
-crates/lyng-js/vm/src/vm/install.rs          # eager FV allocation at code install
-crates/lyng-js/vm/src/vm.rs                  # Vm::run routes to run_via_dsl after switch
+crates/lyng/vm/src/vm/feedback.rs         # FV flat-array refactor (eager alloc, Box<[FeedbackEntry]>)
+crates/lyng/vm/src/vm/install.rs          # eager FV allocation at code install
+crates/lyng/vm/src/vm.rs                  # Vm::run routes to run_via_dsl after switch
 ```
 
 ---
@@ -202,7 +202,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 
 - **Worktree discipline.** Every subagent dispatch starts with a worktree-verification preamble matching R-0's pattern. Subagents must not commit to `main`. If a subagent reports finishing without committing, the orchestrator commits on the subagent's behalf with the agreed message format.
 
-- **Verification rigor.** After every task, the orchestrator runs `cargo build`, `cargo test -p lyng-js-vm`, and any task-specific acceptance command before marking the task complete. Subagents may produce partial work; the orchestrator is the verifier of record.
+- **Verification rigor.** After every task, the orchestrator runs `cargo build`, `cargo test -p lyng-vm`, and any task-specific acceptance command before marking the task complete. Subagents may produce partial work; the orchestrator is the verifier of record.
 
 - **dcat alignment.** Phase boundaries (DSL-0a → DSL-0b → DSL-0c) create dcat tickets and gate them on user approval before close, per the project's "never close issues without explicit user approval" rule (AGENTS.md).
 
@@ -220,7 +220,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 1. Every `Opcode` variant has a corresponding entry in `OPCODES` (Manifest Test 1).
 2. Every `semantic_symbol` resolves to a real function (Manifest Test 2).
 3. Source-grep smoke test (Manifest Test 4) finds no handler-shaped logic outside `op_xxx_semantic` functions or their narrow operand-decode wrappers.
-4. `cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler` passes (same count as Pre-flight 4).
+4. `cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler` passes (same count as Pre-flight 4).
 5. Test262 pass count ≥ Pre-flight 7 baseline.
 
 ---
@@ -252,7 +252,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
     --type epic --priority 1 \
     --parent lyng-49qk \
     --labels js,performance,vm,roadmap,dsl \
-    -d "DSL-0 milestone per §10 of docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md. Plan: docs/superpowers/plans/2026-05-17-dsl-0-spike-and-semantic-extraction.md."
+    -d "DSL-0 milestone per §10 of docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md. Plan: docs/superpowers/plans/2026-05-17-dsl-0-spike-and-semantic-extraction.md."
   ```
   Record the returned ID as `<DSL0_PARENT>`.
 
@@ -277,7 +277,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
   dcat create "Task A2: vm/src/dsl/ scaffold + opcode_manifest skeleton" --type task --priority 1 --parent <DSL0A> --labels js,vm,dsl
   ```
 
-  Persist the ticket IDs to `reports/js/lyng-js/dsl-0-ticket-map.md` so subagents can resolve task→ticket:
+  Persist the ticket IDs to `reports/lyng/dsl-0-ticket-map.md` so subagents can resolve task→ticket:
   ```markdown
   # DSL-0 ticket map
 
@@ -291,7 +291,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 - [ ] **Step 6: Commit the ticket map**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0-ticket-map.md
+  git add reports/lyng/dsl-0-ticket-map.md
   git commit -m "DSL-0: create dcat ticket hierarchy + map"
   ```
 
@@ -300,20 +300,20 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 ### Task A2: Create `vm/src/dsl/` scaffold + opcode_manifest skeleton
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/mod.rs`
-- Create: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Modify: `crates/lyng-js/vm/src/lib.rs`
+- Create: `crates/lyng/vm/src/dsl/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Modify: `crates/lyng/vm/src/lib.rs`
 
 - [ ] **Step 1: Create the `dsl` module entry**
 
-  Create `crates/lyng-js/vm/src/dsl/mod.rs`:
+  Create `crates/lyng/vm/src/dsl/mod.rs`:
   ```rust
-  //! asm-DSL substrate per docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md.
+  //! asm-DSL substrate per docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md.
   //!
   //! This module hosts the DSL runtime support — opcode manifest, slow-path
   //! bridge types, register-pin convention, `LlIntState` ABI, entry/exit
   //! shims, and the per-arch DSL operation backend. The proc-macro that
-  //! consumes these lives in the separate `lyng-js-vm-dsl` crate.
+  //! consumes these lives in the separate `lyng-vm-dsl` crate.
   //!
   //! During DSL-0a the only module populated is `opcode_manifest` plus the
   //! transitional `LlIntDispatchState` wrapper in `slow_path`. DSL-0b adds
@@ -324,7 +324,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 
 - [ ] **Step 2: Create the opcode_manifest skeleton**
 
-  Create `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`:
+  Create `crates/lyng/vm/src/dsl/opcode_manifest.rs`:
   ```rust
   //! Single-implementation invariant manifest per design §10.
   //!
@@ -333,7 +333,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
   //! DSL handler. Seven structural tests use this manifest to verify the
   //! invariant — see the `manifest_tests` module.
 
-  use lyng_js_bytecode::Opcode;
+  use lyng_bytecode::Opcode;
 
   #[derive(Clone, Copy, Debug, PartialEq, Eq)]
   pub enum OpcodeCategory {
@@ -372,7 +372,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 
 - [ ] **Step 3: Wire the module into `lib.rs`**
 
-  Open `crates/lyng-js/vm/src/lib.rs`. Find the existing top-level `pub mod` block (near the `pub mod vm;` line). Add:
+  Open `crates/lyng/vm/src/lib.rs`. Find the existing top-level `pub mod` block (near the `pub mod vm;` line). Add:
   ```rust
   pub mod dsl;
   ```
@@ -381,16 +381,16 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 - [ ] **Step 4: Verify it compiles**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: clean build. `OPCODES` is empty and `unused`-warning is suppressed via the `pub` visibility.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/mod.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          crates/lyng-js/vm/src/lib.rs
+  git add crates/lyng/vm/src/dsl/mod.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          crates/lyng/vm/src/lib.rs
   git commit -m "DSL-0a: dsl/ module scaffold + opcode_manifest skeleton"
   ```
 
@@ -399,14 +399,14 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 ### Task A3: Define `SemanticOutcome` and per-opcode argument structs
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/slow_path.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
 
 `SemanticOutcome` is the return type of every `op_xxx_semantic` function. It encodes the four dispatch decisions a semantic body can produce: Continue (advance PC), Refresh (frame changed, reload pinned regs), Exit-Done, Exit-Error. The α handler in `dispatch_handlers/` translates this into `Step::Continue / Done / Error`; the DSL cold-stub shim translates it into `SlowPathReturn`.
 
 - [ ] **Step 1: Create the slow_path module**
 
-  Create `crates/lyng-js/vm/src/dsl/slow_path.rs`:
+  Create `crates/lyng/vm/src/dsl/slow_path.rs`:
   ```rust
   //! Slow-path bridge: semantic-outcome type + per-opcode argument structs
   //! + (DSL-0b) the `LlIntDispatchState` wrapper and `SlowPathReturn` ABI.
@@ -415,7 +415,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
   //! transitional `LlIntDispatchState` alias are populated. The asm-facing
   //! shim layer and `SlowPathReturn`/`SlowPathTag` lands in DSL-0b.
 
-  use lyng_js_types::Value;
+  use lyng_types::Value;
 
   use crate::error::VmError;
 
@@ -440,7 +440,7 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 
 - [ ] **Step 2: Wire the module into `dsl/mod.rs`**
 
-  Edit `crates/lyng-js/vm/src/dsl/mod.rs` and add:
+  Edit `crates/lyng/vm/src/dsl/mod.rs` and add:
   ```rust
   pub mod slow_path;
   ```
@@ -448,14 +448,14 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 - [ ] **Step 3: Verify it compiles**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: clean build.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs crates/lyng-js/vm/src/dsl/mod.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs crates/lyng/vm/src/dsl/mod.rs
   git commit -m "DSL-0a: SemanticOutcome scaffolding"
   ```
 
@@ -464,13 +464,13 @@ Tasks in this plan are sized for subagent dispatch via `superpowers:subagent-dri
 ### Task A4: Define transitional `LlIntDispatchState` wrapper
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs`
 
 The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is reconstructed via `from_raw` in DSL-0b. Existing semantic logic uses the wrapper through the same API in both phases — that's the contract that lets the alpha path and the DSL cold-stub shim share one semantic body.
 
 - [ ] **Step 1: Add the wrapper to `slow_path.rs`**
 
-  Append to `crates/lyng-js/vm/src/dsl/slow_path.rs`:
+  Append to `crates/lyng/vm/src/dsl/slow_path.rs`:
   ```rust
   use crate::vm::dispatch_state::DispatchState;
 
@@ -513,19 +513,19 @@ The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is rec
 
 - [ ] **Step 2: Make `DispatchState` reachable from `dsl::slow_path`**
 
-  Open `crates/lyng-js/vm/src/vm/dispatch_state.rs`. The `DispatchState` fields are `pub(crate)`. Add `pub(crate)` to the struct itself if not already (it already is — `pub struct DispatchState<'vm>` at line ~45). No change needed; the import in slow_path.rs already works because both modules live in the `lyng-js-vm` crate.
+  Open `crates/lyng/vm/src/vm/dispatch_state.rs`. The `DispatchState` fields are `pub(crate)`. Add `pub(crate)` to the struct itself if not already (it already is — `pub struct DispatchState<'vm>` at line ~45). No change needed; the import in slow_path.rs already works because both modules live in the `lyng-vm` crate.
 
 - [ ] **Step 3: Verify it compiles**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: clean build. The wrapper compiles because the only variant is `Alpha`, which trivially uses the existing `DispatchState` type.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0a: transitional LlIntDispatchState wrapper"
   ```
 
@@ -534,21 +534,21 @@ The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is rec
 ### Task A5: Define `semantics/` module skeleton
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm.rs` (or `vm/mod.rs` if applicable)
+- Create: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm.rs` (or `vm/mod.rs` if applicable)
 
 - [ ] **Step 1: Check the vm module layout**
 
   Run:
   ```sh
-  ls crates/lyng-js/vm/src/vm/
-  head -50 crates/lyng-js/vm/src/lib.rs
+  ls crates/lyng/vm/src/vm/
+  head -50 crates/lyng/vm/src/lib.rs
   ```
   Expected: confirm whether `vm.rs` or `vm/mod.rs` is the module root.
 
 - [ ] **Step 2: Create the semantics module skeleton**
 
-  Create `crates/lyng-js/vm/src/vm/semantics/mod.rs`:
+  Create `crates/lyng/vm/src/vm/semantics/mod.rs`:
   ```rust
   //! Free-function semantic bodies per design §10 DSL-0a.
   //!
@@ -556,7 +556,7 @@ The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is rec
   //! one bytecode opcode. The α handler in `dispatch_handlers/` decodes
   //! operands and calls into one of these; in DSL-0b the same function
   //! is also reachable from the DSL cold-stub shim in
-  //! `crates/lyng-js/vm/src/dsl/slow_path.rs`.
+  //! `crates/lyng/vm/src/dsl/slow_path.rs`.
   //!
   //! Per-family submodules are added by family-extraction tasks A8–A18.
   //! `OpXxxArgs` structs live alongside their semantic body.
@@ -566,19 +566,19 @@ The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is rec
 
 - [ ] **Step 3: Wire the module into the vm tree**
 
-  Open `crates/lyng-js/vm/src/vm.rs` (or `vm/mod.rs`). Find the existing `mod` block near the top. Add `pub(crate) mod semantics;` alphabetically.
+  Open `crates/lyng/vm/src/vm.rs` (or `vm/mod.rs`). Find the existing `mod` block near the top. Add `pub(crate) mod semantics;` alphabetically.
 
 - [ ] **Step 4: Verify it compiles**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: clean build.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/mod.rs crates/lyng-js/vm/src/vm.rs
+  git add crates/lyng/vm/src/vm/semantics/mod.rs crates/lyng/vm/src/vm.rs
   git commit -m "DSL-0a: semantics/ module skeleton"
   ```
 
@@ -587,18 +587,18 @@ The DSL-0a wrapper aliases today's `DispatchState`. The same wrapper type is rec
 ### Task A6: Manifest Test 1 — exhaustive `Opcode` coverage
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 This test fails today (`OPCODES` is empty). It stays failing through tasks A8–A18 and turns green once every family extraction has registered its opcodes in the manifest. We land the test first as the structural guardrail.
 
 - [ ] **Step 1: Append the manifest_tests module**
 
-  Append to `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`:
+  Append to `crates/lyng/vm/src/dsl/opcode_manifest.rs`:
   ```rust
   #[cfg(test)]
   mod manifest_tests {
       use super::*;
-      use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
+      use lyng_bytecode::{Opcode, OPCODE_COUNT};
       use std::collections::HashSet;
 
       /// Test 1 from design §10 DSL-0a: every `Opcode` variant appears in
@@ -649,7 +649,7 @@ This test fails today (`OPCODES` is empty). It stays failing through tasks A8–
 - [ ] **Step 2: Run the failing test**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive 2>&1 | tail -20
+  cargo test -p lyng-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive 2>&1 | tail -20
   ```
   Expected: FAIL. Message names a specific opcode byte that's missing. Record the failure — this is the regression check that drives tasks A8–A18.
 
@@ -664,14 +664,14 @@ This test fails today (`OPCODES` is empty). It stays failing through tasks A8–
 - [ ] **Step 4: Verify the ignored test still compiles**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest 2>&1 | tail -10
+  cargo test -p lyng-vm dsl::opcode_manifest 2>&1 | tail -10
   ```
   Expected: 0 tests passed, 1 ignored.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: manifest Test 1 (exhaustive Opcode coverage), ignored until A18"
   ```
 
@@ -680,17 +680,17 @@ This test fails today (`OPCODES` is empty). It stays failing through tasks A8–
 ### Task A7: Manifest Test 4 — source-grep smoke test
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_manifest_grep.rs`
+- Create: `crates/lyng/vm/tests/dsl_manifest_grep.rs`
 
 Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back into helper modules outside the `semantics/` directory. Runs as a normal `#[test]` because it operates on source files.
 
 - [ ] **Step 1: Create the smoke test**
 
-  Create `crates/lyng-js/vm/tests/dsl_manifest_grep.rs`:
+  Create `crates/lyng/vm/tests/dsl_manifest_grep.rs`:
   ```rust
   //! Test 4 from design §10 DSL-0a: opcode-shaped semantic logic lives only in
-  //! `crates/lyng-js/vm/src/vm/semantics/` and (transitionally) in
-  //! `crates/lyng-js/vm/src/vm/dispatch_handlers/` as decode-and-call thunks.
+  //! `crates/lyng/vm/src/vm/semantics/` and (transitionally) in
+  //! `crates/lyng/vm/src/vm/dispatch_handlers/` as decode-and-call thunks.
   //!
   //! This test reads source files and rejects function names matching
   //! `^pub(\(.*\))?\s*fn\s+op_[a-z0-9_]+\s*\(` (i.e. `op_xxx` functions)
@@ -767,14 +767,14 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 - [ ] **Step 2: Verify the test compiles and is correctly ignored**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_manifest_grep 2>&1 | tail -10
+  cargo test -p lyng-vm --test dsl_manifest_grep 2>&1 | tail -10
   ```
   Expected: 0 tests passed, 1 ignored.
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_manifest_grep.rs
+  git add crates/lyng/vm/tests/dsl_manifest_grep.rs
   git commit -m "DSL-0a: manifest Test 4 (source-grep smoke), ignored until A18"
   ```
 
@@ -783,24 +783,24 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 ### Task A8: Extract `loads` family (35 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/loads.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/loads.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/loads.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/loads.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Move`, `LoadUndefined`, `LoadUninitializedLexical`, `LoadNull`, `LoadTrue`, `LoadFalse`, `LoadZero`, `LoadOne`, `LoadSmi`, `LoadConst`, `Wide` and `ExtraWide` are not here (they're in `prefix` family — Task A18). `LdaUndefined`, `LdaNull`, `LdaTrue`, `LdaFalse`, `LdaZero`, `LdaOne`, `LdaSmi8`, `LdaConst8`, `Ldar`, `Star0..7`, `LoadSmi8`, `LoadConst8`, `LoadLocal0..3`, `StoreLocal0..3` — full list per `dispatch_handlers/loads.rs` `pub use` line.
 
 - [ ] **Step 1: Read the existing α handlers**
 
   ```sh
-  wc -l crates/lyng-js/vm/src/vm/dispatch_handlers/loads.rs
-  rg -n "^pub extern" crates/lyng-js/vm/src/vm/dispatch_handlers/loads.rs
+  wc -l crates/lyng/vm/src/vm/dispatch_handlers/loads.rs
+  rg -n "^pub extern" crates/lyng/vm/src/vm/dispatch_handlers/loads.rs
   ```
   Expected: lists ~35 `pub extern "C" fn op_xxx` entries matching the family.
 
 - [ ] **Step 2: Create the loads semantics module**
 
-  Create `crates/lyng-js/vm/src/vm/semantics/loads.rs`. For each α handler in `dispatch_handlers/loads.rs`, port its semantic body into:
+  Create `crates/lyng/vm/src/vm/semantics/loads.rs`. For each α handler in `dispatch_handlers/loads.rs`, port its semantic body into:
   ```rust
   use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 
@@ -828,7 +828,7 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 
 - [ ] **Step 3: Wire `loads` into `semantics/mod.rs`**
 
-  Append to `crates/lyng-js/vm/src/vm/semantics/mod.rs`:
+  Append to `crates/lyng/vm/src/vm/semantics/mod.rs`:
   ```rust
   pub(crate) mod loads;
   ```
@@ -887,13 +887,13 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 
 - [ ] **Step 5: Register loads opcodes in the manifest**
 
-  In `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`, append entries to `OPCODES` for each loads opcode:
+  In `crates/lyng/vm/src/dsl/opcode_manifest.rs`, append entries to `OPCODES` for each loads opcode:
   ```rust
   pub const OPCODES: &[OpcodeEntry] = &[
       OpcodeEntry {
           opcode: Opcode::Move,
-          semantic_symbol: "lyng_js_vm::vm::semantics::loads::op_move_semantic",
-          dsl_handler_symbol: "lyng_js_vm::dsl::handlers::cold::op_move_dsl",
+          semantic_symbol: "lyng_vm::vm::semantics::loads::op_move_semantic",
+          dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_move_dsl",
           category: OpcodeCategory::Cold,  // refined to Hot in Task B39
       },
       // ... one entry per loads opcode
@@ -905,19 +905,19 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 - [ ] **Step 6: Verify the family compiles and behavior tests pass**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-tests 2>&1 | tail -20
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-tests 2>&1 | tail -20
   ```
   Expected: clean build; all tests pass (no regression vs Pre-flight 4).
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/loads.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/loads.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/mod.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/loads.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/loads.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/mod.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract loads family (35 opcodes) into semantics::loads"
   ```
 
@@ -926,10 +926,10 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 ### Task A9: Extract `arithmetic` family (~30 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/arithmetic.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/arithmetic.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/arithmetic.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/arithmetic.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Add`, `AddSmi`, `Sub`, `SubSmi`, `Mul`, `MulSmi`, `Div`, `Mod`, `DivSmi`, `ModSmi`, `Exp`, `BitOr`, `BitXor`, `BitAnd`, `BitAndSmi`, `BitNot`, `ShiftLeft`, `ShiftRight`, `UnsignedShiftRight`, `Negate`, `Increment`, `Decrement`, `Equal`, `StrictEqual`, `EqualZero`, `LessThan`, `LessEqual`, `GreaterThan`, `GreaterEqual`. Per the `pub use arithmetic::{...}` re-export in `dispatch_handlers/mod.rs`.
 
@@ -937,7 +937,7 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 
   ```sh
   rg -n "execute_(add|sub|mul|div|mod|exp|bit|shift|equal|less|greater|negate|increment|decrement)" \
-     crates/lyng-js/vm/src/vm/dispatch/arithmetic.rs | head -40
+     crates/lyng/vm/src/vm/dispatch/arithmetic.rs | head -40
   ```
   Expected: ~30 helper methods on `Vm`. Most of the work for this family is renaming them to `op_xxx_semantic` free functions.
 
@@ -947,7 +947,7 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 
   Example for `op_add`:
   ```rust
-  use lyng_js_types::{FeedbackSlotId, Value};
+  use lyng_types::{FeedbackSlotId, Value};
   use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 
   pub struct OpAddArgs {
@@ -1034,18 +1034,18 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 - [ ] **Step 6: Verify build + tests**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-tests 2>&1 | tail -20
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-tests 2>&1 | tail -20
   ```
   Expected: clean build; no regressions.
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/arithmetic.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/arithmetic.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/arithmetic.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/arithmetic.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract arithmetic family (~30 opcodes) into semantics::arithmetic"
   ```
 
@@ -1054,10 +1054,10 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 ### Task A10: Extract `control_flow` family (10 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/control_flow.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/control_flow.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Jump`, `Jump8`, `JumpIfTrue`, `JumpIfTrue8`, `JumpIfFalse`, `JumpIfFalse8`, `LoopHeader`, `Return`, `ReturnUndefined`, `Nop`.
 
@@ -1126,17 +1126,17 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 - [ ] **Step 5: Verify build + tests**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-tests 2>&1 | tail -20
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-tests 2>&1 | tail -20
   ```
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/control_flow.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/control_flow.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract control_flow family (10 opcodes) into semantics::control_flow"
   ```
 
@@ -1145,19 +1145,19 @@ Test 4 is defense-in-depth: ensures no opcode-shaped semantic logic sneaks back 
 ### Task A11: Extract `property` family (~21 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/property.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/property.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/property.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/property.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `GetNamedProperty`, `SetNamedProperty`, `AssignNamedProperty`, `StrictAssignNamedProperty`, `GetKeyedProperty`, `SetKeyedProperty`, `AssignKeyedProperty`, `StrictAssignKeyedProperty`, `DefineNamedProperty`, `DefineKeyedProperty`, `CreateObject`, `CreateArray`, `StoreDenseElement`, `LoadDenseElement`, `DeleteProperty`, `In`, `ToPropertyKey`, `CopyDataProperties`, `SetFunctionName`, `CheckObjectCoercible`, `ThrowIfUninitialized`.
 
-This family has the most complex IC machinery. Many of these already have semi-extracted `execute_*_opcode` methods in `crates/lyng-js/vm/src/vm/dispatch/property.rs` (per `wc -l`: 81 KB file). The extraction is mostly mechanical reshape of those.
+This family has the most complex IC machinery. Many of these already have semi-extracted `execute_*_opcode` methods in `crates/lyng/vm/src/vm/dispatch/property.rs` (per `wc -l`: 81 KB file). The extraction is mostly mechanical reshape of those.
 
 - [ ] **Step 1: Inspect existing helpers**
 
   ```sh
-  rg -n "pub.*fn execute_" crates/lyng-js/vm/src/vm/dispatch/property.rs | head -30
+  rg -n "pub.*fn execute_" crates/lyng/vm/src/vm/dispatch/property.rs | head -30
   ```
 
 - [ ] **Step 2: Create `semantics/property.rs`**
@@ -1175,18 +1175,18 @@ This family has the most complex IC machinery. Many of these already have semi-e
 - [ ] **Step 6: Verify build + tests**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-tests 2>&1 | tail -20
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-tests 2>&1 | tail -20
   ```
   Expected: clean build; all tests pass. Property-access tests are the most likely to surface extraction errors — investigate any failure before proceeding.
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/property.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/property.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/property.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/property.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract property family (~21 opcodes) into semantics::property"
   ```
 
@@ -1195,22 +1195,22 @@ This family has the most complex IC machinery. Many of these already have semi-e
 ### Task A12: Extract `names` family (17 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/names.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/names.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/names.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/names.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `LoadGlobal`, `StoreGlobal`, `AssignGlobal`, `DeleteGlobal`, `LoadName`, `ResolveName`, `ResolveGlobal`, `AssignName`, `AssignVariableName`, `DeleteName`, `CaptureName`, `LoadCapturedName`, `LoadCapturedNameThis`, `AssignCapturedName`, `LoadThis`, `LoadCallee`, `LoadNewTarget`.
 
 - [ ] **Step 1: Inspect α handlers**
 
   ```sh
-  rg -n "^pub extern" crates/lyng-js/vm/src/vm/dispatch_handlers/names.rs | head -20
+  rg -n "^pub extern" crates/lyng/vm/src/vm/dispatch_handlers/names.rs | head -20
   ```
 
 - [ ] **Step 2: Create `semantics/names.rs`**
 
-  Each opcode: `OpXxxArgs` + `op_xxx_semantic` returning `SemanticOutcome`. Reuse existing helper functions from `crates/lyng-js/vm/src/vm/names.rs` (the 63 KB file containing the semantic implementations).
+  Each opcode: `OpXxxArgs` + `op_xxx_semantic` returning `SemanticOutcome`. Reuse existing helper functions from `crates/lyng/vm/src/vm/names.rs` (the 63 KB file containing the semantic implementations).
 
 - [ ] **Step 3: Wire into `semantics/mod.rs`**
 
@@ -1223,10 +1223,10 @@ This family has the most complex IC machinery. Many of these already have semi-e
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/names.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/names.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/names.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/names.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract names family (17 opcodes) into semantics::names"
   ```
 
@@ -1235,17 +1235,17 @@ This family has the most complex IC machinery. Many of these already have semi-e
 ### Task A13: Extract `scope` family (10 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/scope.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/scope.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/scope.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/scope.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `LoadEnvSlot`, `StoreEnvSlot`, `AssignEnvSlot`, `EnterEnvScope`, `LeaveEnvScope`, `PushClosureEnv`, `PopClosureEnv`, `PushWithEnv`, `PopWithEnv`, `TypeOf`.
 
 - [ ] **Step 1: Inspect α handlers**
 
   ```sh
-  rg -n "^pub extern" crates/lyng-js/vm/src/vm/dispatch_handlers/scope.rs
+  rg -n "^pub extern" crates/lyng/vm/src/vm/dispatch_handlers/scope.rs
   ```
 
 - [ ] **Step 2: Create `semantics/scope.rs`**
@@ -1263,10 +1263,10 @@ This family has the most complex IC machinery. Many of these already have semi-e
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/scope.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/scope.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/scope.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/scope.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract scope family (10 opcodes) into semantics::scope"
   ```
 
@@ -1275,10 +1275,10 @@ This family has the most complex IC machinery. Many of these already have semi-e
 ### Task A14: Extract `calls` family (9 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/calls.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/calls.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/calls.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/calls.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Call0`, `Call1`, `Call2`, `Call3`, `Call`, `CallMethod`, `TailCall`, `Construct`, `CreateClosure`.
 
@@ -1287,8 +1287,8 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 - [ ] **Step 1: Inspect existing call helpers and α handlers**
 
   ```sh
-  rg -n "^pub extern" crates/lyng-js/vm/src/vm/dispatch_handlers/calls.rs
-  rg -n "CallMethod" crates/lyng-js/vm/src/vm/dispatch_handlers/mod.rs
+  rg -n "^pub extern" crates/lyng/vm/src/vm/dispatch_handlers/calls.rs
+  rg -n "CallMethod" crates/lyng/vm/src/vm/dispatch_handlers/mod.rs
   ```
 
 - [ ] **Step 2: Create `semantics/calls.rs`**
@@ -1299,7 +1299,7 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
   3. Pushes the new frame.
   4. Returns `SemanticOutcome::Refresh` (so the dispatcher picks up the callee's PC/REGS/FV).
 
-  On call failure: `SemanticOutcome::ExitError`. On tail-call: reuse the existing tail-call mechanics from `crates/lyng-js/vm/src/vm/call.rs`.
+  On call failure: `SemanticOutcome::ExitError`. On tail-call: reuse the existing tail-call mechanics from `crates/lyng/vm/src/vm/call.rs`.
 
 - [ ] **Step 3: Wire into `semantics/mod.rs`**
 
@@ -1312,10 +1312,10 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/calls.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/calls.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/calls.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/calls.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract calls family (9 opcodes) into semantics::calls"
   ```
 
@@ -1324,10 +1324,10 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 ### Task A15: Extract `iterators` family (6 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/iterators.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/iterators.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/iterators.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/iterators.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `CreateForIn`, `AdvanceForIn`, `CloseForIn`, `CreateIterator`, `AdvanceIterator`, `CloseIterator`.
 
@@ -1335,7 +1335,7 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 
 - [ ] **Step 2: Create `semantics/iterators.rs`**
 
-  Each iterator opcode's semantic body wraps the iterator-protocol calls from `crates/lyng-js/vm/src/vm/loop_iteration.rs`. Preserve the abrupt-completion routing.
+  Each iterator opcode's semantic body wraps the iterator-protocol calls from `crates/lyng/vm/src/vm/loop_iteration.rs`. Preserve the abrupt-completion routing.
 
 - [ ] **Step 3: Wire into `semantics/mod.rs`**
 
@@ -1348,10 +1348,10 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/iterators.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/iterators.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/iterators.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/iterators.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract iterators family (6 opcodes) into semantics::iterators"
   ```
 
@@ -1360,10 +1360,10 @@ Calls are frame-transitioning. Every successful call's semantic body returns `Re
 ### Task A16: Extract `generators` family (6 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/generators.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/generators.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/generators.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/generators.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `SuspendGeneratorStart`, `Yield`, `Await`, `DelegateYield`, `LoadResumeKind`, `LoadResumeValue`.
 
@@ -1372,8 +1372,8 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 - [ ] **Step 1: Inspect α handlers and existing async support**
 
   ```sh
-  rg -n "^pub extern" crates/lyng-js/vm/src/vm/dispatch_handlers/generators.rs
-  wc -l crates/lyng-js/vm/src/vm/async_functions.rs crates/lyng-js/vm/src/vm/generators.rs
+  rg -n "^pub extern" crates/lyng/vm/src/vm/dispatch_handlers/generators.rs
+  wc -l crates/lyng/vm/src/vm/async_functions.rs crates/lyng/vm/src/vm/generators.rs
   ```
 
 - [ ] **Step 2: Create `semantics/generators.rs`**
@@ -1389,21 +1389,21 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 - [ ] **Step 6: Verify build + tests**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-tests 2>&1 | tail -20
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-tests 2>&1 | tail -20
   # Plus the focused generator/async test slice:
-  cargo run --release -p lyng-js-test262 -- --filter built-ins/Generator --report /tmp/dsl-0a-generators.md -j 4
+  cargo run --release -p lyng-test262 -- --filter built-ins/Generator --report /tmp/dsl-0a-generators.md -j 4
   ```
   Expected: no regressions in the Generator subset.
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/generators.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/generators.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          crates/lyng-js/vm/src/dsl/slow_path.rs
+  git add crates/lyng/vm/src/vm/semantics/generators.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/generators.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0a: extract generators family (6 opcodes) into semantics::generators"
   ```
 
@@ -1412,14 +1412,14 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 ### Task A17: Extract `exceptions` family (4 opcodes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/exceptions.rs`
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/exceptions.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/exceptions.rs`
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/exceptions.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Throw`, `EnterHandler`, `LeaveHandler`, `LoadException`.
 
-`Throw` semantic body either returns `ExitError` (uncaught) or `Refresh` (transferred to a handler in the same frame) or `ExitError` again (cross-frame uncaught after unwind). Use `Vm::transfer_to_exception_handler` (already in `crates/lyng-js/vm/src/vm/exceptions.rs`) to do the routing.
+`Throw` semantic body either returns `ExitError` (uncaught) or `Refresh` (transferred to a handler in the same frame) or `ExitError` again (cross-frame uncaught after unwind). Use `Vm::transfer_to_exception_handler` (already in `crates/lyng/vm/src/vm/exceptions.rs`) to do the routing.
 
 - [ ] **Step 1: Inspect α handlers and exception support**
 
@@ -1436,10 +1436,10 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/exceptions.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/exceptions.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/vm/semantics/exceptions.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/exceptions.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: extract exceptions family (4 opcodes) into semantics::exceptions"
   ```
 
@@ -1448,18 +1448,18 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 ### Task A18: Extract `prefix` family (2 opcodes) + close out remaining
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/vm/semantics/prefix.rs`
-- Create: `crates/lyng-js/vm/src/vm/semantics/misc.rs` (for `InstanceOf` and any orphan opcodes)
-- Modify: `crates/lyng-js/vm/src/vm/semantics/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_handlers/prefix.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/prefix.rs`
+- Create: `crates/lyng/vm/src/vm/semantics/misc.rs` (for `InstanceOf` and any orphan opcodes)
+- Modify: `crates/lyng/vm/src/vm/semantics/mod.rs`
+- Modify: `crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 **Opcodes in scope:** `Wide`, `ExtraWide`, plus a coverage sweep for any opcode that hasn't landed in a prior family (likely `InstanceOf` from the `arithmetic`-family naming convention — re-check).
 
 - [ ] **Step 1: Identify any opcodes still missing from the manifest**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive -- --ignored --nocapture 2>&1 | tail -30
+  cargo test -p lyng-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive -- --ignored --nocapture 2>&1 | tail -30
   ```
   Expected: lists any opcodes still missing. Likely: `InstanceOf`, possibly `CallMethod` (depending on A14 disposition).
 
@@ -1481,7 +1481,7 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
               error: crate::error::VmError::DoublePrefix,
           };
       }
-      inner.prefix = Some(lyng_js_bytecode::Opcode::Wide);
+      inner.prefix = Some(lyng_bytecode::Opcode::Wide);
       SemanticOutcome::Continue { pc_advance: 1 }
   }
 
@@ -1495,12 +1495,12 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
               error: crate::error::VmError::DoublePrefix,
           };
       }
-      inner.prefix = Some(lyng_js_bytecode::Opcode::ExtraWide);
+      inner.prefix = Some(lyng_bytecode::Opcode::ExtraWide);
       SemanticOutcome::Continue { pc_advance: 1 }
   }
   ```
 
-  If `VmError::DoublePrefix` doesn't yet exist, add it as a new variant in `crates/lyng-js/vm/src/error.rs` (and update the existing α handler's error type accordingly).
+  If `VmError::DoublePrefix` doesn't yet exist, add it as a new variant in `crates/lyng/vm/src/error.rs` (and update the existing α handler's error type accordingly).
 
 - [ ] **Step 3: Create `semantics/misc.rs` for any orphans**
 
@@ -1519,35 +1519,35 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 
 - [ ] **Step 7: Enable Manifest Tests 1 and 4**
 
-  In `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`, remove the `#[ignore]` attribute from the exhaustive-coverage test.
-  In `crates/lyng-js/vm/tests/dsl_manifest_grep.rs`, remove the `#[ignore]` attribute.
+  In `crates/lyng/vm/src/dsl/opcode_manifest.rs`, remove the `#[ignore]` attribute from the exhaustive-coverage test.
+  In `crates/lyng/vm/tests/dsl_manifest_grep.rs`, remove the `#[ignore]` attribute.
 
 - [ ] **Step 8: Run both tests**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive
-  cargo test -p lyng-js-vm --test dsl_manifest_grep
+  cargo test -p lyng-vm dsl::opcode_manifest::manifest_tests::opcodes_manifest_is_exhaustive
+  cargo test -p lyng-vm --test dsl_manifest_grep
   ```
   Expected: both PASS. If Test 4 catches an `op_*` function outside the allowlist, either move it to `semantics/` or extend the allowlist with a documented exception.
 
 - [ ] **Step 9: Full test suite + Test262**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
-  cargo run --release -p lyng-js-test262 -- --report /tmp/dsl-0a-test262.md -j 4
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
+  cargo run --release -p lyng-test262 -- --report /tmp/dsl-0a-test262.md -j 4
   ```
   Expected: focused suites pass count matches Pre-flight 4. Test262 pass count ≥ Pre-flight 7 baseline.
 
 - [ ] **Step 10: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/semantics/prefix.rs \
-          crates/lyng-js/vm/src/vm/semantics/misc.rs \
-          crates/lyng-js/vm/src/vm/semantics/mod.rs \
-          crates/lyng-js/vm/src/vm/dispatch_handlers/prefix.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          crates/lyng-js/vm/tests/dsl_manifest_grep.rs \
-          crates/lyng-js/vm/src/error.rs
+  git add crates/lyng/vm/src/vm/semantics/prefix.rs \
+          crates/lyng/vm/src/vm/semantics/misc.rs \
+          crates/lyng/vm/src/vm/semantics/mod.rs \
+          crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          crates/lyng/vm/tests/dsl_manifest_grep.rs \
+          crates/lyng/vm/src/error.rs
   git commit -m "DSL-0a: extract prefix + misc, close manifest coverage, enable Tests 1 + 4"
   ```
 
@@ -1556,7 +1556,7 @@ Generator suspension is the most subtle extraction. `Yield` / `Await` may suspen
 ### Task A19: Manifest Test 2 — `semantic_symbol` linker resolution
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 This test verifies every `OpcodeEntry.semantic_symbol` actually resolves to a function at link time. The simplest way is to call each function via a generated `fn ptr` (with synthetic dummy arguments via `unreachable!()` branches that never run) — but that's overkill. A cleaner approach: a static `&[(&str, fn(&mut LlIntDispatchState<'_, '_>, /* boxed args */ ()) -> ())]`-shaped registry where every semantic body is type-erased to a dummy signature.
 
@@ -1566,7 +1566,7 @@ Easier: a direct second const slice that holds the function pointers themselves,
 
 - [ ] **Step 1: Add the function-pointer registry**
 
-  At the bottom of `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`:
+  At the bottom of `crates/lyng/vm/src/dsl/opcode_manifest.rs`:
   ```rust
   /// Type-erased semantic function pointer. Each opcode has a unique
   /// concrete signature but the linker-resolution test only needs to
@@ -1616,14 +1616,14 @@ Easier: a direct second const slice that holds the function pointers themselves,
 - [ ] **Step 3: Run the test**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest::manifest_tests::semantic_fn_ptrs_resolve 2>&1 | tail -10
+  cargo test -p lyng-vm dsl::opcode_manifest::manifest_tests::semantic_fn_ptrs_resolve 2>&1 | tail -10
   ```
   Expected: PASS.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0a: manifest Test 2 (semantic fn-ptr linker resolution)"
   ```
 
@@ -1636,15 +1636,15 @@ Easier: a direct second const slice that holds the function pointers themselves,
 - [ ] **Step 1: Run all manifest tests**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest
-  cargo test -p lyng-js-vm --test dsl_manifest_grep
+  cargo test -p lyng-vm dsl::opcode_manifest
+  cargo test -p lyng-vm --test dsl_manifest_grep
   ```
   Expected: all pass.
 
 - [ ] **Step 2: Run full focused tests + clippy**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
   cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery 2>&1 | tail -40
   ```
   Expected: focused suites pass; clippy warnings reviewed and either fixed or `allow`-justified inline.
@@ -1652,23 +1652,23 @@ Easier: a direct second const slice that holds the function pointers themselves,
 - [ ] **Step 3: Run Test262 whole-corpus**
 
   ```sh
-  cargo run --release -p lyng-js-test262 -- --report /tmp/dsl-0a-test262.md -j 4
-  cp /tmp/dsl-0a-test262.md reports/js/lyng-js/dsl-0a-test262.md
+  cargo run --release -p lyng-test262 -- --report /tmp/dsl-0a-test262.md -j 4
+  cp /tmp/dsl-0a-test262.md reports/lyng/dsl-0a-test262.md
   ```
   Expected: pass count ≥ Pre-flight 7 baseline.
 
 - [ ] **Step 4: Run V8 v7 to confirm no regression**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --report /tmp/dsl-0a-v8.md --json /tmp/dsl-0a-v8.json
-  cp /tmp/dsl-0a-v8.md reports/js/lyng-js/dsl-0a-v8.md
-  cp /tmp/dsl-0a-v8.json reports/js/lyng-js/dsl-0a-v8.json
+  cargo run --release -p lyng-bench -- v8suite --report /tmp/dsl-0a-v8.md --json /tmp/dsl-0a-v8.json
+  cp /tmp/dsl-0a-v8.md reports/lyng/dsl-0a-v8.md
+  cp /tmp/dsl-0a-v8.json reports/lyng/dsl-0a-v8.json
   ```
   Expected: geomean within ±2% of pre-DSL-0 baseline (acceptable — semantic extraction adds one indirection through `translate_outcome_to_step` per opcode).
 
 - [ ] **Step 5: Write DSL-0a status report**
 
-  Create `reports/js/lyng-js/dsl-0a-status.md`:
+  Create `reports/lyng/dsl-0a-status.md`:
   ```markdown
   # DSL-0a status
 
@@ -1676,40 +1676,40 @@ Easier: a direct second const slice that holds the function pointers themselves,
 
   | Deliverable | Status | Path |
   | --- | --- | --- |
-  | Semantics family: loads | done | crates/lyng-js/vm/src/vm/semantics/loads.rs |
-  | Semantics family: arithmetic | done | crates/lyng-js/vm/src/vm/semantics/arithmetic.rs |
-  | Semantics family: control_flow | done | crates/lyng-js/vm/src/vm/semantics/control_flow.rs |
-  | Semantics family: property | done | crates/lyng-js/vm/src/vm/semantics/property.rs |
-  | Semantics family: names | done | crates/lyng-js/vm/src/vm/semantics/names.rs |
-  | Semantics family: scope | done | crates/lyng-js/vm/src/vm/semantics/scope.rs |
-  | Semantics family: calls | done | crates/lyng-js/vm/src/vm/semantics/calls.rs |
-  | Semantics family: iterators | done | crates/lyng-js/vm/src/vm/semantics/iterators.rs |
-  | Semantics family: generators | done | crates/lyng-js/vm/src/vm/semantics/generators.rs |
-  | Semantics family: exceptions | done | crates/lyng-js/vm/src/vm/semantics/exceptions.rs |
-  | Semantics family: prefix | done | crates/lyng-js/vm/src/vm/semantics/prefix.rs |
-  | Semantics family: misc | done | crates/lyng-js/vm/src/vm/semantics/misc.rs |
-  | Manifest Test 1 (exhaustive coverage) | passing | crates/lyng-js/vm/src/dsl/opcode_manifest.rs |
-  | Manifest Test 2 (semantic fn-ptr resolution) | passing | crates/lyng-js/vm/src/dsl/opcode_manifest.rs |
-  | Manifest Test 4 (source-grep) | passing | crates/lyng-js/vm/tests/dsl_manifest_grep.rs |
-  | Transitional LlIntDispatchState wrapper | done | crates/lyng-js/vm/src/dsl/slow_path.rs |
+  | Semantics family: loads | done | crates/lyng/vm/src/vm/semantics/loads.rs |
+  | Semantics family: arithmetic | done | crates/lyng/vm/src/vm/semantics/arithmetic.rs |
+  | Semantics family: control_flow | done | crates/lyng/vm/src/vm/semantics/control_flow.rs |
+  | Semantics family: property | done | crates/lyng/vm/src/vm/semantics/property.rs |
+  | Semantics family: names | done | crates/lyng/vm/src/vm/semantics/names.rs |
+  | Semantics family: scope | done | crates/lyng/vm/src/vm/semantics/scope.rs |
+  | Semantics family: calls | done | crates/lyng/vm/src/vm/semantics/calls.rs |
+  | Semantics family: iterators | done | crates/lyng/vm/src/vm/semantics/iterators.rs |
+  | Semantics family: generators | done | crates/lyng/vm/src/vm/semantics/generators.rs |
+  | Semantics family: exceptions | done | crates/lyng/vm/src/vm/semantics/exceptions.rs |
+  | Semantics family: prefix | done | crates/lyng/vm/src/vm/semantics/prefix.rs |
+  | Semantics family: misc | done | crates/lyng/vm/src/vm/semantics/misc.rs |
+  | Manifest Test 1 (exhaustive coverage) | passing | crates/lyng/vm/src/dsl/opcode_manifest.rs |
+  | Manifest Test 2 (semantic fn-ptr resolution) | passing | crates/lyng/vm/src/dsl/opcode_manifest.rs |
+  | Manifest Test 4 (source-grep) | passing | crates/lyng/vm/tests/dsl_manifest_grep.rs |
+  | Transitional LlIntDispatchState wrapper | done | crates/lyng/vm/src/dsl/slow_path.rs |
 
   ## Test262 evidence
 
   - Pre-DSL-0a baseline: <N> passing.
   - Post-DSL-0a: <M> passing. Δ: <delta>.
 
-  Report: reports/js/lyng-js/dsl-0a-test262.md.
+  Report: reports/lyng/dsl-0a-test262.md.
 
   ## V8 v7 evidence
 
   - Pre-DSL-0a baseline geomean: <X>.
   - Post-DSL-0a geomean: <Y>. Δ: <delta>%.
 
-  Report: reports/js/lyng-js/dsl-0a-v8.md.
+  Report: reports/lyng/dsl-0a-v8.md.
 
   ## Hand-off to DSL-0b
 
-  DSL-0b lands the `lyng-js-vm-dsl` proc-macro, the `vm/src/dsl/` runtime
+  DSL-0b lands the `lyng-vm-dsl` proc-macro, the `vm/src/dsl/` runtime
   ABI (`LlIntState`, `LlIntRustContext`, slow-path bridge), the AArch64
   backend, the FeedbackVector flat-array refactor, the 9 validation
   cases, the 5 hot ports, the 5 warm ports, and ~140 cold stubs.
@@ -1728,16 +1728,16 @@ Easier: a direct second const slice that holds the function pointers themselves,
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0a-status.md \
-          reports/js/lyng-js/dsl-0a-test262.md \
-          reports/js/lyng-js/dsl-0a-v8.md \
-          reports/js/lyng-js/dsl-0a-v8.json
+  git add reports/lyng/dsl-0a-status.md \
+          reports/lyng/dsl-0a-test262.md \
+          reports/lyng/dsl-0a-v8.md \
+          reports/lyng/dsl-0a-v8.json
   git commit -m "DSL-0a: exit-gate status report + post-extraction evidence"
   ```
 
 - [ ] **Step 8: Notify the user**
 
-  Surface message: "DSL-0a complete. All 152 opcodes extracted; manifest Tests 1, 2, and 4 passing; Test262 not regressed; V8 v7 within ±2% of pre-DSL-0 baseline. Status report at `reports/js/lyng-js/dsl-0a-status.md`. May I proceed to DSL-0b? (DSL-0a dcat ticket is in_review; close gating on your approval.)"
+  Surface message: "DSL-0a complete. All 152 opcodes extracted; manifest Tests 1, 2, and 4 passing; Test262 not regressed; V8 v7 within ±2% of pre-DSL-0 baseline. Status report at `reports/lyng/dsl-0a-status.md`. May I proceed to DSL-0b? (DSL-0a dcat ticket is in_review; close gating on your approval.)"
 
 ---
 
@@ -1748,32 +1748,32 @@ Easier: a direct second const slice that holds the function pointers themselves,
 **Estimated duration:** 4–5 weeks.
 
 **Exit criteria** (verified by Task B50):
-1. `lyng-js-vm-dsl` crate compiles; `llint_handler!` expands real opcodes.
+1. `lyng-vm-dsl` crate compiles; `llint_handler!` expands real opcodes.
 2. All 9 DSL-0b validation cases pass as committed tests.
 3. 5 hot handlers + 5 warm handlers + ~140 cold stubs exist and route through the DSL dispatch table (which is populated but inactive).
 4. FeedbackVector flat-array refactor lands without regressing IC fast-path behavior.
 5. Manifest entries' `dsl_handler_symbol` strings name real DSL symbols.
-6. `cargo build --release -p lyng-js-vm` is clean.
-7. `cargo test -p lyng-js-vm` passes (alpha is still the active path; DSL handlers are dead code per the still-default dispatch table assembly).
+6. `cargo build --release -p lyng-vm` is clean.
+7. `cargo test -p lyng-vm` passes (alpha is still the active path; DSL handlers are dead code per the still-default dispatch table assembly).
 
 ---
 
-### Task B1: Create `lyng-js-vm-dsl` proc-macro crate
+### Task B1: Create `lyng-vm-dsl` proc-macro crate
 
 **Files:**
-- Create: `crates/lyng-js-vm-dsl/Cargo.toml`
-- Create: `crates/lyng-js-vm-dsl/src/lib.rs`
+- Create: `crates/lyng/vm-dsl/Cargo.toml`
+- Create: `crates/lyng/vm-dsl/src/lib.rs`
 - Modify: `Cargo.toml` (workspace)
 
 - [ ] **Step 1: Create crate directory and Cargo.toml**
 
-  Create `crates/lyng-js-vm-dsl/Cargo.toml`:
+  Create `crates/lyng/vm-dsl/Cargo.toml`:
   ```toml
   [package]
-  name = "lyng-js-vm-dsl"
+  name = "lyng-vm-dsl"
   version = "0.1.0"
   edition = "2021"
-  description = "Proc-macro crate for the lyng-js asm-DSL interpreter substrate"
+  description = "Proc-macro crate for the lyng asm-DSL interpreter substrate"
   license = "MIT"
 
   [lib]
@@ -1787,12 +1787,12 @@ Easier: a direct second const slice that holds the function pointers themselves,
 
 - [ ] **Step 2: Create initial lib.rs**
 
-  Create `crates/lyng-js-vm-dsl/src/lib.rs`:
+  Create `crates/lyng/vm-dsl/src/lib.rs`:
   ```rust
   //! Proc-macro crate emitting #[unsafe(naked)] extern "C" fn DSL handlers.
   //!
   //! `llint_handler!` parses an offlineasm-flavored handler body (see
-  //! `docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md` §4) and
+  //! `docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md` §4) and
   //! lowers it to a single `core::arch::naked_asm!` block.
   //!
   //! Submodules:
@@ -1810,7 +1810,7 @@ Easier: a direct second const slice that holds the function pointers themselves,
 
   /// Define a DSL handler.
   ///
-  /// Syntax (see docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md §4):
+  /// Syntax (see docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md §4):
   ///
   /// ```ignore
   /// llint_handler! {
@@ -1841,12 +1841,12 @@ Easier: a direct second const slice that holds the function pointers themselves,
 
 - [ ] **Step 3: Add the crate to the workspace**
 
-  Open the workspace root `Cargo.toml`. Add `"crates/lyng-js-vm-dsl"` to the `members` array in the `[workspace]` section, sorted alphabetically.
+  Open the workspace root `Cargo.toml`. Add `"crates/lyng/vm-dsl"` to the `members` array in the `[workspace]` section, sorted alphabetically.
 
 - [ ] **Step 4: Create empty submodule files**
 
   Create:
-  - `crates/lyng-js-vm-dsl/src/parse.rs` with a TODO stub:
+  - `crates/lyng/vm-dsl/src/parse.rs` with a TODO stub:
     ```rust
     use proc_macro2::TokenStream;
     use syn::Result;
@@ -1860,9 +1860,9 @@ Easier: a direct second const slice that holds the function pointers themselves,
         Err(syn::Error::new(proc_macro2::Span::call_site(), "llint_handler! parser stub — Task B2"))
     }
     ```
-  - `crates/lyng-js-vm-dsl/src/layouts.rs` with a TODO stub.
-  - `crates/lyng-js-vm-dsl/src/scratch.rs` with a TODO stub.
-  - `crates/lyng-js-vm-dsl/src/lower.rs`:
+  - `crates/lyng/vm-dsl/src/layouts.rs` with a TODO stub.
+  - `crates/lyng/vm-dsl/src/scratch.rs` with a TODO stub.
+  - `crates/lyng/vm-dsl/src/lower.rs`:
     ```rust
     use proc_macro2::TokenStream;
     use syn::Result;
@@ -1877,15 +1877,15 @@ Easier: a direct second const slice that holds the function pointers themselves,
 - [ ] **Step 5: Verify the crate compiles**
 
   ```sh
-  cargo build -p lyng-js-vm-dsl
+  cargo build -p lyng-vm-dsl
   ```
   Expected: clean build of the (no-op) proc-macro crate.
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js-vm-dsl/ Cargo.toml
-  git commit -m "DSL-0b: lyng-js-vm-dsl proc-macro crate scaffold"
+  git add crates/lyng/vm-dsl/ Cargo.toml
+  git commit -m "DSL-0b: lyng-vm-dsl proc-macro crate scaffold"
   ```
 
 ---
@@ -1893,13 +1893,13 @@ Easier: a direct second const slice that holds the function pointers themselves,
 ### Task B2: Proc-macro — handler-body parser
 
 **Files:**
-- Modify: `crates/lyng-js-vm-dsl/src/parse.rs`
+- Modify: `crates/lyng/vm-dsl/src/parse.rs`
 
 Parses the input of `llint_handler! { name, layout = X, length = N, |args| { body } }` into an AST containing: handler name, layout descriptor, instruction length, named operand bindings, body statements (each statement is one DSL operation invocation or a label).
 
 - [ ] **Step 1: Define the AST**
 
-  Replace `crates/lyng-js-vm-dsl/src/parse.rs`:
+  Replace `crates/lyng/vm-dsl/src/parse.rs`:
   ```rust
   use proc_macro2::{Span, TokenStream};
   use syn::{
@@ -1952,13 +1952,13 @@ Parses the input of `llint_handler! { name, layout = X, length = N, |args| { bod
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm-dsl
+  cargo build -p lyng-vm-dsl
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js-vm-dsl/src/parse.rs
+  git add crates/lyng/vm-dsl/src/parse.rs
   git commit -m "DSL-0b: proc-macro handler-body parser"
   ```
 
@@ -1967,9 +1967,9 @@ Parses the input of `llint_handler! { name, layout = X, length = N, |args| { bod
 ### Task B3: Proc-macro — operand-layout descriptors
 
 **Files:**
-- Modify: `crates/lyng-js-vm-dsl/src/layouts.rs`
+- Modify: `crates/lyng/vm-dsl/src/layouts.rs`
 
-The layout enum drives the operand-decode prologue. Each variant maps to one of the existing operand layouts in `crates/lyng-js/bytecode/src/instruction.rs`.
+The layout enum drives the operand-decode prologue. Each variant maps to one of the existing operand layouts in `crates/lyng/bytecode/src/instruction.rs`.
 
 - [ ] **Step 1: Implement layout enum and decode-prologue emitter**
 
@@ -1986,7 +1986,7 @@ The layout enum drives the operand-decode prologue. Each variant maps to one of 
       Ab,
       A,
       None,
-      // ... extend per existing OperandLayout in lyng-js-bytecode
+      // ... extend per existing OperandLayout in lyng-bytecode
   }
 
   impl Layout {
@@ -2033,13 +2033,13 @@ The layout enum drives the operand-decode prologue. Each variant maps to one of 
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm-dsl
+  cargo build -p lyng-vm-dsl
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js-vm-dsl/src/layouts.rs
+  git add crates/lyng/vm-dsl/src/layouts.rs
   git commit -m "DSL-0b: proc-macro layout enum + decode-prologue stubs"
   ```
 
@@ -2048,7 +2048,7 @@ The layout enum drives the operand-decode prologue. Each variant maps to one of 
 ### Task B4: Proc-macro — scratch-register allocator
 
 **Files:**
-- Modify: `crates/lyng-js-vm-dsl/src/scratch.rs`
+- Modify: `crates/lyng/vm-dsl/src/scratch.rs`
 
 Maps named operand identifiers and DSL-internal scratch variables (e.g. `t0..t6`) to AArch64 register numbers. Errors at expand time if a handler asks for more scratch than the per-arch budget.
 
@@ -2103,13 +2103,13 @@ Maps named operand identifiers and DSL-internal scratch variables (e.g. `t0..t6`
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm-dsl
+  cargo build -p lyng-vm-dsl
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js-vm-dsl/src/scratch.rs
+  git add crates/lyng/vm-dsl/src/scratch.rs
   git commit -m "DSL-0b: proc-macro scratch-register allocator"
   ```
 
@@ -2118,7 +2118,7 @@ Maps named operand identifiers and DSL-internal scratch variables (e.g. `t0..t6`
 ### Task B5: Proc-macro — lowerer (AST → `naked_asm!` body)
 
 **Files:**
-- Modify: `crates/lyng-js-vm-dsl/src/lower.rs`
+- Modify: `crates/lyng/vm-dsl/src/lower.rs`
 
 The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out: each body statement is one DSL-op invocation, and the lowerer concatenates its asm fragment into a single string passed to `naked_asm!`.
 
@@ -2156,7 +2156,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
       // The body is currently raw TokenStream — the proc-macro doesn't
       // fully expand DSL operation macros itself. Instead it wraps the
       // body in `naked_asm!` and lets the per-arch macros (defined as
-      // `macro_rules!` in crates/lyng-js/vm/src/dsl/backend/aarch64/)
+      // `macro_rules!` in crates/lyng/vm/src/dsl/backend/aarch64/)
       // expand their asm fragments via `concat!`.
       //
       // The lowerer's job here:
@@ -2197,14 +2197,14 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify the proc-macro crate compiles**
 
   ```sh
-  cargo build -p lyng-js-vm-dsl
+  cargo build -p lyng-vm-dsl
   ```
 
 - [ ] **Step 3: Smoke-test with a trivial use site**
 
-  In `crates/lyng-js/vm/src/dsl/`, add a temporary file `_smoke_test.rs` (excluded from `mod.rs`):
+  In `crates/lyng/vm/src/dsl/`, add a temporary file `_smoke_test.rs` (excluded from `mod.rs`):
   ```rust
-  use lyng_js_vm_dsl::llint_handler;
+  use lyng_vm_dsl::llint_handler;
 
   llint_handler! {
       op_smoke, layout = None, length = 1, || {
@@ -2214,19 +2214,19 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
   ```
   Add `_smoke_test.rs` to a test target or behind `#[cfg(any())]` so it doesn't interfere. Confirm:
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 4: Remove the smoke-test file**
 
   ```sh
-  rm crates/lyng-js/vm/src/dsl/_smoke_test.rs
+  rm crates/lyng/vm/src/dsl/_smoke_test.rs
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js-vm-dsl/src/lower.rs
+  git add crates/lyng/vm-dsl/src/lower.rs
   git commit -m "DSL-0b: proc-macro lowerer (AST → naked_asm! body)"
   ```
 
@@ -2235,18 +2235,18 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B6: `reg_convention.rs` — pinned-register documentation
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/reg_convention.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/reg_convention.rs`
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
 
 - [ ] **Step 1: Author the convention doc + const stubs**
 
-  Create `crates/lyng-js/vm/src/dsl/reg_convention.rs`:
+  Create `crates/lyng/vm/src/dsl/reg_convention.rs`:
   ```rust
   //! Pinned-register convention for the asm-DSL substrate.
   //!
   //! Authoritative source: design §5 of
-  //! docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md
-  //! and reports/js/lyng-js/llint-dsl-abi.md.
+  //! docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md
+  //! and reports/lyng/llint-dsl-abi.md.
   //!
   //! AArch64 mapping:
   //!
@@ -2285,14 +2285,14 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 3: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/reg_convention.rs \
-          crates/lyng-js/vm/src/dsl/mod.rs
+  git add crates/lyng/vm/src/dsl/reg_convention.rs \
+          crates/lyng/vm/src/dsl/mod.rs
   git commit -m "DSL-0b: pinned-register convention documentation + const offset stubs"
   ```
 
@@ -2301,17 +2301,17 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B7: `llint_state.rs` — `LlIntState` repr(C)
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/llint_state.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/reg_convention.rs`
+- Create: `crates/lyng/vm/src/dsl/llint_state.rs`
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
+- Modify: `crates/lyng/vm/src/dsl/reg_convention.rs`
 
 - [ ] **Step 1: Define `LlIntState` per design §5**
 
-  Create `crates/lyng-js/vm/src/dsl/llint_state.rs`:
+  Create `crates/lyng/vm/src/dsl/llint_state.rs`:
   ```rust
   //! asm-visible state record + Rust-only context per design §5.
 
-  use lyng_js_types::Value;
+  use lyng_types::Value;
   use crate::dsl::feedback_flat::FeedbackEntry;
 
   /// Opaque marker for the Rust-side context pointer in `LlIntState`.
@@ -2372,7 +2372,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
       #[test]
       fn ll_int_state_offsets_stable() {
           // Confirm the offset_of! values match the documented contract.
-          // Values referenced in reports/js/lyng-js/llint-dsl-abi.md §X.
+          // Values referenced in reports/lyng/llint-dsl-abi.md §X.
           assert_eq!(r::LLINT_STATE_FRAME_PC_OFFSET, 0);
           assert_eq!(r::LLINT_STATE_FRAME_PB_BASE, 8);
           assert_eq!(r::LLINT_STATE_FRAME_REGS_BASE, 16);
@@ -2388,16 +2388,16 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 5: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm dsl::llint_state::tests
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm dsl::llint_state::tests
   ```
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/llint_state.rs \
-          crates/lyng-js/vm/src/dsl/reg_convention.rs \
-          crates/lyng-js/vm/src/dsl/mod.rs
+  git add crates/lyng/vm/src/dsl/llint_state.rs \
+          crates/lyng/vm/src/dsl/reg_convention.rs \
+          crates/lyng/vm/src/dsl/mod.rs
   git commit -m "DSL-0b: LlIntState repr(C) + offset-generation test"
   ```
 
@@ -2406,16 +2406,16 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B8: `llint_state.rs` — `LlIntRustContext` + `LlIntExitSlot`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/llint_state.rs`
+- Modify: `crates/lyng/vm/src/dsl/llint_state.rs`
 
 - [ ] **Step 1: Add the Rust-only context types**
 
   Append:
   ```rust
   use std::sync::Arc;
-  use lyng_js_env::Agent;
-  use lyng_js_host::HostHooks;
-  use lyng_js_objects::NativeFunctionRegistry;
+  use lyng_env::Agent;
+  use lyng_host::HostHooks;
+  use lyng_objects::NativeFunctionRegistry;
   use crate::vm::install::InstalledFunction;
   use crate::FrameRecord;
   use crate::error::VmError;
@@ -2433,7 +2433,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 
   pub struct LlIntExitSlot {
       pub kind:       ExitKind,
-      pub done_value: lyng_js_types::Value,
+      pub done_value: lyng_types::Value,
       pub error:      Option<Box<VmError>>,
   }
 
@@ -2448,7 +2448,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
       fn default() -> Self {
           Self {
               kind:       ExitKind::None,
-              done_value: lyng_js_types::Value::undefined(),
+              done_value: lyng_types::Value::undefined(),
               error:      None,
           }
       }
@@ -2458,13 +2458,13 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/llint_state.rs
+  git add crates/lyng/vm/src/dsl/llint_state.rs
   git commit -m "DSL-0b: LlIntRustContext + LlIntExitSlot + ExitKind"
   ```
 
@@ -2473,7 +2473,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B9: `slow_path.rs` — `SlowPathReturn` + `SlowPathTag`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs`
 
 - [ ] **Step 1: Add the asm-facing return ABI**
 
@@ -2496,13 +2496,13 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0b: SlowPathReturn + SlowPathTag asm-facing ABI"
   ```
 
@@ -2511,7 +2511,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B10: `slow_path.rs` — `LlIntDispatchState::from_raw` (asm path)
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs`
 
 - [ ] **Step 1: Add the Asm variant + `from_raw`**
 
@@ -2564,13 +2564,13 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0b: LlIntDispatchState::from_raw + sync_from_asm (asm path)"
   ```
 
@@ -2579,7 +2579,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B11: `slow_path.rs` — `translate_outcome` shim helper
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs`
 
 - [ ] **Step 1: Add the outcome translator**
 
@@ -2633,14 +2633,14 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs \
-          crates/lyng-js/vm/src/vm/frame.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs \
+          crates/lyng/vm/src/vm/frame.rs
   git commit -m "DSL-0b: translate_outcome shim helper + FrameRecord accessors"
   ```
 
@@ -2649,7 +2649,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B12: Cold-stub shim convenience macro
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs`
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs`
 
 - [ ] **Step 1: Define the shim convenience macro**
 
@@ -2688,13 +2688,13 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/slow_path.rs
+  git add crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0b: dsl_cold_shim! convenience macro"
   ```
 
@@ -2703,22 +2703,22 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B13: Entry shim + `_interpreter_exit`
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/entry.rs`
-- Create: `crates/lyng-js/vm/src/dsl/handlers/mod.rs` (skeleton)
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
-- Modify: `crates/lyng-js/vm/src/vm.rs`
+- Create: `crates/lyng/vm/src/dsl/entry.rs`
+- Create: `crates/lyng/vm/src/dsl/handlers/mod.rs` (skeleton)
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
+- Modify: `crates/lyng/vm/src/vm.rs`
 
 - [ ] **Step 1: Create entry.rs**
 
-  Create `crates/lyng-js/vm/src/dsl/entry.rs`:
+  Create `crates/lyng/vm/src/dsl/entry.rs`:
   ```rust
   //! Entry shim and exit shim per design §5 / §6.
 
   use std::sync::Arc;
-  use lyng_js_env::Agent;
-  use lyng_js_host::HostHooks;
-  use lyng_js_objects::NativeFunctionRegistry;
-  use lyng_js_types::Value;
+  use lyng_env::Agent;
+  use lyng_host::HostHooks;
+  use lyng_objects::NativeFunctionRegistry;
+  use lyng_types::Value;
 
   use crate::dsl::llint_state::{ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState};
   use crate::error::{VmError, VmResult};
@@ -2814,7 +2814,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
   }
   ```
 
-  `VmError::TrampolineExitedWithoutSetting` is a new error variant — add it to `crates/lyng-js/vm/src/error.rs`.
+  `VmError::TrampolineExitedWithoutSetting` is a new error variant — add it to `crates/lyng/vm/src/error.rs`.
 
 - [ ] **Step 2: Wire into `dsl/mod.rs`**
 
@@ -2825,7 +2825,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 
 - [ ] **Step 3: Create handlers/mod.rs skeleton**
 
-  Create `crates/lyng-js/vm/src/dsl/handlers/mod.rs`:
+  Create `crates/lyng/vm/src/dsl/handlers/mod.rs`:
   ```rust
   //! DSL handler functions per design §10 DSL-0b.
 
@@ -2841,7 +2841,7 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 
 - [ ] **Step 4: Add `Vm::run_via_dsl` thin wrapper**
 
-  In `crates/lyng-js/vm/src/vm.rs`, add:
+  In `crates/lyng/vm/src/vm.rs`, add:
   ```rust
   impl Vm {
       pub(crate) fn run_via_dsl(
@@ -2862,19 +2862,19 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 - [ ] **Step 5: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/entry.rs \
-          crates/lyng-js/vm/src/dsl/llint_state.rs \
-          crates/lyng-js/vm/src/dsl/reg_convention.rs \
-          crates/lyng-js/vm/src/dsl/handlers/mod.rs \
-          crates/lyng-js/vm/src/dsl/mod.rs \
-          crates/lyng-js/vm/src/vm.rs \
-          crates/lyng-js/vm/src/error.rs
+  git add crates/lyng/vm/src/dsl/entry.rs \
+          crates/lyng/vm/src/dsl/llint_state.rs \
+          crates/lyng/vm/src/dsl/reg_convention.rs \
+          crates/lyng/vm/src/dsl/handlers/mod.rs \
+          crates/lyng/vm/src/dsl/mod.rs \
+          crates/lyng/vm/src/vm.rs \
+          crates/lyng/vm/src/error.rs
   git commit -m "DSL-0b: entry trampoline + _interpreter_exit + placeholder dispatch table"
   ```
 
@@ -2883,20 +2883,20 @@ The lowerer is where the design's "DSL surface ≈ asm shape" decision pays out:
 ### Task B14: FeedbackVector flat-array — define `FeedbackEntry` layout
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/feedback_flat.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/feedback_flat.rs`
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
 
 Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-size entries. The refactor preserves per-entry packed monomorphic/proto/polymorphic state (Phase 3f); only vector storage changes from `Vec<Option<FeedbackSiteState>>` to `Box<[FeedbackEntry]>`.
 
 - [ ] **Step 1: Inspect current `FeedbackVector` and `FeedbackSiteState`**
 
   ```sh
-  rg -n "pub.*struct.*Feedback(Vector|SiteState|EntryFootprint)" crates/lyng-js/vm/src/vm/feedback.rs | head -20
+  rg -n "pub.*struct.*Feedback(Vector|SiteState|EntryFootprint)" crates/lyng/vm/src/vm/feedback.rs | head -20
   ```
 
 - [ ] **Step 2: Design the flat entry**
 
-  Create `crates/lyng-js/vm/src/dsl/feedback_flat.rs`:
+  Create `crates/lyng/vm/src/dsl/feedback_flat.rs`:
   ```rust
   //! Flat-array feedback storage for the DSL `FV` pin per design §9.
   //!
@@ -2906,7 +2906,7 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
   //! to `Box<[FeedbackEntry]>` so the asm `FV` pin can be a single
   //! pointer with computed offset.
 
-  use lyng_js_types::Value;
+  use lyng_types::Value;
   // Re-export today's per-entry state shape so the rest of the engine
   // continues to use a single source of truth for per-site content.
   pub use crate::vm::feedback::FeedbackSiteState;
@@ -2934,16 +2934,16 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: may fail if `FeedbackSiteState` is not `pub`. Promote its visibility if needed.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/feedback_flat.rs \
-          crates/lyng-js/vm/src/dsl/mod.rs \
-          crates/lyng-js/vm/src/vm/feedback.rs
+  git add crates/lyng/vm/src/dsl/feedback_flat.rs \
+          crates/lyng/vm/src/dsl/mod.rs \
+          crates/lyng/vm/src/vm/feedback.rs
   git commit -m "DSL-0b: FeedbackEntry flat-array layout"
   ```
 
@@ -2952,18 +2952,18 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 ### Task B15: FeedbackVector flat-array — eager allocation at install
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/vm/install.rs`
-- Modify: `crates/lyng-js/vm/src/vm/installed.rs`
+- Modify: `crates/lyng/vm/src/vm/install.rs`
+- Modify: `crates/lyng/vm/src/vm/installed.rs`
 
 - [ ] **Step 1: Add `feedback_flat` field to `InstalledFunction`**
 
-  Inspect `crates/lyng-js/vm/src/vm/installed.rs`. Identify `InstalledFunction`. Add a field:
+  Inspect `crates/lyng/vm/src/vm/installed.rs`. Identify `InstalledFunction`. Add a field:
   ```rust
   pub struct InstalledFunction {
       // ... existing fields ...
       /// Flat IC-entry storage pinned by the DSL substrate's `FV`
       /// register. Allocated to `function.feedback_slot_count()` at
-      /// install; never grown. See `crates/lyng-js/vm/src/dsl/feedback_flat.rs`.
+      /// install; never grown. See `crates/lyng/vm/src/dsl/feedback_flat.rs`.
       pub feedback_flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]>,
   }
   ```
@@ -2980,7 +2980,7 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 
 - [ ] **Step 2: Populate it in install**
 
-  In `crates/lyng-js/vm/src/vm/install.rs`'s install path, after computing the feedback slot count:
+  In `crates/lyng/vm/src/vm/install.rs`'s install path, after computing the feedback slot count:
   ```rust
   let feedback_slot_count = function.feedback_slot_count();
   let feedback_flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]> =
@@ -2997,15 +2997,15 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 - [ ] **Step 3: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
   Expected: clean build.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/install.rs \
-          crates/lyng-js/vm/src/vm/installed.rs
+  git add crates/lyng/vm/src/vm/install.rs \
+          crates/lyng/vm/src/vm/installed.rs
   git commit -m "DSL-0b: eager FeedbackEntry flat allocation at install"
   ```
 
@@ -3014,7 +3014,7 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 ### Task B16: FeedbackVector flat-array — wire `FV` pin from install
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/entry.rs`
+- Modify: `crates/lyng/vm/src/dsl/entry.rs`
 
 - [ ] **Step 1: Update `run_via_dsl` to use the flat array**
 
@@ -3029,13 +3029,13 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/entry.rs
+  git add crates/lyng/vm/src/dsl/entry.rs
   git commit -m "DSL-0b: wire FV pin to InstalledFunction.feedback_flat"
   ```
 
@@ -3044,14 +3044,14 @@ Per design §9, the DSL needs the `FV` pin to point at a flat array of fixed-siz
 ### Task B17: FeedbackVector flat-array — dual-write from existing record paths
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/vm/feedback.rs`
+- Modify: `crates/lyng/vm/src/vm/feedback.rs`
 
 During DSL-0b alpha is still the active path. Alpha's existing `record_feedback_slot` writes into the old `Vec<Option<FeedbackSiteState>>`. To keep the flat array consistent, dual-write: every record path also writes into `InstalledFunction.feedback_flat[slot_id]`.
 
 - [ ] **Step 1: Find the existing record paths**
 
   ```sh
-  rg -n "fn record_feedback_slot\|fn record_smi\|fn value_profile" crates/lyng-js/vm/src/vm/feedback.rs | head -10
+  rg -n "fn record_feedback_slot\|fn record_smi\|fn value_profile" crates/lyng/vm/src/vm/feedback.rs | head -10
   ```
 
 - [ ] **Step 2: Add the dual-write**
@@ -3060,13 +3060,13 @@ During DSL-0b alpha is still the active path. Alpha's existing `record_feedback_
 
 - [ ] **Step 3: Add an invariant test**
 
-  Create `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`:
+  Create `crates/lyng/vm/tests/feedback_flat_consistency.rs`:
   ```rust
   //! After alpha runs a simple SMI-add hot loop, both the legacy
   //! `FeedbackVector` slot and the new `FeedbackEntry` slot should
   //! reflect the same observed type (SMI).
 
-  use lyng_js_vm::test_helpers::{run_script, snapshot_feedback};  // or whatever the existing fixture is
+  use lyng_vm::test_helpers::{run_script, snapshot_feedback};  // or whatever the existing fixture is
 
   #[test]
   fn dual_write_keeps_legacy_and_flat_in_sync() {
@@ -3080,14 +3080,14 @@ During DSL-0b alpha is still the active path. Alpha's existing `record_feedback_
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo test -p lyng-js-vm --test feedback_flat_consistency
+  cargo test -p lyng-vm --test feedback_flat_consistency
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm/feedback.rs \
-          crates/lyng-js/vm/tests/feedback_flat_consistency.rs
+  git add crates/lyng/vm/src/vm/feedback.rs \
+          crates/lyng/vm/tests/feedback_flat_consistency.rs
   git commit -m "DSL-0b: dual-write FeedbackEntry from existing record paths"
   ```
 
@@ -3096,15 +3096,15 @@ During DSL-0b alpha is still the active path. Alpha's existing `record_feedback_
 ### Task B18: FeedbackVector flat-array — phase 3f sidecar parity
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/feedback_flat.rs`
-- Modify: `crates/lyng-js/vm/src/vm/feedback.rs`
+- Modify: `crates/lyng/vm/src/dsl/feedback_flat.rs`
+- Modify: `crates/lyng/vm/src/vm/feedback.rs`
 
 Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work through the flat array.
 
 - [ ] **Step 1: Audit Phase 3f sidecars**
 
   ```sh
-  rg -n "phase[-_]3f\|sidecar\|packed_mono\|packed_proto" crates/lyng-js/vm/src/vm/feedback.rs | head -20
+  rg -n "phase[-_]3f\|sidecar\|packed_mono\|packed_proto" crates/lyng/vm/src/vm/feedback.rs | head -20
   ```
 
 - [ ] **Step 2: If sidecars are inside `FeedbackSiteState`, the refactor is free**
@@ -3118,15 +3118,15 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo test -p lyng-js-vm --test feedback_flat_consistency
+  cargo test -p lyng-vm --test feedback_flat_consistency
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/feedback_flat.rs \
-          crates/lyng-js/vm/src/vm/feedback.rs \
-          crates/lyng-js/vm/tests/feedback_flat_consistency.rs
+  git add crates/lyng/vm/src/dsl/feedback_flat.rs \
+          crates/lyng/vm/src/vm/feedback.rs \
+          crates/lyng/vm/tests/feedback_flat_consistency.rs
   git commit -m "DSL-0b: verify Phase 3f sidecar parity through flat array"
   ```
 
@@ -3139,8 +3139,8 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 - [ ] **Step 1: Run V8 v7 with flat-array dual-write enabled**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --report /tmp/dsl-0b-fv-refactor-v8.md --json /tmp/dsl-0b-fv-refactor-v8.json
-  cp /tmp/dsl-0b-fv-refactor-v8.md reports/js/lyng-js/dsl-0b-fv-refactor-v8.md
+  cargo run --release -p lyng-bench -- v8suite --report /tmp/dsl-0b-fv-refactor-v8.md --json /tmp/dsl-0b-fv-refactor-v8.json
+  cp /tmp/dsl-0b-fv-refactor-v8.md reports/lyng/dsl-0b-fv-refactor-v8.md
   ```
 
 - [ ] **Step 2: Compare to pre-DSL-0 baseline**
@@ -3150,7 +3150,7 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 - [ ] **Step 3: Commit evidence**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0b-fv-refactor-v8.md
+  git add reports/lyng/dsl-0b-fv-refactor-v8.md
   git commit -m "DSL-0b: FV refactor V8 v7 regression check evidence"
   ```
 
@@ -3159,14 +3159,14 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 ### Task B20: AArch64 backend prelude
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/mod.rs`
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs`
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs`
+- Modify: `crates/lyng/vm/src/dsl/mod.rs`
 
 - [ ] **Step 1: Backend dispatch module**
 
-  Create `crates/lyng-js/vm/src/dsl/backend/mod.rs`:
+  Create `crates/lyng/vm/src/dsl/backend/mod.rs`:
   ```rust
   //! Per-arch DSL backend dispatch. Today: AArch64 only.
 
@@ -3189,7 +3189,7 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 
 - [ ] **Step 2: AArch64 backend root**
 
-  Create `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs`:
+  Create `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`:
   ```rust
   pub mod arithmetic;
   pub mod control;
@@ -3231,15 +3231,15 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 
 - [ ] **Step 3: AArch64 prelude constants**
 
-  Create `crates/lyng-js/vm/src/dsl/backend/aarch64/prelude.rs`:
+  Create `crates/lyng/vm/src/dsl/backend/aarch64/prelude.rs`:
   ```rust
   //! AArch64-specific constants referenced by DSL operation macros:
   //! NaN-tag masks, exit-slot offsets, layout-decode helpers.
   //!
-  //! Values authoritative per reports/js/lyng-js/llint-dsl-value-layout.md
-  //! and reports/js/lyng-js/llint-dsl-abi.md.
+  //! Values authoritative per reports/lyng/llint-dsl-value-layout.md
+  //! and reports/lyng/llint-dsl-abi.md.
 
-  use lyng_js_types::Value;
+  use lyng_types::Value;
 
   // SMI tag bits per llint-dsl-value-layout.md §2.
   pub const VALUE_TAG_SMI_MASK: u64 = 0xFFFF_0000_0000_0000;
@@ -3262,7 +3262,7 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
   };
   ```
 
-  Reconcile placeholder masks against the actual values documented in `reports/js/lyng-js/llint-dsl-value-layout.md`. The compile-time `assert!`s will catch mismatches.
+  Reconcile placeholder masks against the actual values documented in `reports/lyng/llint-dsl-value-layout.md`. The compile-time `assert!`s will catch mismatches.
 
 - [ ] **Step 4: Wire into `dsl/mod.rs`**
 
@@ -3273,14 +3273,14 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 - [ ] **Step 5: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm 2>&1 | tail -20
+  cargo build -p lyng-vm 2>&1 | tail -20
   ```
   Expected: may fail on the const-assert. Update masks to match the value-layout report.
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/ crates/lyng-js/vm/src/dsl/mod.rs
+  git add crates/lyng/vm/src/dsl/backend/ crates/lyng/vm/src/dsl/mod.rs
   git commit -m "DSL-0b: AArch64 backend scaffold + prelude constants"
   ```
 
@@ -3289,7 +3289,7 @@ Phase 3f's packed monomorphic/proto/polymorphic sidecars must continue to work t
 ### Task B21: AArch64 backend — operand decoding
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs`
 
 Operand-decode macros emit asm sequences that read operand bytes from the bytecode stream (relative to PC) into named scratch registers. One macro per layout.
 
@@ -3353,13 +3353,13 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 - [ ] **Step 2: Verify the module compiles**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/operands.rs
   git commit -m "DSL-0b: AArch64 operand-decode + register-file macros"
   ```
 
@@ -3368,7 +3368,7 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 ### Task B22: AArch64 backend — value-tag checks and tag manipulation
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/values.rs`
 
 - [ ] **Step 1: Implement value macros**
 
@@ -3420,13 +3420,13 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/values.rs
   git commit -m "DSL-0b: AArch64 value-tag check / manipulation macros"
   ```
 
@@ -3435,7 +3435,7 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 ### Task B23: AArch64 backend — object-record access macros
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/objects.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/objects.rs`
 
 - [ ] **Step 1: Implement object-access macros**
 
@@ -3458,7 +3458,7 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 
   // Additional macros: load_record_shape!, load_record_inline_slot!,
   // load_record_outline_slots!, load_outline_slot!. Fill against the
-  // ObjectRecord layout in crates/lyng-js/objects/.
+  // ObjectRecord layout in crates/lyng/objects/.
   ```
 
   Note: `{vm_heap_pool}` references `offset_of!(Vm, heap_pool_base)`. Resolve to a real offset by adding a `pub const VM_HEAP_POOL_OFFSET` in `reg_convention.rs` (similar to `LLINT_STATE_*` constants).
@@ -3466,13 +3466,13 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/objects.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/objects.rs
   git commit -m "DSL-0b: AArch64 object-record access macros"
   ```
 
@@ -3481,7 +3481,7 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 ### Task B24: AArch64 backend — arithmetic macros
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs`
 
 - [ ] **Step 1: Implement arithmetic macros**
 
@@ -3508,13 +3508,13 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs
   git commit -m "DSL-0b: AArch64 SMI arithmetic macros"
   ```
 
@@ -3523,7 +3523,7 @@ Operand-decode macros emit asm sequences that read operand bytes from the byteco
 ### Task B25: AArch64 backend — control flow + slow-path bridge
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/control.rs`
 
 This is the most-used backend module. `dispatch!()` is the tail-jump at the end of every fast-path handler; `call_slow!` + `dispatch_after_slow!` is the bridge to a Rust shim.
 
@@ -3660,13 +3660,13 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/control.rs
   git commit -m "DSL-0b: AArch64 dispatch + slow-path-bridge + prefix macros"
   ```
 
@@ -3675,9 +3675,9 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 ### Task B26: AArch64 backend — feedback + safepoint + memory macros
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/feedback.rs`
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/safepoint.rs`
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/memory.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/feedback.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/memory.rs`
 
 - [ ] **Step 1: Feedback macros**
 
@@ -3747,16 +3747,16 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/feedback.rs \
-          crates/lyng-js/vm/src/dsl/backend/aarch64/safepoint.rs \
-          crates/lyng-js/vm/src/dsl/backend/aarch64/memory.rs \
-          crates/lyng-js/vm/src/dsl/reg_convention.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/feedback.rs \
+          crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs \
+          crates/lyng/vm/src/dsl/backend/aarch64/memory.rs \
+          crates/lyng/vm/src/dsl/reg_convention.rs
   git commit -m "DSL-0b: AArch64 feedback / safepoint / memory macros"
   ```
 
@@ -3765,7 +3765,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 ### Task B27: AArch64 backend — `inc_counter!` for opcode counters
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`
 
 - [ ] **Step 1: Implement `inc_counter!`**
 
@@ -3806,15 +3806,15 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 2: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo build -p lyng-js-vm --features opcode-counters
+  cargo build -p lyng-vm
+  cargo build -p lyng-vm --features opcode-counters
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs \
-          crates/lyng-js/vm/src/dsl/reg_convention.rs
+  git add crates/lyng/vm/src/dsl/backend/aarch64/counters.rs \
+          crates/lyng/vm/src/dsl/reg_convention.rs
   git commit -m "DSL-0b: AArch64 inc_counter! (feature-gated)"
   ```
 
@@ -3823,16 +3823,16 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 ### Task B28: Document the DSL vocabulary
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/ops.md`
+- Create: `crates/lyng/vm/src/dsl/ops.md`
 
 - [ ] **Step 1: Author the vocabulary doc**
 
-  Create `crates/lyng-js/vm/src/dsl/ops.md`:
+  Create `crates/lyng/vm/src/dsl/ops.md`:
   ```markdown
   # DSL operation vocabulary (AArch64)
 
   All operations are `macro_rules!` macros in
-  `crates/lyng-js/vm/src/dsl/backend/aarch64/*.rs` that produce string
+  `crates/lyng/vm/src/dsl/backend/aarch64/*.rs` that produce string
   literals via `concat!`. The proc-macro lowerer interpolates them into
   the `naked_asm!` body.
 
@@ -3887,7 +3887,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 2: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/ops.md
+  git add crates/lyng/vm/src/dsl/ops.md
   git commit -m "DSL-0b: DSL vocabulary documentation"
   ```
 
@@ -3896,13 +3896,13 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 ### Task B29: DSL_DISPATCH_TABLE assembly
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/mod.rs`
+- Modify: `crates/lyng/vm/src/dsl/handlers/mod.rs`
 
 - [ ] **Step 1: Populate the table from `OPCODES` manifest**
 
   Replace the placeholder table in `handlers/mod.rs`:
   ```rust
-  use lyng_js_bytecode::OPCODE_COUNT;
+  use lyng_bytecode::OPCODE_COUNT;
 
   pub type DslHandler = unsafe extern "C" fn() -> !;
 
@@ -3938,13 +3938,13 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 3: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
+  cargo build -p lyng-vm
   ```
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/
+  git add crates/lyng/vm/src/dsl/handlers/
   git commit -m "DSL-0b: DSL_DISPATCH_TABLE skeleton + handler family modules"
   ```
 
@@ -3953,18 +3953,18 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 ### Task B30: Validation case 1 — empty naked handler compiles
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_empty.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_empty.rs`
 
 This is the load-bearing first proof. If a trivial `llint_handler!` invocation can be expanded to `#[unsafe(naked)] extern "C" fn { naked_asm!(...) }` and compile cleanly, the proc-macro + backend integration is viable. If this fails, the DSL design needs revision before scaling.
 
 - [ ] **Step 1: Author the test**
 
-  Create `crates/lyng-js/vm/tests/dsl_validation_empty.rs`:
+  Create `crates/lyng/vm/tests/dsl_validation_empty.rs`:
   ```rust
   //! DSL-0b validation case 1 (design §10): an empty naked handler
   //! compiles and is callable.
 
-  use lyng_js_vm_dsl::llint_handler;
+  use lyng_vm_dsl::llint_handler;
 
   llint_handler! {
       op_validation_empty, layout = None, length = 1, || {
@@ -3983,14 +3983,14 @@ This is the load-bearing first proof. If a trivial `llint_handler!` invocation c
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_empty 2>&1 | tail -20
+  cargo test -p lyng-vm --test dsl_validation_empty 2>&1 | tail -20
   ```
   Expected: PASS. If it fails, the proc-macro/backend integration is the cause; investigate before proceeding.
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_empty.rs
+  git add crates/lyng/vm/tests/dsl_validation_empty.rs
   git commit -m "DSL-0b: validation case 1 (empty naked handler compiles)"
   ```
 
@@ -3999,13 +3999,13 @@ This is the load-bearing first proof. If a trivial `llint_handler!` invocation c
 ### Task B31: Validation case 2 — slow-path round-trip (4 outcomes)
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_slow_roundtrip.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_slow_roundtrip.rs`
 
 Drives a contrived handler through each of the four slow-path outcomes (Continue, Refresh, Exit-Done, Exit-Error) and confirms the bridge dispatches correctly.
 
 - [ ] **Step 1: Author the test**
 
-  Create `crates/lyng-js/vm/tests/dsl_validation_slow_roundtrip.rs`:
+  Create `crates/lyng/vm/tests/dsl_validation_slow_roundtrip.rs`:
   ```rust
   //! DSL-0b validation case 2 (design §10): each slow-path tag dispatches
   //! correctly.
@@ -4019,13 +4019,13 @@ Drives a contrived handler through each of the four slow-path outcomes (Continue
   //   - A test fixture that calls run_via_dsl with each as the only handler
   //   - Assertions on rust_context.exit and PC offset
   //
-  // The fixture interface lives in crates/lyng-js/vm/src/dsl/test_helpers.rs
+  // The fixture interface lives in crates/lyng/vm/src/dsl/test_helpers.rs
   // (created in this task).
 
   // ... (test body following the fixture API in test_helpers.rs)
   ```
 
-  Create `crates/lyng-js/vm/src/dsl/test_helpers.rs` (or behind `#[cfg(test)]`):
+  Create `crates/lyng/vm/src/dsl/test_helpers.rs` (or behind `#[cfg(test)]`):
   ```rust
   //! Minimal harness for driving a DSL handler through the trampoline.
   //!
@@ -4044,7 +4044,7 @@ Drives a contrived handler through each of the four slow-path outcomes (Continue
   pub enum HarnessOutcome {
       Continued { new_pc_offset: u32 },
       Refreshed,
-      Done { value: lyng_js_types::Value },
+      Done { value: lyng_types::Value },
       Error,
   }
   ```
@@ -4054,14 +4054,14 @@ Drives a contrived handler through each of the four slow-path outcomes (Continue
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_slow_roundtrip
+  cargo test -p lyng-vm --test dsl_validation_slow_roundtrip
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_slow_roundtrip.rs \
-          crates/lyng-js/vm/src/dsl/test_helpers.rs
+  git add crates/lyng/vm/tests/dsl_validation_slow_roundtrip.rs \
+          crates/lyng/vm/src/dsl/test_helpers.rs
   git commit -m "DSL-0b: validation case 2 (slow-path 4-outcome round-trip)"
   ```
 
@@ -4070,7 +4070,7 @@ Drives a contrived handler through each of the four slow-path outcomes (Continue
 ### Task B32: Validation case 3 — PC-sync correctness
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_pc_sync.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_pc_sync.rs`
 
 Verifies the pre-slow-path PC sync from design §6: a semantic body reading `state.frame.instruction_offset()` sees the post-dispatch PC, not stale data.
 
@@ -4079,17 +4079,17 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
   ```rust
   //! DSL-0b validation case 3: pre-slow-path PC sync correctness.
 
-  use lyng_js_vm::dsl::test_helpers::DslHarness;
-  use lyng_js_vm_dsl::llint_handler;
+  use lyng_vm::dsl::test_helpers::DslHarness;
+  use lyng_vm_dsl::llint_handler;
 
   // A cold-stub-style handler that calls a semantic body asserting the
   // observed instruction_offset matches the entry-PC.
-  fn op_pc_sync_semantic(state: &mut lyng_js_vm::dsl::slow_path::LlIntDispatchState<'_, '_>, _args: ()) -> lyng_js_vm::dsl::slow_path::SemanticOutcome {
+  fn op_pc_sync_semantic(state: &mut lyng_vm::dsl::slow_path::LlIntDispatchState<'_, '_>, _args: ()) -> lyng_vm::dsl::slow_path::SemanticOutcome {
       // Read the PC offset via sync_from_asm'd FrameRecord.
       // The harness configures the entry PC to 0x00 — we assert the
       // semantic body sees 0x00, not whatever stale value from before.
       // ... assertion here ...
-      lyng_js_vm::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 4 }
+      lyng_vm::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 4 }
   }
 
   // dsl_cold_shim! generates op_pc_sync_slow_rs.
@@ -4106,20 +4106,20 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
       let outcome = DslHarness::run_one_handler(op_pc_sync);
       // The harness asserts on completion that no assertion-fail
       // occurred inside op_pc_sync_semantic.
-      assert!(matches!(outcome, lyng_js_vm::dsl::test_helpers::HarnessOutcome::Continued { .. }));
+      assert!(matches!(outcome, lyng_vm::dsl::test_helpers::HarnessOutcome::Continued { .. }));
   }
   ```
 
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_pc_sync
+  cargo test -p lyng-vm --test dsl_validation_pc_sync
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_pc_sync.rs
+  git add crates/lyng/vm/tests/dsl_validation_pc_sync.rs
   git commit -m "DSL-0b: validation case 3 (PC-sync correctness)"
   ```
 
@@ -4128,7 +4128,7 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
 ### Task B33: Validation case 4 — safepoint on `op_loop_header`
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_safepoint_loop_header.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_safepoint_loop_header.rs`
 
 - [ ] **Step 1: Author the test**
 
@@ -4136,7 +4136,7 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
 
   ```rust
   //! DSL-0b validation case 4 — see design §6 / §10.
-  use lyng_js_vm::test_helpers::compile_and_run_with_poll_forced;
+  use lyng_vm::test_helpers::compile_and_run_with_poll_forced;
 
   #[test]
   fn loop_header_warm_path_polls_when_pending_set() {
@@ -4150,19 +4150,19 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
   }
   ```
 
-  `compile_and_run_with_poll_forced` is a test helper to be added under `crates/lyng-js/vm/src/test_helpers.rs` if not present.
+  `compile_and_run_with_poll_forced` is a test helper to be added under `crates/lyng/vm/src/test_helpers.rs` if not present.
 
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_safepoint_loop_header
+  cargo test -p lyng-vm --test dsl_validation_safepoint_loop_header
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_safepoint_loop_header.rs \
-          crates/lyng-js/vm/src/test_helpers.rs
+  git add crates/lyng/vm/tests/dsl_validation_safepoint_loop_header.rs \
+          crates/lyng/vm/src/test_helpers.rs
   git commit -m "DSL-0b: validation case 4 (safepoint on op_loop_header)"
   ```
 
@@ -4171,7 +4171,7 @@ Verifies the pre-slow-path PC sync from design §6: a semantic body reading `sta
 ### Task B34: Validation case 5 — safepoint on backward unconditional jump
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_safepoint_backward_jump.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_safepoint_backward_jump.rs`
 
 Tight loop using `op_add` + negative `op_jump` (no `op_loop_header`): confirm the GC poll fires.
 
@@ -4194,7 +4194,7 @@ Tight loop using `op_add` + negative `op_jump` (no `op_loop_header`): confirm th
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_safepoint_backward_jump.rs
+  git add crates/lyng/vm/tests/dsl_validation_safepoint_backward_jump.rs
   git commit -m "DSL-0b: validation case 5 (safepoint on backward op_jump)"
   ```
 
@@ -4203,7 +4203,7 @@ Tight loop using `op_add` + negative `op_jump` (no `op_loop_header`): confirm th
 ### Task B35: Validation case 6 — safepoint on backward conditional jump
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_safepoint_backward_cond_jump.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_safepoint_backward_cond_jump.rs`
 
 Tight loop using a conditional backward `op_jump_if_true(/8)` or `op_jump_if_false(/8)`: confirm the GC poll fires when the taken branch is backward.
 
@@ -4214,7 +4214,7 @@ Tight loop using a conditional backward `op_jump_if_true(/8)` or `op_jump_if_fal
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_safepoint_backward_cond_jump.rs
+  git add crates/lyng/vm/tests/dsl_validation_safepoint_backward_cond_jump.rs
   git commit -m "DSL-0b: validation case 6 (safepoint on backward conditional jump)"
   ```
 
@@ -4223,14 +4223,14 @@ Tight loop using a conditional backward `op_jump_if_true(/8)` or `op_jump_if_fal
 ### Task B36: Validation case 7 — Wide prefix decode
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_prefix_wide.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_prefix_wide.rs`
 
 Drives `op_wide` + `op_move` (wide-form operands) through the DSL trampoline and asserts wide register operands decode correctly.
 
 - [ ] **Step 1: Author the test**
 
   ```rust
-  use lyng_js_vm::test_helpers::run_dsl_handlers;
+  use lyng_vm::test_helpers::run_dsl_handlers;
 
   #[test]
   fn wide_prefix_decodes_wide_op_move() {
@@ -4250,7 +4250,7 @@ Drives `op_wide` + `op_move` (wide-form operands) through the DSL trampoline and
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_prefix_wide.rs
+  git add crates/lyng/vm/tests/dsl_validation_prefix_wide.rs
   git commit -m "DSL-0b: validation case 7 (Wide prefix decode)"
   ```
 
@@ -4259,7 +4259,7 @@ Drives `op_wide` + `op_move` (wide-form operands) through the DSL trampoline and
 ### Task B37: Validation case 8 — ExtraWide prefix decode
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_prefix_extra_wide.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_prefix_extra_wide.rs`
 
 Same shape as B36 but with `op_extra_wide` and u32-width operands.
 
@@ -4270,7 +4270,7 @@ Same shape as B36 but with `op_extra_wide` and u32-width operands.
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_prefix_extra_wide.rs
+  git add crates/lyng/vm/tests/dsl_validation_prefix_extra_wide.rs
   git commit -m "DSL-0b: validation case 8 (ExtraWide prefix decode)"
   ```
 
@@ -4279,7 +4279,7 @@ Same shape as B36 but with `op_extra_wide` and u32-width operands.
 ### Task B38: Validation case 9 — Double-prefix rejection
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_prefix_double.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_prefix_double.rs`
 
 `op_wide` + `op_wide` raises the expected `VmError::DoublePrefix` (added in Task A18) via the `op_double_prefix_slow_rs` path documented in the design.
 
@@ -4300,7 +4300,7 @@ Same shape as B36 but with `op_extra_wide` and u32-width operands.
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_validation_prefix_double.rs
+  git add crates/lyng/vm/tests/dsl_validation_prefix_double.rs
   git commit -m "DSL-0b: validation case 9 (double-prefix rejection)"
   ```
 
@@ -4309,18 +4309,18 @@ Same shape as B36 but with `op_extra_wide` and u32-width operands.
 ### Task B39: Hot port — `op_move` DSL body
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/hot.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_move.md`
-- Modify: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_move.asm`
+- Modify: `crates/lyng/vm/src/dsl/handlers/hot.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_move.md`
+- Modify: `reports/lyng/dsl-asm-baseline-aarch64/op_move.asm`
 
 Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg → dispatch`. Confirms the DSL emits an asm shape close to LLInt's `mov` handler.
 
 - [ ] **Step 1: Author the handler**
 
-  In `crates/lyng-js/vm/src/dsl/handlers/hot.rs`:
+  In `crates/lyng/vm/src/dsl/handlers/hot.rs`:
   ```rust
-  use lyng_js_vm_dsl::llint_handler;
+  use lyng_vm_dsl::llint_handler;
 
   llint_handler! {
       op_move, layout = Ab, length = 3, |dst, src| {
@@ -4335,32 +4335,32 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 
 - [ ] **Step 2: Update manifest**
 
-  Change `op_move`'s `OpcodeEntry.category` from `Cold` (the default during A8 registration) to `Hot`, and update `dsl_handler_symbol` to `"lyng_js_vm::dsl::handlers::hot::op_move"`.
+  Change `op_move`'s `OpcodeEntry.category` from `Cold` (the default during A8 registration) to `Hot`, and update `dsl_handler_symbol` to `"lyng_vm::dsl::handlers::hot::op_move"`.
 
 - [ ] **Step 3: Capture handler asm + diff against LLInt reference**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- asm-diff --opcodes op_move --output /tmp/asm/ --mode update
-  cp /tmp/asm/op_move.asm reports/js/lyng-js/dsl-asm-baseline-aarch64/op_move.asm
+  cargo run --release -p lyng-bench -- asm-diff --opcodes op_move --output /tmp/asm/ --mode update
+  cp /tmp/asm/op_move.asm reports/lyng/dsl-asm-baseline-aarch64/op_move.asm
   ```
 
 - [ ] **Step 4: Write per-handler report**
 
-  Create `reports/js/lyng-js/dsl-handlers/op_move.md`:
+  Create `reports/lyng/dsl-handlers/op_move.md`:
   ```markdown
   # `op_move` DSL port
 
   ## DSL source
 
-  See `crates/lyng-js/vm/src/dsl/handlers/hot.rs`.
+  See `crates/lyng/vm/src/dsl/handlers/hot.rs`.
 
   ## Current asm (AArch64)
 
-  See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_move.asm`.
+  See `reports/lyng/dsl-asm-baseline-aarch64/op_move.asm`.
 
   ## LLInt reference
 
-  See `reports/js/lyng-js/llint-reference/op_mov.asm`.
+  See `reports/lyng/llint-reference/op_mov.asm`.
 
   ## Side-by-side diff
 
@@ -4377,23 +4377,23 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
   ## Behavioral tests
 
   - tests/dsl_validation_empty.rs covers basic register-file read/write.
-  - existing `op_move` tests in `crates/lyng-js/vm/tests/` continue to pass.
+  - existing `op_move` tests in `crates/lyng/vm/tests/` continue to pass.
   ```
 
 - [ ] **Step 5: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
   ```
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/hot.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_move.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_move.asm
+  git add crates/lyng/vm/src/dsl/handlers/hot.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_move.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_move.asm
   git commit -m "DSL-0b: hot port op_move + ported report + asm baseline"
   ```
 
@@ -4402,10 +4402,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B40: Hot port — `op_add` DSL body
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/hot.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_add.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_add.asm`
+- Modify: `crates/lyng/vm/src/dsl/handlers/hot.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_add.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_add.asm`
 
 - [ ] **Step 1: Author the handler**
 
@@ -4435,7 +4435,7 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 
 - [ ] **Step 2: Generate the shim**
 
-  In `crates/lyng-js/vm/src/dsl/handlers/hot.rs`, append:
+  In `crates/lyng/vm/src/dsl/handlers/hot.rs`, append:
   ```rust
   use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
   use crate::vm::semantics::arithmetic::{op_add_semantic, OpAddArgs};
@@ -4457,18 +4457,18 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
-  cargo run --release -p lyng-js-bench -- microbench --opcodes op_add --samples 5 --iters 1000000 --report /tmp/op_add_micro.md
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
+  cargo run --release -p lyng-bench -- microbench --opcodes op_add --samples 5 --iters 1000000 --report /tmp/op_add_micro.md
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/hot.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_add.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_add.asm
+  git add crates/lyng/vm/src/dsl/handlers/hot.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_add.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_add.asm
   git commit -m "DSL-0b: hot port op_add + slow-path shim + ported report"
   ```
 
@@ -4477,10 +4477,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B41: Hot port — `op_jump` DSL body (with backward poll)
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/hot.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_jump.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump.asm`
+- Modify: `crates/lyng/vm/src/dsl/handlers/hot.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_jump.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_jump.asm`
 
 - [ ] **Step 1: Author the handler**
 
@@ -4526,7 +4526,7 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 
 - [ ] **Step 3: Create the poll module**
 
-  Create `crates/lyng-js/vm/src/dsl/poll.rs`:
+  Create `crates/lyng/vm/src/dsl/poll.rs`:
   ```rust
   //! Same-thread safepoint poll consumer per design §6.
 
@@ -4560,19 +4560,19 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 5: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm --test dsl_validation_safepoint_backward_jump
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm --test dsl_validation_safepoint_backward_jump
   ```
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/hot.rs \
-          crates/lyng-js/vm/src/dsl/poll.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_jump.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump.asm \
-          crates/lyng-js/vm/src/vm.rs
+  git add crates/lyng/vm/src/dsl/handlers/hot.rs \
+          crates/lyng/vm/src/dsl/poll.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_jump.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump.asm \
+          crates/lyng/vm/src/vm.rs
   git commit -m "DSL-0b: hot port op_jump + safepoint poll module + report"
   ```
 
@@ -4581,10 +4581,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B42: Hot port — `op_return` DSL body
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/hot.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_return.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_return.asm`
+- Modify: `crates/lyng/vm/src/dsl/handlers/hot.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_return.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_return.asm`
 
 `op_return` is frame-transitioning — always returns `Refresh` or `ExitDone`. The DSL body is short: `load_reg → call_slow → dispatch_after_slow` with the slow-path doing the actual frame pop.
 
@@ -4617,7 +4617,7 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 5: Microbench**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- microbench --opcodes op_return --samples 7 --iters 5000000 --report /tmp/op_return_micro.md
+  cargo run --release -p lyng-bench -- microbench --opcodes op_return --samples 7 --iters 5000000 --report /tmp/op_return_micro.md
   ```
 
   Compare to pre-DSL-0 baseline. If `op_return` is more than 5% slower than the alpha path, file a follow-up to introduce the same-code-unit fast-return shortcut from design §6 — but do NOT block DSL-0b on it.
@@ -4625,10 +4625,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/hot.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_return.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_return.asm
+  git add crates/lyng/vm/src/dsl/handlers/hot.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_return.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_return.asm
   git commit -m "DSL-0b: hot port op_return + ported report + microbench"
   ```
 
@@ -4637,10 +4637,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B43: Warm port — `op_loop_header` DSL body
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/warm.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_loop_header.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_loop_header.asm`
+- Modify: `crates/lyng/vm/src/dsl/handlers/warm.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_loop_header.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_loop_header.asm`
 
 - [ ] **Step 1: Author the handler**
 
@@ -4669,7 +4669,7 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 3: Verify against validation case 4**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_safepoint_loop_header
+  cargo test -p lyng-vm --test dsl_validation_safepoint_loop_header
   ```
 
 - [ ] **Step 4: Capture asm + report**
@@ -4677,10 +4677,10 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/warm.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_loop_header.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_loop_header.asm
+  git add crates/lyng/vm/src/dsl/handlers/warm.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_loop_header.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_loop_header.asm
   git commit -m "DSL-0b: warm port op_loop_header + safepoint coverage"
   ```
 
@@ -4689,9 +4689,9 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B44: Warm ports — `op_jump8` + conditional jumps with backward poll
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/warm.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_jump8.md`, `op_jump_if_true.md`, `op_jump_if_true8.md`, `op_jump_if_false.md`, `op_jump_if_false8.md`
+- Modify: `crates/lyng/vm/src/dsl/handlers/warm.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_jump8.md`, `op_jump_if_true.md`, `op_jump_if_true8.md`, `op_jump_if_false.md`, `op_jump_if_false8.md`
 - Create per-opcode asm baseline files
 
 - [ ] **Step 1: Port each warm jump handler**
@@ -4734,18 +4734,18 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/warm.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_jump8.md \
-          reports/js/lyng-js/dsl-handlers/op_jump_if_true.md \
-          reports/js/lyng-js/dsl-handlers/op_jump_if_true8.md \
-          reports/js/lyng-js/dsl-handlers/op_jump_if_false.md \
-          reports/js/lyng-js/dsl-handlers/op_jump_if_false8.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump8.asm \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump_if_true.asm \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump_if_true8.asm \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump_if_false.asm \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_jump_if_false8.asm
+  git add crates/lyng/vm/src/dsl/handlers/warm.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_jump8.md \
+          reports/lyng/dsl-handlers/op_jump_if_true.md \
+          reports/lyng/dsl-handlers/op_jump_if_true8.md \
+          reports/lyng/dsl-handlers/op_jump_if_false.md \
+          reports/lyng/dsl-handlers/op_jump_if_false8.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump8.asm \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump_if_true.asm \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump_if_true8.asm \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump_if_false.asm \
+          reports/lyng/dsl-asm-baseline-aarch64/op_jump_if_false8.asm
   git commit -m "DSL-0b: warm ports for backward-jump variants (op_jump8, op_jump_if_*)"
   ```
 
@@ -4754,9 +4754,9 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B45: Warm ports — `op_wide` + `op_extra_wide`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/warm.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
-- Create: `reports/js/lyng-js/dsl-handlers/op_wide.md`, `op_extra_wide.md`
+- Modify: `crates/lyng/vm/src/dsl/handlers/warm.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
+- Create: `reports/lyng/dsl-handlers/op_wide.md`, `op_extra_wide.md`
 
 - [ ] **Step 1: Author handlers**
 
@@ -4783,12 +4783,12 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/warm.rs \
-          crates/lyng-js/vm/src/dsl/opcode_manifest.rs \
-          reports/js/lyng-js/dsl-handlers/op_wide.md \
-          reports/js/lyng-js/dsl-handlers/op_extra_wide.md \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_wide.asm \
-          reports/js/lyng-js/dsl-asm-baseline-aarch64/op_extra_wide.asm
+  git add crates/lyng/vm/src/dsl/handlers/warm.rs \
+          crates/lyng/vm/src/dsl/opcode_manifest.rs \
+          reports/lyng/dsl-handlers/op_wide.md \
+          reports/lyng/dsl-handlers/op_extra_wide.md \
+          reports/lyng/dsl-asm-baseline-aarch64/op_wide.asm \
+          reports/lyng/dsl-asm-baseline-aarch64/op_extra_wide.asm
   git commit -m "DSL-0b: warm ports for op_wide + op_extra_wide"
   ```
 
@@ -4797,47 +4797,47 @@ Port the simplest hot opcode first — `op_move` is just `load_reg → store_reg
 ### Task B46: Cold-stub codegen tool
 
 **Files:**
-- Create: `tools/lyng-js-dsl-codegen/Cargo.toml`
-- Create: `tools/lyng-js-dsl-codegen/src/main.rs`
+- Create: `tools/lyng-dsl-codegen/Cargo.toml`
+- Create: `tools/lyng-dsl-codegen/src/main.rs`
 
-Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_shim!` invocations from the `OPCODES` manifest. Run once at DSL-0b end; output committed to `crates/lyng-js/vm/src/dsl/handlers/cold.rs`.
+Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_shim!` invocations from the `OPCODES` manifest. Run once at DSL-0b end; output committed to `crates/lyng/vm/src/dsl/handlers/cold.rs`.
 
 - [ ] **Step 1: Create the tool crate**
 
-  Create `tools/lyng-js-dsl-codegen/Cargo.toml`:
+  Create `tools/lyng-dsl-codegen/Cargo.toml`:
   ```toml
   [package]
-  name = "lyng-js-dsl-codegen"
+  name = "lyng-dsl-codegen"
   version = "0.1.0"
   edition = "2021"
 
   [dependencies]
-  lyng-js-bytecode = { path = "../../crates/lyng-js/bytecode" }
-  lyng-js-vm = { path = "../../crates/lyng-js/vm" }
+  lyng-bytecode = { path = "../../crates/lyng/bytecode" }
+  lyng-vm = { path = "../../crates/lyng/vm" }
   ```
 
 - [ ] **Step 2: Create the generator**
 
-  Create `tools/lyng-js-dsl-codegen/src/main.rs`:
+  Create `tools/lyng-dsl-codegen/src/main.rs`:
   ```rust
   //! Generates cold-stub DSL handlers + shim wrappers from OPCODES manifest.
   //!
-  //! Output: crates/lyng-js/vm/src/dsl/handlers/cold.rs
+  //! Output: crates/lyng/vm/src/dsl/handlers/cold.rs
 
-  use lyng_js_vm::dsl::opcode_manifest::{OPCODES, OpcodeCategory};
+  use lyng_vm::dsl::opcode_manifest::{OPCODES, OpcodeCategory};
 
   fn main() {
       let mut out = String::new();
       out.push_str("//! Auto-generated cold-stub DSL handlers. Do not edit by hand.\n");
-      out.push_str("//! Re-generate via `cargo run -p lyng-js-dsl-codegen`.\n\n");
-      out.push_str("use lyng_js_vm_dsl::llint_handler;\n");
+      out.push_str("//! Re-generate via `cargo run -p lyng-dsl-codegen`.\n\n");
+      out.push_str("use lyng_vm_dsl::llint_handler;\n");
       out.push_str("use crate::dsl_cold_shim;\n\n");
 
       for entry in OPCODES {
           if entry.category != OpcodeCategory::Cold {
               continue;
           }
-          // Resolve the opcode's operand layout via lookup in lyng-js-bytecode.
+          // Resolve the opcode's operand layout via lookup in lyng-bytecode.
           // For each: emit
           //   llint_handler! { op_xxx, layout = ..., length = ..., |args| {
           //       call_slow!(op_xxx_slow_rs, args = [...]);
@@ -4849,28 +4849,28 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
           //   }
           //
           // Layout/family resolution lives in this generator using:
-          //   - lyng_js_bytecode::OperandLayout (existing)
+          //   - lyng_bytecode::OperandLayout (existing)
           //   - the family name extracted from semantic_symbol string
           out.push_str(&format!("// TODO codegen for {:?}\n", entry.opcode));
       }
 
-      let target = std::path::Path::new("crates/lyng-js/vm/src/dsl/handlers/cold.rs");
+      let target = std::path::Path::new("crates/lyng/vm/src/dsl/handlers/cold.rs");
       std::fs::write(target, out).expect("write cold.rs");
   }
   ```
 
-  Fill in the body to produce the actual `llint_handler!` invocations. Use `lyng_js_bytecode::Opcode::layout()` (or whatever the existing API is) to get the operand-layout descriptor per opcode.
+  Fill in the body to produce the actual `llint_handler!` invocations. Use `lyng_bytecode::Opcode::layout()` (or whatever the existing API is) to get the operand-layout descriptor per opcode.
 
 - [ ] **Step 3: Verify the tool builds**
 
   ```sh
-  cargo build -p lyng-js-dsl-codegen
+  cargo build -p lyng-dsl-codegen
   ```
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add tools/lyng-js-dsl-codegen/ Cargo.toml
+  git add tools/lyng-dsl-codegen/ Cargo.toml
   git commit -m "DSL-0b: cold-stub codegen tool"
   ```
 
@@ -4879,19 +4879,19 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task B47: Run cold-stub codegen for all remaining opcodes
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs`
 
 - [ ] **Step 1: Run the generator**
 
   ```sh
-  cargo run -p lyng-js-dsl-codegen
+  cargo run -p lyng-dsl-codegen
   ```
-  Expected: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` populated with ~140 `llint_handler!` + `dsl_cold_shim!` pairs.
+  Expected: `crates/lyng/vm/src/dsl/handlers/cold.rs` populated with ~140 `llint_handler!` + `dsl_cold_shim!` pairs.
 
 - [ ] **Step 2: Verify the output compiles**
 
   ```sh
-  cargo build -p lyng-js-vm 2>&1 | tail -30
+  cargo build -p lyng-vm 2>&1 | tail -30
   ```
   Expected: clean build. If any cold stub fails to compile (e.g. layout mismatch, missing semantic body), fix in the generator and re-run, or fix the generated file directly and update the generator to match.
 
@@ -4902,8 +4902,8 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-          crates/lyng-js/vm/src/dsl/handlers/mod.rs
+  git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+          crates/lyng/vm/src/dsl/handlers/mod.rs
   git commit -m "DSL-0b: generate ~140 cold stubs + populate DSL_DISPATCH_TABLE"
   ```
 
@@ -4912,7 +4912,7 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task B48: Spot-validate 10 representative cold stubs
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_cold_stub_spot_check.rs`
+- Create: `crates/lyng/vm/tests/dsl_cold_stub_spot_check.rs`
 
 - [ ] **Step 1: Author spot-check tests**
 
@@ -4921,7 +4921,7 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
   Recommended picks: `op_load_undefined`, `op_load_smi`, `op_get_named_property`, `op_load_global`, `op_call0`, `op_create_object`, `op_typeof`, `op_throw`, `op_yield`, `op_close_iterator`.
 
   ```rust
-  use lyng_js_vm::test_helpers::dsl_runs_equivalent_to_alpha;
+  use lyng_vm::test_helpers::dsl_runs_equivalent_to_alpha;
 
   #[test]
   fn cold_stub_op_load_undefined_matches_alpha() {
@@ -4935,14 +4935,14 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_cold_stub_spot_check
+  cargo test -p lyng-vm --test dsl_cold_stub_spot_check
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_cold_stub_spot_check.rs \
-          crates/lyng-js/vm/src/test_helpers.rs
+  git add crates/lyng/vm/tests/dsl_cold_stub_spot_check.rs \
+          crates/lyng/vm/src/test_helpers.rs
   git commit -m "DSL-0b: spot-check 10 representative cold stubs"
   ```
 
@@ -4955,9 +4955,9 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 1: Run V8 v7 (DSL handlers compiled but dispatch still alpha)**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --report /tmp/dsl-0b-v8.md --json /tmp/dsl-0b-v8.json
-  cp /tmp/dsl-0b-v8.md reports/js/lyng-js/dsl-0b-v8.md
-  cp /tmp/dsl-0b-v8.json reports/js/lyng-js/dsl-0b-v8.json
+  cargo run --release -p lyng-bench -- v8suite --report /tmp/dsl-0b-v8.md --json /tmp/dsl-0b-v8.json
+  cp /tmp/dsl-0b-v8.md reports/lyng/dsl-0b-v8.md
+  cp /tmp/dsl-0b-v8.json reports/lyng/dsl-0b-v8.json
   ```
 
   Expected: geomean ≈ DSL-0a baseline. DSL handlers are dead code; FV refactor's dual-write may be visible.
@@ -4965,8 +4965,8 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 2: Run microbench for the 5 hot ports**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- microbench --opcodes op_move,op_add,op_jump,op_return,op_loop_header --samples 7 --iters 5000000 --report /tmp/dsl-0b-hot-microbench.md --require-isolation
-  cp /tmp/dsl-0b-hot-microbench.md reports/js/lyng-js/dsl-0b-hot-microbench.md
+  cargo run --release -p lyng-bench -- microbench --opcodes op_move,op_add,op_jump,op_return,op_loop_header --samples 7 --iters 5000000 --report /tmp/dsl-0b-hot-microbench.md --require-isolation
+  cp /tmp/dsl-0b-hot-microbench.md reports/lyng/dsl-0b-hot-microbench.md
   ```
 
   Note: these are measuring DSL handlers in isolation (the bench harness calls them directly). The numbers establish per-handler ns/dispatch independent of the surrounding dispatch substrate.
@@ -4974,9 +4974,9 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 3: Commit evidence**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0b-v8.md \
-          reports/js/lyng-js/dsl-0b-v8.json \
-          reports/js/lyng-js/dsl-0b-hot-microbench.md
+  git add reports/lyng/dsl-0b-v8.md \
+          reports/lyng/dsl-0b-v8.json \
+          reports/lyng/dsl-0b-hot-microbench.md
   git commit -m "DSL-0b: capture V8 v7 + hot-port microbench evidence"
   ```
 
@@ -4989,7 +4989,7 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 1: Run full validation case suite**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_validation_empty \
+  cargo test -p lyng-vm --test dsl_validation_empty \
                           --test dsl_validation_slow_roundtrip \
                           --test dsl_validation_pc_sync \
                           --test dsl_validation_safepoint_loop_header \
@@ -5004,22 +5004,22 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 2: Run cold-stub spot-check + manifest tests**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest
-  cargo test -p lyng-js-vm --test dsl_cold_stub_spot_check
-  cargo test -p lyng-js-vm --test feedback_flat_consistency
+  cargo test -p lyng-vm dsl::opcode_manifest
+  cargo test -p lyng-vm --test dsl_cold_stub_spot_check
+  cargo test -p lyng-vm --test feedback_flat_consistency
   ```
 
 - [ ] **Step 3: Run full focused tests + Test262**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
-  cargo run --release -p lyng-js-test262 -- --report /tmp/dsl-0b-test262.md -j 4
-  cp /tmp/dsl-0b-test262.md reports/js/lyng-js/dsl-0b-test262.md
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
+  cargo run --release -p lyng-test262 -- --report /tmp/dsl-0b-test262.md -j 4
+  cp /tmp/dsl-0b-test262.md reports/lyng/dsl-0b-test262.md
   ```
 
 - [ ] **Step 4: Write DSL-0b status report**
 
-  Create `reports/js/lyng-js/dsl-0b-status.md`:
+  Create `reports/lyng/dsl-0b-status.md`:
   ```markdown
   # DSL-0b status
 
@@ -5027,43 +5027,43 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 
   | Deliverable | Status | Path |
   | --- | --- | --- |
-  | lyng-js-vm-dsl proc-macro crate | done | crates/lyng-js-vm-dsl/ |
-  | vm/src/dsl/ runtime ABI | done | crates/lyng-js/vm/src/dsl/ |
-  | LlIntState + LlIntRustContext + LlIntExitSlot | done | crates/lyng-js/vm/src/dsl/llint_state.rs |
-  | Slow-path bridge + LlIntDispatchState::from_raw | done | crates/lyng-js/vm/src/dsl/slow_path.rs |
-  | Entry shim + _interpreter_exit | done | crates/lyng-js/vm/src/dsl/entry.rs |
-  | FeedbackVector flat-array refactor | done | crates/lyng-js/vm/src/dsl/feedback_flat.rs |
-  | AArch64 backend (operands/values/objects/arithmetic/control/feedback/memory/counters/safepoint) | done | crates/lyng-js/vm/src/dsl/backend/aarch64/ |
-  | 9 validation cases | all passing | crates/lyng-js/vm/tests/dsl_validation_*.rs |
-  | 5 hot ports (op_move, op_add, op_jump, op_return, op_loop_header) | done | crates/lyng-js/vm/src/dsl/handlers/hot.rs |
-  | 5 warm ports (op_jump8, op_jump_if_*, op_wide, op_extra_wide) | done | crates/lyng-js/vm/src/dsl/handlers/warm.rs |
-  | ~140 cold stubs | done | crates/lyng-js/vm/src/dsl/handlers/cold.rs |
-  | Per-handler ported reports | done | reports/js/lyng-js/dsl-handlers/ |
-  | Asm baselines for hot + warm handlers | done | reports/js/lyng-js/dsl-asm-baseline-aarch64/ |
+  | lyng-vm-dsl proc-macro crate | done | crates/lyng/vm-dsl/ |
+  | vm/src/dsl/ runtime ABI | done | crates/lyng/vm/src/dsl/ |
+  | LlIntState + LlIntRustContext + LlIntExitSlot | done | crates/lyng/vm/src/dsl/llint_state.rs |
+  | Slow-path bridge + LlIntDispatchState::from_raw | done | crates/lyng/vm/src/dsl/slow_path.rs |
+  | Entry shim + _interpreter_exit | done | crates/lyng/vm/src/dsl/entry.rs |
+  | FeedbackVector flat-array refactor | done | crates/lyng/vm/src/dsl/feedback_flat.rs |
+  | AArch64 backend (operands/values/objects/arithmetic/control/feedback/memory/counters/safepoint) | done | crates/lyng/vm/src/dsl/backend/aarch64/ |
+  | 9 validation cases | all passing | crates/lyng/vm/tests/dsl_validation_*.rs |
+  | 5 hot ports (op_move, op_add, op_jump, op_return, op_loop_header) | done | crates/lyng/vm/src/dsl/handlers/hot.rs |
+  | 5 warm ports (op_jump8, op_jump_if_*, op_wide, op_extra_wide) | done | crates/lyng/vm/src/dsl/handlers/warm.rs |
+  | ~140 cold stubs | done | crates/lyng/vm/src/dsl/handlers/cold.rs |
+  | Per-handler ported reports | done | reports/lyng/dsl-handlers/ |
+  | Asm baselines for hot + warm handlers | done | reports/lyng/dsl-asm-baseline-aarch64/ |
 
   ## Exit criterion verification
 
-  1. lyng-js-vm-dsl proc-macro compiles + expands real opcodes — ✓
+  1. lyng-vm-dsl proc-macro compiles + expands real opcodes — ✓
   2. All 9 validation cases pass — ✓ (see tests/dsl_validation_*.rs)
   3. 5 hot + 5 warm + ~140 cold handlers exist + populate DSL_DISPATCH_TABLE — ✓
   4. FeedbackVector flat-array refactor lands without regressing IC fast paths — ✓ (see feedback_flat_consistency tests, dsl-0b-fv-refactor-v8.md)
   5. Manifest dsl_handler_symbol entries name real symbols — verified manually; Test 3 enabled in DSL-0c
-  6. cargo build --release -p lyng-js-vm is clean — ✓
-  7. cargo test -p lyng-js-vm passes; alpha is still the active dispatch — ✓
+  6. cargo build --release -p lyng-vm is clean — ✓
+  7. cargo test -p lyng-vm passes; alpha is still the active dispatch — ✓
 
   ## V8 v7 evidence
 
   - Pre-DSL-0 baseline geomean: <X>
   - Post-DSL-0b geomean (alpha still active): <Y>. Δ: <delta>%.
 
-  Report: reports/js/lyng-js/dsl-0b-v8.md.
+  Report: reports/lyng/dsl-0b-v8.md.
 
   ## Test262 evidence
 
   - Pre-DSL-0 baseline: <N>
   - Post-DSL-0b: <M>. Δ: <delta>.
 
-  Report: reports/js/lyng-js/dsl-0b-test262.md.
+  Report: reports/lyng/dsl-0b-test262.md.
 
   ## Hand-off to DSL-0c
 
@@ -5082,14 +5082,14 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0b-status.md \
-          reports/js/lyng-js/dsl-0b-test262.md
+  git add reports/lyng/dsl-0b-status.md \
+          reports/lyng/dsl-0b-test262.md
   git commit -m "DSL-0b: exit-gate status report + post-port evidence"
   ```
 
 - [ ] **Step 7: Notify the user**
 
-  "DSL-0b complete. All 9 validation cases pass; 5 hot + 5 warm + ~140 cold DSL handlers compiled; FeedbackVector flat-array refactor in place; alpha dispatch still active. Per-handler asm-diff reports under `reports/js/lyng-js/dsl-handlers/`. Status report at `reports/js/lyng-js/dsl-0b-status.md`. May I proceed to DSL-0c (switch dispatch + delete alpha)?"
+  "DSL-0b complete. All 9 validation cases pass; 5 hot + 5 warm + ~140 cold DSL handlers compiled; FeedbackVector flat-array refactor in place; alpha dispatch still active. Per-handler asm-diff reports under `reports/lyng/dsl-handlers/`. Status report at `reports/lyng/dsl-0b-status.md`. May I proceed to DSL-0c (switch dispatch + delete alpha)?"
 
 ---
 
@@ -5113,7 +5113,7 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task C1: Switch active dispatch path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/vm.rs`
+- Modify: `crates/lyng/vm/src/vm.rs`
 
 - [ ] **Step 1: Find and update `Vm::run` (or its callee `run_via_trampoline`)**
 
@@ -5129,21 +5129,21 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 2: Run focused tests**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler 2>&1 | tail -30
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler 2>&1 | tail -30
   ```
   Expected: all tests pass. **If anything fails, this is the gate** — debug and fix before continuing.
 
 - [ ] **Step 3: Run Test262 sanity slice**
 
   ```sh
-  cargo run --release -p lyng-js-test262 -- --filter built-ins/Array --report /tmp/dsl-0c-array.md -j 4
+  cargo run --release -p lyng-test262 -- --filter built-ins/Array --report /tmp/dsl-0c-array.md -j 4
   ```
   Expected: pass count matches pre-DSL-0c baseline on the same filter.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/vm.rs
+  git add crates/lyng/vm/src/vm.rs
   git commit -m "DSL-0c: switch Vm::run to dispatch through DSL trampoline"
   ```
 
@@ -5152,24 +5152,24 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task C2: Delete `dispatch_handlers/` directory
 
 **Files:**
-- Delete: `crates/lyng-js/vm/src/vm/dispatch_handlers/` (entire directory)
-- Modify: `crates/lyng-js/vm/src/vm.rs` (remove `pub mod dispatch_handlers;`)
-- Modify: `crates/lyng-js/vm/src/vm/dispatch_state.rs` (the dispatch table built from dispatch_handlers no longer needs the family imports)
+- Delete: `crates/lyng/vm/src/vm/dispatch_handlers/` (entire directory)
+- Modify: `crates/lyng/vm/src/vm.rs` (remove `pub mod dispatch_handlers;`)
+- Modify: `crates/lyng/vm/src/vm/dispatch_state.rs` (the dispatch table built from dispatch_handlers no longer needs the family imports)
 
 - [ ] **Step 1: Remove the module**
 
   ```sh
-  rm -r crates/lyng-js/vm/src/vm/dispatch_handlers
+  rm -r crates/lyng/vm/src/vm/dispatch_handlers
   ```
 
 - [ ] **Step 2: Remove its declaration**
 
-  Open `crates/lyng-js/vm/src/vm.rs` (or wherever the module is declared) and remove the line `pub(crate) mod dispatch_handlers;` (or similar).
+  Open `crates/lyng/vm/src/vm.rs` (or wherever the module is declared) and remove the line `pub(crate) mod dispatch_handlers;` (or similar).
 
 - [ ] **Step 3: Run focused tests**
 
   ```sh
-  cargo build -p lyng-js-vm 2>&1 | tail -30
+  cargo build -p lyng-vm 2>&1 | tail -30
   ```
   Expected: clean build because `Vm::run` no longer routes through `run_trampoline`, which is the only consumer of `dispatch_handlers/`.
 
@@ -5178,8 +5178,8 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 4: Commit**
 
   ```sh
-  git rm -r crates/lyng-js/vm/src/vm/dispatch_handlers/
-  git add crates/lyng-js/vm/src/vm.rs
+  git rm -r crates/lyng/vm/src/vm/dispatch_handlers/
+  git add crates/lyng/vm/src/vm.rs
   git commit -m "DSL-0c: delete dispatch_handlers/ (152 thinned α handlers)"
   ```
 
@@ -5188,22 +5188,22 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task C3: Delete `dispatch_state.rs` (alpha types)
 
 **Files:**
-- Delete: `crates/lyng-js/vm/src/vm/dispatch_state.rs`
-- Modify: `crates/lyng-js/vm/src/vm.rs`
+- Delete: `crates/lyng/vm/src/vm/dispatch_state.rs`
+- Modify: `crates/lyng/vm/src/vm.rs`
 
 - [ ] **Step 1: Remove the module**
 
   ```sh
-  rm crates/lyng-js/vm/src/vm/dispatch_state.rs
+  rm crates/lyng/vm/src/vm/dispatch_state.rs
   ```
 
 - [ ] **Step 2: Remove its declaration + any imports**
 
-  In `crates/lyng-js/vm/src/vm.rs` remove `pub(crate) mod dispatch_state;`. Search for `dispatch_state::` references and remove them (the `LlIntDispatchInner::Alpha` variant in `dsl/slow_path.rs` will also go away — replace it with a single non-enum `Asm` storage).
+  In `crates/lyng/vm/src/vm.rs` remove `pub(crate) mod dispatch_state;`. Search for `dispatch_state::` references and remove them (the `LlIntDispatchInner::Alpha` variant in `dsl/slow_path.rs` will also go away — replace it with a single non-enum `Asm` storage).
 
 - [ ] **Step 3: Simplify `LlIntDispatchState`**
 
-  In `crates/lyng-js/vm/src/dsl/slow_path.rs`:
+  In `crates/lyng/vm/src/dsl/slow_path.rs`:
   ```rust
   pub struct LlIntDispatchState<'vm, 'borrow> {
       pub(crate) state: *mut LlIntState,
@@ -5216,16 +5216,16 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git rm crates/lyng-js/vm/src/vm/dispatch_state.rs
-  git add crates/lyng-js/vm/src/vm.rs \
-          crates/lyng-js/vm/src/dsl/slow_path.rs
+  git rm crates/lyng/vm/src/vm/dispatch_state.rs
+  git add crates/lyng/vm/src/vm.rs \
+          crates/lyng/vm/src/dsl/slow_path.rs
   git commit -m "DSL-0c: delete dispatch_state.rs + simplify LlIntDispatchState"
   ```
 
@@ -5234,35 +5234,35 @@ Generates the `~140` cold-stub `llint_handler!` invocations + their `dsl_cold_sh
 ### Task C4: Delete `dispatch/` α-only helpers
 
 **Files:**
-- Delete: `crates/lyng-js/vm/src/vm/dispatch/` (if its contents are no longer used)
-- Modify: `crates/lyng-js/vm/src/vm.rs`
+- Delete: `crates/lyng/vm/src/vm/dispatch/` (if its contents are no longer used)
+- Modify: `crates/lyng/vm/src/vm.rs`
 
 Most `execute_*_opcode` methods on `Vm` should have been replaced by `semantics/*` free functions during DSL-0a. Audit and remove anything in `dispatch/` that's no longer referenced.
 
 - [ ] **Step 1: Audit references**
 
   ```sh
-  rg -n "vm/dispatch::\|self\.execute_.*_opcode" crates/lyng-js/vm/src/ | head -40
+  rg -n "vm/dispatch::\|self\.execute_.*_opcode" crates/lyng/vm/src/ | head -40
   ```
 
   For each remaining reference, decide: move into `semantics/`, or keep as a private helper if it's still shared.
 
 - [ ] **Step 2: Delete unused files**
 
-  If `dispatch/arithmetic.rs` and `dispatch/property.rs` are still referenced (e.g. their helper functions like `decode_smi_immediate`, `smi_mul_result`, `smi_mod_result` are referenced from `semantics/`), keep those helpers but move them out of `dispatch/`. Move to `crates/lyng-js/vm/src/vm/arithmetic_helpers.rs` (or similar) and delete the `dispatch/` directory.
+  If `dispatch/arithmetic.rs` and `dispatch/property.rs` are still referenced (e.g. their helper functions like `decode_smi_immediate`, `smi_mul_result`, `smi_mod_result` are referenced from `semantics/`), keep those helpers but move them out of `dispatch/`. Move to `crates/lyng/vm/src/vm/arithmetic_helpers.rs` (or similar) and delete the `dispatch/` directory.
 
 - [ ] **Step 3: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
   ```
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git rm -r crates/lyng-js/vm/src/vm/dispatch/
-  git add crates/lyng-js/vm/src/vm.rs
+  git rm -r crates/lyng/vm/src/vm/dispatch/
+  git add crates/lyng/vm/src/vm.rs
   git commit -m "DSL-0c: delete vm/dispatch/ α-only helpers, relocate kept helpers"
   ```
 
@@ -5276,7 +5276,7 @@ Most `execute_*_opcode` methods on `Vm` should have been replaced by `semantics/
 - [ ] **Step 1: Grep for remaining α-machinery references**
 
   ```sh
-  rg -n "run_trampoline\|run_trampoline_uncounted\|run_trampoline_counted\|Step::\|DISPATCH_TABLE\|dispatch_handlers" crates/lyng-js/vm/src/
+  rg -n "run_trampoline\|run_trampoline_uncounted\|run_trampoline_counted\|Step::\|DISPATCH_TABLE\|dispatch_handlers" crates/lyng/vm/src/
   ```
   Expected: no matches outside of test fixtures or migration helpers that should also be removed.
 
@@ -5287,8 +5287,8 @@ Most `execute_*_opcode` methods on `Vm` should have been replaced by `semantics/
 - [ ] **Step 3: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
   ```
 
 - [ ] **Step 4: Commit (if changes made)**
@@ -5303,7 +5303,7 @@ Most `execute_*_opcode` methods on `Vm` should have been replaced by `semantics/
 ### Task C6: Delete tier-accounting calls on backedges
 
 **Files:**
-- Delete: `crates/lyng-js/vm/src/vm/tiering.rs` (if it exists)
+- Delete: `crates/lyng/vm/src/vm/tiering.rs` (if it exists)
 - Modify: any consumer
 
 Per design §6 + §10: "tier-accounting machinery on backedges goes away with the alpha path. After DSL-0c, the interpreter has no tier-up accounting — this is intentional, per §2 (JIT is out of scope)."
@@ -5311,7 +5311,7 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 1: Audit `tiering.rs` references**
 
   ```sh
-  rg -n "observe_tier_backedge_event\|tier_up_counter\|tiering::" crates/lyng-js/vm/src/
+  rg -n "observe_tier_backedge_event\|tier_up_counter\|tiering::" crates/lyng/vm/src/
   ```
 
 - [ ] **Step 2: Remove references**
@@ -5321,20 +5321,20 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 3: Delete `tiering.rs`**
 
   ```sh
-  rm crates/lyng-js/vm/src/vm/tiering.rs
+  rm crates/lyng/vm/src/vm/tiering.rs
   ```
 
 - [ ] **Step 4: Verify**
 
   ```sh
-  cargo build -p lyng-js-vm
-  cargo test -p lyng-js-vm
+  cargo build -p lyng-vm
+  cargo test -p lyng-vm
   ```
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git rm crates/lyng-js/vm/src/vm/tiering.rs
+  git rm crates/lyng/vm/src/vm/tiering.rs
   git add -u
   git commit -m "DSL-0c: delete tier-accounting machinery on backedges"
   ```
@@ -5348,7 +5348,7 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 1: Focused suites**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler 2>&1 | tail -40
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler 2>&1 | tail -40
   ```
   Expected: same pass count as Pre-flight 4.
 
@@ -5362,15 +5362,15 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 3: Whole-corpus Test262**
 
   ```sh
-  cargo run --release -p lyng-js-test262 -- --report /tmp/dsl-0c-test262.md -j 4
-  cp /tmp/dsl-0c-test262.md reports/js/lyng-js/dsl-0c-test262.md
+  cargo run --release -p lyng-test262 -- --report /tmp/dsl-0c-test262.md -j 4
+  cp /tmp/dsl-0c-test262.md reports/lyng/dsl-0c-test262.md
   ```
   Expected: pass count ≥ Pre-flight 7 baseline.
 
 - [ ] **Step 4: Commit evidence**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0c-test262.md
+  git add reports/lyng/dsl-0c-test262.md
   git commit -m "DSL-0c: post-deletion behavioral test evidence"
   ```
 
@@ -5383,16 +5383,16 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 1: V8 v7 run**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --report /tmp/dsl-0c-v8.md --json /tmp/dsl-0c-v8.json
-  cp /tmp/dsl-0c-v8.md reports/js/lyng-js/dsl-0c-v8.md
-  cp /tmp/dsl-0c-v8.json reports/js/lyng-js/dsl-0c-v8.json
+  cargo run --release -p lyng-bench -- v8suite --report /tmp/dsl-0c-v8.md --json /tmp/dsl-0c-v8.json
+  cp /tmp/dsl-0c-v8.md reports/lyng/dsl-0c-v8.md
+  cp /tmp/dsl-0c-v8.json reports/lyng/dsl-0c-v8.json
   ```
 
 - [ ] **Step 2: Microbench (5 hot + 5 warm + a sample of cold opcodes)**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- microbench --opcodes op_move,op_add,op_jump,op_return,op_loop_header,op_jump8,op_jump_if_true,op_wide,op_extra_wide,op_get_named_property,op_load_global,op_call0 --samples 7 --iters 5000000 --report /tmp/dsl-0c-microbench.md --require-isolation
-  cp /tmp/dsl-0c-microbench.md reports/js/lyng-js/dsl-0c-microbench.md
+  cargo run --release -p lyng-bench -- microbench --opcodes op_move,op_add,op_jump,op_return,op_loop_header,op_jump8,op_jump_if_true,op_wide,op_extra_wide,op_get_named_property,op_load_global,op_call0 --samples 7 --iters 5000000 --report /tmp/dsl-0c-microbench.md --require-isolation
+  cp /tmp/dsl-0c-microbench.md reports/lyng/dsl-0c-microbench.md
   ```
 
 - [ ] **Step 3: Compare to gates**
@@ -5407,9 +5407,9 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 - [ ] **Step 4: Commit evidence**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0c-v8.md \
-          reports/js/lyng-js/dsl-0c-v8.json \
-          reports/js/lyng-js/dsl-0c-microbench.md
+  git add reports/lyng/dsl-0c-v8.md \
+          reports/lyng/dsl-0c-v8.json \
+          reports/lyng/dsl-0c-microbench.md
   git commit -m "DSL-0c: microbench + V8 v7 evidence with DSL dispatch active"
   ```
 
@@ -5418,7 +5418,7 @@ Per design §6 + §10: "tier-accounting machinery on backedges goes away with th
 ### Task C9: Manifest Test 3 + 5 — `dsl_handler_symbol` linker resolution
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`
+- Modify: `crates/lyng/vm/src/dsl/opcode_manifest.rs`
 
 Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
@@ -5448,13 +5448,13 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 - [ ] **Step 3: Run**
 
   ```sh
-  cargo test -p lyng-js-vm dsl::opcode_manifest::manifest_tests::dsl_handler_fn_ptrs_resolve
+  cargo test -p lyng-vm dsl::opcode_manifest::manifest_tests::dsl_handler_fn_ptrs_resolve
   ```
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/dsl/opcode_manifest.rs
+  git add crates/lyng/vm/src/dsl/opcode_manifest.rs
   git commit -m "DSL-0c: manifest Test 3/5 (DSL handler fn-ptr linker resolution)"
   ```
 
@@ -5463,7 +5463,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 ### Task C10: Manifest Test 6 — `dispatch_handlers` does not exist
 
 **Files:**
-- Modify: `crates/lyng-js/vm/tests/dsl_manifest_grep.rs`
+- Modify: `crates/lyng/vm/tests/dsl_manifest_grep.rs`
 
 - [ ] **Step 1: Add a complementary "module absent" assertion**
 
@@ -5489,13 +5489,13 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --test dsl_manifest_grep
+  cargo test -p lyng-vm --test dsl_manifest_grep
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_manifest_grep.rs
+  git add crates/lyng/vm/tests/dsl_manifest_grep.rs
   git commit -m "DSL-0c: manifest Test 6 (dispatch_handlers absent + no α references)"
   ```
 
@@ -5504,7 +5504,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 ### Task C11: Manifest Test 7 — opcode-counter mode preserves counts
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_opcode_counter_parity.rs`
+- Create: `crates/lyng/vm/tests/dsl_opcode_counter_parity.rs`
 
 - [ ] **Step 1: Author the test**
 
@@ -5526,19 +5526,19 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
   }
   ```
 
-  Pre-record the alpha-baseline counts by running Richards under opcode-counters during Task A20 (refresh if needed; the alpha-baseline reference file goes in `reports/js/lyng-js/dsl-0a-opcode-counts-richards.json`).
+  Pre-record the alpha-baseline counts by running Richards under opcode-counters during Task A20 (refresh if needed; the alpha-baseline reference file goes in `reports/lyng/dsl-0a-opcode-counts-richards.json`).
 
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-vm --features opcode-counters --test dsl_opcode_counter_parity
+  cargo test -p lyng-vm --features opcode-counters --test dsl_opcode_counter_parity
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/tests/dsl_opcode_counter_parity.rs \
-          reports/js/lyng-js/dsl-0a-opcode-counts-richards.json
+  git add crates/lyng/vm/tests/dsl_opcode_counter_parity.rs \
+          reports/lyng/dsl-0a-opcode-counts-richards.json
   git commit -m "DSL-0c: manifest Test 7 (opcode-counter parity α ↔ DSL)"
   ```
 
@@ -5547,7 +5547,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 ### Task C12: Write DSL-0 decision document
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-0-decision.md`
+- Create: `reports/lyng/dsl-0-decision.md`
 
 - [ ] **Step 1: Author the decision doc**
 
@@ -5562,13 +5562,13 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
   | # | Criterion | Status | Evidence |
   | -: | --- | --- | --- |
-  | 1 | Single-implementation invariant (manifest Tests 1–7) | ✓ | crates/lyng-js/vm/src/dsl/opcode_manifest.rs + tests/dsl_manifest_grep.rs |
-  | 2 | Asm shape within 5 instructions of LLInt (per hot handler) | ✓/✗ | reports/js/lyng-js/dsl-handlers/op_*.md (5 hot ports) |
-  | 3 | Microbench within 2× of LLInt-equivalent | ✓/✗ | reports/js/lyng-js/dsl-0c-microbench.md |
-  | 4 | Behavioral parity | ✓ | reports/js/lyng-js/dsl-0c-test262.md |
-  | 5 | V8 v7 geomean ≥ +20% vs pre-DSL-0 (Richards ≥ +30%) | ✓/✗ | reports/js/lyng-js/dsl-0c-v8.md |
-  | 6 | All 9 DSL-0b validation cases still pass | ✓ | crates/lyng-js/vm/tests/dsl_validation_*.rs |
-  | 7 | Per-opcode dispatch counter parity | ✓ | crates/lyng-js/vm/tests/dsl_opcode_counter_parity.rs |
+  | 1 | Single-implementation invariant (manifest Tests 1–7) | ✓ | crates/lyng/vm/src/dsl/opcode_manifest.rs + tests/dsl_manifest_grep.rs |
+  | 2 | Asm shape within 5 instructions of LLInt (per hot handler) | ✓/✗ | reports/lyng/dsl-handlers/op_*.md (5 hot ports) |
+  | 3 | Microbench within 2× of LLInt-equivalent | ✓/✗ | reports/lyng/dsl-0c-microbench.md |
+  | 4 | Behavioral parity | ✓ | reports/lyng/dsl-0c-test262.md |
+  | 5 | V8 v7 geomean ≥ +20% vs pre-DSL-0 (Richards ≥ +30%) | ✓/✗ | reports/lyng/dsl-0c-v8.md |
+  | 6 | All 9 DSL-0b validation cases still pass | ✓ | crates/lyng/vm/tests/dsl_validation_*.rs |
+  | 7 | Per-opcode dispatch counter parity | ✓ | crates/lyng/vm/tests/dsl_opcode_counter_parity.rs |
 
   ## Observations
 
@@ -5597,7 +5597,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 - [ ] **Step 2: Commit**
 
   ```sh
-  git add reports/js/lyng-js/dsl-0-decision.md
+  git add reports/lyng/dsl-0-decision.md
   git commit -m "DSL-0: decision document"
   ```
 
@@ -5609,14 +5609,14 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
 - [ ] **Step 1: Final sanity-check all seven exit criteria**
 
-  Walk through `reports/js/lyng-js/dsl-0-decision.md` and confirm every row has evidence.
+  Walk through `reports/lyng/dsl-0-decision.md` and confirm every row has evidence.
 
 - [ ] **Step 2: Run every test target one more time**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
-  cargo test -p lyng-js-vm --features opcode-counters
-  cargo build --release -p lyng-js-vm -p lyng-js-bench
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
+  cargo test -p lyng-vm --features opcode-counters
+  cargo build --release -p lyng-vm -p lyng-bench
   cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery 2>&1 | tail -30
   ```
 
@@ -5629,7 +5629,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
 - [ ] **Step 4: Notify the user**
 
-  "DSL-0 complete. Decision: `<COMMIT_TO_DSL_1 | ABORT_TO_GAMMA_HARD>`. All seven exit criteria verified per `reports/js/lyng-js/dsl-0-decision.md`. The DSL-0 dcat parent + sub-epics are in_review; close gates on your approval. Next: <DSL-1 planning | revert and pivot>."
+  "DSL-0 complete. Decision: `<COMMIT_TO_DSL_1 | ABORT_TO_GAMMA_HARD>`. All seven exit criteria verified per `reports/lyng/dsl-0-decision.md`. The DSL-0 dcat parent + sub-epics are in_review; close gates on your approval. Next: <DSL-1 planning | revert and pivot>."
 
 ---
 
@@ -5637,21 +5637,21 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
 After completing every task, verify:
 
-- [ ] **Spec coverage:** every requirement in §10 of the design (R-0 exit criteria already met before DSL-0a; DSL-0a, DSL-0b, DSL-0c sub-phase exit criteria; the seven DSL-0 final exit criteria) is implemented or explicitly waived in `reports/js/lyng-js/dsl-0-decision.md`.
+- [ ] **Spec coverage:** every requirement in §10 of the design (R-0 exit criteria already met before DSL-0a; DSL-0a, DSL-0b, DSL-0c sub-phase exit criteria; the seven DSL-0 final exit criteria) is implemented or explicitly waived in `reports/lyng/dsl-0-decision.md`.
 
-- [ ] **Manifest Tests 1–7 all pass:** running `cargo test -p lyng-js-vm dsl::opcode_manifest` and `cargo test -p lyng-js-vm --test dsl_manifest_grep` reports 0 failures.
+- [ ] **Manifest Tests 1–7 all pass:** running `cargo test -p lyng-vm dsl::opcode_manifest` and `cargo test -p lyng-vm --test dsl_manifest_grep` reports 0 failures.
 
-- [ ] **All 9 DSL-0b validation cases pass:** `cargo test -p lyng-js-vm --test 'dsl_validation_*'`.
+- [ ] **All 9 DSL-0b validation cases pass:** `cargo test -p lyng-vm --test 'dsl_validation_*'`.
 
-- [ ] **Per-handler ported reports exist** for the 5 hot + 5 warm DSL handlers in `reports/js/lyng-js/dsl-handlers/`.
+- [ ] **Per-handler ported reports exist** for the 5 hot + 5 warm DSL handlers in `reports/lyng/dsl-handlers/`.
 
-- [ ] **Asm baselines committed** for every ported handler in `reports/js/lyng-js/dsl-asm-baseline-aarch64/`.
+- [ ] **Asm baselines committed** for every ported handler in `reports/lyng/dsl-asm-baseline-aarch64/`.
 
-- [ ] **`reports/js/lyng-js/dsl-0a-status.md`, `dsl-0b-status.md`, `dsl-0-decision.md` all exist** with their placeholders filled.
+- [ ] **`reports/lyng/dsl-0a-status.md`, `dsl-0b-status.md`, `dsl-0-decision.md` all exist** with their placeholders filled.
 
 - [ ] **No `unsafe` outside the policy-allowed modules** — confirm by re-running the policy lint test introduced in R-0.
 
-- [ ] **`cargo build --release -p lyng-js-vm` is clean.**
+- [ ] **`cargo build --release -p lyng-vm` is clean.**
 
 - [ ] **Test262 pass count ≥ Pre-flight 7 baseline.**
 

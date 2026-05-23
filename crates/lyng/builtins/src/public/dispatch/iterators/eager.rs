@@ -219,7 +219,7 @@ fn iterator_predicate_helper<Cx: PublicBuiltinDispatchContext>(
                 iterator::iterator_close(
                     &mut bridge,
                     &mut iterator_record,
-                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                    Ok::<(), lyng_types::AbruptCompletion>(()),
                 )
             };
             close_result?;
@@ -232,7 +232,7 @@ fn iterator_predicate_helper<Cx: PublicBuiltinDispatchContext>(
                 iterator::iterator_close(
                     &mut bridge,
                     &mut iterator_record,
-                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                    Ok::<(), lyng_types::AbruptCompletion>(()),
                 )
             };
             close_result?;
@@ -303,7 +303,7 @@ pub(super) fn iterator_find_builtin<Cx: PublicBuiltinDispatchContext>(
                 iterator::iterator_close(
                     &mut bridge,
                     &mut iterator_record,
-                    Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                    Ok::<(), lyng_types::AbruptCompletion>(()),
                 )
             };
             close_result?;

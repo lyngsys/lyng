@@ -16,7 +16,7 @@ sidecar and fall to the existing slow path unchanged.
 
 ## POLY_LIMIT decision
 
-V8 v7 suite, 11 samples per benchmark, isolated lyng-js subprocess per
+V8 v7 suite, 11 samples per benchmark, isolated lyng subprocess per
 sample. Scored against the Phase 3e baseline (Richards 318, DeltaBlue
 348, Crypto 274, RayTrace 422, NavierStokes 460, Splay 1278).
 
@@ -41,19 +41,19 @@ Cumulative geomean over Phase 0 sits at **≈ +18%** by Phase 3f.
 DeltaBlue is now **+30.7%** over its Phase 1 baseline; Richards **+35.9%**.
 
 Reports:
-- `reports/js/lyng-js/phase-3f-bench.md`
-- `reports/js/lyng-js/phase-3f-bench.json`
+- `reports/lyng/phase-3f-bench.md`
+- `reports/lyng/phase-3f-bench.json`
 
 ## Inline-asm verification
 
 `cargo asm` snapshots of the 5 representative IC handlers committed at:
 
-- `reports/js/lyng-js/phase-3f-op_get_named_property.asm` (788 lines)
-- `reports/js/lyng-js/phase-3f-op_load_global.asm` (737 lines)
-- `reports/js/lyng-js/phase-3f-op_get_keyed_property.asm` (1422 lines)
-- `reports/js/lyng-js/phase-3f-op_set_named_property_common.asm` (3281 lines)
-- `reports/js/lyng-js/phase-3f-op_store_or_assign_global.asm` (1272 lines)
-- `reports/js/lyng-js/phase-3f-op_set_keyed_property_common.asm` (2266 lines)
+- `reports/lyng/phase-3f-op_get_named_property.asm` (788 lines)
+- `reports/lyng/phase-3f-op_load_global.asm` (737 lines)
+- `reports/lyng/phase-3f-op_get_keyed_property.asm` (1422 lines)
+- `reports/lyng/phase-3f-op_set_named_property_common.asm` (3281 lines)
+- `reports/lyng/phase-3f-op_store_or_assign_global.asm` (1272 lines)
+- `reports/lyng/phase-3f-op_set_keyed_property_common.asm` (2266 lines)
 
 | Handler | `bl` to polymorphic helpers on fast path | `bl` to slow chain on fast path |
 |---|---|---|
@@ -98,11 +98,11 @@ polymorphic fast path. The historical phase-4b-test262.md baseline
 (49721 passed / 8 failed) reflects an older test262 corpus state on
 this checkout; Phase 3f does not regress against the *current* corpus.
 
-Report: `reports/js/lyng-js/phase-3f-test262.md`.
+Report: `reports/lyng/phase-3f-test262.md`.
 
 ## What landed
 
-### Data layout (`crates/lyng-js/vm/src/vm/feedback.rs`)
+### Data layout (`crates/lyng/vm/src/vm/feedback.rs`)
 
 `NamedPropertyFeedback` adds:
 - `polymorphic_fast: [NamedPropertyHandler; POLY_LIMIT]`
@@ -139,7 +139,7 @@ cache transition.
 
 ### Fast-path entry points
 
-New helpers in `crates/lyng-js/vm/src/vm/feedback.rs`:
+New helpers in `crates/lyng/vm/src/vm/feedback.rs`:
 - `Vm::named_property_polymorphic_fast_handler(code, slot, shape)`
 - `Vm::keyed_property_named_polymorphic_fast_handler(code, slot, atom, shape)`
 - `Vm::keyed_property_dense_polymorphic_fast_handler(code, slot)`
@@ -148,7 +148,7 @@ All `#[inline(always)]`, walk `0..POLY_LIMIT` against the runtime
 shape (+ atom for keyed-named, + flags for dense), return the matching
 handler on hit or `None` on miss.
 
-New inline helpers in `crates/lyng-js/vm/src/vm/dispatch/property.rs`:
+New inline helpers in `crates/lyng/vm/src/vm/dispatch/property.rs`:
 - `Vm::try_named_property_polymorphic_fast_load`
 - `Vm::try_named_property_polymorphic_fast_store`
 - `Vm::try_keyed_named_polymorphic_fast_load`
@@ -172,7 +172,7 @@ and the one-hop proto block (Phase 3e):
 - `op_get_keyed_property` — dense-index + named-atom load sides
 - `op_set_keyed_property_common` — dense-index + named-atom store sides
 
-### Tests (`crates/lyng-js/vm/src/tests/inline_caches.rs`)
+### Tests (`crates/lyng/vm/src/tests/inline_caches.rs`)
 
 5 new tests covering Phase 3f-specific behavior:
 - `named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes`
@@ -220,17 +220,17 @@ existing `FeedbackVectorFootprint` accounting.)
 
 ## Files changed
 
-- `crates/lyng-js/vm/src/vm/feedback.rs` — `POLY_LIMIT` constant,
+- `crates/lyng/vm/src/vm/feedback.rs` — `POLY_LIMIT` constant,
   4 new sidecar fields on `NamedPropertyFeedback`, 4 new fields on
   `KeyedPropertyFeedback`, extended `refresh_monomorphic_fast` for
   both, 3 new lookup helpers, all reset paths cleared on cache
   transitions.
-- `crates/lyng-js/vm/src/vm/dispatch/property.rs` — 6 new inline
+- `crates/lyng/vm/src/vm/dispatch/property.rs` — 6 new inline
   helpers, 6 new call sites (Get/Set named, Get/Set keyed-dense,
   Get/Set keyed-named).
-- `crates/lyng-js/vm/src/vm/names.rs` — 3 new call sites
+- `crates/lyng/vm/src/vm/names.rs` — 3 new call sites
   (LoadGlobal, StoreGlobal, AssignGlobal).
-- `crates/lyng-js/vm/src/tests/inline_caches.rs` — 5 new tests +
+- `crates/lyng/vm/src/tests/inline_caches.rs` — 5 new tests +
   one shared `make_object_with_value` helper.
-- `reports/js/lyng-js/phase-3f-*` — bench, test262, asm snapshots,
+- `reports/lyng/phase-3f-*` — bench, test262, asm snapshots,
   and this status report.

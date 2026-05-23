@@ -1,10 +1,10 @@
 use crate::{
     BuiltinAttributes, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
 };
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{BuiltinFunctionId, Value, WellKnownSymbolId};
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{BuiltinFunctionId, Value, WellKnownSymbolId};
 
 pub(super) const fn builtin_function_atom_property(
     atom: AtomId,

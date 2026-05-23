@@ -62,7 +62,7 @@ non-PrototypeData states still fall through to the slow chain.
 
 ### New infrastructure
 
-- `NamedPropertyProtoHandler` in `crates/lyng-js/objects/src/shapes.rs`
+- `NamedPropertyProtoHandler` in `crates/lyng/objects/src/shapes.rs`
   — two-word packed handler: `receiver_word` carries receiver shape;
   `proto_word` mirrors `NamedPropertyHandler`'s layout but for the
   prototype (prototype shape + slot offset + writable + inline-tag).
@@ -82,10 +82,10 @@ non-PrototypeData states still fall through to the slow chain.
   for keyed-NamedAtom feedback.
 - Two `Vm::named_property_proto_fast_handler` /
   `Vm::keyed_property_named_proto_fast_handler` lookup helpers in
-  `crates/lyng-js/vm/src/vm/feedback.rs` (inline-always).
+  `crates/lyng/vm/src/vm/feedback.rs` (inline-always).
 - Two `Vm::try_named_property_proto_fast_load` /
   `Vm::try_keyed_named_proto_fast_load` fast-path helpers in
-  `crates/lyng-js/vm/src/vm/dispatch/property.rs` (inline-always).
+  `crates/lyng/vm/src/vm/dispatch/property.rs` (inline-always).
 
 ### Reused infrastructure
 
@@ -105,9 +105,9 @@ non-PrototypeData states still fall through to the slow chain.
 
 | Check | Phase 3d | Phase 3e | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-objects -p lyng-js-vm` | 480 passed | 486 passed | +6 (new NamedPropertyProtoHandler unit tests + 4 IC integration tests) |
-| `cargo clippy -p lyng-js-vm` | 0 errors, 7 warnings | 0 errors, 7 warnings | unchanged |
-| `cargo clippy -p lyng-js-objects` | clean | clean | unchanged |
+| `cargo test -p lyng-objects -p lyng-vm` | 480 passed | 486 passed | +6 (new NamedPropertyProtoHandler unit tests + 4 IC integration tests) |
+| `cargo clippy -p lyng-vm` | 0 errors, 7 warnings | 0 errors, 7 warnings | unchanged |
+| `cargo clippy -p lyng-objects` | clean | clean | unchanged |
 | `cargo fmt --check` | clean | clean | — |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
@@ -144,8 +144,8 @@ Cumulative geomean over Phase 2a is now **≈ +9.6%** (up from Phase 3d's
 +6.1%) — DeltaBlue and Richards drive the bulk of the improvement.
 
 Reports:
-- `reports/js/lyng-js/phase-3e-bench.md`
-- `reports/js/lyng-js/phase-3e-bench.json`
+- `reports/lyng/phase-3e-bench.md`
+- `reports/lyng/phase-3e-bench.json`
 
 ### `cargo asm`
 
@@ -162,9 +162,9 @@ on the proto-hit path. The helpers are fully inlined into the dispatch
 handlers.
 
 Reports:
-- `reports/js/lyng-js/phase-3e-op_get_named_property.asm`
-- `reports/js/lyng-js/phase-3e-op_load_global.asm`
-- `reports/js/lyng-js/phase-3e-op_get_keyed_property.asm`
+- `reports/lyng/phase-3e-op_get_named_property.asm`
+- `reports/lyng/phase-3e-op_load_global.asm`
+- `reports/lyng/phase-3e-op_get_keyed_property.asm`
 
 ## What's deferred
 
@@ -186,25 +186,25 @@ Reports:
 
 Single-commit delivery (matching the Phase 3b / 3c cadence):
 
-- `crates/lyng-js/objects/src/shapes.rs` — `NamedPropertyProtoHandler`
+- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyProtoHandler`
   packed type + `from_entry` constructor + accessor methods.
-- `crates/lyng-js/objects/src/lib.rs` — re-export
+- `crates/lyng/objects/src/lib.rs` — re-export
   `NamedPropertyProtoHandler`.
-- `crates/lyng-js/objects/src/tests.rs` — 6 unit tests covering
+- `crates/lyng/objects/src/tests.rs` — 6 unit tests covering
   handler packing, multi-hop / single-hop / OwnData rejection, and
   the NONE sentinel.
-- `crates/lyng-js/vm/src/vm/feedback.rs` — 3 sidecar fields on
+- `crates/lyng/vm/src/vm/feedback.rs` — 3 sidecar fields on
   `NamedPropertyFeedback`, 3 sidecar fields on `KeyedPropertyFeedback`,
   extended `refresh_monomorphic_fast` for both, 2 new `Vm` lookup
   helpers, all reset paths cleared on cache transitions.
-- `crates/lyng-js/vm/src/vm/dispatch/property.rs` — 2 new
+- `crates/lyng/vm/src/vm/dispatch/property.rs` — 2 new
   `#[inline(always)]` fast-path helpers
   (`try_named_property_proto_fast_load`,
   `try_keyed_named_proto_fast_load`) + 2 inline call sites
   (`execute_get_named_property_opcode`, keyed-named-atom Get).
-- `crates/lyng-js/vm/src/vm/names.rs` — 1 inline call site in
+- `crates/lyng/vm/src/vm/names.rs` — 1 inline call site in
   `load_global_with_feedback`.
-- `crates/lyng-js/vm/src/tests/inline_caches.rs` — 4 integration tests
+- `crates/lyng/vm/src/tests/inline_caches.rs` — 4 integration tests
   (one-hop PrototypeData hit, prototype-swap invalidation, keyed
   variant, three-hop chain fall-through).
 

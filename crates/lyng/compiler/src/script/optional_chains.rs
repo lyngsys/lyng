@@ -68,7 +68,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let shorted = self.alloc_temp()?;
@@ -419,7 +419,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
         shorted: u16,
     ) -> LoweringResult<()> {
@@ -496,7 +496,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
         shorted: u16,
     ) -> LoweringResult<()> {
@@ -736,7 +736,7 @@ impl FunctionCompiler<'_, '_> {
         expr_id: ExprId,
         callee_register: u16,
         this_register: u16,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         self.emit_call_with_prelowered_target(

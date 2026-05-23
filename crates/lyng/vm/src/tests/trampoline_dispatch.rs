@@ -485,7 +485,10 @@ fn trampoline_executes_typeof() {
 
 #[test]
 fn trampoline_executes_for_of_loop() {
-    let unit = compile_test_unit(35, "let sum = 0; for (let x of [1, 2, 3, 4, 5]) { sum = sum + x }; sum");
+    let unit = compile_test_unit(
+        35,
+        "let sum = 0; for (let x of [1, 2, 3, 4, 5]) { sum = sum + x }; sum",
+    );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
@@ -496,7 +499,10 @@ fn trampoline_executes_for_of_loop() {
 
 #[test]
 fn trampoline_executes_for_in_loop() {
-    let unit = compile_test_unit(36, "let count = 0; for (let _k in { a: 1, b: 2, c: 3 }) { count = count + 1 }; count");
+    let unit = compile_test_unit(
+        36,
+        "let count = 0; for (let _k in { a: 1, b: 2, c: 3 }) { count = count + 1 }; count",
+    );
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");

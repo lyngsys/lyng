@@ -1,6 +1,6 @@
 # JSC LLInt reference capture — local-build setup
 
-`lyng-js-bench capture-llint` uses three modes (`system`, `local`, `excerpt`).
+`lyng-bench capture-llint` uses three modes (`system`, `local`, `excerpt`).
 This doc covers the `local` mode: building JSC from source so the binary
 retains `_llint_op_*` symbols even when the system framework is stripped.
 
@@ -32,11 +32,11 @@ Expected: one or more matches.
 ## Running capture-llint in local mode
 
 ```sh
-cargo run --release -p lyng-js-bench -- capture-llint \
+cargo run --release -p lyng-bench -- capture-llint \
   --source local \
   --jsc-binary /path/to/WebKitBuild/Debug/bin/jsc \
   --opcodes op_add,op_mov,op_jmp,op_get_by_id,op_put_by_id,op_call,op_ret \
-  --output reports/js/lyng-js/llint-reference
+  --output reports/lyng/llint-reference
 ```
 
 ## Running capture-llint in excerpt mode (no build required)
@@ -45,11 +45,11 @@ Excerpt mode reads the offlineasm source files directly from a WebKit
 source checkout — no compilation needed.
 
 ```sh
-cargo run --release -p lyng-js-bench -- capture-llint \
+cargo run --release -p lyng-bench -- capture-llint \
   --source excerpt \
   --jsc-source /Users/sondre/dev/WebKit \
   --opcodes op_add,op_mov,op_jmp,op_get_by_id \
-  --output reports/js/lyng-js/llint-reference
+  --output reports/lyng/llint-reference
 ```
 
 This produces source-level (offlineasm pseudo-code) reference rather than

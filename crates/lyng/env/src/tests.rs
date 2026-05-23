@@ -4,14 +4,14 @@
 )]
 
 use super::*;
-use lyng_js_common::AtomId;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_host::{
+use lyng_common::AtomId;
+use lyng_gc::AllocationLifetime;
+use lyng_host::{
     AgentSpawnKind, AgentThreadStartKind, HostCall, HostSharedBufferId, HostThreadId,
     ImportMetaProperties, ImportMetaProperty, ImportMetaValue, ModuleKey, NoopHostHooks, TestHost,
 };
-use lyng_js_objects::ObjectAllocation;
-use lyng_js_types::{
+use lyng_objects::ObjectAllocation;
+use lyng_types::{
     BackingStoreRef, CodeRef, ObjectRef, PropertyKey, StringRef, Value, WellKnownSymbolId,
 };
 use std::mem::size_of;

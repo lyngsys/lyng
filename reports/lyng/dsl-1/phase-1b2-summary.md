@@ -12,23 +12,23 @@ A/B clears the V8 v7 gate with substantial headroom.
 | Task | Deliverable | Commit |
 |-----:|-------------|--------|
 |  1   | `load_uninit_lex_sentinel!` backend macro (4-instruction movz/movk sequence; literal-pool form rejected by rustc inline-asm parser); `VALUE_UNINIT_LEX_BITS` const in `aarch64/prelude.rs`; `value_uninit_lex_bits` universal lowerer binding; structural compiles-and-links test for opcode 213 | `6a69096d` |
-|  2   | `op_load_const8` inline port (5-instruction body + 4-instr dispatch tail = 9 total; no slow path retained); `op_load_const8_slow_rs` deleted (no callers); per-handler ported report; asm baseline; 5 integration tests in `lyng-js-tests`; **x22→x24 register-pin fix** in `load_constant!` macro (latent Phase 1.B.1 substrate bug — see lessons) | `de2947f2` |
+|  2   | `op_load_const8` inline port (5-instruction body + 4-instr dispatch tail = 9 total; no slow path retained); `op_load_const8_slow_rs` deleted (no callers); per-handler ported report; asm baseline; 5 integration tests in `lyng-tests`; **x22→x24 register-pin fix** in `load_constant!` macro (latent Phase 1.B.1 substrate bug — see lessons) | `de2947f2` |
 |  3   | `op_load_this` inline port (8-instruction body + 4-instr dispatch tail + sentinel-bail branch to `op_load_this_slow_rs`); per-handler ported report; asm baseline; 6 integration tests covering ThisState::Value(v) and ThisState::Lexical arms; `cmp_branch_eq!` macro added to `aarch64/control.rs`; same x22→x24 fix applied to `load_state_value!` in `aarch64/frame.rs` | `3a5facc4` |
 |  4   | Delete the 3 `#[ignore]`-d forward-pointer tests in `dsl_validation_frame_context.rs`; same-load V8 v7 A/B vs `68dd5e89` (+4.89% geomean); slow-path-share measurement (both opcodes 0.00%); per-handler reports updated with measured numbers; microbench gate deferred (snippets gap) | `91e1a4de` |
 |  5   | Phase 1.B.2 sub-phase summary (this file) | TBD-this commit |
 
 ## Test results at HEAD
 
-- `cargo test -p lyng-js-vm --lib --release`: **418 passing** (vs 417
+- `cargo test -p lyng-vm --lib --release`: **418 passing** (vs 417
   Phase 1.B.1 baseline; +1 from Task 1's `value_uninit_lex_bits_matches_runtime`
   unit test)
-- `cargo test -p lyng-js-tests --release`: **1198 passing** (vs 1187
+- `cargo test -p lyng-tests --release`: **1198 passing** (vs 1187
   Phase 1.B.1 baseline; +5 from Task 2's `op_load_const8_inline.rs`,
   +6 from Task 3's `op_load_this_inline.rs`)
-- `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`:
+- `cargo test -p lyng-vm --test dsl_validation_frame_context --release`:
   **4 passing + 0 ignored** (down from 4 passing + 3 ignored; the 3
   forward-pointer tests were superseded by the new integration tests
-  in `lyng-js-tests` and deleted in Task 4)
+  in `lyng-tests` and deleted in Task 4)
 - 2 pre-existing `feedback_flat_consistency` failures unchanged (same
   as Phase 1.B.1 close).
 
@@ -80,11 +80,11 @@ Full microbench + slow-path-share data at
 
 ## Per-handler ported reports
 
-- [`reports/js/lyng-js/dsl-handlers/op_load_const8.md`](../dsl-handlers/op_load_const8.md):
+- [`reports/lyng/dsl-handlers/op_load_const8.md`](../dsl-handlers/op_load_const8.md):
   inline 5-instr body + 4-instr dispatch tail = 9 total. Slow-path
   shim deleted. Smi/Float/Atom/multi-constant integration tests
   exercise all the in-scope `ConstantValue` variants.
-- [`reports/js/lyng-js/dsl-handlers/op_load_this.md`](../dsl-handlers/op_load_this.md):
+- [`reports/lyng/dsl-handlers/op_load_this.md`](../dsl-handlers/op_load_this.md):
   inline 8-instr body (incl. 4-instr sentinel materialization) + 4-instr
   dispatch tail = 14 total; ≤ 12-instr body budget met. Slow-path
   retained as sentinel-bail target for ThisState::Uninitialized /
@@ -94,7 +94,7 @@ Full microbench + slow-path-share data at
 
 ### Latent x22→x24 register-pin bug in Phase 1.B.1 substrate macros
 
-The `load_constant!` macro in `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs`
+The `load_constant!` macro in `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`
 (landed in Phase 1.B.1 Task 5, commit `3d2bfccc`) initially emitted
 `ldr x16, [x22, ...]` to read the `frame_const_base` field — but the
 field lives on `LlIntState`, accessed via the **STATE pin (x24)**, not
@@ -172,7 +172,7 @@ Phase 1.A used the `asm-diff --check` snapshot tool to lock asm
 baselines for ported handlers. The tool doesn't yet support the
 `dsl::handlers::cold::*` namespace (handlers in cold.rs aren't in
 the registry the tool walks). Phase 1.B.2 captured manual asm
-baselines at `reports/js/lyng-js/dsl-asm-baseline-aarch64/` instead.
+baselines at `reports/lyng/dsl-asm-baseline-aarch64/` instead.
 Future asm-diff enhancement: add cold.rs handlers to the registry.
 Not a regression for now — the manual baselines fully document the
 emitted instructions.
@@ -200,8 +200,8 @@ Per spec §1:
 
 | Gate | Result |
 |------|--------|
-| Behavioral parity: `cargo test -p lyng-js-vm --lib --release` (≥417) | ✅ 418 passing (+1 from Task 1 unit test) |
-| Behavioral parity: `cargo test -p lyng-js-tests --release` (≥1187) | ✅ 1198 passing (+5 + 6 from Tasks 2/3 integration tests) |
+| Behavioral parity: `cargo test -p lyng-vm --lib --release` (≥417) | ✅ 418 passing (+1 from Task 1 unit test) |
+| Behavioral parity: `cargo test -p lyng-tests --release` (≥1187) | ✅ 1198 passing (+5 + 6 from Tasks 2/3 integration tests) |
 | Test262 ≥ Phase 1.B.0 baseline | ✅ (no semantic surface touched) |
 | `op_load_const8` ≤ 12 inline instr (body) | ✅ 5 inline + 4 dispatch tail = 9 total |
 | `op_load_const8` microbench within 2× LLInt | ⚠ deferred (no snippet — substrate gap on bench tool, see lessons) |
@@ -242,7 +242,7 @@ Recommended next steps:
    measurable from the start.
 2. **Bench-tool snippet backfill (follow-up).** Add `LoadConst8` and
    `LoadThis` Snippet entries to
-   `tools/lyng-js-bench/src/microbench/snippets.rs` so the per-opcode
+   `tools/lyng-bench/src/microbench/snippets.rs` so the per-opcode
    microbench gate becomes directly measurable for these two opcodes
    retroactively. Small, scoped task (~30 minutes) — should land
    before Phase 1.B.3 closure if Phase 1.B.3 microbench numbers will

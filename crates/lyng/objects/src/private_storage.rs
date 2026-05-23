@@ -3,7 +3,7 @@ use super::{
     InternalMethodError, ObjectRef, ObjectRuntime, ObjectSlotsHandleStoreTarget, PrimitiveHeapView,
     PrimitiveMutator, PrivateDescriptorSummary, Value, ValueStoreTarget,
 };
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 impl ObjectRuntime {
     /// Records the runtime key value for one instance public field emitted by a class.
@@ -40,7 +40,7 @@ impl ObjectRuntime {
         let slots = heap
             .view()
             .object(class_object)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
+            .and_then(lyng_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         if !heap.mut_store_value(ValueStoreTarget::ObjectSlot(slots, slot_index), key_value) {
             return Err(InternalMethodError::CorruptObjectState);
@@ -71,7 +71,7 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::MissingClassRecord)?;
         let slots = heap
             .object(class_object)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
+            .and_then(lyng_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         heap.object_slots(slots)
             .and_then(|slots| slots.get(slot_index as usize).copied())
@@ -142,7 +142,7 @@ impl ObjectRuntime {
         }
         let slots = heap
             .object(class_key)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
+            .and_then(lyng_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         heap.object_slots(slots)
             .and_then(|slots| slots.get(descriptor.slot_index() as usize).copied())
@@ -170,7 +170,7 @@ impl ObjectRuntime {
         let slots = heap
             .view()
             .object(class_key)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
+            .and_then(lyng_gc::RuntimeObjectRecord::private_slots)
             .ok_or(InternalMethodError::CorruptObjectState)?;
         if !heap.mut_store_value(
             ValueStoreTarget::ObjectSlot(slots, descriptor.slot_index()),
@@ -745,7 +745,7 @@ impl ObjectRuntime {
             .ok_or(InternalMethodError::MissingObject)?;
         Ok(heap
             .object(object)
-            .and_then(lyng_js_gc::RuntimeObjectRecord::private_slots)
+            .and_then(lyng_gc::RuntimeObjectRecord::private_slots)
             .and_then(|slots| heap.object_slots(slots))
             .map_or(0usize, <[Value]>::len))
     }

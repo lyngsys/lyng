@@ -3,9 +3,9 @@ use super::{
     allocate_regexp_object, is_regexp_object, is_regexp_value, regexp_object_source_and_flags,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_parser::validate_regexp_constructor_pattern;
-use lyng_js_types::{PropertyKey, Value};
+use lyng_common::WellKnownAtom;
+use lyng_parser::validate_regexp_constructor_pattern;
+use lyng_types::{PropertyKey, Value};
 
 enum RegExpPatternSeed {
     Text(String),

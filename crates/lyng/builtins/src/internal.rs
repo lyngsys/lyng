@@ -1,13 +1,13 @@
 use crate::public::{dispatch_internal_spec_like_builtin, PublicBuiltinDispatchContext};
 use crate::{BuiltinEntryMetadata, BuiltinInvocation};
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveTracer, TraceHeapEdges};
-use lyng_js_objects::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveTracer, TraceHeapEdges};
+use lyng_objects::{
     FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, ObjectFlags,
     OrdinaryObjectData, PrimitiveWrapperKind,
 };
-use lyng_js_types::{
+use lyng_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
     internal_bind_function_private_env_builtin, internal_capture_arrow_context_builtin,
     internal_construct_super_array_like_builtin, internal_construct_super_builtin,
@@ -1163,7 +1163,7 @@ pub fn dispatch_internal_builtin<Cx: PublicBuiltinDispatchContext>(
 }
 
 fn alloc_internal_builtin_function(
-    objects: &mut lyng_js_objects::ObjectRuntime,
+    objects: &mut lyng_objects::ObjectRuntime,
     mutator: &mut PrimitiveMutator<'_>,
     realm: RealmRef,
     global_env: EnvironmentRef,
@@ -1237,8 +1237,8 @@ fn prevent_extensions(agent: &mut Agent, object: ObjectRef) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_env::Runtime;
-    use lyng_js_host::NoopHostHooks;
+    use lyng_env::Runtime;
+    use lyng_host::NoopHostHooks;
 
     #[test]
     fn internal_builtin_cache_bootstraps_compatibility_objects_and_constants() {

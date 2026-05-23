@@ -1,4 +1,4 @@
-//! Integration tests for lyng-js cross-crate contracts and conformance surfaces.
+//! Integration tests for lyng cross-crate contracts and conformance surfaces.
 //!
 //! Validates frontend coverage, runtime primitive and substrate integration,
 //! execution semantics, embedding extension behavior, and large-input smoke cases.

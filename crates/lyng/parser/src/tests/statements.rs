@@ -208,10 +208,10 @@ fn parse_using_declaration_statement() {
     let Stmt::Declaration { decl, .. } = p.ast.get_stmt(block_stmts[0]) else {
         panic!("expected declaration statement");
     };
-    let lyng_js_ast::Decl::Variable { kind, .. } = p.ast.get_decl(*decl) else {
+    let lyng_ast::Decl::Variable { kind, .. } = p.ast.get_decl(*decl) else {
         panic!("expected variable declaration");
     };
-    assert_eq!(*kind, lyng_js_ast::VariableKind::Using);
+    assert_eq!(*kind, lyng_ast::VariableKind::Using);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn parse_await_using_in_async_function() {
     let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) else {
         panic!("expected async function declaration");
     };
-    let lyng_js_ast::Decl::Function { function, .. } = p.ast.get_decl(*decl) else {
+    let lyng_ast::Decl::Function { function, .. } = p.ast.get_decl(*decl) else {
         panic!("expected function declaration");
     };
     let function = p.ast.get_function(*function);
@@ -237,10 +237,10 @@ fn parse_await_using_in_async_function() {
     let Stmt::Declaration { decl, .. } = p.ast.get_stmt(body[0]) else {
         panic!("expected await using declaration");
     };
-    let lyng_js_ast::Decl::Variable { kind, .. } = p.ast.get_decl(*decl) else {
+    let lyng_ast::Decl::Variable { kind, .. } = p.ast.get_decl(*decl) else {
         panic!("expected variable declaration");
     };
-    assert_eq!(*kind, lyng_js_ast::VariableKind::AwaitUsing);
+    assert_eq!(*kind, lyng_ast::VariableKind::AwaitUsing);
 }
 
 #[test]
@@ -320,7 +320,7 @@ fn parse_for_await_of_with_async_identifier_lhs() {
     let Stmt::Declaration { decl, .. } = p.ast.get_stmt(stmts[0]) else {
         panic!("expected async function declaration");
     };
-    let lyng_js_ast::Decl::Function { function, .. } = p.ast.get_decl(*decl) else {
+    let lyng_ast::Decl::Function { function, .. } = p.ast.get_decl(*decl) else {
         panic!("expected function declaration");
     };
     let function = p.ast.get_function(*function);

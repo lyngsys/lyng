@@ -1,4 +1,4 @@
-use lyng_js_host::{
+use lyng_host::{
     DiagnosticReportRequest, HostError, HostHooks, HostResult, ImportMetaProperties,
     ImportMetaProperty, ImportMetaRequest, ImportMetaValue, LoadedModuleSource, LoadedSourceText,
     ModuleKey, ModuleSourceRequest, ScriptSourceRequest, UncaughtExceptionReport,

@@ -1,6 +1,6 @@
 use super::super::{string_ref_code_units, string_value, type_error, PublicBuiltinDispatchContext};
 use crate::BuiltinInvocation;
-use lyng_js_types::Value;
+use lyng_types::Value;
 use std::fmt::Write as _;
 
 fn regexp_escape_push_hex(output: &mut String, unit: u16) {

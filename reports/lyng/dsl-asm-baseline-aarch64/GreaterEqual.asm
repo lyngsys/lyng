@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::arithmetic::op_sub_smi_slow:
+lyng_vm::vm::dispatch_handlers::arithmetic::op_sub_smi_slow:
 L0:
 	sub sp, sp, #272
 	stp x28, x27, [sp, #176]
@@ -114,7 +114,7 @@ L9:
 	mov x5, x6
 	mov x6, x21
 	mov x7, x22
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::finish_abc_value_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::finish_abc_value_result
 	ldr x8, [sp, #112]
 	cmp x8, x24
 	b.ne L10
@@ -123,9 +123,9 @@ L9:
 	ldr w9, [x20, #56]
 	ldrb w8, [x8, x9]
 L11:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L12:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x24, x8, [x19]
 	b L13
@@ -155,13 +155,13 @@ L7:
 	add x1, sp, #112
 	mov x2, x8
 	mov w3, #2
-	bl lyng_js_ops::object::conversions::to_primitive
+	bl lyng_ops::object::conversions::to_primitive
 	ldp x8, x1, [sp, #64]
 	cmp x8, x24
 	b.ne L14
 	add x8, sp, #112
 	mov x0, x23
-	bl lyng_js_ops::read::to_numeric
+	bl lyng_ops::read::to_numeric
 	ldr w28, [sp, #112]
 	cmp w28, #4
 	b.ne L15
@@ -189,7 +189,7 @@ L16:
 	b.hs L17
 	mov x0, x23
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	movi d0, #0000000000000000
 	b L19
 L14:
@@ -210,7 +210,7 @@ L15:
 	b.ne L21
 	mov x0, x23
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 L21:
 	orr x1, x28, x8, lsl #32
 	mov x8, #-9223372036854775808
@@ -226,7 +226,7 @@ L20:
 L17:
 	add x8, sp, #112
 	mov x0, x23
-	bl lyng_js_ops::read::to_number
+	bl lyng_ops::read::to_number
 	ldr w8, [sp, #112]
 	cmp w8, #4
 	b.ne L22
@@ -258,14 +258,14 @@ L25:
 	sxth w8, w26
 	scvtf d1, w8
 	fsub d0, d0, d1
-	bl lyng_js_vm::vm::values::encode_number
+	bl lyng_vm::vm::values::encode_number
 	stp x24, x0, [sp, #16]
 	mov x6, x25
 	b L8
 L18:
 	mov x0, x23
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x8, #-9223372036854775808
 	str x8, [sp, #16]
 	str wzr, [sp, #24]
@@ -295,17 +295,17 @@ L31:
 	.loh AdrpAdd	L30, L31
 	.loh AdrpAdd	L28, L29
 L32:
-lyng_js_vm::vm::dispatch_handlers::arithmetic::op_greater_equal:
+lyng_vm::vm::dispatch_handlers::arithmetic::op_greater_equal:
 L33:
 	stp x29, x30, [sp, #-16]!
 	mov x29, sp
 	mov x1, x0
 	mov x0, x8
 L34:
-	adrp x2, lyng_js_vm::vm::dispatch::arithmetic::<impl lyng_js_vm::vm::Vm>::execute_greater_equal_opcode@PAGE
+	adrp x2, lyng_vm::vm::dispatch::arithmetic::<impl lyng_vm::vm::Vm>::execute_greater_equal_opcode@PAGE
 L35:
-	add x2, x2, lyng_js_vm::vm::dispatch::arithmetic::<impl lyng_js_vm::vm::Vm>::execute_greater_equal_opcode@PAGEOFF
-	bl lyng_js_vm::vm::dispatch_handlers::arithmetic::op_binary_general
+	add x2, x2, lyng_vm::vm::dispatch::arithmetic::<impl lyng_vm::vm::Vm>::execute_greater_equal_opcode@PAGEOFF
+	bl lyng_vm::vm::dispatch_handlers::arithmetic::op_binary_general
 	ldp x29, x30, [sp], #16
 	ret
 	bl core::panicking::panic_cannot_unwind

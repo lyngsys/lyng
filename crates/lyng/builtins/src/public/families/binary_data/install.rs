@@ -2,8 +2,8 @@ use super::super::{
     install_public_builtin_function, install_public_ordinary_object, BinaryDataFamilyBuiltins,
     BinaryDataFamilyPrototypes, FamilyInstallContext,
 };
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_env::Agent;
+use lyng_types::{
     array_buffer_builtin, array_buffer_byte_length_getter_builtin,
     array_buffer_detached_getter_builtin, array_buffer_is_view_builtin,
     array_buffer_max_byte_length_getter_builtin, array_buffer_resizable_getter_builtin,

@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::loads::op_load_const8:
+lyng_vm::vm::dispatch_handlers::loads::op_load_const8:
 L0:
 	stp x29, x30, [sp, #-16]!
 	mov x29, sp
@@ -109,9 +109,9 @@ L11:
 	ldr x12, [x13, #48]
 	ldrb w12, [x12, w11, uxtw]
 L13:
-	adrp x13, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x13, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L14:
-	add x13, x13, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x13, x13, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	str w11, [x9, #56]
 	ldr x9, [x13, x12, lsl #3]
 	add x10, x10, #4

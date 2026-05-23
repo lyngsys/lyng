@@ -9,7 +9,7 @@
 //! Compiler-oriented, arena-backed AST for ECMA-262 Edition 16.
 //!
 //! This crate defines the AST node types, typed node IDs, arena storage,
-//! and literal tables for the lyng-js JavaScript engine. The parser produces
+//! and literal tables for the lyng JavaScript engine. The parser produces
 //! a `ParsedScript` or `ParsedModule` that owns an `Ast` container.
 //!
 //! # Design
@@ -490,7 +490,7 @@ impl Ast {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::{AtomId, SourceId, Span};
+    use lyng_common::{AtomId, SourceId, Span};
 
     fn test_span() -> Span {
         Span::from_offsets(SourceId::new(0), 0, 10)
@@ -903,7 +903,7 @@ mod tests {
             ast,
             root,
             source_text: "".into(),
-            diagnostics: lyng_js_common::DiagnosticList::new(),
+            diagnostics: lyng_common::DiagnosticList::new(),
             strict: false,
         };
         assert!(!parsed.strict);
@@ -921,7 +921,7 @@ mod tests {
             ast,
             root,
             source_text: "".into(),
-            diagnostics: lyng_js_common::DiagnosticList::new(),
+            diagnostics: lyng_common::DiagnosticList::new(),
         };
         assert!(parsed.diagnostics.is_empty());
         assert!(parsed.ast.get_module(parsed.root).body.is_empty());

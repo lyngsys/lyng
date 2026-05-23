@@ -1,8 +1,8 @@
 //! Core parser state machine and helper methods.
 
-use lyng_js_ast::Ast;
-use lyng_js_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span, WellKnownAtom};
-use lyng_js_lexer::{Lexer, LexerMode, Token, TokenKind, TokenPayload};
+use lyng_ast::Ast;
+use lyng_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span, WellKnownAtom};
+use lyng_lexer::{Lexer, LexerMode, Token, TokenKind, TokenPayload};
 
 /// The parser state machine.
 ///
@@ -640,20 +640,18 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the expression is a valid simple assignment target
     /// (identifier, member expression, or similar LHS form).
-    pub fn is_simple_assignment_target(&self, expr: lyng_js_ast::ExprId) -> bool {
+    pub fn is_simple_assignment_target(&self, expr: lyng_ast::ExprId) -> bool {
         match self.ast().get_expr(expr) {
-            lyng_js_ast::Expr::Identifier { name, .. } => {
+            lyng_ast::Expr::Identifier { name, .. } => {
                 !(self.is_strict()
                     && (*name == WellKnownAtom::eval.id()
                         || *name == WellKnownAtom::arguments.id()))
             }
-            lyng_js_ast::Expr::StaticMemberExpression { .. }
-            | lyng_js_ast::Expr::ComputedMemberExpression { .. }
-            | lyng_js_ast::Expr::PrivateMemberExpression { .. } => true,
-            lyng_js_ast::Expr::CallExpression { .. } => {
-                self.allows_annex_b_call_assignment_target()
-            }
-            lyng_js_ast::Expr::ParenthesizedExpression { expression, .. } => {
+            lyng_ast::Expr::StaticMemberExpression { .. }
+            | lyng_ast::Expr::ComputedMemberExpression { .. }
+            | lyng_ast::Expr::PrivateMemberExpression { .. } => true,
+            lyng_ast::Expr::CallExpression { .. } => self.allows_annex_b_call_assignment_target(),
+            lyng_ast::Expr::ParenthesizedExpression { expression, .. } => {
                 self.is_simple_assignment_target(*expression)
             }
             _ => false,
@@ -662,20 +660,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Returns true if the expression is a simple assignment target under the
     /// standard grammar, without Annex B's web-compat CallExpression extension.
-    pub fn is_simple_assignment_target_without_annex_b_call(
-        &self,
-        expr: lyng_js_ast::ExprId,
-    ) -> bool {
+    pub fn is_simple_assignment_target_without_annex_b_call(&self, expr: lyng_ast::ExprId) -> bool {
         match self.ast().get_expr(expr) {
-            lyng_js_ast::Expr::Identifier { name, .. } => {
+            lyng_ast::Expr::Identifier { name, .. } => {
                 !(self.is_strict()
                     && (*name == WellKnownAtom::eval.id()
                         || *name == WellKnownAtom::arguments.id()))
             }
-            lyng_js_ast::Expr::StaticMemberExpression { .. }
-            | lyng_js_ast::Expr::ComputedMemberExpression { .. }
-            | lyng_js_ast::Expr::PrivateMemberExpression { .. } => true,
-            lyng_js_ast::Expr::ParenthesizedExpression { expression, .. } => {
+            lyng_ast::Expr::StaticMemberExpression { .. }
+            | lyng_ast::Expr::ComputedMemberExpression { .. }
+            | lyng_ast::Expr::PrivateMemberExpression { .. } => true,
+            lyng_ast::Expr::ParenthesizedExpression { expression, .. } => {
                 self.is_simple_assignment_target_without_annex_b_call(*expression)
             }
             _ => false,
@@ -685,22 +680,20 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Returns true if the expression is a valid LHS for `=` assignment
     /// (simple target, or object/array literal that can be destructured,
     /// or parenthesized valid target).
-    pub fn is_valid_assignment_lhs(&self, expr: lyng_js_ast::ExprId) -> bool {
+    pub fn is_valid_assignment_lhs(&self, expr: lyng_ast::ExprId) -> bool {
         match self.ast().get_expr(expr) {
-            lyng_js_ast::Expr::Identifier { name, .. } => {
+            lyng_ast::Expr::Identifier { name, .. } => {
                 !(self.is_strict()
                     && (*name == WellKnownAtom::eval.id()
                         || *name == WellKnownAtom::arguments.id()))
             }
-            lyng_js_ast::Expr::StaticMemberExpression { .. }
-            | lyng_js_ast::Expr::ComputedMemberExpression { .. }
-            | lyng_js_ast::Expr::PrivateMemberExpression { .. }
-            | lyng_js_ast::Expr::ObjectExpression { .. }
-            | lyng_js_ast::Expr::ArrayExpression { .. } => true,
-            lyng_js_ast::Expr::CallExpression { .. } => {
-                self.allows_annex_b_call_assignment_target()
-            }
-            lyng_js_ast::Expr::ParenthesizedExpression { expression, .. } => {
+            lyng_ast::Expr::StaticMemberExpression { .. }
+            | lyng_ast::Expr::ComputedMemberExpression { .. }
+            | lyng_ast::Expr::PrivateMemberExpression { .. }
+            | lyng_ast::Expr::ObjectExpression { .. }
+            | lyng_ast::Expr::ArrayExpression { .. } => true,
+            lyng_ast::Expr::CallExpression { .. } => self.allows_annex_b_call_assignment_target(),
+            lyng_ast::Expr::ParenthesizedExpression { expression, .. } => {
                 self.is_valid_assignment_lhs(*expression)
             }
             _ => false,

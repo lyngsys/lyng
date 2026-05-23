@@ -2,15 +2,13 @@ use super::support::{
     compile_and_run, compile_and_run_string, compile_unit, evaluate_with_registry,
     install_native_global,
 };
-use lyng_js_common::AtomTable;
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator};
-use lyng_js_objects::{
+use lyng_common::AtomTable;
+use lyng_gc::{AllocationLifetime, PrimitiveMutator};
+use lyng_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectAllocation, ObjectRuntime,
 };
-use lyng_js_types::{
-    BuiltinFunctionId, EnvironmentRef, NativeFunctionId, ObjectRef, RealmRef, Value,
-};
+use lyng_types::{BuiltinFunctionId, EnvironmentRef, NativeFunctionId, ObjectRef, RealmRef, Value};
 use std::fmt::Write as _;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

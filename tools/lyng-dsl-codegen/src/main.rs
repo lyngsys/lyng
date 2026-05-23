@@ -1,6 +1,6 @@
 //! Cold-stub codegen for DSL-0b (B46–B47).
 //!
-//! Emits `crates/lyng-js/vm/src/dsl/handlers/cold.rs`, populating one
+//! Emits `crates/lyng/vm/src/dsl/handlers/cold.rs`, populating one
 //! `llint_handler!` block + matching `op_xxx_slow_rs` shim per Cold
 //! opcode listed in [`COLD_STUBS`].
 //!
@@ -36,17 +36,17 @@
 //! ## Adding a new Cold opcode
 //!
 //! 1. Add a `Stub { ... }` row to [`COLD_STUBS`].
-//! 2. Re-run `cargo run -p lyng-js-dsl-codegen`.
-//! 3. Verify `cargo build -p lyng-js-vm` is clean.
+//! 2. Re-run `cargo run -p lyng-dsl-codegen`.
+//! 3. Verify `cargo build -p lyng-vm` is clean.
 
 use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
-use lyng_js_bytecode::Opcode;
+use lyng_bytecode::Opcode;
 
 /// Operand-decode layout the asm side uses. Mirrors
-/// `lyng_js_vm_dsl::layouts::Layout`. The proc-macro consumes the
+/// `lyng_vm_dsl::layouts::Layout`. The proc-macro consumes the
 /// `layout = X` token in the emitted `llint_handler!` block.
 #[derive(Clone, Copy, Debug)]
 enum Layout {
@@ -153,7 +153,7 @@ const fn f(name: &'static str, expr: &'static str) -> Field {
 ///
 /// Order doesn't matter — the tool sorts by Opcode discriminant before
 /// emitting to keep the output stable. Each entry must cover one
-/// Cold-categorized opcode from `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`.
+/// Cold-categorized opcode from `crates/lyng/vm/src/dsl/opcode_manifest.rs`.
 ///
 /// Mismatch with the manifest is caught at link time by the
 /// `dsl_handler_symbol` resolution test (Test 3).
@@ -508,7 +508,6 @@ const COLD_STUBS: &[Stub] = &[
         length: 2,
         fields: &[f("a", "a as u16"), f("instruction_len", "2u32")],
     },
-
     // =================================================================
     // arithmetic family — Sub / Mul / Div / Mod / Exp / Bit* / Shift* /
     // comparisons / EqualZero / Unary.
@@ -531,7 +530,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -549,7 +548,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -567,7 +566,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -585,7 +584,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -603,7 +602,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -621,7 +620,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -639,7 +638,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -657,7 +656,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -675,7 +674,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -693,7 +692,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -711,7 +710,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -729,7 +728,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -747,7 +746,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -765,7 +764,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -783,7 +782,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -801,7 +800,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -819,7 +818,7 @@ const COLD_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -839,7 +838,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -857,7 +856,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -875,7 +874,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -893,7 +892,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -911,7 +910,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -929,7 +928,7 @@ const COLD_STUBS: &[Stub] = &[
             f("imm_raw", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -947,7 +946,7 @@ const COLD_STUBS: &[Stub] = &[
             f("src", "b as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -964,7 +963,7 @@ const COLD_STUBS: &[Stub] = &[
             f("src", "b as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -981,7 +980,7 @@ const COLD_STUBS: &[Stub] = &[
             f("src", "b as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -998,7 +997,7 @@ const COLD_STUBS: &[Stub] = &[
             f("src", "b as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1016,12 +1015,11 @@ const COLD_STUBS: &[Stub] = &[
             f("src", "b as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
     },
-
     // =================================================================
     // control_flow family — ReturnUndefined, Nop.
     // =================================================================
@@ -1044,7 +1042,6 @@ const COLD_STUBS: &[Stub] = &[
         length: 4,
         fields: &[f("instruction_len", "4u32")],
     },
-
     // =================================================================
     // property family.
     //
@@ -1064,7 +1061,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1082,7 +1079,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1100,7 +1097,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1118,7 +1115,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1136,7 +1133,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1154,7 +1151,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1172,7 +1169,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1190,7 +1187,7 @@ const COLD_STUBS: &[Stub] = &[
             f("c", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1377,7 +1374,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // names family.
     //
@@ -1398,10 +1394,7 @@ const COLD_STUBS: &[Stub] = &[
             f("a", "a as u16"),
             f("bx", "bx"),
             f("instruction_len", "6u32"),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 4)",
-            ),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 4)"),
         ],
     },
     Stub {
@@ -1415,10 +1408,7 @@ const COLD_STUBS: &[Stub] = &[
             f("a", "a as u16"),
             f("bx", "bx"),
             f("instruction_len", "6u32"),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 4)",
-            ),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 4)"),
         ],
     },
     Stub {
@@ -1432,10 +1422,7 @@ const COLD_STUBS: &[Stub] = &[
             f("a", "a as u16"),
             f("bx", "bx"),
             f("instruction_len", "6u32"),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 4)",
-            ),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 4)"),
         ],
     },
     Stub {
@@ -1633,7 +1620,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // scope family.
     //
@@ -1768,7 +1754,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // calls family.
     //
@@ -1795,7 +1780,7 @@ const COLD_STUBS: &[Stub] = &[
             f("arity", "0u8"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1814,7 +1799,7 @@ const COLD_STUBS: &[Stub] = &[
             f("arity", "1u8"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1833,7 +1818,7 @@ const COLD_STUBS: &[Stub] = &[
             f("arity", "2u8"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1852,7 +1837,7 @@ const COLD_STUBS: &[Stub] = &[
             f("arity", "3u8"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -1874,18 +1859,9 @@ const COLD_STUBS: &[Stub] = &[
             f("a", "a as u16"),
             f("b", "b as u16"),
             f("c", "c as u16"),
-            f(
-                "range",
-                "Self::call_range_from_pc(state, 4)",
-            ),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 8)",
-            ),
-            f(
-                "spread_mask",
-                "Self::spread_mask_from_pc(state, 8)",
-            ),
+            f("range", "Self::call_range_from_pc(state, 4)"),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 8)"),
+            f("spread_mask", "Self::spread_mask_from_pc(state, 8)"),
             f("instruction_len", "10u32"),
         ],
     },
@@ -1900,18 +1876,9 @@ const COLD_STUBS: &[Stub] = &[
             f("a", "a as u16"),
             f("b", "b as u16"),
             f("c", "c as u16"),
-            f(
-                "range",
-                "Self::call_range_from_pc(state, 4)",
-            ),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 8)",
-            ),
-            f(
-                "spread_mask",
-                "Self::spread_mask_from_pc(state, 8)",
-            ),
+            f("range", "Self::call_range_from_pc(state, 4)"),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 8)"),
+            f("spread_mask", "Self::spread_mask_from_pc(state, 8)"),
             f("instruction_len", "10u32"),
         ],
     },
@@ -1925,18 +1892,9 @@ const COLD_STUBS: &[Stub] = &[
         fields: &[
             f("a", "a as u16"),
             f("b", "b as u16"),
-            f(
-                "range",
-                "Self::call_range_from_pc(state, 4)",
-            ),
-            f(
-                "feedback_slot",
-                "Self::feedback_slot_from_pc(state, 8)",
-            ),
-            f(
-                "spread_mask",
-                "Self::spread_mask_from_pc(state, 8)",
-            ),
+            f("range", "Self::call_range_from_pc(state, 4)"),
+            f("feedback_slot", "Self::feedback_slot_from_pc(state, 8)"),
+            f("spread_mask", "Self::spread_mask_from_pc(state, 8)"),
         ],
     },
     Stub {
@@ -1952,7 +1910,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // iterators family.
     //
@@ -2042,7 +1999,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // generators family.
     //
@@ -2122,7 +2078,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // exceptions family.
     //
@@ -2171,7 +2126,6 @@ const COLD_STUBS: &[Stub] = &[
             f("instruction_len", "4u32"),
         ],
     },
-
     // =================================================================
     // misc orphans — InstanceOf, CallMethod. Unit-struct args.
     // =================================================================
@@ -2209,7 +2163,7 @@ fn opcode_snake_name(op: Opcode) -> String {
     // Hand-coded snake-case mapping per the manifest's existing
     // semantic-symbol names. Single source of truth: the
     // `semantic_symbol` strings in
-    // `crates/lyng-js/vm/src/dsl/opcode_manifest.rs`.
+    // `crates/lyng/vm/src/dsl/opcode_manifest.rs`.
     match op {
         Opcode::Star0 => "op_star_0".to_string(),
         Opcode::Star1 => "op_star_1".to_string(),
@@ -2250,7 +2204,7 @@ fn opcode_snake_name(op: Opcode) -> String {
 
 /// Build the header comment + imports for the emitted file.
 fn write_header(out: &mut String) {
-    out.push_str("//! Cold DSL handlers. Auto-generated by `lyng-js-dsl-codegen` (B46–B47).\n");
+    out.push_str("//! Cold DSL handlers. Auto-generated by `lyng-dsl-codegen` (B46–B47).\n");
     out.push_str("//!\n");
     out.push_str("//! Each Cold opcode gets:\n");
     out.push_str("//! 1. A `#[unsafe(naked)] extern \"C\" fn op_xxx_dsl()` handler\n");
@@ -2263,8 +2217,8 @@ fn write_header(out: &mut String) {
     out.push_str("//!    `crate::vm::semantics::<family>::op_xxx_semantic`, and\n");
     out.push_str("//!    translates the outcome back to `SlowPathReturn`.\n");
     out.push_str("//!\n");
-    out.push_str("//! DO NOT EDIT BY HAND. Re-run `cargo run -p lyng-js-dsl-codegen`\n");
-    out.push_str("//! after touching `tools/lyng-js-dsl-codegen/src/main.rs`.\n");
+    out.push_str("//! DO NOT EDIT BY HAND. Re-run `cargo run -p lyng-dsl-codegen`\n");
+    out.push_str("//! after touching `tools/lyng-dsl-codegen/src/main.rs`.\n");
     out.push('\n');
 
     // aarch64 brings in every macro the proc-macro-emitted handlers
@@ -2276,7 +2230,7 @@ fn write_header(out: &mut String) {
     out.push_str("};\n");
     out.push('\n');
     out.push_str("#[cfg(target_arch = \"aarch64\")]\n");
-    out.push_str("use lyng_js_vm_dsl::llint_handler;\n");
+    out.push_str("use lyng_vm_dsl::llint_handler;\n");
     out.push('\n');
 
     // Helper for the feedback-slot extraction shared by LoadGlobal /
@@ -2308,7 +2262,7 @@ fn write_header(out: &mut String) {
     out.push_str("    fn feedback_slot_from_pc(\n");
     out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
     out.push_str("        offset: u32,\n");
-    out.push_str("    ) -> Option<lyng_js_types::FeedbackSlotId> {\n");
+    out.push_str("    ) -> Option<lyng_types::FeedbackSlotId> {\n");
     out.push_str("        let inner = state.dispatch_state();\n");
     out.push_str("        let pc = inner.frame.instruction_offset();\n");
     out.push_str("        // SAFETY: `installed.function.instruction_bytes()` is a\n");
@@ -2318,7 +2272,7 @@ fn write_header(out: &mut String) {
     out.push_str("        let lo = bytes.get((pc + offset) as usize).copied()? as u32;\n");
     out.push_str("        let hi = bytes.get((pc + offset + 1) as usize).copied()? as u32;\n");
     out.push_str("        let raw = lo | (hi << 8);\n");
-    out.push_str("        lyng_js_types::FeedbackSlotId::from_raw(raw)\n");
+    out.push_str("        lyng_types::FeedbackSlotId::from_raw(raw)\n");
     out.push_str("    }\n");
     out.push('\n');
     out.push_str("    /// Read the inline `CallRange` (4 bytes — count, base) from the\n");
@@ -2331,17 +2285,25 @@ fn write_header(out: &mut String) {
     out.push_str("    fn call_range_from_pc(\n");
     out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
     out.push_str("        offset: u32,\n");
-    out.push_str("    ) -> lyng_js_bytecode::CallRange {\n");
+    out.push_str("    ) -> lyng_bytecode::CallRange {\n");
     out.push_str("        let inner = state.dispatch_state();\n");
     out.push_str("        let pc = inner.frame.instruction_offset();\n");
     out.push_str("        let bytes = inner.installed.function().instruction_bytes();\n");
-    out.push_str("        let count_lo = bytes.get((pc + offset) as usize).copied().unwrap_or(0);\n");
-    out.push_str("        let count_hi = bytes.get((pc + offset + 1) as usize).copied().unwrap_or(0);\n");
-    out.push_str("        let base_lo = bytes.get((pc + offset + 2) as usize).copied().unwrap_or(0);\n");
-    out.push_str("        let base_hi = bytes.get((pc + offset + 3) as usize).copied().unwrap_or(0);\n");
+    out.push_str(
+        "        let count_lo = bytes.get((pc + offset) as usize).copied().unwrap_or(0);\n",
+    );
+    out.push_str(
+        "        let count_hi = bytes.get((pc + offset + 1) as usize).copied().unwrap_or(0);\n",
+    );
+    out.push_str(
+        "        let base_lo = bytes.get((pc + offset + 2) as usize).copied().unwrap_or(0);\n",
+    );
+    out.push_str(
+        "        let base_hi = bytes.get((pc + offset + 3) as usize).copied().unwrap_or(0);\n",
+    );
     out.push_str("        let count = u16::from_le_bytes([count_lo, count_hi]);\n");
     out.push_str("        let base = u16::from_le_bytes([base_lo, base_hi]);\n");
-    out.push_str("        lyng_js_bytecode::CallRange::new(base, count)\n");
+    out.push_str("        lyng_bytecode::CallRange::new(base, count)\n");
     out.push_str("    }\n");
     out.push('\n');
     out.push_str("    /// Look up the `spread_mask` metadata for an optional feedback slot.\n");
@@ -2350,7 +2312,7 @@ fn write_header(out: &mut String) {
     out.push_str("    #[inline]\n");
     out.push_str("    fn spread_mask_for(\n");
     out.push_str("        state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
-    out.push_str("        feedback_slot: Option<lyng_js_types::FeedbackSlotId>,\n");
+    out.push_str("        feedback_slot: Option<lyng_types::FeedbackSlotId>,\n");
     out.push_str("    ) -> Option<u64> {\n");
     out.push_str("        let slot = feedback_slot?;\n");
     out.push_str("        let inner = state.dispatch_state();\n");
@@ -2452,7 +2414,7 @@ const HOT_WARM_STUBS: &[Stub] = &[
             f("rhs", "c as u16"),
             f(
                 "feedback_slot",
-                "lyng_js_types::FeedbackSlotId::from_raw(slot)",
+                "lyng_types::FeedbackSlotId::from_raw(slot)",
             ),
             f("instruction_len", "6u32"),
         ],
@@ -2515,7 +2477,7 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
     out.push_str("/// semantic body, and returns the resulting `SemanticOutcome`\n");
     out.push_str("/// (with `pc_advance` = full wide-form instruction length).\n");
     out.push_str("///\n");
-    out.push_str("/// Auto-generated from `tools/lyng-js-dsl-codegen/src/main.rs`'s\n");
+    out.push_str("/// Auto-generated from `tools/lyng-dsl-codegen/src/main.rs`'s\n");
     out.push_str("/// `COLD_STUBS` + `HOT_WARM_STUBS` tables.\n");
     out.push_str("#[cfg(target_arch = \"aarch64\")]\n");
     // The match arms unpack the full decoder tuple even when the
@@ -2525,14 +2487,12 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
     // per-arm `_` prefixes.
     out.push_str("#[allow(unused_variables)]\n");
     out.push_str("pub(crate) fn dispatch_wide_form(\n");
-    out.push_str(
-        "    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n",
-    );
-    out.push_str("    prefix: lyng_js_bytecode::Opcode,\n");
+    out.push_str("    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,\n");
+    out.push_str("    prefix: lyng_bytecode::Opcode,\n");
     out.push_str(") -> crate::dsl::slow_path::SemanticOutcome {\n");
     out.push_str("    use crate::dsl::slow_path::SemanticOutcome;\n");
     out.push_str("    use crate::error::VmError;\n");
-    out.push_str("    use lyng_js_bytecode::Opcode;\n");
+    out.push_str("    use lyng_bytecode::Opcode;\n");
     out.push_str("    // Peek the semantic byte at bytes[pc+1] without holding\n");
     out.push_str("    // a `&` borrow of `dispatch` across the match — the per-\n");
     out.push_str("    // opcode arms borrow `dispatch` mutably to call the\n");
@@ -2582,9 +2542,7 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
                 // Re-acquire the bytes slice from `dispatch` in each arm
                 // so we never hold an immutable borrow across the
                 // semantic-body mutable call below.
-                out.push_str(
-                    "            let decoded = {\n",
-                );
+                out.push_str("            let decoded = {\n");
                 out.push_str("                let inner = dispatch.dispatch_state();\n");
                 out.push_str(
                     "                let bytes = &inner.installed.function().instruction_bytes()[pc as usize..];\n",
@@ -2595,9 +2553,7 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
                 )
                 .unwrap();
                 out.push_str("            };\n");
-                out.push_str(
-                    "            match decoded {\n",
-                );
+                out.push_str("            match decoded {\n");
                 out.push_str(
                     "                Ok((a16, b16, c16, slot_opt, instruction_len)) => {\n",
                 );
@@ -2625,10 +2581,10 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
                         out.push_str("                        instruction_len: instruction_len,\n");
                         continue;
                     }
-                    let expr = field.expr.replace("state", "dispatch").replace(
-                        "Self::",
-                        "ColdShimHelpers::",
-                    );
+                    let expr = field
+                        .expr
+                        .replace("state", "dispatch")
+                        .replace("Self::", "ColdShimHelpers::");
                     writeln!(
                         out,
                         "                        {name}: {expr},",
@@ -2666,9 +2622,7 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
                 .unwrap();
                 out.push_str("            };\n");
                 out.push_str("            match decoded {\n");
-                out.push_str(
-                    "                Ok((a16, bx_val, slot_opt, instruction_len)) => {\n",
-                );
+                out.push_str("                Ok((a16, bx_val, slot_opt, instruction_len)) => {\n");
                 out.push_str("                    let a: u32 = a16 as u32;\n");
                 out.push_str("                    let bx: u32 = bx_val;\n");
                 if profiled {
@@ -2694,10 +2648,10 @@ fn write_wide_form_dispatcher(out: &mut String, cold_stubs: &[Stub]) {
                         out.push_str("                        feedback_slot: feedback_slot,\n");
                         continue;
                     }
-                    let expr = field.expr.replace("state", "dispatch").replace(
-                        "Self::",
-                        "ColdShimHelpers::",
-                    );
+                    let expr = field
+                        .expr
+                        .replace("state", "dispatch")
+                        .replace("Self::", "ColdShimHelpers::");
                     writeln!(
                         out,
                         "                        {name}: {expr},",
@@ -2830,11 +2784,17 @@ fn write_stub(out: &mut String, stub: &Stub) {
             // reference `state` (e.g.
             // `Self::feedback_slot_from_pc(state, 4)`) — rewrite to
             // `&mut dispatch` since that's the binding in scope.
-            let expr = field.expr.replace("state", "&mut dispatch").replace(
-                "Self::",
-                "ColdShimHelpers::",
-            );
-            writeln!(out, "        {name}: {expr},", name = field.name, expr = expr).unwrap();
+            let expr = field
+                .expr
+                .replace("state", "&mut dispatch")
+                .replace("Self::", "ColdShimHelpers::");
+            writeln!(
+                out,
+                "        {name}: {expr},",
+                name = field.name,
+                expr = expr
+            )
+            .unwrap();
         }
         out.push_str("    };\n");
     }
@@ -2897,7 +2857,10 @@ fn main() {
         }
     }
     if !mismatches.is_empty() {
-        eprintln!("[codegen] FATAL: {} length mismatches found:", mismatches.len());
+        eprintln!(
+            "[codegen] FATAL: {} length mismatches found:",
+            mismatches.len()
+        );
         for (op, declared, canonical) in &mismatches {
             eprintln!(
                 "  - {:?} (discriminant {}): declared length = {}, canonical = {}",
@@ -2930,13 +2893,16 @@ fn main() {
         &sorted.iter().copied().copied().collect::<Vec<_>>(),
     );
 
-    write_non_aarch64_stubs(&mut out, &sorted.iter().copied().copied().collect::<Vec<_>>());
+    write_non_aarch64_stubs(
+        &mut out,
+        &sorted.iter().copied().copied().collect::<Vec<_>>(),
+    );
 
     // Determine output path. The tool runs from the workspace root
     // (cargo's working-directory convention), so the relative path
-    // resolves to `crates/lyng-js/vm/src/dsl/handlers/cold.rs`.
+    // resolves to `crates/lyng/vm/src/dsl/handlers/cold.rs`.
     let cwd = std::env::current_dir().expect("current_dir");
-    let output_path = cwd.join("crates/lyng-js/vm/src/dsl/handlers/cold.rs");
+    let output_path = cwd.join("crates/lyng/vm/src/dsl/handlers/cold.rs");
     if !output_path.parent().map(Path::exists).unwrap_or(false) {
         panic!(
             "expected cold.rs parent dir to exist: {}",

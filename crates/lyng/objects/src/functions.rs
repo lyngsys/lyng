@@ -4,7 +4,7 @@ use super::{
     FunctionPayloadRef, InternalMethodResult, NativeFunctionId, ObjectKind, ObjectRef,
     ObjectRuntime, PrimitiveMutator, RealmRef, RuntimeFunctionRecord, Value,
 };
-use lyng_js_gc::RuntimeBoundFunctionRecord;
+use lyng_gc::RuntimeBoundFunctionRecord;
 
 /// Cold payload carried by ordinary objects.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

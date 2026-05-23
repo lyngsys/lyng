@@ -19,14 +19,14 @@ shape that the main `lower_call_expression` / `lower_tail_call_expression` /
 
 | Site | Before | After |
 |---|---|---|
-| `lower_bigint_literal` ([expr.rs](../../../crates/lyng-js/compiler/src/script/expr.rs)) | `alloc_temp` → `LoadConst` → `materialize` (1 Move/arg) | `reserve_argument_block(1)` → `emit_load_atom_string(slot, atom)` (no Move) |
-| `lower_internal_binary_builtin` ([operators.rs](../../../crates/lyng-js/compiler/src/script/operators.rs)) | `lower_expr_to_temp` × 2 → `materialize` (1 Move/arg) | `reserve_argument_block(2)` → `lower_expr_into(arg, slot)` (no synthetic Move) |
-| `lower_template_object` → `lower_template_object_into` ([templates.rs](../../../crates/lyng-js/compiler/src/script/templates.rs)) | `alloc_temp` × (1 + 2·K) → `emit_load_*` → `materialize` | `reserve_argument_block(1 + 2·K)` → `emit_load_*(slot, ...)` (no Move) |
-| `lower_tagged_template_call` ([templates.rs](../../../crates/lyng-js/compiler/src/script/templates.rs)) | `lower_expr_to_temp` × N + `template_object` temp → `materialize` (N+1 Moves) | `reserve_argument_block(1 + N)` → inner template-object call writes into slot 0 + `lower_expr_into(arg, slot)` (no Move) |
-| `lower_internal_template_to_string` ([templates.rs](../../../crates/lyng-js/compiler/src/script/templates.rs)) | `lower_expr_to_temp` → `materialize` (1 Move) | `reserve_argument_block(1)` → `lower_expr_into(expression, slot)` (no synthetic Move) |
-| `lower_direct_eval_call_expression` ([calls.rs](../../../crates/lyng-js/compiler/src/script/calls.rs)) | `lower_call_arguments` (per-arg temp) → `materialize` via `_from_args` helper (2× Moves) | `collect_call_argument_plan` → `reserve_argument_block(1 + N)` → `lower_call_arguments_into(plan, base+1)` + `lower_direct_eval_callee_into(callee, base)` + `_from_range` helper (no synthetic Move) |
-| `lower_direct_eval_tail_call_expression` ([calls.rs](../../../crates/lyng-js/compiler/src/script/calls.rs)) | Lower args to temps → use them for direct-eval call AND for tail call materialize (2× Moves) | Single contiguous (1+N) block — direct-eval call uses full range, tail call reuses slots `[base+1..base+N+1)` (no Move on fallback) |
-| `lower_super_construct_call` ([calls.rs](../../../crates/lyng-js/compiler/src/script/calls.rs)) (both branches) | `alloc_temp` for super_constructor + per-arg temps + `materialize` → `internal_construct_super` (3+ Moves) | `reserve_argument_block(1 + N)` → `internal_super_constructor` writes into slot 0 + `lower_call_arguments_into(plan, base+1)` + `_from_range` helper (no Move) |
+| `lower_bigint_literal` ([expr.rs](../../../crates/lyng/compiler/src/script/expr.rs)) | `alloc_temp` → `LoadConst` → `materialize` (1 Move/arg) | `reserve_argument_block(1)` → `emit_load_atom_string(slot, atom)` (no Move) |
+| `lower_internal_binary_builtin` ([operators.rs](../../../crates/lyng/compiler/src/script/operators.rs)) | `lower_expr_to_temp` × 2 → `materialize` (1 Move/arg) | `reserve_argument_block(2)` → `lower_expr_into(arg, slot)` (no synthetic Move) |
+| `lower_template_object` → `lower_template_object_into` ([templates.rs](../../../crates/lyng/compiler/src/script/templates.rs)) | `alloc_temp` × (1 + 2·K) → `emit_load_*` → `materialize` | `reserve_argument_block(1 + 2·K)` → `emit_load_*(slot, ...)` (no Move) |
+| `lower_tagged_template_call` ([templates.rs](../../../crates/lyng/compiler/src/script/templates.rs)) | `lower_expr_to_temp` × N + `template_object` temp → `materialize` (N+1 Moves) | `reserve_argument_block(1 + N)` → inner template-object call writes into slot 0 + `lower_expr_into(arg, slot)` (no Move) |
+| `lower_internal_template_to_string` ([templates.rs](../../../crates/lyng/compiler/src/script/templates.rs)) | `lower_expr_to_temp` → `materialize` (1 Move) | `reserve_argument_block(1)` → `lower_expr_into(expression, slot)` (no synthetic Move) |
+| `lower_direct_eval_call_expression` ([calls.rs](../../../crates/lyng/compiler/src/script/calls.rs)) | `lower_call_arguments` (per-arg temp) → `materialize` via `_from_args` helper (2× Moves) | `collect_call_argument_plan` → `reserve_argument_block(1 + N)` → `lower_call_arguments_into(plan, base+1)` + `lower_direct_eval_callee_into(callee, base)` + `_from_range` helper (no synthetic Move) |
+| `lower_direct_eval_tail_call_expression` ([calls.rs](../../../crates/lyng/compiler/src/script/calls.rs)) | Lower args to temps → use them for direct-eval call AND for tail call materialize (2× Moves) | Single contiguous (1+N) block — direct-eval call uses full range, tail call reuses slots `[base+1..base+N+1)` (no Move on fallback) |
+| `lower_super_construct_call` ([calls.rs](../../../crates/lyng/compiler/src/script/calls.rs)) (both branches) | `alloc_temp` for super_constructor + per-arg temps + `materialize` → `internal_construct_super` (3+ Moves) | `reserve_argument_block(1 + N)` → `internal_super_constructor` writes into slot 0 + `lower_call_arguments_into(plan, base+1)` + `_from_range` helper (no Move) |
 
 The two branches of `lower_super_construct_call` (direct-eval-allows-super
 arrow path and the regular derived-class path) were also DRYed into a
@@ -36,25 +36,25 @@ behavioral difference is the post-call epilogue.
 ### Helpers added
 
 - **`reserve_argument_block(count: u16) -> LoweringResult<CallRange>`**
-  ([calls.rs](../../../crates/lyng-js/compiler/src/script/calls.rs)) —
+  ([calls.rs](../../../crates/lyng/compiler/src/script/calls.rs)) —
   allocates N contiguous registers and returns a `CallRange`. Pure
   allocation, no Moves; this is the building block every refactored
   callsite uses.
 
 - **`emit_internal_builtin_call_into_with_offset_and_this_from_range`**
-  ([classes.rs](../../../crates/lyng-js/compiler/src/script/classes.rs)) —
+  ([classes.rs](../../../crates/lyng/compiler/src/script/classes.rs)) —
   parallel to the existing `_with_offset_and_this` helper, but takes a
   pre-allocated `CallRange` instead of `&[u16]` of pre-existing registers.
   Skips the internal `materialize_argument_block` step entirely. The
   existing `&[u16]` helper now thin-wraps this one through `materialize`.
 
 - **`lower_direct_eval_callee_into(callee, target)`**
-  ([calls.rs](../../../crates/lyng-js/compiler/src/script/calls.rs)) —
+  ([calls.rs](../../../crates/lyng/compiler/src/script/calls.rs)) —
   variant of the prior `lower_direct_eval_callee` that writes directly
   into a caller-supplied register instead of allocating its own temp.
 
 - **`lower_template_object_into(span, template, dest)`**
-  ([templates.rs](../../../crates/lyng-js/compiler/src/script/templates.rs)) —
+  ([templates.rs](../../../crates/lyng/compiler/src/script/templates.rs)) —
   variant of the prior `lower_template_object` that writes the resulting
   template object directly into a supplied target slot (slot 0 of the
   outer tagged-template-call's argument range).
@@ -80,12 +80,12 @@ behavioral difference is the post-call epilogue.
 
 | Check | Before 4a | After 4a | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-compiler` | 68 passed | **71 passed** | +3 (new structural regression tests) |
-| `cargo test -p lyng-js-bytecode` | 45 passed | 45 passed | unchanged |
-| `cargo test -p lyng-js-vm` | 401 passed | 401 passed | unchanged |
-| `cargo test -p lyng-js-tests` | 1186 passed | 1186 passed | unchanged |
-| `cargo clippy -p lyng-js-compiler --all-features --tests -- -W clippy::pedantic -W clippy::nursery` | clean on compiler files | clean on compiler files | unchanged (pre-existing warnings in `lyng-js-objects`) |
-| `cargo fmt -p lyng-js-compiler` | clean | clean | reformatted touched files |
+| `cargo test -p lyng-compiler` | 68 passed | **71 passed** | +3 (new structural regression tests) |
+| `cargo test -p lyng-bytecode` | 45 passed | 45 passed | unchanged |
+| `cargo test -p lyng-vm` | 401 passed | 401 passed | unchanged |
+| `cargo test -p lyng-tests` | 1186 passed | 1186 passed | unchanged |
+| `cargo clippy -p lyng-compiler --all-features --tests -- -W clippy::pedantic -W clippy::nursery` | clean on compiler files | clean on compiler files | unchanged (pre-existing warnings in `lyng-objects`) |
+| `cargo fmt -p lyng-compiler` | clean | clean | reformatted touched files |
 
 The three new structural regression tests assert that the refactored
 callsites lower argument expressions/synthetic loads **directly** into
@@ -128,7 +128,7 @@ Full density report: [`phase-4a-density.md`](phase-4a-density.md).
 | `exceptions.try-catch-finally` | 1521.28 | 1439.28 | **−5.4%** |
 | `wide.large-register-function` | 1503.59 | 1518.11 | +1.0% (within noise) |
 
-### Runtime benchmark suite (lyng-js-bench runtime, 7 samples / 9 timed runs)
+### Runtime benchmark suite (lyng-bench runtime, 7 samples / 9 timed runs)
 
 Δ ns/work-unit, vs the prior bench checkpoint (Phase 3d):
 
@@ -209,20 +209,20 @@ Also still open from earlier phases:
 ## Files changed
 
 **Compiler**:
-- `crates/lyng-js/compiler/src/script/calls.rs` — new `reserve_argument_block`, refactored direct-eval call/tail-call + super-construct, removed `lower_call_arguments`, factored helper `emit_super_construct_call_into`, added `lower_direct_eval_callee_into`, signature of `add_direct_eval_spread_feedback_site` switched from `&LoweredCallArguments` to primitives.
-- `crates/lyng-js/compiler/src/script/classes.rs` — new `emit_internal_builtin_call_into_with_offset_and_this_from_range` helper; existing helper rewired to call it through `materialize_argument_block`.
-- `crates/lyng-js/compiler/src/script/expr.rs` — BigInt literal lowering uses `reserve_argument_block` + `emit_load_atom_string` directly.
-- `crates/lyng-js/compiler/src/script/operators.rs` — internal binary builtin lowering uses `reserve_argument_block` + `lower_expr_into`.
-- `crates/lyng-js/compiler/src/script/templates.rs` — `lower_template_object` → `lower_template_object_into`, tagged-template call uses pre-reserved range, `lower_internal_template_to_string` takes `ExprId` and lowers into slot directly.
-- `crates/lyng-js/compiler/src/script/state.rs` — removed `LoweredCallArguments` struct.
-- `crates/lyng-js/compiler/src/script.rs` — dropped `LoweredCallArguments` re-export.
-- `crates/lyng-js/compiler/src/script/tests.rs` — three new structural regression tests.
+- `crates/lyng/compiler/src/script/calls.rs` — new `reserve_argument_block`, refactored direct-eval call/tail-call + super-construct, removed `lower_call_arguments`, factored helper `emit_super_construct_call_into`, added `lower_direct_eval_callee_into`, signature of `add_direct_eval_spread_feedback_site` switched from `&LoweredCallArguments` to primitives.
+- `crates/lyng/compiler/src/script/classes.rs` — new `emit_internal_builtin_call_into_with_offset_and_this_from_range` helper; existing helper rewired to call it through `materialize_argument_block`.
+- `crates/lyng/compiler/src/script/expr.rs` — BigInt literal lowering uses `reserve_argument_block` + `emit_load_atom_string` directly.
+- `crates/lyng/compiler/src/script/operators.rs` — internal binary builtin lowering uses `reserve_argument_block` + `lower_expr_into`.
+- `crates/lyng/compiler/src/script/templates.rs` — `lower_template_object` → `lower_template_object_into`, tagged-template call uses pre-reserved range, `lower_internal_template_to_string` takes `ExprId` and lowers into slot directly.
+- `crates/lyng/compiler/src/script/state.rs` — removed `LoweredCallArguments` struct.
+- `crates/lyng/compiler/src/script.rs` — dropped `LoweredCallArguments` re-export.
+- `crates/lyng/compiler/src/script/tests.rs` — three new structural regression tests.
 
 **Reports**:
-- `reports/js/lyng-js/phase-4a-status.md` (this file).
-- `reports/js/lyng-js/phase-4a-density.md`.
-- `reports/js/lyng-js/phase-4a-bench.md`.
-- `reports/js/lyng-js/phase-4a-test262.md`.
+- `reports/lyng/phase-4a-status.md` (this file).
+- `reports/lyng/phase-4a-density.md`.
+- `reports/lyng/phase-4a-bench.md`.
+- `reports/lyng/phase-4a-test262.md`.
 
 Total Phase 4a diff: roughly +260/−260 lines across 8 source files, plus
 the three regression tests (~100 lines) and the four report files.

@@ -3,7 +3,7 @@ use super::super::{
     PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 pub(super) fn string_locale_compare_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,

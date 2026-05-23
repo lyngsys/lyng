@@ -6,7 +6,7 @@ V8 v7 aggregate (3 samples × 6 workloads) = **376,824,184 dispatches**.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -24,7 +24,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_local_1.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_local_1.asm`.
 
 ```asm
 op_load_local_1_dsl:
@@ -51,7 +51,7 @@ landed. Semantic body is `dst = registers[1]` with no bail.
 ## LLInt reference
 
 Structural baseline (LLInt) at
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/LoadLocal1.asm` shows
+`reports/lyng/dsl-asm-baseline-aarch64/LoadLocal1.asm` shows
 the same shape as LoadLocal0's LLInt baseline (~33 instructions
 including prologue/epilogue/bounds-check). The DSL inline form skips
 all framework overhead.
@@ -100,11 +100,11 @@ Gate (< 20%) satisfied with maximum headroom.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **418 passed**.
-- `cargo test -p lyng-js-tests --release` — **1209 passed**.
+- `cargo test -p lyng-vm --lib --release` — **418 passed**.
+- `cargo test -p lyng-tests --release` — **1209 passed**.
 
 Integration test `load_local_1_returns_second_parameter` in
-`crates/lyng-js/tests/src/op_locals_inline.rs` directly exercises
+`crates/lyng/tests/src/op_locals_inline.rs` directly exercises
 LoadLocal1 via parameter access (`(function(a, b) { return b; })(10, 20)`).
 
 ## Notes

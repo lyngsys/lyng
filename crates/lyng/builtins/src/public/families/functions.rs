@@ -10,9 +10,9 @@ use super::{
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     async_function_builtin, async_generator_function_builtin, async_generator_next_builtin,
     async_generator_return_builtin, async_generator_throw_builtin, function_apply_builtin,
     function_bind_builtin, function_builtin, function_call_builtin, function_prototype_builtin,

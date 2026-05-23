@@ -1,6 +1,6 @@
-//! Thin `lyng-js` CLI embedding for the shared Phase 5 runtime path.
+//! Thin `lyng` CLI embedding for the shared Phase 5 runtime path.
 //!
-//! Ownership: `lyng_js_cli` owns command-line parsing, filesystem-backed host
+//! Ownership: `lyng_cli` owns command-line parsing, filesystem-backed host
 //! hooks, and user-facing process reporting. It is a spec-only embedding over
 //! the shared default-realm bootstrap path used by the VM and the Phase 5
 //! harness runner; it does not own bootstrap semantics, compilation semantics,
@@ -18,7 +18,7 @@ mod execution;
 mod extensions;
 mod host;
 
-use lyng_js_builtins::BootstrapMode;
+use lyng_builtins::BootstrapMode;
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 pub use error::{CliError, CliErrorKind, CliResult};
 
 const HELP_TEXT: &str = "\
-Usage: lyng-js <entry.js|entry.mjs>
+Usage: lyng <entry.js|entry.mjs>
 
 Runs one Lyng JS entry file through the shared default-realm bootstrap.
 The CLI does not install harness globals, browser globals, or Node-style globals.
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn parse_args_defaults_to_help_without_script() {
-        let command = parse_args([OsString::from("lyng-js")]).expect("no-arg parse should succeed");
+        let command = parse_args([OsString::from("lyng")]).expect("no-arg parse should succeed");
 
         assert_eq!(command, CliCommand::Help);
     }
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn parse_args_rejects_trailing_arguments() {
         let error = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("demo.js"),
             OsString::from("alpha"),
         ])
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn parse_args_accepts_shell_flag() {
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--shell"),
             OsString::from("x.js"),
         ])
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn parse_args_accepts_test262_flag() {
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--test262"),
             OsString::from("x.js"),
         ])
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn parse_args_accepts_test262_and_shell_together() {
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--shell"),
             OsString::from("--test262"),
             OsString::from("x.js"),
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     fn parse_args_rejects_test262_after_script() {
         let error = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("x.js"),
             OsString::from("--test262"),
         ])
@@ -283,7 +283,7 @@ mod tests {
     #[test]
     fn parse_args_rejects_shell_after_script() {
         let error = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("x.js"),
             OsString::from("--shell"),
         ])
@@ -343,7 +343,7 @@ mod tests {
     fn run_script_in_shell_mode_installs_print() {
         let script = TempScript::new("cli-shell-print.js", r#"print("hello");"#);
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--shell"),
             script.path().as_os_str().to_owned(),
         ])
@@ -423,7 +423,7 @@ mod tests {
             "#,
         );
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--test262"),
             script.path().as_os_str().to_owned(),
         ])
@@ -454,7 +454,7 @@ mod tests {
             "#,
         );
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--test262"),
             script.path().as_os_str().to_owned(),
         ])
@@ -485,7 +485,7 @@ mod tests {
             "#,
         );
         let command = parse_args([
-            OsString::from("lyng-js"),
+            OsString::from("lyng"),
             OsString::from("--test262"),
             entry.as_os_str().to_owned(),
         ])
@@ -542,7 +542,7 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .expect("system clock should stay after UNIX_EPOCH")
                 .as_nanos();
-            let path = std::env::temp_dir().join(format!("lyng-js-cli-{unique}-{label}"));
+            let path = std::env::temp_dir().join(format!("lyng-cli-{unique}-{label}"));
             fs::write(&path, source).expect("temp script should be writable");
             Self { path }
         }
@@ -568,7 +568,7 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .expect("system clock should stay after UNIX_EPOCH")
                 .as_nanos();
-            let root = std::env::temp_dir().join(format!("lyng-js-cli-workspace-{unique}"));
+            let root = std::env::temp_dir().join(format!("lyng-cli-workspace-{unique}"));
             fs::create_dir_all(&root).expect("temp workspace should be creatable");
             Self { root }
         }

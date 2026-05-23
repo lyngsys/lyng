@@ -1,6 +1,6 @@
 .section __TEXT,__text,regular,pure_instructions
 	.p2align	2
-lyng_js_vm::vm::dispatch_handlers::property::op_get_named_property:
+lyng_vm::vm::dispatch_handlers::property::op_get_named_property:
 Lfunc_begin390:
 	.cfi_startproc
 	.cfi_personality 155, _rust_eh_personality
@@ -120,7 +120,7 @@ LBB390_13:
 	ldp x4, x5, [sp, #40]
 	ldr x6, [sp, #56]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	ldr x8, [sp, #112]
 	cmp x8, x28
 	b.ne LBB390_27
@@ -216,7 +216,7 @@ LBB390_32:
 	mov x1, x22
 	mov x2, x21
 	mov x3, x23
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x8, [x29, #-136]
 	ldurb w11, [x29, #-128]
 	cmp x8, x28
@@ -249,7 +249,7 @@ LBB390_38:
 	mov x2, x21
 	mov x3, x23
 	mov x4, x26
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_load_inline_cache_hit
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_load_inline_cache_hit
 	tbz w0, #0, LBB390_46
 	mov x8, x1
 	ldr x1, [x22, #32]
@@ -269,9 +269,9 @@ LBB390_44:
 	ldr w9, [x20, #56]
 	ldrb w8, [x8, x9]
 Lloh1079:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh1080:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x28, x8, [x19]
 	b LBB390_25
@@ -293,7 +293,7 @@ LBB390_46:
 	ldp x4, x5, [sp, #40]
 	ldr x6, [sp, #56]
 	mov x7, x20
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::get_property_from_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::get_property_from_value
 	ldr x8, [sp, #64]
 	cmp x8, x28
 	b.ne LBB390_49
@@ -305,7 +305,7 @@ LBB390_46:
 	mov x4, x26
 	mov x5, x25
 	mov w6, #0
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 	b LBB390_17
 LBB390_49:
 	mov x9, #-9223372036854775808
@@ -335,7 +335,7 @@ LBB390_54:
 	mov x1, x22
 	ldr x2, [sp, #16]
 	mov x3, x23
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x8, [x29, #-136]
 	ldurb w11, [x29, #-128]
 	cmp x8, x28
@@ -380,7 +380,7 @@ LBB390_63:
 	sub x0, x29, #136
 	mov w3, #1
 	mov x4, x21
-	bl lyng_js_vm::vm::dispatch::decode_abc_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abc_operands_wide
 	ldur x8, [x29, #-136]
 	cmp x8, x28
 	b.ne LBB390_20

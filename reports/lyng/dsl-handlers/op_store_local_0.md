@@ -11,7 +11,7 @@ not a bug — it is the expected behavior of the bytecode-builder
 peephole.
 
 The peephole at
-`crates/lyng-js/bytecode/src/builder.rs:150-166`
+`crates/lyng/bytecode/src/builder.rs:150-166`
 (`compact_move_instruction`) evaluates the conditions in this order:
 
 ```rust
@@ -33,7 +33,7 @@ produces it.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -51,7 +51,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_store_local_0.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_store_local_0.asm`.
 
 ```asm
 op_store_local_0_dsl:
@@ -81,7 +81,7 @@ finding above).
 emit pipeline, so no representative snippet can be constructed. The
 `StoreLocal0` snippet was attempted (writing `p0 = v` in a loop) but
 the peephole rewrote every store to `Ldar`, yielding zero StoreLocal0
-dispatches in the test. See `tools/lyng-js-bench/src/microbench/
+dispatches in the test. See `tools/lyng-bench/src/microbench/
 snippets.rs` documentation and the `verify_opcodes_per_iter` test for
 the explicit omission rationale.
 
@@ -95,7 +95,7 @@ Slow-path-share gate (< 20%) is satisfied with maximum headroom.
 
 ## Behavioral tests
 
-vm 418 / lyng-js-tests 1209. The `op_locals_inline.rs::
+vm 418 / lyng-tests 1209. The `op_locals_inline.rs::
 store_local_0_1_2_via_assignments` test writes parameters via `a = a
 * 2;` style assignments but — due to the peephole behavior described
 above — the compiled bytecode dispatches `Ldar` rather than

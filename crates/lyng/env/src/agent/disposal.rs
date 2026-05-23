@@ -4,7 +4,7 @@ use crate::{
     AsyncDisposalResumeRecord, DisposableResourceRecord, DisposalCapabilityId,
     DisposalCapabilityKind, DisposalCapabilityRecord, DisposalCapabilityState, PromiseCapabilityId,
 };
-use lyng_js_types::{ObjectRef, Value};
+use lyng_types::{ObjectRef, Value};
 
 impl Agent {
     pub fn alloc_disposal_capability(

@@ -1,16 +1,16 @@
 [package]
-name = "lyng-js-compiler"
+name = "lyng-compiler"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lyng-js-common = { workspace = true }
-lyng-js-ast = { workspace = true }
-lyng-js-sema = { workspace = true }
-lyng-js-env = { workspace = true }
-lyng-js-bytecode = { workspace = true }
-lyng-js-host = { workspace = true }
-lyng-js-parser = { workspace = true }
-lyng-js-types = { workspace = true }
+lyng-common = { workspace = true }
+lyng-ast = { workspace = true }
+lyng-sema = { workspace = true }
+lyng-env = { workspace = true }
+lyng-bytecode = { workspace = true }
+lyng-host = { workspace = true }
+lyng-parser = { workspace = true }
+lyng-types = { workspace = true }
 
 [dev-dependencies]

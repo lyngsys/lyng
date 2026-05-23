@@ -65,7 +65,7 @@ fn promise_checkpoint_drains_reaction_jobs_and_reports_host_phases() {
     let record = agent
         .promise_record(promise)
         .expect("result promise should remain tracked after checkpoint");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(5));
     let observations = host
         .snapshot()
@@ -111,7 +111,7 @@ fn evaluate_script_drains_nested_promise_jobs_to_quiescence() {
     let record = agent
         .promise_record(result_promise)
         .expect("result promise should remain tracked after checkpoint");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(1));
     assert_eq!(agent.queued_job_count(JobQueueKind::Promise), 0);
 }
@@ -145,7 +145,7 @@ fn evaluate_script_runs_callable_promise_reactions() {
     let record = agent
         .promise_record(result_promise)
         .expect("result promise should remain tracked after checkpoint");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(2));
 }
 
@@ -174,7 +174,7 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
     let record = agent
         .promise_record(promise)
         .expect("Promise.all result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let values = record
         .result()
         .as_object_ref()
@@ -488,7 +488,7 @@ fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let values = record
         .result()
         .as_object_ref()
@@ -548,7 +548,7 @@ fn evaluate_script_array_from_async_uses_intrinsic_iterator_symbols() {
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let values = record
         .result()
         .as_object_ref()
@@ -590,7 +590,7 @@ fn evaluate_script_array_from_async_sync_iterator_observes_mutation_after_first_
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -635,7 +635,7 @@ fn evaluate_script_array_from_async_awaits_async_iterator_values_before_mapping(
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -666,7 +666,7 @@ fn evaluate_script_array_from_async_rejects_bigint_array_like_length() {
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
 }
 
 #[test]
@@ -710,7 +710,7 @@ fn evaluate_script_array_from_async_preserves_custom_constructor_operation_order
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -764,7 +764,7 @@ fn evaluate_script_array_from_async_custom_constructor_uses_custom_sync_iterator
     let record = agent
         .promise_record(promise)
         .expect("Array.fromAsync promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -800,7 +800,7 @@ fn evaluate_script_resolves_promise_all_settled_records() {
     let record = agent
         .promise_record(promise)
         .expect("Promise.allSettled result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let results = record
         .result()
         .as_object_ref()
@@ -873,7 +873,7 @@ fn evaluate_script_resolves_promise_race_with_first_settlement() {
     let record = agent
         .promise_record(promise)
         .expect("Promise.race result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(4));
 }
 
@@ -906,7 +906,7 @@ fn evaluate_script_promise_all_rejects_non_iterables_through_the_returned_promis
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -941,7 +941,7 @@ fn evaluate_script_invokes_promise_all_resolve_for_each_iterated_value() {
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -975,7 +975,7 @@ fn evaluate_script_promise_all_result_creation_avoids_array_prototype_setters() 
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1116,7 +1116,7 @@ fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
     let record = agent
         .promise_record(promise)
         .expect("Promise.any result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(7));
 }
 
@@ -1154,7 +1154,7 @@ fn evaluate_script_rejects_promise_any_with_aggregate_error() {
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1188,7 +1188,7 @@ fn evaluate_script_rejects_promise_any_empty_iterable_with_aggregate_error() {
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1236,7 +1236,7 @@ fn evaluate_script_promise_any_preserves_fulfillment_job_order() {
     let record = agent
         .promise_record(promise)
         .expect("final chained promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1341,7 +1341,7 @@ fn evaluate_script_promise_any_iterator_step_errors_reject_the_result_promise() 
     let record = agent
         .promise_record(promise)
         .expect("result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
     let error = record
         .result()
         .as_object_ref()

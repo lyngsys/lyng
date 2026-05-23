@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use lyng_js_types::{EnvironmentRef, ObjectRef};
+use lyng_types::{EnvironmentRef, ObjectRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MappedArgumentsObject {

@@ -1,5 +1,5 @@
-use lyng_js_ast::{FunctionKind, Pattern};
-use lyng_js_common::{AtomId, Span};
+use lyng_ast::{FunctionKind, Pattern};
+use lyng_common::{AtomId, Span};
 
 use super::{Analyzer, ContainmentQuery};
 use crate::binding::DeclarationKind;
@@ -7,7 +7,7 @@ use crate::function_sema::FunctionSemaRecord;
 use crate::scope::ScopeKind;
 
 impl Analyzer<'_> {
-    pub(super) fn walk_function(&mut self, func_id: lyng_js_ast::FunctionId) {
+    pub(super) fn walk_function(&mut self, func_id: lyng_ast::FunctionId) {
         let func = self.ast.get_function(func_id);
         let func_span = func.span;
         let func_name = func.name;
@@ -167,7 +167,7 @@ impl Analyzer<'_> {
         self.pop_scope();
     }
 
-    fn declare_params(&mut self, params: &lyng_js_ast::FormalParameters) {
+    fn declare_params(&mut self, params: &lyng_ast::FormalParameters) {
         let param_ids = self.ast.get_pattern_list(params.params);
         for &pid in param_ids {
             self.declare_pattern_bindings(pid, DeclarationKind::Parameter);
@@ -179,7 +179,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn has_non_simple_params(&self, params: &lyng_js_ast::FormalParameters) -> bool {
+    fn has_non_simple_params(&self, params: &lyng_ast::FormalParameters) -> bool {
         if params.rest.is_some() {
             return true;
         }
@@ -193,7 +193,7 @@ impl Analyzer<'_> {
         false
     }
 
-    pub(super) fn check_duplicate_params(&mut self, params: &lyng_js_ast::FormalParameters) {
+    pub(super) fn check_duplicate_params(&mut self, params: &lyng_ast::FormalParameters) {
         let mut seen = Vec::new();
         let param_ids = self.ast.get_pattern_list(params.params);
         for &pid in param_ids {
@@ -217,8 +217,8 @@ impl Analyzer<'_> {
 
     fn check_body_lexical_redeclarations_of_parameters(
         &mut self,
-        params: &lyng_js_ast::FormalParameters,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        params: &lyng_ast::FormalParameters,
+        body: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) {
         let mut parameter_names = Vec::new();
         let param_ids = self.ast.get_pattern_list(params.params);
@@ -252,7 +252,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_pattern_names(
         &self,
-        pat_id: lyng_js_ast::PatternId,
+        pat_id: lyng_ast::PatternId,
         out: &mut Vec<(AtomId, Span)>,
     ) {
         let pat = self.ast.get_pattern(pat_id);

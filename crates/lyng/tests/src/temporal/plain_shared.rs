@@ -21,7 +21,7 @@ fn temporal_plain_static_compare_orders_iso_fields() {
             Temporal.PlainYearMonth.compare({ year: 2024, month: 3 }, { year: 2024, month: 2 }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "-1|1|0|1|-1|1|-1|1");
@@ -44,7 +44,7 @@ fn temporal_plain_prototype_equals_accepts_matching_property_bags() {
             new Temporal.PlainMonthDay(2, 29).equals({ monthCode: "M03", day: 1 }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -86,7 +86,7 @@ fn temporal_plain_and_zoned_to_locale_string_match_non_intl_to_string_shape() {
             ].join(",");
         }).join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -117,7 +117,7 @@ fn temporal_plain_string_conversion_accepts_shared_iso_date_time_forms() {
             monthDay.equals("1976-11-18T01:02:03.004005006"),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -199,7 +199,7 @@ fn temporal_plain_property_bags_normalize_month_code_calendar_and_time_defaults(
             invalidConstructorCalendarThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -241,7 +241,7 @@ fn temporal_plain_property_bags_accept_temporal_object_calendars_by_slot() {
             Temporal.PlainYearMonth.from({ year: 2000, month: 5, calendar }).calendarId
         ].join(",")).join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -290,7 +290,7 @@ fn temporal_plain_with_calendar_allocates_iso_clones_and_validates_argument_type
             wrongTypeThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -325,7 +325,7 @@ fn temporal_plain_and_zoned_iso_week_and_era_getters() {
             typeof Object.getOwnPropertyDescriptor(Temporal.ZonedDateTime.prototype, "era").get
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(

@@ -1,4 +1,4 @@
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 /// Tagged Temporal family used by ordinary-object cold metadata.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

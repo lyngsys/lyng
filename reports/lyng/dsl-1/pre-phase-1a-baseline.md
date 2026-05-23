@@ -8,7 +8,7 @@ Captured 2026-05-18 on Kaylee. 1-min loadavg at v8suite start = 2.21
 Captures:
 
 - V8 v7 scores: `/tmp/pre-phase-1a-v8.json`
-  (schema `lyng-js-bench/v8suite/v1`, 7 samples / workload).
+  (schema `lyng-bench/v8suite/v1`, 7 samples / workload).
 - Microbench (markdown — `microbench` has no JSON writer):
   `/tmp/pre-phase-1a-microbench.md` (7 samples / opcode).
 - Slow-path-share (V8 v7 in-process opcode counts):
@@ -73,10 +73,10 @@ flag a Phase 1.A problem.
 | `Jump` (reference)   | 7       | 113.76             | 112.65 | 114.15 | ±0.39  | 1 op/iter     |
 
 "not in config" means the opcode does not appear in
-`tools/lyng-js-bench/hot-opcodes.toml` (LoadNull / LoadTrue /
+`tools/lyng-bench/hot-opcodes.toml` (LoadNull / LoadTrue /
 LoadFalse / LoadOne fall outside the V8 v7 top-30 dispatch list).
 "no snippet" means the opcode is in the config but
-`tools/lyng-js-bench/src/microbench/snippets.rs` does not yet
+`tools/lyng-bench/src/microbench/snippets.rs` does not yet
 provide a generator for it.
 
 ## Slow-path-share (V8 v7)
@@ -84,7 +84,7 @@ provide a generator for it.
 **Captured as all-zero** — this is a known DSL-0c gap, not a Phase
 1.A blocker.
 
-`crates/lyng-js/vm/src/vm.rs:335-353` documents the cause: when the
+`crates/lyng/vm/src/vm.rs:335-353` documents the cause: when the
 α trampoline was removed in DSL-0c C2, the
 `maybe_record_opcode_dispatch` call site went with it. The
 `opcode-counters` feature still compiles, but `vm.enable_opcode_dispatch_counts()`
@@ -131,14 +131,14 @@ prerequisite ticket).
   plan's `--output PATH` flag for `v8suite` is named `--json`; the
   plan's `--opcodes <list>` filter does not exist on `microbench`
   (it runs every opcode in the loaded config). The `--features
-  lyng-js-vm/opcode-counters` cargo flag is also a no-op — the
-  feature is baked into `tools/lyng-js-bench/Cargo.toml`
-  unconditionally. All four `cargo run -p lyng-js-bench --` invocations were
+  lyng-vm/opcode-counters` cargo flag is also a no-op — the
+  feature is baked into `tools/lyng-bench/Cargo.toml`
+  unconditionally. All four `cargo run -p lyng-bench --` invocations were
   adapted accordingly; the captured JSON / MD files are still
   valid baseline reference data.
 - **Microbench snippet gap.** Adding snippets for the nine Phase
   1.A opcodes to
-  `tools/lyng-js-bench/src/microbench/snippets.rs` is the cleanest
+  `tools/lyng-bench/src/microbench/snippets.rs` is the cleanest
   path to a microbench-driven Phase-1.A exit gate. Without that,
   the Task 10 comparison has to rely on the V8 v7 score-delta
   (across-the-suite signal, less targeted) and on the slow-path-

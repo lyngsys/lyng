@@ -1,4 +1,4 @@
-//! Comprehensive tests for the lyng-js lexer.
+//! Comprehensive tests for the lyng lexer.
 #![allow(
     clippy::cast_lossless,
     clippy::float_cmp,
@@ -6,7 +6,7 @@
     reason = "lexer tests compare literal edge cases and intentionally use compact table assertions"
 )]
 
-use lyng_js_common::{AtomTable, SourceId};
+use lyng_common::{AtomTable, SourceId};
 
 use crate::{Lexer, LexerMode, LiteralId, Token, TokenKind, TokenPayload};
 

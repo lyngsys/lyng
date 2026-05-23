@@ -149,7 +149,7 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
         Some((
             "Monomorphic",
             1,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -492,7 +492,7 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
         Some((
             "Monomorphic",
             1,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -534,7 +534,7 @@ fn global_property_store_ic_caches_global_object_data_property() {
         Some((
             "Monomorphic",
             1,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -610,7 +610,7 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
         Some((
             "Polymorphic",
             6,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -838,7 +838,7 @@ fn named_property_store_ic_caches_own_data_paths() {
         Some((
             "Monomorphic",
             1,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -1523,8 +1523,8 @@ fn engine_array_sparse_index_store_uses_fast_path_without_feedback_slow_path() {
 // -----------------------------------------------------------------------------
 
 fn make_object_with_value(
-    agent: &mut lyng_js_env::Agent,
-    root_shape: lyng_js_types::ShapeId,
+    agent: &mut lyng_env::Agent,
+    root_shape: lyng_types::ShapeId,
     extra_atoms: &[u32],
     value_atom: AtomId,
     value: Value,
@@ -1632,7 +1632,7 @@ fn named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
         Some((
             "Polymorphic",
             2,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -1708,7 +1708,7 @@ fn named_property_load_ic_polymorphic_fast_load_falls_through_beyond_poly_limit(
         Some((
             "Polymorphic",
             6,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }
@@ -1764,7 +1764,7 @@ fn named_property_store_ic_polymorphic_fast_store_writes_correct_slot() {
         Some((
             "Polymorphic",
             2,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 
@@ -1878,7 +1878,7 @@ fn named_property_load_ic_polymorphic_fast_load_invalidates_on_prototype_swap() 
         Some((
             "Polymorphic",
             2,
-            Some(lyng_js_objects::NamedPropertyCachePath::OwnData)
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
 }

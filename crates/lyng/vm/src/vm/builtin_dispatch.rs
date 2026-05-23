@@ -17,28 +17,28 @@ use super::{
 };
 use crate::extensions::{EmbeddingFunctionContext, EmbeddingInvocation};
 use crate::frame::GeneratorResumeKind;
-use lyng_js_builtins::{
+use lyng_builtins::{
     builtin_metadata, dispatch_builtin, BuiltinInvocation, DynamicFunctionKind,
     InternalBuiltinDispatchContext, PublicBuiltinDispatchContext,
 };
-use lyng_js_common::AtomTable;
-use lyng_js_env::{
+use lyng_common::AtomTable;
+use lyng_env::{
     EnvironmentLayout, EnvironmentLayoutKind, PromiseResolvingFunctionKind, ThisBindingStatus,
 };
-use lyng_js_host::{
+use lyng_host::{
     HostErrorKind, HostHooks, ImportMetaValue, ModuleImportAttribute, ModuleKey,
     ModuleSourceRequest, TemporalCivilTime, TemporalCivilToInstantRequest,
     TemporalCurrentInstantRequest, TemporalDefaultTimeZone, TemporalDefaultTimeZoneRequest,
     TemporalInstant, TemporalInstantToCivilRequest, TemporalInstantWithOffset,
 };
-use lyng_js_objects::{
+use lyng_objects::{
     ClassPrivateElementKind, FunctionConstructorFlags, FunctionEntryIdentity, FunctionObjectData,
     FunctionThisMode, ObjectAllocation, ObjectColdData,
 };
-use lyng_js_ops::object::ToPrimitiveHint;
-use lyng_js_ops::{errors, object, proxy, read};
-use lyng_js_parser::parse_script;
-use lyng_js_types::{
+use lyng_ops::object::ToPrimitiveHint;
+use lyng_ops::{errors, object, proxy, read};
+use lyng_parser::parse_script;
+use lyng_types::{
     eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
     internal_regexp_literal_builtin, object_to_string_builtin, promise_capability_executor_builtin,
     string_from_code_point_builtin, AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId,
@@ -187,7 +187,7 @@ impl Vm {
         agent
             .objects()
             .function_data(callee_object)
-            .and_then(lyng_js_objects::FunctionObjectData::realm)
+            .and_then(lyng_objects::FunctionObjectData::realm)
             .unwrap_or_else(|| caller_frame.realm())
     }
 }

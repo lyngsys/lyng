@@ -8,11 +8,11 @@
 
 ## What landed
 
-Two changes in `crates/lyng-js/gc/`, scoped to durable infrastructure that
+Two changes in `crates/lyng/gc/`, scoped to durable infrastructure that
 Phase 3 (`lyng-2pgt`) will consume:
 
 1. **`Vec<SlotPage<Record>>` → `Vec<Box<SlotPage<Record>>>`** in
-   `crates/lyng-js/gc/src/arena/storage.rs:176`. Each `SlotPage` is ~5KB; a
+   `crates/lyng/gc/src/arena/storage.rs:176`. Each `SlotPage` is ~5KB; a
    `Vec::push` that grew the slab previously moved all pages inline. Boxing
    makes page bodies pointer-stable, which is the precondition for handing out
    borrow-based record accessors.
@@ -74,7 +74,7 @@ Out of scope (consistent with the plan):
 
 | Check | Pre-change | Post-change | Δ |
 | --- | ---: | ---: | --- |
-| `cargo test -p lyng-js-gc -p lyng-js-objects -p lyng-js-vm -p lyng-js-tests` | 1701 passed, 1 ignored | 1701 passed, 1 ignored | identical |
+| `cargo test -p lyng-gc -p lyng-objects -p lyng-vm -p lyng-tests` | 1701 passed, 1 ignored | 1701 passed, 1 ignored | identical |
 | `cargo clippy --workspace --all-targets` | 0 errors, 62 pre-existing warnings | 0 errors, 62 pre-existing warnings | no new warnings |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
@@ -97,8 +97,8 @@ benefit from the slightly tighter slab allocator behavior post-`Box`
 (less reallocation churn during nursery growth).
 
 Reports:
-- `reports/js/lyng-js/phase-2a-baseline-bench.md`
-- `reports/js/lyng-js/phase-2a-bench.md`
+- `reports/lyng/phase-2a-baseline-bench.md`
+- `reports/lyng/phase-2a-bench.md`
 
 ### `cargo asm` on `op_get_named_property`
 
@@ -106,8 +106,8 @@ Pre- and post-change asm captures are **byte-identical** after stripping
 the cargo build preamble:
 
 ```sh
-$ diff reports/js/lyng-js/phase-2a-baseline-op_get_named_property.asm \
-       reports/js/lyng-js/phase-2a-final-op_get_named_property.asm
+$ diff reports/lyng/phase-2a-baseline-op_get_named_property.asm \
+       reports/lyng/phase-2a-final-op_get_named_property.asm
 $ echo $?
 0
 ```
@@ -125,8 +125,8 @@ this baseline to demonstrate the load-count reduction.
 
 | | Passed | Runnable | Rate |
 | --- | ---: | ---: | ---: |
-| Baseline (`8aaed590`, `reports/js/lyng-js/test262.md`) | 49722 | 49729 | 93.72% |
-| Post-change (`reports/js/lyng-js/phase-2a-test262.md`) | 49722 | 49729 | 93.72% |
+| Baseline (`8aaed590`, `reports/lyng/test262.md`) | 49722 | 49729 | 93.72% |
+| Post-change (`reports/lyng/phase-2a-test262.md`) | 49722 | 49729 | 93.72% |
 
 Identical pass count, identical runnable count, identical pass rate.
 **No regression.** ✓
@@ -160,9 +160,9 @@ Phase 3 can begin without any further `gc` crate work.
 
 ## Files changed
 
-- `crates/lyng-js/gc/src/arena/storage.rs` — `Vec<Box<SlotPage>>`, +
+- `crates/lyng/gc/src/arena/storage.rs` — `Vec<Box<SlotPage>>`, +
   `SlotArena::get_ref`, + `SlotPage::get_ref`.
-- `crates/lyng-js/gc/src/arena.rs` — + `PrimitiveHeap::object_ref`.
-- `crates/lyng-js/gc/src/mutator.rs` — + `PrimitiveHeapView::object_ref`.
+- `crates/lyng/gc/src/arena.rs` — + `PrimitiveHeap::object_ref`.
+- `crates/lyng/gc/src/mutator.rs` — + `PrimitiveHeapView::object_ref`.
 
 Total diff: 18 added lines, 2 modified lines across 3 files.

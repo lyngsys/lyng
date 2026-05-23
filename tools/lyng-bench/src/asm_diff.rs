@@ -1,4 +1,4 @@
-//! `lyng-js-bench asm-diff` — capture, normalize, and diff handler asm
+//! `lyng-bench asm-diff` — capture, normalize, and diff handler asm
 //! against committed per-arch baselines.
 
 use std::collections::HashMap;
@@ -22,9 +22,9 @@ pub enum Mode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaptureMode {
-    Auto,        // try cargo-asm first, fall back to rustc-emit-asm
-    CargoAsm,    // force cargo-asm
-    RustcEmit,   // force cargo rustc -- --emit=asm
+    Auto,      // try cargo-asm first, fall back to rustc-emit-asm
+    CargoAsm,  // force cargo-asm
+    RustcEmit, // force cargo rustc -- --emit=asm
 }
 
 /// Run the asm-diff subcommand.
@@ -43,7 +43,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
 
     for entry in &config.opcodes {
         let symbol = symbol_name_for(&entry.name);
-        let asm = match capture_symbol("lyng-js-vm", &symbol, options.capture_mode) {
+        let asm = match capture_symbol("lyng-vm", &symbol, options.capture_mode) {
             Ok(text) => text,
             Err(err) => {
                 failures.push(format!("{}: capture failed: {err}", entry.name));
@@ -59,10 +59,16 @@ pub fn run(args: &[String]) -> Result<(), String> {
                 entry.aarch64_max_instructions,
             ) {
                 Ok(CheckOutcome::Match) => matches += 1,
-                Ok(CheckOutcome::Differs { diff, current_instr_count, baseline_instr_count }) => {
+                Ok(CheckOutcome::Differs {
+                    diff,
+                    current_instr_count,
+                    baseline_instr_count,
+                }) => {
                     diffs += 1;
-                    println!("=== {} (instr count: baseline {} -> current {}) ===",
-                        entry.name, baseline_instr_count, current_instr_count);
+                    println!(
+                        "=== {} (instr count: baseline {} -> current {}) ===",
+                        entry.name, baseline_instr_count, current_instr_count
+                    );
                     println!("{diff}");
                 }
                 Err(err) => failures.push(format!("{}: {err}", entry.name)),
@@ -75,7 +81,10 @@ pub fn run(args: &[String]) -> Result<(), String> {
         }
     }
 
-    println!("asm-diff: {matches} match, {diffs} differ, {} failures", failures.len());
+    println!(
+        "asm-diff: {matches} match, {diffs} differ, {} failures",
+        failures.len()
+    );
     if !failures.is_empty() {
         return Err(failures.join("\n"));
     }
@@ -94,7 +103,7 @@ fn symbol_name_for(opcode_name: &str) -> String {
     // once the handlers move to the DSL.
     let snake = pascal_to_snake(opcode_name);
     let (submodule, fn_name) = handler_submodule_and_fn(opcode_name, &snake);
-    format!("lyng_js_vm::vm::dispatch_handlers::{submodule}::{fn_name}")
+    format!("lyng_vm::vm::dispatch_handlers::{submodule}::{fn_name}")
 }
 
 fn handler_submodule_and_fn(opcode_name: &str, snake: &str) -> (&'static str, String) {
@@ -105,9 +114,8 @@ fn handler_submodule_and_fn(opcode_name: &str, snake: &str) -> (&'static str, St
     // submodule; those mostly fail capture and get reported.
     match opcode_name {
         // arithmetic
-        "Add" | "Sub" | "Mul" | "Increment" | "Decrement"
-        | "BitAnd" | "ShiftLeft" | "ShiftRight"
-        | "GreaterEqual" | "LessEqual" => ("arithmetic", format!("op_{snake}")),
+        "Add" | "Sub" | "Mul" | "Increment" | "Decrement" | "BitAnd" | "ShiftLeft"
+        | "ShiftRight" | "GreaterEqual" | "LessEqual" => ("arithmetic", format!("op_{snake}")),
         // loads
         "Move" => ("loads", "op_move".to_string()),
         "Ldar" => ("loads", "op_ldar".to_string()),
@@ -155,8 +163,8 @@ fn pascal_to_snake(s: &str) -> String {
 }
 
 fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
-    let mut opcodes_config = PathBuf::from("tools/lyng-js-bench/hot-opcodes.toml");
-    let mut baseline_dir = PathBuf::from("reports/js/lyng-js/dsl-asm-baseline-aarch64");
+    let mut opcodes_config = PathBuf::from("tools/lyng-bench/hot-opcodes.toml");
+    let mut baseline_dir = PathBuf::from("reports/lyng/dsl-asm-baseline-aarch64");
     let mut output_dir = PathBuf::from("/tmp/asm-current");
     let mut mode = Mode::Check;
     let mut capture_mode = CaptureMode::Auto;
@@ -192,7 +200,12 @@ fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
             "--help" | "-h" => {
                 return Err(help_text());
             }
-            other => return Err(format!("asm-diff: unknown argument {other}\n\n{}", help_text())),
+            other => {
+                return Err(format!(
+                    "asm-diff: unknown argument {other}\n\n{}",
+                    help_text()
+                ))
+            }
         }
     }
 
@@ -207,10 +220,10 @@ fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
 
 fn help_text() -> String {
     [
-        "Usage: lyng-js-bench asm-diff [options]",
+        "Usage: lyng-bench asm-diff [options]",
         "",
         "Options:",
-        "  --opcodes-config PATH   Path to hot-opcodes.toml (default: tools/lyng-js-bench/hot-opcodes.toml)",
+        "  --opcodes-config PATH   Path to hot-opcodes.toml (default: tools/lyng-bench/hot-opcodes.toml)",
         "  --baseline DIR          Directory containing committed baselines",
         "  --output DIR            Directory for current-build asm capture",
         "  --mode check|update     check: fail on diff; update: overwrite baselines (default: check)",
@@ -226,11 +239,7 @@ fn help_text() -> String {
 /// # Errors
 ///
 /// Returns Err if the capture tool fails or produces no output.
-pub fn capture_symbol(
-    crate_name: &str,
-    symbol: &str,
-    mode: CaptureMode,
-) -> Result<String, String> {
+pub fn capture_symbol(crate_name: &str, symbol: &str, mode: CaptureMode) -> Result<String, String> {
     match mode {
         CaptureMode::CargoAsm => capture_via_cargo_asm(crate_name, symbol),
         CaptureMode::RustcEmit => capture_via_rustc_emit(crate_name, symbol),
@@ -324,7 +333,12 @@ fn capture_via_rustc_emit(crate_name: &str, symbol: &str) -> Result<String, Stri
                 None
             }
         })
-        .ok_or_else(|| format!(".s file for {crate_name} not found in {}", deps_dir.display()))?;
+        .ok_or_else(|| {
+            format!(
+                ".s file for {crate_name} not found in {}",
+                deps_dir.display()
+            )
+        })?;
 
     // 3. Extract the symbol's body.
     let text = std::fs::read_to_string(&s_file)
@@ -398,7 +412,7 @@ fn legacy_mangled_suffix(symbol: &str) -> Option<String> {
 }
 
 /// Normalize raw asm output per the rules in
-/// `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`.
+/// `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`.
 #[must_use]
 pub fn normalize(raw: &str) -> String {
     let mut label_map: HashMap<String, String> = HashMap::new();
@@ -430,11 +444,7 @@ pub fn normalize(raw: &str) -> String {
     out.join("\n") + "\n"
 }
 
-fn rename_labels(
-    line: &str,
-    map: &mut HashMap<String, String>,
-    next_idx: &mut usize,
-) -> String {
+fn rename_labels(line: &str, map: &mut HashMap<String, String>, next_idx: &mut usize) -> String {
     // Pattern: `LBB<digits>_<digits>` or `L<word>_<digits>` (compiler-generated).
     // Replace with sequential L0, L1, ...
     let mut result = String::with_capacity(line.len());
@@ -490,7 +500,11 @@ use std::path::Path;
 #[derive(Debug, PartialEq)]
 pub enum CheckOutcome {
     Match,
-    Differs { diff: String, current_instr_count: usize, baseline_instr_count: usize },
+    Differs {
+        diff: String,
+        current_instr_count: usize,
+        baseline_instr_count: usize,
+    },
 }
 
 /// Check one symbol against its baseline. Returns Ok(outcome) on success;
@@ -508,8 +522,12 @@ pub fn check_one_symbol(
     max_instructions: Option<u32>,
 ) -> Result<CheckOutcome, String> {
     let baseline_path = baseline_dir.join(format!("{symbol}.asm"));
-    let baseline = std::fs::read_to_string(&baseline_path)
-        .map_err(|err| format!("baseline missing for {symbol}: {} ({err})", baseline_path.display()))?;
+    let baseline = std::fs::read_to_string(&baseline_path).map_err(|err| {
+        format!(
+            "baseline missing for {symbol}: {} ({err})",
+            baseline_path.display()
+        )
+    })?;
 
     let normalized_current = normalize(current_asm);
     let normalized_baseline = normalize(&baseline);
@@ -583,8 +601,7 @@ pub fn update_one_baseline(
         .map_err(|err| format!("create {}: {err}", baseline_dir.display()))?;
     let normalized = normalize(current_asm);
     let path = baseline_dir.join(format!("{symbol}.asm"));
-    std::fs::write(&path, normalized)
-        .map_err(|err| format!("write {}: {err}", path.display()))
+    std::fs::write(&path, normalized).map_err(|err| format!("write {}: {err}", path.display()))
 }
 
 #[cfg(test)]
@@ -617,15 +634,11 @@ mod tests {
     #[test]
     #[ignore = "slow: runs a real cargo build"]
     fn capture_via_rustc_returns_asm_for_existing_symbol() {
-        // Use a real public function from lyng-js-vm. The mangled symbol path
+        // Use a real public function from lyng-vm. The mangled symbol path
         // will be found in the .s file by cargo rustc. Here we use a conservative
         // approach: use the crate name itself, which should appear in at least one
         // symbol. If symbol lookup fails, we'll just verify some asm was captured.
-        let result = capture_symbol(
-            "lyng-js-vm",
-            "lyng_js_vm::Vm::new",
-            CaptureMode::RustcEmit,
-        );
+        let result = capture_symbol("lyng-vm", "lyng_vm::Vm::new", CaptureMode::RustcEmit);
         // The test passes if either:
         // 1. The symbol is found and we get some asm back, OR
         // 2. The symbol isn't found (expected if mangling differs), but the
@@ -699,12 +712,7 @@ mod tests {
         let tmp = tempdir::TempDir::new("asm").expect("tmp");
         let baseline_path = tmp.path().join("fake_op.asm");
         std::fs::write(&baseline_path, "fake_op:\n\tret\n").unwrap();
-        let result = check_one_symbol(
-            "fake_op",
-            "fake_op:\n\tret\n",
-            tmp.path(),
-            Some(100),
-        );
+        let result = check_one_symbol("fake_op", "fake_op:\n\tret\n", tmp.path(), Some(100));
         assert!(result.is_ok(), "{:?}", result);
     }
 }

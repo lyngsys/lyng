@@ -1,4 +1,4 @@
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 use std::fmt;
 use std::num::NonZeroU32;
 

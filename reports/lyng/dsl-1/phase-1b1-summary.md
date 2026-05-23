@@ -12,17 +12,17 @@
 |  2   | `resolve_initial_this_value` helper (two-layer: pure `resolve_this_state_to_mirror` + `&Agent`/`&FrameRecord` wrapper) + 4 unit tests | `66b40f9b` |
 |  3   | Entry-shim population in `entry.rs::run_via_dsl` — derives both fields before the `DispatchState` move | `f00f0355` |
 |  4   | Refresh-arm wiring in `slow_path.rs::translate_outcome` — both fields refreshed alongside existing PB/REGS/FV; `#[cfg(debug_assertions)]` stability assertion for `frame_const_base` | `546b5ce4` |
-|  5   | Backend macros `load_constant!` (in new `aarch64/constants.rs`) and `load_state_value!` (in `aarch64/frame.rs`); lowerer binding wiring in `lyng-js-vm-dsl` for `vm_const_base` + `state_this_value` | `3d2bfccc` |
-|  6   | Synthetic validation handlers at `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` (3 structural compiles-and-links tests + 3 `#[ignore]`-d forward-pointer tests for Phase 1.B.2) | `0605a407` |
-|  7   | GC-stress test at `crates/lyng-js/tests/src/gc_stress_frame_context.rs` (50K-iter closure with `this` + captured constant + nursery allocation pressure) | `5a7ab6a8` |
+|  5   | Backend macros `load_constant!` (in new `aarch64/constants.rs`) and `load_state_value!` (in `aarch64/frame.rs`); lowerer binding wiring in `lyng-vm-dsl` for `vm_const_base` + `state_this_value` | `3d2bfccc` |
+|  6   | Synthetic validation handlers at `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (3 structural compiles-and-links tests + 3 `#[ignore]`-d forward-pointer tests for Phase 1.B.2) | `0605a407` |
+|  7   | GC-stress test at `crates/lyng/tests/src/gc_stress_frame_context.rs` (50K-iter closure with `this` + captured constant + nursery allocation pressure) | `5a7ab6a8` |
 |  8   | Same-load V8 v7 A/B vs `ae8b7766` (+0.80% geomean) + GC root-scanning review doc | `26ec0742` |
 |  9   | Mandatory `feature-dev:code-reviewer` dispatch + sign-off section appended to GC review (verdict: APPROVED, 0 high/medium findings, 2 low addressed inline) | `4ff25b9b` |
 
 ## Test results at HEAD
 
-- `cargo test -p lyng-js-vm --lib --release`: **417 passing** (vs 413 baseline; +4 from Task 2 unit tests)
-- `cargo test -p lyng-js-tests --release`: **1187 passing** (vs 1186 baseline; +1 from Task 7 gc-stress test)
-- `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`: **3 passing + 3 ignored** (3 structural + 3 forward-pointer to Phase 1.B.2)
+- `cargo test -p lyng-vm --lib --release`: **417 passing** (vs 413 baseline; +4 from Task 2 unit tests)
+- `cargo test -p lyng-tests --release`: **1187 passing** (vs 1186 baseline; +1 from Task 7 gc-stress test)
+- `cargo test -p lyng-vm --test dsl_validation_frame_context --release`: **3 passing + 3 ignored** (3 structural + 3 forward-pointer to Phase 1.B.2)
 - 2 pre-existing `feedback_flat_consistency` failures (`dual_write_keeps_smi_add_legacy_and_flat_in_sync`, `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`) remain unrelated to Phase 1.B.1; same as Phase 1.B.0 closure.
 
 ## Same-load A/B vs pre-1.B.1
@@ -44,8 +44,8 @@ Per spec §4: aggregate V8 v7 regression must be ≤ 2%. **Result: PASS** (+0.80
 ## Behavioral parity
 
 All gate criteria green at HEAD `4ff25b9b`:
-- `cargo test -p lyng-js-vm --lib --release`: **417 passing** ✓
-- `cargo test -p lyng-js-tests --release`: **1187 passing** ✓
+- `cargo test -p lyng-vm --lib --release`: **417 passing** ✓
+- `cargo test -p lyng-tests --release`: **1187 passing** ✓
 - Test262 sweep: ≥ Phase 1.B.0 baseline (sub-phase is substrate-only; no semantic surface touched)
 - `gc_stress_frame_context::frame_context_survives_gc_pressure_in_closure_loop`: passing ✓
 - Same-load A/B: +0.80% geomean, no workload regression ✓
@@ -76,8 +76,8 @@ Per spec §1:
 | Gate | Result |
 |------|--------|
 | Layout stable; `ll_int_state_offsets_stable` passing (size 72) | ✅ |
-| Behavioral parity: `cargo test -p lyng-js-vm --lib --release` (≥413) | ✅ 417 passing (+4 from Task 2) |
-| Behavioral parity: `cargo test -p lyng-js-tests --release` (≥1186) | ✅ 1187 passing (+1 from Task 7) |
+| Behavioral parity: `cargo test -p lyng-vm --lib --release` (≥413) | ✅ 417 passing (+4 from Task 2) |
+| Behavioral parity: `cargo test -p lyng-tests --release` (≥1186) | ✅ 1187 passing (+1 from Task 7) |
 | Test262 ≥ Phase 1.B.0 baseline | ✅ (sub-phase is substrate-only; no semantic surface touched) |
 | GC-stress test passing | ✅ `frame_context_survives_gc_pressure_in_closure_loop` ✓ |
 | Same-load A/B aggregate V8 v7 regression ≤ 2% | ✅ +0.80% (well within; no workload regressed > 5%) |
@@ -134,7 +134,7 @@ would be validated.
 ### What landed
 
 Task 6 (commit `0605a407`) added
-`crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` with three
+`crates/lyng/vm/tests/dsl_validation_frame_context.rs` with three
 structural compiles-and-links tests using
 `DslHarness::assert_handler_symbol_exists`. The synthetic handlers
 (opcodes 210/211/212) are NOT in `DSL_DISPATCH_TABLE`; the tests
@@ -146,7 +146,7 @@ contract.
 ### Consequence: the x22→x24 register-pin bug
 
 The `load_constant!` macro in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs` initially
+`crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` initially
 emitted `ldr x16, [x22, ...]` (VM pin) to read `frame_const_base` —
 but `frame_const_base` lives on `LlIntState`, which is addressed via
 the STATE pin (`x24`), not the VM pin (`x22`). The same bug existed
@@ -214,10 +214,10 @@ explicitly if the answer is no.
 ### What changed in the test file
 
 The inline note at the top of
-`crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` was
+`crates/lyng/vm/tests/dsl_validation_frame_context.rs` was
 extended in this cleanup commit to point readers to this
 retrospective. The test file itself is unchanged — the 4 structural
 tests still serve their (now-correctly-scoped) macro-emit /
 lowerer-binding regression-catching role. End-to-end runtime
 coverage of `op_load_const8` and `op_load_this` lives in the
-per-opcode integration tests in `lyng-js-tests` added in Phase 1.B.2.
+per-opcode integration tests in `lyng-tests` added in Phase 1.B.2.

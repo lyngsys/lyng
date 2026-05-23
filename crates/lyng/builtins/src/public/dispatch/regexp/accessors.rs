@@ -3,7 +3,7 @@ use super::super::{
 };
 use super::{boolean_property_value, current_intrinsic_regexp_prototype};
 use crate::BuiltinInvocation;
-use lyng_js_types::{PropertyKey, Value};
+use lyng_types::{PropertyKey, Value};
 
 pub(super) fn regexp_flag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
@@ -19,7 +19,7 @@ pub(super) fn regexp_flag_getter_builtin<Cx: PublicBuiltinDispatchContext>(
         agent
             .objects()
             .regexp_payload(object_ref)
-            .map(lyng_js_objects::RegExpPayload::flags)
+            .map(lyng_objects::RegExpPayload::flags)
     };
     let Some(flags) = flags else {
         if current_intrinsic_regexp_prototype(cx) == Some(object_ref) {
@@ -209,7 +209,7 @@ pub(super) fn regexp_flags_getter_builtin<Cx: PublicBuiltinDispatchContext>(
             agent
                 .objects()
                 .regexp_payload(object_ref)
-                .map(lyng_js_objects::RegExpPayload::flags)
+                .map(lyng_objects::RegExpPayload::flags)
         };
         if let Some(payload_flags) = payload_flags {
             payload_flags.unicode_sets()

@@ -1,5 +1,5 @@
-use lyng_js_common::AtomTable;
-use lyng_js_gc::{PrimitiveHeap, PrimitiveHeapView, PrimitiveMutator};
+use lyng_common::AtomTable;
+use lyng_gc::{PrimitiveHeap, PrimitiveHeapView, PrimitiveMutator};
 
 /// Concrete borrowed primitive-runtime facade used by allocating operations.
 pub struct PrimitiveContext<'a> {
@@ -44,7 +44,7 @@ impl<'a> PrimitiveContext<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_gc::{AllocationLifetime, StringEncoding};
+    use lyng_gc::{AllocationLifetime, StringEncoding};
 
     #[test]
     fn primitive_context_exposes_explicit_heap_and_atom_borrows() {

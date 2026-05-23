@@ -1,10 +1,10 @@
-use lyng_js_ast::{AssignOp, Expr, NumericLiteralSyntax, PropertyKind, UnaryOp};
-use lyng_js_common::WellKnownAtom;
+use lyng_ast::{AssignOp, Expr, NumericLiteralSyntax, PropertyKind, UnaryOp};
+use lyng_common::WellKnownAtom;
 
 use super::{Analyzer, ContainmentQuery};
 
 impl Analyzer<'_> {
-    pub(super) fn walk_expr(&mut self, expr_id: lyng_js_ast::ExprId) {
+    pub(super) fn walk_expr(&mut self, expr_id: lyng_ast::ExprId) {
         let expr = self.ast.get_expr(expr_id);
         match expr {
             Expr::Identifier { name, span, .. } => {
@@ -386,7 +386,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn walk_assignment_target_expr(&mut self, expr_id: lyng_js_ast::ExprId) {
+    pub(super) fn walk_assignment_target_expr(&mut self, expr_id: lyng_ast::ExprId) {
         match self.ast.get_expr(expr_id).clone() {
             Expr::ParenthesizedExpression { span, expression } => {
                 if matches!(
@@ -451,7 +451,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn expr_is_destructuring_pattern(&self, expr_id: lyng_js_ast::ExprId) -> bool {
+    pub(super) fn expr_is_destructuring_pattern(&self, expr_id: lyng_ast::ExprId) -> bool {
         match self.ast.get_expr(expr_id) {
             Expr::ArrayExpression { .. } | Expr::ObjectExpression { .. } => true,
             Expr::ParenthesizedExpression { expression, .. } => {
@@ -461,7 +461,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn validate_object_literal_properties(&mut self, properties: &[lyng_js_ast::Property]) {
+    fn validate_object_literal_properties(&mut self, properties: &[lyng_ast::Property]) {
         let mut proto_seen = false;
 
         for prop in properties {
@@ -483,7 +483,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn is_proto_data_property(&self, property: &lyng_js_ast::Property) -> bool {
+    fn is_proto_data_property(&self, property: &lyng_ast::Property) -> bool {
         if property.kind != PropertyKind::Init
             || property.computed
             || property.method

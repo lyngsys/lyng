@@ -1,7 +1,7 @@
-//! Compiler lowering for the lyng-js bytecode pipeline.
+//! Compiler lowering for the lyng bytecode pipeline.
 //!
-//! Ownership: `lyng_js_compiler` owns lowering state, activation metadata, and
-//! the installable compiled-unit bridge from AST/sema to `lyng_js_bytecode`.
+//! Ownership: `lyng_compiler` owns lowering state, activation metadata, and
+//! the installable compiled-unit bridge from AST/sema to `lyng_bytecode`.
 //! It does not own runtime installation, feedback storage, or execution.
 
 #![allow(

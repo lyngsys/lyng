@@ -15,8 +15,8 @@ use super::{
     typed_array_storage_bits_from_builtin_value, typed_array_this_record,
 };
 use crate::BuiltinInvocation;
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
-use lyng_js_types::{
+use lyng_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_types::{
     BackingStoreRef, BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
 };
 
@@ -149,7 +149,7 @@ fn typed_array_allocation_shape<Cx: PublicBuiltinDispatchContext>(
 
 fn typed_array_constructor_prototype<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    realm: lyng_js_types::RealmRef,
+    realm: lyng_types::RealmRef,
     new_target: ObjectRef,
     kind: TypedArrayElementKind,
 ) -> Result<ObjectRef, Cx::Error> {

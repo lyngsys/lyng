@@ -62,9 +62,13 @@ macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => {
         concat!(
             "ldr    x9, [x22, {vm_counter_base}]\n",
-            "ldr    x10, [x9, #", stringify!($opcode_byte), " * 8]\n",
+            "ldr    x10, [x9, #",
+            stringify!($opcode_byte),
+            " * 8]\n",
             "add    x10, x10, #1\n",
-            "str    x10, [x9, #", stringify!($opcode_byte), " * 8]\n",
+            "str    x10, [x9, #",
+            stringify!($opcode_byte),
+            " * 8]\n",
         )
     };
 }
@@ -81,9 +85,13 @@ macro_rules! inc_slow_semantic_counter {
             // immediately after this fragment; using x9/x10 here would
             // corrupt them.
             "ldr    x16, [x22, {vm_counter_base}]\n",
-            "ldr    x17, [x16, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+            "ldr    x17, [x16, #",
+            stringify!($opcode_byte),
+            " * 8 + 2048]\n",
             "add    x17, x17, #1\n",
-            "str    x17, [x16, #", stringify!($opcode_byte), " * 8 + 2048]\n",
+            "str    x17, [x16, #",
+            stringify!($opcode_byte),
+            " * 8 + 2048]\n",
         )
     };
 }
@@ -97,9 +105,13 @@ macro_rules! inc_slow_safepoint_counter {
             // they're free to clobber before the pending-poll path
             // jumps into a `call_slow!` site (which reloads them).
             "ldr    x16, [x22, {vm_counter_base}]\n",
-            "ldr    x17, [x16, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+            "ldr    x17, [x16, #",
+            stringify!($opcode_byte),
+            " * 8 + 4096]\n",
             "add    x17, x17, #1\n",
-            "str    x17, [x16, #", stringify!($opcode_byte), " * 8 + 4096]\n",
+            "str    x17, [x16, #",
+            stringify!($opcode_byte),
+            " * 8 + 4096]\n",
         )
     };
 }
@@ -111,17 +123,23 @@ macro_rules! inc_slow_safepoint_counter {
 #[cfg(not(feature = "opcode-counters"))]
 #[macro_export]
 macro_rules! inc_dispatch_counter {
-    ($opcode_byte:literal) => { "" };
+    ($opcode_byte:literal) => {
+        ""
+    };
 }
 
 #[cfg(not(feature = "opcode-counters"))]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
-    ($opcode_byte:literal) => { "" };
+    ($opcode_byte:literal) => {
+        ""
+    };
 }
 
 #[cfg(not(feature = "opcode-counters"))]
 #[macro_export]
 macro_rules! inc_slow_safepoint_counter {
-    ($opcode_byte:literal) => { "" };
+    ($opcode_byte:literal) => {
+        ""
+    };
 }

@@ -1,8 +1,8 @@
 //! Pinned-register convention for the asm-DSL substrate.
 //!
 //! Authoritative source: design §5 of
-//! docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md
-//! and reports/js/lyng-js/llint-dsl-abi.md.
+//! docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md
+//! and reports/lyng/llint-dsl-abi.md.
 //!
 //! AArch64 mapping:
 //!
@@ -127,9 +127,18 @@ mod counter_offset_tests {
     fn counter_bank_offsets_match_struct_layout() {
         use crate::DispatchCounters;
         use std::mem::offset_of;
-        assert_eq!(DISPATCH_COUNTER_BANK_DISPATCH, offset_of!(DispatchCounters, dispatch));
-        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SEMANTIC, offset_of!(DispatchCounters, slow_semantic));
-        assert_eq!(DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT, offset_of!(DispatchCounters, slow_safepoint));
+        assert_eq!(
+            DISPATCH_COUNTER_BANK_DISPATCH,
+            offset_of!(DispatchCounters, dispatch)
+        );
+        assert_eq!(
+            DISPATCH_COUNTER_BANK_SLOW_SEMANTIC,
+            offset_of!(DispatchCounters, slow_semantic)
+        );
+        assert_eq!(
+            DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT,
+            offset_of!(DispatchCounters, slow_safepoint)
+        );
     }
 
     #[test]

@@ -7,7 +7,7 @@
 //! candidate slots stay occupied and therefore cannot be reused by the mutator.
 
 use crate::PrimitiveValueCellRef;
-use lyng_js_types::{
+use lyng_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef,
 };

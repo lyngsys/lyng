@@ -19,7 +19,7 @@
     reason = "semantic analysis is a side-table-driven spec pass with tracked frontend cleanup debt"
 )]
 
-//! Semantic analysis pass for the lyng-js JavaScript engine.
+//! Semantic analysis pass for the lyng JavaScript engine.
 //!
 //! This crate walks the parsed AST and produces side-table-driven metadata:
 //! scope tables, binding tables, function-level records, use-site resolution,

@@ -10,9 +10,9 @@ use super::{
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     array_species_getter_builtin, finalization_registry_builtin,
     finalization_registry_register_builtin, finalization_registry_unregister_builtin, map_builtin,
     map_clear_builtin, map_delete_builtin, map_entries_builtin, map_for_each_builtin,

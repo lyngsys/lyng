@@ -10,9 +10,9 @@ use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     date_builtin, date_get_date_builtin, date_get_day_builtin, date_get_full_year_builtin,
     date_get_hours_builtin, date_get_milliseconds_builtin, date_get_minutes_builtin,
     date_get_month_builtin, date_get_seconds_builtin, date_get_time_builtin,

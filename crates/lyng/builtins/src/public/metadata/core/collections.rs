@@ -1,5 +1,5 @@
 use super::super::{BuiltinEntryMetadata, PublicBuiltinMetadataRow};
-use lyng_js_types::{
+use lyng_types::{
     finalization_registry_builtin, finalization_registry_register_builtin,
     finalization_registry_unregister_builtin, map_builtin, map_clear_builtin, map_delete_builtin,
     map_entries_builtin, map_for_each_builtin, map_get_builtin, map_get_or_insert_builtin,

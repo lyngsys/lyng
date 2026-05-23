@@ -179,7 +179,7 @@ fn call_feedback_snapshot_records_builtin_target_identity() {
     assert_eq!(call.entries().len(), 1);
     assert_eq!(
         call.entries()[0].builtin(),
-        Some(lyng_js_types::string_char_code_at_builtin())
+        Some(lyng_types::string_char_code_at_builtin())
     );
 }
 

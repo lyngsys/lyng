@@ -50,7 +50,7 @@ is observed. That means the holdings remain alive even though the target is a
 sweep candidate. The target slot is reclaimed later, when the agent thread
 applies the background sweep plan.
 
-`lyng-js-env` enqueues host-visible finalization cleanup jobs after the agent
+`lyng-env` enqueues host-visible finalization cleanup jobs after the agent
 collection report returns. Job enqueueing observes the pending registry list
 created during weak-state resolution, not the background worker. The ordering
 guarantee is therefore:

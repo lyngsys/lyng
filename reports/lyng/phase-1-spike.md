@@ -17,14 +17,14 @@ expected to vanish under the production register-window helpers.
 A self-contained prototype of the Option α dispatch primitives, reachable only
 from a unit test. The live `run_dispatch_loop` is untouched.
 
-- [crates/lyng-js/vm/src/vm/dispatch_state.rs](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs) — `DispatchState<'vm>`, `Handler` typedef,
+- [crates/lyng/vm/src/vm/dispatch_state.rs](../../../crates/lyng/vm/src/vm/dispatch_state.rs) — `DispatchState<'vm>`, `Handler` typedef,
   `Step` enum, `DISPATCH_TABLE` static (256 entries), `dispatch_next!` macro,
   `run_trampoline`.
-- [crates/lyng-js/vm/src/vm/dispatch_handlers/](../../../crates/lyng-js/vm/src/vm/dispatch_handlers/) —
+- [crates/lyng/vm/src/vm/dispatch_handlers/](../../../crates/lyng/vm/src/vm/dispatch_handlers/) —
   `arithmetic::op_add`, `control_flow::{op_jump_back, op_return}`,
   `loads::{op_move, op_load_undefined}`, `stub::op_stub`.
 - `DispatchState` collision with the pre-existing `DispatchState` frame-snapshot
-  type in [dispatch.rs](../../../crates/lyng-js/vm/src/vm/dispatch.rs) resolved by renaming the old type to
+  type in [dispatch.rs](../../../crates/lyng/vm/src/vm/dispatch.rs) resolved by renaming the old type to
   `DispatchFrameSnapshot` — three callsites plus one structural-test
   assertion, no behavior change.
 
@@ -35,7 +35,7 @@ handlers will use the real bytecode operand decoders.
 
 ## Functional check
 
-`cargo test --release -p lyng-js-vm trampoline_spike` runs a hand-rolled
+`cargo test --release -p lyng-vm trampoline_spike` runs a hand-rolled
 4-opcode program (`LdaUndefined R2; Move R3, R0; Add R2, R3, R1, slot=0;
 Return R2`) and asserts the SMI fast path produces `Value::from_smi(12)` and
 bumps `feedback_counter` to `1`. Result: **pass.**
@@ -126,7 +126,7 @@ op_add's hot-path body breaks down as roughly:
 The 36 B of register-window bounds checks are the spike-only overhead. Production
 handlers go through `absolute_register(registers, idx)` + direct
 `self.register_stack[...]` indexing (see the existing
-[dispatch.rs `Opcode::Add` arm](../../../crates/lyng-js/vm/src/vm/dispatch.rs)) which the compiler folds into a single shared
+[dispatch.rs `Opcode::Add` arm](../../../crates/lyng/vm/src/vm/dispatch.rs)) which the compiler folds into a single shared
 bounds check per opcode arm. Once the spike's `state.regs[idx]` indexing is
 replaced with the production accessor pattern in the first family-conversion
 sub-issue, op_add is projected to land at ~184 B — under the <200 B target.
@@ -152,7 +152,7 @@ Option α produces a viable interpreter dispatch shape on aarch64:
 
 - Phase 1 will hit the Richards ≥260 / DeltaBlue ≥310 / Crypto ≥265 /
   RayTrace ≥430 / NavierStokes ≥470 / Splay ≥1330 benchmark gates. That
-  requires the V8 bench harness to be wired into `lyng-js-bench` and the
+  requires the V8 bench harness to be wired into `lyng-bench` and the
   full handler set converted. Both are tracked as sub-issues of `lyng-33i2`.
 - The Test262 baseline 49722/49729 is preserved. Phase 1 proper preserves it
   by parallel-running the new dispatch behind a feature flag until cutover.

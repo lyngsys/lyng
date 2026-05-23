@@ -1,7 +1,7 @@
-//! ECMA-262 abstract operations for the lyng-js runtime.
+//! ECMA-262 abstract operations for the lyng runtime.
 //!
-//! Ownership: `lyng_js_ops` owns spec-facing semantic helpers built on top of the
-//! representation layer in `lyng_js_types`, the storage layer in `lyng_js_gc`,
+//! Ownership: `lyng_ops` owns spec-facing semantic helpers built on top of the
+//! representation layer in `lyng_types`, the storage layer in `lyng_gc`,
 //! and the public environment and object substrate entrypoints.
 
 #![allow(

@@ -8,7 +8,7 @@ path is one instruction shorter than op_sub's.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -56,7 +56,7 @@ on a pair of `i32` payloads always produces a representable `i32`.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm`.
 
 Fast path (from `op_bit_and_dsl:` through `bl _op_bit_and_record_smi_rs`
 inclusive): **35 instructions** — 4 ldrb/ldrh decode + 1 ldr + 7
@@ -135,7 +135,7 @@ Notes:
   captures embedded in the bench transcript). The `--require-isolation`
   gate rejected the first attempt; rerun without strict gate per spec.
 - The microbench snippet for BitAnd was added in this task at
-  `tools/lyng-js-bench/src/microbench/snippets.rs` (using `x = i & y`
+  `tools/lyng-bench/src/microbench/snippets.rs` (using `x = i & y`
   with two locals to keep the rhs as a register, avoiding the
   `BitAndSmi` peephole for literal RHS).
 
@@ -169,7 +169,7 @@ This is the known measurement artifact, not a real regression: every
 fast-path SMI bit-AND calls
 `call_slow!(op_bit_and_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope). The result: feedback-recording fast-path
 entries are counted as if they were full slow-path entries.
@@ -181,7 +181,7 @@ Phase 1.C.1 summary's Followups #1, the per-opcode gate should
 remain enforced **once the substrate distinguishes
 "feedback-recording shim" from "true slow path"** — that work is a
 substrate fix tracked as a Phase 1.C followup (gate counter-injection
-on label-boundary state in `crates/lyng-js-vm-dsl/src/lower.rs`
+on label-boundary state in `crates/lyng/vm-dsl/src/lower.rs`
 `inject_opcode_byte`) and is not scheduled within Phase 1.C scope.
 
 Crypto's 152M BitAnd dispatches are dominated by 32-bit modular
@@ -205,14 +205,14 @@ should be re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
-- Test262 bitwise-and slice: `cargo run --release -p lyng-js-test262
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
+- Test262 bitwise-and slice: `cargo run --release -p lyng-test262
   -- --filter language/expressions/bitwise-and` → **59/59 variants
   passed across 30 files** (100% pass rate). Includes the
   `S11.10.1_*` and `bigint-*` bitwise-and semantics tests.
 - Two pre-existing failures in
-  `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`
+  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `e1c45c0b` (Task 4 Phase 1.C.1 close) with the
@@ -252,4 +252,4 @@ Per-workload gate status per spec §1.6 + §5:
   rates.
 - — N/A: DeltaBlue, RayTrace, NavierStokes (don't emit BitAnd)
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

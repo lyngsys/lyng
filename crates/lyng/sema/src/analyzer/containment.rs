@@ -1,12 +1,12 @@
-use lyng_js_ast::{Decl, Expr, ForInOfLeft, ForInit, Pattern, Stmt};
-use lyng_js_common::WellKnownAtom;
+use lyng_ast::{Decl, Expr, ForInOfLeft, ForInit, Pattern, Stmt};
+use lyng_common::WellKnownAtom;
 
 use super::{Analyzer, ContainmentQuery};
 
 impl Analyzer<'_> {
     pub(super) fn pattern_contains_query(
         &self,
-        pat_id: lyng_js_ast::PatternId,
+        pat_id: lyng_ast::PatternId,
         query: ContainmentQuery,
     ) -> bool {
         match self.ast.get_pattern(pat_id) {
@@ -36,7 +36,7 @@ impl Analyzer<'_> {
 
     pub(super) fn function_body_contains_query(
         &self,
-        func_id: lyng_js_ast::FunctionId,
+        func_id: lyng_ast::FunctionId,
         query: ContainmentQuery,
     ) -> bool {
         let func = self.ast.get_function(func_id);
@@ -56,7 +56,7 @@ impl Analyzer<'_> {
 
     pub(super) fn stmt_list_contains_query(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        body: lyng_ast::NodeList<lyng_ast::StmtId>,
         query: ContainmentQuery,
     ) -> bool {
         self.ast
@@ -67,7 +67,7 @@ impl Analyzer<'_> {
 
     pub(super) fn stmt_contains_query(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         query: ContainmentQuery,
     ) -> bool {
         match self.ast.get_stmt(stmt_id) {
@@ -162,7 +162,7 @@ impl Analyzer<'_> {
 
     pub(super) fn decl_contains_query(
         &self,
-        decl_id: lyng_js_ast::DeclId,
+        decl_id: lyng_ast::DeclId,
         query: ContainmentQuery,
     ) -> bool {
         match self.ast.get_decl(decl_id) {
@@ -178,13 +178,13 @@ impl Analyzer<'_> {
                 }),
             Decl::Function { .. } | Decl::Class { .. } => false,
             Decl::Export { kind, .. } => match kind {
-                lyng_js_ast::ExportKind::Default { declaration } => match declaration {
-                    lyng_js_ast::ExportDefaultDecl::Expression(expr) => {
+                lyng_ast::ExportKind::Default { declaration } => match declaration {
+                    lyng_ast::ExportDefaultDecl::Expression(expr) => {
                         self.expr_contains_query(*expr, query)
                     }
                     _ => false,
                 },
-                lyng_js_ast::ExportKind::Declaration { decl } => {
+                lyng_ast::ExportKind::Declaration { decl } => {
                     self.decl_contains_query(*decl, query)
                 }
                 _ => false,
@@ -195,7 +195,7 @@ impl Analyzer<'_> {
 
     pub(super) fn expr_contains_query(
         &self,
-        expr_id: lyng_js_ast::ExprId,
+        expr_id: lyng_ast::ExprId,
         query: ContainmentQuery,
     ) -> bool {
         let expr = self.ast.get_expr(expr_id);

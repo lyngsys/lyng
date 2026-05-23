@@ -1,6 +1,6 @@
 # DSL-0 Decision
 
-DSL-0 is the milestone defined in [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md). It comprises three sub-phases:
+DSL-0 is the milestone defined in [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md). It comprises three sub-phases:
 - **DSL-0a**: semantic extraction (all 152 opcodes lifted into free `op_xxx_semantic` functions)
 - **DSL-0b**: DSL substrate infrastructure (proc-macro crate, runtime ABI, AArch64 backend, 12 hot/warm + 140 cold DSL handlers, FeedbackVector flat-array refactor, 9 validation cases)
 - **DSL-0c**: activate DSL dispatch + delete α + verify single-implementation invariant
@@ -21,10 +21,10 @@ Phase DSL-0c was fully executed:
 | # | Criterion | Required | Status | Evidence |
 |--:|---|---|---|---|
 | 1 | Single-implementation invariant via manifest (Tests 1–7) | All pass | **Partial** | Tests 1, 2, 4 pass (DSL-0a). Tests 3, 5, 6, 7 require manifest infrastructure that's deferred to DSL-1 (some test fixtures need updating to assert post-α state). The structural invariant *is* maintained — `dispatch_handlers/` is deleted, `OPCODES` covers all 152 variants, every `semantic_symbol` resolves. |
-| 2 | Asm shape vs LLInt within 5 instructions per hot handler | within 5 instr | Reports exist, several within 6-10 instr | `reports/js/lyng-js/dsl-handlers/op_*.md` (12 handlers; jump variants use slow-path-only delegate, longer than LLInt's inline form — DSL-1 work to inline) |
-| 3 | Microbench within 2× LLInt-equivalent | within 2× | Not LLInt-benched (R-0 LLInt capture insufficient for direct comparison) | `reports/js/lyng-js/dsl-0c-microbench.md` |
-| 4 | Behavioral parity (focused tests pass; Test262 ≥ baseline) | passing | **PASSING** — Test262 100% pass rate (gained 1 file vs Pre-flight) | `reports/js/lyng-js/dsl-0c-test262.md` |
-| 5 | V8 v7: geomean ≥ +20%; Richards ≥ +30% | per gates | **Partial.** Richards 240 / DeltaBlue 291 / Crypto 239 / RayTrace 400 / NavierStokes 415 / Splay 1273. Vs the design's static baseline (Richards 234), Richards +2.6%; vs Pre-DSL-0 actual baseline (Richards 317), -24%. The plan's +20%/+30% targets are not met. | `reports/js/lyng-js/dsl-0c-v8.md` |
+| 2 | Asm shape vs LLInt within 5 instructions per hot handler | within 5 instr | Reports exist, several within 6-10 instr | `reports/lyng/dsl-handlers/op_*.md` (12 handlers; jump variants use slow-path-only delegate, longer than LLInt's inline form — DSL-1 work to inline) |
+| 3 | Microbench within 2× LLInt-equivalent | within 2× | Not LLInt-benched (R-0 LLInt capture insufficient for direct comparison) | `reports/lyng/dsl-0c-microbench.md` |
+| 4 | Behavioral parity (focused tests pass; Test262 ≥ baseline) | passing | **PASSING** — Test262 100% pass rate (gained 1 file vs Pre-flight) | `reports/lyng/dsl-0c-test262.md` |
+| 5 | V8 v7: geomean ≥ +20%; Richards ≥ +30% | per gates | **Partial.** Richards 240 / DeltaBlue 291 / Crypto 239 / RayTrace 400 / NavierStokes 415 / Splay 1273. Vs the design's static baseline (Richards 234), Richards +2.6%; vs Pre-DSL-0 actual baseline (Richards 317), -24%. The plan's +20%/+30% targets are not met. | `reports/lyng/dsl-0c-v8.md` |
 | 6 | All 9 DSL-0b validation cases still pass | passing | Pass | 4 runtime-runnable pass; 5 link-only-deferred are committed but `#[ignore]`d pending real-trampoline test setup |
 | 7 | Per-opcode dispatch counter parity | passing | Deferred | `--features opcode-counters` is currently broken under DSL (counted-trampoline variant deleted); restoring requires re-wiring through `dispatch!` tail. Tracked as DSL-1 follow-up. |
 
@@ -59,11 +59,11 @@ The flat array (`Vm::feedback_flat_storage`) was allocated at install and pin-lo
 
 Fix: `mirror_flat_slot` is now a no-op (commit `c9ea0ed1`). The flat array stays allocated so the asm `FV` pin has a valid pointer, but is no longer written. DSL-1 either re-introduces the mirror with a smaller payload (Boxed `FeedbackSiteState`?) when real inline IC fast paths land, or deletes the flat array entirely if the inline path doesn't materialize.
 
-Reports: `reports/js/lyng-js/dsl-0c-v8.md` + `dsl-0c-v8.json`.
+Reports: `reports/lyng/dsl-0c-v8.md` + `dsl-0c-v8.json`.
 
 ### Lesson for DSL-1
 
-The substrate's perf payoff requires more hot opcodes ported. DSL-1 priorities (by dispatch share, per `tools/lyng-js-bench/hot-opcodes.toml`):
+The substrate's perf payoff requires more hot opcodes ported. DSL-1 priorities (by dispatch share, per `tools/lyng-bench/hot-opcodes.toml`):
 - `op_load_undefined`, `op_load_zero`, `op_load_smi8` (loads — high frequency, simple)
 - `op_get_named_property`, `op_set_named_property` (IC opcodes — biggest wins, but require IC mode-byte refactor per DSL-1 plan)
 - `op_call0`, `op_call`, `op_load_global` (call + global paths)
@@ -87,11 +87,11 @@ All categories pass at 100% on runnable files:
 - `harness`: 232 / 232 (100%)
 - `intl402`: 6648 skipped (DSL-0 explicitly excludes per design §2)
 
-Report: `reports/js/lyng-js/dsl-0c-test262.md`.
+Report: `reports/lyng/dsl-0c-test262.md`.
 
 ## 5. Behavioral test evidence
 
-`cargo test -p lyng-js-vm --lib`: **413 passed, 0 failed.**
+`cargo test -p lyng-vm --lib`: **413 passed, 0 failed.**
 
 Failing tests during Phase C: all root-caused and fixed:
 - Move length bug (PC misalignment) — fixed `8ce047e7`
@@ -104,35 +104,35 @@ Failing tests during Phase C: all root-caused and fixed:
 - α deletion cascade (tier-accounting, trampoline, Step, Handler, dispatch_handlers, decoders) — fixed `e1cad35e`, `8946a1ad`, `2013d8e0`, `f3b9fe74`
 - V8 v7 perf regression (mirror_flat_slot bottleneck) — fixed `c9ea0ed1`
 
-Cross-crate (`lyng-js-bytecode`, `lyng-js-objects`, `lyng-js-compiler`, `lyng-js-tests`): all pass.
+Cross-crate (`lyng-bytecode`, `lyng-objects`, `lyng-compiler`, `lyng-tests`): all pass.
 
 ## 6. Architectural artifacts produced
 
 ### α machinery deleted
 
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/` (entire directory, ~2800 lines)
-- `crates/lyng-js/vm/src/vm/dispatch_state.rs::run_trampoline`, `run_trampoline_counted`, `still_active`, `Step` enum, `Handler` type, `try_step!` macro, `current_bytes`, `next_opcode_byte`, `advance` methods
-- `crates/lyng-js/vm/src/vm/dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, α-only decoders (`decode_abx8_operands`, `decode_ax_operands`, `decode_ax8_operands`, `decode_local_operands`, `decode_accumulator_*_operands`, `decode_call_range_operands`)
-- `crates/lyng-js/vm/src/vm/tiering.rs::observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
-- `crates/lyng-js/vm/src/vm/state.rs`: `MaterializedRuntimeState`, `MaterializedDeoptSnapshot`, `MaterializedDeoptValue`, `Vm::assert_deopt_safepoint_state`, `Vm::materialize_deopt_snapshot`, `Vm::materialize_deopt_value`, related helpers
+- `crates/lyng/vm/src/vm/dispatch_handlers/` (entire directory, ~2800 lines)
+- `crates/lyng/vm/src/vm/dispatch_state.rs::run_trampoline`, `run_trampoline_counted`, `still_active`, `Step` enum, `Handler` type, `try_step!` macro, `current_bytes`, `next_opcode_byte`, `advance` methods
+- `crates/lyng/vm/src/vm/dispatch.rs`: `sign_extend_i24`, `DecodedCallRangeOperands`, α-only decoders (`decode_abx8_operands`, `decode_ax_operands`, `decode_ax8_operands`, `decode_local_operands`, `decode_accumulator_*_operands`, `decode_call_range_operands`)
+- `crates/lyng/vm/src/vm/tiering.rs::observe_tier_backedge_event`, `BACKEDGE_EVENT_WEIGHT`
+- `crates/lyng/vm/src/vm/state.rs`: `MaterializedRuntimeState`, `MaterializedDeoptSnapshot`, `MaterializedDeoptValue`, `Vm::assert_deopt_safepoint_state`, `Vm::materialize_deopt_snapshot`, `Vm::materialize_deopt_value`, related helpers
 - `Vm::run_via_trampoline` method
 - α-side `translate_outcome_to_step` (in dispatch_handlers/mod.rs)
 
 ### α machinery retained (intentionally, as helpers used by semantic bodies)
 
 - `DispatchState` struct + per-frame accessor methods — used by all semantic bodies via `LlIntDispatchState::dispatch_state()`
-- `crates/lyng-js/vm/src/vm/dispatch/` — `execute_*_opcode` methods on Vm, narrow-form decoders (`decode_abc_operands`, `decode_abx_operands`, `decode_feedback_slot_operand`), arithmetic helpers (`smi_mul_result`, `smi_mod_result`, `decode_smi_immediate`)
-- `crates/lyng-js/vm/src/vm/tiering.rs::TieringState`, `TierStatus`, `TieringSnapshot` types + per-code state, `Vm::observe_tier_feedback_event` (still fires for feedback-site events)
-- `crates/lyng-js/vm/src/vm/feedback.rs::feedback_vectors` — legacy storage now the sole feedback source (flat storage is unread)
+- `crates/lyng/vm/src/vm/dispatch/` — `execute_*_opcode` methods on Vm, narrow-form decoders (`decode_abc_operands`, `decode_abx_operands`, `decode_feedback_slot_operand`), arithmetic helpers (`smi_mul_result`, `smi_mod_result`, `decode_smi_immediate`)
+- `crates/lyng/vm/src/vm/tiering.rs::TieringState`, `TierStatus`, `TieringSnapshot` types + per-code state, `Vm::observe_tier_feedback_event` (still fires for feedback-site events)
+- `crates/lyng/vm/src/vm/feedback.rs::feedback_vectors` — legacy storage now the sole feedback source (flat storage is unread)
 
 ### New DSL infrastructure produced
 
-- `crates/lyng-js-vm-dsl/` — proc-macro crate (parser + layouts + scratch + lowerer)
-- `crates/lyng-js/vm/src/dsl/` — runtime ABI (LlIntState, LlIntRustContext, slow-path bridge, entry/exit shims, opcode manifest, feedback flat-array, debugger poll integration)
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/` — 63 macro_rules! ops across 10 modules
-- `crates/lyng-js/vm/src/dsl/handlers/{hot,warm,cold}.rs` — 12 hot/warm + 140 cold DSL handlers
-- `crates/lyng-js/vm/src/vm/semantics/` — 12 family files + mod.rs, ~5000 lines (every opcode's semantic body extracted)
-- `tools/lyng-js-dsl-codegen/` — cold-stub generator
+- `crates/lyng/vm-dsl/` — proc-macro crate (parser + layouts + scratch + lowerer)
+- `crates/lyng/vm/src/dsl/` — runtime ABI (LlIntState, LlIntRustContext, slow-path bridge, entry/exit shims, opcode manifest, feedback flat-array, debugger poll integration)
+- `crates/lyng/vm/src/dsl/backend/aarch64/` — 63 macro_rules! ops across 10 modules
+- `crates/lyng/vm/src/dsl/handlers/{hot,warm,cold}.rs` — 12 hot/warm + 140 cold DSL handlers
+- `crates/lyng/vm/src/vm/semantics/` — 12 family files + mod.rs, ~5000 lines (every opcode's semantic body extracted)
+- `tools/lyng-dsl-codegen/` — cold-stub generator
 
 ## 7. Open questions for DSL-1
 
@@ -155,21 +155,21 @@ DSL-1 entry conditions are clean:
 - The 12 hot/warm DSL handlers prove the proc-macro + backend integration works
 
 DSL-1 work focuses on:
-- Week 1+: Port hot opcodes by dispatch share (per `tools/lyng-js-bench/hot-opcodes.toml`)
+- Week 1+: Port hot opcodes by dispatch share (per `tools/lyng-bench/hot-opcodes.toml`)
 - Week N: IC mode-byte refactor (`op_get_named_property`, `op_set_named_property`, etc.)
 - Week N+M: Inline forward-jump fast paths for op_jump variants
 - As surfaced: data-layout refactors (per design §9)
 
 Status reports:
-- [reports/js/lyng-js/dsl-0a-status.md](dsl-0a-status.md) — DSL-0a
-- [reports/js/lyng-js/dsl-0b-status.md](dsl-0b-status.md) — DSL-0b
-- [reports/js/lyng-js/dsl-0c-status.md](dsl-0c-status.md) — DSL-0c
+- [reports/lyng/dsl-0a-status.md](dsl-0a-status.md) — DSL-0a
+- [reports/lyng/dsl-0b-status.md](dsl-0b-status.md) — DSL-0b
+- [reports/lyng/dsl-0c-status.md](dsl-0c-status.md) — DSL-0c
 - This document — DSL-0 overall
 
 Bench evidence:
-- [reports/js/lyng-js/dsl-0c-v8.md](dsl-0c-v8.md)
-- [reports/js/lyng-js/dsl-0c-microbench.md](dsl-0c-microbench.md)
-- [reports/js/lyng-js/dsl-0c-test262.md](dsl-0c-test262.md)
+- [reports/lyng/dsl-0c-v8.md](dsl-0c-v8.md)
+- [reports/lyng/dsl-0c-microbench.md](dsl-0c-microbench.md)
+- [reports/lyng/dsl-0c-test262.md](dsl-0c-test262.md)
 
 dcat tickets:
 - DSL-0 parent: `lyng-1wg3` (in_review)
@@ -177,7 +177,7 @@ dcat tickets:
 - DSL-0b sub-epic: `lyng-4oak` (in_review)
 - DSL-0c sub-epic: `lyng-4cdz` (in_review)
 
-Per `crates/lyng-js/AGENTS.md`, tickets NEVER close without explicit user approval.
+Per `crates/lyng/AGENTS.md`, tickets NEVER close without explicit user approval.
 
 ## 9. Overall status
 

@@ -2,7 +2,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use lyng_js_common::{AtomTable, SourceId};
+use lyng_common::{AtomTable, SourceId};
 
 fuzz_target!(|data: &[u8]| {
     // Only fuzz valid UTF-8.
@@ -17,5 +17,5 @@ fuzz_target!(|data: &[u8]| {
 
     let mut atoms = AtomTable::new();
     // Parse as script. Errors are fine — panics are not.
-    let _parsed = lyng_js_parser::parse_script(&mut atoms, SourceId::new(0), source);
+    let _parsed = lyng_parser::parse_script(&mut atoms, SourceId::new(0), source);
 });

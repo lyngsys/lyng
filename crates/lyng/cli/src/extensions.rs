@@ -1,6 +1,6 @@
-use lyng_js_env::Agent;
-use lyng_js_types::{EmbeddingFunctionId, PropertyKey, Value};
-use lyng_js_vm::{
+use lyng_env::Agent;
+use lyng_types::{EmbeddingFunctionId, PropertyKey, Value};
+use lyng_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, VmError,
 };

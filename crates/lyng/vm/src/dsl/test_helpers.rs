@@ -27,7 +27,7 @@
 //! The `LlIntRustContext` fields are `pub(crate)` and the
 //! `LlIntDispatchInner::Asm` constructor needs to reach through those
 //! fields, so the harness can only be authored from inside the crate.
-//! Integration tests under `crates/lyng-js/vm/tests/` consume the
+//! Integration tests under `crates/lyng/vm/tests/` consume the
 //! harness via the `#[doc(hidden)] pub` re-export in
 //! [`crate::dsl::test_helpers`].
 
@@ -35,17 +35,17 @@
 
 use std::sync::Arc;
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::{HostHooks, NoopHostHooks};
-use lyng_js_objects::{
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::{HostHooks, NoopHostHooks};
+use lyng_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectRuntime,
 };
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
 
 use crate::dsl::llint_state::{
     ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
@@ -83,7 +83,7 @@ impl NativeFunctionRegistry for RejectingRegistry {
     fn call(
         &mut self,
         _runtime: &mut ObjectRuntime,
-        _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+        _heap: &mut lyng_gc::PrimitiveMutator<'_>,
         _request: NativeCallRequest<'_>,
     ) -> InternalMethodResult<Value> {
         panic!("DslHarness should not invoke native calls");
@@ -92,9 +92,9 @@ impl NativeFunctionRegistry for RejectingRegistry {
     fn construct(
         &mut self,
         _runtime: &mut ObjectRuntime,
-        _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+        _heap: &mut lyng_gc::PrimitiveMutator<'_>,
         _request: NativeConstructRequest<'_>,
-    ) -> InternalMethodResult<lyng_js_types::ObjectRef> {
+    ) -> InternalMethodResult<lyng_types::ObjectRef> {
         panic!("DslHarness should not invoke native constructs");
     }
 }
@@ -133,8 +133,7 @@ impl DslHarness {
             // so the contents are arbitrary as long as compilation
             // succeeds.
             let mut atoms = AtomTable::new();
-            let parsed =
-                parse_script(&mut atoms, SourceId::new(0xD51), "var __dsl_harness = 0;");
+            let parsed = parse_script(&mut atoms, SourceId::new(0xD51), "var __dsl_harness = 0;");
             assert!(
                 !parsed.diagnostics.has_errors(),
                 "DslHarness bootstrap script should parse",
@@ -169,7 +168,7 @@ impl DslHarness {
                 realm.id(),
                 realm.global_env(),
                 realm.global_env(),
-                lyng_js_env::ExecutionContextKind::Script,
+                lyng_env::ExecutionContextKind::Script,
             );
 
             (installed, frame)
@@ -218,9 +217,7 @@ impl DslHarness {
     /// unchanged.
     pub fn invoke_semantic_directly<F>(&mut self, entry_pc: u32, semantic: F) -> HarnessOutcome
     where
-        F: for<'vm, 'borrow> FnOnce(
-            &mut LlIntDispatchState<'vm, 'borrow>,
-        ) -> SemanticOutcome,
+        F: for<'vm, 'borrow> FnOnce(&mut LlIntDispatchState<'vm, 'borrow>) -> SemanticOutcome,
     {
         let agent = self.runtime.root_agent_mut();
         let host: &dyn HostHooks = &NoopHostHooks;
@@ -316,10 +313,8 @@ impl DslHarness {
     /// for the double-prefix-rejection path).
     pub fn with_alpha_dispatch<R>(
         &mut self,
-        init_prefix: Option<lyng_js_bytecode::Opcode>,
-        body: impl for<'vm, 'borrow> FnOnce(
-            &mut LlIntDispatchState<'vm, 'borrow>,
-        ) -> R,
+        init_prefix: Option<lyng_bytecode::Opcode>,
+        body: impl for<'vm, 'borrow> FnOnce(&mut LlIntDispatchState<'vm, 'borrow>) -> R,
     ) -> R {
         let agent = self.runtime.root_agent_mut();
         let host: &dyn HostHooks = &NoopHostHooks;

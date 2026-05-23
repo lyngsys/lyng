@@ -1,6 +1,6 @@
 use super::*;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 // helpers below no longer need to map between profiled and base forms — the
 // opcode in the instruction is already the semantic opcode.
 
-fn instruction_semantic_opcode(instruction: lyng_js_bytecode::Instruction) -> Opcode {
+fn instruction_semantic_opcode(instruction: lyng_bytecode::Instruction) -> Opcode {
     instruction.opcode()
 }
 
@@ -16,24 +16,24 @@ fn is_ordinary_call_opcode(opcode: Opcode) -> bool {
     opcode == Opcode::Call || opcode.small_call_arity().is_some()
 }
 
-fn small_call_base_and_count(instruction: lyng_js_bytecode::Instruction) -> Option<(u16, u16)> {
+fn small_call_base_and_count(instruction: lyng_bytecode::Instruction) -> Option<(u16, u16)> {
     match instruction {
-        lyng_js_bytecode::Instruction::Abc { opcode, c, .. }
-        | lyng_js_bytecode::Instruction::AbcSlot { opcode, c, .. } => {
+        lyng_bytecode::Instruction::Abc { opcode, c, .. }
+        | lyng_bytecode::Instruction::AbcSlot { opcode, c, .. } => {
             opcode.small_call_arity().map(|arity| (c, u16::from(arity)))
         }
-        lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::AbxSlot { .. }
-        | lyng_js_bytecode::Instruction::Ax { .. }
-        | lyng_js_bytecode::Instruction::CallRange { .. } => None,
+        lyng_bytecode::Instruction::Abx { .. }
+        | lyng_bytecode::Instruction::AbxSlot { .. }
+        | lyng_bytecode::Instruction::Ax { .. }
+        | lyng_bytecode::Instruction::CallRange { .. } => None,
     }
 }
 
 fn generic_call_argument_range(
-    instruction: lyng_js_bytecode::Instruction,
-) -> Option<lyng_js_bytecode::CallRange> {
+    instruction: lyng_bytecode::Instruction,
+) -> Option<lyng_bytecode::CallRange> {
     match instruction {
-        lyng_js_bytecode::Instruction::CallRange {
+        lyng_bytecode::Instruction::CallRange {
             opcode: Opcode::Call,
             range,
             ..
@@ -42,50 +42,51 @@ fn generic_call_argument_range(
     }
 }
 
-fn has_move_to_register(instructions: &[lyng_js_bytecode::Instruction], dest: u16) -> bool {
+fn has_move_to_register(instructions: &[lyng_bytecode::Instruction], dest: u16) -> bool {
     instructions.iter().any(|instruction| match *instruction {
-        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
+        lyng_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
             opcode == Opcode::Move && a == dest
         }
-        lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::AbxSlot { .. }
-        | lyng_js_bytecode::Instruction::Ax { .. }
-        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+        lyng_bytecode::Instruction::Abx { .. }
+        | lyng_bytecode::Instruction::AbxSlot { .. }
+        | lyng_bytecode::Instruction::Ax { .. }
+        | lyng_bytecode::Instruction::CallRange { .. } => false,
     })
 }
 
 fn has_writer_with_opcode(
-    instructions: &[lyng_js_bytecode::Instruction],
+    instructions: &[lyng_bytecode::Instruction],
     dest: u16,
     opcodes: &[Opcode],
 ) -> bool {
     instructions.iter().any(|instruction| match *instruction {
-        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::Abx { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::AbxSlot { opcode, a, .. } => {
+        lyng_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_bytecode::Instruction::AbcSlot { opcode, a, .. }
+        | lyng_bytecode::Instruction::Abx { opcode, a, .. }
+        | lyng_bytecode::Instruction::AbxSlot { opcode, a, .. } => {
             a == dest && opcodes.contains(&opcode)
         }
-        lyng_js_bytecode::Instruction::Ax { .. }
-        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+        lyng_bytecode::Instruction::Ax { .. } | lyng_bytecode::Instruction::CallRange { .. } => {
+            false
+        }
     })
 }
 
 fn has_small_call_result_in_register(
-    instructions: &[lyng_js_bytecode::Instruction],
+    instructions: &[lyng_bytecode::Instruction],
     dest: u16,
     argument_count: u8,
 ) -> bool {
     instructions.iter().any(|instruction| match *instruction {
-        lyng_js_bytecode::Instruction::Abc { opcode, a, .. }
-        | lyng_js_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
+        lyng_bytecode::Instruction::Abc { opcode, a, .. }
+        | lyng_bytecode::Instruction::AbcSlot { opcode, a, .. } => {
             a == dest && opcode.small_call_arity() == Some(argument_count)
         }
-        lyng_js_bytecode::Instruction::Abx { .. }
-        | lyng_js_bytecode::Instruction::AbxSlot { .. }
-        | lyng_js_bytecode::Instruction::Ax { .. }
-        | lyng_js_bytecode::Instruction::CallRange { .. } => false,
+        lyng_bytecode::Instruction::Abx { .. }
+        | lyng_bytecode::Instruction::AbxSlot { .. }
+        | lyng_bytecode::Instruction::Ax { .. }
+        | lyng_bytecode::Instruction::CallRange { .. } => false,
     })
 }
 
@@ -94,7 +95,7 @@ fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_gl
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(0),
+        lyng_common::SourceId::new(0),
         "let local = 1; var global = 2; local + global;",
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -126,11 +127,7 @@ fn compile_script_allocates_persistent_slots_for_global_lexicals_and_explicit_gl
 #[test]
 fn compile_script_assigns_and_loads_global_var_declarations_through_global_ops() {
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(
-        &mut atoms,
-        lyng_js_common::SourceId::new(901),
-        "var x = 1; x;",
-    );
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(901), "var x = 1; x;");
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -166,7 +163,7 @@ fn compile_script_allows_strict_function_calls_named_eval_without_dynamic_poison
         f(10);
     "#;
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(900), source);
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(900), source);
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -179,7 +176,7 @@ fn compile_script_emits_child_templates_and_call_sites() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(1),
+        lyng_common::SourceId::new(1),
         r"
             function outer(x) {
                 return (y) => x + y;
@@ -198,7 +195,7 @@ fn compile_script_emits_child_templates_and_call_sites() {
     assert!(unit.functions().len() >= 3);
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::CreateClosure,
             ..
         }
@@ -214,7 +211,7 @@ fn attach_safepoint_reports_register_window_limit_as_lowering_error() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(36),
+        lyng_common::SourceId::new(36),
         "let marker = 1;",
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -253,7 +250,7 @@ fn compile_script_allocates_function_environment_for_direct_arrow_children() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(2),
+        lyng_common::SourceId::new(2),
         r"
             function outer() {
                 return () => this;
@@ -281,7 +278,7 @@ fn compile_script_lowers_unresolved_arguments_in_eval_poisoned_arrow_bodies_thro
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(4),
+        lyng_common::SourceId::new(4),
         r#"
             const f = (p = eval("var arguments = 'param'")) => arguments;
             f();
@@ -295,13 +292,13 @@ fn compile_script_lowers_unresolved_arguments_in_eval_poisoned_arrow_bodies_thro
     let arrow = unit
         .functions()
         .iter()
-        .find(|function| function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Arrow)
+        .find(|function| function.kind() == lyng_bytecode::BytecodeFunctionKind::Arrow)
         .expect("arrow function should be lowered");
 
     assert!(arrow.needs_environment());
     assert!(arrow.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::LoadName,
             ..
         }
@@ -317,7 +314,7 @@ fn compile_script_lowers_function_expression_eval_callee_through_load_name() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(5),
+        lyng_common::SourceId::new(5),
         r#"
             const f = function() {
                 return eval("1");
@@ -334,7 +331,7 @@ fn compile_script_lowers_function_expression_eval_callee_through_load_name() {
         .functions()
         .iter()
         .find(|function| {
-            function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+            function.kind() == lyng_bytecode::BytecodeFunctionKind::Function
                 && function.name().is_none()
         })
         .expect("function expression should be lowered");
@@ -344,7 +341,7 @@ fn compile_script_lowers_function_expression_eval_callee_through_load_name() {
         .iter()
         .any(|instruction| matches!(
             instruction,
-            lyng_js_bytecode::Instruction::Abx {
+            lyng_bytecode::Instruction::Abx {
                 opcode: Opcode::LoadName,
                 ..
             }
@@ -360,7 +357,7 @@ fn compile_script_lowers_logical_member_assignments_through_assign_property_ops(
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r#"
             "use strict";
             var obj = {};
@@ -397,7 +394,7 @@ fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r"
             with ({}) {
                 Object();
@@ -421,7 +418,7 @@ fn compile_script_lowers_with_call_targets_through_captured_name_reference() {
         assert!(
             entry.instructions().iter().any(|instruction| matches!(
                 instruction,
-                lyng_js_bytecode::Instruction::Abx {
+                lyng_bytecode::Instruction::Abx {
                     opcode: actual,
                     ..
                 } if actual == opcode
@@ -440,7 +437,7 @@ fn compile_script_lowers_dynamic_lookup_delete_through_delete_name() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r"
             function testcase() {
                 delete x;
@@ -460,13 +457,12 @@ fn compile_script_lowers_dynamic_lookup_delete_through_delete_name() {
         .iter()
         .enumerate()
         .find_map(|(index, binding)| {
-            (binding.name == x && binding.kind == lyng_js_sema::DeclarationKind::Var).then_some(
-                lyng_js_sema::SemanticBindingId::new(checked_u32_index(index)),
-            )
+            (binding.name == x && binding.kind == lyng_sema::DeclarationKind::Var)
+                .then_some(lyng_sema::SemanticBindingId::new(checked_u32_index(index)))
         })
         .expect("function-local x binding should exist");
     let binding = sema.binding_table.get_mut(binding_id);
-    binding.storage_class = lyng_js_sema::StorageClass::DynamicLookup;
+    binding.storage_class = lyng_sema::StorageClass::DynamicLookup;
     binding.needs_environment = false;
     binding.slot_index = None;
 
@@ -479,14 +475,14 @@ fn compile_script_lowers_dynamic_lookup_delete_through_delete_name() {
 
     assert!(testcase.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::DeleteName,
             ..
         }
     )));
     assert!(!testcase.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::DeleteGlobal,
             ..
         }
@@ -498,7 +494,7 @@ fn compile_script_lowers_parenthesized_typeof_identifiers_through_resolve_name()
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r#"
             function testcase() {
                 eval("function fun(x) { return x; }");
@@ -520,7 +516,7 @@ fn compile_script_lowers_parenthesized_typeof_identifiers_through_resolve_name()
 
     assert!(testcase.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::ResolveName,
             ..
         }
@@ -532,7 +528,7 @@ fn compile_script_lowers_typeof_before_for_lexical_shadow_through_resolve_global
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(37),
+        lyng_common::SourceId::new(37),
         r"
             var beforeType;
             beforeType = typeof f;
@@ -554,7 +550,7 @@ fn compile_script_lowers_typeof_before_for_lexical_shadow_through_resolve_global
 
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::ResolveGlobal,
             ..
         }
@@ -566,7 +562,7 @@ fn compile_script_places_dead_eval_branch_after_jump_in_function_expression() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r#"
             const f = function() {
                 if (false) eval("1");
@@ -583,11 +579,11 @@ fn compile_script_places_dead_eval_branch_after_jump_in_function_expression() {
         .functions()
         .iter()
         .find(|function| {
-            function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+            function.kind() == lyng_bytecode::BytecodeFunctionKind::Function
                 && function.name().is_none()
         })
         .expect("function expression should be lowered");
-    let text = lyng_js_bytecode::disassemble(function_expr);
+    let text = lyng_bytecode::disassemble(function_expr);
 
     let jump_index = text
         .find("JumpIfFalse")
@@ -603,7 +599,7 @@ fn compile_script_named_function_expression_self_binding_allocates_own_environme
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(33),
+        lyng_common::SourceId::new(33),
         r"
             let outcomes = [];
             let saved;
@@ -622,7 +618,7 @@ fn compile_script_named_function_expression_self_binding_allocates_own_environme
         .functions()
         .iter()
         .find(|function| {
-            function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+            function.kind() == lyng_bytecode::BytecodeFunctionKind::Function
                 && function.name() == Some(atoms.intern("observe"))
         })
         .expect("named function expression should be lowered");
@@ -638,13 +634,13 @@ fn compile_script_named_function_expression_self_binding_allocates_own_environme
         .iter()
         .any(|instruction| matches!(
             instruction,
-            lyng_js_bytecode::Instruction::Abx {
+            lyng_bytecode::Instruction::Abx {
                 opcode: Opcode::StoreEnvSlot,
                 bx: 0,
                 ..
             }
         )));
-    let text = lyng_js_bytecode::disassemble(function_expr);
+    let text = lyng_bytecode::disassemble(function_expr);
     assert!(text.contains("LoadEnvSlot") && text.contains("depth=1, slot=0"));
 }
 
@@ -653,7 +649,7 @@ fn compile_script_does_not_poison_root_scope_from_nested_function_eval() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(7),
+        lyng_common::SourceId::new(7),
         r#"
             const f = function() {
                 if (false) eval("1");
@@ -672,14 +668,14 @@ fn compile_script_does_not_poison_root_scope_from_nested_function_eval() {
 
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::StoreEnvSlot,
             ..
         }
     )));
     assert!(!entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::AssignName,
             ..
         }
@@ -691,7 +687,7 @@ fn compile_script_lowers_dynamic_identifier_updates_through_captured_name_ops() 
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(31),
+        lyng_common::SourceId::new(31),
         r"
             var obj = { x: 1 };
             with (obj) {
@@ -712,21 +708,21 @@ fn compile_script_lowers_dynamic_identifier_updates_through_captured_name_ops() 
 
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::CaptureName,
             ..
         }
     )));
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::LoadCapturedName,
             ..
         }
     )));
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::AssignCapturedName,
             ..
         }
@@ -738,7 +734,7 @@ fn compile_script_lowers_eval_poisoned_identifier_rmw_through_captured_name_ops(
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(32),
+        lyng_common::SourceId::new(32),
         r#"
             function outer() {
                 var x = 3;
@@ -760,28 +756,28 @@ fn compile_script_lowers_eval_poisoned_identifier_rmw_through_captured_name_ops(
         .functions()
         .iter()
         .find(|function| {
-            function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+            function.kind() == lyng_bytecode::BytecodeFunctionKind::Function
                 && function.name().is_none()
         })
         .expect("inner function should be lowered");
 
     assert!(inner.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::CaptureName,
             ..
         }
     )));
     assert!(inner.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::LoadCapturedName,
             ..
         }
     )));
     assert!(inner.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::AssignCapturedName,
             ..
         }
@@ -798,7 +794,7 @@ fn compile_script_supports_large_register_functions_and_high_register_calls() {
     source.push_str("fnRef(value279);\n");
 
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3), &source);
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(3), &source);
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -830,7 +826,7 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
     ";
 
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3_141), source);
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(3_141), source);
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -845,7 +841,7 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
                 .iter()
                 .any(|instruction| instruction_semantic_opcode(instruction) == opcode),
             "expected {opcode:?} in:\n{}",
-            lyng_js_bytecode::disassemble(entry)
+            lyng_bytecode::disassemble(entry)
         );
     }
     assert_eq!(
@@ -855,7 +851,7 @@ fn compile_script_uses_small_arity_call_opcodes_for_non_spread_calls() {
             .count(),
         2,
         "four-argument and spread calls should keep the Call fallback:\n{}",
-        lyng_js_bytecode::disassemble(entry)
+        lyng_bytecode::disassemble(entry)
     );
 }
 
@@ -864,7 +860,7 @@ fn compile_script_lowers_small_call_arguments_into_call_base_slots() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(3_142),
+        lyng_common::SourceId::new(3_142),
         r"
             function fnRef(a, b, c) { return a + b + c; }
             fnRef(11, 22, 33);
@@ -877,7 +873,7 @@ fn compile_script_lowers_small_call_arguments_into_call_base_slots() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let (call_base, argument_count) = instructions
         .iter()
         .copied()
@@ -906,7 +902,7 @@ fn compile_script_lowers_generic_call_arguments_into_call_range_slots() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(3_143),
+        lyng_common::SourceId::new(3_143),
         r"
             function fnRef(a, b, c, d) { return a + b + c + d; }
             fnRef(1, 2, 3, 4);
@@ -919,7 +915,7 @@ fn compile_script_lowers_generic_call_arguments_into_call_range_slots() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let argument_range = instructions
         .iter()
         .copied()
@@ -949,7 +945,7 @@ fn compile_script_lowers_spread_argument_expression_into_call_range_slot() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(3_144),
+        lyng_common::SourceId::new(3_144),
         r"
             function fnRef(a, b) { return a; }
             fnRef(...[1, 2], 3);
@@ -962,7 +958,7 @@ fn compile_script_lowers_spread_argument_expression_into_call_range_slot() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let argument_range = instructions
         .iter()
         .copied()
@@ -994,7 +990,7 @@ fn compile_script_lowers_nested_call_results_into_outer_argument_slots() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(3_145),
+        lyng_common::SourceId::new(3_145),
         r"
             function inner(value) { return value; }
             function outer(a, b) { return a + b; }
@@ -1008,7 +1004,7 @@ fn compile_script_lowers_nested_call_results_into_outer_argument_slots() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let (call_base, argument_count) = instructions
         .iter()
         .copied()
@@ -1040,7 +1036,7 @@ fn compile_script_reuses_private_field_registers_for_extremely_large_classes() {
     source.push_str("}\nOverflow;\n");
 
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3_001), &source);
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(3_001), &source);
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -1060,7 +1056,7 @@ fn compile_script_reuses_array_literal_registers_for_large_nested_arrays() {
     source.push_str("];\nmapping.length;\n");
 
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(3_002), &source);
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(3_002), &source);
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -1076,7 +1072,7 @@ fn compile_script_allocates_script_environment_for_captured_top_level_bindings()
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(4),
+        lyng_common::SourceId::new(4),
         r"
             let base = 40;
             function outer(step) {
@@ -1141,7 +1137,7 @@ fn compile_script_assigns_feedback_sites_for_minimum_phase4_kinds() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(5),
+        lyng_common::SourceId::new(5),
         r#"
             function make(value) {
                 return function(delta) { return value + delta; };
@@ -1191,7 +1187,7 @@ fn compile_script_specializes_hot_smi_constants_and_arithmetic() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(902),
+        lyng_common::SourceId::new(902),
         r"
             var sink = 0;
             var one = 1;
@@ -1250,7 +1246,7 @@ fn compile_script_emits_short_local_move_opcodes() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(903),
+        lyng_common::SourceId::new(903),
         r"
             function passthrough(seed) {
                 var first = seed + 1;
@@ -1270,7 +1266,7 @@ fn compile_script_emits_short_local_move_opcodes() {
         .iter()
         .find(|function| function.name() == Some(atoms.intern("passthrough")))
         .expect("function should be emitted");
-    let disassembly = lyng_js_bytecode::disassemble(function);
+    let disassembly = lyng_bytecode::disassemble(function);
 
     assert!(
         function.instructions().iter().any(|instruction| matches!(
@@ -1294,11 +1290,7 @@ fn compile_script_emits_short_local_move_opcodes() {
 #[test]
 fn compile_script_assigns_named_load_feedback_to_global_loads() {
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(
-        &mut atoms,
-        lyng_js_common::SourceId::new(6),
-        "externalGlobal;",
-    );
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(6), "externalGlobal;");
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -1326,7 +1318,7 @@ fn compile_script_assigns_named_store_feedback_to_global_stores() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(7),
+        lyng_common::SourceId::new(7),
         "var globalValue; globalValue = 1;",
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -1354,7 +1346,7 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(9999),
+        lyng_common::SourceId::new(9999),
         r"
             for (let i = 0; i < 3; ++i) {}
             for (let i = 0; i < 2; ++i) {}
@@ -1378,7 +1370,7 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
 
     assert!(!entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::CaptureName | Opcode::LoadCapturedName | Opcode::AssignCapturedName,
             ..
         }
@@ -1386,7 +1378,7 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
 
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::LoadEnvSlot | Opcode::StoreEnvSlot | Opcode::AssignEnvSlot,
             bx: 0,
             ..
@@ -1394,7 +1386,7 @@ fn compile_script_uses_direct_env_slot_updates_for_sibling_lexical_for_loops() {
     )));
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::LoadEnvSlot | Opcode::StoreEnvSlot | Opcode::AssignEnvSlot,
             bx: 1,
             ..
@@ -1407,7 +1399,7 @@ fn compile_script_marks_direct_tail_calls_explicitly() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(6),
+        lyng_common::SourceId::new(6),
         r"
             function recur(step, value) {
                 return step(value);
@@ -1440,7 +1432,7 @@ fn compile_script_keeps_non_tail_calls_and_finally_returns_non_tail() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(7),
+        lyng_common::SourceId::new(7),
         r"
             function direct(value) {
                 let inner = function(next) { return next; };
@@ -1503,7 +1495,7 @@ fn compile_script_marks_conditional_tail_calls_in_each_branch() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(8),
+        lyng_common::SourceId::new(8),
         r"
             function branch(flag, left, right) {
                 return flag ? left() : right();
@@ -1534,7 +1526,7 @@ fn compile_script_keeps_shadowed_eval_fallback_on_the_tail_path() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(22),
+        lyng_common::SourceId::new(22),
         r"
             function recur(step, value) {
                 var eval = step;
@@ -1568,7 +1560,7 @@ fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries(
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(9),
+        lyng_common::SourceId::new(9),
         r"
             function run(make) {
                 let value = 0;
@@ -1597,19 +1589,19 @@ fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries(
     let allocation = run
         .safepoints()
         .iter()
-        .find(|descriptor| descriptor.kind() == lyng_js_bytecode::SafepointKind::Allocation)
+        .find(|descriptor| descriptor.kind() == lyng_bytecode::SafepointKind::Allocation)
         .copied()
         .expect("call or object creation should expose an allocation safepoint");
     let loop_backedge = run
         .safepoints()
         .iter()
-        .find(|descriptor| descriptor.kind() == lyng_js_bytecode::SafepointKind::LoopBackedge)
+        .find(|descriptor| descriptor.kind() == lyng_bytecode::SafepointKind::LoopBackedge)
         .copied()
         .expect("loop backedge should expose a safepoint");
     let exception = run
         .safepoints()
         .iter()
-        .find(|descriptor| descriptor.kind() == lyng_js_bytecode::SafepointKind::ExceptionEdge)
+        .find(|descriptor| descriptor.kind() == lyng_bytecode::SafepointKind::ExceptionEdge)
         .copied()
         .expect("catch edge should expose a safepoint");
 
@@ -1632,8 +1624,8 @@ fn compile_script_attaches_metadata_at_allocation_loop_and_exception_boundaries(
         .expect("exception edge should own a deopt snapshot");
     assert!(exception_snapshot
         .values()
-        .contains(&lyng_js_bytecode::DeoptValueSource::FrameValue(
-            lyng_js_bytecode::DeoptFrameValue::ExceptionValue,
+        .contains(&lyng_bytecode::DeoptValueSource::FrameValue(
+            lyng_bytecode::DeoptFrameValue::ExceptionValue,
         ),));
 }
 
@@ -1642,7 +1634,7 @@ fn compile_script_lowers_class_declarations_and_marks_method_shapes() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(10),
+        lyng_common::SourceId::new(10),
         r#"
             class C {
                 constructor(value) {
@@ -1671,7 +1663,7 @@ fn compile_script_lowers_class_declarations_and_marks_method_shapes() {
     let non_constructible_methods = unit
         .functions()
         .iter()
-        .filter(|function| function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function)
+        .filter(|function| function.kind() == lyng_bytecode::BytecodeFunctionKind::Function)
         .filter(|function| !function.flags().constructible())
         .count();
 
@@ -1684,7 +1676,7 @@ fn compile_script_lowers_class_expressions_and_static_blocks() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(11),
+        lyng_common::SourceId::new(11),
         r"
             let value = class Named {
                 static total = 1;
@@ -1709,14 +1701,14 @@ fn compile_script_lowers_class_expressions_and_static_blocks() {
         .expect("entry function should exist");
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abx {
+        lyng_bytecode::Instruction::Abx {
             opcode: Opcode::CreateClosure,
             ..
         }
     )));
     assert!(entry.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abc {
+        lyng_bytecode::Instruction::Abc {
             opcode: Opcode::SetFunctionName,
             ..
         }
@@ -1728,7 +1720,7 @@ fn compile_script_counts_class_field_arrow_context_in_capture_depths() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(11_001),
+        lyng_common::SourceId::new(11_001),
         r"
             class C {
                 static field = () => C;
@@ -1762,11 +1754,11 @@ fn compile_script_counts_class_field_arrow_context_in_capture_depths() {
                 CaptureSource::EnvironmentSlot { depth: 1, slot: 1 }
             )
     }));
-    assert!(lyng_js_bytecode::disassemble(arrow).contains("LoadEnvSlot     r3, depth=1, slot=1"));
+    assert!(lyng_bytecode::disassemble(arrow).contains("LoadEnvSlot     r3, depth=1, slot=1"));
 
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(11_002),
+        lyng_common::SourceId::new(11_002),
         r"
             class D {
                 field = () => D;
@@ -1808,7 +1800,7 @@ fn compile_script_forces_environments_for_explicit_derived_class_constructors() 
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(12),
+        lyng_common::SourceId::new(12),
         r"
             class Base {
                 constructor(value) {
@@ -1844,7 +1836,7 @@ fn compile_script_counts_forced_derived_constructor_environment_in_capture_depth
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(14),
+        lyng_common::SourceId::new(14),
         r"
             let source = { value: 3 };
             class Base {
@@ -1871,7 +1863,7 @@ fn compile_script_counts_forced_derived_constructor_environment_in_capture_depth
         .iter()
         .find(|function| function.flags().derived_class_constructor())
         .expect("derived constructor should be emitted");
-    let text = lyng_js_bytecode::disassemble(derived_constructor);
+    let text = lyng_bytecode::disassemble(derived_constructor);
 
     assert!(derived_constructor.needs_environment());
     assert!(text.contains("LoadEnvSlot") && text.contains("depth=1, slot=0"));
@@ -1882,7 +1874,7 @@ fn compile_script_lowers_repeated_empty_class_bodies_with_shared_name() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(15),
+        lyng_common::SourceId::new(15),
         r"
             const Base = function() {}.bind();
             class C extends Base {}
@@ -1904,7 +1896,7 @@ fn compile_script_marks_generator_functions_and_emits_resume_dispatch() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(14),
+        lyng_common::SourceId::new(14),
         r"
             function* g() {
                 const value = yield 1;
@@ -1929,28 +1921,28 @@ fn compile_script_marks_generator_functions_and_emits_resume_dispatch() {
     assert!(generator.flags().has_prototype_property());
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::SuspendGeneratorStart,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::Yield,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::LoadResumeKind,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::LoadResumeValue,
             ..
         }
@@ -1962,7 +1954,7 @@ fn compile_script_marks_async_functions_and_emits_await_suspension() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(17),
+        lyng_common::SourceId::new(17),
         r"
             async function f(value) {
                 return await value;
@@ -1990,7 +1982,7 @@ fn compile_script_marks_async_functions_and_emits_await_suspension() {
         .iter()
         .any(|instruction| matches!(
             instruction,
-            lyng_js_bytecode::Instruction::Ax {
+            lyng_bytecode::Instruction::Ax {
                 opcode: Opcode::Await,
                 ..
             }
@@ -2002,7 +1994,7 @@ fn compile_script_marks_async_generators_and_emits_suspend_resume_points() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(19),
+        lyng_common::SourceId::new(19),
         r"
             async function* g(value) {
                 yield await value;
@@ -2027,35 +2019,35 @@ fn compile_script_marks_async_generators_and_emits_suspend_resume_points() {
     assert!(generator.flags().has_prototype_property());
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::SuspendGeneratorStart,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::Await,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::Yield,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::LoadResumeKind,
             ..
         }
     )));
     assert!(generator.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Ax {
+        lyng_bytecode::Instruction::Ax {
             opcode: Opcode::LoadResumeValue,
             ..
         }
@@ -2067,7 +2059,7 @@ fn compile_script_marks_generator_methods_with_prototype_properties() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(15),
+        lyng_common::SourceId::new(15),
         r"
             let ordinary = { method() {} };
             let object = { *gen() { yield 1; } };
@@ -2103,7 +2095,7 @@ fn compile_script_lowers_for_await_of_loops_with_async_iterator_acquisition() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(18),
+        lyng_common::SourceId::new(18),
         r"
             async function collect(iterable) {
                 for await (const value of iterable) {
@@ -2126,7 +2118,7 @@ fn compile_script_lowers_for_await_of_loops_with_async_iterator_acquisition() {
 
     assert!(collect.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abc {
+        lyng_bytecode::Instruction::Abc {
             opcode: Opcode::CreateIterator,
             c: 1,
             ..
@@ -2134,7 +2126,7 @@ fn compile_script_lowers_for_await_of_loops_with_async_iterator_acquisition() {
     )));
     assert!(collect.instructions().iter().any(|instruction| matches!(
         instruction,
-        lyng_js_bytecode::Instruction::Abc {
+        lyng_bytecode::Instruction::Abc {
             opcode: Opcode::AdvanceIterator,
             ..
         }
@@ -2146,7 +2138,7 @@ fn compile_script_computes_expected_argument_count_for_generator_defaults() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(16),
+        lyng_common::SourceId::new(16),
         r"
             function* g(x, y = 1, z) {
                 yield x + y + z;
@@ -2174,7 +2166,7 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(19),
+        lyng_common::SourceId::new(19),
         r#"
             let status = 0;
             try {
@@ -2215,7 +2207,7 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
         .any(|(_, instruction)| {
             matches!(
                 instruction,
-                lyng_js_bytecode::Instruction::Abx {
+                lyng_bytecode::Instruction::Abx {
                     opcode: Opcode::StoreEnvSlot,
                     ..
                 }
@@ -2232,7 +2224,7 @@ fn compile_script_covers_direct_eval_internal_call_inside_try_with_catch_handler
         .any(|(_, instruction)| {
             matches!(
                 instruction,
-                lyng_js_bytecode::Instruction::Abx {
+                lyng_bytecode::Instruction::Abx {
                     opcode: Opcode::AssignName,
                     ..
                 }
@@ -2249,7 +2241,7 @@ fn compile_script_records_direct_eval_lexical_site_for_active_block_scope() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(20),
+        lyng_common::SourceId::new(20),
         r#"
             let x = "outside";
             {
@@ -2282,7 +2274,7 @@ fn compile_script_marks_direct_eval_catch_parameter_scope_for_annex_b() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(22),
+        lyng_common::SourceId::new(22),
         r#"
             try {
                 throw null;
@@ -2316,7 +2308,7 @@ fn compile_script_marks_nested_direct_eval_catch_parameter_scope_for_annex_b() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(23),
+        lyng_common::SourceId::new(23),
         r#"
             try {
                 throw null;
@@ -2349,7 +2341,7 @@ fn compile_script_records_direct_eval_site_for_class_initializer_without_lexical
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(21),
+        lyng_common::SourceId::new(21),
         r#"
             let C = class {
                 x = eval("arguments");
@@ -2380,7 +2372,7 @@ fn compile_script_records_class_name_scope_for_field_initializer_eval() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(24),
+        lyng_common::SourceId::new(24),
         r#"
             class C {
                 static direct = eval("C");
@@ -2416,7 +2408,7 @@ fn compile_script_records_class_name_scope_for_field_initializer_eval() {
 #[test]
 fn compile_script_lowers_bigint_literal_argument_directly_into_call_slot() {
     let mut atoms = AtomTable::new();
-    let parsed = parse_script(&mut atoms, lyng_js_common::SourceId::new(4_001), "1n;");
+    let parsed = parse_script(&mut atoms, lyng_common::SourceId::new(4_001), "1n;");
     assert!(!parsed.diagnostics.has_errors());
     let sema = analyze_script(&parsed, &atoms);
     assert!(!sema.diagnostics.has_errors());
@@ -2424,7 +2416,7 @@ fn compile_script_lowers_bigint_literal_argument_directly_into_call_slot() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let argument_range = instructions
         .iter()
         .copied()
@@ -2452,7 +2444,7 @@ fn compile_script_lowers_tagged_template_arguments_directly_into_call_slots() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(4_003),
+        lyng_common::SourceId::new(4_003),
         "function tag(parts, value) { return parts.length + value; } tag`prefix ${42} suffix`;",
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -2462,7 +2454,7 @@ fn compile_script_lowers_tagged_template_arguments_directly_into_call_slots() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
 
     // Tagged templates lower through two generic Call instructions: the inner
     // internal_get_template_object_builtin call (5-arg: site + 2*quasi
@@ -2491,7 +2483,7 @@ fn compile_script_lowers_direct_eval_call_arguments_directly_into_call_slots() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
-        lyng_js_common::SourceId::new(4_004),
+        lyng_common::SourceId::new(4_004),
         r#"eval("x + 1");"#,
     );
     assert!(!parsed.diagnostics.has_errors());
@@ -2501,7 +2493,7 @@ fn compile_script_lowers_direct_eval_call_arguments_directly_into_call_slots() {
     let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
     let entry = unit.function(unit.entry()).unwrap();
     let instructions = entry.instructions().iter().collect::<Vec<_>>();
-    let disassembly = lyng_js_bytecode::disassemble(entry);
+    let disassembly = lyng_bytecode::disassemble(entry);
     let argument_range = instructions
         .iter()
         .copied()

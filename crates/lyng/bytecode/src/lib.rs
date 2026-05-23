@@ -1,6 +1,6 @@
-//! Bytecode templates and metadata for the lyng-js execution layer.
+//! Bytecode templates and metadata for the lyng execution layer.
 //!
-//! Ownership: `lyng_js_bytecode` owns immutable bytecode templates, instruction records,
+//! Ownership: `lyng_bytecode` owns immutable bytecode templates, instruction records,
 //! compiled-unit containers, metadata shells, builders, and disassembly helpers shared by
 //! the compiler and VM. It does not own lowering policy, runtime installation, or execution.
 

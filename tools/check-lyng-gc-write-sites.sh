@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="${LYNG_GC_WRITE_SITES_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-doc="${LYNG_GC_WRITE_SITES_DOC:-$repo_root/docs/lyng-js/gc-write-sites.md}"
-source_roots="${LYNG_GC_WRITE_SITES_SOURCE_ROOTS:-crates/lyng-js/gc crates/lyng-js/objects crates/lyng-js/env crates/lyng-js/vm}"
+doc="${LYNG_GC_WRITE_SITES_DOC:-$repo_root/docs/lyng/gc-write-sites.md}"
+source_roots="${LYNG_GC_WRITE_SITES_SOURCE_ROOTS:-crates/lyng/gc crates/lyng/objects crates/lyng/env crates/lyng/vm}"
 
 if [[ ! -f "$doc" ]]; then
     echo "missing GC write-site audit document: $doc" >&2

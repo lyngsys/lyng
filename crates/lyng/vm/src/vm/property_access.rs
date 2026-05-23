@@ -5,15 +5,15 @@ use super::{
 };
 use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
-use lyng_js_ops::{
+use lyng_ops::{
     errors,
     object::{self, ToPrimitiveContext},
     proxy, read, typed_array,
 };
-use lyng_js_types::{PropertyDescriptor, PropertyKey, StringRef};
+use lyng_types::{PropertyDescriptor, PropertyKey, StringRef};
 use std::collections::HashSet;
 
-pub(super) use lyng_js_ops::object::ToPrimitiveHint;
+pub(super) use lyng_ops::object::ToPrimitiveHint;
 
 fn array_length_to_uint32(number: f64) -> u32 {
     const TWO_32: f64 = 4_294_967_296.0;
@@ -75,7 +75,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         self.agent
     }
 
-    fn abrupt(&mut self, completion: lyng_js_types::AbruptCompletion) -> Self::Error {
+    fn abrupt(&mut self, completion: lyng_types::AbruptCompletion) -> Self::Error {
         VmError::Abrupt(completion)
     }
 
@@ -399,7 +399,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
         self.agent
     }
 
-    fn abrupt(&mut self, completion: lyng_js_types::AbruptCompletion) -> Self::Error {
+    fn abrupt(&mut self, completion: lyng_types::AbruptCompletion) -> Self::Error {
         VmError::Abrupt(completion)
     }
 
@@ -614,12 +614,12 @@ impl Vm {
         let mut current = agent
             .objects()
             .object_header(agent.heap().view(), object)
-            .and_then(lyng_js_objects::ObjectHeader::prototype);
+            .and_then(lyng_objects::ObjectHeader::prototype);
         while let Some(prototype) = current {
             if agent.objects().is_proxy_object(prototype)
                 || agent.objects().is_module_namespace_object(prototype)
                 || agent.objects().primitive_wrapper_kind(prototype)
-                    == Some(lyng_js_objects::PrimitiveWrapperKind::String)
+                    == Some(lyng_objects::PrimitiveWrapperKind::String)
                 || agent.objects().is_typed_array_object(prototype)
                 || agent.objects().element_logical_len(prototype).unwrap_or(0) != 0
             {
@@ -628,7 +628,7 @@ impl Vm {
             current = agent
                 .objects()
                 .object_header(agent.heap().view(), prototype)
-                .and_then(lyng_js_objects::ObjectHeader::prototype);
+                .and_then(lyng_objects::ObjectHeader::prototype);
         }
         true
     }
@@ -642,7 +642,7 @@ impl Vm {
             current = agent
                 .objects()
                 .object_header(agent.heap().view(), object)
-                .and_then(lyng_js_objects::ObjectHeader::prototype);
+                .and_then(lyng_objects::ObjectHeader::prototype);
         }
         false
     }
@@ -696,10 +696,8 @@ impl Vm {
         Some(Value::from_object_ref(caller))
     }
 
-    fn legacy_function_allows_caller_arguments(
-        function: &lyng_js_bytecode::BytecodeFunction,
-    ) -> bool {
-        function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Function
+    fn legacy_function_allows_caller_arguments(function: &lyng_bytecode::BytecodeFunction) -> bool {
+        function.kind() == lyng_bytecode::BytecodeFunctionKind::Function
             && !function.flags().strict()
             && !function.flags().generator()
             && !function.flags().async_function()
@@ -1326,9 +1324,7 @@ impl Vm {
             // deferred imports use that to trigger EvaluateSync, and
             // uninitialized lexical bindings use it to surface a
             // ReferenceError.
-            self.evaluate_deferred_module_namespace(
-                agent, host, registry, caller, object, key,
-            )?;
+            self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
             let descriptor_result = object::get_own_property_in_context(
                 &mut VmProxyBridge {
                     vm: self,
@@ -1483,9 +1479,7 @@ impl Vm {
             // its side effects (deferred-module EvaluateSync, lexical
             // binding TDZ check via Get) must run before we report back
             // that the assignment was refused.
-            self.evaluate_deferred_module_namespace(
-                agent, host, registry, caller, receiver, key,
-            )?;
+            self.evaluate_deferred_module_namespace(agent, host, registry, caller, receiver, key)?;
             let descriptor_result = object::get_own_property_in_context(
                 &mut VmProxyBridge {
                     vm: self,
@@ -1629,7 +1623,7 @@ impl Vm {
             registry,
             frame,
         };
-        lyng_js_ops::object::to_primitive(&mut bridge, value, hint)
+        lyng_ops::object::to_primitive(&mut bridge, value, hint)
     }
 }
 

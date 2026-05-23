@@ -26,10 +26,22 @@
 macro_rules! add_smi_overflow {
     ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
-            "adds   w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "b.vs   ", stringify!($label), "\n",
+            "adds   w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "b.vs   ",
+            stringify!($label),
+            "\n",
             // Sign-extend so downstream tagging picks up the correct low 32.
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -39,9 +51,21 @@ macro_rules! add_smi_overflow {
 macro_rules! sub_smi_overflow {
     ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
-            "subs   w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "b.vs   ", stringify!($label), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "subs   w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "b.vs   ",
+            stringify!($label),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -68,20 +92,40 @@ macro_rules! mul_smi_overflow {
     ($lhs:tt, $rhs:tt => $dst:tt, $label:tt) => {
         concat!(
             // x_dst = (i64) lhs * (i64) rhs  (signed widening multiply)
-            "smull  x", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
+            "smull  x",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
             // x16 = sxtw(x_dst[31:0])
-            "sxtw   x16, w", stringify!($dst), "\n",
+            "sxtw   x16, w",
+            stringify!($dst),
+            "\n",
             // Overflow if sign-extended low 32 bits != full 64-bit product.
-            "cmp    x", stringify!($dst), ", x16\n",
-            "b.ne   ", stringify!($label), "\n",
+            "cmp    x",
+            stringify!($dst),
+            ", x16\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
             // Negative-zero deferral: product == 0 AND (lhs | rhs) < 0
             // implies one operand was negative and the other zero — the
             // ECMAScript -0 result that SMI can't carry. The `cbnz`
             // short-circuits the common non-zero case so we only pay the
             // orr + tbnz when the product is exactly zero.
-            "cbnz   w", stringify!($dst), ", 8f\n",
-            "orr    w16, w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "tbnz   w16, #31, ", stringify!($label), "\n",
+            "cbnz   w",
+            stringify!($dst),
+            ", 8f\n",
+            "orr    w16, w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "tbnz   w16, #31, ",
+            stringify!($label),
+            "\n",
             "8:\n",
         )
     };
@@ -92,8 +136,18 @@ macro_rules! mul_smi_overflow {
 macro_rules! bit_and_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "and    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "and    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -103,8 +157,18 @@ macro_rules! bit_and_smi {
 macro_rules! bit_or_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "orr    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "orr    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -114,8 +178,18 @@ macro_rules! bit_or_smi {
 macro_rules! bit_xor_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "eor    w", stringify!($dst), ", w", stringify!($lhs), ", w", stringify!($rhs), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "eor    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w",
+            stringify!($rhs),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -128,9 +202,19 @@ macro_rules! shift_left_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
             // Mask shift count to 5 bits (ECMAScript ToUint32 + & 31).
-            "and    w16, w", stringify!($rhs), ", #0x1f\n",
-            "lsl    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "and    w16, w",
+            stringify!($rhs),
+            ", #0x1f\n",
+            "lsl    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w16\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -140,9 +224,19 @@ macro_rules! shift_left_smi {
 macro_rules! shift_right_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "and    w16, w", stringify!($rhs), ", #0x1f\n",
-            "asr    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "and    w16, w",
+            stringify!($rhs),
+            ", #0x1f\n",
+            "asr    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w16\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -158,10 +252,20 @@ macro_rules! shift_right_smi {
 macro_rules! ushift_right_smi {
     ($lhs:tt, $rhs:tt => $dst:tt) => {
         concat!(
-            "and    w16, w", stringify!($rhs), ", #0x1f\n",
-            "lsr    w", stringify!($dst), ", w", stringify!($lhs), ", w16\n",
+            "and    w16, w",
+            stringify!($rhs),
+            ", #0x1f\n",
+            "lsr    w",
+            stringify!($dst),
+            ", w",
+            stringify!($lhs),
+            ", w16\n",
             // Zero-extend (don't sign-extend) — high bit stays the LSR result.
-            "uxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "uxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -172,9 +276,19 @@ macro_rules! ushift_right_smi {
 macro_rules! neg_smi_overflow {
     ($reg:tt, $label:tt) => {
         concat!(
-            "negs   w", stringify!($reg), ", w", stringify!($reg), "\n",
-            "b.vs   ", stringify!($label), "\n",
-            "sxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
+            "negs   w",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
+            "b.vs   ",
+            stringify!($label),
+            "\n",
+            "sxtw   x",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
         )
     };
 }
@@ -184,8 +298,16 @@ macro_rules! neg_smi_overflow {
 macro_rules! bit_not_smi {
     ($reg:tt) => {
         concat!(
-            "mvn    w", stringify!($reg), ", w", stringify!($reg), "\n",
-            "sxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
+            "mvn    w",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
+            "sxtw   x",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
         )
     };
 }
@@ -203,9 +325,19 @@ macro_rules! bit_not_smi {
 macro_rules! inc_smi_overflow {
     ($src:tt => $dst:tt, $label:tt) => {
         concat!(
-            "adds   w", stringify!($dst), ", w", stringify!($src), ", #1\n",
-            "b.vs   ", stringify!($label), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "adds   w",
+            stringify!($dst),
+            ", w",
+            stringify!($src),
+            ", #1\n",
+            "b.vs   ",
+            stringify!($label),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }
@@ -223,9 +355,19 @@ macro_rules! inc_smi_overflow {
 macro_rules! dec_smi_overflow {
     ($src:tt => $dst:tt, $label:tt) => {
         concat!(
-            "subs   w", stringify!($dst), ", w", stringify!($src), ", #1\n",
-            "b.vs   ", stringify!($label), "\n",
-            "sxtw   x", stringify!($dst), ", w", stringify!($dst), "\n",
+            "subs   w",
+            stringify!($dst),
+            ", w",
+            stringify!($src),
+            ", #1\n",
+            "b.vs   ",
+            stringify!($label),
+            "\n",
+            "sxtw   x",
+            stringify!($dst),
+            ", w",
+            stringify!($dst),
+            "\n",
         )
     };
 }

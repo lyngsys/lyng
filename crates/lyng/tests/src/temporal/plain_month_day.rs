@@ -23,7 +23,7 @@ fn temporal_plain_month_day_constructor_getters_and_serialization() {
             threw,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -51,7 +51,7 @@ fn temporal_plain_month_day_from_clones_and_normalizes_property_bags() {
             monthCodeBag.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|02-29|M11|18|11-18|M12|31|12-31");
@@ -71,7 +71,7 @@ fn temporal_plain_month_day_with_replaces_iso_fields() {
             constrained.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|11-18|02-29|02-29");
@@ -90,7 +90,7 @@ fn temporal_partial_plain_dates_convert_to_plain_date() {
             monthDayDate.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2024-02-29|true|2024-02-29");
@@ -111,7 +111,7 @@ fn temporal_plain_month_day_stringification_uses_reference_year_when_requested()
             implicit.toString({ calendarName: "never" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -144,7 +144,7 @@ fn temporal_plain_month_day_to_string_reads_calendar_name_option_in_order() {
         new Temporal.PlainMonthDay(5, 2).toString(options);
         events.join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -180,7 +180,7 @@ fn temporal_plain_month_day_from_uses_overflow_without_storing_bag_year() {
             cloned.toString({ calendarName: "always" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -226,7 +226,7 @@ fn temporal_plain_month_day_with_uses_overflow_year_without_replacing_reference_
             empty,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1972-02-28[u-ca=iso8601]|true|true|true");
@@ -252,7 +252,7 @@ fn temporal_plain_month_day_to_plain_date_constrains_and_to_json_ignores_argumen
             observed.length,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2023-02-28|12-31|0");
@@ -282,7 +282,7 @@ fn temporal_plain_month_day_parses_basic_and_time_offset_string_forms() {
             equalsBasic,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "10-01|10-01|05-02|true|true");
@@ -310,7 +310,7 @@ fn temporal_plain_month_day_month_code_syntax_is_checked_before_year_type() {
         })();
         [syntaxBeforeYear, suitabilityAfterYear].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true");
@@ -338,7 +338,7 @@ fn temporal_plain_month_day_constructor_checks_reference_year_limits() {
         })();
         [upper, lower].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true");

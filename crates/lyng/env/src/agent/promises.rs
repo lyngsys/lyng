@@ -6,7 +6,7 @@ use crate::{
     PromiseReactionId, PromiseReactionKind, PromiseReactionRecord, PromiseRecord,
     PromiseResolvingFunctionId, PromiseResolvingFunctionRecord,
 };
-use lyng_js_types::{ObjectRef, RealmRef, Value};
+use lyng_types::{ObjectRef, RealmRef, Value};
 
 impl Agent {
     pub fn alloc_promise(&mut self, object: ObjectRef, realm: RealmRef) -> PromiseId {

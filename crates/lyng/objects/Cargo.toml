@@ -1,10 +1,10 @@
 [package]
-name = "lyng-js-objects"
+name = "lyng-objects"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lyng-js-common = { workspace = true }
-lyng-js-types = { workspace = true }
-lyng-js-gc = { workspace = true }
+lyng-common = { workspace = true }
+lyng-types = { workspace = true }
+lyng-gc = { workspace = true }
 regress = { version = "0.11.1", features = ["utf16"] }

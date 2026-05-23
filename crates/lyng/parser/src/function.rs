@@ -1,8 +1,8 @@
 //! Function and method body parsing.
 
-use lyng_js_ast::{Expr, FormalParameters, Function, FunctionId, FunctionKind, PatternId};
-use lyng_js_common::{AtomId, Span};
-use lyng_js_lexer::TokenKind;
+use lyng_ast::{Expr, FormalParameters, Function, FunctionId, FunctionKind, PatternId};
+use lyng_common::{AtomId, Span};
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 
@@ -142,12 +142,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             let default_expr = self.parse_assignment_expression();
             let end = self.ast().get_expr(default_expr).span();
             let span = start.cover(end);
-            self.ast_mut()
-                .alloc_pattern(lyng_js_ast::Pattern::Assignment {
-                    span,
-                    left: pattern,
-                    right: default_expr,
-                })
+            self.ast_mut().alloc_pattern(lyng_ast::Pattern::Assignment {
+                span,
+                left: pattern,
+                right: default_expr,
+            })
         } else {
             pattern
         }
@@ -185,9 +184,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         check_yield: bool,
     ) {
         match self.ast().get_pattern(pattern_id).clone() {
-            lyng_js_ast::Pattern::Identifier { .. }
-            | lyng_js_ast::Pattern::InvalidPattern { .. } => {}
-            lyng_js_ast::Pattern::Object {
+            lyng_ast::Pattern::Identifier { .. } | lyng_ast::Pattern::InvalidPattern { .. } => {}
+            lyng_ast::Pattern::Object {
                 properties, rest, ..
             } => {
                 let props = self.ast().get_obj_pattern_prop_list(properties).to_vec();
@@ -207,7 +205,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     self.validate_function_parameter_pattern(rest, check_await, check_yield);
                 }
             }
-            lyng_js_ast::Pattern::Array { elements, rest, .. } => {
+            lyng_ast::Pattern::Array { elements, rest, .. } => {
                 let elems = self.ast().get_opt_pattern_elem_list(elements).to_vec();
                 for elem in elems.into_iter().flatten() {
                     self.validate_function_parameter_pattern(
@@ -220,7 +218,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     self.validate_function_parameter_pattern(rest, check_await, check_yield);
                 }
             }
-            lyng_js_ast::Pattern::Assignment { left, right, .. } => {
+            lyng_ast::Pattern::Assignment { left, right, .. } => {
                 self.validate_function_parameter_pattern(left, check_await, check_yield);
                 self.function_parameter_expr_contains_restricted_construct(
                     right,
@@ -233,7 +231,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     fn function_parameter_expr_contains_restricted_construct(
         &mut self,
-        expr_id: lyng_js_ast::ExprId,
+        expr_id: lyng_ast::ExprId,
         check_await: bool,
         check_yield: bool,
     ) -> bool {

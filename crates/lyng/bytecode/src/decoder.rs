@@ -1,5 +1,5 @@
 use crate::{metadata::CallRange, Instruction, Opcode};
-use lyng_js_types::FeedbackSlotId;
+use lyng_types::FeedbackSlotId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InstructionForm {

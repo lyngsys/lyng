@@ -1,7 +1,7 @@
 # R-0 Status Report
 
 R-0 is the first milestone of the asm-DSL substrate program documented in
-[docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](../../../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+[docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 Its scope is *tooling and evidence* — no runtime substrate change. R-0
 lands the three subcommands (`microbench`, `asm-diff`, `capture-llint`),
 the slow-path counter infrastructure, the measured hot-opcodes
@@ -21,7 +21,7 @@ the known issues that surfaced during execution.
 | 4 | `--count-slow-path-share` infrastructure (`SlowPathCounterStore` + CLI flag) | 20–22 | DONE_WITH_CONCERNS |
 | 5 | `hot-opcodes.toml` from measured V8-v7 data | 4–5 | DONE |
 | 6 | LLInt reference asm capture (25 opcodes) | 19 | DONE |
-| 7 | `reports/js/lyng-js/microbench-baseline.md` | 16 | DONE_WITH_CONCERNS |
+| 7 | `reports/lyng/microbench-baseline.md` | 16 | DONE_WITH_CONCERNS |
 | 8 | asm-diff normalization spec (`dsl-asm-baseline-aarch64/NORMALIZATION.md`) | 7 | DONE |
 | 9 | `dsl-asm-baseline-aarch64/` (30 alpha baselines) | 11 | DONE |
 | 10 | `llint-dsl-value-layout.md` (535 lines) | 23 | DONE |
@@ -32,10 +32,10 @@ the known issues that surfaced during execution.
 | 15 | Test262 evidence (`r0/test262-after-r0.md`) | 27 | DONE_WITH_CONCERNS |
 
 Artifact counts on disk:
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/`: 31 files (30 `.asm` + 1 `NORMALIZATION.md`).
-- `reports/js/lyng-js/llint-reference/`: 26 files (25 `.asm` + 1 `README.md`).
+- `reports/lyng/dsl-asm-baseline-aarch64/`: 31 files (30 `.asm` + 1 `NORMALIZATION.md`).
+- `reports/lyng/llint-reference/`: 26 files (25 `.asm` + 1 `README.md`).
 - 3 substrate-evidence reports (`llint-dsl-{value-layout,abi,safepoints}.md`).
-- 3 R-0 evidence files in `reports/js/lyng-js/r0/` (`determinism.md`,
+- 3 R-0 evidence files in `reports/lyng/r0/` (`determinism.md`,
   `test262-after-r0.md`, plus the V8 v7 raw data `v8-v7-opcode-counts.json` and `v8-v7-top30.tsv`).
 
 ## 2. Exit-criterion verification (§10 R-0)
@@ -44,16 +44,16 @@ The design lists four R-0 exit criteria:
 
 | # | Criterion | Status | Evidence |
 | -: | --- | --- | --- |
-| 1 | All subcommands work end-to-end; deterministic across 5 consecutive runs | ✓ | `reports/js/lyng-js/r0/determinism.md` (5-run check for asm-diff, 3-run structural check for microbench, 2-run byte-identical check for capture-llint) |
-| 2 | Config + baselines + three evidence reports committed | ✓ | `tools/lyng-js-bench/hot-opcodes.toml` + `dsl-asm-baseline-aarch64/` (30 entries) + `llint-dsl-{value-layout,abi,safepoints}.md` |
-| 3 | `hot-opcodes.toml` reflects measured dispatch shares from V8 v7 | ✓ | Top-30 sourced from `reports/js/lyng-js/r0/v8-v7-opcode-counts.json` (raw) and `v8-v7-top30.tsv` (top-N derivation) |
+| 1 | All subcommands work end-to-end; deterministic across 5 consecutive runs | ✓ | `reports/lyng/r0/determinism.md` (5-run check for asm-diff, 3-run structural check for microbench, 2-run byte-identical check for capture-llint) |
+| 2 | Config + baselines + three evidence reports committed | ✓ | `tools/lyng-bench/hot-opcodes.toml` + `dsl-asm-baseline-aarch64/` (30 entries) + `llint-dsl-{value-layout,abi,safepoints}.md` |
+| 3 | `hot-opcodes.toml` reflects measured dispatch shares from V8 v7 | ✓ | Top-30 sourced from `reports/lyng/r0/v8-v7-opcode-counts.json` (raw) and `v8-v7-top30.tsv` (top-N derivation) |
 | 4 | Slow-path-share counter mode produces sane per-opcode counts on a Richards run | ⚠ | Counter mode runs and produces zero per-opcode counts today. The wiring is correct, but `record_semantic` / `record_safepoint` are not yet invoked from runtime handlers — that lights up in DSL-0b. The R-0 deliverable is the *infrastructure*, not the populated counts; see §3 issue (d). |
 
 ## 3. Known issues / DONE_WITH_CONCERNS
 
 ### a. Test262 regression: 49711 / 49729 passing vs 49722 baseline (−11 tests)
 
-Reported in `reports/js/lyng-js/r0/test262-after-r0.md`. The numbers
+Reported in `reports/lyng/r0/test262-after-r0.md`. The numbers
 (53053 selected, 49711 passed, 18 failed, 3324 skipped) are below the
 prior whole-suite baseline of 49722 by 11 tests.
 
@@ -64,7 +64,7 @@ Possibilities to investigate:
   cross-check at `-j 1`). Test262 contains timing-sensitive cases
   whose flakiness depends on harness scheduling.
 - **Code drift.** R-0's only runtime-touching changes are in
-  `tools/lyng-js-bench/` (bench-tool code), `crates/lyng-js/vm/src/slow_path_counts.rs`
+  `tools/lyng-bench/` (bench-tool code), `crates/lyng/vm/src/slow_path_counts.rs`
   (a new counter store, *not* wired into hot dispatch this milestone),
   and `--count-slow-path-share` plumbing. None of these are executed by
   the Test262 harness. They should not affect Test262 — but a focused
@@ -87,7 +87,7 @@ and a bisection over 29 commits will localize quickly.
 Task 16 ran with loadavg 4.54 on the capture machine, well above the
 2.0 ceiling enforced by `--require-isolation`. The baseline was
 captured with the gate disabled. CIs reported in
-`reports/js/lyng-js/microbench-baseline.md` are valid for their
+`reports/lyng/microbench-baseline.md` are valid for their
 samples, but they should be re-collected on a quieter machine before
 DSL-0c uses them as a regression threshold.
 
@@ -128,27 +128,27 @@ currently closed; all R-0 tickets are `in_review` or `in_progress`.
 
 - **Commits on `claude/epic-saha-8f0b96` since `a4870805`:** 29.
 - **Major new source paths:**
-  - `tools/lyng-js-bench/src/asm_diff.rs` (25.5 KB) — Task 7–11.
-  - `tools/lyng-js-bench/src/capture_llint.rs` (12.8 KB) — Task 17–19.
-  - `tools/lyng-js-bench/src/microbench/mod.rs` (11.7 KB) — Task 12–16.
-  - `tools/lyng-js-bench/hot-opcodes.toml` (4.5 KB) — Task 4–5.
-  - `crates/lyng-js/vm/src/slow_path_counts.rs` (2.9 KB) — Task 20–22.
+  - `tools/lyng-bench/src/asm_diff.rs` (25.5 KB) — Task 7–11.
+  - `tools/lyng-bench/src/capture_llint.rs` (12.8 KB) — Task 17–19.
+  - `tools/lyng-bench/src/microbench/mod.rs` (11.7 KB) — Task 12–16.
+  - `tools/lyng-bench/hot-opcodes.toml` (4.5 KB) — Task 4–5.
+  - `crates/lyng/vm/src/slow_path_counts.rs` (2.9 KB) — Task 20–22.
 - **Major new evidence paths:**
-  - `reports/js/lyng-js/microbench-baseline.md` — Task 16.
-  - `reports/js/lyng-js/dsl-asm-baseline-aarch64/` (30 baselines +
+  - `reports/lyng/microbench-baseline.md` — Task 16.
+  - `reports/lyng/dsl-asm-baseline-aarch64/` (30 baselines +
     `NORMALIZATION.md`) — Task 7, 11.
-  - `reports/js/lyng-js/llint-reference/` (25 opcodes +
+  - `reports/lyng/llint-reference/` (25 opcodes +
     `README.md`) — Task 19.
-  - `reports/js/lyng-js/llint-dsl-value-layout.md` — Task 23.
-  - `reports/js/lyng-js/llint-dsl-abi.md` — Task 24.
-  - `reports/js/lyng-js/llint-dsl-safepoints.md` — Task 25.
-  - `reports/js/lyng-js/r0/determinism.md` — Task 26.
-  - `reports/js/lyng-js/r0/test262-after-r0.md` — Task 27.
-  - `reports/js/lyng-js/r0/v8-v7-opcode-counts.json` + `v8-v7-top30.tsv` — Task 4.
+  - `reports/lyng/llint-dsl-value-layout.md` — Task 23.
+  - `reports/lyng/llint-dsl-abi.md` — Task 24.
+  - `reports/lyng/llint-dsl-safepoints.md` — Task 25.
+  - `reports/lyng/r0/determinism.md` — Task 26.
+  - `reports/lyng/r0/test262-after-r0.md` — Task 27.
+  - `reports/lyng/r0/v8-v7-opcode-counts.json` + `v8-v7-top30.tsv` — Task 4.
 - **Policy docs touched:**
-  - `docs/lyng-js/engineering-standards.md` — DSL substrate audit row added.
+  - `docs/lyng/engineering-standards.md` — DSL substrate audit row added.
   - Workspace `Cargo.toml` — scope-allow `unsafe` in DSL substrate modules.
-  - `docs/lyng-js/architecture.md` — forward-pointer to the asm-DSL
+  - `docs/lyng/architecture.md` — forward-pointer to the asm-DSL
     design and to this status report.
 
 ## 5. Hand-off to DSL-0a
@@ -159,11 +159,11 @@ extracts their semantic logic into DSL-compatible form (no dispatch
 rewrite yet). The three R-0 evidence reports are the prerequisite
 reading:
 
-- `reports/js/lyng-js/llint-dsl-value-layout.md` — the contract for
+- `reports/lyng/llint-dsl-value-layout.md` — the contract for
   `Value` representation that DSL handlers must consume and produce.
-- `reports/js/lyng-js/llint-dsl-abi.md` — the calling convention,
+- `reports/lyng/llint-dsl-abi.md` — the calling convention,
   register usage, and frame layout expectations.
-- `reports/js/lyng-js/llint-dsl-safepoints.md` — where the DSL
+- `reports/lyng/llint-dsl-safepoints.md` — where the DSL
   handlers must emit safepoint records and what those records contain.
 
 Open R-0 dcat tickets all sit at `in_review` or `in_progress`. **User

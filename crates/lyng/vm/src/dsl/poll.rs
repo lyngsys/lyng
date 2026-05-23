@@ -34,10 +34,7 @@ pub struct PollArgs;
 /// re-dispatch at the same PC; if the hook installed a step command,
 /// `poll_pending` stays set and the asm slow path would re-fire the
 /// same pause record in a loop.
-pub fn run_poll(
-    state: &mut LlIntDispatchState<'_, '_>,
-    _args: PollArgs,
-) -> SemanticOutcome {
+pub fn run_poll(state: &mut LlIntDispatchState<'_, '_>, _args: PollArgs) -> SemanticOutcome {
     let inner = state.dispatch_state();
     // Mirror α's `op_loop_header_semantic`: write the dispatch state's
     // frame back to `vm.frames.last_mut()` so the safepoint poll

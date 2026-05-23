@@ -4,7 +4,7 @@ use super::{
     PropertyKey, RealmRef, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
     WellKnownSymbolId,
 };
-use lyng_js_types::{function_symbol_has_instance_builtin, NativeFunctionId};
+use lyng_types::{function_symbol_has_instance_builtin, NativeFunctionId};
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
@@ -287,7 +287,7 @@ impl Vm {
             agent
                 .objects()
                 .function_data(object)
-                .and_then(lyng_js_objects::FunctionObjectData::entry),
+                .and_then(lyng_objects::FunctionObjectData::entry),
             Some(FunctionEntryIdentity::Native(NativeFunctionId::Builtin(entry)))
                 if entry == function_symbol_has_instance_builtin()
         )

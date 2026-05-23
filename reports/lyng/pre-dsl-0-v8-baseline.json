@@ -109,9 +109,9 @@
       ]
     }
   ],
-  "lyng_bin": "target/release/lyng-js",
+  "lyng_bin": "target/release/lyng",
   "per_sample_timeout_secs": 120,
   "samples_per_benchmark": 5,
-  "schema": "lyng-js-bench/v8suite/v1",
+  "schema": "lyng-bench/v8suite/v1",
   "v8_root": "testdata/js-benchmarks/v8-v7"
 }

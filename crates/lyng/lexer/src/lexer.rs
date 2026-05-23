@@ -6,7 +6,7 @@
 
 use std::borrow::Cow;
 
-use lyng_js_common::{AtomTable, DiagnosticList, SourceId, Span};
+use lyng_common::{AtomTable, DiagnosticList, SourceId, Span};
 
 use crate::literals::{LiteralTable, StringLiteral};
 use crate::token::{Token, TokenFlags, TokenKind, TokenPayload, KEYWORD_TOKEN_KIND};
@@ -153,13 +153,13 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     /// Interns a string in the shared atom table, returning its `AtomId`.
     #[inline]
-    pub fn intern_atom(&mut self, s: &str) -> lyng_js_common::AtomId {
+    pub fn intern_atom(&mut self, s: &str) -> lyng_common::AtomId {
         self.atoms.intern(s)
     }
 
     /// Resolves an atom ID to its string value.
     #[inline]
-    pub fn resolve_atom(&self, id: lyng_js_common::AtomId) -> &str {
+    pub fn resolve_atom(&self, id: lyng_common::AtomId) -> &str {
         self.atoms.resolve(id)
     }
 

@@ -1,14 +1,14 @@
 //! Operand-layout descriptors.
 //!
 //! Each variant of `Layout` corresponds to one of the operand decoders in
-//! `crates/lyng-js/vm/src/vm/dispatch.rs` (e.g. `decode_abc_operands`,
+//! `crates/lyng/vm/src/vm/dispatch.rs` (e.g. `decode_abc_operands`,
 //! `decode_abx_operands`, `decode_ax_operands`). The proc-macro consumes
 //! the layout to (a) validate the operand binding count and (b) emit the
 //! per-handler decode prologue.
 //!
 //! The decode prologue is emitted as a TokenStream that the consumer
 //! crate's backend macros (`decode_abc!`, `decode_ab!`, `decode_ax!`,
-//! etc., under `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs`)
+//! etc., under `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs`)
 //! expand into a `concat!(...)`-produced asm fragment. The operand
 //! identifiers passed here are first substituted to their scratch-register
 //! numbers by `lower::substitute_idents`, so the asm comes out with real

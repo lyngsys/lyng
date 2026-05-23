@@ -4,13 +4,13 @@
 **Parent epic:** `lyng-33i2` — Phase 1: Threaded dispatch + per-handler ABI
 **Date:** 2026-05-15
 **Toolchain:** rustc 1.93 (2025-12-15), aarch64-apple-darwin, `--release` profile (thin LTO)
-**Measurement method:** `nm -n target/release/lyng-js-bench`, size from delta to next code symbol.
+**Measurement method:** `nm -n target/release/lyng-bench`, size from delta to next code symbol.
 
 ## Acceptance gate
 
 The Phase 1 exit criteria (from `lyng-2wji`):
 
-> cargo asm sizes recorded in `reports/js/lyng-js/phase-1-final-asm.md` for the
+> cargo asm sizes recorded in `reports/lyng/phase-1-final-asm.md` for the
 > four named hot opcodes (op_add, op_move, op_get_named_property, op_call_0) —
 > each < 200 bytes.
 
@@ -55,7 +55,7 @@ the asm as `ldr x9, [x24, #1600]; cmp x8, #151; ccmp x9, #0, #4, ls; b.eq`.
 ## Why the 200-byte gate doesn't hold
 
 The 200-byte gate was a JSC LLInt-aligned target documented during the
-`lyng-33i2` spike (`reports/js/lyng-js/phase-1-spike.md`, "go/no-go criterion
+`lyng-33i2` spike (`reports/lyng/phase-1-spike.md`, "go/no-go criterion
 3"). That spike used a stripped-down bytecode encoding (1-byte register IDs,
 no Wide/ExtraWide path, no feedback slot, no opcode-dispatch counter, no
 debug deopt safepoint) and measured op_add at ~190 B.

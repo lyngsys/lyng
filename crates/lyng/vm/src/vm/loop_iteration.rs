@@ -2,14 +2,14 @@ use super::{
     Agent, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
     EnvironmentRef, FrameRecord, LoopIterationEnvironment, Value, Vm, VmError, VmResult,
 };
-use lyng_js_bytecode::{CaptureDescriptor, CaptureSource};
+use lyng_bytecode::{CaptureDescriptor, CaptureSource};
 
 impl Vm {
     pub(in crate::vm) fn push_loop_iteration_environment(
         &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
-        site: Option<lyng_js_bytecode::LoopIterationEnvironmentSite>,
+        site: Option<lyng_bytecode::LoopIterationEnvironmentSite>,
         mirrored_slot: Option<u32>,
     ) -> VmResult<()> {
         let source_environment = frame.lexical_env();
@@ -112,30 +112,30 @@ impl Vm {
     ) -> VmResult<EnvironmentRef> {
         let active_iteration_outer = self.active_loop_iteration_environment(environment);
         let (outer, source_layout) = match agent.environment(environment) {
-            Some(lyng_js_env::EnvironmentRecord::Declarative(record)) => (
+            Some(lyng_env::EnvironmentRecord::Declarative(record)) => (
                 active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
-            Some(lyng_js_env::EnvironmentRecord::Private(record)) => (
+            Some(lyng_env::EnvironmentRecord::Private(record)) => (
                 active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
-            Some(lyng_js_env::EnvironmentRecord::Function(record)) => {
+            Some(lyng_env::EnvironmentRecord::Function(record)) => {
                 let declarative = record.declarative();
                 (
                     active_iteration_outer.or_else(|| declarative.outer()),
                     Some(declarative.layout()),
                 )
             }
-            Some(lyng_js_env::EnvironmentRecord::Module(record)) => (
+            Some(lyng_env::EnvironmentRecord::Module(record)) => (
                 active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
-            Some(lyng_js_env::EnvironmentRecord::Global(record)) => (
+            Some(lyng_env::EnvironmentRecord::Global(record)) => (
                 active_iteration_outer.or_else(|| record.outer()),
                 Some(record.layout()),
             ),
-            Some(lyng_js_env::EnvironmentRecord::Object(record)) => {
+            Some(lyng_env::EnvironmentRecord::Object(record)) => {
                 (active_iteration_outer.or_else(|| record.outer()), None)
             }
             None => return Err(VmError::MissingEnvironment(environment)),
@@ -147,7 +147,7 @@ impl Vm {
         if let Some(source_layout) = source_layout {
             let slot_count = agent
                 .environment_layout(source_layout)
-                .map_or(0, lyng_js_env::EnvironmentLayout::slot_count);
+                .map_or(0, lyng_env::EnvironmentLayout::slot_count);
             for slot in 0..slot_count {
                 if iteration_slots.contains(&slot) {
                     continue;

@@ -1,5 +1,5 @@
-use lyng_js_common::AtomId;
-use lyng_js_types::{EnvironmentRef, PropertyKey, Value};
+use lyng_common::AtomId;
+use lyng_types::{EnvironmentRef, PropertyKey, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModuleNamespaceExportTarget {

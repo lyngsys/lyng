@@ -12,7 +12,7 @@
 ## TL;DR
 
 We are **not close to LLInt**. Against JSC `--useJIT=false` on the V8 v7
-suite, lyng-js is **5–12× slower per workload**. Against QuickJS (the
+suite, lyng is **5–12× slower per workload**. Against QuickJS (the
 target the roadmap explicitly rejected as "ceiling too low") we are
 **1.6–3.7× slower**. The roadmap targeted *past QuickJS* by Phase 3 and
 *near JSC LLInt* by end of Phase 4. We finished Phase 3f and Phase 4b
@@ -43,10 +43,10 @@ The rest of this document is the receipts.
 
 ### 1.1 V8 v7 (release, isolated subprocess, single hardware, three samples)
 
-Source: [`reports/js/lyng-js/external-engine-compare.md`](external-engine-compare.md)
+Source: [`reports/lyng/external-engine-compare.md`](external-engine-compare.md)
 (committed 2026-05-15, post-Phase-3f, post-Phase-4b).
 
-| Workload      | lyng-js |  QuickJS | JSC LLInt | lyng vs QuickJS | lyng vs JSC LLInt |
+| Workload      | lyng |  QuickJS | JSC LLInt | lyng vs QuickJS | lyng vs JSC LLInt |
 | ------------- | ------: | -------: | --------: | --------------: | ----------------: |
 | Richards      |     318 |      917 |      1871 |  **2.88× slow** |    **5.88× slow** |
 | DeltaBlue     |     360 |     1022 |      1684 |  **2.84× slow** |    **4.68× slow** |
@@ -86,8 +86,8 @@ deliver it.
 
 ### 1.3 Per-handler asm sizes
 
-Source: [`reports/js/lyng-js/phase-1-final-asm.md`](phase-1-final-asm.md)
-and [`reports/js/lyng-js/phase-3f-op_get_named_property.asm`](phase-3f-op_get_named_property.asm).
+Source: [`reports/lyng/phase-1-final-asm.md`](phase-1-final-asm.md)
+and [`reports/lyng/phase-3f-op_get_named_property.asm`](phase-3f-op_get_named_property.asm).
 
 | Handler                  | Lyng-js (bytes / lines) | JSC LLInt baseline                | Ratio  |
 | ------------------------ | ----------------------: | --------------------------------- | -----: |
@@ -130,7 +130,7 @@ proportional to the substrate-cost ratio.
 
 Source: [`bytecode-density-aarch64.md`](bytecode-density-aarch64.md).
 
-| Workload                          | Unit bytes lyng-js | LLInt-equivalent (estimate) | Ratio |
+| Workload                          | Unit bytes lyng | LLInt-equivalent (estimate) | Ratio |
 | --------------------------------- | -----------------: | --------------------------: | ----: |
 | `script.core.objects-and-arrays`  |                244 |                        ~90  |  ~2.7× |
 | `functions.closure-calls`         |                184 |                        ~70  |  ~2.6× |
@@ -201,10 +201,10 @@ status reports say "all helpers fully inlined into each dispatch
 handler" ([phase-3f-status.md:60-76](phase-3f-status.md)).
 
 What actually happened: the handler in
-[`dispatch_handlers/property.rs:31-67`](../../../crates/lyng-js/vm/src/vm/dispatch_handlers/property.rs)
+[`dispatch_handlers/property.rs:31-67`](../../../crates/lyng/vm/src/vm/dispatch_handlers/property.rs)
 delegates to `Vm::execute_get_named_property_opcode`, a separate
 function with its own ABI prologue/epilogue
-([`dispatch/property.rs:70-200`](../../../crates/lyng-js/vm/src/vm/dispatch/property.rs)).
+([`dispatch/property.rs:70-200`](../../../crates/lyng/vm/src/vm/dispatch/property.rs)).
 The IC fast paths are inside *that* function, with this shape:
 
 ```rust
@@ -290,9 +290,9 @@ required:
 > - Full V8 v7 sweep, isolated…
 > - Full Test262 run…
 > - cargo asm of current `run_dispatch_loop` (all 4 monomorphs). Commit
->   to `reports/js/lyng-js/phase-0-asm.md`.
+>   to `reports/lyng/phase-0-asm.md`.
 
-`phase-0-asm.md` does not exist in `reports/js/lyng-js/`. We compared
+`phase-0-asm.md` does not exist in `reports/lyng/`. We compared
 Phase 1 asm to a spike-era projection (which was itself missing several
 load-bearing features), not to a real Phase 0 baseline.
 
@@ -462,7 +462,7 @@ VM; it only changes what we can see.
 
 **Deliverables:**
 
-- **R-0.1 Isolated bench harness.** `lyng-js-bench compare` already
+- **R-0.1 Isolated bench harness.** `lyng-bench compare` already
   exists; harden it so it refuses to run when the 1-min load average
   > 2.0 (currently the requirement is documented but not enforced —
   see `phase-1-diagnostics.md:5`). Add a `--require-isolation` flag
@@ -476,27 +476,27 @@ VM; it only changes what we can see.
     `op_jump_if_true`, `op_load_global`, `op_get_keyed_property`,
     `op_return`, `op_load_const8`.
   - run_trampoline_uncounted asm.
-  - Commit to `reports/js/lyng-js/baseline-2026Q2-asm.md`. This is the
+  - Commit to `reports/lyng/baseline-2026Q2-asm.md`. This is the
     file Phase 0 should have produced.
 - **R-0.3 LLInt reference asm.** Build JSC LLInt locally (or extract
   from the system `libJavaScriptCore.dylib` via `otool -tvV`) and
   snapshot the matching ~12 opcodes:
   `op_get_by_id`, `op_put_by_id`, `op_call`, `op_loop_hint`, `op_jmp`,
   `op_add`, `op_mov`, etc. Commit to
-  `reports/js/lyng-js/llint-reference-asm.md`. This is the
+  `reports/lyng/llint-reference-asm.md`. This is the
   side-by-side comparison the original roadmap promised but never
   produced.
 - **R-0.4 Per-opcode microbench harness.** A new
-  `lyng-js-bench microbench` that runs each hot opcode in a tight loop
+  `lyng-bench microbench` that runs each hot opcode in a tight loop
   (5M iterations) and reports cycles/dispatch via `mach_absolute_time`
   (Darwin) or `clock_gettime(CLOCK_MONOTONIC_RAW)` (Linux). Decoupled
   from V8 v7 noise.
   - Each microbench produces a single number: ns/dispatch for that
     opcode on a hot-cache, no-IC-miss scenario.
-  - Initial numbers feed a `reports/js/lyng-js/microbench-baseline.md`.
+  - Initial numbers feed a `reports/lyng/microbench-baseline.md`.
   - This is the leading indicator. V8 v7 is the lagging indicator.
 - **R-0.5 `cargo asm` diff in CI.** A make target /
-  `lyng-js-bench asm-diff` that:
+  `lyng-bench asm-diff` that:
   - dumps cargo asm of the 12 hot opcodes,
   - compares instruction counts to the committed baseline,
   - **fails the build if any handler grew by > 5 instructions
@@ -510,7 +510,7 @@ VM; it only changes what we can see.
   shown. Currently we eyeball flamegraphs ad-hoc.
 
 **Exit criteria:** baseline + LLInt asm files committed; CI fails on
-unauthorized asm growth; `lyng-js-bench microbench` reports cycle counts
+unauthorized asm growth; `lyng-bench microbench` reports cycle counts
 for the 12 hot opcodes with < 2% sample variance over 5 runs.
 
 **Effort:** 1 week.
@@ -546,7 +546,7 @@ R-1.γ-hard. Only the dispatch shape changes.
 **Verification per variant:**
 
 - `cargo asm` snapshot of all 12 hot opcodes.
-- `lyng-js-bench microbench` per opcode.
+- `lyng-bench microbench` per opcode.
 - V8 v7 sweep, isolated, ≥ 5 samples.
 - Test262 unchanged.
 
@@ -611,7 +611,7 @@ blocks. No nested `if-let-Some` stack.
 
 **Verification (microbench gates):**
 
-- `lyng-js-bench microbench op_get_named_property` ns/dispatch ≤ 60% of
+- `lyng-bench microbench op_get_named_property` ns/dispatch ≤ 60% of
   R-0 baseline.
 - Richards ≥ 380 in isolated bench (vs today's 318, conservative
   target).
@@ -718,29 +718,29 @@ infrastructure should land alongside R-1:
 ### 6.1 `cargo asm` automation
 
 ```sh
-cargo run -p lyng-js-bench -- asm \
+cargo run -p lyng-bench -- asm \
   --opcodes op_add,op_move,op_get_named_property,... \
-  --baseline reports/js/lyng-js/baseline-2026Q2-asm.md \
+  --baseline reports/lyng/baseline-2026Q2-asm.md \
   --output /tmp/asm-current.md \
   --diff
 ```
 
 - Reads the hot-opcode list from a committed config
-  (`reports/js/lyng-js/hot-opcodes.toml`).
+  (`reports/lyng/hot-opcodes.toml`).
 - Runs `cargo asm --release ...` per opcode.
 - Diffs instruction counts and asm size against the baseline.
 - Exits non-zero on regression beyond the per-opcode budget.
 
-Wired into `cargo run --release -p lyng-js-bench -- pre-commit-perf` so
+Wired into `cargo run --release -p lyng-bench -- pre-commit-perf` so
 no merge to main can grow hot-handler asm without a recorded waiver.
 
 ### 6.2 LLInt asm capture
 
 ```sh
-cargo run -p lyng-js-bench -- llint-asm \
+cargo run -p lyng-bench -- llint-asm \
   --jsc /System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc \
   --opcodes op_get_by_id,op_put_by_id,... \
-  --output reports/js/lyng-js/llint-reference-asm.md
+  --output reports/lyng/llint-reference-asm.md
 ```
 
 Uses `otool -tvV` or `objdump` on the JSC binary to extract LLInt
@@ -751,7 +751,7 @@ report that R-0.3 commits.
 ### 6.3 Per-opcode microbench
 
 ```sh
-cargo run --release -p lyng-js-bench -- microbench \
+cargo run --release -p lyng-bench -- microbench \
   --opcode op_get_named_property \
   --samples 7 \
   --iters 5000000
@@ -765,10 +765,10 @@ This is the missing leading indicator. V8 v7 takes 20 minutes and is
 dominated by allocator + GC + builtin behavior; per-opcode microbench
 isolates the substrate cost we care about.
 
-### 6.4 `lyng-js-bench compare-llint`
+### 6.4 `lyng-bench compare-llint`
 
 ```sh
-cargo run --release -p lyng-js-bench -- compare-llint \
+cargo run --release -p lyng-bench -- compare-llint \
   --opcodes op_get_named_property,op_set_named_property \
   --output /tmp/llint-compare.md
 ```
@@ -820,7 +820,7 @@ We violated both. The new operating rule is concrete:
    predicted bench delta.** Filed in the phase's ticket.
 2. **Phase ships with: asm before, asm after, isolated bench before,
    isolated bench after, side-by-side LLInt comparison.** All committed
-   to `reports/js/lyng-js/phase-XYZ-*`.
+   to `reports/lyng/phase-XYZ-*`.
 3. **If the asm shape didn't materialize as predicted, the phase
    doesn't land,** even if benches improved. The why matters: a
    benchmark gain whose mechanism we don't understand is luck, and
@@ -941,13 +941,13 @@ was supposed to encode but didn't.
   - `Source/JavaScriptCore/bytecode/GetByIdMetadata.h` (the mode-byte
     layout this roadmap calls "the missing IC shape").
 - Our current dispatch substrate:
-  - [`crates/lyng-js/vm/src/vm/dispatch_state.rs`](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs)
+  - [`crates/lyng/vm/src/vm/dispatch_state.rs`](../../../crates/lyng/vm/src/vm/dispatch_state.rs)
     (`DispatchState`, `Step`, `dispatch_next!`, `run_trampoline`).
-  - [`crates/lyng-js/vm/src/vm/dispatch_handlers/property.rs`](../../../crates/lyng-js/vm/src/vm/dispatch_handlers/property.rs)
+  - [`crates/lyng/vm/src/vm/dispatch_handlers/property.rs`](../../../crates/lyng/vm/src/vm/dispatch_handlers/property.rs)
     (`op_get_named_property` and friends — the handlers).
-  - [`crates/lyng-js/vm/src/vm/dispatch/property.rs`](../../../crates/lyng-js/vm/src/vm/dispatch/property.rs)
+  - [`crates/lyng/vm/src/vm/dispatch/property.rs`](../../../crates/lyng/vm/src/vm/dispatch/property.rs)
     (`execute_get_named_property_opcode` and the 4-layer IC chain
     R-2 retires).
-  - [`crates/lyng-js/vm/src/vm/feedback.rs`](../../../crates/lyng-js/vm/src/vm/feedback.rs)
+  - [`crates/lyng/vm/src/vm/feedback.rs`](../../../crates/lyng/vm/src/vm/feedback.rs)
     (`NamedPropertyFeedback`, the packed-handler layout, the
     polymorphic sidecar — R-2 unifies these into one mode-byte branch).

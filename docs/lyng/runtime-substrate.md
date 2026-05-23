@@ -6,12 +6,12 @@ and operation contexts.
 
 ## Crate Ownership
 
-- `lyng-js-env` owns runtime, cluster, agent, realm, execution context, environment, module,
+- `lyng-env` owns runtime, cluster, agent, realm, execution context, environment, module,
   symbol, backing-store, and job structures.
-- `lyng-js-objects` owns object records, shapes, property storage, indexed elements,
+- `lyng-objects` owns object records, shapes, property storage, indexed elements,
   receiver payloads, primitive wrappers, private elements, and ordinary internal methods.
-- `lyng-js-host` owns embedding hooks and host-facing traits.
-- `lyng-js-ops` owns semantic operation APIs that coordinate values, objects,
+- `lyng-host` owns embedding hooks and host-facing traits.
+- `lyng-ops` owns semantic operation APIs that coordinate values, objects,
   environments, descriptors, proxies, promises, shared memory, and Temporal helpers.
 
 ## Runtime, Cluster, And Agent
@@ -37,7 +37,7 @@ Agents are thread-affine in the current embedding model.
 ## Realms
 
 Realms hold global object state, intrinsic objects, builtin caches, and host extension
-installations. Realm bootstrap is performed by `lyng-js-builtins`; the environment crate
+installations. Realm bootstrap is performed by `lyng-builtins`; the environment crate
 owns the storage and references that make the realm reachable from the runtime.
 
 ## Execution Contexts

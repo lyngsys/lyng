@@ -8,14 +8,14 @@ use super::{
     Pattern, ProgramRootKind, ProgramSource, SafepointKind, Stmt, StmtId, StorageClass, ThisMode,
     WellKnownAtom,
 };
-use lyng_js_bytecode::{GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan};
-use lyng_js_sema::{DeclarationKind, ScopeId, ScopeKind};
+use lyng_bytecode::{GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan};
+use lyng_sema::{DeclarationKind, ScopeId, ScopeKind};
 
 /// # Errors
 /// Returns `LoweringError` when script metadata or bytecode lowering cannot be encoded.
 pub fn compile_script(
-    parsed: &lyng_js_ast::ParsedScript,
-    sema: &lyng_js_sema::ScriptSema,
+    parsed: &lyng_ast::ParsedScript,
+    sema: &lyng_sema::ScriptSema,
     atoms: &mut AtomTable,
 ) -> LoweringResult<CompiledScriptUnit> {
     let source = parsed.ast.get_script(parsed.root).span.source;
@@ -490,7 +490,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn lower_parameter_pattern_initialization(
         &mut self,
-        pattern: lyng_js_ast::PatternId,
+        pattern: lyng_ast::PatternId,
         source_register: u16,
     ) -> LoweringResult<()> {
         self.lower_binding_pattern_initialization(
@@ -506,7 +506,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     )]
     pub(super) fn lower_binding_pattern_initialization(
         &mut self,
-        pattern: lyng_js_ast::PatternId,
+        pattern: lyng_ast::PatternId,
         kind: DeclarationKind,
         source_register: u16,
     ) -> LoweringResult<()> {
@@ -629,7 +629,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
     fn prepare_with_var_single_name_binding_target(
         &mut self,
         kind: DeclarationKind,
-        pattern: lyng_js_ast::PatternId,
+        pattern: lyng_ast::PatternId,
     ) -> LoweringResult<Option<(u16, AtomId)>> {
         if kind != DeclarationKind::Var || !self.in_with_scope() {
             return Ok(None);
@@ -655,7 +655,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn lower_prepared_with_var_single_name_binding_initialization(
         &mut self,
-        pattern: lyng_js_ast::PatternId,
+        pattern: lyng_ast::PatternId,
         source_register: u16,
         reference: u16,
         name: AtomId,
@@ -732,7 +732,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         Ok(())
     }
 
-    pub(super) fn binding_pattern_name(&self, pattern: lyng_js_ast::PatternId) -> Option<AtomId> {
+    pub(super) fn binding_pattern_name(&self, pattern: lyng_ast::PatternId) -> Option<AtomId> {
         match self.ast().get_pattern(pattern) {
             Pattern::Identifier { name, .. } => Some(*name),
             Pattern::Assignment { left, .. } => self.binding_pattern_name(*left),
@@ -756,8 +756,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn lower_array_binding_pattern_initialization(
         &mut self,
-        elements: lyng_js_ast::NodeList<Option<lyng_js_ast::ArrayPatternElement>>,
-        rest: Option<lyng_js_ast::PatternId>,
+        elements: lyng_ast::NodeList<Option<lyng_ast::ArrayPatternElement>>,
+        rest: Option<lyng_ast::PatternId>,
         kind: DeclarationKind,
         source_register: u16,
     ) -> LoweringResult<()> {
@@ -801,7 +801,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
     fn lower_array_rest_binding_pattern_from_iterator(
         &mut self,
-        rest_pattern: lyng_js_ast::PatternId,
+        rest_pattern: lyng_ast::PatternId,
         kind: DeclarationKind,
         iterator_register: u16,
     ) -> LoweringResult<()> {
@@ -912,7 +912,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 self.hoisted_function_decls.insert(decl);
             }
             Decl::Export {
-                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                kind: lyng_ast::ExportKind::Declaration { decl },
                 ..
             } => {
                 let Decl::Function { function, .. } = self.ast().get_decl(decl).clone() else {
@@ -932,8 +932,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
             Decl::Export {
                 kind:
-                    lyng_js_ast::ExportKind::Default {
-                        declaration: lyng_js_ast::ExportDefaultDecl::Function(function),
+                    lyng_ast::ExportKind::Default {
+                        declaration: lyng_ast::ExportDefaultDecl::Function(function),
                     },
                 ..
             } => {
@@ -945,9 +945,9 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                         | FunctionKind::Async
                         | FunctionKind::AsyncGenerator
                 ) {
-                    self.lower_default_export_declaration(
-                        lyng_js_ast::ExportDefaultDecl::Function(function),
-                    )?;
+                    self.lower_default_export_declaration(lyng_ast::ExportDefaultDecl::Function(
+                        function,
+                    ))?;
                     self.hoisted_default_export_functions.insert(function);
                 }
             }
@@ -1009,7 +1009,7 @@ const fn function_this_mode(kind: BytecodeFunctionKind, strict: bool) -> ThisMod
     }
 }
 
-fn expected_argument_count(ast: &lyng_js_ast::Ast, params: &lyng_js_ast::FormalParameters) -> u16 {
+fn expected_argument_count(ast: &lyng_ast::Ast, params: &lyng_ast::FormalParameters) -> u16 {
     let mut count = 0u16;
     for &parameter in ast.get_pattern_list(params.params) {
         if pattern_has_initializer(ast, parameter) {
@@ -1020,6 +1020,6 @@ fn expected_argument_count(ast: &lyng_js_ast::Ast, params: &lyng_js_ast::FormalP
     count
 }
 
-fn pattern_has_initializer(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::PatternId) -> bool {
+fn pattern_has_initializer(ast: &lyng_ast::Ast, pattern: lyng_ast::PatternId) -> bool {
     matches!(ast.get_pattern(pattern), Pattern::Assignment { .. })
 }

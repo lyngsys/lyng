@@ -51,7 +51,7 @@ impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
     fn default_to_primitive_result(
         &mut self,
         object: ObjectRef,
-        method_name: lyng_js_common::AtomId,
+        method_name: lyng_common::AtomId,
         method_object: ObjectRef,
     ) -> Result<Option<Value>, Self::Error> {
         let Some(entry) = Vm::builtin_entry(self.agent, method_object) else {
@@ -156,7 +156,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             .agent
             .objects()
             .object_header(self.agent.heap().view(), new_target)
-            .is_some_and(|header| header.kind() != lyng_js_objects::ObjectKind::Proxy);
+            .is_some_and(|header| header.kind() != lyng_objects::ObjectKind::Proxy);
         if !is_ordinary_target {
             return Ok(None);
         }
@@ -265,7 +265,7 @@ impl VmBuiltinDispatch<'_, '_, '_> {
 
     pub(super) fn map_temporal_host_result<T>(
         &mut self,
-        result: Result<T, lyng_js_host::HostError>,
+        result: Result<T, lyng_host::HostError>,
     ) -> Result<T, VmError> {
         result.map_err(|error| match error.kind() {
             HostErrorKind::InvalidRequest => VmError::Abrupt(errors::throw_range_error(self.agent)),

@@ -1,9 +1,9 @@
 # DSL operation vocabulary (AArch64)
 
 All operations are `macro_rules!` macros in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/*.rs` that produce string
+`crates/lyng/vm/src/dsl/backend/aarch64/*.rs` that produce string
 literals via `concat!`. The proc-macro lowerer
-(`lyng-js-vm-dsl::lower`) interpolates them as `&'static str`
+(`lyng-vm-dsl::lower`) interpolates them as `&'static str`
 fragments into a single per-handler `core::arch::naked_asm!(...)`
 block. Backend macros emit `{name}` placeholders for things only the
 lowerer knows (handler length, slow-path shim symbols, struct field
@@ -12,7 +12,7 @@ offsets); the lowerer emits the matching `name = const ...` /
 
 ## Pinned-register convention
 
-From `crates/lyng-js/vm/src/dsl/reg_convention.rs`:
+From `crates/lyng/vm/src/dsl/reg_convention.rs`:
 
 | Reg  | Pin                                                   |
 | ---- | ----------------------------------------------------- |
@@ -74,7 +74,7 @@ inside its `naked_asm!`.
 `backend/aarch64/values.rs`
 
 Per
-[`reports/js/lyng-js/llint-dsl-value-layout.md`](../../../../reports/js/lyng-js/llint-dsl-value-layout.md),
+[`reports/lyng/llint-dsl-value-layout.md`](../../../../reports/lyng/llint-dsl-value-layout.md),
 `Value` is an 8-byte NaN-tag-space encoding:
 
 ```text
@@ -87,7 +87,7 @@ Per
     0x7ff8_0000_0000_0000      0x0000_ffff_0000_0000          0x0000_0000_ffff_ffff
 ```
 
-`TagKind` discriminator values (mirrors `lyng_js_types::Value`):
+`TagKind` discriminator values (mirrors `lyng_types::Value`):
 
 | Kind                     | Disc. | Pattern (high 32 bits)   |
 | ------------------------ | -----:| ------------------------ |

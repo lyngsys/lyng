@@ -7,12 +7,12 @@ use super::{
     SuspendedExecutionSideState, Vm, VmError, VmResult,
 };
 use crate::frame::GeneratorResumeKind;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::{ExecutableId, ExecutionContextKind, ThisState};
-use lyng_js_gc::{AllocationLifetime, RuntimeSuspendedExecutionRecord};
-use lyng_js_objects::{GeneratorState, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
-use lyng_js_ops::{errors, iterator, iterator::IteratorOpsContext, object};
-use lyng_js_types::{PropertyKey, SuspendedExecutionRef, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::{ExecutableId, ExecutionContextKind, ThisState};
+use lyng_gc::{AllocationLifetime, RuntimeSuspendedExecutionRecord};
+use lyng_objects::{GeneratorState, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_ops::{errors, iterator, iterator::IteratorOpsContext, object};
+use lyng_types::{PropertyKey, SuspendedExecutionRef, Value};
 
 const THIS_STATE_LEXICAL_RAW: u8 = 0;
 const THIS_STATE_UNINITIALIZED_RAW: u8 = 1;
@@ -120,9 +120,7 @@ impl Vm {
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Throw => {
                 Self::complete_generator_object(agent, generator);
-                Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
-                    value,
-                )))
+                Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(value)))
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Return => {
                 Self::complete_generator_object(agent, generator);
@@ -171,9 +169,9 @@ impl Vm {
                             Self::generator_result_object(agent, caller_frame.realm(), value, false)
                         }
                     }
-                    GeneratorExecutionOutcome::Throw(thrown) => Err(VmError::Abrupt(
-                        lyng_js_types::AbruptCompletion::throw(thrown),
-                    )),
+                    GeneratorExecutionOutcome::Throw(thrown) => {
+                        Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(thrown)))
+                    }
                     GeneratorExecutionOutcome::AsyncSuspend => {
                         Self::complete_generator_object(agent, generator);
                         Err(VmError::AsyncSuspend)
@@ -547,9 +545,7 @@ impl Vm {
                 )
             }
             GeneratorExecutionOutcome::Throw(thrown) => {
-                let result = Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
-                    thrown,
-                )));
+                let result = Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(thrown)));
                 self.settle_async_generator_request_completion(
                     agent, host, registry, generator, request, result,
                 )
@@ -582,7 +578,7 @@ impl Vm {
                     value,
                 )?;
             }
-            Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(thrown))) => {
+            Err(VmError::Abrupt(lyng_types::AbruptCompletion::Throw(thrown))) => {
                 self.settle_promise_capability(
                     agent,
                     host,
@@ -637,11 +633,11 @@ impl Vm {
             agent,
             &realm,
             promise,
-            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturn {
+            lyng_env::PromiseReactionHandler::AsyncGeneratorReturn {
                 generator,
                 reject: false,
             },
-            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturn {
+            lyng_env::PromiseReactionHandler::AsyncGeneratorReturn {
                 generator,
                 reject: true,
             },
@@ -683,11 +679,11 @@ impl Vm {
             agent,
             &realm,
             promise,
-            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
+            lyng_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
                 suspended,
                 reject: false,
             },
-            lyng_js_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
+            lyng_env::PromiseReactionHandler::AsyncGeneratorReturnResume {
                 suspended,
                 reject: true,
             },
@@ -763,7 +759,7 @@ impl Vm {
                 })
             }
             Err(VmError::AsyncSuspend) => Ok(GeneratorExecutionOutcome::AsyncSuspend),
-            Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(thrown))) => {
+            Err(VmError::Abrupt(lyng_types::AbruptCompletion::Throw(thrown))) => {
                 Self::complete_generator_object(agent, generator);
                 Ok(GeneratorExecutionOutcome::Throw(thrown))
             }
@@ -1402,10 +1398,10 @@ impl Vm {
                 let _: () = iterator::iterator_close(
                     &mut bridge,
                     &mut record,
-                    Err(lyng_js_types::AbruptCompletion::Throw(resume_value)),
+                    Err(lyng_types::AbruptCompletion::Throw(resume_value)),
                 )?;
             }
-            return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
+            return Err(VmError::Abrupt(lyng_types::AbruptCompletion::Throw(
                 resume_value,
             )));
         }
@@ -1829,9 +1825,9 @@ impl Vm {
                 Self::generator_result_object(agent, realm, Value::undefined(), true)
             }
             GeneratorResumeKind::Return => Self::generator_result_object(agent, realm, value, true),
-            GeneratorResumeKind::Throw => Err(VmError::Abrupt(
-                lyng_js_types::AbruptCompletion::throw(value),
-            )),
+            GeneratorResumeKind::Throw => {
+                Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(value)))
+            }
         }
     }
 }

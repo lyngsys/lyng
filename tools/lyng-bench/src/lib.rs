@@ -1,13 +1,13 @@
 pub mod asm_diff;
 pub mod capture_llint;
 pub mod cli;
-pub mod hot_opcodes;
 pub mod compare;
 pub mod density;
+pub mod hot_opcodes;
+pub mod microbench;
 pub mod runtime;
 pub mod test262;
 pub mod v8suite;
-pub mod microbench;
 
 /// Dispatch the requested benchmark suite.
 ///

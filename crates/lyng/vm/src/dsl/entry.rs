@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use lyng_js_env::Agent;
-use lyng_js_host::HostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_types::Value;
+use lyng_env::Agent;
+use lyng_host::HostHooks;
+use lyng_objects::NativeFunctionRegistry;
+use lyng_types::Value;
 
 use crate::dsl::handlers::{DslHandler, DSL_DISPATCH_TABLE};
 use crate::dsl::llint_state::{
@@ -66,8 +66,7 @@ pub(crate) fn run_via_dsl(
         // boxed slice's `as_ptr()` is still a valid (non-dangling)
         // pointer; the asm trampoline never dereferences past the
         // slot count anyway.
-        vm.feedback_flat_storage[index].as_ptr()
-            as *mut crate::dsl::feedback_flat::FeedbackEntry
+        vm.feedback_flat_storage[index].as_ptr() as *mut crate::dsl::feedback_flat::FeedbackEntry
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -97,12 +96,12 @@ pub(crate) fn run_via_dsl(
     // See spec §3.4.
     //
     // The chain mirrors `Vm::read_constant` in
-    // crates/lyng-js/vm/src/vm/values.rs:795-806.
+    // crates/lyng/vm/src/vm/values.rs:795-806.
     let const_base: *const Value = agent
         .heap()
         .view()
         .code(frame.code())
-        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+        .and_then(lyng_gc::RuntimeCodeRecord::constants)
         .and_then(|slots| agent.heap().view().code_slots(slots))
         .map(|s| s.as_ptr())
         .unwrap_or(std::ptr::null());
@@ -111,8 +110,7 @@ pub(crate) fn run_via_dsl(
     // active execution context's ThisState into either the real
     // Value or Value::uninitialized_lexical() sentinel.
     // See spec §3.3.
-    let this_value: Value =
-        crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
+    let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
@@ -150,8 +148,7 @@ pub(crate) fn run_via_dsl(
         frame_this_value: this_value,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
-        rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>
-            as *mut LlIntRustContextOpaque,
+        rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_> as *mut LlIntRustContextOpaque,
         prefix: 0,
         _pad2: [0; 7],
     };

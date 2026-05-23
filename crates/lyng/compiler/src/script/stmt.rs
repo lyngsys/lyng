@@ -9,7 +9,7 @@ use super::{
     ScopeKind, SemanticBindingId, Span, Stmt, StmtId, StorageClass, SwitchCase, VariableKind,
     WellKnownAtom,
 };
-use lyng_js_bytecode::DirectEvalSiteFlags;
+use lyng_bytecode::DirectEvalSiteFlags;
 
 #[derive(Clone, Copy)]
 pub(super) enum ObjectRestExcludedKey {
@@ -238,17 +238,17 @@ impl FunctionCompiler<'_, '_> {
     }
 
     const fn merge_disposal_scope_kind(
-        current: Option<lyng_js_env::DisposalCapabilityKind>,
-        next: Option<lyng_js_env::DisposalCapabilityKind>,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+        current: Option<lyng_env::DisposalCapabilityKind>,
+        next: Option<lyng_env::DisposalCapabilityKind>,
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         match (current, next) {
-            (Some(lyng_js_env::DisposalCapabilityKind::Async), _)
-            | (_, Some(lyng_js_env::DisposalCapabilityKind::Async)) => {
-                Some(lyng_js_env::DisposalCapabilityKind::Async)
+            (Some(lyng_env::DisposalCapabilityKind::Async), _)
+            | (_, Some(lyng_env::DisposalCapabilityKind::Async)) => {
+                Some(lyng_env::DisposalCapabilityKind::Async)
             }
-            (Some(lyng_js_env::DisposalCapabilityKind::Sync), _)
-            | (_, Some(lyng_js_env::DisposalCapabilityKind::Sync)) => {
-                Some(lyng_js_env::DisposalCapabilityKind::Sync)
+            (Some(lyng_env::DisposalCapabilityKind::Sync), _)
+            | (_, Some(lyng_env::DisposalCapabilityKind::Sync)) => {
+                Some(lyng_env::DisposalCapabilityKind::Sync)
             }
             (None, None) => None,
         }
@@ -257,18 +257,18 @@ impl FunctionCompiler<'_, '_> {
     fn decl_disposal_scope_kind(
         &self,
         decl_id: DeclId,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         match self.ast().get_decl(decl_id) {
             Decl::Variable {
                 kind: VariableKind::Using,
                 ..
-            } => Some(lyng_js_env::DisposalCapabilityKind::Sync),
+            } => Some(lyng_env::DisposalCapabilityKind::Sync),
             Decl::Variable {
                 kind: VariableKind::AwaitUsing,
                 ..
-            } => Some(lyng_js_env::DisposalCapabilityKind::Async),
+            } => Some(lyng_env::DisposalCapabilityKind::Async),
             Decl::Export {
-                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                kind: lyng_ast::ExportKind::Declaration { decl },
                 ..
             } => self.decl_disposal_scope_kind(*decl),
             _ => None,
@@ -277,8 +277,8 @@ impl FunctionCompiler<'_, '_> {
 
     fn statement_list_disposal_scope_kind(
         &self,
-        list: lyng_js_ast::NodeList<StmtId>,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+        list: lyng_ast::NodeList<StmtId>,
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         let mut kind = None;
         for &stmt in self.ast().get_stmt_list(list) {
             if let Stmt::Declaration { decl, .. } = self.ast().get_stmt(stmt) {
@@ -290,8 +290,8 @@ impl FunctionCompiler<'_, '_> {
 
     fn switch_disposal_scope_kind(
         &self,
-        cases: lyng_js_ast::NodeList<SwitchCase>,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+        cases: lyng_ast::NodeList<SwitchCase>,
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         let mut kind = None;
         for case in self.ast().get_switch_case_list(cases) {
             kind = Self::merge_disposal_scope_kind(
@@ -305,7 +305,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn for_init_disposal_scope_kind(
         &self,
         init: Option<ForInit>,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         let ForInit::Declaration(decl) = init? else {
             return None;
         };
@@ -315,7 +315,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn for_in_of_declaration_disposal_scope_kind(
         &self,
         left: ForInOfLeft,
-    ) -> Option<lyng_js_env::DisposalCapabilityKind> {
+    ) -> Option<lyng_env::DisposalCapabilityKind> {
         let ForInOfLeft::Declaration(decl) = left else {
             return None;
         };
@@ -329,9 +329,7 @@ impl FunctionCompiler<'_, '_> {
         let scope = self.active_disposal_scopes.last().copied()?;
         match kind {
             VariableKind::Using => Some(scope),
-            VariableKind::AwaitUsing
-                if scope.kind == lyng_js_env::DisposalCapabilityKind::Async =>
-            {
+            VariableKind::AwaitUsing if scope.kind == lyng_env::DisposalCapabilityKind::Async => {
                 Some(scope)
             }
             _ => None,
@@ -340,7 +338,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn lower_statement_list_with_disposal(
         &mut self,
-        list: lyng_js_ast::NodeList<StmtId>,
+        list: lyng_ast::NodeList<StmtId>,
         span: Span,
     ) -> LoweringResult<()> {
         let env_scope = self.current_dynamic_env_scope_range()?;
@@ -451,10 +449,10 @@ impl FunctionCompiler<'_, '_> {
             arguments.push(prior_error);
         }
         match scope.kind {
-            lyng_js_env::DisposalCapabilityKind::Sync => {
+            lyng_env::DisposalCapabilityKind::Sync => {
                 self.emit_internal_builtin_call(dispose_scope_builtin(), &arguments, span)
             }
-            lyng_js_env::DisposalCapabilityKind::Async => {
+            lyng_env::DisposalCapabilityKind::Async => {
                 let promise = self.alloc_temp()?;
                 self.emit_internal_builtin_call_into(
                     dispose_scope_async_builtin(),
@@ -485,7 +483,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn with_disposal_scope<F>(
         &mut self,
-        kind: lyng_js_env::DisposalCapabilityKind,
+        kind: lyng_env::DisposalCapabilityKind,
         span: Span,
         body: F,
     ) -> LoweringResult<()>
@@ -494,8 +492,8 @@ impl FunctionCompiler<'_, '_> {
     {
         let capability_register = self.alloc_temp()?;
         let create_builtin = match kind {
-            lyng_js_env::DisposalCapabilityKind::Sync => create_sync_disposal_scope_builtin(),
-            lyng_js_env::DisposalCapabilityKind::Async => create_async_disposal_scope_builtin(),
+            lyng_env::DisposalCapabilityKind::Sync => create_sync_disposal_scope_builtin(),
+            lyng_env::DisposalCapabilityKind::Async => create_async_disposal_scope_builtin(),
         };
         self.emit_internal_builtin_call_into(create_builtin, &[], span, capability_register)?;
         let scope = super::state::ActiveDisposalScope {
@@ -723,7 +721,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         label: Option<AtomId>,
         discriminant: ExprId,
-        cases: lyng_js_ast::NodeList<SwitchCase>,
+        cases: lyng_ast::NodeList<SwitchCase>,
         span: Span,
     ) -> LoweringResult<()> {
         self.reset_statement_result()?;
@@ -739,7 +737,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         label: Option<AtomId>,
         discriminant: ExprId,
-        cases: lyng_js_ast::NodeList<SwitchCase>,
+        cases: lyng_ast::NodeList<SwitchCase>,
     ) -> LoweringResult<()> {
         let discriminant_register = self.lower_expr_to_temp(discriminant)?;
         self.emit_frame_local_tdz_initializers_for_current_scope()?;
@@ -1106,7 +1104,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn lower_array_destructuring_assignment_from_iterator(
         &mut self,
-        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        elements: lyng_ast::NodeList<Option<ExprId>>,
         source_register: u16,
         span: Span,
     ) -> LoweringResult<()> {
@@ -1156,7 +1154,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn lower_array_destructuring_assignment_elements(
         &mut self,
-        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        elements: lyng_ast::NodeList<Option<ExprId>>,
         iterator_register: u16,
     ) -> LoweringResult<()> {
         let value_register = self.alloc_temp()?;
@@ -1594,24 +1592,24 @@ impl FunctionCompiler<'_, '_> {
         }
     }
 
-    fn lower_export_declaration(&mut self, kind: &lyng_js_ast::ExportKind) -> LoweringResult<()> {
+    fn lower_export_declaration(&mut self, kind: &lyng_ast::ExportKind) -> LoweringResult<()> {
         match kind {
-            lyng_js_ast::ExportKind::Declaration { decl } => self.lower_declaration(*decl),
-            lyng_js_ast::ExportKind::Default { declaration } => match declaration {
-                lyng_js_ast::ExportDefaultDecl::Function(function)
+            lyng_ast::ExportKind::Declaration { decl } => self.lower_declaration(*decl),
+            lyng_ast::ExportKind::Default { declaration } => match declaration {
+                lyng_ast::ExportDefaultDecl::Function(function)
                     if self.hoisted_default_export_functions.contains(function) =>
                 {
                     Ok(())
                 }
                 _ => self.lower_default_export_declaration(*declaration),
             },
-            lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => Ok(()),
+            lyng_ast::ExportKind::Named { .. } | lyng_ast::ExportKind::All { .. } => Ok(()),
         }
     }
 
     pub(super) fn lower_default_export_declaration(
         &mut self,
-        declaration: lyng_js_ast::ExportDefaultDecl,
+        declaration: lyng_ast::ExportDefaultDecl,
     ) -> LoweringResult<()> {
         let default_name = WellKnownAtom::default.id();
         let slot = self.state.module_default_export_slot().ok_or(
@@ -1621,7 +1619,7 @@ impl FunctionCompiler<'_, '_> {
         )?;
         let value_register = self.alloc_temp()?;
         match declaration {
-            lyng_js_ast::ExportDefaultDecl::Function(function) => {
+            lyng_ast::ExportDefaultDecl::Function(function) => {
                 let function_expr = self.ast().get_function(function).clone();
                 let child_index = self.ensure_child_index(function)?;
                 self.emit_create_closure(value_register, child_index, function_expr.span)?;
@@ -1634,7 +1632,7 @@ impl FunctionCompiler<'_, '_> {
                     self.store_binding_value(binding_id, name, value_register)?;
                 }
             }
-            lyng_js_ast::ExportDefaultDecl::Class(decl_id) => {
+            lyng_ast::ExportDefaultDecl::Class(decl_id) => {
                 let Decl::Class {
                     name,
                     super_class,
@@ -1657,7 +1655,7 @@ impl FunctionCompiler<'_, '_> {
                     self.store_binding_value(binding_id, name, value_register)?;
                 }
             }
-            lyng_js_ast::ExportDefaultDecl::Expression(expr) => {
+            lyng_ast::ExportDefaultDecl::Expression(expr) => {
                 self.lower_initializer_with_inferred_name(
                     expr,
                     Some(default_name),
@@ -1670,7 +1668,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn emit_block_function_declaration_instantiations(
         &mut self,
-        list: lyng_js_ast::NodeList<StmtId>,
+        list: lyng_ast::NodeList<StmtId>,
     ) -> LoweringResult<()> {
         let stmts = self.ast().get_stmt_list(list).to_vec();
         for stmt in stmts {
@@ -1792,7 +1790,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn function_declaration_uses_annex_b_var_update(
         &self,
-        ast_function: &lyng_js_ast::Function,
+        ast_function: &lyng_ast::Function,
     ) -> bool {
         if ast_function.kind != FunctionKind::Normal {
             return false;
@@ -1909,7 +1907,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_variable_declarator(
         &mut self,
         kind: VariableKind,
-        declarator: lyng_js_ast::VariableDeclarator,
+        declarator: lyng_ast::VariableDeclarator,
     ) -> LoweringResult<()> {
         let declaration_kind = match kind {
             VariableKind::Var => DeclarationKind::Var,

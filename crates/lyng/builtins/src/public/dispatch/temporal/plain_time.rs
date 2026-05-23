@@ -31,67 +31,67 @@ pub(super) fn dispatch_temporal_plain_time_builtin<Cx: PublicBuiltinDispatchCont
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::temporal_plain_time_builtin() {
+    if entry == lyng_types::temporal_plain_time_builtin() {
         return temporal_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_hour_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_hour_getter_builtin() {
         return temporal_plain_time_hour_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_minute_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_minute_getter_builtin() {
         return temporal_plain_time_minute_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_second_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_second_getter_builtin() {
         return temporal_plain_time_second_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_millisecond_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_millisecond_getter_builtin() {
         return temporal_plain_time_millisecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_microsecond_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_microsecond_getter_builtin() {
         return temporal_plain_time_microsecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_nanosecond_getter_builtin() {
+    if entry == lyng_types::temporal_plain_time_nanosecond_getter_builtin() {
         return temporal_plain_time_nanosecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_to_string_builtin() {
+    if entry == lyng_types::temporal_plain_time_to_string_builtin() {
         return temporal_plain_time_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_to_json_builtin() {
+    if entry == lyng_types::temporal_plain_time_to_json_builtin() {
         return temporal_plain_time_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_to_locale_string_builtin() {
+    if entry == lyng_types::temporal_plain_time_to_locale_string_builtin() {
         return temporal_plain_time_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_value_of_builtin() {
+    if entry == lyng_types::temporal_plain_time_value_of_builtin() {
         return temporal_plain_time_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_equals_builtin() {
+    if entry == lyng_types::temporal_plain_time_equals_builtin() {
         return temporal_plain_time_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_with_builtin() {
+    if entry == lyng_types::temporal_plain_time_with_builtin() {
         return temporal_plain_time_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_add_builtin() {
+    if entry == lyng_types::temporal_plain_time_add_builtin() {
         return temporal_plain_time_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_subtract_builtin() {
+    if entry == lyng_types::temporal_plain_time_subtract_builtin() {
         return temporal_plain_time_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_round_builtin() {
+    if entry == lyng_types::temporal_plain_time_round_builtin() {
         return temporal_plain_time_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_since_builtin() {
+    if entry == lyng_types::temporal_plain_time_since_builtin() {
         return temporal_plain_time_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_until_builtin() {
+    if entry == lyng_types::temporal_plain_time_until_builtin() {
         return temporal_plain_time_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_to_plain_date_time_builtin() {
+    if entry == lyng_types::temporal_plain_time_to_plain_date_time_builtin() {
         return temporal_plain_time_to_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_from_builtin() {
+    if entry == lyng_types::temporal_plain_time_from_builtin() {
         return temporal_plain_time_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_time_compare_builtin() {
+    if entry == lyng_types::temporal_plain_time_compare_builtin() {
         return temporal_plain_time_compare_builtin(context, invocation).map(Some);
     }
     Ok(None)

@@ -6,23 +6,23 @@ use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
 use crate::vm::property_access::VmProxyBridge;
-use lyng_js_env::{
+use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
 };
-use lyng_js_gc::ValueStoreTarget;
-use lyng_js_host::HostHooks;
+use lyng_gc::ValueStoreTarget;
+use lyng_host::HostHooks;
 #[cfg(test)]
-use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::{NativeFunctionRegistry, ObjectKind, SlotLocation};
-use lyng_js_ops::{errors, object, proxy, read};
-use lyng_js_types::{FeedbackSlotId, PropertyKey};
+use lyng_host::NoopHostHooks;
+use lyng_objects::{NativeFunctionRegistry, ObjectKind, SlotLocation};
+use lyng_ops::{errors, object, proxy, read};
+use lyng_types::{FeedbackSlotId, PropertyKey};
 
 impl Vm {
     fn layout_binding_slot(
         &self,
         agent: &Agent,
         environment: EnvironmentRef,
-        layout: lyng_js_env::EnvironmentLayoutId,
+        layout: lyng_env::EnvironmentLayoutId,
         name: AtomId,
     ) -> Option<u32> {
         let layout = agent.environment_layout(layout)?;
@@ -607,7 +607,7 @@ impl Vm {
             feedback_slot,
             global_object,
             name,
-            lyng_js_objects::NamedPropertyCachePurpose::Load,
+            lyng_objects::NamedPropertyCachePurpose::Load,
         );
         Ok(value)
     }
@@ -710,7 +710,7 @@ impl Vm {
             feedback_slot,
             global_object,
             name,
-            lyng_js_objects::NamedPropertyCachePurpose::Store,
+            lyng_objects::NamedPropertyCachePurpose::Store,
         );
         Ok(())
     }
@@ -845,7 +845,7 @@ impl Vm {
             feedback_slot,
             global_object,
             name,
-            lyng_js_objects::NamedPropertyCachePurpose::Store,
+            lyng_objects::NamedPropertyCachePurpose::Store,
         );
         Ok(())
     }

@@ -1,4 +1,4 @@
-lyng_js_vm::dsl::handlers::cold::op_load_this_dsl:
+lyng_vm::dsl::handlers::cold::op_load_this_dsl:
 	; len=4 pc=0 pb=8 regs=16 fv=24 prefix=64 poll=1680 fb_stride=6 fb_observed=0 ctr=0 const_base=32 this_value=40 uninit_lex=9221120275695796226 exit=__interpreter_exit
 	ldrb	w9, [x19, #1]                ; decode_abx!(a, bx) — byte at PC+1 → w9 (a = dest reg id)
 	ldrh	w10, [x19, #2]               ; decode_abx!(a, bx) — bytes PC+2..3 → w10 (bx, unused at runtime)

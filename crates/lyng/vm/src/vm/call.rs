@@ -5,13 +5,13 @@ use super::{
 };
 use crate::vm::property_access::VmProxyBridge;
 use crate::VmError;
-use lyng_js_gc::{PrimitiveMutator, RuntimeBoundFunctionRecord};
-use lyng_js_objects::{
+use lyng_gc::{PrimitiveMutator, RuntimeBoundFunctionRecord};
+use lyng_objects::{
     FunctionEntryIdentity, InternalMethodError, NativeCallRequest, NativeConstructRequest,
     ObjectRuntime,
 };
-use lyng_js_ops::{errors, object, proxy};
-use lyng_js_types::{function_call_builtin, FeedbackSlotId};
+use lyng_ops::{errors, object, proxy};
+use lyng_types::{function_call_builtin, FeedbackSlotId};
 
 impl Vm {
     #[expect(
@@ -826,7 +826,7 @@ impl Vm {
         agent
             .objects()
             .function_data(function)
-            .and_then(lyng_js_objects::FunctionObjectData::realm)
+            .and_then(lyng_objects::FunctionObjectData::realm)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
@@ -970,16 +970,16 @@ impl NativeFunctionRegistry for RejectingNativeRegistry {
 mod tests {
     use super::*;
     use crate::{FrameRecord, InstalledCode, RegisterWindow};
-    use lyng_js_bytecode::CompiledScriptUnit;
-    use lyng_js_common::{AtomId, AtomTable, SourceId};
-    use lyng_js_compiler::compile_script;
-    use lyng_js_env::{ExecutionContextKind, Runtime};
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_objects::FunctionEntryIdentity;
-    use lyng_js_ops::object::ordinary_get;
-    use lyng_js_parser::parse_script;
-    use lyng_js_sema::analyze_script;
-    use lyng_js_types::PropertyKey;
+    use lyng_bytecode::CompiledScriptUnit;
+    use lyng_common::{AtomId, AtomTable, SourceId};
+    use lyng_compiler::compile_script;
+    use lyng_env::{ExecutionContextKind, Runtime};
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::FunctionEntryIdentity;
+    use lyng_ops::object::ordinary_get;
+    use lyng_parser::parse_script;
+    use lyng_sema::analyze_script;
+    use lyng_types::PropertyKey;
 
     fn compile_test_unit(source_id: u32, source: &str) -> CompiledScriptUnit {
         let mut atoms = AtomTable::new();
@@ -1050,14 +1050,14 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(getter_code)) = agent
             .objects()
             .function_data(getter)
-            .and_then(lyng_js_objects::FunctionObjectData::entry)
+            .and_then(lyng_objects::FunctionObjectData::entry)
         else {
             panic!("getter descriptor should reference bytecode");
         };
         let getter_environment = agent
             .objects()
             .function_data(getter)
-            .and_then(lyng_js_objects::FunctionObjectData::environment)
+            .and_then(lyng_objects::FunctionObjectData::environment)
             .expect("getter closure should preserve its outer environment");
         let getter_entry = vm
             .installed_function(getter_code)
@@ -1088,7 +1088,7 @@ mod tests {
         let via_property = vm
             .get_property_from_value(
                 agent,
-                &lyng_js_host::NoopHostHooks,
+                &lyng_host::NoopHostHooks,
                 &mut registry,
                 &frame,
                 Value::from_object_ref(object),

@@ -1,5 +1,5 @@
 use super::Value;
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 /// Stable Result-shaped completion surface for spec-facing runtime helpers.
 pub type Completion<T> = Result<T, AbruptCompletion>;

@@ -5,13 +5,13 @@ use super::{
     type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_host::{
+use lyng_gc::AllocationLifetime;
+use lyng_host::{
     TemporalCivilDateTime, TemporalCivilToInstantRequest, TemporalDefaultTimeZoneRequest,
     TemporalDisambiguation, TemporalInstantToCivilRequest,
 };
-use lyng_js_ops::{object, read};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
+use lyng_ops::{object, read};
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value};
 use parsing::date_parse_text;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -285,9 +285,9 @@ fn dispatch_date_conversion_builtin<Cx: PublicBuiltinDispatchContext>(
 fn allocate_date_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     value: Value,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm_root_shape(realm)
@@ -876,7 +876,7 @@ fn date_builtin<Cx: PublicBuiltinDispatchContext>(
         let agent = cx.agent();
         agent
             .realm_intrinsics(realm)
-            .and_then(lyng_js_env::Intrinsics::date_prototype)
+            .and_then(lyng_env::Intrinsics::date_prototype)
     }
     .ok_or_else(|| type_error(cx))?;
 

@@ -1,20 +1,20 @@
 //! Diagnostic quality verification: 10+ scenarios confirming
 //! error messages have correct spans and meaningful text.
 
-use lyng_js_common::{AtomTable, Severity, SourceId};
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
+use lyng_common::{AtomTable, Severity, SourceId};
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
 
 fn sid() -> SourceId {
     SourceId::new(0)
 }
 
-fn script(src: &str) -> lyng_js_ast::ParsedScript {
+fn script(src: &str) -> lyng_ast::ParsedScript {
     let mut atoms = AtomTable::new();
     parse_script(&mut atoms, sid(), src)
 }
 
-fn script_sema(src: &str) -> (lyng_js_ast::ParsedScript, lyng_js_sema::ScriptSema) {
+fn script_sema(src: &str) -> (lyng_ast::ParsedScript, lyng_sema::ScriptSema) {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(&mut atoms, sid(), src);
     let sema = analyze_script(&parsed, &atoms);

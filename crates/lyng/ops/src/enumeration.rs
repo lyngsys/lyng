@@ -1,7 +1,7 @@
 use crate::errors::internal_method_error;
-use lyng_js_env::Agent;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{Completion, ObjectRef, PropertyKey};
+use lyng_env::Agent;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_types::{Completion, ObjectRef, PropertyKey};
 use std::collections::HashSet;
 
 /// Baseline ordinary-object `for-in` state for script execution.
@@ -117,12 +117,12 @@ pub fn create_for_in_enumerator(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomId;
-    use lyng_js_env::Runtime;
-    use lyng_js_gc::AllocationLifetime;
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_objects::ObjectAllocation;
-    use lyng_js_types::{PropertyDescriptor, SymbolRef, Value};
+    use lyng_common::AtomId;
+    use lyng_env::Runtime;
+    use lyng_gc::AllocationLifetime;
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::ObjectAllocation;
+    use lyng_types::{PropertyDescriptor, SymbolRef, Value};
 
     fn data_descriptor(value: Value, enumerable: bool) -> PropertyDescriptor {
         let mut descriptor = PropertyDescriptor::new();

@@ -1,5 +1,5 @@
 use crate::BuiltinHandler;
-use lyng_js_types::BuiltinFunctionId;
+use lyng_types::BuiltinFunctionId;
 
 /// Cold metadata for one registered builtin entrypoint.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,7 +110,7 @@ pub enum BuiltinRegistryError {
     DuplicateBuiltinId(BuiltinFunctionId),
 }
 
-/// Builtin-entry registry owned by `lyng_js_builtins`.
+/// Builtin-entry registry owned by `lyng_builtins`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BuiltinRegistry<Cx> {
     entries: Vec<BuiltinRegistryEntry<Cx>>,
@@ -153,7 +153,7 @@ impl<Cx> BuiltinRegistry<Cx> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_types::{Completion, ObjectRef, Value};
+    use lyng_types::{Completion, ObjectRef, Value};
 
     struct DummyContext;
 

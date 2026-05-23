@@ -9,9 +9,9 @@ use super::{
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     aggregate_error_builtin, error_builtin, error_is_error_builtin, error_to_string_builtin,
     eval_error_builtin, range_error_builtin, reference_error_builtin, suppressed_error_builtin,
     syntax_error_builtin, type_error_builtin, uri_error_builtin, BuiltinFunctionId, ObjectRef,
@@ -131,10 +131,10 @@ pub(in crate::public) fn error_builtin_object(
 fn install_error_constructor(
     agent: &mut Agent,
     cx: FamilyInstallContext,
-    error: lyng_js_types::ObjectRef,
-    entry: lyng_js_types::BuiltinFunctionId,
-    prototype: lyng_js_types::ObjectRef,
-) -> lyng_js_types::ObjectRef {
+    error: lyng_types::ObjectRef,
+    entry: lyng_types::BuiltinFunctionId,
+    prototype: lyng_types::ObjectRef,
+) -> lyng_types::ObjectRef {
     install_public_builtin_function_with_function_prototype(
         agent,
         cx,

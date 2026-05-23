@@ -1022,8 +1022,8 @@ impl FunctionCompiler<'_, '_> {
 
     fn first_identifier_in_pattern(
         &self,
-        pattern_id: lyng_js_ast::PatternId,
-    ) -> Option<lyng_js_ast::PatternId> {
+        pattern_id: lyng_ast::PatternId,
+    ) -> Option<lyng_ast::PatternId> {
         match self.ast().get_pattern(pattern_id) {
             Pattern::Identifier { .. } => Some(pattern_id),
             Pattern::Object {
@@ -1048,8 +1048,8 @@ impl FunctionCompiler<'_, '_> {
 
     fn collect_identifier_patterns(
         &self,
-        pattern_id: lyng_js_ast::PatternId,
-        patterns: &mut Vec<lyng_js_ast::PatternId>,
+        pattern_id: lyng_ast::PatternId,
+        patterns: &mut Vec<lyng_ast::PatternId>,
     ) {
         match self.ast().get_pattern(pattern_id) {
             Pattern::Identifier { .. } => patterns.push(pattern_id),
@@ -1238,21 +1238,21 @@ impl FunctionCompiler<'_, '_> {
                 self.collect_functions_in_class_body(*body, functions);
             }
             Decl::Export { kind, .. } => match kind {
-                lyng_js_ast::ExportKind::Default { declaration } => match declaration {
-                    lyng_js_ast::ExportDefaultDecl::Function(function) => {
+                lyng_ast::ExportKind::Default { declaration } => match declaration {
+                    lyng_ast::ExportDefaultDecl::Function(function) => {
                         self.collect_functions_in_function(*function, functions);
                     }
-                    lyng_js_ast::ExportDefaultDecl::Class(decl) => {
+                    lyng_ast::ExportDefaultDecl::Class(decl) => {
                         self.collect_functions_in_declaration(*decl, functions);
                     }
-                    lyng_js_ast::ExportDefaultDecl::Expression(expr) => {
+                    lyng_ast::ExportDefaultDecl::Expression(expr) => {
                         self.collect_functions_in_expression(*expr, functions);
                     }
                 },
-                lyng_js_ast::ExportKind::Declaration { decl } => {
+                lyng_ast::ExportKind::Declaration { decl } => {
                     self.collect_functions_in_declaration(*decl, functions);
                 }
-                lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => {}
+                lyng_ast::ExportKind::Named { .. } | lyng_ast::ExportKind::All { .. } => {}
             },
             Decl::Import { .. } | Decl::InvalidDeclaration { .. } => {}
         }
@@ -1260,7 +1260,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn collect_functions_in_pattern(
         &self,
-        pattern_id: lyng_js_ast::PatternId,
+        pattern_id: lyng_ast::PatternId,
         functions: &mut Vec<FunctionId>,
     ) {
         match self.ast().get_pattern(pattern_id) {
@@ -1443,12 +1443,12 @@ impl FunctionCompiler<'_, '_> {
 
     fn collect_functions_in_class_body(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         functions: &mut Vec<FunctionId>,
     ) {
         for &element in self.ast().get_class_element_list(body) {
             match self.ast().get_class_element(element) {
-                lyng_js_ast::ClassElement::Method {
+                lyng_ast::ClassElement::Method {
                     key,
                     value,
                     computed,
@@ -1459,7 +1459,7 @@ impl FunctionCompiler<'_, '_> {
                     }
                     self.collect_functions_in_function(*value, functions);
                 }
-                lyng_js_ast::ClassElement::Property {
+                lyng_ast::ClassElement::Property {
                     key,
                     value,
                     computed,
@@ -1472,12 +1472,12 @@ impl FunctionCompiler<'_, '_> {
                         self.collect_functions_in_expression(*value, functions);
                     }
                 }
-                lyng_js_ast::ClassElement::StaticBlock { body, .. } => {
+                lyng_ast::ClassElement::StaticBlock { body, .. } => {
                     for &stmt in self.ast().get_stmt_list(*body) {
                         self.collect_functions_in_statement(stmt, functions);
                     }
                 }
-                lyng_js_ast::ClassElement::InvalidElement { .. } => {}
+                lyng_ast::ClassElement::InvalidElement { .. } => {}
             }
         }
     }

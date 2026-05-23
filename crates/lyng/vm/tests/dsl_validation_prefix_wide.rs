@@ -14,7 +14,7 @@
 //!    fragments in [`crate::dsl::backend::aarch64::operands`] only
 //!    handle u8 operands; the wide-form decoders are explicitly
 //!    deferred to Batch 7 per
-//!    `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs` line 15).
+//!    `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs` line 15).
 //! 3. A `DSL_DISPATCH_TABLE` whose `Wide` and `Move` slots resolve to
 //!    real handler symbols (currently all
 //!    `unimplemented_dsl_handler` placeholders).
@@ -28,9 +28,9 @@
 //! - An `#[ignore]`d end-to-end test as a forward-pointer to Batch 7.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::dispatch;
+use lyng_vm::dispatch;
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm_dsl::llint_handler;
 
 // Compile-only structural test: an `llint_handler!` invocation whose
 // asm body advances PC by one byte and tail-dispatches — the same
@@ -51,7 +51,7 @@ llint_handler! {
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn op_wide_prefix_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_validation_wide_prefix);
 }
 

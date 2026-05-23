@@ -5,12 +5,12 @@ use crate::vm::values::{
     bigint_shift_left_values, bigint_shift_right_values, compare_numeric_values, encode_number,
 };
 use crate::{FrameRecord, Vm, VmError};
-use lyng_js_bytecode::Opcode;
-use lyng_js_env::Agent;
-use lyng_js_host::HostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_ops::{errors, object, pure, read};
-use lyng_js_types::{AbruptCompletion, Value};
+use lyng_bytecode::Opcode;
+use lyng_env::Agent;
+use lyng_host::HostHooks;
+use lyng_objects::NativeFunctionRegistry;
+use lyng_ops::{errors, object, pure, read};
+use lyng_types::{AbruptCompletion, Value};
 
 #[inline]
 pub(in crate::vm) const fn decode_smi_immediate(raw: u16) -> i16 {
@@ -399,7 +399,11 @@ impl Vm {
         ))
     }
 
-    pub(in crate::vm) fn execute_equal_zero_opcode(&self, frame: &FrameRecord, register: u16) -> Value {
+    pub(in crate::vm) fn execute_equal_zero_opcode(
+        &self,
+        frame: &FrameRecord,
+        register: u16,
+    ) -> Value {
         let value = self.read_register(frame.registers(), register);
         Value::from_bool(value.as_f64().is_some_and(|number| number == 0.0))
     }
@@ -1090,8 +1094,8 @@ const fn number_to_u32_after_range_check(number: f64) -> u32 {
 mod tests {
     use super::*;
     use crate::RegisterWindow;
-    use lyng_js_env::ExecutionContextKind;
-    use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef};
+    use lyng_env::ExecutionContextKind;
+    use lyng_types::{CodeRef, EnvironmentRef, RealmRef};
 
     fn test_frame() -> FrameRecord {
         FrameRecord::new(

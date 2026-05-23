@@ -9,8 +9,8 @@ use super::{
     set_property_on_object_or_throw, RegExpExecResult,
 };
 use crate::BuiltinInvocation;
-use lyng_js_ops::read;
-use lyng_js_types::{BuiltinFunctionId, PropertyKey, Value};
+use lyng_ops::read;
+use lyng_types::{BuiltinFunctionId, PropertyKey, Value};
 
 pub(super) fn dispatch_regexp_symbol_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

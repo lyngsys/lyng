@@ -5,7 +5,7 @@ use crate::{
     RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord,
     RuntimeSuspendedExecutionRecord, SuspendedRegistersRef,
 };
-use lyng_js_types::{
+use lyng_types::{
     BigIntRef, CodeRef, EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, StringRef,
     SuspendedExecutionRef, SymbolRef, Value,
 };

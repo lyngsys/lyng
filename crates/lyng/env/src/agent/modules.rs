@@ -1,7 +1,7 @@
 use super::Agent;
 use crate::{CodeRef, EnvironmentRef, ModuleRecord, ModuleResolvedExport, ModuleStatus};
-use lyng_js_host::{ImportMetaProperties, ModuleKey};
-use lyng_js_types::{ObjectRef, Value};
+use lyng_host::{ImportMetaProperties, ModuleKey};
+use lyng_types::{ObjectRef, Value};
 
 impl Agent {
     #[inline]

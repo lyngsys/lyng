@@ -1,6 +1,6 @@
 use super::Agent;
 use crate::{CodeRef, EnvironmentRef, ExecutableId, ExecutionContext, ThisState};
-use lyng_js_types::RealmRef;
+use lyng_types::RealmRef;
 
 impl Agent {
     #[inline]

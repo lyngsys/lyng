@@ -5,13 +5,11 @@ use super::{
     typed_array_storage_bits_from_builtin_value, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::{
-    AsyncWaiterRecord, ExecutableId, ParkedAgentRecord, RuntimeJobPayload, WaiterKind,
-};
-use lyng_js_host::{HostJobKind, ParkAgentRequest, ParkAgentStatus, UnparkAgentRequest};
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
-use lyng_js_ops::{promise, shared_memory as shared_memory_ops};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value};
+use lyng_env::{AsyncWaiterRecord, ExecutableId, ParkedAgentRecord, RuntimeJobPayload, WaiterKind};
+use lyng_host::{HostJobKind, ParkAgentRequest, ParkAgentStatus, UnparkAgentRequest};
+use lyng_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_ops::{promise, shared_memory as shared_memory_ops};
+use lyng_types::{BuiltinFunctionId, ObjectRef, Value};
 
 pub(super) fn dispatch_atomics_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

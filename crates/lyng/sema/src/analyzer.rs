@@ -14,10 +14,10 @@ mod finalize;
 mod functions;
 mod statements;
 
-use lyng_js_ast::{Ast, FunctionId};
+use lyng_ast::{Ast, FunctionId};
 use std::collections::{HashMap, HashSet};
 
-use lyng_js_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span};
+use lyng_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span};
 
 use crate::binding::BindingTable;
 use crate::class_private_layout::ClassPrivateLayoutTable;
@@ -217,7 +217,7 @@ impl<'a> Analyzer<'a> {
     pub(crate) fn analyze_direct_eval_script(
         ast: &'a Ast,
         atoms: &'a AtomTable,
-        root: lyng_js_ast::ScriptId,
+        root: lyng_ast::ScriptId,
         strict: bool,
         options: &DirectEvalScriptAnalysisOptions,
     ) -> Self {
@@ -266,7 +266,7 @@ impl<'a> Analyzer<'a> {
     pub(crate) fn analyze_module(
         ast: &'a Ast,
         atoms: &'a AtomTable,
-        root: lyng_js_ast::ModuleId,
+        root: lyng_ast::ModuleId,
     ) -> Self {
         let mut this = Self::new_for_module(ast, atoms);
         let module = ast.get_module(root);

@@ -64,7 +64,7 @@ impl FunctionActivationPlan {
 }
 
 pub(super) fn parent_function_for(
-    scopes: &lyng_js_sema::ScopeTable,
+    scopes: &lyng_sema::ScopeTable,
     scope_root: ScopeId,
     current: FunctionSemaId,
 ) -> Option<FunctionSemaId> {
@@ -79,14 +79,11 @@ pub(super) fn parent_function_for(
     None
 }
 
-fn is_simple_parameter_pattern(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::PatternId) -> bool {
+fn is_simple_parameter_pattern(ast: &lyng_ast::Ast, pattern: lyng_ast::PatternId) -> bool {
     matches!(ast.get_pattern(pattern), Pattern::Identifier { .. })
 }
 
-fn function_has_non_simple_params(
-    ast: &lyng_js_ast::Ast,
-    function: &lyng_js_ast::Function,
-) -> bool {
+fn function_has_non_simple_params(ast: &lyng_ast::Ast, function: &lyng_ast::Function) -> bool {
     function.params.rest.is_some()
         || ast
             .get_pattern_list(function.params.params)
@@ -94,7 +91,7 @@ fn function_has_non_simple_params(
             .any(|pattern| !is_simple_parameter_pattern(ast, *pattern))
 }
 
-fn pattern_contains_initializer(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::PatternId) -> bool {
+fn pattern_contains_initializer(ast: &lyng_ast::Ast, pattern: lyng_ast::PatternId) -> bool {
     match ast.get_pattern(pattern) {
         Pattern::Assignment { .. } => true,
         Pattern::Object {
@@ -116,10 +113,7 @@ fn pattern_contains_initializer(ast: &lyng_js_ast::Ast, pattern: lyng_js_ast::Pa
     }
 }
 
-fn function_has_parameter_expressions(
-    ast: &lyng_js_ast::Ast,
-    function: &lyng_js_ast::Function,
-) -> bool {
+fn function_has_parameter_expressions(ast: &lyng_ast::Ast, function: &lyng_ast::Function) -> bool {
     ast.get_pattern_list(function.params.params)
         .iter()
         .any(|&pattern| pattern_contains_initializer(ast, pattern))
@@ -264,7 +258,7 @@ pub(super) fn build_function_activation_plan(
     program: ProgramSource<'_>,
     sema: ProgramSemaView<'_>,
     sema_id: FunctionSemaId,
-    record: &lyng_js_sema::FunctionSemaRecord,
+    record: &lyng_sema::FunctionSemaRecord,
     arguments_owners: &HashSet<FunctionSemaId>,
     parent_functions: &[Option<FunctionSemaId>],
 ) -> FunctionActivationPlan {

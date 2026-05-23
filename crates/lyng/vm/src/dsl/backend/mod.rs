@@ -4,7 +4,7 @@
 //! that emit `&'static str` asm fragments (via `concat!`). The DSL
 //! proc-macro lowerer (Batch 1's `lower.rs`) collects those fragments
 //! into a single `core::arch::naked_asm!(...)` block per handler. See
-//! `crates/lyng-js/vm/src/dsl/ops.md` for the full vocabulary.
+//! `crates/lyng/vm/src/dsl/ops.md` for the full vocabulary.
 
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64;

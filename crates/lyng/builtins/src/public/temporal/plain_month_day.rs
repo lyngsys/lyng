@@ -2,9 +2,9 @@ use super::{
     allocate_builtin_function_object, define_builtin_accessor_property,
     define_builtin_data_property, public_builtin_metadata,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
 
 #[derive(Clone, Copy)]
 pub(super) struct PlainMonthDayBootstrapContext {
@@ -79,8 +79,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_builtin())?,
+        lyng_types::temporal_plain_month_day_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_builtin())?,
         Some(plain_month_day_prototype),
     );
     let month_code_getter = allocate_builtin_function_object(
@@ -90,10 +90,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_month_code_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::temporal_plain_month_day_month_code_getter_builtin(),
-        )?,
+        lyng_types::temporal_plain_month_day_month_code_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_month_code_getter_builtin())?,
         None,
     );
     let day_getter = allocate_builtin_function_object(
@@ -103,8 +101,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_day_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_day_getter_builtin())?,
+        lyng_types::temporal_plain_month_day_day_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_day_getter_builtin())?,
         None,
     );
     let calendar_id_getter = allocate_builtin_function_object(
@@ -114,10 +112,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::temporal_plain_month_day_calendar_id_getter_builtin(),
-        )?,
+        lyng_types::temporal_plain_month_day_calendar_id_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_calendar_id_getter_builtin())?,
         None,
     );
     let to_string = allocate_builtin_function_object(
@@ -127,8 +123,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_string_builtin())?,
+        lyng_types::temporal_plain_month_day_to_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_to_string_builtin())?,
         None,
     );
     let to_json = allocate_builtin_function_object(
@@ -138,8 +134,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_json_builtin())?,
+        lyng_types::temporal_plain_month_day_to_json_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_to_json_builtin())?,
         None,
     );
     let to_locale_string = allocate_builtin_function_object(
@@ -149,10 +145,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_to_locale_string_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::temporal_plain_month_day_to_locale_string_builtin(),
-        )?,
+        lyng_types::temporal_plain_month_day_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_to_locale_string_builtin())?,
         None,
     );
     let value_of = allocate_builtin_function_object(
@@ -162,8 +156,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_value_of_builtin())?,
+        lyng_types::temporal_plain_month_day_value_of_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_value_of_builtin())?,
         None,
     );
     let equals = allocate_builtin_function_object(
@@ -173,8 +167,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_equals_builtin())?,
+        lyng_types::temporal_plain_month_day_equals_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_equals_builtin())?,
         None,
     );
     let with = allocate_builtin_function_object(
@@ -184,8 +178,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_with_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_with_builtin())?,
+        lyng_types::temporal_plain_month_day_with_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_with_builtin())?,
         None,
     );
     let to_plain_date = allocate_builtin_function_object(
@@ -195,8 +189,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_to_plain_date_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_to_plain_date_builtin())?,
+        lyng_types::temporal_plain_month_day_to_plain_date_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_to_plain_date_builtin())?,
         None,
     );
     let from = allocate_builtin_function_object(
@@ -206,8 +200,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_month_day_from_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_month_day_from_builtin())?,
+        lyng_types::temporal_plain_month_day_from_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_month_day_from_builtin())?,
         None,
     );
 

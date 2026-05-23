@@ -73,10 +73,10 @@ through to the existing keyed slow chain unchanged.
 
 ### New types and infrastructure
 
-- `KeyedDenseIndexHandler` in `crates/lyng-js/objects/src/shapes.rs` —
+- `KeyedDenseIndexHandler` in `crates/lyng/objects/src/shapes.rs` —
   packs `(receiver_shape: NonZeroU32, receiver_flags: ObjectFlags u16)`
   into a single u64. Low half == 0 ⇒ NONE sentinel.
-- `ObjectFlags::bits` / `from_bits` in `crates/lyng-js/objects/src/core.rs`
+- `ObjectFlags::bits` / `from_bits` in `crates/lyng/objects/src/core.rs`
   — public raw 16-bit accessors needed by the packed handler.
 - 4 new sidecar fields on `KeyedPropertyFeedback`:
   `monomorphic_named_fast`, `monomorphic_named_fast_atom`,
@@ -87,9 +87,9 @@ through to the existing keyed slow chain unchanged.
   `observe_named_atom_slow_path`, `observe_dense_index`, and
   `promote_to_megamorphic`.
 - Two `Vm::keyed_property_{named,dense}_fast_handler` helpers in
-  `crates/lyng-js/vm/src/vm/feedback.rs` (inline-always).
+  `crates/lyng/vm/src/vm/feedback.rs` (inline-always).
 - Four `Vm::try_keyed_{dense,named}_fast_{load,store}` helpers in
-  `crates/lyng-js/vm/src/vm/dispatch/property.rs` (inline-always).
+  `crates/lyng/vm/src/vm/dispatch/property.rs` (inline-always).
 
 ## Verification
 
@@ -97,8 +97,8 @@ through to the existing keyed slow chain unchanged.
 
 | Check | Phase 3c | Phase 3d | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-gc -p lyng-js-objects -p lyng-js-vm -p lyng-js-tests` | 1709 passed | 1712 passed | +3 (new KeyedDenseIndexHandler unit tests) |
-| `cargo clippy -p lyng-js-vm` | 0 errors, 7 warnings | 0 errors, 7 warnings | unchanged |
+| `cargo test -p lyng-gc -p lyng-objects -p lyng-vm -p lyng-tests` | 1709 passed | 1712 passed | +3 (new KeyedDenseIndexHandler unit tests) |
+| `cargo clippy -p lyng-vm` | 0 errors, 7 warnings | 0 errors, 7 warnings | unchanged |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
 
@@ -121,8 +121,8 @@ Cumulative geomean over Phase 2a is now **≈ +6.1%** — the highest yet
 across the four sub-issues 3a-3d.
 
 Reports:
-- `reports/js/lyng-js/phase-3d-bench.md`
-- `reports/js/lyng-js/phase-3d-bench.json`
+- `reports/lyng/phase-3d-bench.md`
+- `reports/lyng/phase-3d-bench.json`
 
 ### `cargo asm`
 
@@ -136,8 +136,8 @@ are gone from the hit path — they sit on the slow-fall-through branches
 for polymorphic / Generic / megamorphic / miss only.
 
 Reports:
-- `reports/js/lyng-js/phase-3d-commit-{a,b}-op_get_keyed_property.asm`
-- `reports/js/lyng-js/phase-3d-commit-{a,b}-op_set_keyed_property_common.asm`
+- `reports/lyng/phase-3d-commit-{a,b}-op_get_keyed_property.asm`
+- `reports/lyng/phase-3d-commit-{a,b}-op_set_keyed_property_common.asm`
 
 ### Test262
 
@@ -156,7 +156,7 @@ File-level pass count is unchanged. No new deterministic failures
 from Phase 3d.
 
 Report:
-- `reports/js/lyng-js/phase-3d-test262.md`
+- `reports/lyng/phase-3d-test262.md`
 
 ## What's deferred
 
@@ -168,13 +168,13 @@ Report:
 ## Files changed
 
 **Phase 3d (1/2)** — infrastructure:
-- `crates/lyng-js/objects/src/core.rs` — `ObjectFlags::bits / from_bits` raw accessors.
-- `crates/lyng-js/objects/src/shapes.rs` — `KeyedDenseIndexHandler` packed type.
-- `crates/lyng-js/objects/src/lib.rs` — re-export `KeyedDenseIndexHandler`.
-- `crates/lyng-js/objects/src/tests.rs` — 3 unit tests for dense handler.
-- `crates/lyng-js/vm/src/vm/feedback.rs` — 4 sidecar fields + `refresh_monomorphic_fast` + 2 `Vm` lookup helpers.
+- `crates/lyng/objects/src/core.rs` — `ObjectFlags::bits / from_bits` raw accessors.
+- `crates/lyng/objects/src/shapes.rs` — `KeyedDenseIndexHandler` packed type.
+- `crates/lyng/objects/src/lib.rs` — re-export `KeyedDenseIndexHandler`.
+- `crates/lyng/objects/src/tests.rs` — 3 unit tests for dense handler.
+- `crates/lyng/vm/src/vm/feedback.rs` — 4 sidecar fields + `refresh_monomorphic_fast` + 2 `Vm` lookup helpers.
 
 **Phase 3d (2/2)** — consumer:
-- `crates/lyng-js/vm/src/vm/dispatch/property.rs` — 4 `#[inline(always)]` fast-path helpers + 6 inline call sites (2 dense get, 1 atom get, 2 dense set, 1 atom set).
+- `crates/lyng/vm/src/vm/dispatch/property.rs` — 4 `#[inline(always)]` fast-path helpers + 6 inline call sites (2 dense get, 1 atom get, 2 dense set, 1 atom set).
 
 Total Phase 3d diff: ~310 added lines + ~30 modified across 6 files.

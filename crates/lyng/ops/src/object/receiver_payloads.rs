@@ -1,7 +1,7 @@
 use crate::errors::throw_type_error;
-use lyng_js_env::Agent;
-use lyng_js_objects::{TemporalObjectData, TemporalObjectKind};
-use lyng_js_types::{Completion, Value};
+use lyng_env::Agent;
+use lyng_objects::{TemporalObjectData, TemporalObjectKind};
+use lyng_types::{Completion, Value};
 
 /// Returns the stored time-value payload for a Date receiver.
 ///

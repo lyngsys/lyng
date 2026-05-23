@@ -28,80 +28,80 @@ pub(super) fn dispatch_temporal_plain_year_month_builtin<Cx: PublicBuiltinDispat
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::temporal_plain_year_month_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_builtin() {
         return temporal_plain_year_month_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_year_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_year_getter_builtin() {
         return temporal_plain_year_month_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_month_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_month_getter_builtin() {
         return temporal_plain_year_month_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_month_code_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_month_code_getter_builtin() {
         return temporal_plain_year_month_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_days_in_month_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_days_in_month_getter_builtin() {
         return temporal_plain_year_month_days_in_month_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_days_in_year_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_days_in_year_getter_builtin() {
         return temporal_plain_year_month_days_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_months_in_year_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_months_in_year_getter_builtin() {
         return temporal_plain_year_month_months_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_in_leap_year_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_in_leap_year_getter_builtin() {
         return temporal_plain_year_month_in_leap_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_era_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_era_getter_builtin() {
         return temporal_plain_year_month_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_era_year_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_era_year_getter_builtin() {
         return temporal_plain_year_month_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_calendar_id_getter_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_calendar_id_getter_builtin() {
         return temporal_plain_year_month_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_to_string_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_to_string_builtin() {
         return temporal_plain_year_month_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_to_json_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_to_json_builtin() {
         return temporal_plain_year_month_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_to_locale_string_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_to_locale_string_builtin() {
         return temporal_plain_year_month_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_value_of_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_value_of_builtin() {
         return temporal_plain_year_month_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_equals_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_equals_builtin() {
         return temporal_plain_year_month_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_with_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_with_builtin() {
         return temporal_plain_year_month_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_add_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_add_builtin() {
         return temporal_plain_year_month_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_subtract_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_subtract_builtin() {
         return temporal_plain_year_month_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_since_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_since_builtin() {
         return temporal_plain_year_month_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_until_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_until_builtin() {
         return temporal_plain_year_month_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_to_plain_date_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_to_plain_date_builtin() {
         return temporal_plain_year_month_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_from_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_from_builtin() {
         return temporal_plain_year_month_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_plain_year_month_compare_builtin() {
+    if entry == lyng_types::temporal_plain_year_month_compare_builtin() {
         return temporal_plain_year_month_compare_builtin(context, invocation).map(Some);
     }
     Ok(None)

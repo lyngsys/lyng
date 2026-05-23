@@ -4,10 +4,10 @@
 use std::mem::size_of;
 use std::time::Instant;
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_lexer::Token;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
+use lyng_common::{AtomTable, SourceId};
+use lyng_lexer::Token;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
 
 /// Phase 1 exit gate: 100k lines, under 5s, no token vector.
 #[test]
@@ -115,7 +115,7 @@ fn streaming_no_token_vector() {
 #[test]
 fn duplicate_import_attribute_key_is_error() {
     let mut atoms = AtomTable::new();
-    let parsed = lyng_js_parser::parse_module(
+    let parsed = lyng_parser::parse_module(
         &mut atoms,
         SourceId::new(0),
         "import x from './m.js' with { type: 'json', type: 'json' };",
@@ -130,7 +130,7 @@ fn duplicate_import_attribute_key_is_error() {
 #[test]
 fn duplicate_import_attribute_key_unicode_escape() {
     let mut atoms = AtomTable::new();
-    let parsed = lyng_js_parser::parse_module(
+    let parsed = lyng_parser::parse_module(
         &mut atoms,
         SourceId::new(0),
         "import x from './m.js' with { type: 'json', typ\\u0065: '' };",

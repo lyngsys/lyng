@@ -1,4 +1,4 @@
-//! Shared infrastructure for the lyng-js JavaScript engine.
+//! Shared infrastructure for the lyng JavaScript engine.
 //!
 //! This crate owns the types shared across the full engine that are not
 //! runtime values: source locations, atoms, and diagnostics.

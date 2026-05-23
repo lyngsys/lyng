@@ -6,7 +6,7 @@ symmetric pair of `op_store_local_3`. V8 v7 aggregate dispatches:
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -24,7 +24,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_store_local_2.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_store_local_2.asm`.
 
 ```asm
 op_store_local_2_dsl:
@@ -67,7 +67,7 @@ RayTrace dominates (99.99% of aggregate share). Gate satisfied.
 
 ## Behavioral tests
 
-vm 418 / lyng-js-tests 1209. Integration test
+vm 418 / lyng-tests 1209. Integration test
 `store_local_0_1_2_via_assignments` covers StoreLocal2 via `c = c * 4`
 parameter mutation.
 

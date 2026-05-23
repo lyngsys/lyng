@@ -4,7 +4,7 @@
 //! perform JS conversion, host interaction, and error allocation, while these
 //! helpers own reusable Temporal arithmetic and formatting rules.
 
-use lyng_js_objects::{
+use lyng_objects::{
     TemporalDurationObjectData, TemporalPlainDateObjectData, TemporalPlainDateTimeObjectData,
     TemporalPlainMonthDayObjectData, TemporalPlainTimeObjectData, TemporalPlainYearMonthObjectData,
 };
@@ -1306,7 +1306,7 @@ pub fn format_offset(offset_nanoseconds: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomId;
+    use lyng_common::AtomId;
 
     #[test]
     fn duration_sign_rejects_mixed_sign_components() {

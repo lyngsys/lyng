@@ -1,13 +1,13 @@
 //! Cross-crate integration coverage for the runtime primitive layer.
 
-use lyng_js_common::{AtomId, AtomLifetime, AtomTable};
-use lyng_js_gc::{
+use lyng_common::{AtomId, AtomLifetime, AtomTable};
+use lyng_gc::{
     AllocationLifetime, AtomGcSweep, BigIntSign, PrimitiveAtomMetadata, PrimitiveCollectionTrigger,
     PrimitiveHeap, PrimitiveRoots, PrimitiveStringRecord, PrimitiveSymbolClass, StringEncoding,
     StringHandleStoreTarget, SymbolFlags, TraceAtomEdges, ValueStoreTarget,
     PRIMITIVE_SLOTS_PER_PAGE,
 };
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 #[test]
 fn nested_runtime_atom_edges_keep_live_atoms_across_heap_records() {

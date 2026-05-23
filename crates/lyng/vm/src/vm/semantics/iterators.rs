@@ -49,7 +49,7 @@
 //! per-frame fields back to the canonical top frame so the callee sees
 //! the up-to-date instruction offset.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::vm::dispatch_state::DispatchState;

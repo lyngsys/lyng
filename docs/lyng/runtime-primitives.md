@@ -5,11 +5,11 @@ primitive abstract operations used by the rest of the engine.
 
 ## Crate Ownership
 
-- `lyng-js-types` owns representation-only runtime data: `Value`, typed handles, builtin
+- `lyng-types` owns representation-only runtime data: `Value`, typed handles, builtin
   IDs, property keys, descriptors, and completion types.
-- `lyng-js-gc` owns allocation domains, mutator access helpers, tracing, rooting, weak
+- `lyng-gc` owns allocation domains, mutator access helpers, tracing, rooting, weak
   state, and collection bookkeeping.
-- `lyng-js-ops` owns ECMA-262 abstract operations and semantic helpers over runtime values,
+- `lyng-ops` owns ECMA-262 abstract operations and semantic helpers over runtime values,
   objects, property keys, descriptors, promises, Temporal records, shared memory, and
   conversions.
 
@@ -72,7 +72,7 @@ keys, builtin metadata, bytecode constants, and shape records.
 
 ## Operation Families
 
-`lyng-js-ops` is organized by semantic area:
+`lyng-ops` is organized by semantic area:
 
 - pure primitive conversion and comparison
 - object operations and internal-method contexts
@@ -90,7 +90,7 @@ ordinary/exotic dispatch, and abrupt completions remain centralized.
 
 ## Invariants
 
-- `lyng-js-types` remains representation-only.
+- `lyng-types` remains representation-only.
 - Heap access and mutation stay behind typed storage and mutator helper APIs.
 - Builtins, VM handlers, and object internals reuse shared operation helpers for
   guest-visible semantics.

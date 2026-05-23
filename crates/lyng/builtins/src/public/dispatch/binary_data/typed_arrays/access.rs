@@ -15,8 +15,8 @@ use super::{
     typed_array_validated_record_and_length,
 };
 use crate::BuiltinInvocation;
-use lyng_js_objects::TypedArrayElementKind;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_objects::TypedArrayElementKind;
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_access_builtin<
     Cx: PublicBuiltinDispatchContext,

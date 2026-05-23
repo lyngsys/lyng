@@ -1,7 +1,7 @@
-//! Comprehensive tests for the lyng-js parser.
+//! Comprehensive tests for the lyng parser.
 
-use lyng_js_ast::*;
-use lyng_js_common::{AtomTable, SourceId};
+use lyng_ast::*;
+use lyng_common::{AtomTable, SourceId};
 
 use crate::{parse_module, parse_script};
 

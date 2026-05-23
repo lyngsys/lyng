@@ -1,7 +1,7 @@
 //! Recursive-descent parser for ECMA-262 Edition 16.
 //!
-//! This crate consumes tokens from `lyng_js_lexer` and builds an arena-backed
-//! AST defined in `lyng_js_ast`. The two public entry points are `parse_script`
+//! This crate consumes tokens from `lyng_lexer` and builds an arena-backed
+//! AST defined in `lyng_ast`. The two public entry points are `parse_script`
 //! and `parse_module`.
 
 #![allow(
@@ -36,9 +36,9 @@ mod stmt;
 #[cfg(test)]
 mod tests;
 
-use lyng_js_ast::{Module, ParsedModule, ParsedScript, Script};
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_lexer::{TokenKind, TokenPayload};
+use lyng_ast::{Module, ParsedModule, ParsedScript, Script};
+use lyng_common::{AtomTable, SourceId};
+use lyng_lexer::{TokenKind, TokenPayload};
 
 use parser::Parser;
 

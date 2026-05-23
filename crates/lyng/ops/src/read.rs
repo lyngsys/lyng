@@ -4,10 +4,10 @@ use crate::convert::{
     string_view_to_number, LogicalType,
 };
 use crate::pure;
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_gc::{BigIntSign, PrimitiveHeapView};
-use lyng_js_types::{BigIntRef, Completion, StringRef, Value};
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_gc::{BigIntSign, PrimitiveHeapView};
+use lyng_types::{BigIntRef, Completion, StringRef, Value};
 
 #[inline]
 fn borrowed_strings_equal(
@@ -409,8 +409,8 @@ pub fn is_loosely_equal(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
-    use lyng_js_types::{AbruptCompletion, ObjectRef, SymbolRef};
+    use lyng_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
+    use lyng_types::{AbruptCompletion, ObjectRef, SymbolRef};
 
     #[test]
     fn read_only_helpers_take_shared_heap_views() {

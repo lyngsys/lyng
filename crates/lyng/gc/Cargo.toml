@@ -1,8 +1,8 @@
 [package]
-name = "lyng-js-gc"
+name = "lyng-gc"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lyng-js-common = { workspace = true }
-lyng-js-types = { workspace = true }
+lyng-common = { workspace = true }
+lyng-types = { workspace = true }

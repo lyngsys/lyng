@@ -1,8 +1,8 @@
 use crate::{
     BuiltinAttributes, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
 };
-use lyng_js_common::AtomId;
-use lyng_js_types::{
+use lyng_common::AtomId;
+use lyng_types::{
     atomics_add_builtin, atomics_and_builtin, atomics_compare_exchange_builtin,
     atomics_exchange_builtin, atomics_is_lock_free_builtin, atomics_load_builtin,
     atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin, atomics_store_builtin,

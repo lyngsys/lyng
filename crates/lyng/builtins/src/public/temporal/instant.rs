@@ -2,9 +2,9 @@ use super::{
     allocate_builtin_function_object, define_builtin_accessor_property,
     define_builtin_data_property, public_builtin_metadata,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
 
 #[derive(Clone, Copy)]
 pub(super) struct InstantBootstrapContext {
@@ -88,8 +88,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_builtin())?,
+        lyng_types::temporal_instant_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_builtin())?,
         Some(instant_prototype),
     );
     let from = allocate_builtin_function_object(
@@ -99,8 +99,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_from_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_from_builtin())?,
+        lyng_types::temporal_instant_from_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_from_builtin())?,
         None,
     );
     let from_epoch_nanoseconds = allocate_builtin_function_object(
@@ -110,8 +110,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_from_epoch_nanoseconds_builtin())?,
+        lyng_types::temporal_instant_from_epoch_nanoseconds_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_from_epoch_nanoseconds_builtin())?,
         None,
     );
     let from_epoch_milliseconds = allocate_builtin_function_object(
@@ -121,8 +121,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_from_epoch_milliseconds_builtin())?,
+        lyng_types::temporal_instant_from_epoch_milliseconds_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_from_epoch_milliseconds_builtin())?,
         None,
     );
     let compare = allocate_builtin_function_object(
@@ -132,8 +132,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_compare_builtin())?,
+        lyng_types::temporal_instant_compare_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_compare_builtin())?,
         None,
     );
     let epoch_nanoseconds_getter = allocate_builtin_function_object(
@@ -143,10 +143,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::temporal_instant_epoch_nanoseconds_getter_builtin(),
-        )?,
+        lyng_types::temporal_instant_epoch_nanoseconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_epoch_nanoseconds_getter_builtin())?,
         None,
     );
     let epoch_milliseconds_getter = allocate_builtin_function_object(
@@ -156,10 +154,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin(),
-        public_builtin_metadata(
-            lyng_js_types::temporal_instant_epoch_milliseconds_getter_builtin(),
-        )?,
+        lyng_types::temporal_instant_epoch_milliseconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_epoch_milliseconds_getter_builtin())?,
         None,
     );
     let to_string = allocate_builtin_function_object(
@@ -169,8 +165,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_to_string_builtin())?,
+        lyng_types::temporal_instant_to_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_to_string_builtin())?,
         None,
     );
     let to_json = allocate_builtin_function_object(
@@ -180,8 +176,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_to_json_builtin())?,
+        lyng_types::temporal_instant_to_json_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_to_json_builtin())?,
         None,
     );
     let to_locale_string = allocate_builtin_function_object(
@@ -191,8 +187,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_to_locale_string_builtin())?,
+        lyng_types::temporal_instant_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_to_locale_string_builtin())?,
         None,
     );
     let value_of = allocate_builtin_function_object(
@@ -202,8 +198,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_value_of_builtin())?,
+        lyng_types::temporal_instant_value_of_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_value_of_builtin())?,
         None,
     );
     let equals = allocate_builtin_function_object(
@@ -213,8 +209,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_equals_builtin())?,
+        lyng_types::temporal_instant_equals_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_equals_builtin())?,
         None,
     );
     let add = allocate_builtin_function_object(
@@ -224,8 +220,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_add_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_add_builtin())?,
+        lyng_types::temporal_instant_add_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_add_builtin())?,
         None,
     );
     let subtract = allocate_builtin_function_object(
@@ -235,8 +231,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_subtract_builtin())?,
+        lyng_types::temporal_instant_subtract_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_subtract_builtin())?,
         None,
     );
     let round = allocate_builtin_function_object(
@@ -246,8 +242,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_round_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_round_builtin())?,
+        lyng_types::temporal_instant_round_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_round_builtin())?,
         None,
     );
     let since = allocate_builtin_function_object(
@@ -257,8 +253,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_since_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_since_builtin())?,
+        lyng_types::temporal_instant_since_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_since_builtin())?,
         None,
     );
     let until = allocate_builtin_function_object(
@@ -268,8 +264,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_until_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_until_builtin())?,
+        lyng_types::temporal_instant_until_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_until_builtin())?,
         None,
     );
     let to_zoned_date_time_iso = allocate_builtin_function_object(
@@ -279,8 +275,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_instant_to_zoned_date_time_iso_builtin())?,
+        lyng_types::temporal_instant_to_zoned_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_types::temporal_instant_to_zoned_date_time_iso_builtin())?,
         None,
     );
 

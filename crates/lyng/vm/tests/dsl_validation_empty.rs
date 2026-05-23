@@ -5,22 +5,22 @@
 //! plan. It exercises the full proc-macro + backend-macro +
 //! `naked_asm!` integration:
 //!
-//! 1. `llint_handler!` parses the syntax in `lyng-js-vm-dsl::parse`.
-//! 2. The lowerer (`lyng-js-vm-dsl::lower`) emits an
+//! 1. `llint_handler!` parses the syntax in `lyng-vm-dsl::parse`.
+//! 2. The lowerer (`lyng-vm-dsl::lower`) emits an
 //!    `#[unsafe(naked)] pub extern "C" fn` whose body is a single
 //!    `core::arch::naked_asm!` call. Each body statement becomes a
 //!    comma-separated template argument; the trailing
 //!    `length = const N as u32` is the only named binding needed for
 //!    this minimal case.
 //! 3. `dispatch!(advance = 0)` is a `#[macro_export]`-ed backend macro
-//!    living at `lyng_js_vm::dispatch`. It expands to a `concat!(...)`
+//!    living at `lyng_vm::dispatch`. It expands to a `concat!(...)`
 //!    yielding a four-instruction tail-jump asm fragment.
 //! 4. rustc composes everything into a single asm template and produces
 //!    a real `extern "C" fn` whose symbol can be taken at runtime.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::dispatch;
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm::dispatch;
+use lyng_vm_dsl::llint_handler;
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {

@@ -50,8 +50,8 @@
 //!     the next iteration, mirroring the unary-arithmetic semantic bodies).
 //!  3. `Err(error)` — abrupt completion escapes; return `ExitError`.
 
-use lyng_js_ops::read;
-use lyng_js_types::Value;
+use lyng_ops::read;
+use lyng_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
@@ -95,9 +95,8 @@ fn op_jump_shared_semantic(
         Vm::poll_incremental_mark_safepoint(inner.agent);
     }
     let instruction_offset = inner.frame.instruction_offset();
-    let target = i64::from(instruction_offset)
-        + i64::from(args.instruction_len)
-        + i64::from(args.delta);
+    let target =
+        i64::from(instruction_offset) + i64::from(args.instruction_len) + i64::from(args.delta);
     if target < 0 || target > i64::from(u32::MAX) {
         return SemanticOutcome::ExitError {
             error: VmError::InvalidJumpTarget {
@@ -156,8 +155,7 @@ fn op_jump_if_shared_semantic(
     let condition = inner
         .vm
         .read_register_unchecked(inner.frame.registers(), args.condition_register);
-    let truthy_result =
-        read::to_boolean_agent(inner.agent, condition).map_err(VmError::Abrupt);
+    let truthy_result = read::to_boolean_agent(inner.agent, condition).map_err(VmError::Abrupt);
     let truthy = match inner.handle_dispatch_result(truthy_result) {
         Ok(Some(t)) => t,
         Ok(None) => {
@@ -174,9 +172,8 @@ fn op_jump_if_shared_semantic(
             Vm::poll_incremental_mark_safepoint(inner.agent);
         }
         let instruction_offset = inner.frame.instruction_offset();
-        let target = i64::from(instruction_offset)
-            + i64::from(args.instruction_len)
-            + i64::from(args.delta);
+        let target =
+            i64::from(instruction_offset) + i64::from(args.instruction_len) + i64::from(args.delta);
         if target < 0 || target > i64::from(u32::MAX) {
             return SemanticOutcome::ExitError {
                 error: VmError::InvalidJumpTarget {

@@ -2,7 +2,7 @@
 
 **Issue:** `lyng-4pvk` — Remove `argument_scratch` Vec materialization for ordinary VM calls
 **Baseline commit:** `d9243123` (Phase 4c deferral)
-**Command:** `cargo run --release -p lyng-js-test262 -- --report ... --list-failures`
+**Command:** `cargo run --release -p lyng-test262 -- --report ... --list-failures`
 
 ## Result summary
 
@@ -44,9 +44,9 @@ cleanly. These appeared to be machine-load-induced timing flakes from
 the warm-build state and not semantic regressions from this patch —
 all three confirmed via:
 
-- `lyng-js-test262 --filter harness/deepEqual -j 12`: 14/14 pass × 3
+- `lyng-test262 --filter harness/deepEqual -j 12`: 14/14 pass × 3
   consecutive runs
-- `lyng-js-test262 -j 1` against the full corpus: matches baseline
+- `lyng-test262 -j 1` against the full corpus: matches baseline
   exactly minus the flaky timeout
 
 ## Patch-time semantic bug found and fixed

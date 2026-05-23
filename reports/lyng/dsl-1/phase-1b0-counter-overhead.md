@@ -4,12 +4,12 @@ Measured 2026-05-18 after counters were wired into the DSL `dispatch!` tail (Tas
 
 ## Methodology
 
-A feature-off `--no-default-features`-style measurement is **not** practical: `lyng-js-bench` has hard dependencies on the counter API (`Vm::enable_opcode_dispatch_counts`, `opcode_dispatch_counts`, etc.); compiling it without the `opcode-counters` feature fails with 48 errors. Rather than refactor the bench tool to make those uses feature-gated (out of scope for Task 6), this measurement uses the **same-load A/B protocol from spec §4** to compare against the pre-counter-wiring HEAD.
+A feature-off `--no-default-features`-style measurement is **not** practical: `lyng-bench` has hard dependencies on the counter API (`Vm::enable_opcode_dispatch_counts`, `opcode_dispatch_counts`, etc.); compiling it without the `opcode-counters` feature fails with 48 errors. Rather than refactor the bench tool to make those uses feature-gated (out of scope for Task 6), this measurement uses the **same-load A/B protocol from spec §4** to compare against the pre-counter-wiring HEAD.
 
 - **Pre-wiring HEAD:** `b680752e` (Phase 1.A end state — counter macros existed but were not yet emitted by the lowerer; no per-dispatch increments fired).
 - **Post-wiring HEAD:** `845cee79` (Phase 1.B.0 through Task 5 — `inc_dispatch_counter!` emitted at every handler entry; `inc_slow_semantic_counter!` / `inc_slow_safepoint_counter!` emitted inside `call_slow!` / `poll_safepoint!`).
 
-Both runs: `v8suite --samples 7`. Build via the standard `cargo run --release -p lyng-js-bench -- v8suite`. Loadavg captured at start/end of each run.
+Both runs: `v8suite --samples 7`. Build via the standard `cargo run --release -p lyng-bench -- v8suite`. Loadavg captured at start/end of each run.
 
 | Measurement | Loadavg at start | Loadavg at end |
 |-------------|-----------------:|---------------:|
@@ -54,10 +54,10 @@ The empty cost on V8 v7 is consistent with Apple Silicon's wide-issue out-of-ord
 
 The Phase 1.A summary's correction (same-load A/B protocol) directly informs this approach. Comparing absolute scores across measurements taken at different machine loads (as the original Task 10 subagent did) gives misleading results. Same-load A/B against a pre-change HEAD on the same machine within a short time window is the reliable methodology.
 
-`lyng-js-bench` feature-off rebuilding is identified as a future improvement opportunity — if a "true" counter-off baseline ever needs to be measured (e.g., to validate the dispatch-counter shape after a major rustc upgrade), the bench tool's counter-API uses would need to be feature-gated. Not a blocker for the < 20% slow-path-share enforcement in subsequent DSL-1 phases.
+`lyng-bench` feature-off rebuilding is identified as a future improvement opportunity — if a "true" counter-off baseline ever needs to be measured (e.g., to validate the dispatch-counter shape after a major rustc upgrade), the bench tool's counter-API uses would need to be feature-gated. Not a blocker for the < 20% slow-path-share enforcement in subsequent DSL-1 phases.
 
 ## Implications for the rest of DSL-1
 
 - **Counter wiring stays on by default** in dev/bench builds. The `< 20% slow-path-share` invariant is now enforceable for Phase 1.B.3 opcode ports onward.
-- **Production builds** (`lyng-js-cli`) continue NOT enabling `opcode-counters` (matching the existing `lyng-3lqp` decision); the macros expand to empty strings in that configuration, leaving zero per-dispatch overhead in shipped binaries.
+- **Production builds** (`lyng-cli`) continue NOT enabling `opcode-counters` (matching the existing `lyng-3lqp` decision); the macros expand to empty strings in that configuration, leaving zero per-dispatch overhead in shipped binaries.
 - **No mitigation needed** (sparse counters, batched counters, etc. were the contingency from the parent §13.12 open question — not required).

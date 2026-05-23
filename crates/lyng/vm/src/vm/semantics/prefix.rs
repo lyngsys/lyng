@@ -30,7 +30,7 @@
 //!      `Continue { pc_advance: 0 }` (same-PC dispatch tail; the
 //!      α/DSL caller is responsible for picking the semantic byte).
 
-use lyng_js_bytecode::Opcode;
+use lyng_bytecode::Opcode;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;

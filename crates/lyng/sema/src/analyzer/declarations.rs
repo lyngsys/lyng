@@ -3,8 +3,8 @@ mod patterns;
 
 use std::collections::{HashMap, HashSet};
 
-use lyng_js_ast::{CatchClause, Decl, ForInOfLeft, ForInit, FunctionKind, Stmt, VariableKind};
-use lyng_js_common::AtomId;
+use lyng_ast::{CatchClause, Decl, ForInOfLeft, ForInit, FunctionKind, Stmt, VariableKind};
+use lyng_common::AtomId;
 
 use super::{Analyzer, LexicalDeclaredName, LexicalDeclaredNameKind};
 use crate::binding::DeclarationKind;
@@ -15,7 +15,7 @@ impl Analyzer<'_> {
         &mut self,
         name: AtomId,
         scope: crate::ids::ScopeId,
-        span: lyng_js_common::Span,
+        span: lyng_common::Span,
     ) {
         if self.function_binding_is_lexical_in_scope(scope) {
             self.declare_binding(name, DeclarationKind::Function, scope, span);
@@ -45,7 +45,7 @@ impl Analyzer<'_> {
 
     pub(super) fn check_statement_list_redeclarations(
         &mut self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
         scope_kind: ScopeKind,
     ) {
         let mut lexical_names = Vec::new();
@@ -59,7 +59,7 @@ impl Analyzer<'_> {
 
     pub(super) fn check_switch_case_redeclarations(
         &mut self,
-        cases: lyng_js_ast::NodeList<lyng_js_ast::SwitchCase>,
+        cases: lyng_ast::NodeList<lyng_ast::SwitchCase>,
     ) {
         let mut lexical_names = Vec::new();
         let mut var_names = Vec::new();
@@ -82,7 +82,7 @@ impl Analyzer<'_> {
 
     pub(super) fn predeclare_switch_case_bindings(
         &mut self,
-        cases: lyng_js_ast::NodeList<lyng_js_ast::SwitchCase>,
+        cases: lyng_ast::NodeList<lyng_ast::SwitchCase>,
     ) {
         for case in self.ast.get_switch_case_list(cases) {
             for &stmt_id in self.ast.get_stmt_list(case.consequent) {
@@ -93,7 +93,7 @@ impl Analyzer<'_> {
 
     pub(super) fn hoist_switch_case_declarations(
         &mut self,
-        cases: lyng_js_ast::NodeList<lyng_js_ast::SwitchCase>,
+        cases: lyng_ast::NodeList<lyng_ast::SwitchCase>,
     ) {
         let cases = self.ast.get_switch_case_list(cases).to_vec();
         for case in &cases {
@@ -106,14 +106,14 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_js_ast::StmtId) {
+    pub(super) fn predeclare_stmt_lexical_bindings(&mut self, stmt_id: lyng_ast::StmtId) {
         let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
             return;
         };
         self.predeclare_decl_lexical_bindings(*decl);
     }
 
-    fn predeclare_decl_lexical_bindings(&mut self, decl_id: lyng_js_ast::DeclId) {
+    fn predeclare_decl_lexical_bindings(&mut self, decl_id: lyng_ast::DeclId) {
         let decl = self.ast.get_decl(decl_id);
         match decl {
             Decl::Variable {
@@ -146,11 +146,11 @@ impl Analyzer<'_> {
                 }
             }
             Decl::Export { kind, .. } => match kind {
-                lyng_js_ast::ExportKind::Declaration { decl } => {
+                lyng_ast::ExportKind::Declaration { decl } => {
                     self.predeclare_decl_lexical_bindings(*decl);
                 }
-                lyng_js_ast::ExportKind::Default { declaration } => match declaration {
-                    lyng_js_ast::ExportDefaultDecl::Class(class) => {
+                lyng_ast::ExportKind::Default { declaration } => match declaration {
+                    lyng_ast::ExportDefaultDecl::Class(class) => {
                         if let Decl::Class {
                             name: Some(name),
                             span,
@@ -170,10 +170,10 @@ impl Analyzer<'_> {
                             }
                         }
                     }
-                    lyng_js_ast::ExportDefaultDecl::Function(_) => {}
-                    lyng_js_ast::ExportDefaultDecl::Expression(_) => {}
+                    lyng_ast::ExportDefaultDecl::Function(_) => {}
+                    lyng_ast::ExportDefaultDecl::Expression(_) => {}
                 },
-                lyng_js_ast::ExportKind::Named { .. } | lyng_js_ast::ExportKind::All { .. } => {}
+                lyng_ast::ExportKind::Named { .. } | lyng_ast::ExportKind::All { .. } => {}
             },
             Decl::Function { .. } | Decl::Import { .. } | Decl::InvalidDeclaration { .. } => {}
         }
@@ -271,7 +271,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_lexically_declared_names_from_stmt_list(
         &self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
         scope_kind: ScopeKind,
         out: &mut Vec<LexicalDeclaredName>,
     ) {
@@ -282,7 +282,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_lexically_declared_names_from_stmt_list_item(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         scope_kind: ScopeKind,
         out: &mut Vec<LexicalDeclaredName>,
     ) {
@@ -294,7 +294,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_lexically_declared_names_from_decl(
         &self,
-        decl_id: lyng_js_ast::DeclId,
+        decl_id: lyng_ast::DeclId,
         scope_kind: ScopeKind,
         out: &mut Vec<LexicalDeclaredName>,
     ) {
@@ -352,16 +352,16 @@ impl Analyzer<'_> {
             Decl::Import { specifiers, .. } => {
                 for spec in self.ast.get_import_spec_list(*specifiers) {
                     match spec {
-                        lyng_js_ast::ImportSpecifier::Default { local, span, .. }
-                        | lyng_js_ast::ImportSpecifier::Namespace { local, span, .. }
-                        | lyng_js_ast::ImportSpecifier::Source { local, span, .. } => {
+                        lyng_ast::ImportSpecifier::Default { local, span, .. }
+                        | lyng_ast::ImportSpecifier::Namespace { local, span, .. }
+                        | lyng_ast::ImportSpecifier::Source { local, span, .. } => {
                             out.push(LexicalDeclaredName {
                                 name: *local,
                                 span: *span,
                                 kind: LexicalDeclaredNameKind::Other,
                             });
                         }
-                        lyng_js_ast::ImportSpecifier::Named { local, span, .. } => {
+                        lyng_ast::ImportSpecifier::Named { local, span, .. } => {
                             out.push(LexicalDeclaredName {
                                 name: *local,
                                 span: *span,
@@ -372,7 +372,7 @@ impl Analyzer<'_> {
                 }
             }
             Decl::Export { kind, .. } => {
-                if let lyng_js_ast::ExportKind::Declaration { decl } = kind {
+                if let lyng_ast::ExportKind::Declaration { decl } = kind {
                     self.collect_lexically_declared_names_from_decl(*decl, scope_kind, out);
                 }
             }
@@ -382,7 +382,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_var_declared_names_from_stmt_list(
         &self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
         scope_kind: ScopeKind,
         out: &mut Vec<AtomId>,
     ) {
@@ -393,7 +393,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_var_declared_names_from_stmt(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         scope_kind: ScopeKind,
         out: &mut Vec<AtomId>,
     ) {
@@ -472,7 +472,7 @@ impl Analyzer<'_> {
 
     pub(super) fn collect_var_declared_names_from_decl(
         &self,
-        decl_id: lyng_js_ast::DeclId,
+        decl_id: lyng_ast::DeclId,
         scope_kind: ScopeKind,
         out: &mut Vec<AtomId>,
     ) {
@@ -496,11 +496,11 @@ impl Analyzer<'_> {
                 }
             }
             Decl::Export { kind, .. } => match kind {
-                lyng_js_ast::ExportKind::Declaration { decl } => {
+                lyng_ast::ExportKind::Declaration { decl } => {
                     self.collect_var_declared_names_from_decl(*decl, scope_kind, out);
                 }
-                lyng_js_ast::ExportKind::Default { declaration } => {
-                    if let lyng_js_ast::ExportDefaultDecl::Function(function_id) = declaration {
+                lyng_ast::ExportKind::Default { declaration } => {
+                    if let lyng_ast::ExportDefaultDecl::Function(function_id) = declaration {
                         if !self.function_binding_is_lexical_in_scope_kind(scope_kind) {
                             if let Some(name) = self.ast.get_function(*function_id).name {
                                 out.push(name);
@@ -516,8 +516,8 @@ impl Analyzer<'_> {
 
     pub(super) fn check_for_head_body_var_conflicts(
         &mut self,
-        decl_id: lyng_js_ast::DeclId,
-        body: lyng_js_ast::StmtId,
+        decl_id: lyng_ast::DeclId,
+        body: lyng_ast::StmtId,
     ) {
         let mut head_names = Vec::new();
         self.collect_for_head_lexical_bound_names(decl_id, &mut head_names);
@@ -543,8 +543,8 @@ impl Analyzer<'_> {
 
     fn collect_for_head_lexical_bound_names(
         &self,
-        decl_id: lyng_js_ast::DeclId,
-        out: &mut Vec<(AtomId, lyng_js_common::Span)>,
+        decl_id: lyng_ast::DeclId,
+        out: &mut Vec<(AtomId, lyng_common::Span)>,
     ) {
         let Decl::Variable {
             kind:
@@ -563,7 +563,7 @@ impl Analyzer<'_> {
 
     pub(super) fn hoist_annex_b_block_function_var_bindings(
         &mut self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) {
         let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
         if self.ctx.strict || !matches!(scope_kind, ScopeKind::Block | ScopeKind::Switch) {
@@ -579,7 +579,7 @@ impl Analyzer<'_> {
 
     pub(super) fn hoist_annex_b_contained_block_function_var_bindings(
         &mut self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) {
         let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
         if self.ctx.strict || !matches!(scope_kind, ScopeKind::Global | ScopeKind::Function) {
@@ -592,7 +592,7 @@ impl Analyzer<'_> {
 
     fn hoist_annex_b_contained_functions_from_stmt_list(
         &mut self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
         direct_candidate_context: bool,
         inherited_blocked_names: &HashSet<AtomId>,
     ) {
@@ -621,7 +621,7 @@ impl Analyzer<'_> {
 
     fn hoist_annex_b_contained_functions_from_stmt(
         &mut self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         inherited_blocked_names: &HashSet<AtomId>,
     ) {
         match self.ast.get_stmt(stmt_id) {
@@ -722,7 +722,7 @@ impl Analyzer<'_> {
 
     fn hoist_annex_b_if_clause_function(
         &mut self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         inherited_blocked_names: &HashSet<AtomId>,
     ) {
         if let Some((name, span)) = self.annex_b_direct_function_declaration(stmt_id) {
@@ -734,8 +734,8 @@ impl Analyzer<'_> {
 
     fn annex_b_direct_function_declaration(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
-    ) -> Option<(AtomId, lyng_js_common::Span)> {
+        stmt_id: lyng_ast::StmtId,
+    ) -> Option<(AtomId, lyng_common::Span)> {
         let Stmt::Declaration { decl, .. } = self.ast.get_stmt(stmt_id) else {
             return None;
         };
@@ -748,8 +748,8 @@ impl Analyzer<'_> {
 
     fn annex_b_block_level_function_declaration(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
-    ) -> Option<(AtomId, lyng_js_common::Span)> {
+        stmt_id: lyng_ast::StmtId,
+    ) -> Option<(AtomId, lyng_common::Span)> {
         match self.ast.get_stmt(stmt_id) {
             Stmt::Labeled { body, .. } => self.annex_b_block_level_function_declaration(*body),
             _ => self.annex_b_direct_function_declaration(stmt_id),
@@ -758,7 +758,7 @@ impl Analyzer<'_> {
 
     fn annex_b_direct_function_names_in_list(
         &self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) -> HashSet<AtomId> {
         self.ast
             .get_stmt_list(list)
@@ -770,7 +770,7 @@ impl Analyzer<'_> {
 
     fn annex_b_non_function_lexical_names_in_list(
         &self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) -> HashSet<AtomId> {
         let mut names = HashSet::new();
         for &stmt_id in self.ast.get_stmt_list(list) {
@@ -784,7 +784,7 @@ impl Analyzer<'_> {
 
     fn annex_b_collect_non_function_lexical_names(
         &self,
-        decl_id: lyng_js_ast::DeclId,
+        decl_id: lyng_ast::DeclId,
         names: &mut HashSet<AtomId>,
     ) {
         match self.ast.get_decl(decl_id) {
@@ -817,17 +817,17 @@ impl Analyzer<'_> {
                 }
             }
             Decl::Export { kind, .. } => {
-                if let lyng_js_ast::ExportKind::Declaration { decl } = kind {
+                if let lyng_ast::ExportKind::Declaration { decl } = kind {
                     self.annex_b_collect_non_function_lexical_names(*decl, names);
                 }
             }
             Decl::Import { specifiers, .. } => {
                 for spec in self.ast.get_import_spec_list(*specifiers) {
                     match spec {
-                        lyng_js_ast::ImportSpecifier::Default { local, .. }
-                        | lyng_js_ast::ImportSpecifier::Namespace { local, .. }
-                        | lyng_js_ast::ImportSpecifier::Source { local, .. }
-                        | lyng_js_ast::ImportSpecifier::Named { local, .. } => {
+                        lyng_ast::ImportSpecifier::Default { local, .. }
+                        | lyng_ast::ImportSpecifier::Namespace { local, .. }
+                        | lyng_ast::ImportSpecifier::Source { local, .. }
+                        | lyng_ast::ImportSpecifier::Named { local, .. } => {
                             names.insert(*local);
                         }
                     }
@@ -839,7 +839,7 @@ impl Analyzer<'_> {
 
     fn annex_b_collect_for_head_lexical_names(
         &self,
-        decl_id: lyng_js_ast::DeclId,
+        decl_id: lyng_ast::DeclId,
         names: &mut HashSet<AtomId>,
     ) {
         let Decl::Variable {
@@ -868,7 +868,7 @@ impl Analyzer<'_> {
         };
         if matches!(
             self.ast.get_pattern(param),
-            lyng_js_ast::Pattern::Identifier { .. }
+            lyng_ast::Pattern::Identifier { .. }
         ) {
             return;
         }
@@ -877,11 +877,7 @@ impl Analyzer<'_> {
         names.extend(bound.into_iter().map(|(name, _)| name));
     }
 
-    fn hoist_annex_b_block_function_var_binding(
-        &mut self,
-        name: AtomId,
-        span: lyng_js_common::Span,
-    ) {
+    fn hoist_annex_b_block_function_var_binding(&mut self, name: AtomId, span: lyng_common::Span) {
         if self.annex_b_parameter_names_contain(name) {
             return;
         }
@@ -954,7 +950,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn hoist_declarations(&mut self, stmt_id: lyng_js_ast::StmtId) {
+    pub(super) fn hoist_declarations(&mut self, stmt_id: lyng_ast::StmtId) {
         let stmt = self.ast.get_stmt(stmt_id);
         match stmt {
             Stmt::Declaration { decl, .. } => {
@@ -967,7 +963,7 @@ impl Analyzer<'_> {
                         }
                     }
                     Decl::Export { kind, .. } => match kind {
-                        lyng_js_ast::ExportKind::Declaration { decl } => {
+                        lyng_ast::ExportKind::Declaration { decl } => {
                             if let Decl::Function { function, span, .. } = self.ast.get_decl(*decl)
                             {
                                 let func = self.ast.get_function(*function);
@@ -980,9 +976,8 @@ impl Analyzer<'_> {
                                 }
                             }
                         }
-                        lyng_js_ast::ExportKind::Default { declaration } => {
-                            if let lyng_js_ast::ExportDefaultDecl::Function(function) = declaration
-                            {
+                        lyng_ast::ExportKind::Default { declaration } => {
+                            if let lyng_ast::ExportDefaultDecl::Function(function) = declaration {
                                 let func = self.ast.get_function(*function);
                                 if let Some(name) = func.name {
                                     self.hoist_function_binding(
@@ -993,16 +988,15 @@ impl Analyzer<'_> {
                                 }
                             }
                         }
-                        lyng_js_ast::ExportKind::Named { .. }
-                        | lyng_js_ast::ExportKind::All { .. } => {}
+                        lyng_ast::ExportKind::Named { .. } | lyng_ast::ExportKind::All { .. } => {}
                     },
                     Decl::Import { specifiers, .. } => {
                         for spec in self.ast.get_import_spec_list(*specifiers) {
                             match spec {
-                                lyng_js_ast::ImportSpecifier::Default { local, span, .. }
-                                | lyng_js_ast::ImportSpecifier::Namespace { local, span, .. }
-                                | lyng_js_ast::ImportSpecifier::Source { local, span, .. }
-                                | lyng_js_ast::ImportSpecifier::Named { local, span, .. } => {
+                                lyng_ast::ImportSpecifier::Default { local, span, .. }
+                                | lyng_ast::ImportSpecifier::Namespace { local, span, .. }
+                                | lyng_ast::ImportSpecifier::Source { local, span, .. }
+                                | lyng_ast::ImportSpecifier::Named { local, span, .. } => {
                                     self.declare_binding(
                                         *local,
                                         DeclarationKind::Import,
@@ -1026,7 +1020,7 @@ impl Analyzer<'_> {
 
     fn hoist_var_declarations_from_stmt_list(
         &mut self,
-        list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        list: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) {
         let stmts = self.ast.get_stmt_list(list).to_vec();
         for stmt_id in stmts {
@@ -1034,7 +1028,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn hoist_var_declarations_from_stmt(&mut self, stmt_id: lyng_js_ast::StmtId) {
+    fn hoist_var_declarations_from_stmt(&mut self, stmt_id: lyng_ast::StmtId) {
         match self.ast.get_stmt(stmt_id).clone() {
             Stmt::Block { body, .. } => {
                 self.hoist_var_declarations_from_stmt_list(body);
@@ -1100,7 +1094,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn hoist_var_declarations_from_decl(&mut self, decl_id: lyng_js_ast::DeclId) {
+    fn hoist_var_declarations_from_decl(&mut self, decl_id: lyng_ast::DeclId) {
         match self.ast.get_decl(decl_id).clone() {
             Decl::Variable {
                 kind: VariableKind::Var,
@@ -1113,7 +1107,7 @@ impl Analyzer<'_> {
                 }
             }
             Decl::Export {
-                kind: lyng_js_ast::ExportKind::Declaration { decl },
+                kind: lyng_ast::ExportKind::Declaration { decl },
                 ..
             } => {
                 self.hoist_var_declarations_from_decl(decl);
@@ -1122,7 +1116,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn walk_decl(&mut self, decl_id: lyng_js_ast::DeclId) {
+    pub(super) fn walk_decl(&mut self, decl_id: lyng_ast::DeclId) {
         let decl = self.ast.get_decl(decl_id);
         match decl {
             Decl::Variable {

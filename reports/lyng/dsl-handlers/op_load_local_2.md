@@ -6,7 +6,7 @@ V8 v7 aggregate (3 samples × 6 workloads) = **144,349,854 dispatches**.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -24,7 +24,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_local_2.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_local_2.asm`.
 
 ```asm
 op_load_local_2_dsl:
@@ -69,9 +69,9 @@ dispatches** with **0** slow-path entries.
 
 ## Behavioral tests
 
-vm 418 / lyng-js-tests 1209. Integration test
+vm 418 / lyng-tests 1209. Integration test
 `load_local_2_returns_third_parameter` in
-`crates/lyng-js/tests/src/op_locals_inline.rs` covers direct
+`crates/lyng/tests/src/op_locals_inline.rs` covers direct
 third-parameter access.
 
 ## Notes

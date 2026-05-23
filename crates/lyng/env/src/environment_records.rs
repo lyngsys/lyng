@@ -1,7 +1,7 @@
 use super::{EnvironmentLayoutId, ThisBindingStatus};
-use lyng_js_common::AtomId;
-use lyng_js_gc::EnvironmentSlotsRef;
-use lyng_js_types::{EnvironmentRef, ObjectRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::EnvironmentSlotsRef;
+use lyng_types::{EnvironmentRef, ObjectRef, Value};
 use std::collections::HashSet;
 
 /// Read-only typed view over one declarative environment record.

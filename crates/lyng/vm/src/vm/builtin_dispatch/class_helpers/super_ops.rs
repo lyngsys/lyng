@@ -5,7 +5,7 @@ use super::{
 
 #[derive(Clone, Copy, Debug)]
 struct SuperConstructContext {
-    function_env: Option<lyng_js_types::EnvironmentRef>,
+    function_env: Option<lyng_types::EnvironmentRef>,
     active_function: ObjectRef,
     binding_status: ThisBindingStatus,
     new_target: ObjectRef,
@@ -14,15 +14,15 @@ struct SuperConstructContext {
 impl Vm {
     fn super_constructor_this_environment_record(
         agent: &Agent,
-        start: lyng_js_types::EnvironmentRef,
-    ) -> VmResult<Option<lyng_js_env::FunctionEnvironmentRecord>> {
+        start: lyng_types::EnvironmentRef,
+    ) -> VmResult<Option<lyng_env::FunctionEnvironmentRecord>> {
         let mut current = Some(start);
         while let Some(environment) = current {
             match agent
                 .environment(environment)
                 .ok_or(VmError::MissingEnvironment(environment))?
             {
-                lyng_js_env::EnvironmentRecord::Function(record) => {
+                lyng_env::EnvironmentRecord::Function(record) => {
                     let function_is_lexical = agent
                         .objects()
                         .function_data(record.function_object())
@@ -35,11 +35,11 @@ impl Vm {
                     }
                     return Ok(Some(record));
                 }
-                lyng_js_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Module(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Global(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Module(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Global(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => current = record.outer(),
             }
         }
         Ok(None)
@@ -143,7 +143,7 @@ impl Vm {
         let record = Self::super_constructor_this_environment_record(agent, caller.lexical_env())?;
         let function_env = record.map(|record| record.declarative().id());
         let active_function = record
-            .map(lyng_js_env::FunctionEnvironmentRecord::function_object)
+            .map(lyng_env::FunctionEnvironmentRecord::function_object)
             .or_else(|| caller.callee())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let derived_constructor = {
@@ -169,15 +169,15 @@ impl Vm {
                         .current_execution_context()
                         .is_some_and(|context| context.this_state() != ThisState::Uninitialized)
                 {
-                    lyng_js_env::ThisBindingStatus::Initialized
+                    lyng_env::ThisBindingStatus::Initialized
                 } else {
-                    lyng_js_env::ThisBindingStatus::Uninitialized
+                    lyng_env::ThisBindingStatus::Uninitialized
                 }
             },
-            lyng_js_env::FunctionEnvironmentRecord::this_binding_status,
+            lyng_env::FunctionEnvironmentRecord::this_binding_status,
         );
         let new_target = record
-            .and_then(lyng_js_env::FunctionEnvironmentRecord::new_target)
+            .and_then(lyng_env::FunctionEnvironmentRecord::new_target)
             .or_else(|| caller.new_target())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         Ok(SuperConstructContext {
@@ -208,13 +208,13 @@ impl Vm {
             Some(context.new_target),
         )?;
         let this_value = Value::from_object_ref(this_object);
-        if context.binding_status != lyng_js_env::ThisBindingStatus::Uninitialized {
+        if context.binding_status != lyng_env::ThisBindingStatus::Uninitialized {
             return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
         }
         if let Some(function_env) = context.function_env {
             let _ = agent.set_function_this_binding(
                 function_env,
-                lyng_js_env::ThisBindingStatus::Initialized,
+                lyng_env::ThisBindingStatus::Initialized,
                 this_value,
             );
             if !agent.set_execution_context_this_state_for_lexical_env(

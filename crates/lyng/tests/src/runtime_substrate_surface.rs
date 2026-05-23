@@ -1,18 +1,18 @@
 //! Compile-smoke coverage for the runtime substrate crate DAG.
 
-use lyng_js_ast::FunctionId;
-use lyng_js_common::AtomId;
-use lyng_js_compiler::{derive_environment_layout_plan, EnvironmentLayoutPlanError};
-use lyng_js_env::{
+use lyng_ast::FunctionId;
+use lyng_common::AtomId;
+use lyng_compiler::{derive_environment_layout_plan, EnvironmentLayoutPlanError};
+use lyng_env::{
     EnvironmentLayoutKind, ExecutableId, ExecutionContext, ExecutionContextKind, Intrinsics,
     JobQueueKind, Runtime, ThisState,
 };
-use lyng_js_host::NoopHostHooks;
-use lyng_js_sema::{
+use lyng_host::NoopHostHooks;
+use lyng_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
     FunctionSemaTable, ScopeKind, ScopeRecord, ScopeTable, StorageClass,
 };
-use lyng_js_types::{CodeRef, Value};
+use lyng_types::{CodeRef, Value};
 
 #[test]
 fn runtime_topology_boots_through_public_env_surface() {

@@ -1,6 +1,6 @@
 //! Test 4 from design §10 DSL-0a: opcode-shaped semantic logic lives only in
-//! `crates/lyng-js/vm/src/vm/semantics/` and (transitionally) in
-//! `crates/lyng-js/vm/src/vm/dispatch_handlers/` as decode-and-call thunks.
+//! `crates/lyng/vm/src/vm/semantics/` and (transitionally) in
+//! `crates/lyng/vm/src/vm/dispatch_handlers/` as decode-and-call thunks.
 //!
 //! This test reads source files and rejects function names matching
 //! `^pub(\(.*\))?\s*fn\s+op_[a-z0-9_]+\s*\(` (i.e. `op_xxx` functions)

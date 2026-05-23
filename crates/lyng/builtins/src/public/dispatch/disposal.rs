@@ -8,11 +8,11 @@ use super::{
     reference_error, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::DisposalCapabilityKind;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::ObjectAllocation;
-use lyng_js_ops::errors;
-use lyng_js_types::{
+use lyng_env::DisposalCapabilityKind;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::ObjectAllocation;
+use lyng_ops::errors;
+use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
@@ -35,25 +35,25 @@ fn dispatch_disposal_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::disposable_stack_builtin() {
+    if entry == lyng_types::disposable_stack_builtin() {
         return disposable_stack_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_use_builtin() {
+    if entry == lyng_types::disposable_stack_use_builtin() {
         return disposable_stack_use_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_adopt_builtin() {
+    if entry == lyng_types::disposable_stack_adopt_builtin() {
         return disposable_stack_adopt_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_defer_builtin() {
+    if entry == lyng_types::disposable_stack_defer_builtin() {
         return disposable_stack_defer_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_move_builtin() {
+    if entry == lyng_types::disposable_stack_move_builtin() {
         return disposable_stack_move_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_disposed_getter_builtin() {
+    if entry == lyng_types::disposable_stack_disposed_getter_builtin() {
         return disposable_stack_disposed_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::disposable_stack_dispose_builtin() {
+    if entry == lyng_types::disposable_stack_dispose_builtin() {
         return disposal_stack_dispose_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -64,28 +64,28 @@ fn dispatch_async_disposal_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::async_disposable_stack_builtin() {
+    if entry == lyng_types::async_disposable_stack_builtin() {
         return async_disposable_stack_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_use_builtin() {
+    if entry == lyng_types::async_disposable_stack_use_builtin() {
         return async_disposable_stack_use_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_adopt_builtin() {
+    if entry == lyng_types::async_disposable_stack_adopt_builtin() {
         return async_disposable_stack_adopt_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_defer_builtin() {
+    if entry == lyng_types::async_disposable_stack_defer_builtin() {
         return async_disposable_stack_defer_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_move_builtin() {
+    if entry == lyng_types::async_disposable_stack_move_builtin() {
         return async_disposable_stack_move_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_disposed_getter_builtin() {
+    if entry == lyng_types::async_disposable_stack_disposed_getter_builtin() {
         return async_disposable_stack_disposed_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposable_stack_dispose_async_builtin() {
+    if entry == lyng_types::async_disposable_stack_dispose_async_builtin() {
         return async_disposable_stack_dispose_async_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::async_disposal_resume_builtin() {
+    if entry == lyng_types::async_disposal_resume_builtin() {
         return async_disposal_resume_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -96,43 +96,43 @@ fn dispatch_disposal_scope_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::create_sync_disposal_scope_builtin() {
+    if entry == lyng_types::create_sync_disposal_scope_builtin() {
         return create_disposal_scope_builtin(context, DisposalCapabilityKind::Sync).map(Some);
     }
-    if entry == lyng_js_types::create_async_disposal_scope_builtin() {
+    if entry == lyng_types::create_async_disposal_scope_builtin() {
         return create_disposal_scope_builtin(context, DisposalCapabilityKind::Async).map(Some);
     }
-    if entry == lyng_js_types::add_sync_disposable_resource_builtin() {
+    if entry == lyng_types::add_sync_disposable_resource_builtin() {
         return add_disposal_scope_resource_builtin(context, invocation, false).map(Some);
     }
-    if entry == lyng_js_types::add_async_disposable_resource_builtin() {
+    if entry == lyng_types::add_async_disposable_resource_builtin() {
         return add_disposal_scope_resource_builtin(context, invocation, true).map(Some);
     }
-    if entry == lyng_js_types::dispose_scope_builtin() {
+    if entry == lyng_types::dispose_scope_builtin() {
         return dispose_scope_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::dispose_scope_async_builtin() {
+    if entry == lyng_types::dispose_scope_async_builtin() {
         return dispose_scope_async_builtin(context, invocation).map(Some);
     }
     Ok(None)
 }
 
-fn disposal_capability_payload_value(id: lyng_js_env::DisposalCapabilityId) -> Value {
+fn disposal_capability_payload_value(id: lyng_env::DisposalCapabilityId) -> Value {
     i32::try_from(id.get()).map_or_else(|_| Value::from_f64(f64::from(id.get())), Value::from_smi)
 }
 
 fn disposal_stack_default_prototype<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<ObjectRef, Cx::Error> {
     let intrinsics = cx.agent().realm(realm).map(|realm| realm.intrinsics());
     let prototype = match kind {
-        lyng_js_env::DisposalCapabilityKind::Sync => {
-            intrinsics.and_then(lyng_js_env::Intrinsics::disposable_stack_prototype)
+        lyng_env::DisposalCapabilityKind::Sync => {
+            intrinsics.and_then(lyng_env::Intrinsics::disposable_stack_prototype)
         }
-        lyng_js_env::DisposalCapabilityKind::Async => {
-            intrinsics.and_then(lyng_js_env::Intrinsics::async_disposable_stack_prototype)
+        lyng_env::DisposalCapabilityKind::Async => {
+            intrinsics.and_then(lyng_env::Intrinsics::async_disposable_stack_prototype)
         }
     };
     prototype.ok_or_else(|| type_error(cx))
@@ -142,7 +142,7 @@ fn create_disposal_stack_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
     prototype: ObjectRef,
-    capability: lyng_js_env::DisposalCapabilityId,
+    capability: lyng_env::DisposalCapabilityId,
 ) -> Result<ObjectRef, Cx::Error> {
     let root_shape = cx
         .agent()
@@ -169,7 +169,7 @@ fn create_disposal_stack_object<Cx: PublicBuiltinDispatchContext>(
 fn create_disposal_scope_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    capability: lyng_js_env::DisposalCapabilityId,
+    capability: lyng_env::DisposalCapabilityId,
 ) -> Result<ObjectRef, Cx::Error> {
     let prototype = cx
         .agent()
@@ -182,12 +182,12 @@ fn create_disposal_scope_object<Cx: PublicBuiltinDispatchContext>(
 fn require_disposal_stack_receiver<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<
     (
         ObjectRef,
-        lyng_js_env::DisposalCapabilityId,
-        lyng_js_env::DisposalCapabilityState,
+        lyng_env::DisposalCapabilityId,
+        lyng_env::DisposalCapabilityState,
     ),
     Cx::Error,
 > {
@@ -208,10 +208,10 @@ fn require_disposal_stack_receiver<Cx: PublicBuiltinDispatchContext>(
 fn require_pending_disposal_stack<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-    kind: lyng_js_env::DisposalCapabilityKind,
-) -> Result<(ObjectRef, lyng_js_env::DisposalCapabilityId), Cx::Error> {
+    kind: lyng_env::DisposalCapabilityKind,
+) -> Result<(ObjectRef, lyng_env::DisposalCapabilityId), Cx::Error> {
     let (object, capability, state) = require_disposal_stack_receiver(cx, value, kind)?;
-    if matches!(state, lyng_js_env::DisposalCapabilityState::Disposed) {
+    if matches!(state, lyng_env::DisposalCapabilityState::Disposed) {
         return Err(reference_error(cx));
     }
     Ok((object, capability))
@@ -223,8 +223,8 @@ fn require_disposal_scope_receiver<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<
     (
         ObjectRef,
-        lyng_js_env::DisposalCapabilityId,
-        lyng_js_env::DisposalCapabilityRecord,
+        lyng_env::DisposalCapabilityId,
+        lyng_env::DisposalCapabilityRecord,
     ),
     Cx::Error,
 > {
@@ -245,8 +245,8 @@ fn require_pending_disposal_scope<Cx: PublicBuiltinDispatchContext>(
 ) -> Result<
     (
         ObjectRef,
-        lyng_js_env::DisposalCapabilityId,
-        lyng_js_env::DisposalCapabilityRecord,
+        lyng_env::DisposalCapabilityId,
+        lyng_env::DisposalCapabilityRecord,
     ),
     Cx::Error,
 > {
@@ -261,7 +261,7 @@ fn dispose_method_for_hint<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
     async_hint: bool,
-) -> Result<Option<(ObjectRef, lyng_js_env::DisposalMethodKind)>, Cx::Error> {
+) -> Result<Option<(ObjectRef, lyng_env::DisposalMethodKind)>, Cx::Error> {
     if value.is_undefined() || value.is_null() {
         return Ok(None);
     }
@@ -278,7 +278,7 @@ fn dispose_method_for_hint<Cx: PublicBuiltinDispatchContext>(
         if !(method.is_undefined() || method.is_null()) {
             return Ok(Some((
                 cx.require_callable_object(method)?,
-                lyng_js_env::DisposalMethodKind::Async,
+                lyng_env::DisposalMethodKind::Async,
             )));
         }
     }
@@ -296,9 +296,9 @@ fn dispose_method_for_hint<Cx: PublicBuiltinDispatchContext>(
     Ok(Some((
         cx.require_callable_object(method)?,
         if async_hint {
-            lyng_js_env::DisposalMethodKind::AsyncFromSync
+            lyng_env::DisposalMethodKind::AsyncFromSync
         } else {
-            lyng_js_env::DisposalMethodKind::Sync
+            lyng_env::DisposalMethodKind::Sync
         },
     )))
 }
@@ -306,12 +306,12 @@ fn dispose_method_for_hint<Cx: PublicBuiltinDispatchContext>(
 fn dispose_method_for_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-    kind: lyng_js_env::DisposalCapabilityKind,
-) -> Result<Option<(ObjectRef, lyng_js_env::DisposalMethodKind)>, Cx::Error> {
+    kind: lyng_env::DisposalCapabilityKind,
+) -> Result<Option<(ObjectRef, lyng_env::DisposalMethodKind)>, Cx::Error> {
     dispose_method_for_hint(
         cx,
         value,
-        matches!(kind, lyng_js_env::DisposalCapabilityKind::Async),
+        matches!(kind, lyng_env::DisposalCapabilityKind::Async),
     )
 }
 
@@ -329,19 +329,19 @@ fn append_disposal_error<Cx: PublicBuiltinDispatchContext>(
 
 fn call_disposal_resource<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    resource: lyng_js_env::DisposableResourceRecord,
+    resource: lyng_env::DisposableResourceRecord,
 ) -> Result<Value, Cx::Error> {
     match resource.kind() {
-        lyng_js_env::DisposableResourceKind::NoMethod => Ok(Value::undefined()),
-        lyng_js_env::DisposableResourceKind::UseMethod => {
+        lyng_env::DisposableResourceKind::NoMethod => Ok(Value::undefined()),
+        lyng_env::DisposableResourceKind::UseMethod => {
             let callable = resource.callable().ok_or_else(|| type_error(cx))?;
             cx.call_to_completion(callable, resource.value(), &[])
         }
-        lyng_js_env::DisposableResourceKind::CallbackWithValue => {
+        lyng_env::DisposableResourceKind::CallbackWithValue => {
             let callable = resource.callable().ok_or_else(|| type_error(cx))?;
             cx.call_to_completion(callable, Value::undefined(), &[resource.value()])
         }
-        lyng_js_env::DisposableResourceKind::CallbackWithoutValue => {
+        lyng_env::DisposableResourceKind::CallbackWithoutValue => {
             let callable = resource.callable().ok_or_else(|| type_error(cx))?;
             cx.call_to_completion(callable, Value::undefined(), &[])
         }
@@ -363,20 +363,20 @@ fn promise_for_async_disposal_result<Cx: PublicBuiltinDispatchContext>(
 
 fn allocate_async_disposal_resume_function<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    operation: lyng_js_env::AsyncDisposalOperationId,
+    operation: lyng_env::AsyncDisposalOperationId,
     reject: bool,
 ) -> Result<ObjectRef, Cx::Error> {
-    let function = cx.allocate_builtin_function(lyng_js_types::async_disposal_resume_builtin())?;
+    let function = cx.allocate_builtin_function(lyng_types::async_disposal_resume_builtin())?;
     let _ = cx.agent().alloc_async_disposal_resume(
         function,
-        lyng_js_env::AsyncDisposalResumeRecord::new(operation, reject),
+        lyng_env::AsyncDisposalResumeRecord::new(operation, reject),
     );
     Ok(function)
 }
 
 fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    operation_id: lyng_js_env::AsyncDisposalOperationId,
+    operation_id: lyng_env::AsyncDisposalOperationId,
 ) -> Result<(), Cx::Error> {
     loop {
         let operation = cx
@@ -422,7 +422,7 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
                 continue;
             }
         };
-        if matches!(method_kind, lyng_js_env::DisposalMethodKind::AsyncFromSync) {
+        if matches!(method_kind, lyng_env::DisposalMethodKind::AsyncFromSync) {
             continue;
         }
 
@@ -476,7 +476,7 @@ fn continue_async_disposal<Cx: PublicBuiltinDispatchContext>(
 
 fn create_disposal_scope_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let realm = cx.builtin_realm();
     let capability = cx.agent().alloc_disposal_capability(kind);
@@ -500,15 +500,13 @@ fn add_disposal_scope_resource_builtin<Cx: PublicBuiltinDispatchContext>(
         .copied()
         .unwrap_or(Value::undefined());
     let (_, capability, record) = require_pending_disposal_scope(cx, scope)?;
-    if async_hint && record.kind() != lyng_js_env::DisposalCapabilityKind::Async {
+    if async_hint && record.kind() != lyng_env::DisposalCapabilityKind::Async {
         return Err(type_error(cx));
     }
     if async_hint && (value.is_undefined() || value.is_null()) {
         let _ = cx.agent().push_disposal_resource(
             capability,
-            lyng_js_env::DisposableResourceRecord::no_method(
-                lyng_js_env::DisposalMethodKind::Async,
-            ),
+            lyng_env::DisposableResourceRecord::no_method(lyng_env::DisposalMethodKind::Async),
         );
         return Ok(value);
     }
@@ -517,19 +515,19 @@ fn add_disposal_scope_resource_builtin<Cx: PublicBuiltinDispatchContext>(
     };
     let _ = cx.agent().push_disposal_resource(
         capability,
-        lyng_js_env::DisposableResourceRecord::use_method(value, callable, method_kind),
+        lyng_env::DisposableResourceRecord::use_method(value, callable, method_kind),
     );
     Ok(value)
 }
 
 fn dispose_scope_capability<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::DisposalCapabilityId,
+    capability: lyng_env::DisposalCapabilityId,
     prior_error: Option<Value>,
 ) -> Result<Value, Cx::Error> {
     let _ = cx
         .agent()
-        .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);
+        .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
     let mut pending_error = prior_error;
     let mut saw_disposal_error = false;
     while let Some(resource) = cx.agent().pop_disposal_resource(capability) {
@@ -564,7 +562,7 @@ fn dispose_scope_builtin<Cx: PublicBuiltinDispatchContext>(
     if record.is_disposed() {
         return Ok(Value::undefined());
     }
-    if record.kind() != lyng_js_env::DisposalCapabilityKind::Sync {
+    if record.kind() != lyng_env::DisposalCapabilityKind::Sync {
         return Err(type_error(cx));
     }
     dispose_scope_capability(cx, capability, invocation.arguments().get(1).copied())
@@ -594,10 +592,9 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
         return Ok(Value::undefined());
     }
     if record.resources().is_empty() {
-        let _ = cx.agent().set_disposal_capability_state(
-            capability,
-            lyng_js_env::DisposalCapabilityState::Disposed,
-        );
+        let _ = cx
+            .agent()
+            .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
         return Ok(Value::undefined());
     }
     let promise_constructor = promise_default_constructor(cx)?;
@@ -605,7 +602,7 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
     let promise = promise_capability_promise(cx, promise_capability)?;
     let _ = cx
         .agent()
-        .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);
+        .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
     let operation = cx
         .agent()
         .alloc_async_disposal_operation(capability, promise_capability);
@@ -623,7 +620,7 @@ fn dispose_scope_async_builtin<Cx: PublicBuiltinDispatchContext>(
 fn disposal_stack_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let realm = cx.builtin_realm();
     let default_prototype = disposal_stack_default_prototype(cx, realm, kind)?;
@@ -639,14 +636,14 @@ fn disposable_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_constructor_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Sync)
+    disposal_stack_constructor_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Sync)
 }
 
 fn async_disposable_stack_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_constructor_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Async)
+    disposal_stack_constructor_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Async)
 }
 
 fn disposable_stack_disposed_getter_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -656,9 +653,9 @@ fn disposable_stack_disposed_getter_builtin<Cx: PublicBuiltinDispatchContext>(
     let (_, capability, state) = require_disposal_stack_receiver(
         cx,
         invocation.this_value(),
-        lyng_js_env::DisposalCapabilityKind::Sync,
+        lyng_env::DisposalCapabilityKind::Sync,
     )?;
-    let disposed = matches!(state, lyng_js_env::DisposalCapabilityState::Disposed)
+    let disposed = matches!(state, lyng_env::DisposalCapabilityState::Disposed)
         && cx.agent().disposal_capability(capability).is_some();
     Ok(Value::from_bool(disposed))
 }
@@ -670,9 +667,9 @@ fn async_disposable_stack_disposed_getter_builtin<Cx: PublicBuiltinDispatchConte
     let (_, capability, state) = require_disposal_stack_receiver(
         cx,
         invocation.this_value(),
-        lyng_js_env::DisposalCapabilityKind::Async,
+        lyng_env::DisposalCapabilityKind::Async,
     )?;
-    let disposed = matches!(state, lyng_js_env::DisposalCapabilityState::Disposed)
+    let disposed = matches!(state, lyng_env::DisposalCapabilityState::Disposed)
         && cx.agent().disposal_capability(capability).is_some();
     Ok(Value::from_bool(disposed))
 }
@@ -680,7 +677,7 @@ fn async_disposable_stack_disposed_getter_builtin<Cx: PublicBuiltinDispatchConte
 fn disposal_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let (_, capability) = require_pending_disposal_stack(cx, invocation.this_value(), kind)?;
     let value = invocation
@@ -688,14 +685,12 @@ fn disposal_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
         .first()
         .copied()
         .unwrap_or(Value::undefined());
-    if matches!(kind, lyng_js_env::DisposalCapabilityKind::Async)
+    if matches!(kind, lyng_env::DisposalCapabilityKind::Async)
         && (value.is_undefined() || value.is_null())
     {
         let _ = cx.agent().push_disposal_resource(
             capability,
-            lyng_js_env::DisposableResourceRecord::no_method(
-                lyng_js_env::DisposalMethodKind::Async,
-            ),
+            lyng_env::DisposableResourceRecord::no_method(lyng_env::DisposalMethodKind::Async),
         );
         return Ok(value);
     }
@@ -704,7 +699,7 @@ fn disposal_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
     };
     let _ = cx.agent().push_disposal_resource(
         capability,
-        lyng_js_env::DisposableResourceRecord::use_method(value, callable, method_kind),
+        lyng_env::DisposableResourceRecord::use_method(value, callable, method_kind),
     );
     Ok(value)
 }
@@ -713,20 +708,20 @@ fn disposable_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_use_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Sync)
+    disposal_stack_use_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Sync)
 }
 
 fn async_disposable_stack_use_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_use_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Async)
+    disposal_stack_use_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Async)
 }
 
 fn disposal_stack_adopt_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let (_, capability) = require_pending_disposal_stack(cx, invocation.this_value(), kind)?;
     let value = invocation
@@ -742,12 +737,12 @@ fn disposal_stack_adopt_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let method_kind = match kind {
-        lyng_js_env::DisposalCapabilityKind::Sync => lyng_js_env::DisposalMethodKind::Sync,
-        lyng_js_env::DisposalCapabilityKind::Async => lyng_js_env::DisposalMethodKind::Async,
+        lyng_env::DisposalCapabilityKind::Sync => lyng_env::DisposalMethodKind::Sync,
+        lyng_env::DisposalCapabilityKind::Async => lyng_env::DisposalMethodKind::Async,
     };
     let _ = cx.agent().push_disposal_resource(
         capability,
-        lyng_js_env::DisposableResourceRecord::callback_with_value(value, on_dispose, method_kind),
+        lyng_env::DisposableResourceRecord::callback_with_value(value, on_dispose, method_kind),
     );
     Ok(value)
 }
@@ -756,20 +751,20 @@ fn disposable_stack_adopt_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_adopt_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Sync)
+    disposal_stack_adopt_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Sync)
 }
 
 fn async_disposable_stack_adopt_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_adopt_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Async)
+    disposal_stack_adopt_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Async)
 }
 
 fn disposal_stack_defer_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let (_, capability) = require_pending_disposal_stack(cx, invocation.this_value(), kind)?;
     let on_dispose = cx.require_callable_object(
@@ -780,12 +775,12 @@ fn disposal_stack_defer_builtin<Cx: PublicBuiltinDispatchContext>(
             .unwrap_or(Value::undefined()),
     )?;
     let method_kind = match kind {
-        lyng_js_env::DisposalCapabilityKind::Sync => lyng_js_env::DisposalMethodKind::Sync,
-        lyng_js_env::DisposalCapabilityKind::Async => lyng_js_env::DisposalMethodKind::Async,
+        lyng_env::DisposalCapabilityKind::Sync => lyng_env::DisposalMethodKind::Sync,
+        lyng_env::DisposalCapabilityKind::Async => lyng_env::DisposalMethodKind::Async,
     };
     let _ = cx.agent().push_disposal_resource(
         capability,
-        lyng_js_env::DisposableResourceRecord::callback_without_value(on_dispose, method_kind),
+        lyng_env::DisposableResourceRecord::callback_without_value(on_dispose, method_kind),
     );
     Ok(Value::undefined())
 }
@@ -794,20 +789,20 @@ fn disposable_stack_defer_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_defer_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Sync)
+    disposal_stack_defer_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Sync)
 }
 
 fn async_disposable_stack_defer_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_defer_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Async)
+    disposal_stack_defer_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Async)
 }
 
 fn disposal_stack_move_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
-    kind: lyng_js_env::DisposalCapabilityKind,
+    kind: lyng_env::DisposalCapabilityKind,
 ) -> Result<Value, Cx::Error> {
     let (_, capability) = require_pending_disposal_stack(cx, invocation.this_value(), kind)?;
     let realm = cx.builtin_realm();
@@ -818,7 +813,7 @@ fn disposal_stack_move_builtin<Cx: PublicBuiltinDispatchContext>(
         .ok_or_else(|| type_error(cx))?;
     let _ = cx
         .agent()
-        .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);
+        .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
     let new_capability = cx.agent().alloc_disposal_capability(kind);
     let _ = cx
         .agent()
@@ -831,14 +826,14 @@ fn disposable_stack_move_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_move_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Sync)
+    disposal_stack_move_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Sync)
 }
 
 fn async_disposable_stack_move_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Value, Cx::Error> {
-    disposal_stack_move_builtin(cx, invocation, lyng_js_env::DisposalCapabilityKind::Async)
+    disposal_stack_move_builtin(cx, invocation, lyng_env::DisposalCapabilityKind::Async)
 }
 
 fn disposal_stack_dispose_builtin<Cx: PublicBuiltinDispatchContext>(
@@ -848,14 +843,14 @@ fn disposal_stack_dispose_builtin<Cx: PublicBuiltinDispatchContext>(
     let (_, capability, state) = require_disposal_stack_receiver(
         cx,
         invocation.this_value(),
-        lyng_js_env::DisposalCapabilityKind::Sync,
+        lyng_env::DisposalCapabilityKind::Sync,
     )?;
-    if matches!(state, lyng_js_env::DisposalCapabilityState::Disposed) {
+    if matches!(state, lyng_env::DisposalCapabilityState::Disposed) {
         return Ok(Value::undefined());
     }
     let _ = cx
         .agent()
-        .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);
+        .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
     let mut pending_error = None;
     while let Some(resource) = cx.agent().pop_disposal_resource(capability) {
         match call_disposal_resource(cx, resource) {
@@ -905,7 +900,7 @@ fn async_disposable_stack_dispose_async_builtin<Cx: PublicBuiltinDispatchContext
         let _ = cx.call_to_completion(reject, Value::undefined(), &[reason])?;
         return Ok(Value::from_object_ref(promise));
     };
-    if !matches!(record.kind(), lyng_js_env::DisposalCapabilityKind::Async) {
+    if !matches!(record.kind(), lyng_env::DisposalCapabilityKind::Async) {
         let reject = promise_capability_reject(cx, promise_capability)?;
         let reason = errors::throw_type_error(cx.agent())
             .thrown_value()
@@ -920,7 +915,7 @@ fn async_disposable_stack_dispose_async_builtin<Cx: PublicBuiltinDispatchContext
     }
     let _ = cx
         .agent()
-        .set_disposal_capability_state(capability, lyng_js_env::DisposalCapabilityState::Disposed);
+        .set_disposal_capability_state(capability, lyng_env::DisposalCapabilityState::Disposed);
     let operation = cx
         .agent()
         .alloc_async_disposal_operation(capability, promise_capability);

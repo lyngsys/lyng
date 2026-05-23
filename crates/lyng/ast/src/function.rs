@@ -4,7 +4,7 @@
 //! arrow functions, and method definitions. `ClassElement` covers methods,
 //! properties, and static blocks in class bodies.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::common::{FunctionKind, MethodKind};
 use crate::ids::{ExprId, FunctionId, NodeList, PatternId, StmtId};

@@ -23,10 +23,7 @@ impl FunctionCompiler<'_, '_> {
             .ok_or(LoweringError::MissingUseSite { expr })
     }
 
-    pub(super) fn private_use(
-        &self,
-        expr: ExprId,
-    ) -> LoweringResult<&lyng_js_sema::PrivateUseRecord> {
+    pub(super) fn private_use(&self, expr: ExprId) -> LoweringResult<&lyng_sema::PrivateUseRecord> {
         self.state
             .sema
             .private_uses
@@ -37,7 +34,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn binding(
         &self,
         binding: SemanticBindingId,
-    ) -> LoweringResult<&lyng_js_sema::BindingRecord> {
+    ) -> LoweringResult<&lyng_sema::BindingRecord> {
         self.state
             .sema
             .binding_table
@@ -114,7 +111,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn declared_binding_for_pattern(
         &self,
-        pattern: lyng_js_ast::PatternId,
+        pattern: lyng_ast::PatternId,
         expected_kind: DeclarationKind,
     ) -> LoweringResult<SemanticBindingId> {
         let Pattern::Identifier { name, .. } = self.ast().get_pattern(pattern).clone() else {
@@ -245,7 +242,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn resolved_arguments_binding_shadows_owner(
         &self,
-        use_site: &lyng_js_sema::UseSiteRecord,
+        use_site: &lyng_sema::UseSiteRecord,
         owner: FunctionSemaId,
     ) -> LoweringResult<bool> {
         let Some(binding_id) = use_site.resolved_binding else {
@@ -266,7 +263,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn arguments_access_for_use(
         &self,
-        use_site: &lyng_js_sema::UseSiteRecord,
+        use_site: &lyng_sema::UseSiteRecord,
     ) -> LoweringResult<Option<(u8, u32)>> {
         if use_site.name != WellKnownAtom::arguments.id() {
             return Ok(None);

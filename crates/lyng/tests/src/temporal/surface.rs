@@ -1,5 +1,5 @@
 use super::compile_and_run_with_host;
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 #[test]
 fn temporal_june_2024_removed_names_are_absent_from_public_surface() {
@@ -55,7 +55,7 @@ fn temporal_june_2024_removed_names_are_absent_from_public_surface() {
         }
         allPresentOrAbsent;
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, Value::from_bool(true));

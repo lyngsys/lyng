@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{Opcode, OPCODE_COUNT};
 
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 

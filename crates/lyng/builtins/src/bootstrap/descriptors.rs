@@ -253,7 +253,7 @@ fn resolve_builtin_function_value(
     agent: &mut Agent,
     builtin_cache: &mut BuiltinCache,
     realm: RealmRef,
-    entry: lyng_js_types::BuiltinFunctionId,
+    entry: lyng_types::BuiltinFunctionId,
 ) -> Result<Value, BuiltinBootstrapError> {
     builtin_cache
         .builtin_constant(agent, realm, entry)
@@ -264,7 +264,7 @@ fn resolve_accessor_builtin_value(
     agent: &mut Agent,
     builtin_cache: &mut BuiltinCache,
     realm: RealmRef,
-    entry: Option<lyng_js_types::BuiltinFunctionId>,
+    entry: Option<lyng_types::BuiltinFunctionId>,
 ) -> Result<Value, BuiltinBootstrapError> {
     let Some(entry) = entry else {
         return Ok(Value::undefined());

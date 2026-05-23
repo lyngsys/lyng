@@ -1,4 +1,4 @@
-__ZN10lyng_js_vm2vm17dispatch_handlers12control_flow16op_jump_if_false17hba91908de013b17cE:
+__ZN10lyng_vm2vm17dispatch_handlers12control_flow16op_jump_if_false17hba91908de013b17cE:
 L0:
 	.loc	185 169 0
 	sub	sp, sp, #80
@@ -61,7 +61,7 @@ L21:
 	mov	x0, x8
 	mov	x1, x19
 	mov	w5, #0
-	bl	__ZN10lyng_js_vm2vm17dispatch_handlers12control_flow15op_jump_if_impl17hd46dfef41a6e59a2E
+	bl	__ZN10lyng_vm2vm17dispatch_handlers12control_flow15op_jump_if_impl17hd46dfef41a6e59a2E
 L22:
 L23:
 	.loc	185 0 5 is_stmt 0
@@ -111,7 +111,7 @@ L13:
 	mov	x0, sp
 	mov	w4, #0
 	mov	x20, x8
-	bl	__ZN10lyng_js_vm2vm8dispatch24decode_abx_operands_wide17hac6b4f3cbbb3a75fE
+	bl	__ZN10lyng_vm2vm8dispatch24decode_abx_operands_wide17hac6b4f3cbbb3a75fE
 L39:
 	.loc	88 0 16 is_stmt 0
 	mov	x8, x20

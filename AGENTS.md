@@ -4,7 +4,7 @@ This file is the repo-level operating guide for coding agents working in `lyng`.
 
 ## What This Repo Is
 
-`lyng` is a Rust workspace containing a single active implementation track: the Lyng JavaScript engine in `crates/lyng-js/*`, the proc-macro asm-DSL substrate in `crates/lyng-js-vm-dsl/`, and the tooling around them under `tools/`.
+`lyng` is a Rust workspace containing a single active implementation track: the Lyng JavaScript engine in `crates/lyng/*`, the proc-macro asm-DSL substrate in `crates/lyng/vm-dsl/`, and the tooling around them under `tools/`.
 
 The root workspace members are defined in `Cargo.toml`.
 
@@ -13,40 +13,40 @@ The root workspace members are defined in `Cargo.toml`.
 Start here before making non-trivial changes:
 
 - `Cargo.toml`
-- `docs/lyng-js/README.md`
-- `docs/lyng-js/architecture.md`
-- `docs/lyng-js/engineering-standards.md`
+- `docs/lyng/README.md`
+- `docs/lyng/architecture.md`
+- `docs/lyng/engineering-standards.md`
 
 If you are changing a specific subsystem, read the crate-local sources and tests for that subsystem before editing.
 
-For any Lyng JS work, also read `crates/lyng-js/AGENTS.md`. This applies even when the
-files being edited live outside `crates/lyng-js`, such as `docs/lyng-js`,
-`tools/lyng-js-test262`, `tools/lyng-js-bench`, `reports/js/lyng-js`, or
+For any Lyng JS work, also read `crates/lyng/AGENTS.md`. This applies even when the
+files being edited live outside `crates/lyng`, such as `docs/lyng`,
+`tools/lyng-test262`, `tools/lyng-bench`, `reports/lyng`, or
 `testdata/test262`.
 
 ## Workspace Map
 
-- `crates/lyng-js/common`: shared Lyng JS value/string/source-location types and interning
-- `crates/lyng-js/lexer`: hand-written lexer
-- `crates/lyng-js/parser`: parser and parse errors
-- `crates/lyng-js/ast`: arena-backed AST nodes
-- `crates/lyng-js/sema`: semantic analysis tables and resolution metadata
-- `crates/lyng-js/bytecode`: bytecode IR, opcodes, disassembler
-- `crates/lyng-js/compiler`: AST/sema -> bytecode lowering
-- `crates/lyng-js/gc`: GC-adjacent runtime storage primitives
-- `crates/lyng-js/types`: shared runtime and builtin ids/types
-- `crates/lyng-js/host`: host hooks and embedding interfaces
-- `crates/lyng-js/objects`: object model/runtime objects
-- `crates/lyng-js/env`: environments and execution-context substrate
-- `crates/lyng-js/ops`: runtime semantic operations
-- `crates/lyng-js/vm`: bytecode interpreter
-- `crates/lyng-js/builtins`: builtin bootstrap, constructors, prototypes, and globals
-- `crates/lyng-js/cli`: CLI entrypoint for parse/compile/evaluate flows
-- `crates/lyng-js/tests`: Lyng JS integration, conformance, and regression coverage
-- `crates/lyng-js-vm-dsl`: proc-macro crate for the asm-DSL interpreter substrate
-- `tools/lyng-js-bench`: unified Lyng JS benchmark, memory-report, and bytecode-density runner
-- `tools/lyng-js-dsl-codegen`: codegen for VM DSL cold-handler stubs
-- `tools/lyng-js-test262`: external whole-corpus Test262 embedding and report entrypoint with path-based filtering
+- `crates/lyng/common`: shared Lyng JS value/string/source-location types and interning
+- `crates/lyng/lexer`: hand-written lexer
+- `crates/lyng/parser`: parser and parse errors
+- `crates/lyng/ast`: arena-backed AST nodes
+- `crates/lyng/sema`: semantic analysis tables and resolution metadata
+- `crates/lyng/bytecode`: bytecode IR, opcodes, disassembler
+- `crates/lyng/compiler`: AST/sema -> bytecode lowering
+- `crates/lyng/gc`: GC-adjacent runtime storage primitives
+- `crates/lyng/types`: shared runtime and builtin ids/types
+- `crates/lyng/host`: host hooks and embedding interfaces
+- `crates/lyng/objects`: object model/runtime objects
+- `crates/lyng/env`: environments and execution-context substrate
+- `crates/lyng/ops`: runtime semantic operations
+- `crates/lyng/vm`: bytecode interpreter
+- `crates/lyng/builtins`: builtin bootstrap, constructors, prototypes, and globals
+- `crates/lyng/cli`: CLI entrypoint for parse/compile/evaluate flows
+- `crates/lyng/tests`: Lyng JS integration, conformance, and regression coverage
+- `crates/lyng/vm-dsl`: proc-macro crate for the asm-DSL interpreter substrate
+- `tools/lyng-bench`: unified Lyng JS benchmark, memory-report, and bytecode-density runner
+- `tools/lyng-dsl-codegen`: codegen for VM DSL cold-handler stubs
+- `tools/lyng-test262`: external whole-corpus Test262 embedding and report entrypoint with path-based filtering
 - `testdata/test262`: Test262 checkout used by the Lyng JS harnesses
 
 ## Repo Priorities
@@ -61,13 +61,13 @@ Follow these project-specific constraints when making changes:
 
 ## Lyng JS Priorities
 
-See `crates/lyng-js/AGENTS.md` for the detailed Lyng JS operating guide.
+See `crates/lyng/AGENTS.md` for the detailed Lyng JS operating guide.
 
 - Lyng JS remains focused on ECMA-262 semantics and conformance.
 - Aim for a gold-standard implementation bar. Do not treat code quality or readability as secondary to feature completion.
 - Prioritize code quality, readability, performance, memory behavior, cleanup, auditability, and verification clarity.
 - Performance optimizations must be defensible as general semantic engine improvements, not benchmark-score hacks. Benchmarks are evidence for bottlenecks and regressions; do not special-case a benchmark source shape, input string, or harness behavior just to improve a score. Gold-standard parity comes from improving the engine, not cheating the benchmarks.
-- Keep docs, tooling, reports, and issue tracking aligned with the live Lyng JS docs and the checked-in report/report-manifest flow under `reports/js/lyng-js/`.
+- Keep docs, tooling, reports, and issue tracking aligned with the live Lyng JS docs and the checked-in report/report-manifest flow under `reports/lyng/`.
 - Do not blur core ECMA-262 completion work with ECMA-402 Intl or other extension work unless the user explicitly asks for that scope.
 
 ## Editing Expectations
@@ -97,7 +97,7 @@ See `crates/lyng-js/AGENTS.md` for the detailed Lyng JS operating guide.
 
 ## Generated And Fixture Content
 
-- `reports/js/` contains generated reports. Do not hand-edit them unless the task is explicitly about report output.
+- `reports/lyng/` contains generated reports. Do not hand-edit them unless the task is explicitly about report output.
 - `testdata/test262/` is a fixture corpus. Treat it as test input, not normal implementation files.
 - The harness tools may generate new report files during verification. Avoid deleting unrelated generated reports unless the user asks.
 
@@ -117,26 +117,26 @@ clear, documented reason to allow a specific lint locally.
 
 ### Lyng JS engine
 
-- `cargo test -p lyng-js-parser`
-- `cargo test -p lyng-js-compiler`
-- `cargo test -p lyng-js-vm`
-- `cargo test -p lyng-js-tests`
-- `cargo run --release -p lyng-js-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-js-test262-temporal.md -j 4`
-- `cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.md -j 12`
-- `cargo run --release -p lyng-js-bench -- runtime --report /tmp/lyng-js-bench.md`
-- `cargo run --release -p lyng-js-bench -- density --report /tmp/lyng-js-bytecode-density.md`
+- `cargo test -p lyng-parser`
+- `cargo test -p lyng-compiler`
+- `cargo test -p lyng-vm`
+- `cargo test -p lyng-tests`
+- `cargo run --release -p lyng-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-test262-temporal.md -j 4`
+- `cargo run --release -p lyng-test262 -- --report /tmp/lyng-test262-report.md -j 12`
+- `cargo run --release -p lyng-bench -- runtime --report /tmp/lyng-bench.md`
+- `cargo run --release -p lyng-bench -- density --report /tmp/lyng-bytecode-density.md`
 
 Notes:
 
 - Lyng JS is the only JavaScript implementation track in this repo.
-- Prefer targeted `lyng-js-*` crate tests first, then the relevant `lyng-js-test262 --filter ...` slice or whole-corpus report flow when semantics or performance-sensitive VM/compiler behavior changes.
-- Use `lyng-js-bench density` for bytecode-density/encoding validation.
+- Prefer targeted `lyng-*` crate tests first, then the relevant `lyng-test262 --filter ...` slice or whole-corpus report flow when semantics or performance-sensitive VM/compiler behavior changes.
+- Use `lyng-bench density` for bytecode-density/encoding validation.
 
 ## Change-Specific Verification
 
 Pick the narrowest useful verification for the area you touch:
 
-- Lyng JS parser/compiler/vm change: run the nearest `lyng-js-*` crate tests plus the relevant `lyng-js-test262 --filter ...` slice or whole-corpus report flow if behavior changes; add `lyng-js-bench runtime` for hot-path or memory-sensitive work and `lyng-js-bench density` when bytecode density/encoding changes
+- Lyng JS parser/compiler/vm change: run the nearest `lyng-*` crate tests plus the relevant `lyng-test262 --filter ...` slice or whole-corpus report flow if behavior changes; add `lyng-bench runtime` for hot-path or memory-sensitive work and `lyng-bench density` when bytecode density/encoding changes
 - CLI-only change: run the binary directly with a representative script
 
 If you do not run verification, say so clearly in your handoff.
@@ -153,13 +153,13 @@ If you do not run verification, say so clearly in your handoff.
 
 Useful files when tracing behavior:
 
-- `crates/lyng-js/lexer/src/lexer.rs`
-- `crates/lyng-js/parser/src/lib.rs`
-- `crates/lyng-js/compiler/src/lib.rs`
-- `crates/lyng-js/env/src/lib.rs`
-- `crates/lyng-js/objects/src/lib.rs`
-- `crates/lyng-js/vm/src/lib.rs`
-- `crates/lyng-js/tests/src/lib.rs`
+- `crates/lyng/lexer/src/lexer.rs`
+- `crates/lyng/parser/src/lib.rs`
+- `crates/lyng/compiler/src/lib.rs`
+- `crates/lyng/env/src/lib.rs`
+- `crates/lyng/objects/src/lib.rs`
+- `crates/lyng/vm/src/lib.rs`
+- `crates/lyng/tests/src/lib.rs`
 
 ## Avoid These Mistakes
 

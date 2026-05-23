@@ -9,10 +9,10 @@ use super::{
 };
 use crate::BuiltinInvocation;
 use bigint::{bigint_to_number_value, dispatch_bigint_builtin};
-use lyng_js_gc::{AllocationLifetime, SymbolFlags};
-use lyng_js_objects::PrimitiveWrapperKind;
-use lyng_js_ops::{object, read};
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_gc::{AllocationLifetime, SymbolFlags};
+use lyng_objects::PrimitiveWrapperKind;
+use lyng_ops::{object, read};
+use lyng_types::{BuiltinFunctionId, Value};
 use math::dispatch_math_builtin;
 
 pub(super) fn dispatch_primitive_builtin<Cx: PublicBuiltinDispatchContext>(

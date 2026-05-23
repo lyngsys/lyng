@@ -29,7 +29,7 @@
 //! semantic body itself stays fusion-agnostic — fusion is a dispatch-time
 //! optimization, not part of opcode semantics.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 
@@ -50,7 +50,9 @@ pub(crate) fn op_move_semantic(
     let inner = state.dispatch_state();
     let registers = inner.frame.registers();
     let value = inner.vm.read_register_unchecked(registers, args.src);
-    inner.vm.write_register_unchecked(registers, args.dst, value);
+    inner
+        .vm
+        .write_register_unchecked(registers, args.dst, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
     }

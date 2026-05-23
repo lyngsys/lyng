@@ -108,7 +108,7 @@ fn evaluate_script_promise_finally_invokes_result_then_observably() {
         .promise_record(promise)
         .expect("finally observable-then promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 

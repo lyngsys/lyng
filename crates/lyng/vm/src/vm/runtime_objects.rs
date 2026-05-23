@@ -3,12 +3,12 @@ use super::{
     Agent, AllocationLifetime, BytecodeFunction, FrameRecord, HostHooks, NativeFunctionRegistry,
     ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
-use lyng_js_objects::{
+use lyng_objects::{
     FunctionConstructorFlags, FunctionKindFlags, FunctionObjectData, FunctionThisMode,
     InternalMethodError, ObjectColdData, ObjectFlags, OrdinaryObjectData, RegExpPayload,
 };
-use lyng_js_ops::{enumeration::ForInEnumerator, errors, iterator, object, proxy};
-use lyng_js_types::{PropertyDescriptor, PropertyKey};
+use lyng_ops::{enumeration::ForInEnumerator, errors, iterator, object, proxy};
+use lyng_types::{PropertyDescriptor, PropertyKey};
 
 fn map_internal_method_error(agent: &mut Agent, error: InternalMethodError) -> VmError {
     let abrupt = match error {
@@ -38,7 +38,7 @@ impl iterator::IteratorOpsContext for VmIteratorBridge<'_> {
         self.frame.realm()
     }
 
-    fn abrupt(&mut self, completion: lyng_js_types::AbruptCompletion) -> Self::Error {
+    fn abrupt(&mut self, completion: lyng_types::AbruptCompletion) -> Self::Error {
         VmError::Abrupt(completion)
     }
 
@@ -160,12 +160,12 @@ impl Vm {
         };
         let private_env = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::private_env);
+            .and_then(lyng_env::ExecutionContext::private_env);
         let environment = if child.captures().is_empty() {
             let lexical_env = frame.lexical_env();
             if matches!(
                 agent.environment(lexical_env),
-                Some(lyng_js_env::EnvironmentRecord::Object(_))
+                Some(lyng_env::EnvironmentRecord::Object(_))
             ) {
                 lexical_env
             } else {
@@ -690,14 +690,14 @@ impl Vm {
             agent,
             &realm,
             value_wrapper,
-            lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
+            lyng_env::PromiseReactionHandler::AsyncFromSyncIteratorValue { done },
             if done {
-                lyng_js_env::PromiseReactionHandler::Thrower
+                lyng_env::PromiseReactionHandler::Thrower
             } else {
                 close_on_rejection.map_or(
-                    lyng_js_env::PromiseReactionHandler::Thrower,
+                    lyng_env::PromiseReactionHandler::Thrower,
                     |(iterator, next_method)| {
-                        lyng_js_env::PromiseReactionHandler::AsyncFromSyncIteratorReject {
+                        lyng_env::PromiseReactionHandler::AsyncFromSyncIteratorReject {
                             iterator,
                             next_method,
                         }
@@ -732,7 +732,7 @@ impl Vm {
             let resume_value = frame.resume_value();
             frame.clear_resume();
             if resume_kind == crate::frame::GeneratorResumeKind::Throw {
-                return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
+                return Err(VmError::Abrupt(lyng_types::AbruptCompletion::Throw(
                     resume_value,
                 )));
             }
@@ -899,7 +899,7 @@ impl Vm {
                     record.set_done(true);
                     return Ok(());
                 }
-                return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::Throw(
+                return Err(VmError::Abrupt(lyng_types::AbruptCompletion::Throw(
                     resume_value,
                 )));
             }
@@ -1101,29 +1101,29 @@ impl Vm {
     }
 }
 
-const fn bytecode_this_mode(function: &BytecodeFunction) -> lyng_js_objects::FunctionThisMode {
+const fn bytecode_this_mode(function: &BytecodeFunction) -> lyng_objects::FunctionThisMode {
     match function.this_mode() {
-        lyng_js_bytecode::ThisMode::Lexical => FunctionThisMode::Lexical,
-        lyng_js_bytecode::ThisMode::Strict => FunctionThisMode::Strict,
-        lyng_js_bytecode::ThisMode::Global => FunctionThisMode::Global,
+        lyng_bytecode::ThisMode::Lexical => FunctionThisMode::Lexical,
+        lyng_bytecode::ThisMode::Strict => FunctionThisMode::Strict,
+        lyng_bytecode::ThisMode::Global => FunctionThisMode::Global,
     }
 }
 
 const fn bytecode_constructor_flags(function: &BytecodeFunction) -> FunctionConstructorFlags {
     match function.kind() {
-        lyng_js_bytecode::BytecodeFunctionKind::Function => {
+        lyng_bytecode::BytecodeFunctionKind::Function => {
             FunctionConstructorFlags::empty().with_constructible(function.flags().constructible())
         }
-        lyng_js_bytecode::BytecodeFunctionKind::Arrow
-        | lyng_js_bytecode::BytecodeFunctionKind::Module
-        | lyng_js_bytecode::BytecodeFunctionKind::Script
-        | lyng_js_bytecode::BytecodeFunctionKind::Builtin => FunctionConstructorFlags::empty(),
+        lyng_bytecode::BytecodeFunctionKind::Arrow
+        | lyng_bytecode::BytecodeFunctionKind::Module
+        | lyng_bytecode::BytecodeFunctionKind::Script
+        | lyng_bytecode::BytecodeFunctionKind::Builtin => FunctionConstructorFlags::empty(),
     }
 }
 
 const fn bytecode_kind_flags(function: &BytecodeFunction) -> FunctionKindFlags {
     let mut flags = match function.kind() {
-        lyng_js_bytecode::BytecodeFunctionKind::Arrow => FunctionKindFlags::ARROW,
+        lyng_bytecode::BytecodeFunctionKind::Arrow => FunctionKindFlags::ARROW,
         _ => FunctionKindFlags::empty(),
     };
     if function.flags().class_constructor() {
@@ -1210,7 +1210,7 @@ fn function_name_text_from_property_key(
     }
 }
 
-fn decode_function_name_text(view: &lyng_js_gc::PrimitiveStringView<'_>) -> Option<String> {
+fn decode_function_name_text(view: &lyng_gc::PrimitiveStringView<'_>) -> Option<String> {
     if let Some(bytes) = view.latin1_bytes() {
         return Some(bytes.iter().map(|byte| char::from(*byte)).collect());
     }
@@ -1222,7 +1222,7 @@ fn decode_function_name_text(view: &lyng_js_gc::PrimitiveStringView<'_>) -> Opti
     String::from_utf16(&units).ok()
 }
 
-fn string_ref_is_empty(agent: &Agent, string: lyng_js_types::StringRef) -> bool {
+fn string_ref_is_empty(agent: &Agent, string: lyng_types::StringRef) -> bool {
     agent
         .heap()
         .view()
@@ -1234,17 +1234,17 @@ fn string_ref_is_empty(agent: &Agent, string: lyng_js_types::StringRef) -> bool 
 mod tests {
     use super::*;
     use crate::frame::RegisterWindow;
-    use lyng_js_bytecode::{
+    use lyng_bytecode::{
         BytecodeBuilder, BytecodeFunctionFlags, BytecodeFunctionId, BytecodeFunctionKind,
         CompiledFunctionUnit,
     };
-    use lyng_js_common::SourceId;
-    use lyng_js_env::{
+    use lyng_common::SourceId;
+    use lyng_env::{
         EnvironmentLayout, EnvironmentLayoutKind, ExecutionContext, ExecutionContextKind, Runtime,
     };
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_ops::object;
-    use lyng_js_types::PropertyKey;
+    use lyng_host::NoopHostHooks;
+    use lyng_ops::object;
+    use lyng_types::PropertyKey;
 
     #[test]
     fn create_closure_captures_current_private_environment() {
@@ -1280,7 +1280,7 @@ mod tests {
 
         let mut vm = Vm::new();
         let _ = vm
-            .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+            .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
             .expect("bootstrap should succeed");
         let installed = vm
             .install_function(agent, realm.id(), &unit)
@@ -1337,7 +1337,7 @@ mod tests {
 
         let mut vm = Vm::new();
         let _ = vm
-            .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+            .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
             .expect("bootstrap should succeed");
         let installed = vm
             .install_function(agent, realm.id(), &unit)
@@ -1395,7 +1395,7 @@ mod tests {
 
         let mut vm = Vm::new();
         let _ = vm
-            .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+            .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
             .expect("bootstrap should succeed");
         let installed = vm
             .install_function(agent, realm.id(), &unit)
@@ -1484,7 +1484,7 @@ mod tests {
 
         let mut vm = Vm::new();
         let _ = vm
-            .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+            .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
             .expect("bootstrap should succeed");
         let installed = vm
             .install_function(agent, realm.id(), &unit)

@@ -4,10 +4,10 @@ use super::{
     Intrinsics, ModuleRecord, ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata,
     RealmRef, RegExpLegacyStaticState, WellKnownSymbols,
 };
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
-use lyng_js_host::ModuleKey;
-use lyng_js_objects::RegExpPayload;
-use lyng_js_types::{CodeRef, StringRef};
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
+use lyng_host::ModuleKey;
+use lyng_objects::RegExpPayload;
+use lyng_types::{CodeRef, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,

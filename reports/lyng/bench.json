@@ -492,15 +492,15 @@
   "settings": {
     "count_opcodes": true,
     "frontend_repetitions": 24,
-    "json_path": "reports/js/lyng-js/bench.json",
+    "json_path": "reports/lyng/bench.json",
     "loop_trip_count": 2048,
-    "report_path": "/tmp/lyng-js-bench-counts-phase-4b-post.md",
+    "report_path": "/tmp/lyng-bench-counts-phase-4b-post.md",
     "runs_per_sample": 9,
     "samples": 7,
     "warmup_runs": 2
   },
   "suite": "runtime",
-  "tool": "lyng-js-bench runtime",
+  "tool": "lyng-bench runtime",
   "workloads": [
     {
       "delta": {

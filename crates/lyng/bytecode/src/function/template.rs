@@ -8,7 +8,7 @@ use crate::metadata::{
     DeoptSnapshot, DirectEvalLexicalSite, ExceptionHandler, FeedbackSiteDescriptor,
     LoopIterationEnvironmentSite, SafepointDescriptor, SourceMapEntry, ThisMode,
 };
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 use std::fmt;
 
 /// Immutable bytecode template shared by the compiler and runtime installation layers.

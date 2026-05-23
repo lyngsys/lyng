@@ -3,14 +3,14 @@ use crate::error::VmResult;
 use crate::vm::property_access::VmProxyBridge;
 use crate::vm::registers::absolute_register;
 use crate::{FrameRecord, Vm, VmError};
-use lyng_js_bytecode::Opcode;
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, ValueStoreTarget};
-use lyng_js_host::HostHooks;
-use lyng_js_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
-use lyng_js_ops::{errors, object};
-use lyng_js_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
+use lyng_bytecode::Opcode;
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, ValueStoreTarget};
+use lyng_host::HostHooks;
+use lyng_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
+use lyng_ops::{errors, object};
+use lyng_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 impl Vm {
     #[expect(
@@ -1485,7 +1485,7 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         frame_depth: usize,
         frame: &mut FrameRecord,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
         value: Value,
     ) -> VmResult<()> {

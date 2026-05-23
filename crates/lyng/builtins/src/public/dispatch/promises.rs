@@ -6,14 +6,14 @@ use super::{
     string_value, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::{
+use lyng_common::WellKnownAtom;
+use lyng_env::{
     Agent, PromiseCombinatorElementKind, PromiseCombinatorElementRecord, PromiseCombinatorKind,
     PromiseFinallyFunctionKind, PromiseFinallyFunctionRecord, PromiseReactionHandler,
     PromiseReactionKind, PromiseResolvingFunctionKind, PromiseState,
 };
-use lyng_js_ops::{errors, iterator, promise};
-use lyng_js_types::{
+use lyng_ops::{errors, iterator, promise};
+use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
@@ -174,14 +174,14 @@ fn promise_builtin<Cx: PublicBuiltinDispatchContext>(
     let _ = cx.agent().set_promise_capability_reject(capability, reject);
     let _ = cx.agent().alloc_promise_resolving_function(
         resolve,
-        lyng_js_env::PromiseResolvingFunctionRecord::new(
+        lyng_env::PromiseResolvingFunctionRecord::new(
             PromiseResolvingFunctionKind::Resolve,
             capability,
         ),
     );
     let _ = cx.agent().alloc_promise_resolving_function(
         reject,
-        lyng_js_env::PromiseResolvingFunctionRecord::new(
+        lyng_env::PromiseResolvingFunctionRecord::new(
             PromiseResolvingFunctionKind::Reject,
             capability,
         ),
@@ -513,7 +513,7 @@ fn promise_combinator_element_builtin<Cx: PublicBuiltinDispatchContext>(
     let capability = cx
         .agent()
         .promise_combinator(combinator_id)
-        .map(lyng_js_env::PromiseCombinatorRecord::capability)
+        .map(lyng_env::PromiseCombinatorRecord::capability)
         .ok_or_else(|| type_error(cx))?;
     let argument = invocation
         .arguments()
@@ -619,8 +619,8 @@ fn promise_collecting_combinator_builtin<Cx: PublicBuiltinDispatchContext>(
 fn perform_promise_all<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
-    capability: lyng_js_env::PromiseCapabilityId,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    capability: lyng_env::PromiseCapabilityId,
+    combinator: lyng_env::PromiseCombinatorId,
     iterable: Value,
 ) -> Result<(), Cx::Error> {
     let promise_resolve = promise_resolve_method(cx, constructor)?;
@@ -700,8 +700,8 @@ fn perform_promise_all<Cx: PublicBuiltinDispatchContext>(
 fn perform_promise_all_settled<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
-    capability: lyng_js_env::PromiseCapabilityId,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    capability: lyng_env::PromiseCapabilityId,
+    combinator: lyng_env::PromiseCombinatorId,
     iterable: Value,
 ) -> Result<(), Cx::Error> {
     let promise_resolve = promise_resolve_method(cx, constructor)?;
@@ -786,8 +786,8 @@ fn perform_promise_all_settled<Cx: PublicBuiltinDispatchContext>(
 fn perform_promise_any<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
-    capability: lyng_js_env::PromiseCapabilityId,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    capability: lyng_env::PromiseCapabilityId,
+    combinator: lyng_env::PromiseCombinatorId,
     iterable: Value,
 ) -> Result<(), Cx::Error> {
     let promise_resolve = promise_resolve_method(cx, constructor)?;
@@ -861,7 +861,7 @@ fn perform_promise_any<Cx: PublicBuiltinDispatchContext>(
 fn perform_promise_race<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
-    capability: lyng_js_env::PromiseCapabilityId,
+    capability: lyng_env::PromiseCapabilityId,
     iterable: Value,
 ) -> Result<(), Cx::Error> {
     let promise_resolve = promise_resolve_method(cx, constructor)?;
@@ -918,13 +918,13 @@ fn perform_promise_race<Cx: PublicBuiltinDispatchContext>(
 
 fn reject_promise_any_errors<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::PromiseCapabilityId,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    capability: lyng_env::PromiseCapabilityId,
+    combinator: lyng_env::PromiseCombinatorId,
 ) -> Result<(), Cx::Error> {
     let reasons = cx
         .agent()
         .promise_combinator(combinator)
-        .map(lyng_js_env::PromiseCombinatorRecord::values)
+        .map(lyng_env::PromiseCombinatorRecord::values)
         .map(<[Value]>::to_vec)
         .ok_or_else(|| type_error(cx))?;
     let aggregate_error = create_aggregate_error_from_values(cx, &reasons, None)?;
@@ -995,7 +995,7 @@ fn allocate_promise_finally_continuation<Cx: PublicBuiltinDispatchContext>(
 
 fn allocate_promise_combinator_element<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    combinator: lyng_env::PromiseCombinatorId,
     index: usize,
     kind: PromiseCombinatorElementKind,
 ) -> Result<ObjectRef, Cx::Error> {
@@ -1023,7 +1023,7 @@ const fn promise_combinator_element_entry(kind: PromiseCombinatorElementKind) ->
 
 fn reject_promise_capability_error<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::PromiseCapabilityId,
+    capability: lyng_env::PromiseCapabilityId,
     error: Cx::Error,
 ) -> Result<(), Cx::Error> {
     let Some(thrown) = cx.extract_thrown_value(error)? else {
@@ -1036,12 +1036,12 @@ fn reject_promise_capability_error<Cx: PublicBuiltinDispatchContext>(
 
 fn promise_combinator_values_array<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    combinator: lyng_js_env::PromiseCombinatorId,
+    combinator: lyng_env::PromiseCombinatorId,
 ) -> Result<ObjectRef, Cx::Error> {
     let values = cx
         .agent()
         .promise_combinator(combinator)
-        .map(lyng_js_env::PromiseCombinatorRecord::values)
+        .map(lyng_env::PromiseCombinatorRecord::values)
         .map(<[Value]>::to_vec)
         .ok_or_else(|| type_error(cx))?;
     create_array_from_values(cx, &values)
@@ -1171,12 +1171,12 @@ fn promise_species_constructor<Cx: PublicBuiltinDispatchContext>(
 pub(super) fn new_promise_capability<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     constructor: ObjectRef,
-) -> Result<lyng_js_env::PromiseCapabilityId, Cx::Error> {
+) -> Result<lyng_env::PromiseCapabilityId, Cx::Error> {
     let capability = cx.agent().alloc_promise_capability();
     let executor = cx.allocate_builtin_function(super::promise_capability_executor_builtin())?;
     let _ = cx.agent().alloc_promise_resolving_function(
         executor,
-        lyng_js_env::PromiseResolvingFunctionRecord::new(
+        lyng_env::PromiseResolvingFunctionRecord::new(
             PromiseResolvingFunctionKind::CapabilityExecutor,
             capability,
         ),
@@ -1207,31 +1207,31 @@ pub(super) fn new_promise_capability<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn promise_capability_promise<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::PromiseCapabilityId,
+    capability: lyng_env::PromiseCapabilityId,
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
+        .and_then(lyng_env::PromiseCapabilityRecord::promise)
         .ok_or_else(|| type_error(cx))
 }
 
 pub(super) fn promise_capability_resolve<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::PromiseCapabilityId,
+    capability: lyng_env::PromiseCapabilityId,
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(lyng_js_env::PromiseCapabilityRecord::resolve)
+        .and_then(lyng_env::PromiseCapabilityRecord::resolve)
         .ok_or_else(|| type_error(cx))
 }
 
 pub(super) fn promise_capability_reject<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    capability: lyng_js_env::PromiseCapabilityId,
+    capability: lyng_env::PromiseCapabilityId,
 ) -> Result<ObjectRef, Cx::Error> {
     cx.agent()
         .promise_capability(capability)
-        .and_then(lyng_js_env::PromiseCapabilityRecord::reject)
+        .and_then(lyng_env::PromiseCapabilityRecord::reject)
         .ok_or_else(|| type_error(cx))
 }
 
@@ -1240,7 +1240,7 @@ pub(super) fn perform_promise_then_with_capability<Cx: PublicBuiltinDispatchCont
     promise_object: ObjectRef,
     on_fulfilled: PromiseReactionHandler,
     on_rejected: PromiseReactionHandler,
-    capability: Option<lyng_js_env::PromiseCapabilityId>,
+    capability: Option<lyng_env::PromiseCapabilityId>,
 ) -> Result<(), Cx::Error> {
     let fulfill_reaction = promise::create_promise_reaction(
         cx.agent(),
@@ -1316,13 +1316,13 @@ fn perform_promise_then<Cx: PublicBuiltinDispatchContext>(
 fn enqueue_promise_reaction_job(
     agent: &mut Agent,
     realm: RealmRef,
-    reaction: lyng_js_env::PromiseReactionId,
+    reaction: lyng_env::PromiseReactionId,
     argument: Value,
 ) {
     let _ = agent.enqueue_job_with_payload(
-        lyng_js_host::HostJobKind::Promise,
-        lyng_js_env::ExecutableId::Builtin,
-        lyng_js_env::RuntimeJobPayload::PromiseReaction { reaction, argument },
+        lyng_host::HostJobKind::Promise,
+        lyng_env::ExecutableId::Builtin,
+        lyng_env::RuntimeJobPayload::PromiseReaction { reaction, argument },
         Some(realm),
         Some("PromiseReaction".into()),
     );
@@ -1345,7 +1345,7 @@ fn promise_resolving_function_builtin<Cx: PublicBuiltinDispatchContext>(
     if cx
         .agent()
         .promise_capability(capability)
-        .is_some_and(lyng_js_env::PromiseCapabilityRecord::already_resolved)
+        .is_some_and(lyng_env::PromiseCapabilityRecord::already_resolved)
     {
         return Ok(Value::undefined());
     }
@@ -1400,7 +1400,7 @@ fn promise_resolving_function_builtin<Cx: PublicBuiltinDispatchContext>(
     let realm = cx
         .agent()
         .promise_record(promise_object)
-        .map_or(fallback_realm, lyng_js_env::PromiseRecord::realm);
+        .map_or(fallback_realm, lyng_env::PromiseRecord::realm);
     promise::enqueue_thenable_job(cx.agent(), realm, promise_object, thenable, then);
     Ok(Value::undefined())
 }

@@ -1,8 +1,8 @@
 use super::{ExecutableId, JobId, PromiseCapabilityId, PromiseReactionId, RuntimeDomainAccounting};
-use lyng_js_common::AtomId;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_host::{HostJobId, HostJobKind, WaitLocation};
-use lyng_js_types::{ObjectRef, RealmRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_host::{HostJobId, HostJobKind, WaitLocation};
+use lyng_types::{ObjectRef, RealmRef, Value};
 use std::collections::VecDeque;
 use std::mem::size_of;
 

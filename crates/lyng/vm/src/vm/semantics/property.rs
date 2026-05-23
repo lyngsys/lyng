@@ -53,9 +53,9 @@
 //!   `Continue { pc_advance: 0 }`; escape → `ExitError`. Mirrors the
 //!   arithmetic unary pattern (`op_negate_semantic`).
 
-use lyng_js_bytecode::Opcode;
-use lyng_js_ops::errors;
-use lyng_js_types::{FeedbackSlotId, Value};
+use lyng_bytecode::Opcode;
+use lyng_ops::errors;
+use lyng_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
@@ -415,11 +415,7 @@ pub(crate) fn op_create_object_semantic(
     let realm = inner.frame.realm();
     let object = {
         let DispatchState { agent, .. } = &mut *inner;
-        match Vm::create_object(
-            agent,
-            realm,
-            usize::try_from(args.bx).unwrap_or(usize::MAX),
-        ) {
+        match Vm::create_object(agent, realm, usize::try_from(args.bx).unwrap_or(usize::MAX)) {
             Ok(object) => object,
             Err(error) => return SemanticOutcome::ExitError { error },
         }

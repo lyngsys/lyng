@@ -6,7 +6,7 @@ a `.slow:` label hosting `call_slow! + dispatch_after_slow!`.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/hot.rs`:
+`crates/lyng/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {
@@ -60,7 +60,7 @@ gracefully handles the `0` (no feedback slot) case via niche encoding.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_add.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_add.asm`.
 
 The fast path is 21 instructions:
 - 4 ldrb/ldrh (operand decode)
@@ -76,7 +76,7 @@ The fast path is 21 instructions:
 - 4 (dispatch: add/ldrb/ldr/br)
 
 Total fast path: ~39 instructions (LLInt op_add is in the same ballpark
-— see `reports/js/lyng-js/llint-reference/op_add.md`).
+— see `reports/lyng/llint-reference/op_add.md`).
 
 The slow path is `call_slow! + dispatch_after_slow!` — 5 instructions
 for the call setup + 1 bl + the dispatch_after_slow trampoline.
@@ -91,7 +91,7 @@ the live operand window.
 
 ## LLInt reference
 
-See `reports/js/lyng-js/llint-reference/op_add.md`.
+See `reports/lyng/llint-reference/op_add.md`.
 
 JSC's `op_add` macro uses a similar pattern (tag-check both operands,
 SMI fast path with overflow detection, slow path on miss). The exact
@@ -168,4 +168,4 @@ Per-workload gate status per spec §1.6 + §5:
   op_add on the same workloads has identical SMI-bail discipline and
   would record comparable rates.
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

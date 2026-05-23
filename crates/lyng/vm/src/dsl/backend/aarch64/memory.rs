@@ -14,7 +14,13 @@
 macro_rules! load_byte {
     ($base:literal, $offset:literal => $dst:ident) => {
         concat!(
-            "ldrb   w", stringify!($dst), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "ldrb   w",
+            stringify!($dst),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -24,7 +30,13 @@ macro_rules! load_byte {
 macro_rules! load_half {
     ($base:literal, $offset:literal => $dst:ident) => {
         concat!(
-            "ldrh   w", stringify!($dst), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "ldrh   w",
+            stringify!($dst),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -34,7 +46,13 @@ macro_rules! load_half {
 macro_rules! load_word {
     ($base:literal, $offset:literal => $dst:ident) => {
         concat!(
-            "ldr    w", stringify!($dst), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "ldr    w",
+            stringify!($dst),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -44,7 +62,13 @@ macro_rules! load_word {
 macro_rules! load_quad {
     ($base:literal, $offset:literal => $dst:ident) => {
         concat!(
-            "ldr    x", stringify!($dst), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -54,7 +78,13 @@ macro_rules! load_quad {
 macro_rules! store_byte {
     ($src:ident, $base:literal, $offset:literal) => {
         concat!(
-            "strb   w", stringify!($src), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "strb   w",
+            stringify!($src),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -64,7 +94,13 @@ macro_rules! store_byte {
 macro_rules! store_half {
     ($src:ident, $base:literal, $offset:literal) => {
         concat!(
-            "strh   w", stringify!($src), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "strh   w",
+            stringify!($src),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -74,7 +110,13 @@ macro_rules! store_half {
 macro_rules! store_word {
     ($src:ident, $base:literal, $offset:literal) => {
         concat!(
-            "str    w", stringify!($src), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "str    w",
+            stringify!($src),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }
@@ -84,7 +126,13 @@ macro_rules! store_word {
 macro_rules! store_quad {
     ($src:ident, $base:literal, $offset:literal) => {
         concat!(
-            "str    x", stringify!($src), ", [x", stringify!($base), ", #", stringify!($offset), "]\n",
+            "str    x",
+            stringify!($src),
+            ", [x",
+            stringify!($base),
+            ", #",
+            stringify!($offset),
+            "]\n",
         )
     };
 }

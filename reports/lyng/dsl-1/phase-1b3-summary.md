@@ -31,14 +31,14 @@ IDE false positive matching the Phase 1.A retrospective pattern.
 
 ## Test results at HEAD
 
-- `cargo test -p lyng-js-vm --lib --release`: **418 passing** (matches
+- `cargo test -p lyng-vm --lib --release`: **418 passing** (matches
   umbrella baseline; no new lib tests in 1.B.3 — the 2 new macros' unit
   tests live in the structural validation test crate).
-- `cargo test -p lyng-js-tests --release`: **1209 passing** (vs 1198
+- `cargo test -p lyng-tests --release`: **1209 passing** (vs 1198
   Phase 1.B.2 baseline; +5 from Task 2's `op_locals_inline.rs::load_*`,
   +3 from Task 3's `op_locals_inline.rs::store_*` + `op_ldar_inline.rs`,
   +3 additional tests).
-- `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`:
+- `cargo test -p lyng-vm --test dsl_validation_frame_context --release`:
   **6 passing + 0 ignored** (vs 4 in Phase 1.B.2 baseline; +2 from
   Task 1's structural validation handlers for opcodes 214 + 215).
 - 2 pre-existing `feedback_flat_consistency` failures unchanged (same
@@ -119,23 +119,23 @@ Full data at [`phase-1b3-microbench.md`](phase-1b3-microbench.md).
 
 ## Per-handler ported reports
 
-- [`reports/js/lyng-js/dsl-handlers/op_load_local_0.md`](../dsl-handlers/op_load_local_0.md):
+- [`reports/lyng/dsl-handlers/op_load_local_0.md`](../dsl-handlers/op_load_local_0.md):
   LoadLocal0 (slot 0 = accumulator); uses existing `load_acc!`. ~268M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_load_local_1.md`](../dsl-handlers/op_load_local_1.md):
+- [`reports/lyng/dsl-handlers/op_load_local_1.md`](../dsl-handlers/op_load_local_1.md):
   LoadLocal1; uses new `load_local_fixed!(1 => 10)`. ~377M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_load_local_2.md`](../dsl-handlers/op_load_local_2.md):
+- [`reports/lyng/dsl-handlers/op_load_local_2.md`](../dsl-handlers/op_load_local_2.md):
   LoadLocal2; uses new `load_local_fixed!(2 => 10)`. ~144M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_load_local_3.md`](../dsl-handlers/op_load_local_3.md):
+- [`reports/lyng/dsl-handlers/op_load_local_3.md`](../dsl-handlers/op_load_local_3.md):
   LoadLocal3; uses new `load_local_fixed!(3 => 10)`. ~273M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_store_local_0.md`](../dsl-handlers/op_store_local_0.md):
+- [`reports/lyng/dsl-handlers/op_store_local_0.md`](../dsl-handlers/op_store_local_0.md):
   StoreLocal0; uses new `store_local_fixed!(10, 0)`. **0 dispatches** (unreachable through peephole). Inline body correct + cheap.
-- [`reports/js/lyng-js/dsl-handlers/op_store_local_1.md`](../dsl-handlers/op_store_local_1.md):
+- [`reports/lyng/dsl-handlers/op_store_local_1.md`](../dsl-handlers/op_store_local_1.md):
   StoreLocal1; uses new `store_local_fixed!(10, 1)`. ~3M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_store_local_2.md`](../dsl-handlers/op_store_local_2.md):
+- [`reports/lyng/dsl-handlers/op_store_local_2.md`](../dsl-handlers/op_store_local_2.md):
   StoreLocal2; uses new `store_local_fixed!(10, 2)`. ~3M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_store_local_3.md`](../dsl-handlers/op_store_local_3.md):
+- [`reports/lyng/dsl-handlers/op_store_local_3.md`](../dsl-handlers/op_store_local_3.md):
   StoreLocal3; uses new `store_local_fixed!(10, 3)`. ~102M dispatches.
-- [`reports/js/lyng-js/dsl-handlers/op_ldar.md`](../dsl-handlers/op_ldar.md):
+- [`reports/lyng/dsl-handlers/op_ldar.md`](../dsl-handlers/op_ldar.md):
   Ldar (Load Accumulator from Register); uses existing `load_reg!` + `store_acc!`. ~89M dispatches.
 
 All 9 reports document the inline shape (7 instructions each, decode +
@@ -152,7 +152,7 @@ slow-path-share + behavioral test outcomes.
 
 **Verdict:** PASS — matches umbrella §4 gate (≥ 49729 passing files).
 Phase 1.B.3 changed only inline-body code paths (the slow-path
-semantic bodies remain intact in `crates/lyng-js/vm/src/vm/semantics/`
+semantic bodies remain intact in `crates/lyng/vm/src/vm/semantics/`
 and are unchanged); no semantic surface was touched, so Test262 parity
 was expected.
 
@@ -181,7 +181,7 @@ from the Phase 1.B.1 retrospective lesson were applied directly:
 
 ### StoreLocal0 architectural unreachability
 
-The bytecode-builder peephole at `crates/lyng-js/bytecode/src/builder.rs:150-166`
+The bytecode-builder peephole at `crates/lyng/bytecode/src/builder.rs:150-166`
 (`compact_move_instruction`) evaluates `Move dst=0, src=B` → `Ldar B`
 BEFORE the `store_local_opcode` branch fires. Consequently,
 `StoreLocal0 = Opcode 148` cannot be emitted from compiled JS source;
@@ -207,7 +207,7 @@ validation tests missed the x22→x24 register-pin bug. Phase 1.B.3
 applied the lesson: every new macro has BOTH a structural
 compiles-and-links test (in `dsl_validation_frame_context.rs`, opcodes
 214 + 215) AND end-to-end integration tests in
-`crates/lyng-js/tests/src/op_{locals,ldar}_inline.rs` that
+`crates/lyng/tests/src/op_{locals,ldar}_inline.rs` that
 runtime-dispatch through the inline path. No register-pin-class bug
 slipped through. The new `load_local_fixed!` / `store_local_fixed!`
 macros use `x20` consistently (the REGS pin per `dsl/reg_convention`),
@@ -274,7 +274,7 @@ rather than as a single-point estimate.
 The brief's Step A specified fixing a "real rustc warning, not stale
 rust-analyzer" for `unused import: store_local_fixed` at `cold.rs:22`.
 The warning does **not** manifest on this aarch64-apple-darwin build:
-- `cargo build -p lyng-js-vm --release` produces 0 warnings
+- `cargo build -p lyng-vm --release` produces 0 warnings
 - `cargo check`, `cargo clippy`, and `RUSTFLAGS="-Dwarnings" cargo
   build` all clean
 - Removing the imports produced 7 compile errors confirming they are
@@ -299,8 +299,8 @@ the Phase 1.B umbrella spec):
 
 | Gate | Result |
 |------|--------|
-| Behavioral parity: `cargo test -p lyng-js-vm --lib --release` (≥418) | ✅ 418 passing |
-| Behavioral parity: `cargo test -p lyng-js-tests --release` (≥1198) | ✅ 1209 passing (+11 integration tests) |
+| Behavioral parity: `cargo test -p lyng-vm --lib --release` (≥418) | ✅ 418 passing |
+| Behavioral parity: `cargo test -p lyng-tests --release` (≥1198) | ✅ 1209 passing (+11 integration tests) |
 | Test262 ≥ Phase 1.B baseline (49729) | ✅ 49729 passing / 0 failing |
 | All 9 opcodes ported with ≤ 12 inline instr (body) | ✅ all at exactly 7 inline instr |
 | All measurable opcodes microbench within 2× LLInt | ✅ all 8 reachable opcodes within budget; StoreLocal0 by analogy (unreachable) |

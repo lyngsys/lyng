@@ -1,13 +1,13 @@
 use crate::script::{CompilationState, ProgramRootKind, ProgramSource};
 use crate::{checked_u32_index, LoweringResult};
-use lyng_js_ast::{
+use lyng_ast::{
     Decl, ExportDefaultDecl, ExportKind, ImportAttribute, ImportSpecifier, ParsedModule, Pattern,
     Stmt,
 };
-use lyng_js_bytecode::{BytecodeFunction, BytecodeFunctionId, CompiledAtom};
-use lyng_js_common::{AtomId, AtomTable, SourceId, Span, WellKnownAtom};
-use lyng_js_host::ModuleImportAttribute;
-use lyng_js_sema::{ModuleSema, ScopeId, SemanticBindingId};
+use lyng_bytecode::{BytecodeFunction, BytecodeFunctionId, CompiledAtom};
+use lyng_common::{AtomId, AtomTable, SourceId, Span, WellKnownAtom};
+use lyng_host::ModuleImportAttribute;
+use lyng_sema::{ModuleSema, ScopeId, SemanticBindingId};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -502,8 +502,8 @@ fn derive_module_metadata(
 }
 
 fn derive_decl_metadata(
-    ast: &lyng_js_ast::Ast,
-    decl_id: lyng_js_ast::DeclId,
+    ast: &lyng_ast::Ast,
+    decl_id: lyng_ast::DeclId,
     compilation: &CompilationState<'_>,
     bindings_by_name: &HashMap<AtomId, SemanticBindingId>,
     metadata: &mut ModuleMetadata,
@@ -575,7 +575,7 @@ fn derive_decl_metadata(
     reason = "module export derivation follows the ECMA-262 export-entry cases in one pass"
 )]
 fn derive_export_metadata(
-    ast: &lyng_js_ast::Ast,
+    ast: &lyng_ast::Ast,
     kind: &ExportKind,
     compilation: &CompilationState<'_>,
     bindings_by_name: &HashMap<AtomId, SemanticBindingId>,
@@ -703,8 +703,8 @@ fn derive_export_metadata(
 }
 
 fn collect_pattern_exports(
-    ast: &lyng_js_ast::Ast,
-    pattern: lyng_js_ast::PatternId,
+    ast: &lyng_ast::Ast,
+    pattern: lyng_ast::PatternId,
     compilation: &CompilationState<'_>,
     bindings_by_name: &HashMap<AtomId, SemanticBindingId>,
     metadata: &mut ModuleMetadata,
@@ -768,9 +768,9 @@ fn local_binding_slot(
 }
 
 fn push_requested_module(
-    ast: &lyng_js_ast::Ast,
-    source: lyng_js_ast::StringLiteralId,
-    attributes: lyng_js_ast::NodeList<ImportAttribute>,
+    ast: &lyng_ast::Ast,
+    source: lyng_ast::StringLiteralId,
+    attributes: lyng_ast::NodeList<ImportAttribute>,
     phase: ModuleRequestPhase,
     compilation: &CompilationState<'_>,
     metadata: &mut ModuleMetadata,
@@ -808,8 +808,8 @@ fn import_request_phase(specifiers: &[ImportSpecifier]) -> ModuleRequestPhase {
 }
 
 fn collect_module_expression_sites(
-    ast: &lyng_js_ast::Ast,
-    body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+    ast: &lyng_ast::Ast,
+    body: lyng_ast::NodeList<lyng_ast::StmtId>,
     metadata: &mut ModuleMetadata,
 ) {
     for &stmt in ast.get_stmt_list(body) {
@@ -818,8 +818,8 @@ fn collect_module_expression_sites(
 }
 
 fn collect_expression_sites_from_stmt(
-    ast: &lyng_js_ast::Ast,
-    stmt_id: lyng_js_ast::StmtId,
+    ast: &lyng_ast::Ast,
+    stmt_id: lyng_ast::StmtId,
     metadata: &mut ModuleMetadata,
 ) {
     match ast.get_stmt(stmt_id) {
@@ -852,12 +852,12 @@ fn collect_expression_sites_from_stmt(
         } => {
             if let Some(init) = init {
                 match init {
-                    lyng_js_ast::ForInit::Declaration(decl) => {
+                    lyng_ast::ForInit::Declaration(decl) => {
                         if let Decl::Export { kind, .. } = ast.get_decl(*decl) {
                             let _ = kind;
                         }
                     }
-                    lyng_js_ast::ForInit::Expression(expr) => {
+                    lyng_ast::ForInit::Expression(expr) => {
                         collect_expression_sites_from_expr(ast, *expr, metadata);
                     }
                 }
@@ -924,8 +924,8 @@ fn collect_expression_sites_from_stmt(
 }
 
 fn collect_expression_sites_from_decl(
-    ast: &lyng_js_ast::Ast,
-    decl_id: lyng_js_ast::DeclId,
+    ast: &lyng_ast::Ast,
+    decl_id: lyng_ast::DeclId,
     metadata: &mut ModuleMetadata,
 ) {
     match ast.get_decl(decl_id) {
@@ -969,8 +969,8 @@ fn collect_expression_sites_from_decl(
 }
 
 fn collect_expression_sites_from_function(
-    ast: &lyng_js_ast::Ast,
-    function: lyng_js_ast::FunctionId,
+    ast: &lyng_ast::Ast,
+    function: lyng_ast::FunctionId,
     metadata: &mut ModuleMetadata,
 ) {
     let function = ast.get_function(function);
@@ -981,13 +981,13 @@ fn collect_expression_sites_from_function(
 }
 
 fn collect_expression_sites_from_class_body(
-    ast: &lyng_js_ast::Ast,
-    body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+    ast: &lyng_ast::Ast,
+    body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     metadata: &mut ModuleMetadata,
 ) {
     for &element in ast.get_class_element_list(body) {
         match ast.get_class_element(element) {
-            lyng_js_ast::ClassElement::Method {
+            lyng_ast::ClassElement::Method {
                 key,
                 value,
                 computed,
@@ -998,7 +998,7 @@ fn collect_expression_sites_from_class_body(
                 }
                 collect_expression_sites_from_function(ast, *value, metadata);
             }
-            lyng_js_ast::ClassElement::Property {
+            lyng_ast::ClassElement::Property {
                 key,
                 value,
                 computed,
@@ -1011,10 +1011,10 @@ fn collect_expression_sites_from_class_body(
                     collect_expression_sites_from_expr(ast, *value, metadata);
                 }
             }
-            lyng_js_ast::ClassElement::StaticBlock { body, .. } => {
+            lyng_ast::ClassElement::StaticBlock { body, .. } => {
                 collect_module_expression_sites(ast, *body, metadata);
             }
-            lyng_js_ast::ClassElement::InvalidElement { .. } => {}
+            lyng_ast::ClassElement::InvalidElement { .. } => {}
         }
     }
 }
@@ -1024,17 +1024,17 @@ fn collect_expression_sites_from_class_body(
     reason = "expression-site traversal is an exhaustive AST visitor with one arm per expression form"
 )]
 fn collect_expression_sites_from_expr(
-    ast: &lyng_js_ast::Ast,
-    expr_id: lyng_js_ast::ExprId,
+    ast: &lyng_ast::Ast,
+    expr_id: lyng_ast::ExprId,
     metadata: &mut ModuleMetadata,
 ) {
     match ast.get_expr(expr_id) {
-        lyng_js_ast::Expr::MetaProperty { meta, property, .. } => {
+        lyng_ast::Expr::MetaProperty { meta, property, .. } => {
             if *meta == WellKnownAtom::import.id() && *property == WellKnownAtom::meta.id() {
                 metadata.has_import_meta = true;
             }
         }
-        lyng_js_ast::Expr::ImportExpression {
+        lyng_ast::Expr::ImportExpression {
             span,
             source,
             options,
@@ -1048,12 +1048,12 @@ fn collect_expression_sites_from_expr(
                 collect_expression_sites_from_expr(ast, *options, metadata);
             }
         }
-        lyng_js_ast::Expr::ArrayExpression { elements, .. } => {
+        lyng_ast::Expr::ArrayExpression { elements, .. } => {
             for element in ast.get_opt_expr_list(*elements).iter().flatten() {
                 collect_expression_sites_from_expr(ast, *element, metadata);
             }
         }
-        lyng_js_ast::Expr::ObjectExpression { properties, .. } => {
+        lyng_ast::Expr::ObjectExpression { properties, .. } => {
             for property in ast.get_property_list(*properties) {
                 if property.computed {
                     collect_expression_sites_from_expr(ast, property.key, metadata);
@@ -1061,11 +1061,11 @@ fn collect_expression_sites_from_expr(
                 collect_expression_sites_from_expr(ast, property.value, metadata);
             }
         }
-        lyng_js_ast::Expr::FunctionExpression { function, .. }
-        | lyng_js_ast::Expr::ArrowFunctionExpression { function, .. } => {
+        lyng_ast::Expr::FunctionExpression { function, .. }
+        | lyng_ast::Expr::ArrowFunctionExpression { function, .. } => {
             collect_expression_sites_from_function(ast, *function, metadata);
         }
-        lyng_js_ast::Expr::ClassExpression {
+        lyng_ast::Expr::ClassExpression {
             super_class, body, ..
         } => {
             if let Some(super_class) = super_class {
@@ -1073,33 +1073,33 @@ fn collect_expression_sites_from_expr(
             }
             collect_expression_sites_from_class_body(ast, *body, metadata);
         }
-        lyng_js_ast::Expr::TemplateLiteral { template, .. } => {
+        lyng_ast::Expr::TemplateLiteral { template, .. } => {
             for &expression in ast.templates().get_expressions(*template) {
                 collect_expression_sites_from_expr(ast, expression, metadata);
             }
         }
-        lyng_js_ast::Expr::TaggedTemplateExpression { tag, template, .. } => {
+        lyng_ast::Expr::TaggedTemplateExpression { tag, template, .. } => {
             collect_expression_sites_from_expr(ast, *tag, metadata);
             for &expression in ast.templates().get_expressions(*template) {
                 collect_expression_sites_from_expr(ast, expression, metadata);
             }
         }
-        lyng_js_ast::Expr::UnaryExpression { argument, .. }
-        | lyng_js_ast::Expr::UpdateExpression { argument, .. }
-        | lyng_js_ast::Expr::AwaitExpression { argument, .. }
-        | lyng_js_ast::Expr::SpreadElement { argument, .. }
-        | lyng_js_ast::Expr::OptionalChainExpression { base: argument, .. }
-        | lyng_js_ast::Expr::ParenthesizedExpression {
+        lyng_ast::Expr::UnaryExpression { argument, .. }
+        | lyng_ast::Expr::UpdateExpression { argument, .. }
+        | lyng_ast::Expr::AwaitExpression { argument, .. }
+        | lyng_ast::Expr::SpreadElement { argument, .. }
+        | lyng_ast::Expr::OptionalChainExpression { base: argument, .. }
+        | lyng_ast::Expr::ParenthesizedExpression {
             expression: argument,
             ..
         } => collect_expression_sites_from_expr(ast, *argument, metadata),
-        lyng_js_ast::Expr::BinaryExpression { left, right, .. }
-        | lyng_js_ast::Expr::LogicalExpression { left, right, .. }
-        | lyng_js_ast::Expr::AssignmentExpression { left, right, .. } => {
+        lyng_ast::Expr::BinaryExpression { left, right, .. }
+        | lyng_ast::Expr::LogicalExpression { left, right, .. }
+        | lyng_ast::Expr::AssignmentExpression { left, right, .. } => {
             collect_expression_sites_from_expr(ast, *left, metadata);
             collect_expression_sites_from_expr(ast, *right, metadata);
         }
-        lyng_js_ast::Expr::ConditionalExpression {
+        lyng_ast::Expr::ConditionalExpression {
             test,
             consequent,
             alternate,
@@ -1109,15 +1109,15 @@ fn collect_expression_sites_from_expr(
             collect_expression_sites_from_expr(ast, *consequent, metadata);
             collect_expression_sites_from_expr(ast, *alternate, metadata);
         }
-        lyng_js_ast::Expr::SequenceExpression { expressions, .. } => {
+        lyng_ast::Expr::SequenceExpression { expressions, .. } => {
             for &expression in ast.get_expr_list(*expressions) {
                 collect_expression_sites_from_expr(ast, expression, metadata);
             }
         }
-        lyng_js_ast::Expr::CallExpression {
+        lyng_ast::Expr::CallExpression {
             callee, arguments, ..
         }
-        | lyng_js_ast::Expr::NewExpression {
+        | lyng_ast::Expr::NewExpression {
             callee, arguments, ..
         } => {
             collect_expression_sites_from_expr(ast, *callee, metadata);
@@ -1125,40 +1125,40 @@ fn collect_expression_sites_from_expr(
                 collect_expression_sites_from_expr(ast, argument, metadata);
             }
         }
-        lyng_js_ast::Expr::StaticMemberExpression { object, .. }
-        | lyng_js_ast::Expr::PrivateMemberExpression { object, .. }
-        | lyng_js_ast::Expr::PrivateInExpression { object, .. } => {
+        lyng_ast::Expr::StaticMemberExpression { object, .. }
+        | lyng_ast::Expr::PrivateMemberExpression { object, .. }
+        | lyng_ast::Expr::PrivateInExpression { object, .. } => {
             collect_expression_sites_from_expr(ast, *object, metadata);
         }
-        lyng_js_ast::Expr::ComputedMemberExpression {
+        lyng_ast::Expr::ComputedMemberExpression {
             object, property, ..
         } => {
             collect_expression_sites_from_expr(ast, *object, metadata);
             collect_expression_sites_from_expr(ast, *property, metadata);
         }
-        lyng_js_ast::Expr::YieldExpression { argument, .. } => {
+        lyng_ast::Expr::YieldExpression { argument, .. } => {
             if let Some(argument) = argument {
                 collect_expression_sites_from_expr(ast, *argument, metadata);
             }
         }
-        lyng_js_ast::Expr::This { .. }
-        | lyng_js_ast::Expr::Super { .. }
-        | lyng_js_ast::Expr::Identifier { .. }
-        | lyng_js_ast::Expr::NullLiteral { .. }
-        | lyng_js_ast::Expr::BooleanLiteral { .. }
-        | lyng_js_ast::Expr::NumericLiteral { .. }
-        | lyng_js_ast::Expr::StringLiteral { .. }
-        | lyng_js_ast::Expr::BigIntLiteral { .. }
-        | lyng_js_ast::Expr::RegExpLiteral { .. }
-        | lyng_js_ast::Expr::InvalidExpression { .. } => {}
+        lyng_ast::Expr::This { .. }
+        | lyng_ast::Expr::Super { .. }
+        | lyng_ast::Expr::Identifier { .. }
+        | lyng_ast::Expr::NullLiteral { .. }
+        | lyng_ast::Expr::BooleanLiteral { .. }
+        | lyng_ast::Expr::NumericLiteral { .. }
+        | lyng_ast::Expr::StringLiteral { .. }
+        | lyng_ast::Expr::BigIntLiteral { .. }
+        | lyng_ast::Expr::RegExpLiteral { .. }
+        | lyng_ast::Expr::InvalidExpression { .. } => {}
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_parser::parse_module;
-    use lyng_js_sema::analyze_module;
+    use lyng_parser::parse_module;
+    use lyng_sema::analyze_module;
 
     #[test]
     fn compile_module_emits_real_module_artifact() {

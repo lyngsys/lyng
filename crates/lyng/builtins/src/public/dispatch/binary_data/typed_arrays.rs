@@ -14,15 +14,15 @@ pub(super) use search::dispatch_typed_array_search_builtin;
 
 use super::{length_value_u64, range_error, type_error, PublicBuiltinDispatchContext};
 use crate::public::dispatch::BuiltinToPrimitiveBridge;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::{
     ObjectAllocation, ObjectColdData, OrdinaryObjectData, TypedArrayElementKind,
     TypedArrayObjectData,
 };
-use lyng_js_ops::typed_array;
-use lyng_js_types::{ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId};
+use lyng_ops::typed_array;
+use lyng_types::{ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId};
 
 pub(super) const fn typed_array_storage_u8_bits(bits: u64) -> u8 {
     typed_array::storage_u8_bits(bits)
@@ -204,21 +204,19 @@ pub(super) fn typed_array_default_prototype<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     kind: TypedArrayElementKind,
 ) -> Result<ObjectRef, Cx::Error> {
-    let getter: fn(lyng_js_env::Intrinsics) -> Option<ObjectRef> = match kind {
-        TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array_prototype,
-        TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array_prototype,
-        TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array_prototype,
-        TypedArrayElementKind::Float16 => lyng_js_env::Intrinsics::float16_array_prototype,
-        TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array_prototype,
-        TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array_prototype,
-        TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array_prototype,
-        TypedArrayElementKind::BigUint64 => lyng_js_env::Intrinsics::big_uint64_array_prototype,
-        TypedArrayElementKind::Uint32 => lyng_js_env::Intrinsics::uint32_array_prototype,
-        TypedArrayElementKind::Uint16 => lyng_js_env::Intrinsics::uint16_array_prototype,
-        TypedArrayElementKind::Uint8Clamped => {
-            lyng_js_env::Intrinsics::uint8_clamped_array_prototype
-        }
-        TypedArrayElementKind::Uint8 => lyng_js_env::Intrinsics::uint8_array_prototype,
+    let getter: fn(lyng_env::Intrinsics) -> Option<ObjectRef> = match kind {
+        TypedArrayElementKind::Int8 => lyng_env::Intrinsics::int8_array_prototype,
+        TypedArrayElementKind::Int16 => lyng_env::Intrinsics::int16_array_prototype,
+        TypedArrayElementKind::Int32 => lyng_env::Intrinsics::int32_array_prototype,
+        TypedArrayElementKind::Float16 => lyng_env::Intrinsics::float16_array_prototype,
+        TypedArrayElementKind::Float32 => lyng_env::Intrinsics::float32_array_prototype,
+        TypedArrayElementKind::Float64 => lyng_env::Intrinsics::float64_array_prototype,
+        TypedArrayElementKind::BigInt64 => lyng_env::Intrinsics::big_int64_array_prototype,
+        TypedArrayElementKind::BigUint64 => lyng_env::Intrinsics::big_uint64_array_prototype,
+        TypedArrayElementKind::Uint32 => lyng_env::Intrinsics::uint32_array_prototype,
+        TypedArrayElementKind::Uint16 => lyng_env::Intrinsics::uint16_array_prototype,
+        TypedArrayElementKind::Uint8Clamped => lyng_env::Intrinsics::uint8_clamped_array_prototype,
+        TypedArrayElementKind::Uint8 => lyng_env::Intrinsics::uint8_array_prototype,
     };
     let prototype = {
         let agent = cx.agent();
@@ -235,19 +233,19 @@ fn typed_array_default_constructor<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     kind: TypedArrayElementKind,
 ) -> Result<ObjectRef, Cx::Error> {
-    let getter: fn(lyng_js_env::Intrinsics) -> Option<ObjectRef> = match kind {
-        TypedArrayElementKind::Int8 => lyng_js_env::Intrinsics::int8_array,
-        TypedArrayElementKind::Int16 => lyng_js_env::Intrinsics::int16_array,
-        TypedArrayElementKind::Int32 => lyng_js_env::Intrinsics::int32_array,
-        TypedArrayElementKind::Float16 => lyng_js_env::Intrinsics::float16_array,
-        TypedArrayElementKind::Float32 => lyng_js_env::Intrinsics::float32_array,
-        TypedArrayElementKind::Float64 => lyng_js_env::Intrinsics::float64_array,
-        TypedArrayElementKind::BigInt64 => lyng_js_env::Intrinsics::big_int64_array,
-        TypedArrayElementKind::BigUint64 => lyng_js_env::Intrinsics::big_uint64_array,
-        TypedArrayElementKind::Uint32 => lyng_js_env::Intrinsics::uint32_array,
-        TypedArrayElementKind::Uint16 => lyng_js_env::Intrinsics::uint16_array,
-        TypedArrayElementKind::Uint8Clamped => lyng_js_env::Intrinsics::uint8_clamped_array,
-        TypedArrayElementKind::Uint8 => lyng_js_env::Intrinsics::uint8_array,
+    let getter: fn(lyng_env::Intrinsics) -> Option<ObjectRef> = match kind {
+        TypedArrayElementKind::Int8 => lyng_env::Intrinsics::int8_array,
+        TypedArrayElementKind::Int16 => lyng_env::Intrinsics::int16_array,
+        TypedArrayElementKind::Int32 => lyng_env::Intrinsics::int32_array,
+        TypedArrayElementKind::Float16 => lyng_env::Intrinsics::float16_array,
+        TypedArrayElementKind::Float32 => lyng_env::Intrinsics::float32_array,
+        TypedArrayElementKind::Float64 => lyng_env::Intrinsics::float64_array,
+        TypedArrayElementKind::BigInt64 => lyng_env::Intrinsics::big_int64_array,
+        TypedArrayElementKind::BigUint64 => lyng_env::Intrinsics::big_uint64_array,
+        TypedArrayElementKind::Uint32 => lyng_env::Intrinsics::uint32_array,
+        TypedArrayElementKind::Uint16 => lyng_env::Intrinsics::uint16_array,
+        TypedArrayElementKind::Uint8Clamped => lyng_env::Intrinsics::uint8_clamped_array,
+        TypedArrayElementKind::Uint8 => lyng_env::Intrinsics::uint8_array,
     };
     let constructor = {
         let agent = cx.agent();

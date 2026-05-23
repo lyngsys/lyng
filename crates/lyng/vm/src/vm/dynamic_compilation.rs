@@ -3,23 +3,23 @@ use super::{
     Agent, AllocationLifetime, FrameRecord, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError,
     VmResult, WellKnownAtom,
 };
-use lyng_js_builtins::DynamicFunctionKind as BuiltinDynamicFunctionKind;
-use lyng_js_common::{AtomId, SourceId, Span};
-use lyng_js_compiler::dynamic;
-use lyng_js_env::{
+use lyng_builtins::DynamicFunctionKind as BuiltinDynamicFunctionKind;
+use lyng_common::{AtomId, SourceId, Span};
+use lyng_compiler::dynamic;
+use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
     ThisState,
 };
-use lyng_js_host::HostHooks;
-use lyng_js_objects::{ClassPrivateElementKind, InternalMethodError, RegExpPayload};
-use lyng_js_ops::{errors, names as ops_names, object};
-use lyng_js_parser::validate_regexp_literal;
-use lyng_js_sema::{
+use lyng_host::HostHooks;
+use lyng_objects::{ClassPrivateElementKind, InternalMethodError, RegExpPayload};
+use lyng_ops::{errors, names as ops_names, object};
+use lyng_parser::validate_regexp_literal;
+use lyng_sema::{
     ClassPrivateElementKind as SemaClassPrivateElementKind, ClassPrivateElementRecord,
     DeclarationKind, DirectEvalScriptAnalysisOptions, ResolutionKind, ScopeId, ScriptSema,
     StorageClass,
 };
-use lyng_js_types::{AbruptCompletion, PropertyDescriptor, PropertyKey, RealmRef, StringRef};
+use lyng_types::{AbruptCompletion, PropertyDescriptor, PropertyKey, RealmRef, StringRef};
 use std::collections::HashMap;
 
 fn source_is_empty_block_sequence(source: &str) -> bool {
@@ -391,8 +391,7 @@ impl Vm {
         let root_var_names = Self::direct_eval_root_var_names(analysis.sema());
         let root_function_names = Self::direct_eval_root_function_names(analysis.sema());
         if !analysis.parsed().strict
-            && let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
-                agent.environment(global_env)
+            && let Some(lyng_env::EnvironmentRecord::Global(record)) = agent.environment(global_env)
         {
             Self::validate_direct_eval_global_declarations(
                 agent,
@@ -429,8 +428,7 @@ impl Vm {
                 (environment, environment)
             })
         } else {
-            if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
-                agent.environment(global_env)
+            if let Some(lyng_env::EnvironmentRecord::Global(record)) = agent.environment(global_env)
             {
                 Self::seed_direct_eval_global_var_bindings(
                     agent,
@@ -584,7 +582,7 @@ impl Vm {
         &self,
         agent: &mut Agent,
         caller: FrameRecord,
-        lexical_env: lyng_js_types::EnvironmentRef,
+        lexical_env: lyng_types::EnvironmentRef,
     ) -> VmResult<bool> {
         if ops_names::has_identifier_binding(agent, lexical_env, WellKnownAtom::arguments.id())
             .map_err(VmError::Abrupt)?
@@ -594,18 +592,18 @@ impl Vm {
 
         Ok(matches!(
             self.installed_function(caller.code())
-                .map(lyng_js_bytecode::BytecodeFunction::kind),
-            Some(lyng_js_bytecode::BytecodeFunctionKind::Function)
+                .map(lyng_bytecode::BytecodeFunction::kind),
+            Some(lyng_bytecode::BytecodeFunctionKind::Function)
         ))
     }
 
     fn caller_allows_direct_eval_function_code(&self, agent: &Agent, caller: FrameRecord) -> bool {
         match self
             .installed_function(caller.code())
-            .map(lyng_js_bytecode::BytecodeFunction::kind)
+            .map(lyng_bytecode::BytecodeFunction::kind)
         {
-            Some(lyng_js_bytecode::BytecodeFunctionKind::Function) => true,
-            Some(lyng_js_bytecode::BytecodeFunctionKind::Arrow) => {
+            Some(lyng_bytecode::BytecodeFunctionKind::Function) => true,
+            Some(lyng_bytecode::BytecodeFunctionKind::Arrow) => {
                 let global_object = agent
                     .realm(caller.realm())
                     .map(|realm| realm.global_object());
@@ -620,7 +618,7 @@ impl Vm {
     fn caller_direct_eval_home_object(
         &self,
         agent: &Agent,
-        lexical_env: lyng_js_types::EnvironmentRef,
+        lexical_env: lyng_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> Option<ObjectRef> {
         if let Ok(Some(record)) = Self::this_environment_record(agent, lexical_env) {
@@ -630,7 +628,7 @@ impl Vm {
             if let Some(home_object) = agent
                 .objects()
                 .function_data(record.function_object())
-                .and_then(lyng_js_objects::FunctionObjectData::home_object)
+                .and_then(lyng_objects::FunctionObjectData::home_object)
             {
                 return Some(home_object);
             }
@@ -644,42 +642,42 @@ impl Vm {
             agent
                 .objects()
                 .function_data(callee)
-                .and_then(lyng_js_objects::FunctionObjectData::home_object)
+                .and_then(lyng_objects::FunctionObjectData::home_object)
         })
     }
 
     fn caller_direct_eval_active_function(
         agent: &Agent,
-        lexical_env: lyng_js_types::EnvironmentRef,
+        lexical_env: lyng_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> Option<ObjectRef> {
         Self::this_environment_record(agent, lexical_env)
             .ok()
             .flatten()
-            .map(lyng_js_env::FunctionEnvironmentRecord::function_object)
+            .map(lyng_env::FunctionEnvironmentRecord::function_object)
             .or_else(|| caller.callee())
     }
 
     fn caller_direct_eval_private_env(
         agent: &Agent,
         caller: FrameRecord,
-    ) -> Option<lyng_js_types::EnvironmentRef> {
+    ) -> Option<lyng_types::EnvironmentRef> {
         agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::private_env)
+            .and_then(lyng_env::ExecutionContext::private_env)
             .or_else(|| {
                 caller.callee().and_then(|callee| {
                     agent
                         .objects()
                         .function_data(callee)
-                        .and_then(lyng_js_objects::FunctionObjectData::private_env)
+                        .and_then(lyng_objects::FunctionObjectData::private_env)
                 })
             })
     }
 
     fn caller_direct_eval_call_state(
         agent: &Agent,
-        lexical_env: lyng_js_types::EnvironmentRef,
+        lexical_env: lyng_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> VmResult<(Value, Option<ObjectRef>)> {
         if let Some(context) = agent.current_execution_context()
@@ -751,7 +749,7 @@ impl Vm {
         }
 
         let diagnostics = std::mem::take(&mut sema.diagnostics).into_inner();
-        let mut filtered = lyng_js_common::DiagnosticList::new();
+        let mut filtered = lyng_common::DiagnosticList::new();
         for diagnostic in diagnostics {
             let suppress = (allow_new_target
                 && diagnostic.message == "'new.target' outside of a function")
@@ -798,8 +796,8 @@ impl Vm {
 
     fn environment_has_active_layout_binding(
         agent: &Agent,
-        _environment: lyng_js_types::EnvironmentRef,
-        layout: lyng_js_env::EnvironmentLayoutId,
+        _environment: lyng_types::EnvironmentRef,
+        layout: lyng_env::EnvironmentLayoutId,
         name: AtomId,
     ) -> bool {
         agent.environment_layout(layout).is_some_and(|layout| {
@@ -814,7 +812,7 @@ impl Vm {
 
     fn layout_binding_is_lexical(
         agent: &Agent,
-        layout: lyng_js_env::EnvironmentLayoutId,
+        layout: lyng_env::EnvironmentLayoutId,
         name: AtomId,
     ) -> Option<bool> {
         agent.environment_layout(layout).and_then(|layout| {
@@ -828,7 +826,7 @@ impl Vm {
 
     fn collect_layout_lexical_names(
         agent: &Agent,
-        layout: lyng_js_env::EnvironmentLayoutId,
+        layout: lyng_env::EnvironmentLayoutId,
         out: &mut Vec<AtomId>,
     ) {
         let Some(layout) = agent.environment_layout(layout) else {
@@ -845,8 +843,8 @@ impl Vm {
 
     fn direct_eval_lexical_names_before_var_env(
         agent: &Agent,
-        start: lyng_js_types::EnvironmentRef,
-        var_env: lyng_js_types::EnvironmentRef,
+        start: lyng_types::EnvironmentRef,
+        var_env: lyng_types::EnvironmentRef,
     ) -> Vec<AtomId> {
         let mut names = Vec::new();
         let mut current = Some(start);
@@ -856,27 +854,27 @@ impl Vm {
             };
             let reached_var_env = environment == var_env;
             match record {
-                lyng_js_env::EnvironmentRecord::Declarative(record) => {
+                lyng_env::EnvironmentRecord::Declarative(record) => {
                     Self::collect_layout_lexical_names(agent, record.layout(), &mut names);
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Function(record) => {
+                lyng_env::EnvironmentRecord::Function(record) => {
                     let declarative = record.declarative();
                     Self::collect_layout_lexical_names(agent, declarative.layout(), &mut names);
                     current = declarative.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Module(record) => {
+                lyng_env::EnvironmentRecord::Module(record) => {
                     Self::collect_layout_lexical_names(agent, record.layout(), &mut names);
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Global(record) => {
+                lyng_env::EnvironmentRecord::Global(record) => {
                     for &name in record.lexical_names() {
                         Self::push_unique_atom(&mut names, name);
                     }
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => current = record.outer(),
             }
             if reached_var_env {
                 break;
@@ -887,10 +885,10 @@ impl Vm {
 
     fn direct_eval_chain_lexical_binding_before_var_env(
         agent: &Agent,
-        start: lyng_js_types::EnvironmentRef,
-        var_env: lyng_js_types::EnvironmentRef,
+        start: lyng_types::EnvironmentRef,
+        var_env: lyng_types::EnvironmentRef,
         name: AtomId,
-    ) -> Option<(lyng_js_types::EnvironmentRef, bool)> {
+    ) -> Option<(lyng_types::EnvironmentRef, bool)> {
         let mut current = Some(start);
         while let Some(environment) = current {
             if environment == var_env {
@@ -900,7 +898,7 @@ impl Vm {
                 break;
             };
             match record {
-                lyng_js_env::EnvironmentRecord::Declarative(record) => {
+                lyng_env::EnvironmentRecord::Declarative(record) => {
                     if let Some(is_lexical) =
                         Self::layout_binding_is_lexical(agent, record.layout(), name)
                     {
@@ -908,7 +906,7 @@ impl Vm {
                     }
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Function(record) => {
+                lyng_env::EnvironmentRecord::Function(record) => {
                     let declarative = record.declarative();
                     if let Some(is_lexical) =
                         Self::layout_binding_is_lexical(agent, declarative.layout(), name)
@@ -917,7 +915,7 @@ impl Vm {
                     }
                     current = declarative.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Module(record) => {
+                lyng_env::EnvironmentRecord::Module(record) => {
                     if let Some(is_lexical) =
                         Self::layout_binding_is_lexical(agent, record.layout(), name)
                     {
@@ -925,15 +923,15 @@ impl Vm {
                     }
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Global(record) => {
+                lyng_env::EnvironmentRecord::Global(record) => {
                     if let Some(binding) = Self::lookup_global_lexical_binding(agent, &record, name)
                     {
                         return Some((binding.environment(), true));
                     }
                     current = record.outer();
                 }
-                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => current = record.outer(),
             }
         }
         None
@@ -941,14 +939,14 @@ impl Vm {
 
     fn validate_direct_eval_lower_lexical_conflicts(
         agent: &mut Agent,
-        lexical_env: lyng_js_types::EnvironmentRef,
-        var_env: lyng_js_types::EnvironmentRef,
+        lexical_env: lyng_types::EnvironmentRef,
+        var_env: lyng_types::EnvironmentRef,
         function_names: &[AtomId],
         var_names: &[AtomId],
         annex_b_catch_environments: &[(
-            lyng_js_types::EnvironmentRef,
+            lyng_types::EnvironmentRef,
             u32,
-            lyng_js_types::EnvironmentRef,
+            lyng_types::EnvironmentRef,
             u32,
             AtomId,
         )],
@@ -1008,7 +1006,7 @@ impl Vm {
 
     fn validate_direct_eval_global_declarations(
         agent: &mut Agent,
-        global_env: lyng_js_types::EnvironmentRef,
+        global_env: lyng_types::EnvironmentRef,
         global_object: ObjectRef,
         function_names: &[AtomId],
         var_names: &[AtomId],
@@ -1036,14 +1034,14 @@ impl Vm {
 
     fn direct_eval_variable_environment_has_own_binding(
         agent: &Agent,
-        variable_env: lyng_js_types::EnvironmentRef,
+        variable_env: lyng_types::EnvironmentRef,
         name: AtomId,
     ) -> bool {
         let Some(record) = agent.environment(variable_env) else {
             return false;
         };
         match record {
-            lyng_js_env::EnvironmentRecord::Declarative(record) => {
+            lyng_env::EnvironmentRecord::Declarative(record) => {
                 Self::environment_has_active_layout_binding(
                     agent,
                     variable_env,
@@ -1051,7 +1049,7 @@ impl Vm {
                     name,
                 )
             }
-            lyng_js_env::EnvironmentRecord::Function(record) => {
+            lyng_env::EnvironmentRecord::Function(record) => {
                 Self::environment_has_active_layout_binding(
                     agent,
                     variable_env,
@@ -1059,7 +1057,7 @@ impl Vm {
                     name,
                 )
             }
-            lyng_js_env::EnvironmentRecord::Module(record) => {
+            lyng_env::EnvironmentRecord::Module(record) => {
                 Self::environment_has_active_layout_binding(
                     agent,
                     variable_env,
@@ -1067,42 +1065,44 @@ impl Vm {
                     name,
                 )
             }
-            lyng_js_env::EnvironmentRecord::Global(record) => record.has_var_name(name),
-            lyng_js_env::EnvironmentRecord::Private(_)
-            | lyng_js_env::EnvironmentRecord::Object(_) => false,
+            lyng_env::EnvironmentRecord::Global(record) => record.has_var_name(name),
+            lyng_env::EnvironmentRecord::Private(_) | lyng_env::EnvironmentRecord::Object(_) => {
+                false
+            }
         }
     }
 
     fn direct_eval_variable_environment_has_own_lexical_binding(
         agent: &Agent,
-        variable_env: lyng_js_types::EnvironmentRef,
+        variable_env: lyng_types::EnvironmentRef,
         name: AtomId,
     ) -> bool {
         let Some(record) = agent.environment(variable_env) else {
             return false;
         };
         match record {
-            lyng_js_env::EnvironmentRecord::Declarative(record) => {
+            lyng_env::EnvironmentRecord::Declarative(record) => {
                 Self::layout_binding_is_lexical(agent, record.layout(), name) == Some(true)
             }
-            lyng_js_env::EnvironmentRecord::Function(record) => {
+            lyng_env::EnvironmentRecord::Function(record) => {
                 Self::layout_binding_is_lexical(agent, record.declarative().layout(), name)
                     == Some(true)
             }
-            lyng_js_env::EnvironmentRecord::Module(record) => {
+            lyng_env::EnvironmentRecord::Module(record) => {
                 Self::layout_binding_is_lexical(agent, record.layout(), name) == Some(true)
             }
-            lyng_js_env::EnvironmentRecord::Global(record) => {
+            lyng_env::EnvironmentRecord::Global(record) => {
                 Self::lookup_global_lexical_binding(agent, &record, name).is_some()
             }
-            lyng_js_env::EnvironmentRecord::Private(_)
-            | lyng_js_env::EnvironmentRecord::Object(_) => false,
+            lyng_env::EnvironmentRecord::Private(_) | lyng_env::EnvironmentRecord::Object(_) => {
+                false
+            }
         }
     }
 
     fn rewrite_direct_eval_root_bindings(
         agent: &Agent,
-        variable_env: lyng_js_types::EnvironmentRef,
+        variable_env: lyng_types::EnvironmentRef,
         always_host: bool,
         sema: &mut ScriptSema,
     ) -> Vec<AtomId> {
@@ -1169,9 +1169,9 @@ impl Vm {
 
     fn create_direct_eval_var_environment(
         agent: &mut Agent,
-        outer: lyng_js_types::EnvironmentRef,
+        outer: lyng_types::EnvironmentRef,
         hosted_names: &[AtomId],
-    ) -> VmResult<Option<lyng_js_types::EnvironmentRef>> {
+    ) -> VmResult<Option<lyng_types::EnvironmentRef>> {
         if hosted_names.is_empty() {
             return Ok(None);
         }
@@ -1208,16 +1208,17 @@ impl Vm {
 
     fn direct_eval_named_environment_slot(
         agent: &Agent,
-        environment: lyng_js_types::EnvironmentRef,
+        environment: lyng_types::EnvironmentRef,
         name: AtomId,
     ) -> Option<u32> {
         let layout = match agent.environment(environment)? {
-            lyng_js_env::EnvironmentRecord::Declarative(record) => record.layout(),
-            lyng_js_env::EnvironmentRecord::Function(record) => record.declarative().layout(),
-            lyng_js_env::EnvironmentRecord::Module(record) => record.layout(),
-            lyng_js_env::EnvironmentRecord::Global(record) => record.layout(),
-            lyng_js_env::EnvironmentRecord::Private(_)
-            | lyng_js_env::EnvironmentRecord::Object(_) => return None,
+            lyng_env::EnvironmentRecord::Declarative(record) => record.layout(),
+            lyng_env::EnvironmentRecord::Function(record) => record.declarative().layout(),
+            lyng_env::EnvironmentRecord::Module(record) => record.layout(),
+            lyng_env::EnvironmentRecord::Global(record) => record.layout(),
+            lyng_env::EnvironmentRecord::Private(_) | lyng_env::EnvironmentRecord::Object(_) => {
+                return None
+            }
         };
         agent
             .environment_layout(layout)?
@@ -1231,10 +1232,10 @@ impl Vm {
 
     fn direct_eval_chain_named_environment_slot(
         agent: &Agent,
-        start: lyng_js_types::EnvironmentRef,
-        stop: lyng_js_types::EnvironmentRef,
+        start: lyng_types::EnvironmentRef,
+        stop: lyng_types::EnvironmentRef,
         name: AtomId,
-    ) -> Option<(lyng_js_types::EnvironmentRef, u32)> {
+    ) -> Option<(lyng_types::EnvironmentRef, u32)> {
         let mut current = Some(start);
         while let Some(environment) = current {
             if let Some(slot) = Self::direct_eval_named_environment_slot(agent, environment, name) {
@@ -1244,12 +1245,12 @@ impl Vm {
                 return None;
             }
             current = match agent.environment(environment)? {
-                lyng_js_env::EnvironmentRecord::Declarative(record) => record.outer(),
-                lyng_js_env::EnvironmentRecord::Function(record) => record.declarative().outer(),
-                lyng_js_env::EnvironmentRecord::Module(record) => record.outer(),
-                lyng_js_env::EnvironmentRecord::Global(record) => record.outer(),
-                lyng_js_env::EnvironmentRecord::Private(record) => record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => record.outer(),
+                lyng_env::EnvironmentRecord::Declarative(record) => record.outer(),
+                lyng_env::EnvironmentRecord::Function(record) => record.declarative().outer(),
+                lyng_env::EnvironmentRecord::Module(record) => record.outer(),
+                lyng_env::EnvironmentRecord::Global(record) => record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => record.outer(),
             };
         }
         None
@@ -1258,9 +1259,9 @@ impl Vm {
     fn sync_direct_eval_annex_b_catch_bindings(
         agent: &mut Agent,
         annex_b_catch_environments: &[(
-            lyng_js_types::EnvironmentRef,
+            lyng_types::EnvironmentRef,
             u32,
-            lyng_js_types::EnvironmentRef,
+            lyng_types::EnvironmentRef,
             u32,
             AtomId,
         )],
@@ -1284,8 +1285,8 @@ impl Vm {
 
     fn sync_direct_eval_annex_b_catch_var_bindings(
         agent: &mut Agent,
-        source_start: lyng_js_types::EnvironmentRef,
-        var_environment: lyng_js_types::EnvironmentRef,
+        source_start: lyng_types::EnvironmentRef,
+        var_environment: lyng_types::EnvironmentRef,
         hosted_names: &[AtomId],
         annex_b_catch_names: &[AtomId],
         sync_names: &[AtomId],
@@ -1321,8 +1322,8 @@ impl Vm {
 
     fn seed_direct_eval_annex_b_catch_var_bindings(
         agent: &mut Agent,
-        source_start: lyng_js_types::EnvironmentRef,
-        var_environment: lyng_js_types::EnvironmentRef,
+        source_start: lyng_types::EnvironmentRef,
+        var_environment: lyng_types::EnvironmentRef,
         hosted_names: &[AtomId],
         annex_b_catch_names: &[AtomId],
     ) -> VmResult<()> {
@@ -1357,7 +1358,7 @@ impl Vm {
 
     fn seed_direct_eval_global_var_bindings(
         agent: &mut Agent,
-        global_env: lyng_js_types::EnvironmentRef,
+        global_env: lyng_types::EnvironmentRef,
         global_object: ObjectRef,
         var_names: &[AtomId],
         function_names: &[AtomId],
@@ -1551,7 +1552,7 @@ impl Vm {
                 &annex_b_catch_environments,
                 &annex_b_catch_names,
             )?;
-            if let Some(lyng_js_env::EnvironmentRecord::Global(record)) =
+            if let Some(lyng_env::EnvironmentRecord::Global(record)) =
                 agent.environment(caller_variable_env)
             {
                 Self::validate_direct_eval_global_declarations(
@@ -1565,12 +1566,10 @@ impl Vm {
         }
         let caller_is_script = self
             .installed_function(caller.code())
-            .is_some_and(|function| {
-                function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script
-            });
+            .is_some_and(|function| function.kind() == lyng_bytecode::BytecodeFunctionKind::Script);
         let caller_variable_env_is_global = matches!(
             agent.environment(caller_variable_env),
-            Some(lyng_js_env::EnvironmentRecord::Global(_))
+            Some(lyng_env::EnvironmentRecord::Global(_))
         );
         let host_root_bindings =
             analysis.parsed().strict || (caller_variable_env_is_global && !caller_is_script);
@@ -1606,7 +1605,7 @@ impl Vm {
             })
         } else if let Some(record) = caller_is_script.then_some(()).and_then(|()| {
             match agent.environment(caller_variable_env) {
-                Some(lyng_js_env::EnvironmentRecord::Global(record)) => Some(record),
+                Some(lyng_env::EnvironmentRecord::Global(record)) => Some(record),
                 _ => None,
             }
         }) {

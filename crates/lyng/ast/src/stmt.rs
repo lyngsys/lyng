@@ -2,7 +2,7 @@
 //!
 //! Each variant carries a `Span` plus minimal child-ID payload.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::ids::{DeclId, ExprId, NodeList, PatternId, StmtId};
 

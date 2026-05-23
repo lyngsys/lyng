@@ -3,9 +3,9 @@ use super::{
     Agent, AllocationLifetime, ArgumentsMode, EnvironmentRef, ObjectAllocation, ObjectRef,
     RealmRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
-use lyng_js_objects::ObjectFlags;
-use lyng_js_ops::{errors, object};
-use lyng_js_types::{PropertyDescriptor, PropertyKey, WellKnownSymbolId};
+use lyng_objects::ObjectFlags;
+use lyng_ops::{errors, object};
+use lyng_types::{PropertyDescriptor, PropertyKey, WellKnownSymbolId};
 
 impl Vm {
     #[expect(

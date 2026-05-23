@@ -9,8 +9,8 @@ use super::{
     try_delete_property_from_object, type_error, BuiltinFunctionId, BuiltinInvocation, PropertyKey,
     PublicBuiltinDispatchContext, Value,
 };
-use lyng_js_objects::{ObjectKind, PrimitiveWrapperKind};
-use lyng_js_types::{ObjectRef, StringRef};
+use lyng_objects::{ObjectKind, PrimitiveWrapperKind};
+use lyng_types::{ObjectRef, StringRef};
 use std::fmt::Write as _;
 
 pub(super) fn dispatch_json_builtin<Cx: PublicBuiltinDispatchContext>(

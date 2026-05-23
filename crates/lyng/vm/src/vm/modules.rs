@@ -1,30 +1,30 @@
 use std::collections::HashSet;
 
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_bytecode::{Instruction, InstructionStream, Opcode};
-use lyng_js_common::{AtomId, Diagnostic, WellKnownAtom};
-use lyng_js_compiler::{
+use lyng_builtins::BootstrapMode;
+use lyng_bytecode::{Instruction, InstructionStream, Opcode};
+use lyng_common::{AtomId, Diagnostic, WellKnownAtom};
+use lyng_compiler::{
     compile_module, CompiledModuleUnit, ModuleImportKind as CompiledModuleImportKind,
     ModuleRequestPhase as CompiledModuleRequestPhase,
 };
-use lyng_js_env::{
+use lyng_env::{
     Agent, ModuleBindingAlias, ModuleImportEntry, ModuleImportKind, ModuleIndirectExportEntry,
     ModuleLocalExportEntry, ModuleRecord, ModuleRequestPhase, ModuleRequestRecord,
     ModuleResolvedExport, ModuleResolvedExportTarget, ModuleStarExportEntry, ModuleStatus,
     RealmRecord,
 };
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_host::{
+use lyng_gc::AllocationLifetime;
+use lyng_host::{
     DiagnosticReportRequest, HostHooks, ImportMetaRequest, ModuleKey, ModuleSourceRequest,
     NoopHostHooks,
 };
-use lyng_js_objects::{
+use lyng_objects::{
     ModuleNamespaceExport, ModuleNamespaceExportTarget, NativeFunctionRegistry, ObjectAllocation,
 };
-use lyng_js_ops::errors;
-use lyng_js_parser::parse_module;
-use lyng_js_sema::analyze_module;
-use lyng_js_types::{
+use lyng_ops::errors;
+use lyng_parser::parse_module;
+use lyng_sema::analyze_module;
+use lyng_types::{
     AbruptCompletion, CodeRef, EnvironmentRef, ObjectRef, PropertyDescriptor, PropertyKey,
     RealmRef, Value, WellKnownSymbolId,
 };
@@ -368,7 +368,7 @@ impl Vm {
         agent: &mut Agent,
         realm: &RealmRecord,
         host: &dyn HostHooks,
-        loaded: lyng_js_host::LoadedModuleSource,
+        loaded: lyng_host::LoadedModuleSource,
     ) -> Result<LoadedModuleRoot, ModuleLoadError> {
         if agent.module_record(&loaded.key).is_none() {
             let source = self.allocate_dynamic_source_id();
@@ -436,7 +436,7 @@ impl Vm {
         }
         let layout = function
             .environment_layout()
-            .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
+            .and_then(|layout| lyng_env::EnvironmentLayoutId::from_raw(layout.get()))
             .ok_or_else(|| VmError::MissingEnvironmentLayout(installed.code()))?;
         agent
             .alloc_module_environment(
@@ -534,7 +534,7 @@ impl Vm {
                 realm.id(),
                 module_env,
                 module_env,
-                lyng_js_env::ExecutionContextKind::Module,
+                lyng_env::ExecutionContextKind::Module,
             );
             let closure = self.create_closure(agent, &frame, child_index)?;
             Self::initialize_environment_slot(
@@ -622,8 +622,8 @@ impl Vm {
         };
         let next_offset =
             store_offset.checked_add(u32::try_from(store_instruction.encoded_len()).ok()?)?;
-        let create_operands = lyng_js_bytecode::WideAbxOperands::new(create_register, child_index);
-        let store_operands = lyng_js_bytecode::WideAbxOperands::new(store_register, env_operand);
+        let create_operands = lyng_bytecode::WideAbxOperands::new(create_register, child_index);
+        let store_operands = lyng_bytecode::WideAbxOperands::new(store_register, env_operand);
         if create_operands.a() != store_operands.a() {
             return None;
         }
@@ -669,9 +669,7 @@ impl Vm {
             ModuleStatus::Evaluated | ModuleStatus::Evaluating => return Ok(Value::undefined()),
             ModuleStatus::Errored => {
                 if let Some(thrown) = evaluation_error {
-                    return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
-                        thrown,
-                    )));
+                    return Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(thrown)));
                 }
             }
             ModuleStatus::New
@@ -763,9 +761,7 @@ impl Vm {
                         .module_record(key)
                         .and_then(ModuleRecord::evaluation_error)
                         .unwrap_or(Value::undefined());
-                    return Err(VmError::Abrupt(lyng_js_types::AbruptCompletion::throw(
-                        thrown,
-                    )));
+                    return Err(VmError::Abrupt(lyng_types::AbruptCompletion::throw(thrown)));
                 }
                 ModuleStatus::Evaluating
                 | ModuleStatus::Linked

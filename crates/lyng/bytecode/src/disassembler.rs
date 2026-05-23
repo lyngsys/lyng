@@ -431,7 +431,12 @@ fn disassemble_instruction_at(instruction: Instruction, function: &BytecodeFunct
     let opcode = instruction.opcode().name();
     let opcode = format!("{opcode:<16}");
     let mut text = match instruction {
-        Instruction::Abc { opcode: bytecode_opcode, a, b, c }
+        Instruction::Abc {
+            opcode: bytecode_opcode,
+            a,
+            b,
+            c,
+        }
         | Instruction::AbcSlot {
             opcode: bytecode_opcode,
             a,

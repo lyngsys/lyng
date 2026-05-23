@@ -36,7 +36,7 @@ pub mod values;
 /// trailer into a single `core::arch::naked_asm!` block.
 ///
 /// This macro is a thin shim today. The real heavy lifting lives in
-/// the proc-macro lowerer (`lyng-js-vm-dsl::lower`), which builds the
+/// the proc-macro lowerer (`lyng-vm-dsl::lower`), which builds the
 /// `concat!`-composed asm template *and* supplies the named bindings
 /// (`{length}`, `{shim}`, `{state_pc}`, etc.). Backend macros emit
 /// fragments with literal `{name}` placeholders; the lowerer's

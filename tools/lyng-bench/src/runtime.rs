@@ -1,15 +1,15 @@
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
-use lyng_js_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
-use lyng_js_env::{ExecutableId, Runtime, RuntimePhase6Accounting as RuntimeAccounting};
-use lyng_js_gc::{AllocationLifetime, PrimitiveRoots, RuntimeObjectRecord, ValueStoreTarget};
-use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
-use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::{CodeRef, Value as JsValue};
-use lyng_js_vm::{
+use lyng_builtins::BootstrapMode;
+use lyng_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
+use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::{compile_module, compile_script, CompiledModuleUnit};
+use lyng_env::{ExecutableId, Runtime, RuntimePhase6Accounting as RuntimeAccounting};
+use lyng_gc::{AllocationLifetime, PrimitiveRoots, RuntimeObjectRecord, ValueStoreTarget};
+use lyng_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
+use lyng_parser::{parse_module, parse_script};
+use lyng_sema::{analyze_module, analyze_script};
+use lyng_types::{CodeRef, Value as JsValue};
+use lyng_vm::{
     FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, SlowPathCounts, Vm,
 };
 use serde_json::{json, Value};
@@ -22,8 +22,8 @@ use std::mem::{size_of, size_of_val};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-pub const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/bench.md";
-pub const DEFAULT_JSON_PATH: &str = "reports/js/lyng-js/bench.json";
+pub const DEFAULT_REPORT_PATH: &str = "reports/lyng/bench.md";
+pub const DEFAULT_JSON_PATH: &str = "reports/lyng/bench.json";
 const DEFAULT_SAMPLES: usize = 7;
 const DEFAULT_RUNS: usize = 9;
 const DEFAULT_WARMUP_RUNS: usize = 2;
@@ -310,7 +310,7 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes] [--count-slow-path-share]".to_string()
+    "Usage: lyng-bench runtime [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--runs <n>] [--warmup-runs <n>] [--loop-trips <n>] [--frontend-repetitions <n>] [--count-opcodes] [--count-slow-path-share]".to_string()
 }
 
 fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
@@ -1270,7 +1270,7 @@ fn render_report(
 ) -> String {
     let mut output = String::new();
     let mut command = format!(
-        "cargo run --release -p lyng-js-bench -- runtime --report {} --json {}",
+        "cargo run --release -p lyng-bench -- runtime --report {} --json {}",
         options.report_path, options.json_path
     );
     if options.count_opcodes {
@@ -1709,7 +1709,7 @@ fn render_json_report(
     json!({
         "schema_version": 1,
         "suite": "runtime",
-        "tool": "lyng-js-bench runtime",
+        "tool": "lyng-bench runtime",
         "settings": {
             "report_path": options.report_path,
             "json_path": options.json_path,
@@ -1917,7 +1917,7 @@ fn runtime_snapshot_json(snapshot: &RuntimeSnapshot) -> Value {
     })
 }
 
-fn runtime_domain_json(accounting: lyng_js_env::RuntimeDomainAccounting) -> Value {
+fn runtime_domain_json(accounting: lyng_env::RuntimeDomainAccounting) -> Value {
     json!({
         "records": accounting.records,
         "metadata_bytes": accounting.metadata_bytes,
@@ -1954,7 +1954,7 @@ fn opt_usize_text(value: Option<usize>) -> String {
     value.map_or_else(|| "n/a".to_string(), |value| value.to_string())
 }
 
-fn domain_cell(accounting: lyng_js_env::RuntimeDomainAccounting) -> String {
+fn domain_cell(accounting: lyng_env::RuntimeDomainAccounting) -> String {
     format!(
         "{} rec / {} meta / {} payload / {} live",
         accounting.records,
@@ -2545,7 +2545,7 @@ mod tests {
 
     #[test]
     fn runtime_report_path_drops_phase_naming() {
-        assert_eq!(DEFAULT_REPORT_PATH, "reports/js/lyng-js/bench.md");
+        assert_eq!(DEFAULT_REPORT_PATH, "reports/lyng/bench.md");
     }
 
     #[test]
@@ -2794,7 +2794,7 @@ mod tests {
     #[test]
     fn write_report_returns_filesystem_errors() {
         let path = env::temp_dir().join(format!(
-            "lyng-js-bench-runtime-report-dir-{}",
+            "lyng-bench-runtime-report-dir-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&path);

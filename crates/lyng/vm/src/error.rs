@@ -1,7 +1,7 @@
-use lyng_js_builtins::BuiltinBootstrapError;
-use lyng_js_bytecode::{BytecodeFunctionId, ConstantValue, Opcode};
-use lyng_js_host::HostError;
-use lyng_js_types::{
+use lyng_builtins::BuiltinBootstrapError;
+use lyng_bytecode::{BytecodeFunctionId, ConstantValue, Opcode};
+use lyng_host::HostError;
+use lyng_types::{
     AbruptCompletion, CodeRef, EmbeddingFunctionId, EnvironmentRef, RealmRef,
     SuspendedExecutionRef, Value,
 };

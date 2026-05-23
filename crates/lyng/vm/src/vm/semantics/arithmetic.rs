@@ -41,10 +41,10 @@
 //! an α-side helper called through `DispatchState` accessors, rather than
 //! re-implementing register write + PC advance inline in each semantic.
 
-use lyng_js_env::Agent;
-use lyng_js_host::HostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_types::{FeedbackSlotId, Value};
+use lyng_env::Agent;
+use lyng_host::HostHooks;
+use lyng_objects::NativeFunctionRegistry;
+use lyng_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmResult;

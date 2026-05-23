@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use lyng_js_bench::test262::{
+use lyng_bench::test262::{
     aggregate_sampled_variants, cause_hints_for_aggregate, parse_options_for_test,
     render_json_report, render_markdown_report, render_profile_counter_summary, Test262Aggregate,
     Test262Mode, Test262Options, Test262PhaseTimings, Test262Sample, Test262VariantDiagnostics,

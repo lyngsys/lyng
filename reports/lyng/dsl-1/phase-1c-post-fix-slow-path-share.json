@@ -1,6 +1,6 @@
 {
   "samples_per_benchmark": 5,
-  "schema": "lyng-js-bench/v8suite/opcode-counts/v1",
+  "schema": "lyng-bench/v8suite/opcode-counts/v1",
   "totals": {
     "opcode_counts": {
       "Add": 1491918832,

@@ -1,5 +1,5 @@
 use crate::{internal::internal_builtin_metadata, BuiltinEntryMetadata};
-use lyng_js_types::BuiltinFunctionId;
+use lyng_types::BuiltinFunctionId;
 
 mod binary_data;
 mod core;
@@ -157,7 +157,7 @@ pub fn builtin_metadata(entry: BuiltinFunctionId) -> Option<BuiltinEntryMetadata
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_types::BuiltinIdNamespace;
+    use lyng_types::BuiltinIdNamespace;
     use std::collections::HashSet;
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
                     entry,
                     group.name()
                 );
-                let Some(id_entry) = lyng_js_types::builtin_id_registry_entry(entry) else {
+                let Some(id_entry) = lyng_types::builtin_id_registry_entry(entry) else {
                     panic!("metadata row {entry:?} missing from builtin id registry");
                 };
                 assert_ne!(id_entry.namespace(), BuiltinIdNamespace::Internal);
@@ -193,23 +193,23 @@ mod tests {
     #[test]
     fn public_metadata_registry_keeps_representative_entries_stable() {
         assert_eq!(
-            public_builtin_metadata(lyng_js_types::object_builtin()),
+            public_builtin_metadata(lyng_types::object_builtin()),
             Some(BuiltinEntryMetadata::new("Object", 1, true, true))
         );
         assert_eq!(
-            public_builtin_metadata(lyng_js_types::array_from_builtin()),
+            public_builtin_metadata(lyng_types::array_from_builtin()),
             Some(BuiltinEntryMetadata::new("from", 1, false, false))
         );
         assert_eq!(
-            public_builtin_metadata(lyng_js_types::promise_then_builtin()),
+            public_builtin_metadata(lyng_types::promise_then_builtin()),
             Some(BuiltinEntryMetadata::new("then", 2, false, false))
         );
         assert_eq!(
-            public_builtin_metadata(lyng_js_types::temporal_instant_builtin()),
+            public_builtin_metadata(lyng_types::temporal_instant_builtin()),
             Some(BuiltinEntryMetadata::new("Instant", 1, true, true))
         );
         assert_eq!(
-            public_builtin_metadata(lyng_js_types::uint8_array_to_base64_builtin()),
+            public_builtin_metadata(lyng_types::uint8_array_to_base64_builtin()),
             Some(BuiltinEntryMetadata::new("toBase64", 0, false, false))
         );
     }

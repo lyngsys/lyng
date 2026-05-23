@@ -1,6 +1,6 @@
 use crate::{errors::internal_method_error, typed_array};
-use lyng_js_env::Agent;
-use lyng_js_types::{Completion, ObjectRef, PropertyDescriptor, PropertyKey};
+use lyng_env::Agent;
+use lyng_types::{Completion, ObjectRef, PropertyDescriptor, PropertyKey};
 
 pub(super) use crate::typed_array::NumericKey as TypedArrayNumericKey;
 

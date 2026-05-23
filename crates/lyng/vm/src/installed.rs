@@ -1,6 +1,6 @@
-use lyng_js_bytecode::BytecodeFunctionId;
-use lyng_js_env::ExecutableId;
-use lyng_js_types::CodeRef;
+use lyng_bytecode::BytecodeFunctionId;
+use lyng_env::ExecutableId;
+use lyng_types::CodeRef;
 
 /// Minimal installed-code shell proving the VM owns the transition into runtime code storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

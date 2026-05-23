@@ -1,7 +1,7 @@
 //! Use-site resolution: tracks every identifier reference and its resolution.
 
-use lyng_js_ast::ExprId;
-use lyng_js_common::AtomId;
+use lyng_ast::ExprId;
+use lyng_common::AtomId;
 
 use crate::ids::{ScopeId, SemanticBindingId, UseSiteId};
 

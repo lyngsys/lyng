@@ -7,7 +7,7 @@ run.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -27,10 +27,10 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_const8.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_const8.asm`.
 
-Captured from `target/release/deps/lyng_js_vm-*.s` after a
-`cargo rustc --release -p lyng-js-vm --lib -- --emit=asm -C debuginfo=0`
+Captured from `target/release/deps/lyng_vm-*.s` after a
+`cargo rustc --release -p lyng-vm --lib -- --emit=asm -C debuginfo=0`
 build. Effective sequence:
 
 ```asm
@@ -49,7 +49,7 @@ op_load_const8_dsl:
 **9 instructions** total. Well within the ≤12 budget. The `#32` literal
 is `offset_of!(LlIntState, frame_const_base)` (pinned by the
 `LLINT_STATE_FRAME_CONST_BASE` const). x24 is the STATE pin per the
-asm-DSL register convention (see `crates/lyng-js/vm/src/dsl/reg_convention.rs`).
+asm-DSL register convention (see `crates/lyng/vm/src/dsl/reg_convention.rs`).
 
 LLVM did not rewrite the `load_constant!` body — the canonical 2-instr
 indexed-load shape (`ldr base; ldr value[idx]`) appears verbatim.
@@ -115,7 +115,7 @@ constant-pool base pointer is materialized.
 ## Microbench
 
 The Phase 1.B.2 plan / spec assumed a `LoadConst8` snippet was added in
-Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
+Phase 1.B.0 Task 7. **It was not** — `tools/lyng-bench/src/microbench/snippets.rs`
 at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
 `LoadThis` are among them.
 
@@ -144,7 +144,7 @@ indexed constant-pool load is a single `ldr` after the cached
 `frame_const_base` mirror.
 
 The full microbench discussion lives at
-[`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
+[`reports/lyng/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
 
 ## V8 v7
 
@@ -156,7 +156,7 @@ slow-path-share data confirms op_load_const8 inline-handles 100% of
 its V8 v7 dispatches with no bail (~103M dispatches aggregate across 3
 samples = ~34M per V8 v7 run; matches the predicted #21 dispatch share).
 
-Full A/B report: [`reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
+Full A/B report: [`reports/lyng/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
 
 ## Slow-path-share
 
@@ -183,8 +183,8 @@ slow-path-share gate (< 20%) is satisfied with maximum headroom.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **418 passed**.
-- `cargo test -p lyng-js-tests --release` — **1192 passed** (1187
+- `cargo test -p lyng-vm --lib --release` — **418 passed**.
+- `cargo test -p lyng-tests --release` — **1192 passed** (1187
   baseline + 5 new `op_load_const8_inline.rs` integration tests).
 
 Both green; behavioral parity preserved.

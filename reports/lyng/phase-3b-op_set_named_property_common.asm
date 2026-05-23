@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::property::op_set_named_property_common:
+lyng_vm::vm::dispatch_handlers::property::op_set_named_property_common:
 Lfunc_begin403:
 	.cfi_startproc
 	sub sp, sp, #448
@@ -113,7 +113,7 @@ LBB403_15:
 	mov x20, x0
 	mov x0, x15
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x8, x0
 	mov x0, x20
 	mov w9, #0
@@ -196,7 +196,7 @@ LBB403_28:
 	mov x2, x5
 	mov x22, x15
 	mov x21, x5
-	bl lyng_js_ops::object::primitive_wrappers::to_object
+	bl lyng_ops::object::primitive_wrappers::to_object
 	ldur w9, [x29, #-152]
 	cmp w9, #4
 	b.ne LBB403_34
@@ -211,7 +211,7 @@ LBB403_28:
 	mov w3, #1
 	ldp x4, x5, [sp, #48]
 	mov x6, x21
-	bl lyng_js_ops::proxy::set
+	bl lyng_ops::proxy::set
 	ldr x10, [sp, #208]
 	cmp x10, x27
 	b.ne LBB403_35
@@ -269,7 +269,7 @@ LBB403_42:
 	mov x1, x19
 	ldr x2, [sp, #80]
 	mov x3, x24
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -386,7 +386,7 @@ LBB403_62:
 LBB403_63:
 	ldr x0, [sp, #80]
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x24, x0
 	ldr x8, [sp, #64]
 	cbz x8, LBB403_66
@@ -410,7 +410,7 @@ LBB403_66:
 	mov x1, x19
 	ldr x2, [sp, #80]
 	mov x3, x24
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -448,7 +448,7 @@ LBB403_72:
 	mov x2, x9
 	mov w3, #1
 	mov x4, x23
-	bl lyng_js_vm::vm::dispatch::decode_abc_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abc_operands_wide
 	mov x0, x20
 	ldur x8, [x29, #-152]
 	cmp x8, x27
@@ -523,14 +523,14 @@ LBB403_85:
 	str x6, [sp, #56]
 	mov x23, x5
 	mov x22, x15
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_store_inline_cache
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_store_inline_cache
 	and w8, w0, #0xff
 	cmp w8, #2
 	b.ne LBB403_89
 	str x21, [sp, #64]
 	mov x0, x22
 	mov x1, x23
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::prototype_chain_has_proxy
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::prototype_chain_has_proxy
 	tbz w0, #0, LBB403_94
 	ldr x8, [sp, #88]
 	ldr w1, [x8, #8]
@@ -538,7 +538,7 @@ LBB403_85:
 	mov x21, x22
 	mov x0, x22
 	mov x2, x23
-	bl lyng_js_ops::object::primitive_wrappers::to_object
+	bl lyng_ops::object::primitive_wrappers::to_object
 	ldur w9, [x29, #-152]
 	cmp w9, #4
 	b.ne LBB403_96
@@ -556,7 +556,7 @@ LBB403_85:
 	mov x4, x26
 	mov x22, x23
 	mov x6, x23
-	bl lyng_js_ops::proxy::set
+	bl lyng_ops::proxy::set
 	b LBB403_106
 LBB403_89:
 	ldr w9, [sp, #44]
@@ -569,7 +569,7 @@ LBB403_89:
 LBB403_91:
 	mov x0, x19
 	mov x2, x24
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	ldr x8, [sp, #88]
 	ldr w9, [x8, #56]
 	adds w9, w9, w20
@@ -583,9 +583,9 @@ LBB403_93:
 	ldr w8, [x8, #56]
 	ldrb w8, [x9, x8]
 Lloh1177:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh1178:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x27, x8, [x0]
 	b LBB403_25
@@ -600,7 +600,7 @@ LBB403_94:
 	ldr x23, [sp, #56]
 	mov x4, x23
 	mov w5, #0
-	bl lyng_js_ops::object::ordinary::ordinary_set
+	bl lyng_ops::object::ordinary::ordinary_set
 	ldur w8, [x29, #-152]
 	cmp w8, #4
 	b.ne LBB403_105
@@ -624,7 +624,7 @@ LBB403_97:
 LBB403_98:
 	mov x0, x22
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x24, x0
 	mov x20, x21
 	cbz x21, LBB403_101
@@ -647,7 +647,7 @@ LBB403_101:
 	mov x1, x19
 	mov x2, x22
 	mov x3, x24
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -673,7 +673,7 @@ LBB403_105:
 	ldp x4, x5, [sp, #24]
 	ldr x6, [sp, #48]
 	ldr x7, [sp, #88]
-	bl lyng_js_vm::vm::property_access::<impl lyng_js_vm::vm::Vm>::set_property_on_value
+	bl lyng_vm::vm::property_access::<impl lyng_vm::vm::Vm>::set_property_on_value
 LBB403_106:
 	ldr x10, [sp, #96]
 	cmp x10, x27
@@ -692,7 +692,7 @@ LBB403_108:
 	mov x4, x22
 	mov x5, x26
 	mov w6, #1
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 	ldr x0, [sp, #72]
 	b LBB403_32
 LBB403_109:
@@ -724,7 +724,7 @@ LBB403_115:
 	mov x1, x19
 	mov x2, x21
 	mov x3, x24
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -770,7 +770,7 @@ LBB403_125:
 LBB403_126:
 	mov x0, x21
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x8, #-9223372036854775808
 	str x8, [sp, #160]
 	str wzr, [sp, #168]
@@ -782,7 +782,7 @@ LBB403_127:
 	mov x2, x21
 	ldr x3, [sp, #64]
 	ldr x4, [sp, #88]
-	bl lyng_js_vm::vm::dispatch::<impl lyng_js_vm::vm::Vm>::handle_dispatch_result
+	bl lyng_vm::vm::dispatch::<impl lyng_vm::vm::Vm>::handle_dispatch_result
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -832,7 +832,7 @@ LBB403_135:
 	stur x8, [x28, #4]
 	sub x1, x29, #152
 	mov x0, x22
-	bl lyng_js_gc::mutator::PrimitiveMutator::store_value
+	bl lyng_gc::mutator::PrimitiveMutator::store_value
 	cmp w21, #79
 	b.lo LBB403_153
 	cbnz w0, LBB403_153
@@ -845,7 +845,7 @@ LBB403_138:
 LBB403_139:
 	mov x0, x22
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x24, x0
 	ldr x8, [sp, #64]
 	cbz x8, LBB403_142
@@ -869,7 +869,7 @@ LBB403_142:
 	mov x1, x19
 	mov x2, x22
 	mov x3, x24
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x10, [x29, #-152]
 	ldurb w9, [x29, #-144]
 	cmp x10, x27
@@ -920,7 +920,7 @@ LBB403_154:
 	mov x0, x19
 	mov x1, x23
 	mov x2, x24
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	ldr x8, [sp, #88]
 	ldr w8, [x8, #56]
 	adds w9, w8, w20

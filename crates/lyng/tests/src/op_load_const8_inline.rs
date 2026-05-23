@@ -18,14 +18,14 @@
 //!   the inline path's `frame_const_base[idx]` indexed-load must
 //!   pick the right element.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Compile + execute `src` in a fresh realm, returning the script's
 /// completion value. Mirrors the helper shape used by

@@ -1,7 +1,7 @@
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_vm::Vm;
+use lyng_builtins::BootstrapMode;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_vm::Vm;
 
 const PHASE5_DEFAULT_REALM_BUDGET_BYTES: usize = 1024 * 1024;
 

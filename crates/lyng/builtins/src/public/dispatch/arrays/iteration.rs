@@ -7,8 +7,8 @@ use super::super::{
 };
 use super::{array_index_from_number, array_length_as_number};
 use crate::BuiltinInvocation;
-use lyng_js_ops::read;
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
+use lyng_ops::read;
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
 
 pub(super) fn dispatch_array_iteration_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

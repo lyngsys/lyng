@@ -3,7 +3,7 @@
 //! Tracks per-function metadata such as strictness, scope linkage,
 //! environment needs, and special-name references.
 
-use lyng_js_ast::FunctionId;
+use lyng_ast::FunctionId;
 
 use crate::ids::{FunctionSemaId, ScopeId, SemanticBindingId};
 

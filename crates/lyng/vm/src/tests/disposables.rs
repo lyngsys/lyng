@@ -114,7 +114,7 @@ fn async_disposable_stack_dispose_async_awaits_resources_in_lifo_order() {
     let record = agent
         .promise_record(promise)
         .expect("disposeAsync result promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -162,7 +162,7 @@ fn async_disposable_stack_dispose_async_awaits_null_resources_before_resolving()
         .promise_record(promise)
         .expect("disposeAsync ordering promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -207,7 +207,7 @@ fn async_disposable_stack_rejects_with_nested_suppressed_error() {
     let record = agent
         .promise_record(promise)
         .expect("disposeAsync rejection promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -503,7 +503,7 @@ fn await_using_waits_for_async_disposal_before_resolving() {
     let record = agent
         .promise_record(promise)
         .expect("await using promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -549,7 +549,7 @@ fn skipped_await_using_declaration_does_not_suspend_async_function() {
     let record = agent
         .promise_record(promise)
         .expect("skipped await using promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 

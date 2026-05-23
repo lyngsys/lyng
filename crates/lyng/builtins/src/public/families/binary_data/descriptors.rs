@@ -6,9 +6,9 @@ mod typed_arrays;
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{RealmRef, Value};
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{RealmRef, Value};
 
 #[allow(clippy::too_many_lines)]
 pub(in crate::public) fn install_binary_data_family_descriptors(

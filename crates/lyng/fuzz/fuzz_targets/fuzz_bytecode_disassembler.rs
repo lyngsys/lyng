@@ -1,10 +1,10 @@
 #![no_main]
 
-use lyng_js_bytecode::{
+use lyng_bytecode::{
     decode_instruction_stream, disassemble, disassemble_instruction, ArgumentsMode,
     BytecodeFunction, BytecodeFunctionId, ConstantValue,
 };
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 use libfuzzer_sys::fuzz_target;
 
 const MAX_INPUT_LEN: usize = 4096;

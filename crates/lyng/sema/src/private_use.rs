@@ -1,7 +1,7 @@
 //! Resolved private-name uses keyed by expression site.
 
-use lyng_js_ast::ExprId;
-use lyng_js_common::AtomId;
+use lyng_ast::ExprId;
+use lyng_common::AtomId;
 
 use crate::ids::ScopeId;
 

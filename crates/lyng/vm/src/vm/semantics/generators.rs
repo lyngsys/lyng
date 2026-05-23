@@ -79,7 +79,7 @@
 //! consume the slot. Both return
 //! `Continue { pc_advance: args.instruction_len }`.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::vm::dispatch::next_dispatch_instruction_offset;
@@ -324,4 +324,3 @@ pub(crate) fn op_load_resume_value_semantic(
         pc_advance: args.instruction_len,
     }
 }
-

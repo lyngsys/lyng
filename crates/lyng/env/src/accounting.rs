@@ -1,4 +1,4 @@
-use lyng_js_gc::{PrimitiveAllocationProfile, PrimitiveDomainAccounting, PrimitiveHeapAccounting};
+use lyng_gc::{PrimitiveAllocationProfile, PrimitiveDomainAccounting, PrimitiveHeapAccounting};
 
 /// Runtime-owned memory summary for one Phase 6 domain outside the primitive heap.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -204,10 +204,10 @@ pub const fn merge_primitive_heap_accounting(
 mod tests {
     use super::*;
     use crate::{ExecutableId, Runtime};
-    use lyng_js_gc::AllocationLifetime;
-    use lyng_js_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
-    use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, RegExpPayload};
-    use lyng_js_types::CodeRef;
+    use lyng_gc::AllocationLifetime;
+    use lyng_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
+    use lyng_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, RegExpPayload};
+    use lyng_types::CodeRef;
 
     #[test]
     fn empty_runtime_phase6_accounting_starts_with_zero_future_domains() {

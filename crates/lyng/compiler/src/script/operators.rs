@@ -7,22 +7,22 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_unary_expression(
         &mut self,
         _expr_id: ExprId,
-        operator: lyng_js_ast::UnaryOp,
+        operator: lyng_ast::UnaryOp,
         argument: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
         match operator {
-            lyng_js_ast::UnaryOp::Minus => {
+            lyng_ast::UnaryOp::Minus => {
                 let argument_register = self.lower_expr_to_temp(argument)?;
                 self.emit_profiled_negate(dest, argument_register)
             }
-            lyng_js_ast::UnaryOp::Plus => {
+            lyng_ast::UnaryOp::Plus => {
                 let argument_register = self.lower_expr_to_temp(argument)?;
                 let zero = self.alloc_temp()?;
                 self.emit_load_smi(zero, 0)?;
                 self.emit_profiled_binary(Opcode::Sub, dest, argument_register, zero)
             }
-            lyng_js_ast::UnaryOp::Not => {
+            lyng_ast::UnaryOp::Not => {
                 let argument_register = self.lower_expr_to_temp(argument)?;
                 let jump_false = self.builder.emit_cond_jump_placeholder(
                     Opcode::JumpIfFalse,
@@ -37,16 +37,16 @@ impl FunctionCompiler<'_, '_> {
                 self.builder.patch_jump_to(jump_end, end_offset)?;
                 Ok(())
             }
-            lyng_js_ast::UnaryOp::BitNot => {
+            lyng_ast::UnaryOp::BitNot => {
                 let argument_register = self.lower_expr_to_temp(argument)?;
                 self.emit_profiled_bit_not(dest, argument_register)
             }
-            lyng_js_ast::UnaryOp::Void => {
+            lyng_ast::UnaryOp::Void => {
                 let temp = self.alloc_temp()?;
                 self.lower_expr_into(argument, temp)?;
                 self.emit_load_undefined(dest)
             }
-            lyng_js_ast::UnaryOp::TypeOf => {
+            lyng_ast::UnaryOp::TypeOf => {
                 let mut current = argument;
                 while let Expr::ParenthesizedExpression { expression, .. } =
                     self.ast().get_expr(current)
@@ -84,7 +84,7 @@ impl FunctionCompiler<'_, '_> {
                 self.builder.emit_ax(Opcode::TypeOf, i32::from(dest))?;
                 Ok(())
             }
-            lyng_js_ast::UnaryOp::Delete => self.lower_delete_expression(argument, dest),
+            lyng_ast::UnaryOp::Delete => self.lower_delete_expression(argument, dest),
         }
     }
 
@@ -155,7 +155,7 @@ impl FunctionCompiler<'_, '_> {
     fn smi_i16_literal(&self, expr: ExprId) -> Option<i16> {
         match self.ast().get_expr(expr) {
             Expr::NumericLiteral {
-                value: lyng_js_ast::NumericLiteral::Int32(value),
+                value: lyng_ast::NumericLiteral::Int32(value),
                 ..
             } => i16::try_from(*value).ok(),
             _ => None,
@@ -234,18 +234,18 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn lower_logical_expression(
         &mut self,
-        operator: lyng_js_ast::LogicalOp,
+        operator: lyng_ast::LogicalOp,
         left: ExprId,
         right: ExprId,
         dest: u16,
     ) -> LoweringResult<()> {
         self.lower_expr_into(left, dest)?;
         match operator {
-            lyng_js_ast::LogicalOp::And | lyng_js_ast::LogicalOp::Or => {
+            lyng_ast::LogicalOp::And | lyng_ast::LogicalOp::Or => {
                 let short_circuit = match operator {
-                    lyng_js_ast::LogicalOp::And => Opcode::JumpIfFalse,
-                    lyng_js_ast::LogicalOp::Or => Opcode::JumpIfTrue,
-                    lyng_js_ast::LogicalOp::NullishCoalescing => unreachable!(),
+                    lyng_ast::LogicalOp::And => Opcode::JumpIfFalse,
+                    lyng_ast::LogicalOp::Or => Opcode::JumpIfTrue,
+                    lyng_ast::LogicalOp::NullishCoalescing => unreachable!(),
                 };
                 let jump_end = self
                     .builder
@@ -255,7 +255,7 @@ impl FunctionCompiler<'_, '_> {
                 self.builder.patch_jump_to(jump_end, end)?;
                 Ok(())
             }
-            lyng_js_ast::LogicalOp::NullishCoalescing => {
+            lyng_ast::LogicalOp::NullishCoalescing => {
                 let null_value = self.alloc_temp()?;
                 self.emit_load_null(null_value)?;
                 let is_null = self.alloc_temp()?;

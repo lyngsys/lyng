@@ -1,8 +1,8 @@
 //! End-to-end pipeline tests: source -> parse -> sema.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{
+use lyng_common::{AtomTable, SourceId};
+use lyng_parser::{parse_module, parse_script};
+use lyng_sema::{
     analyze_module, analyze_script, DeclarationKind, ResolutionKind, ScopeId, ScopeKind,
     StorageClass,
 };

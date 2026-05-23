@@ -340,7 +340,7 @@ impl PrimitiveValueCellRecord {
 
 /// Number of `Value` slots packed directly inside every `RuntimeObjectRecord`.
 ///
-/// Mirrors `lyng_js_objects::INLINE_NAMED_SLOT_COUNT`. Objects whose shape places named
+/// Mirrors `lyng_objects::INLINE_NAMED_SLOT_COUNT`. Objects whose shape places named
 /// properties in slots `0..INLINE_NAMED_SLOT_COUNT` read and write them through this inline
 /// array instead of a separate `NamedSlotStorage` heap allocation, matching V8's in-object
 /// properties / JSC's butterfly inline section. GC tracing walks these slots in

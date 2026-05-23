@@ -1,17 +1,17 @@
 use super::*;
 use crate::errors::throw_type_error;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::{Agent, Runtime};
-use lyng_js_gc::{AllocationLifetime, BigIntSign, SymbolFlags};
-use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::{
+use lyng_common::WellKnownAtom;
+use lyng_env::{Agent, Runtime};
+use lyng_gc::{AllocationLifetime, BigIntSign, SymbolFlags};
+use lyng_host::NoopHostHooks;
+use lyng_objects::{
     ArrayBufferObjectData, FunctionConstructorFlags, FunctionObjectData, FunctionThisMode,
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectAllocation, ObjectColdData, ObjectRuntime, OrdinaryObjectData, PrimitiveWrapperKind,
     TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind, TypedArrayElementKind,
     TypedArrayObjectData,
 };
-use lyng_js_types::{
+use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, EnvironmentRef, PropertyKey, RealmRef, WellKnownSymbolId,
 };
 
@@ -163,7 +163,7 @@ impl NativeFunctionRegistry for RecordingRegistry {
     fn call(
         &mut self,
         _runtime: &mut ObjectRuntime,
-        _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+        _heap: &mut lyng_gc::PrimitiveMutator<'_>,
         request: NativeCallRequest<'_>,
     ) -> InternalMethodResult<Value> {
         self.last_call = Some(RecordedCall {
@@ -179,7 +179,7 @@ impl NativeFunctionRegistry for RecordingRegistry {
     fn construct(
         &mut self,
         runtime: &mut ObjectRuntime,
-        heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+        heap: &mut lyng_gc::PrimitiveMutator<'_>,
         request: NativeConstructRequest<'_>,
     ) -> InternalMethodResult<ObjectRef> {
         self.last_construct = Some(RecordedConstruct {
@@ -244,7 +244,7 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let default_realm = agent.default_realm().expect("default realm should exist");
-    let key = PropertyKey::from_atom(lyng_js_common::AtomId::from_raw(501));
+    let key = PropertyKey::from_atom(lyng_common::AtomId::from_raw(501));
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         let root_shape = default_realm

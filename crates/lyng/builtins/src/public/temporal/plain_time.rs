@@ -2,9 +2,9 @@ use super::{
     allocate_builtin_function_object, define_builtin_accessor_property,
     define_builtin_data_property, public_builtin_metadata,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
 
 #[derive(Clone, Copy)]
 pub(super) struct PlainTimeBootstrapContext {
@@ -94,8 +94,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_builtin())?,
+        lyng_types::temporal_plain_time_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_builtin())?,
         Some(plain_time_prototype),
     );
     let hour_getter = allocate_builtin_function_object(
@@ -105,8 +105,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_hour_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_hour_getter_builtin())?,
+        lyng_types::temporal_plain_time_hour_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_hour_getter_builtin())?,
         None,
     );
     let minute_getter = allocate_builtin_function_object(
@@ -116,8 +116,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_minute_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_minute_getter_builtin())?,
+        lyng_types::temporal_plain_time_minute_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_minute_getter_builtin())?,
         None,
     );
     let second_getter = allocate_builtin_function_object(
@@ -127,8 +127,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_second_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_second_getter_builtin())?,
+        lyng_types::temporal_plain_time_second_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_second_getter_builtin())?,
         None,
     );
     let millisecond_getter = allocate_builtin_function_object(
@@ -138,8 +138,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_millisecond_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_millisecond_getter_builtin())?,
+        lyng_types::temporal_plain_time_millisecond_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_millisecond_getter_builtin())?,
         None,
     );
     let microsecond_getter = allocate_builtin_function_object(
@@ -149,8 +149,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_microsecond_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_microsecond_getter_builtin())?,
+        lyng_types::temporal_plain_time_microsecond_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_microsecond_getter_builtin())?,
         None,
     );
     let nanosecond_getter = allocate_builtin_function_object(
@@ -160,8 +160,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_nanosecond_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_nanosecond_getter_builtin())?,
+        lyng_types::temporal_plain_time_nanosecond_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_nanosecond_getter_builtin())?,
         None,
     );
     let to_string = allocate_builtin_function_object(
@@ -171,8 +171,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_string_builtin())?,
+        lyng_types::temporal_plain_time_to_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_to_string_builtin())?,
         None,
     );
     let to_json = allocate_builtin_function_object(
@@ -182,8 +182,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_json_builtin())?,
+        lyng_types::temporal_plain_time_to_json_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_to_json_builtin())?,
         None,
     );
     let to_locale_string = allocate_builtin_function_object(
@@ -193,8 +193,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_to_locale_string_builtin())?,
+        lyng_types::temporal_plain_time_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_to_locale_string_builtin())?,
         None,
     );
     let value_of = allocate_builtin_function_object(
@@ -204,8 +204,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_value_of_builtin())?,
+        lyng_types::temporal_plain_time_value_of_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_value_of_builtin())?,
         None,
     );
     let equals = allocate_builtin_function_object(
@@ -215,8 +215,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_equals_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_equals_builtin())?,
+        lyng_types::temporal_plain_time_equals_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_equals_builtin())?,
         None,
     );
     let with = allocate_builtin_function_object(
@@ -226,8 +226,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_with_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_with_builtin())?,
+        lyng_types::temporal_plain_time_with_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_with_builtin())?,
         None,
     );
     let add = allocate_builtin_function_object(
@@ -237,8 +237,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_add_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_add_builtin())?,
+        lyng_types::temporal_plain_time_add_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_add_builtin())?,
         None,
     );
     let subtract = allocate_builtin_function_object(
@@ -248,8 +248,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_subtract_builtin())?,
+        lyng_types::temporal_plain_time_subtract_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_subtract_builtin())?,
         None,
     );
     let round = allocate_builtin_function_object(
@@ -259,8 +259,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_round_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_round_builtin())?,
+        lyng_types::temporal_plain_time_round_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_round_builtin())?,
         None,
     );
     let since = allocate_builtin_function_object(
@@ -270,8 +270,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_since_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_since_builtin())?,
+        lyng_types::temporal_plain_time_since_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_since_builtin())?,
         None,
     );
     let until = allocate_builtin_function_object(
@@ -281,8 +281,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_until_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_until_builtin())?,
+        lyng_types::temporal_plain_time_until_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_until_builtin())?,
         None,
     );
     let from = allocate_builtin_function_object(
@@ -292,8 +292,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_from_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_from_builtin())?,
+        lyng_types::temporal_plain_time_from_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_from_builtin())?,
         None,
     );
     let compare = allocate_builtin_function_object(
@@ -303,8 +303,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_plain_time_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_plain_time_compare_builtin())?,
+        lyng_types::temporal_plain_time_compare_builtin(),
+        public_builtin_metadata(lyng_types::temporal_plain_time_compare_builtin())?,
         None,
     );
 

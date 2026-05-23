@@ -24,9 +24,9 @@
 //!    stub, not `unimplemented_dsl_handler`.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_bytecode::Opcode;
+use lyng_bytecode::Opcode;
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::dsl::handlers::{cold, DslHandler, DSL_DISPATCH_TABLE};
+use lyng_vm::dsl::handlers::{cold, DslHandler, DSL_DISPATCH_TABLE};
 
 /// Shared assertion body used by each per-opcode test below. Takes
 /// the opcode + its directly-referenced handler symbol and verifies:

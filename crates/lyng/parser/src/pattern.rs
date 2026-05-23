@@ -1,7 +1,7 @@
 //! Pattern (destructuring) parsing.
 
-use lyng_js_ast::{ArrayPatternElement, Expr, ObjectPatternProperty, Pattern, PatternId};
-use lyng_js_lexer::TokenKind;
+use lyng_ast::{ArrayPatternElement, Expr, ObjectPatternProperty, Pattern, PatternId};
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 

@@ -73,7 +73,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<bool> {
         if !self.direct_eval_identifier(callee)? {
@@ -132,7 +132,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
     ) -> LoweringResult<bool> {
         if !self.direct_eval_identifier(callee)? {
             return Ok(false);
@@ -385,7 +385,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         if self.expr_continues_optional_chain(callee) {
@@ -426,7 +426,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
     ) -> LoweringResult<()> {
         if self.expr_continues_optional_chain(callee) {
             let result = self.alloc_temp()?;
@@ -470,7 +470,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         expr_id: ExprId,
         callee: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let argument_plan = self.collect_call_argument_plan(arguments)?;
@@ -618,7 +618,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn collect_call_argument_plan(
         &self,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
     ) -> LoweringResult<CallArgumentPlan> {
         let mut plan = CallArgumentPlan::default();
         for (index, argument) in self
@@ -749,7 +749,7 @@ impl FunctionCompiler<'_, '_> {
         expr_id: ExprId,
         callee_register: u16,
         this_register: u16,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let argument_plan = self.collect_call_argument_plan(arguments)?;
@@ -841,7 +841,7 @@ impl FunctionCompiler<'_, '_> {
     fn lower_super_construct_call(
         &mut self,
         expr_id: ExprId,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let current_direct_eval_arrow = self.current_function_ast.is_some_and(|function| {
@@ -878,7 +878,7 @@ impl FunctionCompiler<'_, '_> {
     fn emit_super_construct_call_into(
         &mut self,
         span: Span,
-        arguments: lyng_js_ast::NodeList<ExprId>,
+        arguments: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let argument_plan = self.collect_call_argument_plan(arguments)?;

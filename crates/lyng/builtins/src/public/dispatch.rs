@@ -18,14 +18,14 @@ mod support;
 mod temporal;
 use crate::internal::{dispatch_internal_builtin, InternalBuiltinDispatchContext};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_host::{
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_host::{
     TemporalCivilTime, TemporalCivilToInstantRequest, TemporalCurrentInstantRequest,
     TemporalDefaultTimeZone, TemporalDefaultTimeZoneRequest, TemporalInstant,
     TemporalInstantToCivilRequest, TemporalInstantWithOffset,
 };
-use lyng_js_types::{
+use lyng_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
     internal_object_has_own_property_builtin, internal_object_to_string_builtin,
     internal_regexp_literal_builtin, internal_string_index_of_builtin,
@@ -255,7 +255,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn recycle_string_code_units_scratch(&mut self, _units: Vec<u16>) {}
 
-    fn callee_object(&self) -> lyng_js_types::ObjectRef;
+    fn callee_object(&self) -> lyng_types::ObjectRef;
 
     fn builtin_realm(&self) -> RealmRef;
 
@@ -279,20 +279,20 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn get_property_from_object_with_receiver(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
         receiver: Value,
     ) -> Result<Value, Self::Error>;
 
     fn get_own_property_from_object(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
     ) -> Result<Option<PropertyDescriptor>, Self::Error>;
 
     fn set_property_on_object_with_receiver(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
         value: Value,
         receiver: Value,
@@ -300,7 +300,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn define_property_on_object(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
         descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
@@ -308,7 +308,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn try_fast_create_data_property(
         &mut self,
-        _object: lyng_js_types::ObjectRef,
+        _object: lyng_types::ObjectRef,
         _index: u32,
         _value: Value,
     ) -> Result<bool, Self::Error> {
@@ -317,7 +317,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn try_fast_has_own_index_property(
         &mut self,
-        _object: lyng_js_types::ObjectRef,
+        _object: lyng_types::ObjectRef,
         _index: u32,
     ) -> Result<Option<bool>, Self::Error> {
         Ok(None)
@@ -325,20 +325,20 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn delete_property_from_object(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
     ) -> Result<bool, Self::Error>;
 
     fn prepare_own_property_keys_from_object(
         &mut self,
-        _object: lyng_js_types::ObjectRef,
+        _object: lyng_types::ObjectRef,
     ) -> Result<(), Self::Error> {
         Ok(())
     }
 
     fn prepare_has_property_from_object(
         &mut self,
-        _object: lyng_js_types::ObjectRef,
+        _object: lyng_types::ObjectRef,
         _key: PropertyKey,
     ) -> Result<(), Self::Error> {
         Ok(())
@@ -348,31 +348,31 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         &mut self,
         realm: RealmRef,
         value: Value,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn allocate_ordinary_object_with_prototype(
         &mut self,
         realm: RealmRef,
-        prototype: Option<lyng_js_types::ObjectRef>,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+        prototype: Option<lyng_types::ObjectRef>,
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn allocate_builtin_function(
         &mut self,
         entry: BuiltinFunctionId,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn create_array_object(
         &mut self,
         realm: RealmRef,
         element_capacity: usize,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn ordinary_constructor_prototype(
         &mut self,
         realm: RealmRef,
-        new_target: Option<lyng_js_types::ObjectRef>,
-        default_prototype: lyng_js_types::ObjectRef,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+        new_target: Option<lyng_types::ObjectRef>,
+        default_prototype: lyng_types::ObjectRef,
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn descriptor_object_from_descriptor(
         &mut self,
@@ -382,30 +382,30 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn to_property_descriptor(
         &mut self,
-        descriptor_object: lyng_js_types::ObjectRef,
+        descriptor_object: lyng_types::ObjectRef,
     ) -> Result<PropertyDescriptor, Self::Error>;
 
     fn set_integrity_level(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         freeze: bool,
     ) -> Result<bool, Self::Error>;
 
     fn test_integrity_level(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         frozen: bool,
     ) -> Result<bool, Self::Error>;
 
     fn park_agent(
         &mut self,
-        request: &lyng_js_host::ParkAgentRequest,
-    ) -> Result<lyng_js_host::ParkAgentResult, Self::Error>;
+        request: &lyng_host::ParkAgentRequest,
+    ) -> Result<lyng_host::ParkAgentResult, Self::Error>;
 
     fn unpark_agent(
         &mut self,
-        request: &lyng_js_host::UnparkAgentRequest,
-    ) -> Result<lyng_js_host::UnparkAgentResult, Self::Error>;
+        request: &lyng_host::UnparkAgentRequest,
+    ) -> Result<lyng_host::UnparkAgentResult, Self::Error>;
 
     fn temporal_current_instant(
         &mut self,
@@ -435,18 +435,18 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
     fn require_callable_object(
         &mut self,
         value: Value,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn call_to_completion(
         &mut self,
-        callee_object: lyng_js_types::ObjectRef,
+        callee_object: lyng_types::ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> Result<Value, Self::Error>;
 
     fn try_fast_apply_builtin(
         &mut self,
-        _target: lyng_js_types::ObjectRef,
+        _target: lyng_types::ObjectRef,
         _this_value: Value,
         _arguments: Value,
     ) -> Result<Option<Value>, Self::Error> {
@@ -455,7 +455,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn try_fast_array_push(
         &mut self,
-        _object: lyng_js_types::ObjectRef,
+        _object: lyng_types::ObjectRef,
         _length: u64,
         _arguments: &[Value],
     ) -> Result<Option<u64>, Self::Error> {
@@ -464,10 +464,10 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn construct_to_completion(
         &mut self,
-        callee_object: lyng_js_types::ObjectRef,
+        callee_object: lyng_types::ObjectRef,
         arguments: &[Value],
-        new_target: Option<lyng_js_types::ObjectRef>,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+        new_target: Option<lyng_types::ObjectRef>,
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn collect_array_like_arguments(
         &mut self,
@@ -477,10 +477,10 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn create_bound_function(
         &mut self,
-        target: lyng_js_types::ObjectRef,
+        target: lyng_types::ObjectRef,
         bound_this: Value,
         bound_arguments: &[Value],
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn create_dynamic_function(
         &mut self,
@@ -489,24 +489,24 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
         body_source: &str,
         strict_caller: bool,
         kind: DynamicFunctionKind,
-        new_target: Option<lyng_js_types::ObjectRef>,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error>;
+        new_target: Option<lyng_types::ObjectRef>,
+    ) -> Result<lyng_types::ObjectRef, Self::Error>;
 
     fn generator_next(
         &mut self,
-        generator: lyng_js_types::ObjectRef,
+        generator: lyng_types::ObjectRef,
         value: Value,
     ) -> Result<Value, Self::Error>;
 
     fn generator_return(
         &mut self,
-        generator: lyng_js_types::ObjectRef,
+        generator: lyng_types::ObjectRef,
         value: Value,
     ) -> Result<Value, Self::Error>;
 
     fn generator_throw(
         &mut self,
-        generator: lyng_js_types::ObjectRef,
+        generator: lyng_types::ObjectRef,
         value: Value,
     ) -> Result<Value, Self::Error>;
 
@@ -536,7 +536,7 @@ pub trait PublicBuiltinDispatchContext: InternalBuiltinDispatchContext {
 
     fn function_to_string_text(
         &mut self,
-        function: lyng_js_types::ObjectRef,
+        function: lyng_types::ObjectRef,
     ) -> Result<String, Self::Error>;
 }
 
@@ -675,446 +675,446 @@ impl PublicBuiltinFamilyRange {
 
 const PUBLIC_BUILTIN_FAMILY_RANGES: &[PublicBuiltinFamilyRange] = &[
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::boolean_builtin(),
-        lyng_js_types::symbol_description_getter_builtin(),
+        lyng_types::boolean_builtin(),
+        lyng_types::symbol_description_getter_builtin(),
         PublicBuiltinFamily::Primitives,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::function_builtin(),
-        lyng_js_types::function_to_string_builtin(),
+        lyng_types::function_builtin(),
+        lyng_types::function_to_string_builtin(),
         PublicBuiltinFamily::Functions,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_builtin(),
-        lyng_js_types::object_property_is_enumerable_builtin(),
+        lyng_types::object_builtin(),
+        lyng_types::object_property_is_enumerable_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::error_builtin(),
-        lyng_js_types::uri_error_builtin(),
+        lyng_types::error_builtin(),
+        lyng_types::uri_error_builtin(),
         PublicBuiltinFamily::ErrorObjects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::number_builtin(),
-        lyng_js_types::number_to_exponential_builtin(),
+        lyng_types::number_builtin(),
+        lyng_types::number_to_exponential_builtin(),
         PublicBuiltinFamily::Primitives,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_builtin(),
-        lyng_js_types::string_value_of_builtin(),
+        lyng_types::string_builtin(),
+        lyng_types::string_value_of_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_builtin(),
-        lyng_js_types::regexp_to_string_builtin(),
+        lyng_types::regexp_builtin(),
+        lyng_types::regexp_to_string_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::date_builtin(),
-        lyng_js_types::date_value_of_builtin(),
+        lyng_types::date_builtin(),
+        lyng_types::date_value_of_builtin(),
         PublicBuiltinFamily::Date,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::parse_int_builtin(),
-        lyng_js_types::decode_uri_component_builtin(),
+        lyng_types::parse_int_builtin(),
+        lyng_types::decode_uri_component_builtin(),
         PublicBuiltinFamily::Language,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_char_at_builtin(),
-        lyng_js_types::string_substring_builtin(),
+        lyng_types::string_char_at_builtin(),
+        lyng_types::string_substring_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_exec_builtin(),
-        lyng_js_types::regexp_sticky_getter_builtin(),
+        lyng_types::regexp_exec_builtin(),
+        lyng_types::regexp_sticky_getter_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_builtin(),
-        lyng_js_types::array_entries_builtin(),
+        lyng_types::array_builtin(),
+        lyng_types::array_entries_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::iterator_prototype_iterator_builtin(),
-        lyng_js_types::iterator_prototype_iterator_builtin(),
+        lyng_types::iterator_prototype_iterator_builtin(),
+        lyng_types::iterator_prototype_iterator_builtin(),
         PublicBuiltinFamily::Iterators,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_iterator_next_builtin(),
-        lyng_js_types::array_iterator_next_builtin(),
+        lyng_types::array_iterator_next_builtin(),
+        lyng_types::array_iterator_next_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_iterator_next_builtin(),
-        lyng_js_types::string_iterator_builtin(),
+        lyng_types::string_iterator_next_builtin(),
+        lyng_types::string_iterator_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_species_getter_builtin(),
-        lyng_js_types::array_species_getter_builtin(),
+        lyng_types::array_species_getter_builtin(),
+        lyng_types::array_species_getter_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_source_getter_builtin(),
-        lyng_js_types::regexp_escape_builtin(),
+        lyng_types::regexp_source_getter_builtin(),
+        lyng_types::regexp_escape_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_slice_builtin(),
-        lyng_js_types::string_slice_builtin(),
+        lyng_types::string_slice_builtin(),
+        lyng_types::string_slice_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_to_string_builtin(),
-        lyng_js_types::array_for_each_builtin(),
+        lyng_types::array_to_string_builtin(),
+        lyng_types::array_for_each_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_keys_builtin(),
-        lyng_js_types::object_get_own_property_symbols_builtin(),
+        lyng_types::object_keys_builtin(),
+        lyng_types::object_get_own_property_symbols_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::generator_function_builtin(),
-        lyng_js_types::generator_throw_builtin(),
+        lyng_types::generator_function_builtin(),
+        lyng_types::generator_throw_builtin(),
         PublicBuiltinFamily::Functions,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_is_array_builtin(),
-        lyng_js_types::array_is_array_builtin(),
+        lyng_types::array_is_array_builtin(),
+        lyng_types::array_is_array_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_define_properties_builtin(),
-        lyng_js_types::object_define_properties_builtin(),
+        lyng_types::object_define_properties_builtin(),
+        lyng_types::object_define_properties_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::eval_builtin(),
-        lyng_js_types::eval_builtin(),
+        lyng_types::eval_builtin(),
+        lyng_types::eval_builtin(),
         PublicBuiltinFamily::Language,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_from_builtin(),
-        lyng_js_types::array_fill_builtin(),
+        lyng_types::array_from_builtin(),
+        lyng_types::array_fill_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_to_locale_string_builtin(),
-        lyng_js_types::object_to_locale_string_builtin(),
+        lyng_types::object_to_locale_string_builtin(),
+        lyng_types::object_to_locale_string_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_join_builtin(),
-        lyng_js_types::array_join_builtin(),
+        lyng_types::array_join_builtin(),
+        lyng_types::array_join_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_entries_builtin(),
-        lyng_js_types::object_entries_builtin(),
+        lyng_types::object_entries_builtin(),
+        lyng_types::object_entries_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_unshift_builtin(),
-        lyng_js_types::array_unshift_builtin(),
+        lyng_types::array_unshift_builtin(),
+        lyng_types::array_unshift_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_starts_with_builtin(),
-        lyng_js_types::string_starts_with_builtin(),
+        lyng_types::string_starts_with_builtin(),
+        lyng_types::string_starts_with_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_has_own_builtin(),
-        lyng_js_types::object_has_own_builtin(),
+        lyng_types::object_has_own_builtin(),
+        lyng_types::object_has_own_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_shift_builtin(),
-        lyng_js_types::array_shift_builtin(),
+        lyng_types::array_shift_builtin(),
+        lyng_types::array_shift_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_values_builtin(),
-        lyng_js_types::object_values_builtin(),
+        lyng_types::object_values_builtin(),
+        lyng_types::object_values_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_repeat_builtin(),
-        lyng_js_types::string_repeat_builtin(),
+        lyng_types::string_repeat_builtin(),
+        lyng_types::string_repeat_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_get_own_property_descriptors_builtin(),
-        lyng_js_types::object_is_builtin(),
+        lyng_types::object_get_own_property_descriptors_builtin(),
+        lyng_types::object_is_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::date_get_timezone_offset_builtin(),
-        lyng_js_types::date_get_timezone_offset_builtin(),
+        lyng_types::date_get_timezone_offset_builtin(),
+        lyng_types::date_get_timezone_offset_builtin(),
         PublicBuiltinFamily::Date,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_from_char_code_builtin(),
-        lyng_js_types::string_search_builtin(),
+        lyng_types::string_from_char_code_builtin(),
+        lyng_types::string_search_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::bigint_as_int_n_builtin(),
-        lyng_js_types::bigint_as_uint_n_builtin(),
+        lyng_types::bigint_as_int_n_builtin(),
+        lyng_types::bigint_as_uint_n_builtin(),
         PublicBuiltinFamily::Primitives,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_concat_builtin(),
-        lyng_js_types::string_concat_builtin(),
+        lyng_types::string_concat_builtin(),
+        lyng_types::string_concat_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::math_acos_builtin(),
-        lyng_js_types::number_to_locale_string_builtin(),
+        lyng_types::math_acos_builtin(),
+        lyng_types::number_to_locale_string_builtin(),
         PublicBuiltinFamily::Primitives,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::date_utc_builtin(),
-        lyng_js_types::date_to_temporal_instant_builtin(),
+        lyng_types::date_utc_builtin(),
+        lyng_types::date_to_temporal_instant_builtin(),
         PublicBuiltinFamily::Date,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_from_code_point_builtin(),
-        lyng_js_types::string_trim_start_builtin(),
+        lyng_types::string_from_code_point_builtin(),
+        lyng_types::string_trim_start_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_symbol_match_builtin(),
-        lyng_js_types::regexp_symbol_match_all_builtin(),
+        lyng_types::regexp_symbol_match_builtin(),
+        lyng_types::regexp_symbol_match_all_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_match_all_builtin(),
-        lyng_js_types::string_match_all_builtin(),
+        lyng_types::string_match_all_builtin(),
+        lyng_types::string_match_all_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_last_index_of_builtin(),
-        lyng_js_types::array_from_async_builtin(),
+        lyng_types::array_last_index_of_builtin(),
+        lyng_types::array_from_async_builtin(),
         PublicBuiltinFamily::Arrays,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::object_assign_builtin(),
-        lyng_js_types::object_group_by_builtin(),
+        lyng_types::object_assign_builtin(),
+        lyng_types::object_group_by_builtin(),
         PublicBuiltinFamily::Objects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::abstract_module_source_builtin(),
-        lyng_js_types::abstract_module_source_to_string_tag_getter_builtin(),
+        lyng_types::abstract_module_source_builtin(),
+        lyng_types::abstract_module_source_to_string_tag_getter_builtin(),
         PublicBuiltinFamily::Language,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::function_symbol_has_instance_builtin(),
-        lyng_js_types::function_symbol_has_instance_builtin(),
+        lyng_types::function_symbol_has_instance_builtin(),
+        lyng_types::function_symbol_has_instance_builtin(),
         PublicBuiltinFamily::Functions,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_species_getter_builtin(),
-        lyng_js_types::regexp_species_getter_builtin(),
+        lyng_types::regexp_species_getter_builtin(),
+        lyng_types::regexp_species_getter_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::error_is_error_builtin(),
-        lyng_js_types::error_is_error_builtin(),
+        lyng_types::error_is_error_builtin(),
+        lyng_types::error_is_error_builtin(),
         PublicBuiltinFamily::ErrorObjects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_string_iterator_next_builtin(),
-        lyng_js_types::regexp_unicode_sets_getter_builtin(),
+        lyng_types::regexp_string_iterator_next_builtin(),
+        lyng_types::regexp_unicode_sets_getter_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_substr_builtin(),
-        lyng_js_types::string_substr_builtin(),
+        lyng_types::string_substr_builtin(),
+        lyng_types::string_substr_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::escape_builtin(),
-        lyng_js_types::unescape_builtin(),
+        lyng_types::escape_builtin(),
+        lyng_types::unescape_builtin(),
         PublicBuiltinFamily::Language,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::string_anchor_builtin(),
-        lyng_js_types::string_sup_builtin(),
+        lyng_types::string_anchor_builtin(),
+        lyng_types::string_sup_builtin(),
         PublicBuiltinFamily::Strings,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::date_get_year_builtin(),
-        lyng_js_types::date_set_year_builtin(),
+        lyng_types::date_get_year_builtin(),
+        lyng_types::date_set_year_builtin(),
         PublicBuiltinFamily::Date,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::regexp_compile_builtin(),
-        lyng_js_types::regexp_legacy_paren9_getter_builtin(),
+        lyng_types::regexp_compile_builtin(),
+        lyng_types::regexp_legacy_paren9_getter_builtin(),
         PublicBuiltinFamily::RegExp,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::promise_builtin(),
-        lyng_js_types::promise_any_reject_element_builtin(),
+        lyng_types::promise_builtin(),
+        lyng_types::promise_any_reject_element_builtin(),
         PublicBuiltinFamily::Promises,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::aggregate_error_builtin(),
-        lyng_js_types::aggregate_error_builtin(),
+        lyng_types::aggregate_error_builtin(),
+        lyng_types::aggregate_error_builtin(),
         PublicBuiltinFamily::ErrorObjects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::promise_finally_function_builtin(),
-        lyng_js_types::promise_finally_function_builtin(),
+        lyng_types::promise_finally_function_builtin(),
+        lyng_types::promise_finally_function_builtin(),
         PublicBuiltinFamily::Promises,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::async_function_builtin(),
-        lyng_js_types::async_generator_throw_builtin(),
+        lyng_types::async_function_builtin(),
+        lyng_types::async_generator_throw_builtin(),
         PublicBuiltinFamily::Functions,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_buffer_builtin(),
-        lyng_js_types::array_buffer_slice_builtin(),
+        lyng_types::array_buffer_builtin(),
+        lyng_types::array_buffer_slice_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::json_parse_builtin(),
-        lyng_js_types::json_stringify_builtin(),
+        lyng_types::json_parse_builtin(),
+        lyng_types::json_stringify_builtin(),
         PublicBuiltinFamily::Json,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::data_view_builtin(),
-        lyng_js_types::big_int64_array_builtin(),
+        lyng_types::data_view_builtin(),
+        lyng_types::big_int64_array_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::map_builtin(),
-        lyng_js_types::set_for_each_builtin(),
+        lyng_types::map_builtin(),
+        lyng_types::set_for_each_builtin(),
         PublicBuiltinFamily::Collections,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::typed_array_builtin(),
-        lyng_js_types::typed_array_to_string_builtin(),
+        lyng_types::typed_array_builtin(),
+        lyng_types::typed_array_to_string_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::json_raw_json_builtin(),
-        lyng_js_types::json_is_raw_json_builtin(),
+        lyng_types::json_raw_json_builtin(),
+        lyng_types::json_is_raw_json_builtin(),
         PublicBuiltinFamily::Json,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::proxy_builtin(),
-        lyng_js_types::reflect_set_prototype_of_builtin(),
+        lyng_types::proxy_builtin(),
+        lyng_types::reflect_set_prototype_of_builtin(),
         PublicBuiltinFamily::ObjectReflection,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::weak_map_builtin(),
-        lyng_js_types::finalization_registry_unregister_builtin(),
+        lyng_types::weak_map_builtin(),
+        lyng_types::finalization_registry_unregister_builtin(),
         PublicBuiltinFamily::Collections,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::shared_array_buffer_builtin(),
-        lyng_js_types::atomics_is_lock_free_builtin(),
+        lyng_types::shared_array_buffer_builtin(),
+        lyng_types::atomics_is_lock_free_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::suppressed_error_builtin(),
-        lyng_js_types::suppressed_error_builtin(),
+        lyng_types::suppressed_error_builtin(),
+        lyng_types::suppressed_error_builtin(),
         PublicBuiltinFamily::ErrorObjects,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::disposable_stack_builtin(),
-        lyng_js_types::dispose_scope_async_builtin(),
+        lyng_types::disposable_stack_builtin(),
+        lyng_types::dispose_scope_async_builtin(),
         PublicBuiltinFamily::Disposal,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::temporal_instant_builtin(),
-        lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin(),
+        lyng_types::temporal_instant_builtin(),
+        lyng_types::temporal_zoned_date_time_to_locale_string_builtin(),
         PublicBuiltinFamily::Temporal,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_buffer_resize_builtin(),
-        lyng_js_types::array_buffer_resize_builtin(),
+        lyng_types::array_buffer_resize_builtin(),
+        lyng_types::array_buffer_resize_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::temporal_plain_date_with_calendar_builtin(),
-        lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin(),
+        lyng_types::temporal_plain_date_with_calendar_builtin(),
+        lyng_types::temporal_zoned_date_time_era_year_getter_builtin(),
         PublicBuiltinFamily::Temporal,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::promise_try_builtin(),
-        lyng_js_types::promise_with_resolvers_builtin(),
+        lyng_types::promise_try_builtin(),
+        lyng_types::promise_with_resolvers_builtin(),
         PublicBuiltinFamily::Promises,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::map_get_or_insert_builtin(),
-        lyng_js_types::set_is_disjoint_from_builtin(),
+        lyng_types::map_get_or_insert_builtin(),
+        lyng_types::set_is_disjoint_from_builtin(),
         PublicBuiltinFamily::Collections,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::atomics_pause_builtin(),
-        lyng_js_types::atomics_pause_builtin(),
+        lyng_types::atomics_pause_builtin(),
+        lyng_types::atomics_pause_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::iterator_builtin(),
-        lyng_js_types::iterator_constructor_setter_builtin(),
+        lyng_types::iterator_builtin(),
+        lyng_types::iterator_constructor_setter_builtin(),
         PublicBuiltinFamily::Iterators,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::data_view_get_big_int64_builtin(),
-        lyng_js_types::data_view_set_float16_builtin(),
+        lyng_types::data_view_get_big_int64_builtin(),
+        lyng_types::data_view_set_float16_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
-        lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
+        lyng_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
+        lyng_types::temporal_zoned_date_time_get_time_zone_transition_builtin(),
         PublicBuiltinFamily::Temporal,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::iterator_map_builtin(),
-        lyng_js_types::iterator_zip_keyed_builtin(),
+        lyng_types::iterator_map_builtin(),
+        lyng_types::iterator_zip_keyed_builtin(),
         PublicBuiltinFamily::Iterators,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::array_buffer_detached_getter_builtin(),
-        lyng_js_types::shared_array_buffer_max_byte_length_getter_builtin(),
+        lyng_types::array_buffer_detached_getter_builtin(),
+        lyng_types::shared_array_buffer_max_byte_length_getter_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::map_group_by_builtin(),
-        lyng_js_types::map_group_by_builtin(),
+        lyng_types::map_group_by_builtin(),
+        lyng_types::map_group_by_builtin(),
         PublicBuiltinFamily::Collections,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::async_iterator_dispose_builtin(),
-        lyng_js_types::async_iterator_dispose_builtin(),
+        lyng_types::async_iterator_dispose_builtin(),
+        lyng_types::async_iterator_dispose_builtin(),
         PublicBuiltinFamily::Iterators,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::promise_finally_continuation_builtin(),
-        lyng_js_types::promise_finally_continuation_builtin(),
+        lyng_types::promise_finally_continuation_builtin(),
+        lyng_types::promise_finally_continuation_builtin(),
         PublicBuiltinFamily::Promises,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::temporal_plain_date_time_with_plain_time_builtin(),
-        lyng_js_types::temporal_plain_date_time_with_plain_time_builtin(),
+        lyng_types::temporal_plain_date_time_with_plain_time_builtin(),
+        lyng_types::temporal_plain_date_time_with_plain_time_builtin(),
         PublicBuiltinFamily::Temporal,
     ),
     PublicBuiltinFamilyRange::new(
-        lyng_js_types::float16_array_builtin(),
-        lyng_js_types::float16_array_builtin(),
+        lyng_types::float16_array_builtin(),
+        lyng_types::float16_array_builtin(),
         PublicBuiltinFamily::BinaryData,
     ),
 ];
 
 const CORE_PUBLIC_BUILTIN_FAMILY_TABLE: [u8; 321] =
-    build_public_builtin_family_table::<321>(lyng_js_types::CORE_BUILTIN_NAMESPACE_START);
+    build_public_builtin_family_table::<321>(lyng_types::CORE_BUILTIN_NAMESPACE_START);
 const COMPLETION_PUBLIC_BUILTIN_FAMILY_TABLE: [u8; 490] =
-    build_public_builtin_family_table::<490>(lyng_js_types::COMPLETION_BUILTIN_NAMESPACE_START);
+    build_public_builtin_family_table::<490>(lyng_types::COMPLETION_BUILTIN_NAMESPACE_START);
 
 #[allow(
     clippy::cast_possible_truncation,
@@ -1148,15 +1148,15 @@ fn public_builtin_family(entry: BuiltinFunctionId) -> Option<PublicBuiltinFamily
     let raw = entry.get();
     lookup_public_builtin_family_table(
         raw,
-        lyng_js_types::CORE_BUILTIN_NAMESPACE_START,
-        lyng_js_types::CORE_BUILTIN_NAMESPACE_END,
+        lyng_types::CORE_BUILTIN_NAMESPACE_START,
+        lyng_types::CORE_BUILTIN_NAMESPACE_END,
         &CORE_PUBLIC_BUILTIN_FAMILY_TABLE,
     )
     .or_else(|| {
         lookup_public_builtin_family_table(
             raw,
-            lyng_js_types::COMPLETION_BUILTIN_NAMESPACE_START,
-            lyng_js_types::COMPLETION_BUILTIN_NAMESPACE_END,
+            lyng_types::COMPLETION_BUILTIN_NAMESPACE_START,
+            lyng_types::COMPLETION_BUILTIN_NAMESPACE_END,
             &COMPLETION_PUBLIC_BUILTIN_FAMILY_TABLE,
         )
     })
@@ -1307,7 +1307,7 @@ mod tests {
             Some(PublicBuiltinFamily::Promises)
         );
         assert_eq!(
-            public_builtin_family(lyng_js_types::temporal_instant_builtin()),
+            public_builtin_family(lyng_types::temporal_instant_builtin()),
             Some(PublicBuiltinFamily::Temporal)
         );
         assert_eq!(
@@ -1318,14 +1318,14 @@ mod tests {
 
     #[test]
     fn public_builtin_family_covers_registered_public_and_internal_ids() {
-        for entry in lyng_js_types::BUILTIN_ID_REGISTRY {
+        for entry in lyng_types::BUILTIN_ID_REGISTRY {
             let family = public_builtin_family(entry.id());
             match entry.namespace() {
-                lyng_js_types::BuiltinIdNamespace::Internal => {
+                lyng_types::BuiltinIdNamespace::Internal => {
                     assert_eq!(family, Some(PublicBuiltinFamily::Internal));
                 }
-                lyng_js_types::BuiltinIdNamespace::Core
-                | lyng_js_types::BuiltinIdNamespace::Completion => {
+                lyng_types::BuiltinIdNamespace::Core
+                | lyng_types::BuiltinIdNamespace::Completion => {
                     assert!(
                         matches!(family, Some(family) if family != PublicBuiltinFamily::Internal),
                         "{} should have a public dispatch family",

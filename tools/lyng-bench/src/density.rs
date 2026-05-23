@@ -1,11 +1,11 @@
-use lyng_js_bytecode::CompiledScriptUnit;
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_vm::Vm;
+use lyng_bytecode::CompiledScriptUnit;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_vm::Vm;
 use serde_json::{json, Value};
 use std::env;
 use std::fmt::Write;
@@ -167,18 +167,18 @@ fn parse_options(args: &[String]) -> Result<Options, String> {
 }
 
 fn usage() -> String {
-    "Usage: lyng-js-bench density [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--evals <n>] [--loop-trips <n>]"
+    "Usage: lyng-bench density [--preset <smoke|inner-loop|baseline|ci-regression|profile-target>] [--report <path>] [--json <path>] [--samples <n>] [--evals <n>] [--loop-trips <n>]"
         .to_string()
 }
 
 #[must_use]
 pub fn default_report_path(arch: &str) -> String {
-    format!("reports/js/lyng-js/bytecode-density-{arch}.md")
+    format!("reports/lyng/bytecode-density-{arch}.md")
 }
 
 #[must_use]
 pub fn default_json_path(arch: &str) -> String {
-    format!("reports/js/lyng-js/bytecode-density-{arch}.json")
+    format!("reports/lyng/bytecode-density-{arch}.json")
 }
 
 fn apply_preset(options: &mut Options, preset: &str) -> Result<(), String> {
@@ -292,7 +292,7 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     let unit_words = unit
         .functions()
         .iter()
-        .map(lyng_js_bytecode::BytecodeFunction::instruction_count)
+        .map(lyng_bytecode::BytecodeFunction::instruction_count)
         .sum::<usize>();
     let unit_bytes = unit
         .functions()
@@ -302,7 +302,7 @@ fn collect_density_metrics(unit: &CompiledScriptUnit) -> DensityMetrics {
     let base_words = unit
         .functions()
         .iter()
-        .map(lyng_js_bytecode::BytecodeFunction::instruction_count)
+        .map(lyng_bytecode::BytecodeFunction::instruction_count)
         .sum::<usize>();
     let wide_words = unit
         .functions()
@@ -353,8 +353,8 @@ fn count_wide_prefixes(bytes: &[u8]) -> usize {
     bytes
         .iter()
         .filter(|byte| {
-            **byte == lyng_js_bytecode::Opcode::Wide as u8
-                || **byte == lyng_js_bytecode::Opcode::ExtraWide as u8
+            **byte == lyng_bytecode::Opcode::Wide as u8
+                || **byte == lyng_bytecode::Opcode::ExtraWide as u8
         })
         .count()
 }
@@ -620,10 +620,10 @@ fn write_density_notes(out: &mut String) {
 fn invocation_hint(report_path: &str) -> String {
     if env::consts::OS == "macos" && env::consts::ARCH == "x86_64" {
         return format!(
-            "cargo run --release --target x86_64-apple-darwin -p lyng-js-bench -- density --report {report_path}"
+            "cargo run --release --target x86_64-apple-darwin -p lyng-bench -- density --report {report_path}"
         );
     }
-    format!("cargo run --release -p lyng-js-bench -- density --report {report_path}")
+    format!("cargo run --release -p lyng-bench -- density --report {report_path}")
 }
 
 #[derive(Default)]
@@ -670,7 +670,7 @@ fn render_json_report(
     json!({
         "schema_version": 1,
         "suite": "density",
-        "tool": "lyng-js-bench density",
+        "tool": "lyng-bench density",
         "settings": {
             "report_path": options.report_path,
             "json_path": options.json_path,
@@ -960,9 +960,7 @@ fn wide_register_workload(loop_trip_count: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_bytecode::{
-        ArgumentsMode, BytecodeFunction, BytecodeFunctionId, Instruction, Opcode,
-    };
+    use lyng_bytecode::{ArgumentsMode, BytecodeFunction, BytecodeFunctionId, Instruction, Opcode};
 
     #[test]
     fn generated_workloads_compile() {
@@ -1009,7 +1007,7 @@ mod tests {
     fn density_report_path_drops_phase_naming() {
         assert_eq!(
             default_report_path("aarch64"),
-            "reports/js/lyng-js/bytecode-density-aarch64.md"
+            "reports/lyng/bytecode-density-aarch64.md"
         );
     }
 

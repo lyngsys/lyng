@@ -4,37 +4,37 @@ pub(super) use crate::{
     VmDebugCommand, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason, VmDebugSafepointKind,
     VmDebugStepMode, VmError,
 };
-pub(super) use lyng_js_bytecode::{
+pub(super) use lyng_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,
     BytecodeFunction, BytecodeFunctionId, BytecodeFunctionKind, CompiledAtom, CompiledFunctionUnit,
     CompiledScriptUnit, ConstantValue, DeoptFrameValue, DeoptValueSource, ExceptionHandler,
     ExceptionHandlerKind, FeedbackSiteKind, FeedbackSiteMetadata, Instruction, Opcode,
     SafepointKind,
 };
-pub(super) use lyng_js_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
-pub(super) use lyng_js_compiler::{compile_module, compile_script, CompiledModuleUnit};
-pub(super) use lyng_js_env::{
+pub(super) use lyng_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
+pub(super) use lyng_compiler::{compile_module, compile_script, CompiledModuleUnit};
+pub(super) use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
     ExecutableId, ExecutionContextKind, JobQueueKind, ModuleStatus, PromiseReactionHandler,
     PromiseReactionKind, PromiseReactionRecord, RealmBootstrapState, Runtime, RuntimeJobPayload,
 };
-pub(super) use lyng_js_gc::{
+pub(super) use lyng_gc::{
     AllocationLifetime, BigIntSign, PrimitiveMutator, PrimitiveRoots, PrimitiveStringView,
     StringEncoding,
 };
-pub(super) use lyng_js_host::{
+pub(super) use lyng_host::{
     HostCall, HostJobKind, HostJobPhase, ImportMetaProperties, ImportMetaProperty, ImportMetaValue,
     LoadedModuleSource, ModuleKey, ModuleSourceRequest, NoopHostHooks, TestHost,
 };
-pub(super) use lyng_js_objects::{
+pub(super) use lyng_objects::{
     FunctionEntryIdentity, InternalMethodResult, NamedPropertyCachePath, NamedPropertyStorageMode,
     NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
     ObjectRuntime,
 };
-pub(super) use lyng_js_ops::object::{ordinary_create_data_property, ordinary_get};
-pub(super) use lyng_js_parser::{parse_module, parse_script};
-pub(super) use lyng_js_sema::{analyze_module, analyze_script};
-pub(super) use lyng_js_types::{
+pub(super) use lyng_ops::object::{ordinary_create_data_property, ordinary_get};
+pub(super) use lyng_parser::{parse_module, parse_script};
+pub(super) use lyng_sema::{analyze_module, analyze_script};
+pub(super) use lyng_types::{
     function_builtin, internal_function_call_builtin, symbol_builtin, CodeRef, EmbeddingFunctionId,
     EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef, PropertyKey, RealmRef, Value,
 };
@@ -72,7 +72,7 @@ fn test_embedding_eval_script_entry() -> EmbeddingFunctionId {
         .expect("embedding function ids should stay non-zero")
 }
 
-fn test_embedding_property_key(agent: &mut lyng_js_env::Agent, text: &str) -> PropertyKey {
+fn test_embedding_property_key(agent: &mut lyng_env::Agent, text: &str) -> PropertyKey {
     PropertyKey::from_atom(agent.atoms_mut().intern_collectible(text))
 }
 
@@ -150,7 +150,7 @@ pub(super) fn unit_atom(unit: &CompiledScriptUnit, text: &str) -> AtomId {
 }
 
 pub(super) fn unit_runtime_atom(
-    agent: &mut lyng_js_env::Agent,
+    agent: &mut lyng_env::Agent,
     unit: &CompiledScriptUnit,
     atom: AtomId,
 ) -> AtomId {
@@ -164,8 +164,8 @@ pub(super) fn unit_runtime_atom(
 }
 
 pub(super) fn install_global_value(
-    agent: &mut lyng_js_env::Agent,
-    realm: &lyng_js_env::RealmRecord,
+    agent: &mut lyng_env::Agent,
+    realm: &lyng_env::RealmRecord,
     name: AtomId,
     value: Value,
 ) {
@@ -194,25 +194,22 @@ pub(super) fn decode_string(view: &PrimitiveStringView<'_>) -> String {
 }
 
 pub(super) fn global_value(
-    agent: &mut lyng_js_env::Agent,
-    realm: &lyng_js_env::RealmRecord,
+    agent: &mut lyng_env::Agent,
+    realm: &lyng_env::RealmRecord,
     name: &str,
 ) -> Value {
     let atom = agent.atoms_mut().intern_collectible(name);
     ordinary_get(agent, realm.global_object(), PropertyKey::from_atom(atom)).unwrap()
 }
 
-pub(super) fn iterator_result_fields(
-    agent: &mut lyng_js_env::Agent,
-    result: Value,
-) -> (Value, Value) {
+pub(super) fn iterator_result_fields(agent: &mut lyng_env::Agent, result: Value) -> (Value, Value) {
     let object = result
         .as_object_ref()
         .expect("iterator result should be an object");
     let value = ordinary_get(
         agent,
         object,
-        PropertyKey::from_atom(lyng_js_common::WellKnownAtom::value.id()),
+        PropertyKey::from_atom(lyng_common::WellKnownAtom::value.id()),
     )
     .unwrap();
     let done_atom = agent.atoms_mut().intern_collectible("done");

@@ -6,7 +6,7 @@ Wide, 2 for ExtraWide).
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/warm.rs`:
+`crates/lyng/vm/src/dsl/handlers/warm.rs`:
 
 ```rust
 llint_handler! {
@@ -30,8 +30,8 @@ rejection guard (a `brk #0` placeholder until
 ## Current asm (AArch64)
 
 See:
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_wide.asm`
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_extra_wide.asm`
+- `reports/lyng/dsl-asm-baseline-aarch64/op_wide.asm`
+- `reports/lyng/dsl-asm-baseline-aarch64/op_extra_wide.asm`
 
 Each emits exactly 7 fast-path instructions:
 

@@ -1,9 +1,9 @@
 //! Sema integration tests using parsed AST (not hand-built).
 //! Validates scope structure, binding analysis, captures, and storage classes.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{
+use lyng_common::{AtomTable, SourceId};
+use lyng_parser::{parse_module, parse_script};
+use lyng_sema::{
     analyze_module, analyze_script, ClassPrivateElementKind, DeclarationKind, ResolutionKind,
     ScopeId, ScopeKind, StorageClass,
 };
@@ -12,7 +12,7 @@ fn sid() -> SourceId {
     SourceId::new(0)
 }
 
-fn sema(src: &str) -> (lyng_js_sema::ScriptSema, AtomTable) {
+fn sema(src: &str) -> (lyng_sema::ScriptSema, AtomTable) {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(&mut atoms, sid(), src);
     assert!(
@@ -29,7 +29,7 @@ fn sema(src: &str) -> (lyng_js_sema::ScriptSema, AtomTable) {
     (s, atoms)
 }
 
-fn module_sema(src: &str) -> (lyng_js_sema::ModuleSema, AtomTable) {
+fn module_sema(src: &str) -> (lyng_sema::ModuleSema, AtomTable) {
     let mut atoms = AtomTable::new();
     let parsed = parse_module(&mut atoms, sid(), src);
     assert!(
@@ -377,8 +377,8 @@ fn class_private_layout_preserves_source_order_staticness_and_kind() {
         sema.diagnostics.as_slice()
     );
 
-    let body = match parsed.ast.get_decl(lyng_js_ast::DeclId::new(0)) {
-        lyng_js_ast::Decl::Class { body, .. } => *body,
+    let body = match parsed.ast.get_decl(lyng_ast::DeclId::new(0)) {
+        lyng_ast::Decl::Class { body, .. } => *body,
         other => panic!("expected first declaration to be a class, got {other:?}"),
     };
     let layout = sema
@@ -433,8 +433,8 @@ fn class_private_layout_exists_for_classes_without_private_elements() {
         sema.diagnostics.as_slice()
     );
 
-    let body = match parsed.ast.get_decl(lyng_js_ast::DeclId::new(0)) {
-        lyng_js_ast::Decl::Class { body, .. } => *body,
+    let body = match parsed.ast.get_decl(lyng_ast::DeclId::new(0)) {
+        lyng_ast::Decl::Class { body, .. } => *body,
         other => panic!("expected first declaration to be a class, got {other:?}"),
     };
     let layout = sema

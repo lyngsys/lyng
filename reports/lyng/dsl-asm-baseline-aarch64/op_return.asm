@@ -1,6 +1,6 @@
 // DSL-0b op_return handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::hot::op_return
-// Source: crates/lyng-js/vm/src/dsl/handlers/hot.rs (B42)
+// Symbol: lyng_vm::dsl::handlers::hot::op_return
+// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B42)
 // Layout: A (single byte operand at PC+1), length = 2 bytes.
 //
 // op_return is frame-transitioning — always returns Refresh / ExitDone /

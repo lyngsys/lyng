@@ -4,12 +4,12 @@ mod left_hand_side;
 mod operators;
 mod primary;
 
-use lyng_js_ast::{
+use lyng_ast::{
     AssignOp, Expr, ExprId, FunctionKind, ImportExpressionPhase, LogicalOp, TemplateQuasi,
 };
-use lyng_js_common::{AtomId, Span, WellKnownAtom};
-use lyng_js_lexer::StringLiteral as LexerStringLiteral;
-use lyng_js_lexer::{LexerMode, TokenKind, TokenPayload};
+use lyng_common::{AtomId, Span, WellKnownAtom};
+use lyng_lexer::StringLiteral as LexerStringLiteral;
+use lyng_lexer::{LexerMode, TokenKind, TokenPayload};
 
 use self::operators::{token_can_start_expression, token_to_assign_op};
 use crate::parser::Parser;
@@ -275,7 +275,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     // Template literal
     // -----------------------------------------------------------------------
 
-    pub fn parse_template_literal(&mut self, tagged: bool) -> lyng_js_ast::TemplateLiteralId {
+    pub fn parse_template_literal(&mut self, tagged: bool) -> lyng_ast::TemplateLiteralId {
         let mut quasis = Vec::new();
         let mut expressions = Vec::new();
 

@@ -4,10 +4,10 @@ use super::{
     type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, BigIntSign};
-use lyng_js_objects::{DataViewObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
-use lyng_js_types::{BuiltinFunctionId, RealmRef, Value};
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, BigIntSign};
+use lyng_objects::{DataViewObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_types::{BuiltinFunctionId, RealmRef, Value};
 
 pub(super) fn dispatch_data_view_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -98,9 +98,9 @@ pub(super) fn dispatch_data_view_builtin<Cx: PublicBuiltinDispatchContext>(
 fn allocate_data_view_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     data_view: DataViewObjectData,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())

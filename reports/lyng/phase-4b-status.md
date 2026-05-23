@@ -45,7 +45,7 @@ macro_rules! dispatch_next_with_value {
     ($state:expr, $value:expr) => {{
         let byte = $state.next_opcode_byte();
         if let Some(target) =
-            ::lyng_js_bytecode::Opcode::accumulator_store_index_for_byte(byte)
+            ::lyng_bytecode::Opcode::accumulator_store_index_for_byte(byte)
         {
             let registers = $state.frame.registers();
             $state.vm.write_register_unchecked(registers, target, $value);
@@ -78,12 +78,12 @@ in-bounds. The contract is documented at the new
 
 | Check | Before 4b | After 4b | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-compiler` | 71 passed | 71 passed | unchanged |
-| `cargo test -p lyng-js-bytecode` | 45 passed | 45 passed | unchanged |
-| `cargo test -p lyng-js-vm` | 401 passed | 401 passed | unchanged |
-| `cargo test -p lyng-js-vm --features opcode-counters` | 402 passed | **403 passed** | +1 (new Star fusion regression) |
-| `cargo test -p lyng-js-tests` | 1186 passed | 1186 passed | unchanged |
-| `cargo clippy -p lyng-js-vm --all-features --tests -- -W clippy::pedantic -W clippy::nursery` | clean on changed files | clean on changed files | unchanged |
+| `cargo test -p lyng-compiler` | 71 passed | 71 passed | unchanged |
+| `cargo test -p lyng-bytecode` | 45 passed | 45 passed | unchanged |
+| `cargo test -p lyng-vm` | 401 passed | 401 passed | unchanged |
+| `cargo test -p lyng-vm --features opcode-counters` | 402 passed | **403 passed** | +1 (new Star fusion regression) |
+| `cargo test -p lyng-tests` | 1186 passed | 1186 passed | unchanged |
+| `cargo clippy -p lyng-vm --all-features --tests -- -W clippy::pedantic -W clippy::nursery` | clean on changed files | clean on changed files | unchanged |
 
 The new regression test `vm_star_fusion_elides_star_dispatch_after_lda`
 builds a 3-instruction script that compacts to `LdaOne; Star2; Return r2`,
@@ -96,7 +96,7 @@ enables opcode dispatch counters, and asserts:
 
 This pins the fusion shape so future changes can't silently regress it.
 
-### Runtime benchmark suite (lyng-js-bench runtime, 7 samples / 9 timed runs)
+### Runtime benchmark suite (lyng-bench runtime, 7 samples / 9 timed runs)
 
 Δ ns/work-unit, vs the prior bench checkpoint (Phase 4a):
 
@@ -188,25 +188,25 @@ of inner-loop patterns). With Phase 4c, the fusion fires more often.
 ## Files changed
 
 **VM**:
-- `crates/lyng-js/vm/src/vm/dispatch_state.rs` — new
+- `crates/lyng/vm/src/vm/dispatch_state.rs` — new
   `dispatch_next_with_value!` macro alongside `dispatch_next!`.
-- `crates/lyng-js/vm/src/vm/dispatch_handlers/loads.rs` — nine `Lda*`
+- `crates/lyng/vm/src/vm/dispatch_handlers/loads.rs` — nine `Lda*`
   handlers switched to `dispatch_next_with_value!`.
-- `crates/lyng-js/vm/src/tests/core.rs` — new
+- `crates/lyng/vm/src/tests/core.rs` — new
   `vm_star_fusion_elides_star_dispatch_after_lda` regression test
   (`#[cfg(feature = "opcode-counters")]`).
 
 **Bytecode**:
-- `crates/lyng-js/bytecode/src/opcode.rs` — new
+- `crates/lyng/bytecode/src/opcode.rs` — new
   `Opcode::accumulator_store_index_for_byte(byte)` helper for the
   dispatch-loop peek (avoids materializing a full `Opcode` enum value
   on the hot path).
 
 **Reports**:
-- `reports/js/lyng-js/phase-4b-status.md` (this file).
-- `reports/js/lyng-js/phase-4b-density.md`.
-- `reports/js/lyng-js/phase-4b-bench.md`.
-- `reports/js/lyng-js/phase-4b-test262.md`.
+- `reports/lyng/phase-4b-status.md` (this file).
+- `reports/lyng/phase-4b-density.md`.
+- `reports/lyng/phase-4b-bench.md`.
+- `reports/lyng/phase-4b-test262.md`.
 
 Total Phase 4b diff: roughly +90 added lines / −20 modified across 4
 source files, plus the regression test (~60 lines) and the four

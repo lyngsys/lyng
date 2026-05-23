@@ -1,7 +1,7 @@
 # asm-diff normalization rules
 
 This document is the single source of truth for the normalization
-rules applied by `lyng-js-bench asm-diff` before comparing handler
+rules applied by `lyng-bench asm-diff` before comparing handler
 asm to committed baselines. Changes to these rules require a separate,
 explicitly-reasoned commit.
 
@@ -43,5 +43,5 @@ produce byte-identical normalized output. If they don't, the rules
 above are incomplete — file a bug.
 
 Cross-rustc-version stability is NOT guaranteed. When upgrading
-rustc, run `lyng-js-bench asm-diff --mode update` to refresh
+rustc, run `lyng-bench asm-diff --mode update` to refresh
 baselines; commit message must include `[asm-baseline-refresh: rustc <old>→<new>]`.

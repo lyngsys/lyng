@@ -1,4 +1,4 @@
-//! Parser for `tools/lyng-js-bench/hot-opcodes.toml`.
+//! Parser for `tools/lyng-bench/hot-opcodes.toml`.
 //!
 //! Consumed by `asm-diff`, `microbench`, and `--count-slow-path-share`.
 //! The config is the single source of truth for which opcodes count
@@ -41,8 +41,7 @@ impl HotOpcodesConfig {
     pub fn load(path: &Path) -> Result<Self, String> {
         let raw = std::fs::read_to_string(path)
             .map_err(|err| format!("read {}: {err}", path.display()))?;
-        toml::from_str::<Self>(&raw)
-            .map_err(|err| format!("parse {}: {err}", path.display()))
+        toml::from_str::<Self>(&raw).map_err(|err| format!("parse {}: {err}", path.display()))
     }
 
     /// Effective slow-path share threshold for an opcode (override or default).
@@ -58,7 +57,10 @@ impl HotOpcodesConfig {
     /// Hot-opcode name list, in config order.
     #[must_use]
     pub fn hot_opcode_names(&self) -> Vec<&str> {
-        self.opcodes.iter().map(|entry| entry.name.as_str()).collect()
+        self.opcodes
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .collect()
     }
 }
 
@@ -113,8 +115,7 @@ mod tests {
 
     #[test]
     fn parses_the_committed_hot_opcodes_toml() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("hot-opcodes.toml");
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("hot-opcodes.toml");
         let config = HotOpcodesConfig::load(&path).expect("load");
         // The hot-opcodes.toml tracks the top-30 V8 v7 opcodes plus any
         // macro-shared symmetric pairs deemed in-scope by per-phase

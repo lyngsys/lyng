@@ -5,9 +5,9 @@ use super::{
     },
     RealmRef,
 };
-use lyng_js_common::AtomId;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{ObjectRef, SuspendedExecutionRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_types::{ObjectRef, SuspendedExecutionRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PromiseState {
@@ -1074,7 +1074,7 @@ impl PromiseTableId for PromiseCombinatorElementId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_types::RealmRef;
+    use lyng_types::RealmRef;
 
     #[test]
     fn promise_tables_allocate_records_and_round_trip_by_object() {

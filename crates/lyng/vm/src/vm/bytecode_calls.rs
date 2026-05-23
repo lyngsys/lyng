@@ -5,9 +5,9 @@ use super::{
     ThisBindingStatus, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
     WellKnownAtom,
 };
-use lyng_js_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionRegistry};
-use lyng_js_ops::errors;
-use lyng_js_types::PropertyKey;
+use lyng_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionRegistry};
+use lyng_ops::errors;
+use lyng_types::PropertyKey;
 
 const MAX_BYTECODE_CALL_DEPTH: usize = 8_192;
 
@@ -203,7 +203,7 @@ impl Vm {
 
         let (lexical_env, variable_env) = if needs_environment {
             let layout = environment_layout
-                .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
+                .and_then(|layout| lyng_env::EnvironmentLayoutId::from_raw(layout.get()))
                 .ok_or(VmError::MissingEnvironmentLayout(code))?;
             let env = agent
                 .alloc_function_environment(
@@ -268,7 +268,7 @@ impl Vm {
 
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
         let context = ExecutionContext::bytecode(
             prepared.realm,
             prepared.code,
@@ -436,7 +436,7 @@ impl Vm {
 
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
         let context = ExecutionContext::bytecode(
             prepared.realm,
             prepared.code,
@@ -587,7 +587,7 @@ impl Vm {
             if let Some(home_object) = agent
                 .objects()
                 .function_data(record.function_object())
-                .and_then(lyng_js_objects::FunctionObjectData::home_object)
+                .and_then(lyng_objects::FunctionObjectData::home_object)
             {
                 return Ok(home_object);
             }
@@ -598,7 +598,7 @@ impl Vm {
                 agent
                     .objects()
                     .function_data(callee)
-                    .and_then(lyng_js_objects::FunctionObjectData::home_object)
+                    .and_then(lyng_objects::FunctionObjectData::home_object)
             })
             .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
     }
@@ -606,25 +606,25 @@ impl Vm {
     pub(super) fn this_environment_record(
         agent: &Agent,
         start: EnvironmentRef,
-    ) -> VmResult<Option<lyng_js_env::FunctionEnvironmentRecord>> {
+    ) -> VmResult<Option<lyng_env::FunctionEnvironmentRecord>> {
         let mut current = Some(start);
         while let Some(environment) = current {
             match agent
                 .environment(environment)
                 .ok_or(VmError::MissingEnvironment(environment))?
             {
-                lyng_js_env::EnvironmentRecord::Function(record) => {
+                lyng_env::EnvironmentRecord::Function(record) => {
                     if record.this_binding_status() == ThisBindingStatus::Lexical {
                         current = record.declarative().outer();
                         continue;
                     }
                     return Ok(Some(record));
                 }
-                lyng_js_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Module(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Global(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Module(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Global(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => current = record.outer(),
             }
         }
         Ok(None)
@@ -713,20 +713,20 @@ pub(super) struct PreparedBytecodeCall {
 mod tests {
     use super::*;
     use crate::vm::call::RejectingNativeRegistry;
-    use lyng_js_bytecode::{
+    use lyng_bytecode::{
         BytecodeBuilder, BytecodeFunctionId, BytecodeFunctionKind, CompiledFunctionUnit,
         CompiledScriptUnit,
     };
-    use lyng_js_common::SourceId;
-    use lyng_js_compiler::compile_script;
-    use lyng_js_env::{
+    use lyng_common::SourceId;
+    use lyng_compiler::compile_script;
+    use lyng_env::{
         EnvironmentLayout, EnvironmentLayoutKind, ExecutionContextKind, Runtime, ThisBindingStatus,
     };
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_objects::{FunctionObjectData, ObjectColdData};
-    use lyng_js_parser::parse_script;
-    use lyng_js_sema::analyze_script;
-    use lyng_js_types::eval_builtin;
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::{FunctionObjectData, ObjectColdData};
+    use lyng_parser::parse_script;
+    use lyng_sema::analyze_script;
+    use lyng_types::eval_builtin;
 
     #[test]
     fn prepared_bytecode_call_threads_private_env_into_execution_context() {
@@ -838,7 +838,7 @@ mod tests {
         let unit = CompiledFunctionUnit::new(SourceId::new(92), function.id(), vec![function]);
         let mut vm = Vm::new();
         let _ = vm
-            .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+            .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
             .expect("bootstrap should succeed");
         let installed = vm
             .install_function(agent, realm.id(), &unit)
@@ -887,7 +887,7 @@ mod tests {
     }
 
     fn compile_test_script(source: &str) -> CompiledScriptUnit {
-        let mut atoms = lyng_js_common::AtomTable::new();
+        let mut atoms = lyng_common::AtomTable::new();
         let parsed = parse_script(&mut atoms, SourceId::new(93), source);
         assert!(!parsed.diagnostics.has_errors());
         let sema = analyze_script(&parsed, &atoms);
@@ -920,7 +920,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(lyng_js_objects::FunctionObjectData::entry)
+            .and_then(lyng_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
@@ -977,7 +977,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(lyng_js_objects::FunctionObjectData::entry)
+            .and_then(lyng_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
@@ -1028,7 +1028,7 @@ mod tests {
         let Some(FunctionEntryIdentity::Bytecode(code)) = agent
             .objects()
             .function_data(function_object)
-            .and_then(lyng_js_objects::FunctionObjectData::entry)
+            .and_then(lyng_objects::FunctionObjectData::entry)
         else {
             panic!("function expression should remain backed by installed bytecode");
         };

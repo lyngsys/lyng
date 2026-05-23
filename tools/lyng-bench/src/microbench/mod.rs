@@ -1,4 +1,4 @@
-//! `lyng-js-bench microbench` — per-opcode ns/dispatch with confidence interval.
+//! `lyng-bench microbench` — per-opcode ns/dispatch with confidence interval.
 //!
 //! Loop construction: each opcode has a hand-written JS source snippet that
 //! exercises the opcode in a tight inner loop; the harness compiles it,
@@ -7,19 +7,19 @@
 use std::hint::black_box;
 use std::path::PathBuf;
 
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_vm::{Vm, VmError};
-use lyng_js_types::Value;
+use lyng_builtins::BootstrapMode;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::{Vm, VmError};
 
 mod snippets;
 mod timing;
-pub use snippets::{Snippet, all_snippets, for_opcode};
+pub use snippets::{all_snippets, for_opcode, Snippet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MicrobenchOptions {
@@ -174,8 +174,12 @@ fn run_snippet(
     for sample_index in 0..samples {
         let mut eval_result: Option<Result<Value, VmError>> = None;
         let sample = timing::time_once(dispatches_per_sample, || {
-            eval_result =
-                Some(vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env()));
+            eval_result = Some(vm.evaluate_installed(
+                agent,
+                installed,
+                realm.global_env(),
+                realm.global_env(),
+            ));
         });
         let value = eval_result
             .expect("time_once closure always assigns eval_result")
@@ -249,7 +253,7 @@ fn read_loadavg_one_min() -> Result<f64, String> {
 }
 
 fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
-    let mut opcodes_config = PathBuf::from("tools/lyng-js-bench/hot-opcodes.toml");
+    let mut opcodes_config = PathBuf::from("tools/lyng-bench/hot-opcodes.toml");
     let mut baseline: Option<PathBuf> = None;
     let mut samples = 7;
     let mut iters = 5_000_000;
@@ -259,14 +263,36 @@ fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
-            "--opcodes-config" => opcodes_config = iter.next().ok_or("--opcodes-config requires a path")?.into(),
-            "--baseline" => baseline = Some(iter.next().ok_or("--baseline requires a path")?.into()),
-            "--samples" => samples = iter.next().and_then(|s| s.parse().ok()).ok_or("--samples requires a number")?,
-            "--iters" => iters = iter.next().and_then(|s| s.parse().ok()).ok_or("--iters requires a number")?,
+            "--opcodes-config" => {
+                opcodes_config = iter
+                    .next()
+                    .ok_or("--opcodes-config requires a path")?
+                    .into()
+            }
+            "--baseline" => {
+                baseline = Some(iter.next().ok_or("--baseline requires a path")?.into())
+            }
+            "--samples" => {
+                samples = iter
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--samples requires a number")?
+            }
+            "--iters" => {
+                iters = iter
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--iters requires a number")?
+            }
             "--require-isolation" => require_isolation = true,
             "--output" => output = Some(iter.next().ok_or("--output requires a path")?.into()),
             "--help" | "-h" => return Err(help_text()),
-            other => return Err(format!("microbench: unknown arg {other}\n\n{}", help_text())),
+            other => {
+                return Err(format!(
+                    "microbench: unknown arg {other}\n\n{}",
+                    help_text()
+                ))
+            }
         }
     }
 
@@ -282,7 +308,7 @@ fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
 
 fn help_text() -> String {
     [
-        "Usage: lyng-js-bench microbench [options]",
+        "Usage: lyng-bench microbench [options]",
         "",
         "Options:",
         "  --opcodes-config PATH    Path to hot-opcodes.toml",
@@ -315,9 +341,11 @@ mod tests {
 
     #[test]
     fn snippets_cover_hot_opcodes_or_emit_warning() {
-        let config = crate::hot_opcodes::HotOpcodesConfig::load(
-            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/hot-opcodes.toml")),
-        ).expect("load");
+        let config = crate::hot_opcodes::HotOpcodesConfig::load(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/hot-opcodes.toml"
+        )))
+        .expect("load");
         let snippets = snippets::all_snippets();
         let mut missing: Vec<&str> = Vec::new();
         for entry in &config.opcodes {

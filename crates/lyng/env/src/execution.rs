@@ -1,6 +1,6 @@
-use lyng_js_common::AtomId;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, ShapeId, StringRef, Value};
 use std::ops::Range;
 
 /// Execution identity categories reserved by the runtime substrate.
@@ -35,7 +35,7 @@ pub enum ThisState {
     Value(Value),
 }
 
-/// Cold execution-context record owned by `lyng_js_env`.
+/// Cold execution-context record owned by `lyng_env`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExecutionContext {
     realm: RealmRef,

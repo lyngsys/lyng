@@ -10,22 +10,22 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use lyng_js_builtins::BootstrapMode;
-use lyng_js_bytecode::CompiledScriptUnit;
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::{Agent, Runtime};
-use lyng_js_host::{ModuleKey, ModuleSourceRequest};
-use lyng_js_ops::object::ordinary_get;
-use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::{AbruptCompletion, CodeRef, ObjectRef, PropertyKey, Value};
-use lyng_js_vm::{
+use lyng_builtins::BootstrapMode;
+use lyng_bytecode::CompiledScriptUnit;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::{Agent, Runtime};
+use lyng_host::{ModuleKey, ModuleSourceRequest};
+use lyng_ops::object::ordinary_get;
+use lyng_parser::{parse_module, parse_script};
+use lyng_sema::{analyze_module, analyze_script};
+use lyng_types::{AbruptCompletion, CodeRef, ObjectRef, PropertyKey, Value};
+use lyng_vm::{
     FeedbackInlineCacheState, FeedbackSiteDetail, ModuleLoadError, SharedRealmExtensionProvider,
     Vm, VmError, VmEvaluationObserver,
 };
 
-use lyng_js_test262_harness::{Test262PrintObserver, Test262RealmExtension};
+use lyng_test262_harness::{Test262PrintObserver, Test262RealmExtension};
 
 use crate::diagnostics::{Test262DiagnosticTimings, Test262RuntimeDiagnostics};
 use crate::extensions::Test262Host;
@@ -35,7 +35,7 @@ use crate::metadata::{
     TestMetadata, TestVariant,
 };
 
-pub const WORKER_RESULT_PREFIX: &str = "__lyng_js_test262_result__:";
+pub const WORKER_RESULT_PREFIX: &str = "__lyng_test262_result__:";
 pub const WORKER_REQUEST_SEPARATOR: char = '\t';
 const ASYNC_COMPLETE_MESSAGE: &str = "Test262:AsyncTestComplete";
 const ASYNC_FAILURE_PREFIX: &str = "Test262:AsyncTestFailure:";
@@ -822,8 +822,8 @@ fn count_wide_prefixes(bytes: &[u8]) -> usize {
     bytes
         .iter()
         .filter(|byte| {
-            **byte == lyng_js_bytecode::Opcode::Wide as u8
-                || **byte == lyng_js_bytecode::Opcode::ExtraWide as u8
+            **byte == lyng_bytecode::Opcode::Wide as u8
+                || **byte == lyng_bytecode::Opcode::ExtraWide as u8
         })
         .count()
 }
@@ -1528,7 +1528,7 @@ mod tests {
             .as_nanos();
         let unique = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
         let path = env::temp_dir().join(format!(
-            "lyng-js-test262-{}-{}-{}",
+            "lyng-test262-{}-{}-{}",
             std::process::id(),
             nonce,
             unique

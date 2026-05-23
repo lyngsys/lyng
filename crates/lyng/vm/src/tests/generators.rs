@@ -533,7 +533,7 @@ fn module_default_export_generator_declarations_lower_under_6e1() {
     let default_slot = unit
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("module should export a default generator")
         .local_slot();
     let value_slot = unit

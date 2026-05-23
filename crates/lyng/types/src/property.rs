@@ -1,5 +1,5 @@
 use super::{SymbolRef, Value};
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 /// Spec-facing property key classification used by slow-path runtime helpers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

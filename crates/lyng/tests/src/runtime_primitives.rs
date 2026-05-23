@@ -1,9 +1,9 @@
 //! Compile-smoke coverage for the runtime primitive crate DAG.
 
-use lyng_js_common::{AtomId, AtomTable};
-use lyng_js_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
-use lyng_js_ops::{allocating, pure, read, PrimitiveContext};
-use lyng_js_types::{
+use lyng_common::{AtomId, AtomTable};
+use lyng_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
+use lyng_ops::{allocating, pure, read, PrimitiveContext};
+use lyng_types::{
     AbruptCompletion, BigIntRef, Completion, PropertyDescriptor, PropertyKey, StringRef, SymbolRef,
     Value,
 };
@@ -79,7 +79,7 @@ fn primitive_context_surface_is_reexported() {
         AllocationLifetime::Default,
     );
     let bigint = context.mutator().alloc_bigint(
-        lyng_js_gc::BigIntSign::Negative,
+        lyng_gc::BigIntSign::Negative,
         &[9, 0],
         AllocationLifetime::Default,
     );
@@ -96,7 +96,7 @@ fn primitive_context_surface_is_reexported() {
     );
     assert_eq!(
         read::bigint_sign(context.heap(), bigint),
-        Some(lyng_js_gc::BigIntSign::Negative)
+        Some(lyng_gc::BigIntSign::Negative)
     );
     assert_eq!(read::bigint_is_zero(context.heap(), bigint), Some(false));
     assert_eq!(read::string_code_unit_len(context.heap(), string), Some(3));

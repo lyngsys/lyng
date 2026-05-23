@@ -1,6 +1,6 @@
-//! Object-model substrate for the lyng-js runtime layer.
+//! Object-model substrate for the lyng runtime layer.
 //!
-//! Ownership: `lyng_js_objects` owns object allocation, canonical shapes,
+//! Ownership: `lyng_objects` owns object allocation, canonical shapes,
 //! named-property metadata, indexed-element and named-slot storage references,
 //! cold payload metadata, and later internal-method dispatch.
 
@@ -11,12 +11,12 @@
     reason = "object-model APIs expose domain-specific records and lightweight descriptor accessors across crates"
 )]
 
-use lyng_js_gc::{
+use lyng_gc::{
     AllocationLifetime, FunctionPayloadRef, ObjectHandleStoreTarget, ObjectSlotsHandleStoreTarget,
     PrimitiveHeapView, PrimitiveMutator, RuntimeFunctionRecord, RuntimeObjectRecord,
     RuntimeShapeRecord, ShapeHandleStoreTarget, ValueStoreTarget,
 };
-use lyng_js_types::{
+use lyng_types::{
     BackingStoreRef, BuiltinFunctionId, CodeRef, DescriptorAttributes, EmbeddingFunctionId,
     EnvironmentRef, NativeFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
     ShapeId, Value,

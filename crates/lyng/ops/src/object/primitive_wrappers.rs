@@ -1,8 +1,8 @@
 use crate::errors::{self, throw_type_error};
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, StringEncoding};
-use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind};
-use lyng_js_types::{AbruptCompletion, Completion, ObjectRef, RealmRef, ShapeId, StringRef, Value};
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, StringEncoding};
+use lyng_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind};
+use lyng_types::{AbruptCompletion, Completion, ObjectRef, RealmRef, ShapeId, StringRef, Value};
 
 /// ECMAScript `ToObject` over the shared wrapper substrate.
 ///

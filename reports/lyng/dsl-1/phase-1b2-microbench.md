@@ -9,8 +9,8 @@ measurements. Section below updated 2026-05-20 to replace the
 
 ## Microbench (post-port ns/dispatch)
 
-The `lyng-js-bench microbench` runner inspects the snippet table at
-`tools/lyng-js-bench/src/microbench/snippets.rs`. The Phase-1.B.0 commit
+The `lyng-bench microbench` runner inspects the snippet table at
+`tools/lyng-bench/src/microbench/snippets.rs`. The Phase-1.B.0 commit
 (`ad240f50` "DSL-1 Phase 1.B.0 Tasks 7+8: microbench snippets for 14
 opcodes") added snippets for 7 Phase-1.A opcodes + 7 Phase-1.B anchor
 opcodes (LoadLocal0..3, StoreLocal3, LoadEnvSlot, Ldar). **It did NOT
@@ -30,7 +30,7 @@ gap.
 ```
 
 (Source: `/tmp/cleanup-microbench.md` produced by
-`cargo run --release -p lyng-js-bench -- microbench --samples 7
+`cargo run --release -p lyng-bench -- microbench --samples 7
 --output /tmp/cleanup-microbench.md` at HEAD `922ff5f2`.)
 
 **Observed shape vs the analogous-opcode prediction:**
@@ -60,7 +60,7 @@ same-load measurement (see below).
 
 ## Slow-path-share on V8 v7
 
-Run with `cargo run --release -p lyng-js-bench -- v8suite --samples 3
+Run with `cargo run --release -p lyng-bench -- v8suite --samples 3
 --count-opcodes --count-slow-path-share --json /tmp/phase-1b2-slowshare.json
 --counts-json /tmp/phase-1b2-slowshare-counts.json`. The
 `--count-slow-path-share` flag joins the per-opcode semantic and
@@ -118,8 +118,8 @@ may push share above 0%, but the < 20% gate has substantial headroom.
 
 The Task 2 + 3 commits captured asm baselines:
 
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_const8.asm`
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_this.asm`
+- `reports/lyng/dsl-asm-baseline-aarch64/op_load_const8.asm`
+- `reports/lyng/dsl-asm-baseline-aarch64/op_load_this.asm`
 
 Both confirm the inline bodies meet the spec gates:
 
@@ -130,8 +130,8 @@ Both confirm the inline bodies meet the spec gates:
 
 The `asm-diff --check` tool does not yet support the
 `dsl::handlers::cold::*` namespace; the asm baselines under
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/` (captured manually via
-`cargo rustc --release -p lyng-js-vm --lib -- --emit=asm`) are the
+`reports/lyng/dsl-asm-baseline-aarch64/` (captured manually via
+`cargo rustc --release -p lyng-vm --lib -- --emit=asm`) are the
 authoritative artifact.
 
 ## Verdict
@@ -148,7 +148,7 @@ authoritative artifact.
 All three quantitative gates now pass cleanly. The microbench gate
 was originally deferred at Phase 1.B.2 closure because the
 `LoadConst8` / `LoadThis` snippets were missing from
-`tools/lyng-js-bench/src/microbench/snippets.rs`; the snippets were
+`tools/lyng-bench/src/microbench/snippets.rs`; the snippets were
 backfilled in Phase 1.B cleanup batch 1 (commit `922ff5f2`) and the
 gate is verified post-hoc. The V8 v7 A/B (see
 [`phase-1b2-ab-comparison.md`](phase-1b2-ab-comparison.md)) is the

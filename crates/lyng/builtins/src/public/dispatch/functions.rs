@@ -1,10 +1,10 @@
 use super::{string_value, type_error, BuiltinProxyBridge, PublicBuiltinDispatchContext};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_objects::FunctionEntryIdentity;
-use lyng_js_ops::object;
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_objects::FunctionEntryIdentity;
+use lyng_ops::object;
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
 
 pub(super) fn dispatch_function_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -338,7 +338,7 @@ fn bound_function_target(agent: &Agent, function: ObjectRef) -> Option<ObjectRef
         .view()
         .function_payload(payload)?
         .bound()
-        .map(lyng_js_gc::RuntimeBoundFunctionRecord::target)
+        .map(lyng_gc::RuntimeBoundFunctionRecord::target)
 }
 
 fn async_generator_next_builtin<Cx: PublicBuiltinDispatchContext>(

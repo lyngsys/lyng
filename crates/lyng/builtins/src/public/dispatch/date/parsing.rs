@@ -3,7 +3,7 @@ use super::{
     date_days_in_month, date_i64_as_number, date_make_local_value, date_make_utc_value,
     date_time_clip_value, DATE_MONTH_NAMES, DATE_MS_PER_MINUTE,
 };
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 fn date_parse_two_digits(bytes: &[u8], index: usize) -> Option<u32> {
     let tens = *bytes.get(index)?;

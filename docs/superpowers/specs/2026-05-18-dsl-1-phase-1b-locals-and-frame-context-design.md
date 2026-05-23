@@ -2,9 +2,9 @@
 
 **Date:** 2026-05-18
 **Status:** Design approved; ready for implementation planning.
-**Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1 phase.
+**Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) §10 DSL-1 phase.
 **Sibling spec:** [`2026-05-18-dsl-1-hot-opcode-rollout-design.md`](2026-05-18-dsl-1-hot-opcode-rollout-design.md) — the DSL-1 epic spec.
-**Predecessor:** Phase 1.A summary at [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-summary.md) (HEAD `b680752e`: 7 inline ports + 2 deferrals + corrected +1.7% V8 v7 result).
+**Predecessor:** Phase 1.A summary at [`reports/lyng/dsl-1/phase-1a-summary.md`](../../../reports/lyng/dsl-1/phase-1a-summary.md) (HEAD `b680752e`: 7 inline ports + 2 deferrals + corrected +1.7% V8 v7 result).
 
 ---
 
@@ -17,7 +17,7 @@ Complete the Phase 1.A backfill (frame-context refactor + the 2 deferred opcodes
 ### In scope
 
 - **Infra (10.A + 10.B):** Counter wiring into the DSL `dispatch!` tail (and `call_slow!`/`poll_safepoint!` for slow-path-share banks); microbench snippets for the 14 in-scope opcodes (7 Phase-1.A + 7 Phase-1.B anchors).
-- **Frame-context refactor:** Add `frame_const_base: *const Value` and `frame_this_value: Value` to [`LlIntState`](../../../crates/lyng-js/vm/src/dsl/llint_state.rs); pre-resolve at activation entry; refresh on frame transitions; GC root-scanning design review.
+- **Frame-context refactor:** Add `frame_const_base: *const Value` and `frame_this_value: Value` to [`LlIntState`](../../../crates/lyng/vm/src/dsl/llint_state.rs); pre-resolve at activation entry; refresh on frame transitions; GC root-scanning design review.
 - **Phase 1.A backfill:** Inline ports for `op_load_const8` (#21) and `op_load_this` (#12) using the new fields.
 - **Phase 1.B opcode ports (top-30 anchors):** `op_load_local_0/1/2/3` (#11/8/18/9), `op_store_local_3` (#22), `op_load_env_slot` (#19), `op_ldar` (#26) — 7 opcodes, ~1.38B combined dispatches/run.
 - **Macro-shared symmetric pairs:** `op_store_local_0/1/2` if they share `op_store_local_3`'s macro at <15 min port cost each.
@@ -33,7 +33,7 @@ Complete the Phase 1.A backfill (frame-context refactor + the 2 deferred opcodes
 
 A port is justified in Phase 1.B if and only if:
 
-1. The opcode is in measured top-30 ([`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv)), **OR**
+1. The opcode is in measured top-30 ([`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv)), **OR**
 2. The opcode is the macro-shared symmetric pair of a top-30 anchor in this phase, with port cost <15 min and no new backend macro required.
 
 Phase 1.A's adjacent-family completions (op_load_undefined/null/true/false/one) would NOT have shipped under this rule. Phase 1.B inherits the rule.
@@ -101,8 +101,8 @@ Same coordinator/worker model as Phase 1.A (scaled cleanly across 7 mechanical p
 ### Refactor worker dispatch brief (1.B.1)
 
 This is the highest-stakes worker in Phase 1.B. Brief includes:
-- Both deferral notes ([`phase-1a-load-const8-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md), [`phase-1a-load-this-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md)) as the requirements spec.
-- Pointer to current `LlIntState` layout + offset-of test (`crates/lyng-js/vm/src/dsl/llint_state.rs`).
+- Both deferral notes ([`phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md), [`phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)) as the requirements spec.
+- Pointer to current `LlIntState` layout + offset-of test (`crates/lyng/vm/src/dsl/llint_state.rs`).
 - Pointer to entry shim (`entry.rs`) and slow-path bridges (`slow_path.rs`) — must update both for refresh discipline.
 - Pointer to GC scan code; reviewer must verify the new fields are scanned alongside REGS and frame roots.
 - Explicit guidance on `Atom`/`Builtin` constant pre-resolution (const8 deferral note covers this).
@@ -127,14 +127,14 @@ This is the highest-stakes worker in Phase 1.B. Brief includes:
 **Steps:**
 1. Stash current working-tree state (`git stash --include-untracked`).
 2. Checkout the comparison-base HEAD (`git checkout <base-sha>`).
-3. Build release: `cargo build --release -p lyng-js-bench`.
-4. Run `cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/a-b-base.json`. Note current `uptime`.
+3. Build release: `cargo build --release -p lyng-bench`.
+4. Run `cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/a-b-base.json`. Note current `uptime`.
 5. Checkout the post-change HEAD (`git checkout <post-sha>`).
 6. Build release.
 7. Immediately re-run v8suite to `/tmp/a-b-post.json`. Verify `uptime` is within ±20% of step-4 loadavg (if not, abort — machine state shifted too much; re-run).
 8. Restore working tree: `git checkout <feature-branch>` then `git stash pop`.
 9. Compute per-workload deltas and geomean delta from the two JSONs.
-10. Commit the A/B data as `reports/js/lyng-js/dsl-1/phase-1b-N-ab-comparison.md`.
+10. Commit the A/B data as `reports/lyng/dsl-1/phase-1b-N-ab-comparison.md`.
 
 **What NOT to do:**
 - Don't compare against Task-0 pre-DSL-0 absolute baseline directly (loadavg-shifted numbers are misleading).
@@ -149,11 +149,11 @@ This is the highest-stakes worker in Phase 1.B. Brief includes:
 - 10.B: `microbench --samples 7` reports ns/dispatch with CI95 for all 14 in-scope opcodes — no "no snippet" entries.
 
 **1.B.1 — Refactor green:**
-- `cargo test -p lyng-js-vm --lib --release` (≥413).
-- `cargo test -p lyng-js-tests --release` (≥1186).
+- `cargo test -p lyng-vm --lib --release` (≥413).
+- `cargo test -p lyng-tests --release` (≥1186).
 - Test262 pass count ≥ pre-refactor baseline (run at 1.B.0 closure).
 - Same-load A/B against 1.B.0-end HEAD: aggregate V8 v7 regression ≤ 2%.
-- GC root-scanning review documented at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`.
+- GC root-scanning review documented at `reports/lyng/dsl-1/phase-1b1-gc-review.md`.
 
 **1.B.2 — Backfill ports inline:**
 - Per-opcode: ≤12 inline instr; slow-path-share <20%; microbench within 2× LLInt; behavioral tests pass; ported report + asm baseline.
@@ -162,18 +162,18 @@ This is the highest-stakes worker in Phase 1.B. Brief includes:
 - Per-opcode: same checks as 1.B.2 for each of the 7 + symmetric pairs.
 - Same-load A/B against pre-DSL-0 HEAD `d850f261`: V8 v7 geomean ≥ +3%.
 - Same-load A/B against pre-1.B HEAD: no workload regresses > 2%.
-- Phase summary at `reports/js/lyng-js/dsl-1/phase-1b-summary.md` with A/B data inline.
+- Phase summary at `reports/lyng/dsl-1/phase-1b-summary.md` with A/B data inline.
 
 ### Per-opcode gates (now fully enforceable thanks to 1.B.0)
 
 | Gate | Criterion | Source |
 |------|-----------|--------|
-| Behavioral | `cargo test -p lyng-js-vm -p lyng-js-tests` passes | Existing suite |
+| Behavioral | `cargo test -p lyng-vm -p lyng-tests` passes | Existing suite |
 | Asm shape | Within 5 instr of LLInt + documented Value-layout delta | Per-opcode ported report |
-| Microbench | ns/dispatch within 2× of LLInt reference, 7-sample median, 95% CI | `lyng-js-bench microbench` (enabled by 1.B.0) |
-| Slow-path-share | <20% on V8 v7 | `lyng-js-bench v8suite --count-slow-path-share` (enabled by 1.B.0) |
-| Asm baseline | Captured, passes `asm-diff --check` | `lyng-js-bench asm-diff` |
-| Ported report | All sections present | `reports/js/lyng-js/dsl-handlers/` |
+| Microbench | ns/dispatch within 2× of LLInt reference, 7-sample median, 95% CI | `lyng-bench microbench` (enabled by 1.B.0) |
+| Slow-path-share | <20% on V8 v7 | `lyng-bench v8suite --count-slow-path-share` (enabled by 1.B.0) |
+| Asm baseline | Captured, passes `asm-diff --check` | `lyng-bench asm-diff` |
+| Ported report | All sections present | `reports/lyng/dsl-handlers/` |
 
 ---
 
@@ -199,25 +199,25 @@ Risks retired from Phase 1.A: workflow ambiguity, mechanical port repeatability,
 ## 6. Deliverables checklist
 
 ### Code
-- 9-12 new inline DSL handlers in [`cold.rs`](../../../crates/lyng-js/vm/src/dsl/handlers/cold.rs)
-- Counter wiring in [`backend/aarch64/control.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs) (`dispatch!` tail) and `call_slow!`/`poll_safepoint!` macros
+- 9-12 new inline DSL handlers in [`cold.rs`](../../../crates/lyng/vm/src/dsl/handlers/cold.rs)
+- Counter wiring in [`backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) (`dispatch!` tail) and `call_slow!`/`poll_safepoint!` macros
 - Counter array field on `Vm` struct (asm-stable `[u64; 256]` for opcodes; similar for slow-path-semantic + slow-path-safepoint banks)
-- `LlIntState` extended with `frame_const_base` + `frame_this_value`; offset consts in [`reg_convention.rs`](../../../crates/lyng-js/vm/src/dsl/reg_convention.rs)
+- `LlIntState` extended with `frame_const_base` + `frame_this_value`; offset consts in [`reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs)
 - New backend macros as opcode ports surface them (`load_local_const!`, `load_constant!`, `load_value_at_offset!`, others)
-- Flat constant-pool resolution in [`entry.rs`](../../../crates/lyng-js/vm/src/dsl/entry.rs) activation entry; refresh discipline in [`slow_path.rs`](../../../crates/lyng-js/vm/src/dsl/slow_path.rs)
-- Microbench snippets in [`tools/lyng-js-bench/src/microbench/snippets.rs`](../../../tools/lyng-js-bench/src/microbench/snippets.rs) for 14 opcodes
+- Flat constant-pool resolution in [`entry.rs`](../../../crates/lyng/vm/src/dsl/entry.rs) activation entry; refresh discipline in [`slow_path.rs`](../../../crates/lyng/vm/src/dsl/slow_path.rs)
+- Microbench snippets in [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs) for 14 opcodes
 
 ### Reports
 - Per-handler ported reports + asm baselines for the 9-12 new ports
 - Updated Phase-1.A ported reports (back-fill microbench data section once 10.B lands)
-- 4 sub-phase summaries at `reports/js/lyng-js/dsl-1/phase-1b-N-summary.md`
-- Frame-context refactor design doc at `docs/lyng-js/YYYY-MM-DD-frame-context-refactor.md`
-- GC root-scanning review at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`
+- 4 sub-phase summaries at `reports/lyng/dsl-1/phase-1b-N-summary.md`
+- Frame-context refactor design doc at `docs/lyng/YYYY-MM-DD-frame-context-refactor.md`
+- GC root-scanning review at `reports/lyng/dsl-1/phase-1b1-gc-review.md`
 - A/B comparison data per sub-phase
-- Final Phase 1.B summary at `reports/js/lyng-js/dsl-1/phase-1b-summary.md`
+- Final Phase 1.B summary at `reports/lyng/dsl-1/phase-1b-summary.md`
 
 ### Config
-- `tools/lyng-js-bench/hot-opcodes.toml`: `aarch64_max_instructions` calibrated for the 7 top-30 Phase-1.B opcodes
+- `tools/lyng-bench/hot-opcodes.toml`: `aarch64_max_instructions` calibrated for the 7 top-30 Phase-1.B opcodes
 
 ---
 
@@ -239,19 +239,19 @@ Risks retired from Phase 1.A: workflow ambiguity, mechanical port repeatability,
 
 ## 8. Policy alignment
 
-Per parent §12: policy updates landed in DSL-0. Phase 1.B's frame-context refactor stays within the existing scoped-unsafe boundary (`crates/lyng-js/vm/src/dsl/`); no policy changes expected. If the refactor surfaces a new unsafe scope question (e.g., direct `*const Value` dereferencing in entry shim), coordinator audits before merging.
+Per parent §12: policy updates landed in DSL-0. Phase 1.B's frame-context refactor stays within the existing scoped-unsafe boundary (`crates/lyng/vm/src/dsl/`); no policy changes expected. If the refactor surfaces a new unsafe scope question (e.g., direct `*const Value` dereferencing in entry shim), coordinator audits before merging.
 
 ---
 
 ## 9. References
 
-- **Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md)
+- **Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md)
 - **DSL-1 epic spec:** [`2026-05-18-dsl-1-hot-opcode-rollout-design.md`](2026-05-18-dsl-1-hot-opcode-rollout-design.md)
-- **Phase 1.A summary:** [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-summary.md)
+- **Phase 1.A summary:** [`reports/lyng/dsl-1/phase-1a-summary.md`](../../../reports/lyng/dsl-1/phase-1a-summary.md)
 - **Phase 1.A deferral notes:**
-  - [`reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md)
-  - [`reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md)
-- **Measured top-30:** [`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../../../reports/js/lyng-js/r0/v8-v7-top30.tsv)
-- **Hot-opcodes config:** [`tools/lyng-js-bench/hot-opcodes.toml`](../../../tools/lyng-js-bench/hot-opcodes.toml)
-- **DSL substrate:** [`crates/lyng-js/vm/src/dsl/`](../../../crates/lyng-js/vm/src/dsl/)
-- **inc_counter! macro (already exists, needs wiring):** [`crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs)
+  - [`reports/lyng/dsl-1/phase-1a-load-const8-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-const8-deferred.md)
+  - [`reports/lyng/dsl-1/phase-1a-load-this-deferred.md`](../../../reports/lyng/dsl-1/phase-1a-load-this-deferred.md)
+- **Measured top-30:** [`reports/lyng/r0/v8-v7-top30.tsv`](../../../reports/lyng/r0/v8-v7-top30.tsv)
+- **Hot-opcodes config:** [`tools/lyng-bench/hot-opcodes.toml`](../../../tools/lyng-bench/hot-opcodes.toml)
+- **DSL substrate:** [`crates/lyng/vm/src/dsl/`](../../../crates/lyng/vm/src/dsl/)
+- **inc_counter! macro (already exists, needs wiring):** [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)

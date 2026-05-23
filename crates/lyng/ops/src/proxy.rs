@@ -1,9 +1,7 @@
 use crate::{object as ordinary_object, read};
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{
-    AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value,
-};
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 use std::collections::HashSet;
 
 #[allow(
@@ -712,7 +710,7 @@ fn create_list_from_array_like_keys<Cx: ProxyTrapContext>(
 ) -> Result<Vec<PropertyKey>, Cx::Error> {
     let length_value = cx.get_property_value(
         Value::from_object_ref(object),
-        PropertyKey::from_atom(lyng_js_common::WellKnownAtom::length.id()),
+        PropertyKey::from_atom(lyng_common::WellKnownAtom::length.id()),
     )?;
     let length_result = {
         let view = cx.agent().heap().view();
@@ -740,7 +738,7 @@ fn create_list_from_array_like_keys<Cx: ProxyTrapContext>(
 
 fn array_like_index_key(index: u64) -> PropertyKey {
     PropertyKey::from_array_index(index).unwrap_or_else(|| {
-        let atom = lyng_js_common::AtomId::from_raw(0);
+        let atom = lyng_common::AtomId::from_raw(0);
         let _ = atom;
         panic!("proxy ownKeys trap index should stay within u32")
     })

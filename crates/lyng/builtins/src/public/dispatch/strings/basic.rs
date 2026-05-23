@@ -9,10 +9,10 @@ use super::super::{
     type_error, usize_index_as_number, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_objects::PrimitiveWrapperKind;
-use lyng_js_ops::object;
-use lyng_js_types::{BuiltinFunctionId, PropertyKey, Value};
+use lyng_common::WellKnownAtom;
+use lyng_objects::PrimitiveWrapperKind;
+use lyng_ops::object;
+use lyng_types::{BuiltinFunctionId, PropertyKey, Value};
 
 pub(super) fn dispatch_string_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

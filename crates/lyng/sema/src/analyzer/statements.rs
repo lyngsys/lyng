@@ -1,12 +1,12 @@
-use lyng_js_ast::{Decl, ForInOfLeft, ForInit, Stmt, VariableKind};
-use lyng_js_common::WellKnownAtom;
+use lyng_ast::{Decl, ForInOfLeft, ForInit, Stmt, VariableKind};
+use lyng_common::WellKnownAtom;
 
 use super::Analyzer;
 use crate::binding::DeclarationKind;
 use crate::scope::ScopeKind;
 
 impl Analyzer<'_> {
-    pub(super) fn walk_stmt_list(&mut self, list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>) {
+    pub(super) fn walk_stmt_list(&mut self, list: lyng_ast::NodeList<lyng_ast::StmtId>) {
         let scope_kind = self.scopes.get(self.ctx.current_scope).kind;
         let stmts = self.ast.get_stmt_list(list).to_vec();
         for &stmt_id in &stmts {
@@ -23,14 +23,14 @@ impl Analyzer<'_> {
         }
     }
 
-    fn walk_stmt_list_items(&mut self, list: lyng_js_ast::NodeList<lyng_js_ast::StmtId>) {
+    fn walk_stmt_list_items(&mut self, list: lyng_ast::NodeList<lyng_ast::StmtId>) {
         let stmts = self.ast.get_stmt_list(list).to_vec();
         for stmt_id in stmts {
             self.walk_stmt(stmt_id);
         }
     }
 
-    fn walk_stmt(&mut self, stmt_id: lyng_js_ast::StmtId) {
+    fn walk_stmt(&mut self, stmt_id: lyng_ast::StmtId) {
         let stmt = self.ast.get_stmt(stmt_id);
         match stmt {
             Stmt::Block { body, .. } => {
@@ -253,7 +253,7 @@ impl Analyzer<'_> {
                     if let Some(param) = catch.param {
                         if !matches!(
                             self.ast.get_pattern(param),
-                            lyng_js_ast::Pattern::Identifier { .. }
+                            lyng_ast::Pattern::Identifier { .. }
                         ) {
                             let mut bound = Vec::new();
                             self.collect_pattern_names(param, &mut bound);
@@ -280,7 +280,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn stmt_is_loop(&self, stmt_id: lyng_js_ast::StmtId) -> bool {
+    fn stmt_is_loop(&self, stmt_id: lyng_ast::StmtId) -> bool {
         let stmt = self.ast.get_stmt(stmt_id);
         matches!(
             stmt,

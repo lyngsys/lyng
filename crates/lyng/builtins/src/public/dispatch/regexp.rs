@@ -21,12 +21,12 @@ use construction::{
     normalize_regexp_constructor_pattern_text, regexp_builtin, regexp_species_getter_builtin,
 };
 use escape::regexp_escape_builtin;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::RegExpLegacyStaticText;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
-use lyng_js_parser::{validate_regexp_constructor_pattern, validate_regexp_literal};
-use lyng_js_types::{
+use lyng_common::WellKnownAtom;
+use lyng_env::RegExpLegacyStaticText;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::{ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_parser::{validate_regexp_constructor_pattern, validate_regexp_literal};
+use lyng_types::{
     BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
 };
 use std::ops::Range;
@@ -124,7 +124,7 @@ fn dispatch_regexp_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn is_regexp_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> bool {
     cx.agent().objects().is_regexp_object(object_ref)
 }
@@ -171,7 +171,7 @@ pub(super) fn is_regexp_value<Cx: PublicBuiltinDispatchContext>(
 
 fn current_intrinsic_regexp_prototype<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-) -> Option<lyng_js_types::ObjectRef> {
+) -> Option<lyng_types::ObjectRef> {
     let realm = cx.builtin_realm();
     let agent = cx.agent();
     agent
@@ -182,7 +182,7 @@ fn current_intrinsic_regexp_prototype<Cx: PublicBuiltinDispatchContext>(
 fn regexp_matcher_this_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let object_ref = value.as_object_ref().ok_or_else(|| type_error(cx))?;
     if !is_regexp_object(cx, object_ref) {
         return Err(type_error(cx));
@@ -229,8 +229,8 @@ fn boolean_property_value<Cx: PublicBuiltinDispatchContext>(
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct RegExpExecState {
-    flags: lyng_js_objects::RegExpObjectFlags,
-    matched: lyng_js_objects::RegExpMatchRecord,
+    flags: lyng_objects::RegExpObjectFlags,
+    matched: lyng_objects::RegExpMatchRecord,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -402,17 +402,17 @@ const REGEXP_STRING_ITERATOR_DONE_SLOT: u32 = 4;
 pub(super) fn allocate_regexp_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     pattern: &str,
     flags: &str,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
     }
     .ok_or_else(|| type_error(cx))?;
     let payload =
-        lyng_js_objects::RegExpPayload::compile(pattern, flags).map_err(|_| syntax_error(cx))?;
+        lyng_objects::RegExpPayload::compile(pattern, flags).map_err(|_| syntax_error(cx))?;
     let object = cx.agent().with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         let object = objects.alloc_object(
@@ -473,27 +473,27 @@ pub(super) fn regexp_literal_builtin<Cx: PublicBuiltinDispatchContext>(
 
 fn regexp_object_flags<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
-) -> Result<lyng_js_objects::RegExpObjectFlags, Cx::Error> {
+    object_ref: lyng_types::ObjectRef,
+) -> Result<lyng_objects::RegExpObjectFlags, Cx::Error> {
     let flags = {
         let agent = cx.agent();
         agent
             .objects()
             .regexp_payload(object_ref)
-            .map(lyng_js_objects::RegExpPayload::flags)
+            .map(lyng_objects::RegExpPayload::flags)
     };
     if let Some(flags) = flags {
         return Ok(flags);
     }
     if current_intrinsic_regexp_prototype(cx) == Some(object_ref) {
-        return Ok(lyng_js_objects::RegExpObjectFlags::default());
+        return Ok(lyng_objects::RegExpObjectFlags::default());
     }
     Err(type_error(cx))
 }
 
 fn regexp_object_source_and_flags<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> Result<(String, String), Cx::Error> {
     let values = {
         let agent = cx.agent();
@@ -507,7 +507,7 @@ fn regexp_object_source_and_flags<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn regexp_object_source_text<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> Result<String, Cx::Error> {
     let text = {
         let agent = cx.agent();
@@ -543,7 +543,7 @@ fn advance_string_index(units: &[u16], index: usize, unicode_aware: bool) -> usi
 
 fn allocate_named_capture_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    captures: &[lyng_js_objects::RegExpNamedCapture],
+    captures: &[lyng_objects::RegExpNamedCapture],
     units: &[u16],
     use_indices: bool,
 ) -> Result<Option<Value>, Cx::Error> {
@@ -777,7 +777,7 @@ fn build_regexp_match_result<Cx: PublicBuiltinDispatchContext>(
 
 fn regexp_exec_state<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     input_ref: StringRef,
     units: &[u16],
     advance_empty_match: bool,
@@ -1547,7 +1547,7 @@ fn regexp_object_supports_literal_global_replace_fast_path<Cx: PublicBuiltinDisp
     agent
         .objects()
         .regexp_payload(regexp_object)
-        .is_some_and(lyng_js_objects::RegExpPayload::supports_literal_global_replace_fast_path)
+        .is_some_and(lyng_objects::RegExpPayload::supports_literal_global_replace_fast_path)
 }
 
 fn regexp_literal_global_replace_fast_path<Cx: PublicBuiltinDispatchContext>(
@@ -1630,10 +1630,10 @@ fn regexp_literal_global_replace_ranges_fast_path<Cx: PublicBuiltinDispatchConte
         .expect("ranges should be non-empty after early return")
         .clone();
     let flags = regexp_object_flags(cx, regexp_object)?;
-    let matched = lyng_js_objects::RegExpMatchRecord::new(
+    let matched = lyng_objects::RegExpMatchRecord::new(
         last_range,
         Vec::<Option<Range<usize>>>::new().into_boxed_slice(),
-        Vec::<lyng_js_objects::RegExpNamedCapture>::new().into_boxed_slice(),
+        Vec::<lyng_objects::RegExpNamedCapture>::new().into_boxed_slice(),
     );
     let state = RegExpExecState { flags, matched };
     record_regexp_legacy_static_match(cx, source_ref, source_units, &state)?;
@@ -1721,7 +1721,7 @@ fn regexp_compile_builtin<Cx: PublicBuiltinDispatchContext>(
     if validate_regexp_constructor_pattern(&pattern_text, &flags_text).is_err() {
         return Err(syntax_error(cx));
     }
-    let payload = lyng_js_objects::RegExpPayload::compile(&pattern_text, &flags_text)
+    let payload = lyng_objects::RegExpPayload::compile(&pattern_text, &flags_text)
         .map_err(|_| syntax_error(cx))?;
     let stored = cx
         .agent()

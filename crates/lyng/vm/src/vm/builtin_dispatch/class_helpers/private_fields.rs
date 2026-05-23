@@ -27,11 +27,11 @@ impl Vm {
         let outer = agent
             .objects()
             .function_data(function)
-            .and_then(lyng_js_objects::FunctionObjectData::private_env)
+            .and_then(lyng_objects::FunctionObjectData::private_env)
             .or_else(|| {
                 agent
                     .current_execution_context()
-                    .and_then(lyng_js_env::ExecutionContext::private_env)
+                    .and_then(lyng_env::ExecutionContext::private_env)
             });
         let installs_private_names = arguments
             .get(3)
@@ -123,7 +123,7 @@ impl Vm {
             agent
                 .objects()
                 .function_data(callee)
-                .and_then(lyng_js_objects::FunctionObjectData::home_object)
+                .and_then(lyng_objects::FunctionObjectData::home_object)
         }) {
             if remaining == 0 {
                 return home_object;
@@ -138,7 +138,7 @@ impl Vm {
                 break;
             };
             match record {
-                lyng_js_env::EnvironmentRecord::Function(record) => {
+                lyng_env::EnvironmentRecord::Function(record) => {
                     if callee_object.is_some_and(|callee| record.function_object() == callee) {
                         current = record.declarative().outer();
                         continue;
@@ -151,11 +151,11 @@ impl Vm {
                     }
                     current = record.declarative().outer();
                 }
-                lyng_js_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Private(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Module(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Global(record) => current = record.outer(),
-                lyng_js_env::EnvironmentRecord::Object(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Declarative(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Private(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Module(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Global(record) => current = record.outer(),
+                lyng_env::EnvironmentRecord::Object(record) => current = record.outer(),
             }
         }
 
@@ -169,7 +169,7 @@ impl Vm {
     ) -> Option<ObjectRef> {
         let mut current = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::private_env);
+            .and_then(lyng_env::ExecutionContext::private_env);
         let mut remaining = class_depth;
 
         while let Some(environment) = current {

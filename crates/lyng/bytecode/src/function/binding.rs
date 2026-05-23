@@ -1,4 +1,4 @@
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 /// Frozen per-slot flags carried alongside one installable bytecode environment binding.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

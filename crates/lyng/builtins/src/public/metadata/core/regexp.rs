@@ -1,5 +1,5 @@
 use super::super::{BuiltinEntryMetadata, PublicBuiltinMetadataRow};
-use lyng_js_types::{
+use lyng_types::{
     regexp_builtin, regexp_compile_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin,
     regexp_exec_builtin, regexp_flags_getter_builtin, regexp_global_getter_builtin,
     regexp_has_indices_getter_builtin, regexp_ignore_case_getter_builtin,

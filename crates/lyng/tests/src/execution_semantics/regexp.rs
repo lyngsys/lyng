@@ -1,9 +1,9 @@
 use super::support::{compile_and_run_string, compile_unit};
-use lyng_js_common::AtomTable;
-use lyng_js_env::{RegExpLegacyStaticText, Runtime};
-use lyng_js_host::NoopHostHooks;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::AtomTable;
+use lyng_env::{RegExpLegacyStaticText, Runtime};
+use lyng_host::NoopHostHooks;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 #[test]
 fn regexp_scoped_ignore_case_applies_to_backrefs_boundaries_and_properties() {

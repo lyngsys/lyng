@@ -4,14 +4,14 @@
     reason = "cross-crate runtime integration tests keep long scenario coverage in test-only code"
 )]
 
-use lyng_js_ast::FunctionId;
-use lyng_js_common::{AtomId, Severity, SourceId, Span};
-use lyng_js_compiler::{
+use lyng_ast::FunctionId;
+use lyng_common::{AtomId, Severity, SourceId, Span};
+use lyng_compiler::{
     derive_environment_layout_plan, install_environment_layout_plan, seed_global_var_names,
 };
-use lyng_js_env::{EnvironmentRecord, ParkedAgentRecord, Runtime, ThisBindingStatus};
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator};
-use lyng_js_host::{
+use lyng_env::{EnvironmentRecord, ParkedAgentRecord, Runtime, ThisBindingStatus};
+use lyng_gc::{AllocationLifetime, PrimitiveMutator};
+use lyng_host::{
     AgentSpawnKind, AgentThreadStartKind, ArrayBufferTransferRequest, DiagnosticReportRequest,
     HostCall, HostHooks, HostJobKind, HostTransferredBufferId, ImportMetaProperties,
     ImportMetaProperty, ImportMetaRequest, ImportMetaValue, LoadedModuleSource, LoadedSourceText,
@@ -19,16 +19,16 @@ use lyng_js_host::{
     SharedArrayBufferShareRequest, TestHost, UncaughtExceptionReport, UnparkAgentRequest,
     WaitLocation,
 };
-use lyng_js_objects::{
+use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
     InvalidationCause, NamedPropertyStorageMode, NativeCallRequest, NativeConstructRequest,
     NativeFunctionRegistry, ObjectAllocation, ObjectColdData, ObjectRuntime,
 };
-use lyng_js_sema::{
+use lyng_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
     FunctionSemaTable, ScopeId, ScopeKind, ScopeRecord, ScopeTable, StorageClass,
 };
-use lyng_js_types::{
+use lyng_types::{
     BackingStoreRef, BuiltinFunctionId, EnvironmentRef, NativeFunctionId, ObjectRef,
     PropertyDescriptor, PropertyKey, SymbolRef, Value,
 };
@@ -181,7 +181,7 @@ fn build_environment_plan_tables() -> (
 fn lookup_slot_binding(
     runtime: &Runtime,
     env: EnvironmentRef,
-    layout_id: lyng_js_env::EnvironmentLayoutId,
+    layout_id: lyng_env::EnvironmentLayoutId,
     name: AtomId,
 ) -> Option<Value> {
     let agent = runtime.root_agent();
@@ -280,7 +280,7 @@ struct RecordedNativeCall {
     callee: ObjectRef,
     this_value: Value,
     arguments: Vec<Value>,
-    realm: lyng_js_types::RealmRef,
+    realm: lyng_types::RealmRef,
     environment: EnvironmentRef,
     private_env: Option<EnvironmentRef>,
     home_object: Option<ObjectRef>,
@@ -292,7 +292,7 @@ struct RecordedNativeConstruct {
     callee: ObjectRef,
     new_target: ObjectRef,
     arguments: Vec<Value>,
-    realm: lyng_js_types::RealmRef,
+    realm: lyng_types::RealmRef,
     environment: EnvironmentRef,
     private_env: Option<EnvironmentRef>,
     home_object: Option<ObjectRef>,
@@ -446,7 +446,7 @@ fn phase3_environment_chain_shadowing_and_realm_state_flow_across_crates() {
         )
     });
 
-    let intrinsics = lyng_js_env::Intrinsics::new()
+    let intrinsics = lyng_env::Intrinsics::new()
         .with_object_prototype(Some(object_prototype))
         .with_function_prototype(Some(function_prototype))
         .with_array_prototype(Some(array_prototype));
@@ -824,7 +824,7 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
             .object_header(runtime.root_agent().heap().view(), function_object)
             .unwrap()
             .kind(),
-        lyng_js_objects::ObjectKind::Function
+        lyng_objects::ObjectKind::Function
     );
     assert_eq!(
         runtime
@@ -946,7 +946,7 @@ fn phase3_host_boundary_and_cluster_plumbing_compose_through_public_surfaces() {
         .enqueue_job(
             worker_a,
             HostJobKind::Harness,
-            lyng_js_env::ExecutableId::Builtin,
+            lyng_env::ExecutableId::Builtin,
             Some(default_realm.id()),
             Some("phase3-job".into()),
         )
@@ -955,12 +955,12 @@ fn phase3_host_boundary_and_cluster_plumbing_compose_through_public_surfaces() {
     let worker_a_host = runtime
         .root_cluster()
         .agent(worker_a)
-        .and_then(lyng_js_env::Agent::host_id)
+        .and_then(lyng_env::Agent::host_id)
         .expect("worker A should carry a host agent id");
     let shared_worker_host = runtime
         .root_cluster()
         .agent(worker_b)
-        .and_then(lyng_js_env::Agent::host_id)
+        .and_then(lyng_env::Agent::host_id)
         .expect("worker B should carry a host agent id");
     let cluster = runtime.root_cluster_mut();
 

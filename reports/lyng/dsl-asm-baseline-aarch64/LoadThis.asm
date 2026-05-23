@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::names::op_load_this:
+lyng_vm::vm::dispatch_handlers::names::op_load_this:
 L0:
 	sub sp, sp, #144
 	stp x26, x25, [sp, #64]
@@ -47,7 +47,7 @@ L5:
 	b.ne L7
 	mov x0, x21
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov w10, #0
 	mov w8, #0
 	lsr x17, x0, #32
@@ -67,7 +67,7 @@ L6:
 	ldr w2, [x20, #68]
 	add x0, sp, #16
 	mov x1, x21
-	bl lyng_js_vm::vm::bytecode_calls::<impl lyng_js_vm::vm::Vm>::this_environment_record
+	bl lyng_vm::vm::bytecode_calls::<impl lyng_vm::vm::Vm>::this_environment_record
 	ldr x9, [sp, #16]
 	cmp x9, x24
 	b.ne L11
@@ -77,7 +77,7 @@ L6:
 	cbz w8, L7
 	mov x0, x21
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov w10, #0
 	mov w8, #0
 	lsr x17, x0, #32
@@ -122,7 +122,7 @@ L14:
 	mov x1, x23
 	mov x2, x21
 	mov x3, x22
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldr x9, [sp, #16]
 	ldrb w8, [sp, #24]
 	cmp x9, x24
@@ -208,7 +208,7 @@ L22:
 L2:
 	add x0, sp, #16
 	mov w4, #0
-	bl lyng_js_vm::vm::dispatch::decode_abx_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abx_operands_wide
 	ldr x8, [sp, #16]
 	cmp x8, x24
 	b.ne L9
@@ -232,9 +232,9 @@ L7:
 	ldrb w8, [x9, w8, uxtw]
 L18:
 L23:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L24:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x24, x8, [x19]
 L10:

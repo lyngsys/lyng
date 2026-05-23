@@ -11,7 +11,7 @@ use crate::hooks::{
     UnparkAgentResult,
 };
 use crate::ids::{HostAgentId, HostSharedBufferId, HostThreadId, HostTransferredBufferId};
-use lyng_js_types::BackingStoreRef;
+use lyng_types::BackingStoreRef;
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Arc, Mutex};
 

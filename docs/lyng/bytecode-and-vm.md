@@ -18,7 +18,7 @@ The engine does not execute ASTs and does not use stack bytecode.
 
 ## Bytecode Templates
 
-`lyng-js-bytecode` owns:
+`lyng-bytecode` owns:
 
 - `BytecodeFunction`
 - `BytecodeFunctionHeader`
@@ -106,19 +106,19 @@ metadata and reporting only; native-code execution is not part of the engine.
 
 ## Opcode Dispatch Counters
 
-`lyng-js-vm` exposes optional per-opcode dispatch counters for profiler and JIT bring-up
+`lyng-vm` exposes optional per-opcode dispatch counters for profiler and JIT bring-up
 work. Counters are disabled by default; when enabled through `Vm`, the interpreter records
 one dispatch count per executed bytecode opcode and exposes an immutable
 `OpcodeDispatchCounts` snapshot to embedders. The snapshot is runtime observability state,
 not bytecode-template metadata.
 
-`lyng-js-bench runtime --count-opcodes` enables the VM counters for executable runtime
+`lyng-bench runtime --count-opcodes` enables the VM counters for executable runtime
 workload rows and renders the top 20 opcodes per row in Markdown and JSON reports. Leave
 the flag off for normal throughput baselines.
 
 ## Inspector Safepoints
 
-`lyng-js-vm` also exposes a minimal debugger hook for interpreter-level inspection. An
+`lyng-vm` also exposes a minimal debugger hook for interpreter-level inspection. An
 embedder installs a `VmDebugHook`, requests a pause globally or at one installed
 `CodeRef` and bytecode offset, then receives a `VmDebugPauseContext` at the next matching
 safepoint.
@@ -155,6 +155,6 @@ compiler owns lowering. The host crate owns host-provided module and dynamic imp
 - Every IC-shaped opcode carries a mandatory trailing feedback slot operand
   (Track H, landed). The bytecode encoding is JIT-ready: a future Baseline JIT
   consumes the same bytes and `FeedbackVector` without reshape.
-  See [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md).
+  See [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md).
 - Native-code execution is absent from the current engine; the JSC-aligned
   roadmap above plans to add a Sparkplug-style Baseline JIT as Phase 6.

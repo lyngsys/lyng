@@ -116,7 +116,7 @@ impl ObjectRuntime {
             crate::ModuleNamespaceExportTarget::Binding { environment, slot } => {
                 let slots = heap
                     .environment(environment)
-                    .and_then(lyng_js_gc::RuntimeEnvironmentRecord::slots)
+                    .and_then(lyng_gc::RuntimeEnvironmentRecord::slots)
                     .and_then(|slots| heap.environment_slots(slots))
                     .ok_or(InternalMethodError::CorruptObjectState)?;
                 let value = slots

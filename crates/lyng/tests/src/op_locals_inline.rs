@@ -4,10 +4,10 @@
 //! Each test exercises one or more of the 4 LoadLocal opcodes (slots
 //! 0..3, via parameter access) and the 4 StoreLocal opcodes (slots
 //! 0..3, via parameter or local-variable update in a loop or
-//! assignment). The lyng-js bytecode compiler decides which JS-level
+//! assignment). The lyng bytecode compiler decides which JS-level
 //! binding lands in which register slot — function parameters occupy
 //! slots 0..N-1, and `let` bindings begin at slot 4 (slots 0..3 are
-//! reserved by the calling convention; see `tools/lyng-js-bench/src/
+//! reserved by the calling convention; see `tools/lyng-bench/src/
 //! microbench/snippets.rs:283-298` for the same observation).
 //!
 //! Tests pass with the cold-stub OR the inline port — the inline port
@@ -17,14 +17,14 @@
 //! re-run after the inline ports land. The before-and-after green
 //! signal documents semantic parity.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Compile + execute `src` in a fresh realm, returning the script's
 /// completion value. Mirrors the helper shape used by
@@ -57,7 +57,7 @@ fn run_script(src: &str) -> Value {
 
 #[test]
 fn load_local_0_returns_first_parameter() {
-    // First parameter sits at register 0 in lyng-js's calling
+    // First parameter sits at register 0 in lyng's calling
     // convention (slot 0 = accumulator). Reading it via parameter
     // access triggers LoadLocal0 in the bytecode.
     let value = run_script("(function(a) { return a; })(42);");
@@ -93,9 +93,7 @@ fn load_locals_aggregate() {
     // Exercises LoadLocal0 + LoadLocal1 + LoadLocal2 + LoadLocal3 in
     // a single expression. Validates indexing is correct (not just
     // always slot 0). 1 + 2 + 3 + 4 = 10.
-    let value = run_script(
-        "(function(a, b, c, d) { return a + b + c + d; })(1, 2, 3, 4);",
-    );
+    let value = run_script("(function(a, b, c, d) { return a + b + c + d; })(1, 2, 3, 4);");
     assert_eq!(value, Value::from_smi(10));
 }
 

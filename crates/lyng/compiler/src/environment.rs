@@ -1,13 +1,13 @@
-use lyng_js_common::AtomId;
-use lyng_js_env::{
+use lyng_common::AtomId;
+use lyng_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
     EnvironmentSlotFlags,
 };
-use lyng_js_sema::{
+use lyng_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
     FunctionSemaTable, ScopeId, ScopeKind, ScopeTable, SemanticBindingId, StorageClass,
 };
-use lyng_js_types::EnvironmentRef;
+use lyng_types::EnvironmentRef;
 
 /// Errors raised while translating sema metadata into runtime environment layouts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -297,7 +297,7 @@ const fn scope_layout_kind(kind: ScopeKind) -> Option<EnvironmentLayoutKind> {
 }
 
 fn scope_needs_environment(
-    scope: &lyng_js_sema::ScopeRecord,
+    scope: &lyng_sema::ScopeRecord,
     function_records: &[FunctionSemaRecord],
 ) -> bool {
     match scope.kind {
@@ -342,7 +342,7 @@ const fn binding_is_mutable(kind: DeclarationKind) -> bool {
 }
 
 fn validate_scope_reference(
-    scope_records: &[lyng_js_sema::ScopeRecord],
+    scope_records: &[lyng_sema::ScopeRecord],
     scope: ScopeId,
 ) -> EnvironmentLayoutPlanResult<()> {
     if scope_records.get(scope.raw() as usize).is_some() {
@@ -355,7 +355,7 @@ fn validate_scope_reference(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_ast::FunctionId;
+    use lyng_ast::FunctionId;
 
     fn build_layout_tables() -> (
         ScopeTable,
@@ -368,7 +368,7 @@ mod tests {
     ) {
         let function_id = FunctionSemaId::new(0);
         let mut scopes = ScopeTable::new();
-        let global_scope = scopes.alloc(lyng_js_sema::ScopeRecord {
+        let global_scope = scopes.alloc(lyng_sema::ScopeRecord {
             parent: None,
             kind: ScopeKind::Global,
             owning_function: None,
@@ -379,7 +379,7 @@ mod tests {
             bindings: Vec::new(),
             children: Vec::new(),
         });
-        let function_scope = scopes.alloc(lyng_js_sema::ScopeRecord {
+        let function_scope = scopes.alloc(lyng_sema::ScopeRecord {
             parent: Some(global_scope),
             kind: ScopeKind::Function,
             owning_function: Some(function_id),

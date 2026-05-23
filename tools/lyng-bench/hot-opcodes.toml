@@ -1,7 +1,7 @@
 # Hot-opcode configuration for the asm-DSL substrate.
 #
 # The `hot` list is the top-30 opcodes by measured dispatch share on the
-# V8 v7 benchmark suite (see reports/js/lyng-js/r0/v8-v7-top30.tsv for
+# V8 v7 benchmark suite (see reports/lyng/r0/v8-v7-top30.tsv for
 # the source data; refresh when the compiler emits a major new pattern).
 #
 # `target_slow_path_share` is the DSL-1 invariant: each hot opcode must
@@ -10,12 +10,12 @@
 #
 # `aarch64_max_instructions` and `x86_64_max_instructions` are the
 # asm-diff per-handler budgets (instructions, not bytes) used by
-# `lyng-js-bench asm-diff`. Calibrated in DSL-0b from real measurements.
+# `lyng-bench asm-diff`. Calibrated in DSL-0b from real measurements.
 # Placeholder values here (0 = no enforcement); update during DSL-0b.
 
 [meta]
-source_data = "reports/js/lyng-js/r0/v8-v7-top30.tsv"
-refresh_command = "cargo run --release -p lyng-js-bench --features lyng-js-vm/opcode-counters -- v8suite --count-opcodes --counts-json /tmp/r0-opcode-counts.json"
+source_data = "reports/lyng/r0/v8-v7-top30.tsv"
+refresh_command = "cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite --count-opcodes --counts-json /tmp/r0-opcode-counts.json"
 default_target_slow_path_share = 0.20
 
 [[opcodes]]
@@ -40,7 +40,7 @@ x86_64_max_instructions = 0
 name = "Mul"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.1: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_mul.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm
 # (40 instructions in the inline fast path through bl record_smi —
 # 4 more than op_sub because mul_smi_overflow! emits 7 instructions
 # vs sub_smi_overflow!'s 3 to honor ECMAScript -0 semantics on
@@ -55,7 +55,7 @@ x86_64_max_instructions = 0
 name = "Increment"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.3: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm
 # (27 instructions in the inline fast path through bl record_smi —
 # substantially shorter than the binary inline ports because op_increment
 # is unary: a single source register saves the rhs decode/check_smi/untag
@@ -98,7 +98,7 @@ x86_64_max_instructions = 0
 name = "ShiftRight"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.2: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_right.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm
 # (36 instructions in the inline fast path through bl record_smi — identical
 # to op_shift_left's count because shift_right_smi! has the same 3-instruction
 # shape (and #0x1f + asr + sxtw); only the shift mnemonic changes (asr is
@@ -118,7 +118,7 @@ x86_64_max_instructions = 0
 name = "LoadThis"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.A: deferred to Phase 1.B; budget unset.
-# See reports/js/lyng-js/dsl-1/phase-1a-load-this-deferred.md for the
+# See reports/lyng/dsl-1/phase-1a-load-this-deferred.md for the
 # frame-context refactor that unblocks the inline port.
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
@@ -177,7 +177,7 @@ x86_64_max_instructions = 0
 name = "LoadConst8"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.A: deferred to Phase 1.B; budget unset.
-# See reports/js/lyng-js/dsl-1/phase-1a-load-const8-deferred.md for the
+# See reports/lyng/dsl-1/phase-1a-load-const8-deferred.md for the
 # flat-Value constants refactor that unblocks the inline port.
 aarch64_max_instructions = 0
 x86_64_max_instructions = 0
@@ -195,7 +195,7 @@ x86_64_max_instructions = 0
 # bytecode-builder peephole rewrites `Move dst=0` to `Ldar` before the
 # `store_local_opcode` branch fires, so StoreLocal0 cannot be emitted
 # via the standard pipeline. See
-# `reports/js/lyng-js/dsl-handlers/op_store_local_0.md`.
+# `reports/lyng/dsl-handlers/op_store_local_0.md`.
 [[opcodes]]
 name = "StoreLocal1"
 target_slow_path_share = 0.20
@@ -212,7 +212,7 @@ x86_64_max_instructions = 0
 name = "Decrement"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.3: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm
 # (27 instructions in the inline fast path through bl record_smi — identical
 # to op_increment because the two unary update ops share the same shape;
 # only the arith mnemonic differs (subs vs adds). `dec_smi_overflow!` uses
@@ -228,7 +228,7 @@ x86_64_max_instructions = 0
 name = "BitAnd"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.2: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm
 # (35 instructions in the inline fast path through bl record_smi —
 # 1 fewer than op_sub because bit_and_smi! has no overflow branch
 # (and + sxtw, vs sub_smi_overflow!'s subs + b.vs + sxtw)).
@@ -241,7 +241,7 @@ x86_64_max_instructions = 0
 name = "ShiftLeft"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.2: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm
 # (36 instructions in the inline fast path through bl record_smi —
 # +1 vs op_bit_and because shift_left_smi! is 3 instructions (and+lsl+sxtw)
 # vs bit_and_smi!'s 2 (and+sxtw). The extra `and w16, rhs, #0x1f` masks the
@@ -273,7 +273,7 @@ x86_64_max_instructions = 0
 name = "Sub"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.1: inline DSL port landed. Budget = measured + 2.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm
 # (36 instructions in the inline fast path through bl record_smi).
 aarch64_max_instructions = 38
 x86_64_max_instructions = 0

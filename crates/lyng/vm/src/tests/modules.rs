@@ -52,7 +52,7 @@ fn evaluate_module_uses_module_environment_and_preserves_default_export_value() 
     assert_eq!(record.status(), ModuleStatus::Evaluated);
     assert!(matches!(
         agent.environment(module_env),
-        Some(lyng_js_env::EnvironmentRecord::Module(_))
+        Some(lyng_env::EnvironmentRecord::Module(_))
     ));
     assert_eq!(
         agent.environment_slot(module_env, 0),
@@ -91,7 +91,7 @@ fn import_meta_returns_one_cached_object_and_exposes_the_module_key() {
     let url_slot = unit
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("module should export a default value")
         .local_slot();
     let url = agent
@@ -140,7 +140,7 @@ fn evaluate_module_initializes_named_default_function_binding() {
     let default_slot = unit
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("module should export a default value")
         .local_slot();
     let binding_slot = unit
@@ -465,7 +465,7 @@ fn linked_module_graph_keeps_named_default_function_exports_live() {
     let default_slot = importer
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("importer should export a default value")
         .local_slot();
 
@@ -550,7 +550,7 @@ fn host_module_loader_recurses_through_attributes_and_import_meta() {
     )
     .local_exports()
     .iter()
-    .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+    .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
     .expect("entry module should export a default value")
     .local_slot();
     let value = agent
@@ -572,23 +572,23 @@ fn host_module_loader_recurses_through_attributes_and_import_meta() {
     assert_eq!(
         host.snapshot().calls,
         vec![
-            lyng_js_host::HostCall::LoadModule(ModuleSourceRequest {
+            lyng_host::HostCall::LoadModule(ModuleSourceRequest {
                 specifier: "entry.mjs".into(),
                 referrer: None,
                 attributes: Vec::new(),
             }),
-            lyng_js_host::HostCall::LoadModule(ModuleSourceRequest {
+            lyng_host::HostCall::LoadModule(ModuleSourceRequest {
                 specifier: "./dep.mjs".into(),
                 referrer: Some(ModuleKey::new("/tmp/entry.mjs")),
-                attributes: vec![lyng_js_host::ModuleImportAttribute {
+                attributes: vec![lyng_host::ModuleImportAttribute {
                     key: "type".into(),
                     value: "js".into(),
                 }],
             }),
-            lyng_js_host::HostCall::ResolveImportMeta(lyng_js_host::ImportMetaRequest {
+            lyng_host::HostCall::ResolveImportMeta(lyng_host::ImportMetaRequest {
                 module: ModuleKey::new("/tmp/dep.mjs"),
             }),
-            lyng_js_host::HostCall::ResolveImportMeta(lyng_js_host::ImportMetaRequest {
+            lyng_host::HostCall::ResolveImportMeta(lyng_host::ImportMetaRequest {
                 module: ModuleKey::new("/tmp/entry.mjs"),
             }),
         ]
@@ -655,7 +655,7 @@ fn host_module_loader_keeps_named_default_function_exports_live() {
     let default_slot = unit
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("entry module should export a default value")
         .local_slot();
 
@@ -1082,7 +1082,7 @@ fn module_namespace_object_keys_throw_for_uninitialized_binding() {
     let default_slot = unit
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("module should export default")
         .local_slot();
     assert_eq!(
@@ -1236,7 +1236,7 @@ fn linked_module_graph_keeps_named_import_bindings_live() {
     assert_eq!(importer_record.status(), ModuleStatus::Evaluated);
     assert_eq!(
         agent.module_binding_alias(importer_env, counter_import_slot),
-        Some(lyng_js_env::ModuleBindingAlias::new(
+        Some(lyng_env::ModuleBindingAlias::new(
             dependency_env,
             counter_export_slot,
         ))
@@ -1741,7 +1741,7 @@ fn linked_module_graph_treats_mixed_shared_namespace_star_exports_as_unambiguous
     let default_slot = main
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("main module should export a default value")
         .local_slot();
 
@@ -2032,7 +2032,7 @@ fn linked_module_graph_omits_ambiguous_star_exports_from_namespaces() {
     let default_slot = importer
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("importer should export a default value")
         .local_slot();
 
@@ -2085,7 +2085,7 @@ fn linked_module_graph_treats_shared_namespace_star_exports_as_unambiguous() {
     let default_slot = main
         .local_exports()
         .iter()
-        .find(|entry| entry.export_name() == lyng_js_common::WellKnownAtom::default.id())
+        .find(|entry| entry.export_name() == lyng_common::WellKnownAtom::default.id())
         .expect("main module should export a default value")
         .local_slot();
 

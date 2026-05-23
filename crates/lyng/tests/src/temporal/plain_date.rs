@@ -25,7 +25,7 @@ fn temporal_plain_date_constructor_getters_and_serialization() {
             threw,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -50,7 +50,7 @@ fn temporal_plain_date_to_json_ignores_argument_properties() {
             new Temporal.PlainDate(1972, 12, 31).toJSON(options),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1972-01-01|1972-01-01|1972-12-31|1972-12-31");
@@ -72,7 +72,7 @@ fn temporal_plain_date_to_locale_string_ignores_argument_properties() {
             new Temporal.PlainDate(1972, 12, 31).toLocaleString(options),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1972-01-01|1972-01-01|1972-12-31|1972-12-31");
@@ -116,7 +116,7 @@ fn temporal_plain_date_to_string_honors_calendar_name_options() {
             badCount
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -146,7 +146,7 @@ fn temporal_plain_date_iso_derived_getters() {
             common.inLeapYear,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "4|60|29|366|12|true|7|365|31|365|12|false");
@@ -188,7 +188,7 @@ fn temporal_plain_date_from_clones_dates_and_normalizes_property_bags() {
             emptyBagThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -222,7 +222,7 @@ fn temporal_plain_date_from_validates_options_after_invalid_strings() {
         }
         String(count);
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "15");
@@ -257,7 +257,7 @@ fn temporal_plain_date_from_reads_options_before_invalid_month_code_validation()
         })();
         [threw, log.join(",")].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -291,7 +291,7 @@ fn temporal_plain_date_from_constrains_property_bags_and_requires_string_month_c
             typeErrors,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2021-12-31|M12|6");
@@ -319,7 +319,7 @@ fn temporal_plain_date_from_validates_month_code_syntax_before_year_type() {
         })();
         [badSyntax, badIsoMonthCode].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|TypeError");
@@ -354,7 +354,7 @@ fn temporal_plain_date_calendar_strings_distinguish_constructor_and_with_calenda
         })();
         [constructorRangeErrors, withCalendarCalendarId, invalidAnnotation].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "3|iso8601|true");
@@ -383,7 +383,7 @@ fn temporal_plain_date_with_replaces_iso_fields() {
             rejectThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|1976-11-29|2024-02-29|2024-02-29|true");
@@ -453,7 +453,7 @@ fn temporal_plain_date_with_honors_overflow_and_rejects_calendar_like_bags() {
             order.join(",")
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -483,7 +483,7 @@ fn temporal_plain_date_add_balances_iso_duration_fields() {
             original.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2021-02-28|2021-02-28|1976-12-08|2020-02-29");
@@ -508,7 +508,7 @@ fn temporal_plain_date_subtract_balances_iso_duration_fields() {
             balanced.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2020-02-28|2021-02-28|1976-11-18");
@@ -556,7 +556,7 @@ fn temporal_plain_date_add_subtract_and_to_plain_date_time_honor_options_and_lim
             firstNs.toString()
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -583,7 +583,7 @@ fn temporal_plain_date_since_and_until_return_iso_date_durations() {
             until.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "since|1|until|1|46|6|4");
@@ -627,7 +627,7 @@ fn temporal_plain_date_since_until_balance_calendar_units() {
             mismatch,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|1|0|1|1|2|0|3|4|0|true");
@@ -646,7 +646,7 @@ fn temporal_plain_date_until_counts_days_across_year_boundaries() {
             leap.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "365|366");
@@ -679,7 +679,7 @@ fn temporal_plain_date_until_uses_auto_largest_unit_for_rounding() {
             weeks.weeks,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "4|30|144");
@@ -710,7 +710,7 @@ fn temporal_plain_date_difference_rejects_rounding_outside_iso_limits() {
         })();
         [since, until].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true");
@@ -737,7 +737,7 @@ fn temporal_plain_date_since_rounds_months_relative_to_receiver() {
             negative.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1|0|-2|0");
@@ -760,7 +760,7 @@ fn temporal_plain_date_since_balances_months_relative_to_receiver() {
             backward.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1|3|-1|-1");
@@ -819,7 +819,7 @@ fn temporal_plain_date_difference_reads_options_before_validation() {
         })();
         [threw, log.join(",")].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -916,7 +916,7 @@ fn temporal_plain_date_difference_reads_other_bag_in_spec_order() {
         new Temporal.PlainDate(2000, 5, 2).since(other, options);
         log.join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -939,7 +939,7 @@ fn temporal_plain_date_converts_to_partial_plain_dates() {
             monthDay.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|2024-02|true|02-29");
@@ -967,7 +967,7 @@ fn temporal_plain_date_to_zoned_date_time_resolves_midnight_and_plain_time() {
             String(partialTime.epochNanoseconds)
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -1026,7 +1026,7 @@ fn temporal_plain_date_to_zoned_date_time_normalizes_time_zone_like_strings() {
             invalidYearZeroThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "UTC|-07:00|+01:46|true|true|true|true");
@@ -1057,7 +1057,7 @@ fn temporal_zoned_date_time_prototype_getters_are_redefinable_for_slot_fast_path
             redefined,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|false|function|true");
@@ -1094,7 +1094,7 @@ fn temporal_plain_date_from_zoned_date_time_uses_slots_without_getters() {
         Temporal.PlainDate.from(arg);
         actual.join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "");
@@ -1132,7 +1132,7 @@ fn temporal_zoned_date_time_slot_fast_path_probe() {
         }
         outcome;
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "ok");

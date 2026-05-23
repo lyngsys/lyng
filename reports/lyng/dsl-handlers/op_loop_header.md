@@ -6,7 +6,7 @@ poll site.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/warm.rs`:
+`crates/lyng/vm/src/dsl/handlers/warm.rs`:
 
 ```rust
 llint_handler! {
@@ -39,11 +39,11 @@ GC + debugger integrations arrive.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_loop_header.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_loop_header.asm`.
 
 ## LLInt reference
 
-See `reports/js/lyng-js/llint-reference/op_loop_hint.md`.
+See `reports/lyng/llint-reference/op_loop_hint.md`.
 
 JSC's `op_loop_hint` shape:
 

@@ -1,6 +1,6 @@
 # JSC LLInt reference asm
 
-Captured by `lyng-js-bench capture-llint`.
+Captured by `lyng-bench capture-llint`.
 
 | Opcode | Source mode |
 |---|---|

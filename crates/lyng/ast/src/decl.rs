@@ -3,7 +3,7 @@
 //! Declarations can appear as statements (via `Stmt::Declaration`) and at
 //! the module/script top level.
 
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 use crate::common::VariableKind;
 use crate::ids::{

@@ -2,8 +2,8 @@ use super::{
     Agent, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
 };
 use crate::vm::property_access::VmProxyBridge;
-use lyng_js_ops::{errors, object, proxy};
-use lyng_js_types::PropertyDescriptor;
+use lyng_ops::{errors, object, proxy};
+use lyng_types::PropertyDescriptor;
 
 impl Vm {
     fn callback_object(agent: &Agent, value: Value) -> Option<ObjectRef> {

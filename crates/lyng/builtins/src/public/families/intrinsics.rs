@@ -1,6 +1,6 @@
 use crate::public::PublicRealmBuiltins;
-use lyng_js_env::{Agent, Intrinsics};
-use lyng_js_types::{ObjectRef, RealmRef};
+use lyng_env::{Agent, Intrinsics};
+use lyng_types::{ObjectRef, RealmRef};
 
 #[derive(Clone, Copy, Debug)]
 #[allow(clippy::struct_field_names)]

@@ -1,5 +1,5 @@
 use super::super::{BuiltinEntryMetadata, PublicBuiltinMetadataRow};
-use lyng_js_types::{
+use lyng_types::{
     date_builtin, date_get_date_builtin, date_get_day_builtin, date_get_full_year_builtin,
     date_get_hours_builtin, date_get_milliseconds_builtin, date_get_minutes_builtin,
     date_get_month_builtin, date_get_seconds_builtin, date_get_time_builtin,

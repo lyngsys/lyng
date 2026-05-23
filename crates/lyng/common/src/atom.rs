@@ -381,7 +381,7 @@ impl OccupiedAtomEntry {
 
 /// A collection session over an `AtomTable`.
 ///
-/// `lyng_js_gc` drives the session by visiting `AtomId` edges during its
+/// `lyng_gc` drives the session by visiting `AtomId` edges during its
 /// ordinary mark walk and then calling `sweep` once tracing is complete.
 pub struct AtomCollection<'a> {
     table: &'a mut AtomTable,

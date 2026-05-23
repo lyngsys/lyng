@@ -2,8 +2,8 @@ use super::{
     code_index, Agent, AllocationLifetime, AtomId, DirectEvalEnvironmentState, EnvironmentLayoutId,
     EnvironmentRef, FrameRecord, Vm, VmError, VmResult,
 };
-use lyng_js_bytecode::DirectEvalSiteFlags;
-use lyng_js_env::{
+use lyng_bytecode::DirectEvalSiteFlags;
+use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
 
@@ -20,7 +20,7 @@ impl Vm {
     fn direct_eval_lexical_layout(
         &mut self,
         agent: &mut Agent,
-        bindings: &[lyng_js_bytecode::BytecodeEnvironmentBinding],
+        bindings: &[lyng_bytecode::BytecodeEnvironmentBinding],
     ) -> EnvironmentLayoutId {
         if let Some(layout) = self.direct_eval_lexical_layouts.get(bindings).copied() {
             return layout;
@@ -56,30 +56,31 @@ impl Vm {
     fn environment_outer(agent: &Agent, environment: EnvironmentRef) -> Option<EnvironmentRef> {
         let record = agent.environment(environment)?;
         Some(match record {
-            lyng_js_env::EnvironmentRecord::Declarative(record) => record.outer()?,
-            lyng_js_env::EnvironmentRecord::Private(record) => record.outer()?,
-            lyng_js_env::EnvironmentRecord::Function(record) => record.declarative().outer()?,
-            lyng_js_env::EnvironmentRecord::Module(record) => record.outer()?,
-            lyng_js_env::EnvironmentRecord::Global(record) => record.outer()?,
-            lyng_js_env::EnvironmentRecord::Object(record) => record.outer()?,
+            lyng_env::EnvironmentRecord::Declarative(record) => record.outer()?,
+            lyng_env::EnvironmentRecord::Private(record) => record.outer()?,
+            lyng_env::EnvironmentRecord::Function(record) => record.declarative().outer()?,
+            lyng_env::EnvironmentRecord::Module(record) => record.outer()?,
+            lyng_env::EnvironmentRecord::Global(record) => record.outer()?,
+            lyng_env::EnvironmentRecord::Object(record) => record.outer()?,
         })
     }
 
     fn environment_matches_direct_eval_scope(
         agent: &Agent,
         environment: EnvironmentRef,
-        scope: &lyng_js_bytecode::DirectEvalLexicalScope,
+        scope: &lyng_bytecode::DirectEvalLexicalScope,
     ) -> bool {
         let Some(record) = agent.environment(environment) else {
             return false;
         };
         let Some(layout_id) = (match record {
-            lyng_js_env::EnvironmentRecord::Declarative(record) => Some(record.layout()),
-            lyng_js_env::EnvironmentRecord::Function(record) => Some(record.declarative().layout()),
-            lyng_js_env::EnvironmentRecord::Module(record) => Some(record.layout()),
-            lyng_js_env::EnvironmentRecord::Global(record) => Some(record.layout()),
-            lyng_js_env::EnvironmentRecord::Private(_)
-            | lyng_js_env::EnvironmentRecord::Object(_) => None,
+            lyng_env::EnvironmentRecord::Declarative(record) => Some(record.layout()),
+            lyng_env::EnvironmentRecord::Function(record) => Some(record.declarative().layout()),
+            lyng_env::EnvironmentRecord::Module(record) => Some(record.layout()),
+            lyng_env::EnvironmentRecord::Global(record) => Some(record.layout()),
+            lyng_env::EnvironmentRecord::Private(_) | lyng_env::EnvironmentRecord::Object(_) => {
+                None
+            }
         }) else {
             return false;
         };
@@ -109,7 +110,7 @@ impl Vm {
     fn direct_eval_scope_source_environment(
         agent: &Agent,
         start: EnvironmentRef,
-        scope: &lyng_js_bytecode::DirectEvalLexicalScope,
+        scope: &lyng_bytecode::DirectEvalLexicalScope,
     ) -> Option<EnvironmentRef> {
         let mut current = Some(start);
         while let Some(environment) = current {
@@ -267,7 +268,7 @@ impl Vm {
         let lexical_env = self.lexical_name_start_environment(frame);
         if matches!(
             agent.environment(lexical_env),
-            Some(lyng_js_env::EnvironmentRecord::Object(_))
+            Some(lyng_env::EnvironmentRecord::Object(_))
         ) {
             return lexical_env;
         }

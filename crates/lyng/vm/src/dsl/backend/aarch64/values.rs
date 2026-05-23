@@ -1,6 +1,6 @@
 //! Value-tag check and tag-manipulation asm fragments for AArch64.
 //!
-//! Per [`reports/js/lyng-js/llint-dsl-value-layout.md`], `Value` is a
+//! Per [`reports/lyng/llint-dsl-value-layout.md`], `Value` is a
 //! NaN-tag-space `u64` with a 16-bit `TagKind` field in bits 32-47 and
 //! a 32-bit payload in bits 0-31. The high 13 bits encode the
 //! canonical-NaN prefix (`TAG_HEADER = 0x7ff8_...`).
@@ -44,12 +44,16 @@ macro_rules! check_smi {
             // x16 := TAG_HEADER | TAG_KIND_MASK == 0x7fff_ffff_0000_0000
             "movz   x16, #0xffff, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x", stringify!($reg), ", x16\n",
+            "and    x16, x",
+            stringify!($reg),
+            ", x16\n",
             // x17 := TAG_HEADER | (4 << 32) == 0x7ff8_0004_0000_0000
             "movz   x17, #0x4, lsl #32\n",
             "movk   x17, #0x7ff8, lsl #48\n",
             "cmp    x16, x17\n",
-            "b.ne   ", stringify!($label), "\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -61,11 +65,15 @@ macro_rules! check_object_ref {
         concat!(
             "movz   x16, #0xffff, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x", stringify!($reg), ", x16\n",
+            "and    x16, x",
+            stringify!($reg),
+            ", x16\n",
             "movz   x17, #0x5, lsl #32\n",
             "movk   x17, #0x7ff8, lsl #48\n",
             "cmp    x16, x17\n",
-            "b.ne   ", stringify!($label), "\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -77,11 +85,15 @@ macro_rules! check_string_ref {
         concat!(
             "movz   x16, #0xffff, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x", stringify!($reg), ", x16\n",
+            "and    x16, x",
+            stringify!($reg),
+            ", x16\n",
             "movz   x17, #0x6, lsl #32\n",
             "movk   x17, #0x7ff8, lsl #48\n",
             "cmp    x16, x17\n",
-            "b.ne   ", stringify!($label), "\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -93,8 +105,12 @@ macro_rules! check_undefined {
         concat!(
             "movz   x16, #0x1, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "cmp    x", stringify!($reg), ", x16\n",
-            "b.ne   ", stringify!($label), "\n",
+            "cmp    x",
+            stringify!($reg),
+            ", x16\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -106,8 +122,12 @@ macro_rules! check_null {
         concat!(
             "movz   x16, #0x2, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "cmp    x", stringify!($reg), ", x16\n",
-            "b.ne   ", stringify!($label), "\n",
+            "cmp    x",
+            stringify!($reg),
+            ", x16\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -119,11 +139,15 @@ macro_rules! check_bool {
         concat!(
             "movz   x16, #0xffff, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x", stringify!($reg), ", x16\n",
+            "and    x16, x",
+            stringify!($reg),
+            ", x16\n",
             "movz   x17, #0x3, lsl #32\n",
             "movk   x17, #0x7ff8, lsl #48\n",
             "cmp    x16, x17\n",
-            "b.ne   ", stringify!($label), "\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -133,9 +157,13 @@ macro_rules! check_bool {
 macro_rules! check_double {
     ($reg:tt, $label:tt) => {
         concat!(
-            "lsr    x16, x", stringify!($reg), ", #48\n",
+            "lsr    x16, x",
+            stringify!($reg),
+            ", #48\n",
             "cmp    x16, #0x7ff8\n",
-            "b.eq   ", stringify!($label), "\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -147,18 +175,14 @@ macro_rules! check_double {
 #[macro_export]
 macro_rules! untag_smi {
     ($reg:tt) => {
-        concat!(
-            "sxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
-        )
+        concat!("sxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",)
     };
 }
 
 #[macro_export]
 macro_rules! untag_object_ref {
     ($reg:tt) => {
-        concat!(
-            "uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
-        )
+        concat!("uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",)
     };
 }
 
@@ -166,7 +190,11 @@ macro_rules! untag_object_ref {
 macro_rules! untag_bool {
     ($reg:tt) => {
         concat!(
-            "and    x", stringify!($reg), ", x", stringify!($reg), ", #0x1\n",
+            "and    x",
+            stringify!($reg),
+            ", x",
+            stringify!($reg),
+            ", #0x1\n",
         )
     };
 }
@@ -181,8 +209,16 @@ macro_rules! tag_smi {
         concat!(
             "movz   x16, #0x4, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
-            "orr    x", stringify!($reg), ", x16, x", stringify!($reg), "\n",
+            "uxtw   x",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
+            "orr    x",
+            stringify!($reg),
+            ", x16, x",
+            stringify!($reg),
+            "\n",
         )
     };
 }
@@ -193,8 +229,16 @@ macro_rules! tag_object_ref {
         concat!(
             "movz   x16, #0x5, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
-            "orr    x", stringify!($reg), ", x16, x", stringify!($reg), "\n",
+            "uxtw   x",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
+            "orr    x",
+            stringify!($reg),
+            ", x16, x",
+            stringify!($reg),
+            "\n",
         )
     };
 }
@@ -203,8 +247,12 @@ macro_rules! tag_object_ref {
 macro_rules! tag_undefined {
     ($reg:tt) => {
         concat!(
-            "movz   x", stringify!($reg), ", #0x1, lsl #32\n",
-            "movk   x", stringify!($reg), ", #0x7ff8, lsl #48\n",
+            "movz   x",
+            stringify!($reg),
+            ", #0x1, lsl #32\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x7ff8, lsl #48\n",
         )
     };
 }
@@ -213,8 +261,12 @@ macro_rules! tag_undefined {
 macro_rules! tag_null {
     ($reg:tt) => {
         concat!(
-            "movz   x", stringify!($reg), ", #0x2, lsl #32\n",
-            "movk   x", stringify!($reg), ", #0x7ff8, lsl #48\n",
+            "movz   x",
+            stringify!($reg),
+            ", #0x2, lsl #32\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x7ff8, lsl #48\n",
         )
     };
 }
@@ -223,9 +275,17 @@ macro_rules! tag_null {
 macro_rules! tag_bool_const {
     ($reg:tt, $payload:literal) => {
         concat!(
-            "movz   x", stringify!($reg), ", #", stringify!($payload), "\n",
-            "movk   x", stringify!($reg), ", #0x3, lsl #32\n",
-            "movk   x", stringify!($reg), ", #0x7ff8, lsl #48\n",
+            "movz   x",
+            stringify!($reg),
+            ", #",
+            stringify!($payload),
+            "\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x3, lsl #32\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x7ff8, lsl #48\n",
         )
     };
 }
@@ -243,9 +303,17 @@ macro_rules! tag_bool_const {
 macro_rules! tag_smi_const {
     ($reg:tt, $payload:literal) => {
         concat!(
-            "movz   x", stringify!($reg), ", #", stringify!($payload), "\n",
-            "movk   x", stringify!($reg), ", #0x4, lsl #32\n",
-            "movk   x", stringify!($reg), ", #0x7ff8, lsl #48\n",
+            "movz   x",
+            stringify!($reg),
+            ", #",
+            stringify!($payload),
+            "\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x4, lsl #32\n",
+            "movk   x",
+            stringify!($reg),
+            ", #0x7ff8, lsl #48\n",
         )
     };
 }
@@ -269,11 +337,23 @@ macro_rules! tag_smi_const {
 macro_rules! tag_smi_from_signed_byte {
     ($reg:tt) => {
         concat!(
-            "sxtb   w", stringify!($reg), ", w", stringify!($reg), "\n",
-            "uxtw   x", stringify!($reg), ", w", stringify!($reg), "\n",
+            "sxtb   w",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
+            "uxtw   x",
+            stringify!($reg),
+            ", w",
+            stringify!($reg),
+            "\n",
             "movz   x16, #0x4, lsl #32\n",
             "movk   x16, #0x7ff8, lsl #48\n",
-            "orr    x", stringify!($reg), ", x16, x", stringify!($reg), "\n",
+            "orr    x",
+            stringify!($reg),
+            ", x16, x",
+            stringify!($reg),
+            "\n",
         )
     };
 }
@@ -328,10 +408,18 @@ macro_rules! tag_smi_from_signed_byte {
 macro_rules! load_uninit_lex_sentinel {
     ($dst_reg:tt) => {
         concat!(
-            "movz   x", stringify!($dst_reg), ", #({value_uninit_lex_bits} & 0xffff)\n",
-            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 16) & 0xffff), lsl #16\n",
-            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 32) & 0xffff), lsl #32\n",
-            "movk   x", stringify!($dst_reg), ", #(({value_uninit_lex_bits} >> 48) & 0xffff), lsl #48\n",
+            "movz   x",
+            stringify!($dst_reg),
+            ", #({value_uninit_lex_bits} & 0xffff)\n",
+            "movk   x",
+            stringify!($dst_reg),
+            ", #(({value_uninit_lex_bits} >> 16) & 0xffff), lsl #16\n",
+            "movk   x",
+            stringify!($dst_reg),
+            ", #(({value_uninit_lex_bits} >> 32) & 0xffff), lsl #32\n",
+            "movk   x",
+            stringify!($dst_reg),
+            ", #(({value_uninit_lex_bits} >> 48) & 0xffff), lsl #48\n",
         )
     };
 }

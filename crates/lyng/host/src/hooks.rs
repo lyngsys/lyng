@@ -2,8 +2,8 @@ use crate::error::{HostError, HostResult};
 use crate::ids::{
     HostAgentId, HostJobId, HostSharedBufferId, HostThreadId, HostTransferredBufferId,
 };
-use lyng_js_common::{Severity, SourceId, Span};
-use lyng_js_types::{BackingStoreRef, BuiltinFunctionId};
+use lyng_common::{Severity, SourceId, Span};
+use lyng_types::{BackingStoreRef, BuiltinFunctionId};
 use std::cmp::Ordering;
 
 /// Host-facing diagnostic payload.
@@ -19,8 +19,8 @@ pub struct DiagnosticReportRequest {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UncaughtExceptionReport {
     pub source: Option<SourceId>,
-    pub realm: Option<lyng_js_types::RealmRef>,
-    pub thrown_value: lyng_js_types::Value,
+    pub realm: Option<lyng_types::RealmRef>,
+    pub thrown_value: lyng_types::Value,
     pub message: String,
 }
 

@@ -19,7 +19,7 @@ Use the local V8 v7 corpus as the first and only approved Octane-style corpus:
 - `NavierStokes`
 
 These workloads are pure JavaScript, run without browser or Node host APIs, and already
-fit the external-engine comparison path in `tools/lyng-js-bench compare`. Keep filtered
+fit the external-engine comparison path in `tools/lyng-bench compare`. Keep filtered
 per-benchmark runs as the default inner loop. Use the full V8 v7 suite only for wider
 checkpoints because full-suite scoring is too coarse and slow for day-to-day diagnosis.
 
@@ -77,13 +77,13 @@ Future fixture additions must follow the same rule:
 
 ## Harness Requirements
 
-`tools/lyng-js-bench compare` owns external-engine benchmark wiring. It should keep doing
+`tools/lyng-bench compare` owns external-engine benchmark wiring. It should keep doing
 all of the following:
 
 - Generate standalone scripts under the configured scripts directory.
 - Support per-benchmark filtering for inner-loop runs.
 - Keep optional full-suite mode available but non-default.
-- Run Lyng JS as `target/release/lyng-js --shell` for V8 v7 so `print(...)` is available.
+- Run Lyng JS as `target/release/lyng --shell` for V8 v7 so `print(...)` is available.
 - Run QuickJS with its explicit `--script` argument.
 - Run Boa with its normal command form.
 - Record the exact command vector in Markdown and JSON so results are reproducible.
@@ -94,7 +94,7 @@ fallbacks such as `print` followed by `console.log`.
 ## Report Contract
 
 External comparison reports should stay aligned with
-`reports/js/lyng-js/external-engine-compare.*`:
+`reports/lyng/external-engine-compare.*`:
 
 - Markdown is the human triage artifact.
 - JSON is the machine-readable baseline and handoff artifact.

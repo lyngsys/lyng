@@ -1,8 +1,8 @@
 // DSL-1 Phase 1.C.3 op_decrement_dsl handler asm (AArch64), captured from
-//   cargo rustc --release -p lyng-js-vm --lib -- --emit=asm
+//   cargo rustc --release -p lyng-vm --lib -- --emit=asm
 //
-// Symbol: lyng_js_vm::dsl::handlers::cold::op_decrement_dsl
-// Source: crates/lyng-js/vm/src/dsl/handlers/cold.rs
+// Symbol: lyng_vm::dsl::handlers::cold::op_decrement_dsl
+// Source: crates/lyng/vm/src/dsl/handlers/cold.rs
 // Layout: AbcSlot (a, b, c byte operands + 16-bit feedback slot),
 // length = 6 bytes. The `c` operand is decoded by the proc-macro
 // lowerer but unused by the handler body (op_decrement is logically

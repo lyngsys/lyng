@@ -1,4 +1,4 @@
-use lyng_js_types::{PropertyDescriptor, Value};
+use lyng_types::{PropertyDescriptor, Value};
 
 #[inline]
 fn numeric_pair(left: Value, right: Value) -> Option<(f64, f64)> {
@@ -312,7 +312,7 @@ pub fn same_value_zero(left: Value, right: Value) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_types::{
+    use lyng_types::{
         BigIntRef, InternalSentinel, ObjectRef, PropertyDescriptor, StringRef, SymbolRef,
     };
 

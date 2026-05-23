@@ -1,5 +1,5 @@
-use lyng_js_gc::{BigIntSign, PrimitiveBigIntView, PrimitiveStringView};
-use lyng_js_types::{AbruptCompletion, Value};
+use lyng_gc::{BigIntSign, PrimitiveBigIntView, PrimitiveStringView};
+use lyng_types::{AbruptCompletion, Value};
 use std::fmt::Write;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -584,7 +584,7 @@ const fn is_ecmascript_trim_whitespace(ch: char) -> bool {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
-    use lyng_js_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
+    use lyng_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
 
     #[test]
     fn string_to_number_handles_trim_prefixes_and_invalid_input() {

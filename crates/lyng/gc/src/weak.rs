@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use lyng_js_types::{ObjectRef, SymbolRef, Value};
+use lyng_types::{ObjectRef, SymbolRef, Value};
 
 /// Heap handle classes that ECMAScript permits to be held weakly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

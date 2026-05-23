@@ -1,6 +1,6 @@
 # Phase 1 — Diagnostics for the V8 v7 geomean shortfall
 
-**Issue context:** [`lyng-33i2`](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs) Phase 1 cutover landed but missed all six V8 v7 score targets and regressed DeltaBlue by -7.2%. The roadmap's "Re-evaluation Checkpoints" section ([jsc-aligned-engine-roadmap.md:968-988](jsc-aligned-engine-roadmap.md)) names this exact outcome as a hard stop: *"if α's gain is < 8% geomean (below even the conservative target), the package theory is wrong or LLVM is materializing the Step enum on the hot path. Stop. Inspect run() asm."*
+**Issue context:** [`lyng-33i2`](../../../crates/lyng/vm/src/vm/dispatch_state.rs) Phase 1 cutover landed but missed all six V8 v7 score targets and regressed DeltaBlue by -7.2%. The roadmap's "Re-evaluation Checkpoints" section ([jsc-aligned-engine-roadmap.md:968-988](jsc-aligned-engine-roadmap.md)) names this exact outcome as a hard stop: *"if α's gain is < 8% geomean (below even the conservative target), the package theory is wrong or LLVM is materializing the Step enum on the hot path. Stop. Inspect run() asm."*
 **Date:** 2026-05-15
 **Toolchain:** rustc 1.93.1 (2026-02-11), aarch64-apple-darwin, `--release` profile (thin LTO)
 **Methodology:** cargo-asm symbol dumps + diagnostic A/B with one variable removed at a time. Flamegraph runs were deferred — load average was 4.97 at investigation time, well above the roadmap's <2.0 isolation requirement, and the asm evidence proved deterministic enough to act on.
@@ -20,7 +20,7 @@ Combined Tier 1+2 fixes project ~7 instructions saved per dispatch (~25% of the 
 
 Captured `cargo asm --release` on the four named hot opcodes plus the trampoline. Counted true instructions (lines starting with `\t<mnemonic>`, excluding `.cfi_*` directives and labels). Diffed the dispatch-tail block specifically against the spike-era expected shape from [phase-1-spike.md](phase-1-spike.md).
 
-For the maybe_record hypothesis, edited `dispatch_next!` to remove the `$state.vm.maybe_record_opcode_dispatch(byte)` call, rebuilt, captured asm, computed delta, restored the macro. The trampoline-internal calls at [dispatch_state.rs:276](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs:276) and [dispatch_state.rs:317](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs:317) were left in place since they fire once per trampoline entry (not per dispatch).
+For the maybe_record hypothesis, edited `dispatch_next!` to remove the `$state.vm.maybe_record_opcode_dispatch(byte)` call, rebuilt, captured asm, computed delta, restored the macro. The trampoline-internal calls at [dispatch_state.rs:276](../../../crates/lyng/vm/src/vm/dispatch_state.rs:276) and [dispatch_state.rs:317](../../../crates/lyng/vm/src/vm/dispatch_state.rs:317) were left in place since they fire once per trampoline entry (not per dispatch).
 
 Bench numbers were not re-captured — load avg was 4.97 (vs roadmap's <2.0 isolation requirement). The committed [bench-v8.md](bench-v8.md) numbers are taken as authoritative for the "before" reading.
 
@@ -128,7 +128,7 @@ The package theory is intact. The miss is per-dispatch overhead added by the two
 
 ### 4. A/B confirmation: removing `maybe_record_opcode_dispatch` saves 21 instructions per handler
 
-Diagnostic edit at [dispatch_state.rs:229-241](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs:229): commented out the `$state.vm.maybe_record_opcode_dispatch(byte)` line in the `dispatch_next!` macro. Rebuilt and recaptured asm. The macro was restored after measurement.
+Diagnostic edit at [dispatch_state.rs:229-241](../../../crates/lyng/vm/src/vm/dispatch_state.rs:229): commented out the `$state.vm.maybe_record_opcode_dispatch(byte)` line in the `dispatch_next!` macro. Rebuilt and recaptured asm. The macro was restored after measurement.
 
 | Symbol | Before instructions | After instructions | Delta |
 | --- | ---: | ---: | ---: |
@@ -145,7 +145,7 @@ Even though the cold path is taken only when counters are enabled, it still occu
 
 ### 5. The trampoline epoch check could be 2-3 instructions cheaper
 
-[dispatch_state.rs:306-321](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs:306) currently:
+[dispatch_state.rs:306-321](../../../crates/lyng/vm/src/vm/dispatch_state.rs:306) currently:
 
 ```rust
 if state.frame_check_epoch != state.vm.dispatch_frame_check_epoch() {
@@ -165,7 +165,7 @@ Two tiers of fixes, ordered by risk/reward. Each tier delivers an isolated win a
 
 ### Tier 1 — Move `maybe_record_opcode_dispatch` off the hot path
 
-**Goal:** Remove 4 instrs/dispatch + ~17 cold-path instrs/handler symbol. Zero behavior change when counters are off (the default everywhere except `lyng-js-bench --count-opcodes`).
+**Goal:** Remove 4 instrs/dispatch + ~17 cold-path instrs/handler symbol. Zero behavior change when counters are off (the default everywhere except `lyng-bench --count-opcodes`).
 
 **Recommended approach: separate "instrumented" dispatch table at compile time.**
 
@@ -199,11 +199,11 @@ pub fn run_trampoline(state: &mut DispatchState) -> VmResult<Value> {
 
 Two trampolines, each pinning a slightly different inner loop. The hot path stays clean; the counted path is the diagnostic / bench-harness path. Increment lives in the trampoline body, not in the handler's tail.
 
-**Why not a `#[cfg(feature = "opcode-counters")]` gate?** The counter has a real runtime user (the `lyng-js-bench --count-opcodes` flag, see [bench.md](bench.md)). A feature flag forces a recompile to switch modes, which is painful for ad-hoc bench investigation. Two trampolines pay 1 extra branch at script entry, never per dispatch.
+**Why not a `#[cfg(feature = "opcode-counters")]` gate?** The counter has a real runtime user (the `lyng-bench --count-opcodes` flag, see [bench.md](bench.md)). A feature flag forces a recompile to switch modes, which is painful for ad-hoc bench investigation. Two trampolines pay 1 extra branch at script entry, never per dispatch.
 
 **Alternative: bytecode-level instrumentation.** Compiler emits `RecordDispatch` opcodes adjacent to every other opcode in a "counted" bytecode variant. Higher engineering cost; cleaner asm. Defer unless Tier 1 + 2 still fall short.
 
-**Verification:** Re-run [tests/core.rs:232-263](../../../crates/lyng-js/vm/src/tests/core.rs:232) (the counter test). Capture `cargo asm` of `op_move` / `op_add` — expect 77 / 119 instructions or fewer.
+**Verification:** Re-run [tests/core.rs:232-263](../../../crates/lyng/vm/src/tests/core.rs:232) (the counter test). Capture `cargo asm` of `op_move` / `op_add` — expect 77 / 119 instructions or fewer.
 
 **Estimated effort:** 1 day. **Asm delta projected:** -4 instrs/dispatch, -21 instrs avg per handler symbol.
 
@@ -211,7 +211,7 @@ Two trampolines, each pinning a slightly different inner loop. The hot path stay
 
 **Goal:** Recover 2 more instructions per dispatch from the trampoline loop body without changing the cross-frame catch parity that fbace3dd put in place.
 
-**Concrete changes in [dispatch_state.rs:282-326](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs:282):**
+**Concrete changes in [dispatch_state.rs:282-326](../../../crates/lyng/vm/src/vm/dispatch_state.rs:282):**
 
 ```rust
 #[inline(never)]
@@ -252,7 +252,7 @@ The hot path becomes: `ldr w10, [x_vm, #1656]; cmp w_local, w10; b.eq loop_top` 
 
 **Risk:** The `unsafe` deref + register pinning is localized to the trampoline body. The `state.vm` aliasing rule is already enforced by the borrow checker for safe code paths; the `*mut Vm` here is a stable identity since the handler receives `&mut DispatchState` whose `vm` field has the same lifetime as the trampoline call.
 
-**Verification:** Re-run cross-frame catch parity tests (`cargo test --release -p lyng-js-vm trampoline_parity`). Re-run Test262. Capture trampoline asm — expect 3-instr hot-path epoch check.
+**Verification:** Re-run cross-frame catch parity tests (`cargo test --release -p lyng-vm trampoline_parity`). Re-run Test262. Capture trampoline asm — expect 3-instr hot-path epoch check.
 
 **Estimated effort:** 2–3 days including the parity-test re-run and asm verification. **Asm delta projected:** -3 instrs/dispatch.
 
@@ -284,9 +284,9 @@ Expected gain: 5–8% on dispatch-bound workloads. Cost: one localized `unsafe` 
 **T3b — Restate the asm-size gate in the roadmap.** [phase-1-final-asm.md](phase-1-final-asm.md) already proposes ≤100 B for tail-merged shims, ≤1000 B for real hot handlers. Update [lyng-33i2's acceptance text](.dogcats/issues.jsonl) and the [Phase 1 exit criteria](jsc-aligned-engine-roadmap.md:343-360) to match. The 200B target was JSC-LLInt-aligned and assumed offlineasm; production carries Rust ABI prologue + Wide path + feedback slot decode + register-window bounds checks. Either accept ~250B as the structural floor or commit to γ.
 
 **T3c — Commit the missing pre-Phase-1 baselines.** Re-run on `main~N` (the trampoline-cutover boundary) and commit:
-- `reports/js/lyng-js/phase-0-bench.md`
-- `reports/js/lyng-js/phase-0-test262.md`
-- `reports/js/lyng-js/phase-0-asm.md`
+- `reports/lyng/phase-0-bench.md`
+- `reports/lyng/phase-0-test262.md`
+- `reports/lyng/phase-0-asm.md`
 
 Phase 2 and Phase 3 will compute cumulative gains; without phase-0 they have to bootstrap from the roadmap's baseline column in [bench-v8.md](bench-v8.md), which isn't an isolated snapshot.
 
@@ -325,10 +325,10 @@ Sub-9 ([lyng-2wji](.dogcats/issues.jsonl)) is the right home for the re-run. The
 
 ## Files referenced
 
-- [dispatch_state.rs](../../../crates/lyng-js/vm/src/vm/dispatch_state.rs) — DispatchState, Handler, Step, DISPATCH_TABLE, dispatch_next!, run_trampoline
-- [dispatch_handlers/mod.rs](../../../crates/lyng-js/vm/src/vm/dispatch_handlers/mod.rs) — build_dispatch_table
-- [dispatch_handlers/arithmetic.rs](../../../crates/lyng-js/vm/src/vm/dispatch_handlers/arithmetic.rs) — op_add and the SMI fast path
-- [vm.rs:295](../../../crates/lyng-js/vm/src/vm.rs:295) — maybe_record_opcode_dispatch
+- [dispatch_state.rs](../../../crates/lyng/vm/src/vm/dispatch_state.rs) — DispatchState, Handler, Step, DISPATCH_TABLE, dispatch_next!, run_trampoline
+- [dispatch_handlers/mod.rs](../../../crates/lyng/vm/src/vm/dispatch_handlers/mod.rs) — build_dispatch_table
+- [dispatch_handlers/arithmetic.rs](../../../crates/lyng/vm/src/vm/dispatch_handlers/arithmetic.rs) — op_add and the SMI fast path
+- [vm.rs:295](../../../crates/lyng/vm/src/vm.rs:295) — maybe_record_opcode_dispatch
 - [jsc-aligned-engine-roadmap.md](jsc-aligned-engine-roadmap.md) — Phase 1 exit criteria, re-evaluation checkpoints, γ-swap spec
 - [phase-1-spike.md](phase-1-spike.md) — spike-era dispatch asm shape
 - [phase-1-final-asm.md](phase-1-final-asm.md) — production asm sizes + the restated-gate proposal
@@ -345,9 +345,9 @@ Baseline (today) and post-experiment asm dumps preserved at:
 These are transient (machine-local). The instruction counts and dispatch-tail diffs above are the load-bearing artifacts; the raw dumps are reproducible via:
 
 ```sh
-cargo build --release -p lyng-js-vm
-cargo asm --release -p lyng-js-vm "lyng_js_vm::vm::dispatch_handlers::arithmetic::op_add" 0
-cargo asm --release -p lyng-js-vm "lyng_js_vm::vm::dispatch_state::run_trampoline"
+cargo build --release -p lyng-vm
+cargo asm --release -p lyng-vm "lyng_vm::vm::dispatch_handlers::arithmetic::op_add" 0
+cargo asm --release -p lyng-vm "lyng_vm::vm::dispatch_state::run_trampoline"
 ```
 
 ---
@@ -416,8 +416,8 @@ per dispatch versus the pre-fix production code, ~25% reduction.**
 
 ### Test verification
 
-- `cargo test --release -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-compiler`: 577/577 pass (including the opcode counter tests at [tests/core.rs:232-263](../../../crates/lyng-js/vm/src/tests/core.rs:232) — counter functionality preserved via `run_trampoline_counted`).
-- `cargo test --release -p lyng-js-tests`: 1186/1186 pass.
+- `cargo test --release -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-compiler`: 577/577 pass (including the opcode counter tests at [tests/core.rs:232-263](../../../crates/lyng/vm/src/tests/core.rs:232) — counter functionality preserved via `run_trampoline_counted`).
+- `cargo test --release -p lyng-tests`: 1186/1186 pass.
 - Test262 whole-suite: **49722/49729 runnable files pass (same as baseline; 0 panics, same 7 failures as pre-T1+T2)**.
 
 ### Bench verification — V8 v7 sweep landed

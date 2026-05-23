@@ -10,9 +10,9 @@ use super::{
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_types::{
     async_iterator_dispose_builtin, iterator_builtin, iterator_concat_builtin,
     iterator_constructor_getter_builtin, iterator_constructor_setter_builtin,
     iterator_dispose_builtin, iterator_drop_builtin, iterator_every_builtin,
@@ -395,7 +395,7 @@ impl IteratorDescriptorAtoms {
         let atoms = agent.atoms_mut();
         Self {
             next: atoms.intern("next"),
-            constructor: lyng_js_common::WellKnownAtom::constructor.id(),
+            constructor: lyng_common::WellKnownAtom::constructor.id(),
             from: atoms.intern("from"),
             concat: atoms.intern("concat"),
             zip: atoms.intern("zip"),

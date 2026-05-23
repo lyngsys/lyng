@@ -802,7 +802,7 @@ mod prepare_suite_tests {
             .as_nanos();
         let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "lyng-js-test262-prepare-{}-{}-{}",
+            "lyng-test262-prepare-{}-{}-{}",
             std::process::id(),
             nonce,
             counter
@@ -821,7 +821,7 @@ mod prepare_suite_tests {
     fn options_for_filter(filter: &str) -> RunnerConfig {
         RunnerConfig {
             filter: Some(filter.to_string()),
-            report_path: "/tmp/lyng-js-test262-test.md".to_string(),
+            report_path: "/tmp/lyng-test262-test.md".to_string(),
             manifest_path: DEFAULT_MANIFEST_PATH.to_string(),
             no_skip: false,
             list_failures: false,

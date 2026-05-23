@@ -5,7 +5,7 @@ use super::{
     type_error, uri_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(super) fn dispatch_language_support_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,

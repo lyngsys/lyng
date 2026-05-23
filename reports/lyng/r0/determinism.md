@@ -6,14 +6,14 @@ determinism behavior.
 
 ## asm-diff
 
-- Command: `cargo run --release -p lyng-js-bench -- asm-diff --mode check --opcodes-config tools/lyng-js-bench/hot-opcodes.toml --baseline reports/js/lyng-js/dsl-asm-baseline-aarch64`
+- Command: `cargo run --release -p lyng-bench -- asm-diff --mode check --opcodes-config tools/lyng-bench/hot-opcodes.toml --baseline reports/lyng/dsl-asm-baseline-aarch64`
 - 5 consecutive runs produced deterministic summary output (verified via direct comparison).
 - Summary line (consistent across all 5 runs): `asm-diff: 29 match, 1 differ, 0 failures`
 - Label numbering varies between runs (cosmetic assembly formatting), but the semantic result is identical.
 
 ## microbench
 
-- Command: `cargo run --release -p lyng-js-bench -- microbench --samples 3 --iters 100000`
+- Command: `cargo run --release -p lyng-bench -- microbench --samples 3 --iters 100000`
 - 3 consecutive runs: timing values vary (expected — wall-time and CPU jitter across runs).
 - Table structure (column headers, row labels, opcode list) is deterministic (verified via regex-normalized structure diff).
 - Verification: comparing normalized headers and table structure (with timing values replaced) across all 3 runs shows zero differences.
@@ -21,7 +21,7 @@ determinism behavior.
 
 ## capture-llint (excerpt mode)
 
-- Command: `cargo run --release -p lyng-js-bench -- capture-llint --source excerpt --jsc-source /Users/sondre/dev/WebKit --opcodes op_add,op_mov,op_jmp --output /tmp/capture-llint-N`
+- Command: `cargo run --release -p lyng-bench -- capture-llint --source excerpt --jsc-source /Users/sondre/dev/WebKit --opcodes op_add,op_mov,op_jmp --output /tmp/capture-llint-N`
 - 2 consecutive runs produced byte-identical output trees (verified via `diff -r` on output directories).
 - Output directory structure: README.md, op_add.md, op_jmp.md, op_mov.md (all identical between runs).
 - Deterministic by construction: same source files, same opcodes → same extracted excerpts.

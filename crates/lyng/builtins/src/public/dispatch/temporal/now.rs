@@ -15,22 +15,22 @@ pub(super) fn dispatch_temporal_now_builtin<Cx: PublicBuiltinDispatchContext>(
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::temporal_now_instant_builtin() {
+    if entry == lyng_types::temporal_now_instant_builtin() {
         return temporal_now_instant_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_now_time_zone_id_builtin() {
+    if entry == lyng_types::temporal_now_time_zone_id_builtin() {
         return temporal_now_time_zone_id_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_now_plain_date_iso_builtin() {
+    if entry == lyng_types::temporal_now_plain_date_iso_builtin() {
         return temporal_now_plain_date_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_now_plain_time_iso_builtin() {
+    if entry == lyng_types::temporal_now_plain_time_iso_builtin() {
         return temporal_now_plain_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_now_plain_date_time_iso_builtin() {
+    if entry == lyng_types::temporal_now_plain_date_time_iso_builtin() {
         return temporal_now_plain_date_time_iso_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_now_zoned_date_time_iso_builtin() {
+    if entry == lyng_types::temporal_now_zoned_date_time_iso_builtin() {
         return temporal_now_zoned_date_time_iso_builtin(context, invocation).map(Some);
     }
     Ok(None)

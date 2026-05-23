@@ -1,7 +1,7 @@
-use lyng_js_ast::{DeclId, ExprId, FunctionId, PatternId, StmtId};
-use lyng_js_bytecode::BytecodeBuildError;
-use lyng_js_common::AtomId;
-use lyng_js_sema::{FunctionSemaId, SemanticBindingId};
+use lyng_ast::{DeclId, ExprId, FunctionId, PatternId, StmtId};
+use lyng_bytecode::BytecodeBuildError;
+use lyng_common::AtomId;
+use lyng_sema::{FunctionSemaId, SemanticBindingId};
 
 pub type LoweringResult<T> = Result<T, LoweringError>;
 

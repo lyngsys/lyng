@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use lyng_js_env::Agent;
-use lyng_js_ops::enumeration::ForInEnumerator;
-use lyng_js_ops::iterator::IteratorRecord;
-use lyng_js_types::PropertyKey;
+use lyng_env::Agent;
+use lyng_ops::enumeration::ForInEnumerator;
+use lyng_ops::iterator::IteratorRecord;
+use lyng_types::PropertyKey;
 
 use crate::error::VmResult;
 use crate::{RegisterWindow, VmError};

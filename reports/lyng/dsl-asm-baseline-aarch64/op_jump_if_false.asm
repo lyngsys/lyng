@@ -1,5 +1,5 @@
 // DSL-0b op_jump_if_false handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::warm::op_jump_if_false
+// Symbol: lyng_vm::dsl::handlers::warm::op_jump_if_false
 // Layout: Abx (1-byte condition register + 2-byte i16 delta), length = 4.
 //
 // Structurally identical to op_jump_if_true.asm; the only difference

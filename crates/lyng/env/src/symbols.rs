@@ -1,6 +1,6 @@
-use lyng_js_common::{AtomId, AtomTable, WellKnownAtom};
-use lyng_js_gc::{AtomGcSweep, PrimitiveTracer, TraceAtomEdges, TraceHeapEdges};
-use lyng_js_types::{SymbolRef, WellKnownSymbolId};
+use lyng_common::{AtomId, AtomTable, WellKnownAtom};
+use lyng_gc::{AtomGcSweep, PrimitiveTracer, TraceAtomEdges, TraceHeapEdges};
+use lyng_types::{SymbolRef, WellKnownSymbolId};
 
 /// Agent-owned atom set used by the default-realm bootstrap.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

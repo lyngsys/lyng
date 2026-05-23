@@ -3,14 +3,10 @@ use super::{
     to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::{
-    ArrayBufferObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData,
-};
-use lyng_js_types::{
-    BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
-};
+use lyng_common::WellKnownAtom;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::{ArrayBufferObjectData, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId};
 
 pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
     context: &mut Cx,
@@ -71,10 +67,10 @@ pub(super) fn dispatch_buffer_builtin<Cx: PublicBuiltinDispatchContext>(
 fn allocate_array_buffer_family_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     data: ArrayBufferObjectData,
     kind: OrdinaryObjectData,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -101,9 +97,9 @@ fn allocate_array_buffer_family_object<Cx: PublicBuiltinDispatchContext>(
 pub(super) fn allocate_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-    backing_store: lyng_js_types::BackingStoreRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+    backing_store: lyng_types::BackingStoreRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     allocate_array_buffer_object_with_data(
         cx,
         realm,
@@ -115,18 +111,18 @@ pub(super) fn allocate_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_array_buffer_object_with_data<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     data: ArrayBufferObjectData,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     allocate_array_buffer_family_object(cx, realm, prototype, data, OrdinaryObjectData::ArrayBuffer)
 }
 
 fn allocate_shared_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
-    backing_store: lyng_js_types::BackingStoreRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+    prototype: lyng_types::ObjectRef,
+    backing_store: lyng_types::BackingStoreRef,
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     allocate_shared_array_buffer_object_with_data(
         cx,
         realm,
@@ -138,9 +134,9 @@ fn allocate_shared_array_buffer_object<Cx: PublicBuiltinDispatchContext>(
 fn allocate_shared_array_buffer_object_with_data<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
-    prototype: lyng_js_types::ObjectRef,
+    prototype: lyng_types::ObjectRef,
     data: ArrayBufferObjectData,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     allocate_array_buffer_family_object(
         cx,
         realm,
@@ -153,7 +149,7 @@ fn allocate_shared_array_buffer_object_with_data<Cx: PublicBuiltinDispatchContex
 fn array_buffer_this_store<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-) -> Result<lyng_js_types::BackingStoreRef, Cx::Error> {
+) -> Result<lyng_types::BackingStoreRef, Cx::Error> {
     Ok(array_buffer_this_data(cx, value)?.1.backing_store())
 }
 
@@ -176,7 +172,7 @@ fn array_buffer_this_data<Cx: PublicBuiltinDispatchContext>(
 fn shared_array_buffer_this_store<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-) -> Result<lyng_js_types::BackingStoreRef, Cx::Error> {
+) -> Result<lyng_types::BackingStoreRef, Cx::Error> {
     Ok(shared_array_buffer_this_data(cx, value)?.1.backing_store())
 }
 
@@ -471,7 +467,7 @@ fn shared_array_buffer_max_byte_length_getter_builtin<Cx: PublicBuiltinDispatchC
 
 fn shared_buffer_byte_length_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    store: lyng_js_types::BackingStoreRef,
+    store: lyng_types::BackingStoreRef,
 ) -> Result<Value, Cx::Error> {
     let byte_length = cx
         .agent()

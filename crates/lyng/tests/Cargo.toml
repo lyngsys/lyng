@@ -1,21 +1,21 @@
 [package]
-name = "lyng-js-tests"
+name = "lyng-tests"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-lyng-js-common = { workspace = true }
-lyng-js-lexer = { workspace = true }
-lyng-js-ast = { workspace = true }
-lyng-js-parser = { workspace = true }
-lyng-js-sema = { workspace = true }
-lyng-js-types = { workspace = true }
-lyng-js-gc = { workspace = true }
-lyng-js-ops = { workspace = true }
-lyng-js-host = { workspace = true }
-lyng-js-objects = { workspace = true }
-lyng-js-env = { workspace = true }
-lyng-js-bytecode = { workspace = true }
-lyng-js-compiler = { workspace = true }
-lyng-js-vm = { workspace = true }
-lyng-js-builtins = { workspace = true }
+lyng-common = { workspace = true }
+lyng-lexer = { workspace = true }
+lyng-ast = { workspace = true }
+lyng-parser = { workspace = true }
+lyng-sema = { workspace = true }
+lyng-types = { workspace = true }
+lyng-gc = { workspace = true }
+lyng-ops = { workspace = true }
+lyng-host = { workspace = true }
+lyng-objects = { workspace = true }
+lyng-env = { workspace = true }
+lyng-bytecode = { workspace = true }
+lyng-compiler = { workspace = true }
+lyng-vm = { workspace = true }
+lyng-builtins = { workspace = true }

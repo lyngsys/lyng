@@ -1,7 +1,7 @@
 # DSL-0b Status Report
 
 DSL-0b is the second sub-phase of the DSL-0 milestone documented in
-[`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+[`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 Its scope is the asm-DSL substrate's infrastructure + first
 implementations: proc-macro crate, runtime ABI (`LlIntState`,
 `LlIntRustContext`, slow-path bridge, entry/exit shims), AArch64
@@ -17,7 +17,7 @@ the dispatch substrate until Phase C flips the switch.
 
 | # | Deliverable | Tasks | Status |
 |--:|---|---|---|
-| 1 | `lyng-js-vm-dsl` proc-macro crate (parser + layouts + scratch + lowerer) | B1–B5 | DONE |
+| 1 | `lyng-vm-dsl` proc-macro crate (parser + layouts + scratch + lowerer) | B1–B5 | DONE |
 | 2 | Runtime ABI (`LlIntState` + `LlIntRustContext` + `LlIntExitSlot`) | B6–B8 | DONE |
 | 3 | Slow-path bridge (`SlowPathReturn`, `LlIntDispatchState::from_raw`, `sync_from_asm`, `translate_outcome`) | B9–B12 | DONE |
 | 4 | Entry trampoline + `_interpreter_exit` (stub trampoline for DSL-0b; flipped in Phase C) | B13 | DONE |
@@ -43,13 +43,13 @@ The design lists seven exit criteria:
 
 | # | Criterion | Status | Evidence |
 |--:|---|---|---|
-| 1 | `lyng-js-vm-dsl` crate compiles; `llint_handler!` expands real opcodes | ✓ | `cargo build -p lyng-js-vm-dsl` clean. Validation case 1 (B30) expands a real `llint_handler!` and the symbol exists at link time. |
+| 1 | `lyng-vm-dsl` crate compiles; `llint_handler!` expands real opcodes | ✓ | `cargo build -p lyng-vm-dsl` clean. Validation case 1 (B30) expands a real `llint_handler!` and the symbol exists at link time. |
 | 2 | All 9 DSL-0b validation cases pass as committed tests | ✓ (with documented runtime deferrals) | B30, B31, B32, B38 fully runtime-runnable, 14 tests pass. B33–B37 use Path A (link-only / structural verification) with explicit `#[ignore]` markers pointing to runtime enablement in Phase C. |
 | 3 | 5 hot + 5 warm + ~140 cold stubs exist; populate `DSL_DISPATCH_TABLE` | ✓ | 5 hot in `dsl/handlers/hot.rs`, 7 warm in `dsl/handlers/warm.rs`, 140 cold in generated `dsl/handlers/cold.rs`. `DSL_DISPATCH_TABLE` fully populated via `const fn build_dispatch_table()` in `dsl/handlers/mod.rs`. |
 | 4 | FeedbackVector flat-array refactor lands without regressing IC fast-path behavior | ✓ | `feedback_flat_consistency` tests pass (3 cases: SMI-add, polymorphic property access, cold-install). V8 v7 with dual-write enabled: all 6 benches within ±5% of pre-DSL-0 baseline (see `dsl-0b-fv-refactor-v8.md`). |
 | 5 | Manifest entries' `dsl_handler_symbol` strings name real DSL symbols | ✓ | 12 hot/warm entries updated to point to real handler symbols. 140 cold entries point to generated symbols. Linker-resolution (Test 3 / Test 5) lands in Phase C. |
-| 6 | `cargo build --release -p lyng-js-vm` is clean | ✓ | Verified at multiple commit boundaries. No new warnings beyond pre-existing α-side. |
-| 7 | `cargo test -p lyng-js-vm` passes (α is still active; DSL handlers are dead code) | ✓ | Cross-crate: **1826 passed, 7 ignored**. The 7 ignored are: 1 pre-existing doctest + 5 deferred validation cases (B33–B37) + 1 from feedback_flat consistency (cold-install edge). |
+| 6 | `cargo build --release -p lyng-vm` is clean | ✓ | Verified at multiple commit boundaries. No new warnings beyond pre-existing α-side. |
+| 7 | `cargo test -p lyng-vm` passes (α is still active; DSL handlers are dead code) | ✓ | Cross-crate: **1826 passed, 7 ignored**. The 7 ignored are: 1 pre-existing doctest + 5 deferred validation cases (B33–B37) + 1 from feedback_flat consistency (cold-install edge). |
 
 ## 3. V8 v7 evidence
 
@@ -64,7 +64,7 @@ DSL-0b improved V8 v7 across all 6 benchmarks (α path still active; gains come 
 | NavierStokes | 457 | 478 | 477 | **+4.4%** |
 | Splay | 1342 | 1488 | 1477 | **+10.1%** |
 
-Reports: `reports/js/lyng-js/dsl-0b-v8.md` + `dsl-0b-v8.json`.
+Reports: `reports/lyng/dsl-0b-v8.md` + `dsl-0b-v8.json`.
 
 **Geomean directionally positive** even though the DSL substrate is dead code in DSL-0b. Phase C (active DSL dispatch) is expected to extend this further on the 5 hot ports.
 
@@ -79,33 +79,33 @@ Reports: `reports/js/lyng-js/dsl-0b-v8.md` + `dsl-0b-v8.json`.
 
 DSL-0a temporarily improved one staging-category file from fail to pass (likely due to a timing window the macro-driven α thinning happened to widen). DSL-0b's substrate work re-narrowed it. **Pre-flight 7 baseline (49728) is preserved**, matching the DSL-0b exit criterion. The DSL-0a-temporary improvement was a happy accident, not a target.
 
-Report: `reports/js/lyng-js/dsl-0b-test262.md`.
+Report: `reports/lyng/dsl-0b-test262.md`.
 
 ## 5. Architectural artifacts produced
 
 ### Files created
 
-- `crates/lyng-js-vm-dsl/` — proc-macro crate (394 lines across 5 source files + Cargo.toml)
-- `crates/lyng-js/vm/src/dsl/llint_state.rs` — `LlIntState` repr(C) + `LlIntRustContext` + offset-generation tests
-- `crates/lyng-js/vm/src/dsl/reg_convention.rs` — pinned-register conventions + const field offsets
-- `crates/lyng-js/vm/src/dsl/entry.rs` — `run_via_dsl` + `_interpreter_exit` (stub trampoline)
-- `crates/lyng-js/vm/src/dsl/poll.rs` — same-thread `poll_pending` consumer (no-op stub for DSL-0b; real GC/debugger integration is post-Phase-C)
-- `crates/lyng-js/vm/src/dsl/feedback_flat.rs` — `FeedbackEntry` layout
-- `crates/lyng-js/vm/src/dsl/handlers/{mod,hot,warm,cold}.rs` — DSL handler bodies
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/{prelude,operands,values,objects,arithmetic,control,feedback,safepoint,memory,counters}.rs` — 63 macro_rules! ops
-- `crates/lyng-js/vm/src/dsl/test_helpers.rs` — `DslHarness` shared validation-case fixture
-- `tools/lyng-js-dsl-codegen/` — cold-stub generator (~2400-line metadata table + emitter)
-- `reports/js/lyng-js/dsl-handlers/op_*.md` — 12 per-handler ported reports
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_*.asm` — 9 asm baselines for new DSL handlers
+- `crates/lyng/vm-dsl/` — proc-macro crate (394 lines across 5 source files + Cargo.toml)
+- `crates/lyng/vm/src/dsl/llint_state.rs` — `LlIntState` repr(C) + `LlIntRustContext` + offset-generation tests
+- `crates/lyng/vm/src/dsl/reg_convention.rs` — pinned-register conventions + const field offsets
+- `crates/lyng/vm/src/dsl/entry.rs` — `run_via_dsl` + `_interpreter_exit` (stub trampoline)
+- `crates/lyng/vm/src/dsl/poll.rs` — same-thread `poll_pending` consumer (no-op stub for DSL-0b; real GC/debugger integration is post-Phase-C)
+- `crates/lyng/vm/src/dsl/feedback_flat.rs` — `FeedbackEntry` layout
+- `crates/lyng/vm/src/dsl/handlers/{mod,hot,warm,cold}.rs` — DSL handler bodies
+- `crates/lyng/vm/src/dsl/backend/aarch64/{prelude,operands,values,objects,arithmetic,control,feedback,safepoint,memory,counters}.rs` — 63 macro_rules! ops
+- `crates/lyng/vm/src/dsl/test_helpers.rs` — `DslHarness` shared validation-case fixture
+- `tools/lyng-dsl-codegen/` — cold-stub generator (~2400-line metadata table + emitter)
+- `reports/lyng/dsl-handlers/op_*.md` — 12 per-handler ported reports
+- `reports/lyng/dsl-asm-baseline-aarch64/op_*.asm` — 9 asm baselines for new DSL handlers
 
 ### Files modified
 
-- `crates/lyng-js/vm/src/dsl/opcode_manifest.rs` — `OpcodeCategory` updates for 12 hot/warm + 140 cold entries
-- `crates/lyng-js/vm/src/dsl/slow_path.rs` — `LlIntDispatchInner::Asm` variant + `from_raw` + `sync_from_asm` + `translate_outcome` + `dsl_cold_shim!` macro
-- `crates/lyng-js/vm/src/vm/feedback.rs` — dual-write from `record_*` paths to flat-array storage
-- `crates/lyng-js/vm/src/vm/install.rs` — eager flat-array allocation at install
-- `crates/lyng-js/vm/src/vm.rs` — `Vm::run_via_dsl` wrapper (not yet active) + `feedback_flat_storage` sibling map
-- `crates/lyng-js/vm/src/error.rs` — `VmError::TrampolineExitedWithoutSetting`, `VmError::DoublePrefix` (latter from DSL-0a)
+- `crates/lyng/vm/src/dsl/opcode_manifest.rs` — `OpcodeCategory` updates for 12 hot/warm + 140 cold entries
+- `crates/lyng/vm/src/dsl/slow_path.rs` — `LlIntDispatchInner::Asm` variant + `from_raw` + `sync_from_asm` + `translate_outcome` + `dsl_cold_shim!` macro
+- `crates/lyng/vm/src/vm/feedback.rs` — dual-write from `record_*` paths to flat-array storage
+- `crates/lyng/vm/src/vm/install.rs` — eager flat-array allocation at install
+- `crates/lyng/vm/src/vm.rs` — `Vm::run_via_dsl` wrapper (not yet active) + `feedback_flat_storage` sibling map
+- `crates/lyng/vm/src/error.rs` — `VmError::TrampolineExitedWithoutSetting`, `VmError::DoublePrefix` (latter from DSL-0a)
 - Various visibility widenings for cross-module access (`pub(crate)` adjustments to `InstalledFunction`, `FeedbackSiteState`, etc.)
 
 ## 6. Concerns and deviations
@@ -151,7 +151,7 @@ Phase C is the final DSL-0 phase:
 - **C9–C11**: enable manifest Tests 3, 5, 6, 7.
 - **C12–C13**: DSL-0 decision document + exit gate.
 
-DSL-0b dcat ticket (`lyng-4oak`) and 50 sub-tickets are in `in_review` awaiting user approval to close. Per `crates/lyng-js/AGENTS.md`: tickets NEVER close without explicit user approval.
+DSL-0b dcat ticket (`lyng-4oak`) and 50 sub-tickets are in `in_review` awaiting user approval to close. Per `crates/lyng/AGENTS.md`: tickets NEVER close without explicit user approval.
 
 ## 9. Status
 

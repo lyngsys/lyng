@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::{Agent, Runtime};
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_gc::PrimitiveStringView;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_ops::errors;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::{EmbeddingFunctionId, PropertyKey, Value};
-use lyng_js_vm::{
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::{Agent, Runtime};
+use lyng_gc::AllocationLifetime;
+use lyng_gc::PrimitiveStringView;
+use lyng_host::NoopHostHooks;
+use lyng_ops::errors;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::{EmbeddingFunctionId, PropertyKey, Value};
+use lyng_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, SharedRealmExtensionProvider, Vm, VmError,
 };
@@ -28,7 +28,7 @@ fn embedding_create_realm_entry() -> EmbeddingFunctionId {
         .expect("embedding function ids should stay non-zero")
 }
 
-fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_js_bytecode::CompiledScriptUnit {
+fn compile_unit(source: &str, atoms: &mut AtomTable) -> lyng_bytecode::CompiledScriptUnit {
     let parsed = parse_script(atoms, SourceId::new(0), source);
     assert!(
         !parsed.diagnostics.has_errors(),

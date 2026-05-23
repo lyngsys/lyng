@@ -1,4 +1,4 @@
-__ZN10lyng_js_vm2vm17dispatch_handlers10arithmetic10op_bit_and17h5b310fbcff76e749E:
+__ZN10lyng_vm2vm17dispatch_handlers10arithmetic10op_bit_and17h5b310fbcff76e749E:
 L0:
 	.loc	178 673 0
 	sub	sp, sp, #160
@@ -120,7 +120,7 @@ L38:
 	mov	x1, x21
 	ldr	w2, [sp, #12]
 	mov	x6, x23
-	bl	__ZN10lyng_js_vm2vm17dispatch_handlers10arithmetic15op_bit_and_slow17hf68b0ea063983066E
+	bl	__ZN10lyng_vm2vm17dispatch_handlers10arithmetic15op_bit_and_slow17hf68b0ea063983066E
 L39:
 L40:
 	b	L41
@@ -158,7 +158,7 @@ L49:
 	.loc	178 688 18
 	mov	x0, x24
 	mov	x2, x5
-	bl	__ZN10lyng_js_vm2vm8feedback36_$LT$impl$u20$lyng_js_vm..vm..Vm$GT$20record_feedback_slot17h9062948f4dbd3d29E
+	bl	__ZN10lyng_vm2vm8feedback36_$LT$impl$u20$lyng_vm..vm..Vm$GT$20record_feedback_slot17h9062948f4dbd3d29E
 L50:
 L51:
 	.loc	178 691 69
@@ -191,10 +191,10 @@ L59:
 L60:
 	.loc	1 244 13
 L61:
-	adrp	x9, __ZN10lyng_js_vm2vm14dispatch_state14DISPATCH_TABL62@PAGE
+	adrp	x9, __ZN10lyng_vm2vm14dispatch_state14DISPATCH_TABL62@PAGE
 L63:
 L64:
-	add	x9, x9, __ZN10lyng_js_vm2vm14dispatch_state14DISPATCH_TABL62@PAGEOFF
+	add	x9, x9, __ZN10lyng_vm2vm14dispatch_state14DISPATCH_TABL62@PAGEOFF
 	ldr	x8, [x9, x8, lsl #3]
 	mov	x9, #33
 	movk	x9, #32768, lsl #48
@@ -229,7 +229,7 @@ L74:
 	mov	w3, #1
 	mov	x22, x4
 	mov	x5, x20
-	bl	__ZN10lyng_js_vm2vm8dispatch24decode_abc_operands_wide17he457cb4163a94953E
+	bl	__ZN10lyng_vm2vm8dispatch24decode_abc_operands_wide17he457cb4163a94953E
 L75:
 	.loc	178 677 63
 	ldr	x8, [sp, #16]

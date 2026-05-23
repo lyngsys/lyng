@@ -1,4 +1,4 @@
-lyng_js_vm::dsl::handlers::cold::op_load_one_dsl:
+lyng_vm::dsl::handlers::cold::op_load_one_dsl:
 	; len=4 pc=0 pb=8 regs=16 fv=24 prefix=48 poll=1680 fb_stride=6 fb_observed=0 exit=__interpreter_exit
 	ldrb	w9, [x19, #1]              ; decode a (byte at PC+1)
 	ldrh	w10, [x19, #2]             ; decode _bx (unused; LLVM kept the load)

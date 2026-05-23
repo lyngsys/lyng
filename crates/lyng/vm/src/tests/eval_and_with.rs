@@ -126,9 +126,9 @@ fn direct_eval_string_comparison_source_lowers_to_dynamic_name_lookup() {
     for record in sema.use_sites.as_mut_slice() {
         if matches!(
             record.resolution_kind,
-            lyng_js_sema::ResolutionKind::Global | lyng_js_sema::ResolutionKind::Unresolved
+            lyng_sema::ResolutionKind::Global | lyng_sema::ResolutionKind::Unresolved
         ) {
-            record.resolution_kind = lyng_js_sema::ResolutionKind::Dynamic;
+            record.resolution_kind = lyng_sema::ResolutionKind::Dynamic;
         }
     }
 
@@ -1552,7 +1552,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
     let Some(FunctionEntryIdentity::Bytecode(code)) = agent
         .objects()
         .function_data(function_object)
-        .and_then(lyng_js_objects::FunctionObjectData::entry)
+        .and_then(lyng_objects::FunctionObjectData::entry)
     else {
         panic!("function expression should remain backed by installed bytecode");
     };
@@ -1562,7 +1562,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
     let environment = agent
         .objects()
         .function_data(function_object)
-        .and_then(lyng_js_objects::FunctionObjectData::environment)
+        .and_then(lyng_objects::FunctionObjectData::environment)
         .expect("function expression closure should preserve its outer environment");
 
     let closure_result = vm

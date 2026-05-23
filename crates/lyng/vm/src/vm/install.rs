@@ -3,11 +3,11 @@ use super::{
     BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
     RealmRef, TieringState, Value, Vm, VmError, VmResult,
 };
-use lyng_js_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
-use lyng_js_env::{
+use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
+use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };
-use lyng_js_gc::{CodeHandleStoreTarget, RuntimeCodeRecord, ValueStoreTarget};
+use lyng_gc::{CodeHandleStoreTarget, RuntimeCodeRecord, ValueStoreTarget};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,9 +15,9 @@ pub(crate) struct InstalledFunction {
     pub(super) function: BytecodeFunction,
     pub(super) child_codes: Vec<CodeRef>,
     canonical_atoms: Arc<[Option<AtomId>]>,
-    direct_eval_lexical_sites: Vec<lyng_js_bytecode::DirectEvalLexicalSite>,
-    loop_iteration_sites: Vec<lyng_js_bytecode::LoopIterationEnvironmentSite>,
-    feedback_sites_by_slot: Vec<Option<lyng_js_bytecode::FeedbackSiteDescriptor>>,
+    direct_eval_lexical_sites: Vec<lyng_bytecode::DirectEvalLexicalSite>,
+    loop_iteration_sites: Vec<lyng_bytecode::LoopIterationEnvironmentSite>,
+    feedback_sites_by_slot: Vec<Option<lyng_bytecode::FeedbackSiteDescriptor>>,
 }
 
 impl InstalledFunction {
@@ -88,8 +88,8 @@ impl InstalledFunction {
 
     pub(crate) fn feedback_descriptor_for_slot(
         &self,
-        slot: lyng_js_types::FeedbackSlotId,
-    ) -> Option<lyng_js_bytecode::FeedbackSiteDescriptor> {
+        slot: lyng_types::FeedbackSlotId,
+    ) -> Option<lyng_bytecode::FeedbackSiteDescriptor> {
         self.feedback_sites_by_slot
             .get(usize::try_from(slot.get().saturating_sub(1)).ok()?)
             .copied()
@@ -100,11 +100,11 @@ impl InstalledFunction {
     pub(in crate::vm) fn loop_iteration_environment_site(
         &self,
         instruction_offset: u32,
-    ) -> Option<&lyng_js_bytecode::LoopIterationEnvironmentSite> {
+    ) -> Option<&lyng_bytecode::LoopIterationEnvironmentSite> {
         self.loop_iteration_sites
             .binary_search_by_key(
                 &instruction_offset,
-                lyng_js_bytecode::LoopIterationEnvironmentSite::instruction_offset,
+                lyng_bytecode::LoopIterationEnvironmentSite::instruction_offset,
             )
             .ok()
             .and_then(|index| self.loop_iteration_sites.get(index))
@@ -114,11 +114,11 @@ impl InstalledFunction {
     pub(super) fn direct_eval_lexical_site(
         &self,
         instruction_offset: u32,
-    ) -> Option<&lyng_js_bytecode::DirectEvalLexicalSite> {
+    ) -> Option<&lyng_bytecode::DirectEvalLexicalSite> {
         self.direct_eval_lexical_sites
             .binary_search_by_key(
                 &instruction_offset,
-                lyng_js_bytecode::DirectEvalLexicalSite::instruction_offset,
+                lyng_bytecode::DirectEvalLexicalSite::instruction_offset,
             )
             .ok()
             .and_then(|index| self.direct_eval_lexical_sites.get(index))
@@ -127,7 +127,7 @@ impl InstalledFunction {
     #[inline]
     pub(super) fn feedback_slot_descriptors(
         &self,
-    ) -> &[Option<lyng_js_bytecode::FeedbackSiteDescriptor>] {
+    ) -> &[Option<lyng_bytecode::FeedbackSiteDescriptor>] {
         &self.feedback_sites_by_slot
     }
 
@@ -135,7 +135,7 @@ impl InstalledFunction {
     pub(super) fn source_map_entry(
         &self,
         instruction_offset: u32,
-    ) -> Option<lyng_js_bytecode::SourceMapEntry> {
+    ) -> Option<lyng_bytecode::SourceMapEntry> {
         self.function.source_map_entry_at(instruction_offset)
     }
 
@@ -143,7 +143,7 @@ impl InstalledFunction {
     pub(super) fn safepoint(
         &self,
         instruction_offset: u32,
-    ) -> Option<lyng_js_bytecode::SafepointDescriptor> {
+    ) -> Option<lyng_bytecode::SafepointDescriptor> {
         self.function.safepoint_at(instruction_offset)
     }
 
@@ -151,7 +151,7 @@ impl InstalledFunction {
     pub(super) fn safepoint_by_id(
         &self,
         safepoint_id: u32,
-    ) -> Option<lyng_js_bytecode::SafepointDescriptor> {
+    ) -> Option<lyng_bytecode::SafepointDescriptor> {
         self.function.safepoint_by_id(safepoint_id)
     }
 
@@ -159,7 +159,7 @@ impl InstalledFunction {
     pub(super) fn deopt_snapshot(
         &self,
         safepoint_id: u32,
-    ) -> Option<&lyng_js_bytecode::DeoptSnapshot> {
+    ) -> Option<&lyng_bytecode::DeoptSnapshot> {
         self.function.deopt_snapshot_for_safepoint(safepoint_id)
     }
 
@@ -179,21 +179,21 @@ impl InstalledFunction {
 }
 
 fn canonical_direct_eval_site(
-    site: &lyng_js_bytecode::DirectEvalLexicalSite,
+    site: &lyng_bytecode::DirectEvalLexicalSite,
     canonical_atoms: &[Option<AtomId>],
-) -> lyng_js_bytecode::DirectEvalLexicalSite {
+) -> lyng_bytecode::DirectEvalLexicalSite {
     let canonical_scopes = site
         .scopes()
         .iter()
         .map(|scope| {
-            let canonical_scope = lyng_js_bytecode::DirectEvalLexicalScope::new(
+            let canonical_scope = lyng_bytecode::DirectEvalLexicalScope::new(
                 scope.source_base(),
                 scope
                     .bindings()
                     .iter()
                     .copied()
                     .map(|binding| {
-                        lyng_js_bytecode::BytecodeEnvironmentBinding::new(
+                        lyng_bytecode::BytecodeEnvironmentBinding::new(
                             binding
                                 .name()
                                 .map(|atom| canonical_atom(canonical_atoms, atom)),
@@ -221,7 +221,7 @@ fn canonical_direct_eval_site(
         .copied()
         .map(|name| canonical_atom(canonical_atoms, name))
         .collect::<Vec<_>>();
-    lyng_js_bytecode::DirectEvalLexicalSite::new(
+    lyng_bytecode::DirectEvalLexicalSite::new(
         site.instruction_offset(),
         canonical_scopes,
         site.flags(),
@@ -262,7 +262,10 @@ fn validate_instruction_registers(
     instruction: Instruction,
 ) -> VmResult<()> {
     match instruction {
-        Instruction::Abc { opcode, a, b, c } | Instruction::AbcSlot { opcode, a, b, c, .. } => match opcode {
+        Instruction::Abc { opcode, a, b, c }
+        | Instruction::AbcSlot {
+            opcode, a, b, c, ..
+        } => match opcode {
             Opcode::Move
             | Opcode::Ldar
             | Opcode::Negate
@@ -635,7 +638,7 @@ impl Vm {
                         .collect::<Vec<_>>()
                 };
                 let layout_kind = match function.kind() {
-                    lyng_js_bytecode::BytecodeFunctionKind::Module => EnvironmentLayoutKind::Module,
+                    lyng_bytecode::BytecodeFunctionKind::Module => EnvironmentLayoutKind::Module,
                     _ => EnvironmentLayoutKind::Function,
                 };
                 let layout = agent.alloc_environment_layout(EnvironmentLayout::new(
@@ -643,7 +646,7 @@ impl Vm {
                     bindings,
                     true,
                 ));
-                let layout = lyng_js_bytecode::EnvironmentLayoutRef::from_raw(layout.get());
+                let layout = lyng_bytecode::EnvironmentLayoutRef::from_raw(layout.get());
                 function
                     .clone()
                     .with_environment_layout(layout)
@@ -719,7 +722,7 @@ impl Vm {
         constants: &[ConstantValue],
         compiled_atoms_by_id: &[Option<&CompiledAtom>],
         canonical_atoms: &[Option<AtomId>],
-    ) -> Option<lyng_js_gc::CodeSlotsRef> {
+    ) -> Option<lyng_gc::CodeSlotsRef> {
         if constants.is_empty() {
             return None;
         }
@@ -769,11 +772,12 @@ impl Vm {
         // mirror the legacy `Vec<Option<FeedbackSiteState>>`. Storage
         // is pointer-stable thereafter — the slow path never grows it.
         if self.feedback_flat_storage.len() <= index {
-            self.feedback_flat_storage
-                .resize_with(index + 1, || Vec::<crate::dsl::feedback_flat::FeedbackEntry>::new().into_boxed_slice());
+            self.feedback_flat_storage.resize_with(index + 1, || {
+                Vec::<crate::dsl::feedback_flat::FeedbackEntry>::new().into_boxed_slice()
+            });
         }
-        let slot_count = usize::try_from(installed.function.feedback_slot_count())
-            .unwrap_or(usize::MAX);
+        let slot_count =
+            usize::try_from(installed.function.feedback_slot_count()).unwrap_or(usize::MAX);
         let flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]> = (0..slot_count)
             .map(|_| crate::dsl::feedback_flat::FeedbackEntry::default())
             .collect::<Vec<_>>()
@@ -788,11 +792,11 @@ impl Vm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_bytecode::{
+    use lyng_bytecode::{
         ArgumentsMode, DeoptFrameValue, DeoptSnapshot, DeoptValueSource, Instruction, Opcode,
         SafepointDescriptor, SafepointKind, SourceMapEntry,
     };
-    use lyng_js_common::SourceId;
+    use lyng_common::SourceId;
 
     #[test]
     fn sparse_cold_metadata_indexes_do_not_scale_with_instruction_count() {

@@ -52,7 +52,7 @@ fn async_function_call_returns_a_promise_and_fulfills_after_await() {
         .promise_record(promise)
         .expect("async function promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(41));
 }
 
@@ -80,7 +80,7 @@ fn async_function_call_rejects_the_returned_promise_on_await_rejection() {
         .promise_record(promise)
         .expect("async function promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Rejected);
+    assert_eq!(record.state(), lyng_env::PromiseState::Rejected);
     assert_eq!(record.result(), Value::from_smi(99));
 }
 
@@ -130,7 +130,7 @@ fn async_function_constructor_compiles_dynamic_async_bodies() {
         .promise_record(promise)
         .expect("dynamic AsyncFunction promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(5));
 }
 
@@ -176,7 +176,7 @@ fn for_await_of_consumes_async_iterators() {
         .promise_record(promise)
         .expect("for await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -208,7 +208,7 @@ fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
         .promise_record(promise)
         .expect("for await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -264,7 +264,7 @@ fn for_await_of_sync_iterator_preserves_async_from_sync_tick_order() {
         .map(|view| decode_string(&view))
         .expect("for await log should be a string");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(
         actual,
         "pre,constructor,constructor,tick 1,tick 2,loop,constructor,tick 3,tick 4,post"
@@ -317,7 +317,7 @@ fn for_await_of_break_rejects_when_async_close_rejects() {
         .expect("for await promise should remain tracked")
         .result();
 
-    assert_eq!(state, lyng_js_env::PromiseState::Rejected);
+    assert_eq!(state, lyng_env::PromiseState::Rejected);
     let reason = promise_result
         .as_object_ref()
         .expect("async iterator close rejection should reject with an error object");
@@ -379,7 +379,7 @@ fn for_await_of_return_closes_wrapped_sync_iterators_and_awaits_return_value() {
         .promise_record(promise)
         .expect("for await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(11));
 }
 
@@ -422,7 +422,7 @@ fn for_await_of_return_preserves_value_with_async_iterator_close() {
         .promise_record(promise)
         .expect("for await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(1));
 }
 
@@ -470,7 +470,7 @@ fn for_await_of_return_preserves_value_with_sync_wrapper_close_without_await() {
         .promise_record(promise)
         .expect("for await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(1));
 }
 
@@ -509,7 +509,7 @@ fn async_generator_next_returns_a_promise_for_iterator_results() {
         .promise_record(promise)
         .expect("async generator promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -541,7 +541,7 @@ fn async_generator_yield_unwraps_promises_before_resolving_next() {
         .promise_record(promise)
         .expect("async generator promise-yield promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(7));
 }
 
@@ -577,7 +577,7 @@ fn async_generator_awaits_within_the_body_before_settling_next_requests() {
         .promise_record(promise)
         .expect("async generator await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -621,7 +621,7 @@ fn async_generator_yield_star_uses_async_iterator_hint() {
         .promise_record(promise)
         .expect("async generator yield-star promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(1));
 }
 
@@ -685,7 +685,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
     let record = agent
         .promise_record(promise)
         .expect("async generator delegated yield-star promise should remain tracked");
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     let text = record
         .result()
         .as_string_ref()
@@ -742,7 +742,7 @@ fn async_generator_yield_star_missing_return_method_awaits_return_value() {
         .promise_record(promise)
         .expect("async generator return-value await promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(3));
 }
 
@@ -1138,7 +1138,7 @@ fn async_iterator_prototype_async_dispose_rejects_when_return_throws() {
         .promise_record(promise)
         .expect("async dispose rejection chain should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1179,7 +1179,7 @@ fn async_generator_function_constructor_compiles_dynamic_async_generator_bodies(
         .promise_record(promise)
         .expect("dynamic async generator promise should remain tracked");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_smi(15));
 }
 

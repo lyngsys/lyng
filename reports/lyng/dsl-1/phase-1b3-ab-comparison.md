@@ -130,10 +130,10 @@ rather than composed from these same-load deltas.
 
 ## Methodology notes
 
-- Bench command: `cargo run --release -p lyng-js-bench -- v8suite
+- Bench command: `cargo run --release -p lyng-bench -- v8suite
   --samples 11 --json /tmp/phase-1b3-ab-{base,post}.json`.
 - Median computed by the bench tool (per
-  `tools/lyng-js-bench/src/v8suite/mod.rs`).
+  `tools/lyng-bench/src/v8suite/mod.rs`).
 - `bench-v8.md` (the markdown report side-effect) was restored after
   each measurement; only the JSON artifacts are kept for the per-sample
   arrays.

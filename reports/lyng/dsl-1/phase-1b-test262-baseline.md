@@ -5,7 +5,7 @@
 observable runtime behavior identical to `7baf5846` since all
 cleanup-batch commits between `7baf5846` and `78e25a6b` are
 test/doc-only).
-**Run command:** `cargo run --release -p lyng-js-test262 -- --report
+**Run command:** `cargo run --release -p lyng-test262 -- --report
 /tmp/phase-1b-test262-baseline.md`
 **Duration:** 69.7s wall-clock (12 threads — runner auto-detects
 hardware concurrency; the historical pre-DSL-0 baseline used 4 jobs
@@ -84,7 +84,7 @@ now closes the loophole identified in the post-1.B.2 audit.
 
 3324 files in `testdata/test262/test/intl402/` are skipped via the
 checked-in manifest rule at
-[`reports/js/lyng-js/test262-exclusions.txt`](../test262-exclusions.txt).
+[`reports/lyng/test262-exclusions.txt`](../test262-exclusions.txt).
 Reason: ECMA-402 Intl is out of scope for the active ECMA-262
 conformance sweep. This is the same skip pattern present in the
 pre-DSL-0 baseline; not Phase-1.B-introduced.

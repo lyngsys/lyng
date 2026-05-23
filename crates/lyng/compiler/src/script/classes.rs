@@ -15,7 +15,7 @@ use super::{
     SafepointKind, ScopeId, ScopeKind, SemanticBindingId, Span, StmtId, StorageClass, ThisMode,
     WellKnownAtom,
 };
-use lyng_js_types::{
+use lyng_types::{
     internal_construct_super_array_like_builtin, internal_require_constructor_builtin,
 };
 
@@ -47,7 +47,7 @@ enum PendingStaticClassElement {
 }
 
 struct PrivateElementDescriptorLookup {
-    by_name_and_kind: HashMap<(AtomId, lyng_js_sema::ClassPrivateElementKind), (u32, Span)>,
+    by_name_and_kind: HashMap<(AtomId, lyng_sema::ClassPrivateElementKind), (u32, Span)>,
 }
 
 #[derive(Clone, Copy)]
@@ -88,11 +88,11 @@ impl PrivateElementInitializerScratch {
     }
 }
 
-fn numeric_property_name_text(value: lyng_js_ast::NumericLiteral) -> String {
+fn numeric_property_name_text(value: lyng_ast::NumericLiteral) -> String {
     match value {
-        lyng_js_ast::NumericLiteral::Int32(number) => number.to_string(),
-        lyng_js_ast::NumericLiteral::Number(0.0) => "0".to_string(),
-        lyng_js_ast::NumericLiteral::Number(number) => number.to_string(),
+        lyng_ast::NumericLiteral::Int32(number) => number.to_string(),
+        lyng_ast::NumericLiteral::Number(0.0) => "0".to_string(),
+        lyng_ast::NumericLiteral::Number(number) => number.to_string(),
     }
 }
 
@@ -149,7 +149,7 @@ fn radix_digits_to_decimal(digits: &str, radix: u32) -> String {
 }
 
 impl PrivateElementDescriptorLookup {
-    fn from_layout(layout: &lyng_js_sema::ClassPrivateLayoutRecord) -> Self {
+    fn from_layout(layout: &lyng_sema::ClassPrivateLayoutRecord) -> Self {
         let mut by_name_and_kind = HashMap::with_capacity(layout.entries().len());
         for (index, entry) in layout.entries().iter().copied().enumerate() {
             by_name_and_kind
@@ -164,11 +164,7 @@ impl PrivateElementDescriptorLookup {
         Self { by_name_and_kind }
     }
 
-    fn get(
-        &self,
-        name: AtomId,
-        kind: lyng_js_sema::ClassPrivateElementKind,
-    ) -> Option<(u32, Span)> {
+    fn get(&self, name: AtomId, kind: lyng_sema::ClassPrivateElementKind) -> Option<(u32, Span)> {
         self.by_name_and_kind.get(&(name, kind)).copied()
     }
 }
@@ -179,7 +175,7 @@ impl FunctionCompiler<'_, '_> {
         expr_id: ExprId,
         name: Option<AtomId>,
         super_class: Option<ExprId>,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let class_span = self.ast().get_expr(expr_id).span();
@@ -197,7 +193,7 @@ impl FunctionCompiler<'_, '_> {
         decl_id: DeclId,
         name: Option<AtomId>,
         super_class: Option<ExprId>,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     ) -> LoweringResult<()> {
         let name = name.ok_or(LoweringError::UnsupportedDeclaration { decl: decl_id })?;
         let binding_id = self.class_declaration_binding(name)?;
@@ -215,7 +211,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         name: Option<AtomId>,
         super_class: Option<ExprId>,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         class_span: Span,
         dest: u16,
     ) -> LoweringResult<()> {
@@ -252,7 +248,7 @@ impl FunctionCompiler<'_, '_> {
             .iter()
             .filter_map(
                 |element_id| match self.ast().get_class_element(*element_id) {
-                    lyng_js_ast::ClassElement::Method {
+                    lyng_ast::ClassElement::Method {
                         key,
                         kind,
                         private: true,
@@ -263,15 +259,15 @@ impl FunctionCompiler<'_, '_> {
                             Some(ClassInstanceElementPlan::PrivateElement {
                                 name: *name,
                                 kind: match kind {
-                                    lyng_js_ast::MethodKind::Method
-                                    | lyng_js_ast::MethodKind::Constructor => {
-                                        lyng_js_sema::ClassPrivateElementKind::Method
+                                    lyng_ast::MethodKind::Method
+                                    | lyng_ast::MethodKind::Constructor => {
+                                        lyng_sema::ClassPrivateElementKind::Method
                                     }
-                                    lyng_js_ast::MethodKind::Get => {
-                                        lyng_js_sema::ClassPrivateElementKind::Getter
+                                    lyng_ast::MethodKind::Get => {
+                                        lyng_sema::ClassPrivateElementKind::Getter
                                     }
-                                    lyng_js_ast::MethodKind::Set => {
-                                        lyng_js_sema::ClassPrivateElementKind::Setter
+                                    lyng_ast::MethodKind::Set => {
+                                        lyng_sema::ClassPrivateElementKind::Setter
                                     }
                                 },
                                 value: None,
@@ -279,7 +275,7 @@ impl FunctionCompiler<'_, '_> {
                         }
                         _ => None,
                     },
-                    lyng_js_ast::ClassElement::Property {
+                    lyng_ast::ClassElement::Property {
                         key,
                         value,
                         computed,
@@ -306,12 +302,12 @@ impl FunctionCompiler<'_, '_> {
                         |backing_name| {
                             Some(ClassInstanceElementPlan::PrivateElement {
                                 name: backing_name,
-                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                                kind: lyng_sema::ClassPrivateElementKind::Field,
                                 value: *value,
                             })
                         },
                     ),
-                    lyng_js_ast::ClassElement::Property {
+                    lyng_ast::ClassElement::Property {
                         key,
                         value,
                         private: true,
@@ -321,7 +317,7 @@ impl FunctionCompiler<'_, '_> {
                         Expr::Identifier { name, .. } => {
                             Some(ClassInstanceElementPlan::PrivateElement {
                                 name: *name,
-                                kind: lyng_js_sema::ClassPrivateElementKind::Field,
+                                kind: lyng_sema::ClassPrivateElementKind::Field,
                                 value: *value,
                             })
                         }
@@ -385,7 +381,7 @@ impl FunctionCompiler<'_, '_> {
         let mut pending_static_elements = Vec::new();
         for element_id in elements {
             match self.ast().get_class_element(element_id).clone() {
-                lyng_js_ast::ClassElement::Method {
+                lyng_ast::ClassElement::Method {
                     kind,
                     key,
                     value,
@@ -394,7 +390,7 @@ impl FunctionCompiler<'_, '_> {
                     span,
                     ..
                 } => {
-                    if kind == lyng_js_ast::MethodKind::Constructor {
+                    if kind == lyng_ast::MethodKind::Constructor {
                         self.skip_class_body_function_scope(body);
                         continue;
                     }
@@ -417,15 +413,11 @@ impl FunctionCompiler<'_, '_> {
                     self.bind_function_home_object(method, home_object, span)?;
                     self.bind_function_private_env(method, span)?;
                     let private_kind = match kind {
-                        lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
-                            lyng_js_sema::ClassPrivateElementKind::Method
+                        lyng_ast::MethodKind::Method | lyng_ast::MethodKind::Constructor => {
+                            lyng_sema::ClassPrivateElementKind::Method
                         }
-                        lyng_js_ast::MethodKind::Get => {
-                            lyng_js_sema::ClassPrivateElementKind::Getter
-                        }
-                        lyng_js_ast::MethodKind::Set => {
-                            lyng_js_sema::ClassPrivateElementKind::Setter
-                        }
+                        lyng_ast::MethodKind::Get => lyng_sema::ClassPrivateElementKind::Getter,
+                        lyng_ast::MethodKind::Set => lyng_sema::ClassPrivateElementKind::Setter,
                     };
                     self.emit_define_private_element_with_scratch(
                         dest,
@@ -458,7 +450,7 @@ impl FunctionCompiler<'_, '_> {
                         )?;
                     }
                 }
-                lyng_js_ast::ClassElement::Method {
+                lyng_ast::ClassElement::Method {
                     kind,
                     key,
                     value,
@@ -467,7 +459,7 @@ impl FunctionCompiler<'_, '_> {
                     r#static,
                     span,
                 } => {
-                    if kind == lyng_js_ast::MethodKind::Constructor {
+                    if kind == lyng_ast::MethodKind::Constructor {
                         self.skip_class_body_function_scope(body);
                         continue;
                     }
@@ -478,7 +470,7 @@ impl FunctionCompiler<'_, '_> {
                     let child_index = self.ensure_child_index(value)?;
                     self.emit_create_closure(method, child_index, span)?;
                     self.skip_class_body_function_scope(body);
-                    if kind == lyng_js_ast::MethodKind::Method
+                    if kind == lyng_ast::MethodKind::Method
                         && let Some(name_register) = name_register
                     {
                         self.emit_set_function_name(method, name_register)?;
@@ -487,31 +479,31 @@ impl FunctionCompiler<'_, '_> {
                     self.bind_function_home_object(method, home_object, span)?;
                     self.bind_function_private_env(method, span)?;
                     match kind {
-                        lyng_js_ast::MethodKind::Method => {
+                        lyng_ast::MethodKind::Method => {
                             self.emit_internal_builtin_call(
                                 internal_define_method_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
                         }
-                        lyng_js_ast::MethodKind::Get => {
+                        lyng_ast::MethodKind::Get => {
                             self.emit_internal_builtin_call(
                                 internal_define_class_getter_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
                         }
-                        lyng_js_ast::MethodKind::Set => {
+                        lyng_ast::MethodKind::Set => {
                             self.emit_internal_builtin_call(
                                 internal_define_class_setter_property_builtin(),
                                 &[target, key_register, method],
                                 span,
                             )?;
                         }
-                        lyng_js_ast::MethodKind::Constructor => unreachable!(),
+                        lyng_ast::MethodKind::Constructor => unreachable!(),
                     }
                 }
-                lyng_js_ast::ClassElement::Property {
+                lyng_ast::ClassElement::Property {
                     key,
                     value,
                     computed,
@@ -525,7 +517,7 @@ impl FunctionCompiler<'_, '_> {
                         prototype,
                         backing_name,
                         r#static,
-                        lyng_js_sema::ClassPrivateElementKind::Field,
+                        lyng_sema::ClassPrivateElementKind::Field,
                         None,
                         span,
                         private_define_scratch
@@ -552,7 +544,7 @@ impl FunctionCompiler<'_, '_> {
                         span,
                     )?;
                 }
-                lyng_js_ast::ClassElement::Property {
+                lyng_ast::ClassElement::Property {
                     key,
                     value,
                     computed,
@@ -574,7 +566,7 @@ impl FunctionCompiler<'_, '_> {
                     next_computed_instance_field_key =
                         next_computed_instance_field_key.saturating_add(1);
                 }
-                lyng_js_ast::ClassElement::Property {
+                lyng_ast::ClassElement::Property {
                     key,
                     value,
                     computed,
@@ -597,7 +589,7 @@ impl FunctionCompiler<'_, '_> {
                             prototype,
                             private_name,
                             true,
-                            lyng_js_sema::ClassPrivateElementKind::Field,
+                            lyng_sema::ClassPrivateElementKind::Field,
                             None,
                             span,
                             private_define_scratch.expect(
@@ -618,7 +610,7 @@ impl FunctionCompiler<'_, '_> {
                         self.skip_class_body_function_scope(body);
                     }
                 }
-                lyng_js_ast::ClassElement::Property {
+                lyng_ast::ClassElement::Property {
                     key,
                     value,
                     private: true,
@@ -639,7 +631,7 @@ impl FunctionCompiler<'_, '_> {
                         prototype,
                         private_name,
                         false,
-                        lyng_js_sema::ClassPrivateElementKind::Field,
+                        lyng_sema::ClassPrivateElementKind::Field,
                         None,
                         span,
                         private_define_scratch
@@ -649,7 +641,7 @@ impl FunctionCompiler<'_, '_> {
                         self.skip_class_body_function_scope(body);
                     }
                 }
-                lyng_js_ast::ClassElement::StaticBlock {
+                lyng_ast::ClassElement::StaticBlock {
                     body: block_body,
                     span,
                 } => {
@@ -660,8 +652,8 @@ impl FunctionCompiler<'_, '_> {
                         scope,
                     });
                 }
-                lyng_js_ast::ClassElement::Property { .. }
-                | lyng_js_ast::ClassElement::InvalidElement { .. } => {}
+                lyng_ast::ClassElement::Property { .. }
+                | lyng_ast::ClassElement::InvalidElement { .. } => {}
             }
         }
         if let (Some(name), Some(binding_id)) = (name, class_self_binding)
@@ -686,9 +678,9 @@ impl FunctionCompiler<'_, '_> {
 
     fn class_layout_for_span(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         class_span: Span,
-    ) -> Option<&lyng_js_sema::ClassPrivateLayoutRecord> {
+    ) -> Option<&lyng_sema::ClassPrivateLayoutRecord> {
         self.state
             .sema
             .class_private_layouts
@@ -698,8 +690,8 @@ impl FunctionCompiler<'_, '_> {
 
     fn active_class_layout(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
-    ) -> Option<&lyng_js_sema::ClassPrivateLayoutRecord> {
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
+    ) -> Option<&lyng_sema::ClassPrivateLayoutRecord> {
         self.active_class_span
             .and_then(|class_span| self.class_layout_for_span(body, class_span))
             .or_else(|| self.state.sema.class_private_layouts.get(body))
@@ -709,17 +701,17 @@ impl FunctionCompiler<'_, '_> {
         let scope = self
             .active_class_body
             .and_then(|body| self.active_class_layout(body))
-            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+            .map(lyng_sema::ClassPrivateLayoutRecord::scope)?;
         self.active_direct_eval_scope(scope).then_some(scope)
     }
 
     fn class_constructor_method(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     ) -> Option<FunctionId> {
         for &element in self.ast().get_class_element_list(body) {
-            if let lyng_js_ast::ClassElement::Method {
-                kind: lyng_js_ast::MethodKind::Constructor,
+            if let lyng_ast::ClassElement::Method {
+                kind: lyng_ast::MethodKind::Constructor,
                 value,
                 ..
             } = self.ast().get_class_element(element)
@@ -734,13 +726,13 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         dest: u16,
         private_name: AtomId,
-        kind: lyng_js_ast::MethodKind,
+        kind: lyng_ast::MethodKind,
     ) -> LoweringResult<()> {
         let raw_name = self.state.atoms.resolve(private_name).to_owned();
         let text = match kind {
-            lyng_js_ast::MethodKind::Get => format!("get #{raw_name}"),
-            lyng_js_ast::MethodKind::Set => format!("set #{raw_name}"),
-            lyng_js_ast::MethodKind::Method | lyng_js_ast::MethodKind::Constructor => {
+            lyng_ast::MethodKind::Get => format!("get #{raw_name}"),
+            lyng_ast::MethodKind::Set => format!("set #{raw_name}"),
+            lyng_ast::MethodKind::Method | lyng_ast::MethodKind::Constructor => {
                 format!("#{raw_name}")
             }
         };
@@ -755,13 +747,13 @@ impl FunctionCompiler<'_, '_> {
 
     fn class_self_binding(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         class_span: Span,
         name: AtomId,
     ) -> Option<SemanticBindingId> {
         let scope = self
             .class_layout_for_span(body, class_span)
-            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+            .map(lyng_sema::ClassPrivateLayoutRecord::scope)?;
         self.state
             .sema
             .binding_table
@@ -821,10 +813,10 @@ impl FunctionCompiler<'_, '_> {
             Expr::Identifier { name, .. } => Some(name),
             Expr::StringLiteral { value, .. } => {
                 match self.ast().literals().get_string_value(value).clone() {
-                    lyng_js_ast::StringLiteralValue::Utf8(text) => {
+                    lyng_ast::StringLiteralValue::Utf8(text) => {
                         Some(self.state.atoms.intern(&text))
                     }
-                    lyng_js_ast::StringLiteralValue::Utf16(units) => {
+                    lyng_ast::StringLiteralValue::Utf16(units) => {
                         Some(self.state.atoms.intern_utf16(&units))
                     }
                 }
@@ -872,7 +864,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         class_object: u16,
         prototype: u16,
-        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        class_body: NodeList<lyng_ast::ClassElementId>,
         key: ExprId,
         computed: bool,
         is_static: bool,
@@ -882,7 +874,7 @@ impl FunctionCompiler<'_, '_> {
         let descriptor_index = self.private_element_descriptor_index(
             class_body,
             backing_name,
-            lyng_js_sema::ClassPrivateElementKind::Field,
+            lyng_sema::ClassPrivateElementKind::Field,
         )?;
         let target = if is_static { class_object } else { prototype };
         let home_object = target;
@@ -1009,7 +1001,7 @@ impl FunctionCompiler<'_, '_> {
     fn lower_pending_static_class_element(
         &mut self,
         class_object: u16,
-        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        class_body: NodeList<lyng_ast::ClassElementId>,
         element: PendingStaticClassElement,
         private_initializer_scratch: Option<PrivateElementInitializerScratch>,
     ) -> LoweringResult<()> {
@@ -1044,7 +1036,7 @@ impl FunctionCompiler<'_, '_> {
                 let descriptor_index = self.private_element_descriptor_index(
                     class_body,
                     name,
-                    lyng_js_sema::ClassPrivateElementKind::Field,
+                    lyng_sema::ClassPrivateElementKind::Field,
                 )?;
                 self.lower_private_element_initializer_with_scratch(
                     class_object,
@@ -1082,7 +1074,7 @@ impl FunctionCompiler<'_, '_> {
 
     fn next_class_body_function_scope(
         &mut self,
-        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        class_body: NodeList<lyng_ast::ClassElementId>,
     ) -> LoweringResult<ScopeId> {
         self.try_next_class_body_function_scope(class_body).ok_or(
             LoweringError::UnsupportedDeclaration {
@@ -1093,11 +1085,11 @@ impl FunctionCompiler<'_, '_> {
 
     fn try_next_class_body_function_scope(
         &mut self,
-        class_body: NodeList<lyng_js_ast::ClassElementId>,
+        class_body: NodeList<lyng_ast::ClassElementId>,
     ) -> Option<ScopeId> {
         let class_scope = self
             .active_class_layout(class_body)
-            .map(lyng_js_sema::ClassPrivateLayoutRecord::scope)?;
+            .map(lyng_sema::ClassPrivateLayoutRecord::scope)?;
         let previous_scope = self.current_scope;
         self.current_scope = class_scope;
         let scope = self
@@ -1107,10 +1099,7 @@ impl FunctionCompiler<'_, '_> {
         scope
     }
 
-    fn skip_class_body_function_scope(
-        &mut self,
-        class_body: NodeList<lyng_js_ast::ClassElementId>,
-    ) {
+    fn skip_class_body_function_scope(&mut self, class_body: NodeList<lyng_ast::ClassElementId>) {
         let _ = self.try_next_class_body_function_scope(class_body);
     }
 
@@ -1199,7 +1188,7 @@ impl FunctionCompiler<'_, '_> {
         prototype: u16,
         name: AtomId,
         is_static: bool,
-        kind: lyng_js_sema::ClassPrivateElementKind,
+        kind: lyng_sema::ClassPrivateElementKind,
         value: Option<u16>,
         span: Span,
         scratch: PrivateElementDefinitionScratch,
@@ -1353,7 +1342,7 @@ impl FunctionCompiler<'_, '_> {
         name: Option<AtomId>,
         derived: bool,
         instance_elements: &[ClassInstanceElementPlan],
-        class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        class_body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         class_span: Span,
     ) -> LoweringResult<()> {
         let (id, function) = self.build_synthetic_default_class_constructor(
@@ -1374,7 +1363,7 @@ impl FunctionCompiler<'_, '_> {
         name: Option<AtomId>,
         derived: bool,
         instance_elements: &[ClassInstanceElementPlan],
-        class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        class_body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         class_span: Span,
     ) -> LoweringResult<(BytecodeFunctionId, BytecodeFunction)> {
         let id = self.state.alloc_function_id();
@@ -1499,7 +1488,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         this_register: u16,
         instance_elements: &[ClassInstanceElementPlan],
-        class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        class_body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     ) -> LoweringResult<()> {
         let previous_instance_initializer =
             std::mem::replace(&mut self.in_instance_class_field_initializer, true);
@@ -1522,7 +1511,7 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         this_register: u16,
         instance_elements: &[ClassInstanceElementPlan],
-        class_body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        class_body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
     ) -> LoweringResult<()> {
         let private_descriptors = self
             .active_class_layout(class_body)
@@ -1540,7 +1529,7 @@ impl FunctionCompiler<'_, '_> {
             let ClassInstanceElementPlan::PrivateElement { name, kind, .. } = element else {
                 continue;
             };
-            if kind == lyng_js_sema::ClassPrivateElementKind::Field {
+            if kind == lyng_sema::ClassPrivateElementKind::Field {
                 continue;
             }
             let (descriptor_index, span) = Self::private_element_descriptor_from_lookup(
@@ -1618,7 +1607,7 @@ impl FunctionCompiler<'_, '_> {
                     }
                 }
                 ClassInstanceElementPlan::PrivateElement { name, kind, value } => {
-                    if kind != lyng_js_sema::ClassPrivateElementKind::Field {
+                    if kind != lyng_sema::ClassPrivateElementKind::Field {
                         continue;
                     }
                     let inferred_name = Some(self.private_name_with_hash_atom(name));
@@ -1648,7 +1637,7 @@ impl FunctionCompiler<'_, '_> {
     fn private_element_descriptor_from_lookup(
         private_descriptors: Option<&PrivateElementDescriptorLookup>,
         name: AtomId,
-        kind: lyng_js_sema::ClassPrivateElementKind,
+        kind: lyng_sema::ClassPrivateElementKind,
     ) -> LoweringResult<(u32, Span)> {
         private_descriptors
             .and_then(|descriptors| descriptors.get(name, kind))
@@ -1659,9 +1648,9 @@ impl FunctionCompiler<'_, '_> {
 
     fn private_element_descriptor_index(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         name: AtomId,
-        kind: lyng_js_sema::ClassPrivateElementKind,
+        kind: lyng_sema::ClassPrivateElementKind,
     ) -> LoweringResult<u32> {
         let layout =
             self.active_class_layout(body)
@@ -1682,23 +1671,23 @@ impl FunctionCompiler<'_, '_> {
     }
 
     pub(super) fn private_access_descriptor_index_for_layout(
-        layout: &lyng_js_sema::ClassPrivateLayoutRecord,
+        layout: &lyng_sema::ClassPrivateLayoutRecord,
         name: AtomId,
         set_context: bool,
     ) -> LoweringResult<u32> {
         let preferred = if set_context {
             [
-                lyng_js_sema::ClassPrivateElementKind::Field,
-                lyng_js_sema::ClassPrivateElementKind::Setter,
-                lyng_js_sema::ClassPrivateElementKind::Getter,
-                lyng_js_sema::ClassPrivateElementKind::Method,
+                lyng_sema::ClassPrivateElementKind::Field,
+                lyng_sema::ClassPrivateElementKind::Setter,
+                lyng_sema::ClassPrivateElementKind::Getter,
+                lyng_sema::ClassPrivateElementKind::Method,
             ]
         } else {
             [
-                lyng_js_sema::ClassPrivateElementKind::Field,
-                lyng_js_sema::ClassPrivateElementKind::Method,
-                lyng_js_sema::ClassPrivateElementKind::Getter,
-                lyng_js_sema::ClassPrivateElementKind::Setter,
+                lyng_sema::ClassPrivateElementKind::Field,
+                lyng_sema::ClassPrivateElementKind::Method,
+                lyng_sema::ClassPrivateElementKind::Getter,
+                lyng_sema::ClassPrivateElementKind::Setter,
             ]
         };
         for kind in preferred {
@@ -1807,12 +1796,12 @@ impl FunctionCompiler<'_, '_> {
         )
     }
 
-    const fn private_element_kind_tag(kind: lyng_js_sema::ClassPrivateElementKind) -> i16 {
+    const fn private_element_kind_tag(kind: lyng_sema::ClassPrivateElementKind) -> i16 {
         match kind {
-            lyng_js_sema::ClassPrivateElementKind::Field => 0,
-            lyng_js_sema::ClassPrivateElementKind::Method => 1,
-            lyng_js_sema::ClassPrivateElementKind::Getter => 2,
-            lyng_js_sema::ClassPrivateElementKind::Setter => 3,
+            lyng_sema::ClassPrivateElementKind::Field => 0,
+            lyng_sema::ClassPrivateElementKind::Method => 1,
+            lyng_sema::ClassPrivateElementKind::Getter => 2,
+            lyng_sema::ClassPrivateElementKind::Setter => 3,
         }
     }
 

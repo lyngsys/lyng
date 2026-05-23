@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::control_flow::op_jump_if_false8:
+lyng_vm::vm::dispatch_handlers::control_flow::op_jump_if_false8:
 L0:
 	stp x29, x30, [sp, #-16]!
 	mov x29, sp
@@ -17,7 +17,7 @@ L0:
 	mov x0, x8
 	mov w4, #3
 	mov w5, #0
-	bl lyng_js_vm::vm::dispatch_handlers::control_flow::op_jump_if_impl
+	bl lyng_vm::vm::dispatch_handlers::control_flow::op_jump_if_impl
 	b L3
 L2:
 	ldr w9, [x1, #4]

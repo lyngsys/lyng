@@ -2,19 +2,19 @@ use crate::error::CliError;
 use crate::extensions::CliRealmExtension;
 use crate::host::{CliHost, CliHostSnapshot};
 use crate::CliInvocation;
-use lyng_js_common::{Diagnostic, Severity, SourceId, WellKnownAtom};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::{Agent, Runtime};
-use lyng_js_host::{
+use lyng_common::{Diagnostic, Severity, SourceId, WellKnownAtom};
+use lyng_compiler::compile_script;
+use lyng_env::{Agent, Runtime};
+use lyng_host::{
     DiagnosticReportRequest, HostHooks, ModuleKey, ModuleSourceRequest, ScriptSourceRequest,
     UncaughtExceptionReport,
 };
-use lyng_js_ops::{number_to_string, object};
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_test262_harness::Test262RealmExtension;
-use lyng_js_types::{ObjectRef, PropertyKey, Value};
-use lyng_js_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
+use lyng_ops::{number_to_string, object};
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_test262_harness::Test262RealmExtension;
+use lyng_types::{ObjectRef, PropertyKey, Value};
+use lyng_vm::{ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError};
 use std::fmt::Write as _;
 use std::io::Write;
 use std::sync::Arc;
@@ -233,7 +233,7 @@ fn shell_extension_provider(invocation: &CliInvocation) -> Option<SharedRealmExt
 fn report_diagnostics(
     host: &dyn HostHooks,
     diagnostics: &[Diagnostic],
-) -> Result<(), lyng_js_host::HostError> {
+) -> Result<(), lyng_host::HostError> {
     for diagnostic in diagnostics {
         host.report_diagnostic(&DiagnosticReportRequest {
             severity: diagnostic.severity,
@@ -368,7 +368,7 @@ fn primitive_value_text(agent: &Agent, value: Value) -> Option<String> {
     None
 }
 
-fn decode_string(agent: &Agent, string: lyng_js_types::StringRef) -> Option<String> {
+fn decode_string(agent: &Agent, string: lyng_types::StringRef) -> Option<String> {
     let view = agent.heap().view().string_view(string)?;
     decode_string_units(
         view.latin1_bytes(),

@@ -5,12 +5,12 @@ use super::{
     ObjectRef, RealmRef, Vm, VmError, VmResult, WellKnownAtom,
 };
 use crate::frame::GeneratorResumeKind;
-use lyng_js_env::{
+use lyng_env::{
     PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
     PromiseResolvingFunctionKind, PromiseResolvingFunctionRecord, RealmRecord,
 };
-use lyng_js_ops::errors;
-use lyng_js_types::{
+use lyng_ops::errors;
+use lyng_types::{
     promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion,
     PropertyKey, SuspendedExecutionRef, Value,
 };
@@ -336,7 +336,7 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         agent
             .promise_capability(capability)
-            .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
+            .and_then(lyng_env::PromiseCapabilityRecord::promise)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))
     }
 
@@ -388,7 +388,7 @@ impl Vm {
             None,
         ));
         match record.state() {
-            lyng_js_env::PromiseState::Pending => {
+            lyng_env::PromiseState::Pending => {
                 let _ = agent.push_promise_reaction(
                     promise,
                     PromiseReactionKind::Fulfill,
@@ -400,7 +400,7 @@ impl Vm {
                     reject_reaction,
                 );
             }
-            lyng_js_env::PromiseState::Fulfilled => {
+            lyng_env::PromiseState::Fulfilled => {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;
@@ -411,7 +411,7 @@ impl Vm {
                     record.result(),
                 );
             }
-            lyng_js_env::PromiseState::Rejected => {
+            lyng_env::PromiseState::Rejected => {
                 let realm = agent
                     .realm(record.realm())
                     .ok_or_else(|| VmError::MissingRootShape(record.realm()))?;

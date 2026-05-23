@@ -28,7 +28,7 @@ fn temporal_plain_time_constructor_getters_and_serialization() {
             threw,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -61,7 +61,7 @@ fn temporal_plain_time_to_locale_string_matches_non_intl_to_string_shape() {
             brandThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "function|0|12:34:56.987654321|true|false|true|true");
@@ -119,7 +119,7 @@ fn temporal_plain_time_from_clones_times_and_normalizes_property_bags() {
             rejectThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -219,7 +219,7 @@ fn temporal_plain_time_from_reads_fields_before_options_and_clones_zoned_values(
             stringOrder,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -260,7 +260,7 @@ fn temporal_plain_time_with_replaces_time_fields() {
             invalidThrew,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -389,7 +389,7 @@ fn temporal_plain_time_with_rejects_invalid_bags_and_reads_fields_before_options
         time.with(fields, options);
         invalidChecks + "|" + actual.join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -414,7 +414,7 @@ fn temporal_plain_time_add_balances_sub_day_units() {
             time.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -463,7 +463,7 @@ fn temporal_plain_time_string_conversion_rounding_and_difference_are_exact_time_
             until.nanoseconds,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -616,7 +616,7 @@ fn temporal_plain_time_difference_reads_other_then_options_and_delays_validation
             mismatchSince,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -651,7 +651,7 @@ fn temporal_plain_time_since_until_reject_smaller_largest_unit_pairs() {
         }
         failures.join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "");
@@ -672,7 +672,7 @@ fn temporal_plain_time_to_string_honors_precision_and_rounding_options() {
             time.toJSON({ smallestUnit: "minute" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -695,7 +695,7 @@ fn temporal_plain_date_converts_to_plain_date_time() {
             dateTimeWithTime.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(

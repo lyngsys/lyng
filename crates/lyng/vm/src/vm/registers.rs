@@ -1,6 +1,6 @@
 use super::call::finalize_frame_result;
 use super::{Agent, RegisterWindow, Value, Vm, VmError, VmResult};
-use lyng_js_types::AbruptCompletion;
+use lyng_types::AbruptCompletion;
 
 impl Vm {
     #[inline]

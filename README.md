@@ -15,7 +15,7 @@ spec text and verify itself against a corpus it cannot bullshit its way through.
 
 The code is slop. The goal is **solid gold slop** — spec-faithful, well-tested, cleanly
 organized, and held to a real quality bar despite being agent-written. The `AGENTS.md` at
-the repo root and the one inside `crates/lyng-js/` encode the standards the agents are
+the repo root and the one inside `crates/lyng/` encode the standards the agents are
 held to.
 
 ## Current state
@@ -36,12 +36,12 @@ has not been started. Current work is on runtime performance.
 
 ## Workspace shape
 
-- `crates/lyng-js/`: engine crates, integration tests, runtime/compiler implementation
-- `crates/lyng-js-vm-dsl/`: proc-macro substrate for the asm-DSL interpreter
+- `crates/lyng/`: engine crates, integration tests, runtime/compiler implementation
+- `crates/lyng/vm-dsl/`: proc-macro substrate for the asm-DSL interpreter
 - `tools/`: Test262 runner, benchmark/runtime-report tooling, DSL codegen
 
 ## Read next
 
-- [Engine overview](crates/lyng-js/README.md)
-- [Docs index](docs/lyng-js/README.md)
+- [Engine overview](crates/lyng/README.md)
+- [Docs index](docs/lyng/README.md)
 - [Repo-level agent guide](AGENTS.md)

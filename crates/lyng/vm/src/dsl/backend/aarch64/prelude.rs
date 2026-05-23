@@ -1,8 +1,8 @@
 //! AArch64-specific constants referenced by DSL operation macros:
 //! NaN-tag masks, kind discriminator values, layout-decode helpers.
 //!
-//! Authoritative source: [`reports/js/lyng-js/llint-dsl-value-layout.md`]
-//! and [`reports/js/lyng-js/llint-dsl-abi.md`].
+//! Authoritative source: [`reports/lyng/llint-dsl-value-layout.md`]
+//! and [`reports/lyng/llint-dsl-abi.md`].
 //!
 //! Encoding recap (NaN-tag-space, kind in bits 32-47):
 //!
@@ -21,7 +21,7 @@
 //! Value (the low 32 are payload). For singletons (`undefined`, `null`)
 //! the full 64-bit value can be compared because payload is zero.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 // Core mask family (matches `value.rs` private constants).
 pub const VALUE_TAG_HEADER: u64 = 0x7ff8_0000_0000_0000;

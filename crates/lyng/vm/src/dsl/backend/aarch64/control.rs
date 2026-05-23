@@ -62,7 +62,9 @@ macro_rules! dispatch {
     };
     (advance = $n:literal) => {
         concat!(
-            "add    x19, x19, #", stringify!($n), "\n",
+            "add    x19, x19, #",
+            stringify!($n),
+            "\n",
             "ldrb   w8, [x19]\n",
             "ldr    x16, [x23, x8, lsl #3]\n",
             "br     x16\n",
@@ -118,7 +120,9 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "bl     {", stringify!($shim), "}\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = []) => {
@@ -127,7 +131,9 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "bl     {", stringify!($shim), "}\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     // ---- 1 arg ----
@@ -138,8 +144,12 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = [$a:tt]) => {
@@ -148,8 +158,12 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     // ---- 2 args ----
@@ -160,9 +174,15 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = [$a:tt, $b:tt]) => {
@@ -171,9 +191,15 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     // ---- 3 args ----
@@ -184,10 +210,18 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = [$a:tt, $b:tt, $c:tt]) => {
@@ -196,10 +230,18 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     // ---- 4 args ----
@@ -210,11 +252,21 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "mov    w4, w", stringify!($d), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "mov    w4, w",
+            stringify!($d),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt]) => {
@@ -223,11 +275,21 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "mov    w4, w", stringify!($d), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "mov    w4, w",
+            stringify!($d),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     // ---- 5 args ----
@@ -238,12 +300,24 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "mov    w4, w", stringify!($d), "\n",
-            "mov    w5, w", stringify!($e), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "mov    w4, w",
+            stringify!($d),
+            "\n",
+            "mov    w5, w",
+            stringify!($e),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
     ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt, $e:tt]) => {
@@ -252,12 +326,24 @@ macro_rules! call_slow {
             "sub    x17, x19, x16\n",
             "str    w17, [x24, {state_pc}]\n",
             "mov    x0, x24\n",
-            "mov    w1, w", stringify!($a), "\n",
-            "mov    w2, w", stringify!($b), "\n",
-            "mov    w3, w", stringify!($c), "\n",
-            "mov    w4, w", stringify!($d), "\n",
-            "mov    w5, w", stringify!($e), "\n",
-            "bl     {", stringify!($shim), "}\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "mov    w4, w",
+            stringify!($d),
+            "\n",
+            "mov    w5, w",
+            stringify!($e),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
         )
     };
 }
@@ -286,7 +372,7 @@ macro_rules! dispatch_after_slow {
     () => {
         concat!(
             // Common case first: tag == Continue (0).
-            "cbnz   x0, 1f\n",          // → "unusual" handling
+            "cbnz   x0, 1f\n", // → "unusual" handling
             // Continue path: PC = pb_base + new_offset (low 32 of x1).
             // Also reload REGS / FV from state — a nested call in the
             // slow path (e.g. ToPrimitive invoking valueOf bytecode)
@@ -304,9 +390,9 @@ macro_rules! dispatch_after_slow {
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "1:\n",                      // unusual:
+            "1:\n", // unusual:
             "cmp    x0, #2\n",
-            "b.eq   2f\n",               // → exit
+            "b.eq   2f\n", // → exit
             // Refresh path: reload PC / REGS / FV from state.frame_*.
             "ldr    w16, [x24, {state_pc}]\n",
             "ldr    x17, [x24, {state_pb}]\n",
@@ -316,7 +402,7 @@ macro_rules! dispatch_after_slow {
             "ldrb   w8,  [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "2:\n",                      // exit:
+            "2:\n", // exit:
             "b      {exit}\n",
         )
     };
@@ -330,9 +416,7 @@ macro_rules! dispatch_after_slow {
 #[macro_export]
 macro_rules! branch_zero {
     ($reg:tt, $label:tt) => {
-        concat!(
-            "cbz    x", stringify!($reg), ", ", stringify!($label), "\n",
-        )
+        concat!("cbz    x", stringify!($reg), ", ", stringify!($label), "\n",)
     };
 }
 
@@ -340,9 +424,7 @@ macro_rules! branch_zero {
 #[macro_export]
 macro_rules! branch_nonzero {
     ($reg:tt, $label:tt) => {
-        concat!(
-            "cbnz   x", stringify!($reg), ", ", stringify!($label), "\n",
-        )
+        concat!("cbnz   x", stringify!($reg), ", ", stringify!($label), "\n",)
     };
 }
 
@@ -367,7 +449,7 @@ macro_rules! label {
 /// Two instructions: `cmp x{a}, x{b}; b.eq {label}`. The label is
 /// substituted by the lowerer (DSL `.slow` → `<handler_name>slow`),
 /// matching the existing `.slow:` body-label convention used by hot
-/// handlers like `op_add` (see `crates/lyng-js/vm/src/dsl/handlers/hot.rs`).
+/// handlers like `op_add` (see `crates/lyng/vm/src/dsl/handlers/hot.rs`).
 ///
 /// Used by Phase 1.B.2's `op_load_this` inline port to bail to the
 /// slow path when `frame_this_value` holds the
@@ -377,8 +459,14 @@ macro_rules! label {
 macro_rules! cmp_branch_eq {
     ($a:tt, $b:tt, $label:tt) => {
         concat!(
-            "cmp    x", stringify!($a), ", x", stringify!($b), "\n",
-            "b.eq   ", stringify!($label), "\n",
+            "cmp    x",
+            stringify!($a),
+            ", x",
+            stringify!($b),
+            "\n",
+            "b.eq   ",
+            stringify!($label),
+            "\n",
         )
     };
 }
@@ -408,16 +496,18 @@ macro_rules! dispatch_prefixed {
         concat!(
             // Reject doubled prefix.
             "ldrb   w16, [x24, {state_prefix}]\n",
-            "cbnz   w16, 1f\n",         // → double-prefix slow path
+            "cbnz   w16, 1f\n", // → double-prefix slow path
             // Stash prefix discriminator.
-            "mov    w16, #", stringify!($kind), "\n",
+            "mov    w16, #",
+            stringify!($kind),
+            "\n",
             "strb   w16, [x24, {state_prefix}]\n",
             // Advance PC past the prefix byte and dispatch.
             "add    x19, x19, #1\n",
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
-            "1:\n",                      // double-prefix:
+            "1:\n", // double-prefix:
             // TODO: call op_double_prefix_slow_rs once Batch 7 lands.
             "brk    #0\n",
         )

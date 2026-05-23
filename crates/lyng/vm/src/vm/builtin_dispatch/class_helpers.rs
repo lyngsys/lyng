@@ -167,11 +167,11 @@ impl Vm {
         let outer = agent
             .objects()
             .function_data(function)
-            .and_then(lyng_js_objects::FunctionObjectData::environment)
+            .and_then(lyng_objects::FunctionObjectData::environment)
             .or_else(|| {
                 agent
                     .current_execution_context()
-                    .map(lyng_js_env::ExecutionContext::lexical_env)
+                    .map(lyng_env::ExecutionContext::lexical_env)
             })
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
@@ -180,7 +180,7 @@ impl Vm {
         ));
         let new_target = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::new_target);
+            .and_then(lyng_env::ExecutionContext::new_target);
         let env = agent
             .alloc_function_environment(
                 Some(outer),

@@ -1,22 +1,22 @@
 [package]
-name = "lyng-js-cli"
+name = "lyng-cli"
 version.workspace = true
 edition.workspace = true
-default-run = "lyng-js"
+default-run = "lyng"
 
 [[bin]]
-name = "lyng-js"
+name = "lyng"
 path = "src/main.rs"
 
 [dependencies]
-lyng-js-builtins = { workspace = true }
-lyng-js-common = { workspace = true }
-lyng-js-compiler = { workspace = true }
-lyng-js-env = { workspace = true }
-lyng-js-host = { workspace = true }
-lyng-js-ops = { workspace = true }
-lyng-js-parser = { workspace = true }
-lyng-js-sema = { workspace = true }
-lyng-js-test262-harness = { workspace = true }
-lyng-js-types = { workspace = true }
-lyng-js-vm = { workspace = true }
+lyng-builtins = { workspace = true }
+lyng-common = { workspace = true }
+lyng-compiler = { workspace = true }
+lyng-env = { workspace = true }
+lyng-host = { workspace = true }
+lyng-ops = { workspace = true }
+lyng-parser = { workspace = true }
+lyng-sema = { workspace = true }
+lyng-test262-harness = { workspace = true }
+lyng-types = { workspace = true }
+lyng-vm = { workspace = true }

@@ -17,26 +17,26 @@
 ## File structure overview
 
 ### Created
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/locals.rs` — new `load_local_fixed!` + `store_local_fixed!` macros
-- `crates/lyng-js-tests/tests/op_locals_inline.rs` — JS-level integration tests for the 8 LoadLocal/StoreLocal opcodes
-- `crates/lyng-js-tests/tests/op_ldar_inline.rs` — JS-level integration tests for Ldar
-- `reports/js/lyng-js/dsl-handlers/op_load_local_0.md` (+ similar for 1, 2, 3) — per-handler ported reports
-- `reports/js/lyng-js/dsl-handlers/op_store_local_0.md` (+ similar for 1, 2, 3) — per-handler ported reports
-- `reports/js/lyng-js/dsl-handlers/op_ldar.md` — per-handler ported report
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_local_{0,1,2,3}.asm` — asm baselines
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_store_local_{0,1,2,3}.asm` — asm baselines
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_ldar.asm` — asm baseline
-- `reports/js/lyng-js/dsl-1/phase-1b3-ab-comparison.md` — same-load A/B vs `08727f92`
-- `reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md` — cumulative A/B vs `d850f261`
-- `reports/js/lyng-js/dsl-1/phase-1b3-microbench.md` — microbench results + slow-path-share
-- `reports/js/lyng-js/dsl-1/phase-1b3-summary.md` — sub-phase summary
+- `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs` — new `load_local_fixed!` + `store_local_fixed!` macros
+- `crates/lyng-tests/tests/op_locals_inline.rs` — JS-level integration tests for the 8 LoadLocal/StoreLocal opcodes
+- `crates/lyng-tests/tests/op_ldar_inline.rs` — JS-level integration tests for Ldar
+- `reports/lyng/dsl-handlers/op_load_local_0.md` (+ similar for 1, 2, 3) — per-handler ported reports
+- `reports/lyng/dsl-handlers/op_store_local_0.md` (+ similar for 1, 2, 3) — per-handler ported reports
+- `reports/lyng/dsl-handlers/op_ldar.md` — per-handler ported report
+- `reports/lyng/dsl-asm-baseline-aarch64/op_load_local_{0,1,2,3}.asm` — asm baselines
+- `reports/lyng/dsl-asm-baseline-aarch64/op_store_local_{0,1,2,3}.asm` — asm baselines
+- `reports/lyng/dsl-asm-baseline-aarch64/op_ldar.asm` — asm baseline
+- `reports/lyng/dsl-1/phase-1b3-ab-comparison.md` — same-load A/B vs `08727f92`
+- `reports/lyng/dsl-1/phase-1b3-cumulative-ab.md` — cumulative A/B vs `d850f261`
+- `reports/lyng/dsl-1/phase-1b3-microbench.md` — microbench results + slow-path-share
+- `reports/lyng/dsl-1/phase-1b3-summary.md` — sub-phase summary
 
 ### Modified
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs` — declare new `locals` submodule
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace 9 `call_slow!` shims with inline ports (and optionally delete dead slow-path stubs)
-- `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` — add 2 structural compiles-and-links tests for the new macros
-- `tools/lyng-js-bench/src/microbench/snippets.rs` — add 3 missing snippets (StoreLocal0, StoreLocal1, StoreLocal2)
-- `reports/js/lyng-js/dsl-1/phase-1b-followups.md` — record op_load_env_slot deferral formally
+- `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` — declare new `locals` submodule
+- `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace 9 `call_slow!` shims with inline ports (and optionally delete dead slow-path stubs)
+- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — add 2 structural compiles-and-links tests for the new macros
+- `tools/lyng-bench/src/microbench/snippets.rs` — add 3 missing snippets (StoreLocal0, StoreLocal1, StoreLocal2)
+- `reports/lyng/dsl-1/phase-1b-followups.md` — record op_load_env_slot deferral formally
 
 ### Untouched
 - All `LlIntState` fields, lowerer bindings, GC code, entry/slow-path infrastructure.
@@ -49,8 +49,8 @@
 - **NEVER skip hooks** (`--no-verify`), force-push, or destructive ops without explicit user consent.
 - **Commits:** Each task ends with a self-contained commit. HEREDOC + `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` footer.
 - **Untracked planning docs** (`docs/superpowers/{plans,specs}/*.md`): leave untouched per user discipline.
-- **`reports/js/lyng-js/bench-v8.md`** is a bench-tool side-effect. May be modified or clean depending on entry state; never stage it.
-- **Behavioral parity at every commit:** `cargo test -p lyng-js-vm --lib --release` (≥418), `cargo test -p lyng-js-tests --release` (≥1198). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
+- **`reports/lyng/bench-v8.md`** is a bench-tool side-effect. May be modified or clean depending on entry state; never stage it.
+- **Behavioral parity at every commit:** `cargo test -p lyng-vm --lib --release` (≥418), `cargo test -p lyng-tests --release` (≥1198). 2 pre-existing `feedback_flat_consistency` failures stay unrelated.
 - **TDD discipline** for the macros (Task 1) and per-opcode integration tests (Tasks 2 + 3). Write tests first, verify they pass with the cold stub, then replace the stub — the same tests must continue passing.
 - **Post-audit lesson honored:** every new backend macro must be exercised by REAL handler dispatch within this sub-phase, not just structural compiles-and-links.
 
@@ -59,19 +59,19 @@
 ## Task 1: Add `load_local_fixed!` + `store_local_fixed!` backend macros
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/locals.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
-- Modify: `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` (add 2 structural tests)
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs`
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
+- Modify: `crates/lyng/vm/tests/dsl_validation_frame_context.rs` (add 2 structural tests)
 
 - [ ] **Step 1: Read the existing operands macros for template shape**
 
 ```bash
-cat crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs | head -150
+cat crates/lyng/vm/src/dsl/backend/aarch64/operands.rs | head -150
 ```
 
 Pay attention to `load_acc!` (operands.rs:126), `store_acc!` (operands.rs:136), and `load_reg!` (operands.rs:106). Your new `load_local_fixed!` is the fixed-immediate-index sibling of `load_reg!` (`load_reg!` takes an x-register index; yours takes a u8 compile-time literal).
 
-- [ ] **Step 2: Create `crates/lyng-js/vm/src/dsl/backend/aarch64/locals.rs`**
+- [ ] **Step 2: Create `crates/lyng/vm/src/dsl/backend/aarch64/locals.rs`**
 
 ```rust
 //! Fixed-immediate-index register-window load/store macros for DSL-1
@@ -133,16 +133,16 @@ macro_rules! store_local_fixed {
 
 - [ ] **Step 3: Declare the new submodule in `aarch64/mod.rs`**
 
-Open `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs`. Add `pub mod locals;` alongside the other `pub mod ...;` declarations (e.g., `pub mod constants;`, `pub mod frame;`).
+Open `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs`. Add `pub mod locals;` alongside the other `pub mod ...;` declarations (e.g., `pub mod constants;`, `pub mod frame;`).
 
 - [ ] **Step 4: Build to verify the macros compile**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean. No handler uses the macros yet; this only confirms `macro_rules!` syntax is valid.
 
 - [ ] **Step 5: Add 2 structural compiles-and-links tests in dsl_validation_frame_context.rs**
 
-Open `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing 4 structural handlers, add 2 more:
+Open `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Alongside the existing 4 structural handlers, add 2 more:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -188,7 +188,7 @@ fn store_local_fixed_handler_compiles_and_links() {
 
 - [ ] **Step 6: Run the new tests**
 
-Run: `cargo test -p lyng-js-vm --test dsl_validation_frame_context --release`
+Run: `cargo test -p lyng-vm --test dsl_validation_frame_context --release`
 Expected: 6 tests passing (4 existing + 2 new). 0 ignored.
 
 If the macros don't emit valid asm, the build fails — switch macro internals (e.g., adjust the `#(N*8)` literal-expression syntax) until rustc accepts it.
@@ -197,15 +197,15 @@ If the macros don't emit valid asm, the build fails — switch macro internals (
 
 Run in parallel:
 ```bash
-cargo test -p lyng-js-vm --lib --release
-cargo test -p lyng-js-tests --release
+cargo test -p lyng-vm --lib --release
+cargo test -p lyng-tests --release
 ```
-Expected: 418+ vm, 1198+ lyng-js-tests (parity maintained).
+Expected: 418+ vm, 1198+ lyng-tests (parity maintained).
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/backend/aarch64/locals.rs crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs crates/lyng-js/vm/tests/dsl_validation_frame_context.rs
+git add crates/lyng/vm/src/dsl/backend/aarch64/locals.rs crates/lyng/vm/src/dsl/backend/aarch64/mod.rs crates/lyng/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 1: load_local_fixed! + store_local_fixed! backend macros
 
@@ -235,26 +235,26 @@ EOF
 ## Task 2: Inline-port the 4 `op_load_local_N` handlers
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs:4253-4365` (replace 4 cold stubs)
-- Create: `crates/lyng-js-tests/tests/op_locals_inline.rs` (integration tests covering all 8 LoadLocal/StoreLocal cases — written here, used by Task 3 too)
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs:4253-4365` (replace 4 cold stubs)
+- Create: `crates/lyng-tests/tests/op_locals_inline.rs` (integration tests covering all 8 LoadLocal/StoreLocal cases — written here, used by Task 3 too)
 
-- [ ] **Step 1: Discover the lyng-js-tests script-running helper**
+- [ ] **Step 1: Discover the lyng-tests script-running helper**
 
 ```bash
-grep -rn "fn.*Value\b\|pub fn run_script\|pub fn evaluate_script\|fn execute_script" crates/lyng-js-tests/src/ 2>/dev/null | head -10
+grep -rn "fn.*Value\b\|pub fn run_script\|pub fn evaluate_script\|fn execute_script" crates/lyng-tests/src/ 2>/dev/null | head -10
 ```
 
 Find the existing helper that runs a JS source and returns a `Value` (or `VmResult<Value>`). Use that same helper in your new test file. Phase 1.B.2's `op_load_const8_inline.rs` and `op_load_this_inline.rs` are existing examples; read them:
 
 ```bash
-head -30 crates/lyng-js-tests/tests/op_load_const8_inline.rs
+head -30 crates/lyng-tests/tests/op_load_const8_inline.rs
 ```
 
 Match the convention.
 
 - [ ] **Step 2: Write the failing integration tests FIRST (they should pass with the cold stub)**
 
-Create `crates/lyng-js-tests/tests/op_locals_inline.rs`:
+Create `crates/lyng-tests/tests/op_locals_inline.rs`:
 
 ```rust
 //! Phase 1.B.3 Tasks 2 + 3: integration tests for the inline
@@ -266,7 +266,7 @@ Create `crates/lyng-js-tests/tests/op_locals_inline.rs`:
 //! Tests pass with the cold-stub OR the inline port — the inline port
 //! must produce the same observable semantics.
 
-use lyng_js_tests::run_script_returning_value;  // adjust to match the actual helper name
+use lyng_tests::run_script_returning_value;  // adjust to match the actual helper name
 
 #[test]
 fn load_local_0_returns_first_parameter() {
@@ -363,18 +363,18 @@ fn locals_in_tight_loop_sum() {
 }
 ```
 
-**Note on the actual local-slot placement:** the lyng-js bytecode compiler decides which local variable goes to which slot. The tests above assume parameters take slots 0..N-1 and locals are placed after. If the compiler diverges (e.g., uses different slot ordering), the test SEMANTICS still hold (correct return value) even if the specific opcodes fired differ. The integration tests verify END-TO-END correctness, not opcode-specific dispatch — that's what microbench + asm baselines verify in Task 4.
+**Note on the actual local-slot placement:** the lyng bytecode compiler decides which local variable goes to which slot. The tests above assume parameters take slots 0..N-1 and locals are placed after. If the compiler diverges (e.g., uses different slot ordering), the test SEMANTICS still hold (correct return value) even if the specific opcodes fired differ. The integration tests verify END-TO-END correctness, not opcode-specific dispatch — that's what microbench + asm baselines verify in Task 4.
 
 - [ ] **Step 3: Run the tests — they should pass with cold stubs (TDD red-green-refactor: this is the "the spec is met before the change" baseline)**
 
-Run: `cargo test -p lyng-js-tests --test op_locals_inline --release`
+Run: `cargo test -p lyng-tests --test op_locals_inline --release`
 Expected: 8 passing (or however many you wrote). They pass because cold stubs produce correct semantics.
 
 If any test fails BEFORE you touch the handlers, that's an unrelated bug — investigate before proceeding.
 
 - [ ] **Step 4: Replace the 4 `op_load_local_N` cold stubs with inline ports**
 
-In `crates/lyng-js/vm/src/dsl/handlers/cold.rs`, find the 4 `llint_handler!` invocations (around lines 4255, 4284, 4313, 4342 per the research). Replace each with the inline form.
+In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the 4 `llint_handler!` invocations (around lines 4255, 4284, 4313, 4342 per the research). Replace each with the inline form.
 
 For `op_load_local_0_dsl` (opcode 144, slot 0 = accumulator):
 
@@ -413,34 +413,34 @@ Substitute N = 1, 2, 3 literally in each handler (the lowerer's macro substituti
 - [ ] **Step 5: Check whether the slow-path stubs are now dead**
 
 ```bash
-grep -rn "op_load_local_[0-3]_slow_rs" crates/lyng-js/
+grep -rn "op_load_local_[0-3]_slow_rs" crates/lyng/
 ```
 
 If the 4 `op_load_local_N_slow_rs` functions have no callers outside their own definition, delete them. If something else calls them (e.g., a wide/extra-wide prefix variant), keep them. Document either way in the commit message.
 
 - [ ] **Step 6: Build to verify the inline ports compile**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean. If a macro signature mismatch arises, adjust.
 
 - [ ] **Step 7: Run the integration tests — they must still pass**
 
-Run: `cargo test -p lyng-js-tests --test op_locals_inline --release`
+Run: `cargo test -p lyng-tests --test op_locals_inline --release`
 Expected: still passing. The inline ports produce the same observable semantics as the cold stubs.
 
 - [ ] **Step 8: Run full vm + tests suites for parity**
 
 Run in parallel:
 ```bash
-cargo test -p lyng-js-vm --lib --release
-cargo test -p lyng-js-tests --release
+cargo test -p lyng-vm --lib --release
+cargo test -p lyng-tests --release
 ```
-Expected: 418+ vm, 1198+ lyng-js-tests + 8 new from op_locals_inline.rs = 1206+ total.
+Expected: 418+ vm, 1198+ lyng-tests + 8 new from op_locals_inline.rs = 1206+ total.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs crates/lyng-js-tests/tests/op_locals_inline.rs
+git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_locals_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 2: op_load_local_0/1/2/3 inline ports
 
@@ -471,12 +471,12 @@ EOF
 ## Task 3: Inline-port the 4 `op_store_local_N` handlers + `op_ldar`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` (lines 3957 area for op_ldar, 4369-4467 area for store_local 0/1/2/3)
-- Create: `crates/lyng-js-tests/tests/op_ldar_inline.rs` (integration tests for Ldar)
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` (lines 3957 area for op_ldar, 4369-4467 area for store_local 0/1/2/3)
+- Create: `crates/lyng-tests/tests/op_ldar_inline.rs` (integration tests for Ldar)
 
 - [ ] **Step 1: Write the Ldar integration tests FIRST**
 
-Create `crates/lyng-js-tests/tests/op_ldar_inline.rs`:
+Create `crates/lyng-tests/tests/op_ldar_inline.rs`:
 
 ```rust
 //! Phase 1.B.3 Task 3: integration tests for the inline op_ldar port.
@@ -486,7 +486,7 @@ Create `crates/lyng-js-tests/tests/op_ldar_inline.rs`:
 //! after temporaries are computed when the next opcode expects the
 //! value in the accumulator.
 
-use lyng_js_tests::run_script_returning_value;  // match Task 2's helper
+use lyng_tests::run_script_returning_value;  // match Task 2's helper
 
 #[test]
 fn ldar_via_intermediate_temporary() {
@@ -522,12 +522,12 @@ fn ldar_with_function_call_result() {
 
 - [ ] **Step 2: Run the tests — they should pass with the cold stub**
 
-Run: `cargo test -p lyng-js-tests --test op_ldar_inline --release`
+Run: `cargo test -p lyng-tests --test op_ldar_inline --release`
 Expected: 3 passing. Cold stub produces correct semantics.
 
 - [ ] **Step 3: Replace the 4 `op_store_local_N` cold stubs with inline ports**
 
-In `crates/lyng-js/vm/src/dsl/handlers/cold.rs`, find the 4 store-local stubs (opcodes 148, 149, 150, 151 — around lines 4371, 4400, 4429, 4458). Replace each with:
+In `crates/lyng/vm/src/dsl/handlers/cold.rs`, find the 4 store-local stubs (opcodes 148, 149, 150, 151 — around lines 4371, 4400, 4429, 4458). Replace each with:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -546,7 +546,7 @@ Substitute N = 0, 1, 2, 3 literally in each of the 4 handlers.
 
 - [ ] **Step 4: Replace the `op_ldar_dsl` cold stub with inline port**
 
-In `crates/lyng-js/vm/src/dsl/handlers/cold.rs` around line 3959, replace:
+In `crates/lyng/vm/src/dsl/handlers/cold.rs` around line 3959, replace:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -565,27 +565,27 @@ llint_handler! {
 - [ ] **Step 5: Check whether store-local + Ldar slow stubs are now dead**
 
 ```bash
-grep -rn "op_store_local_[0-3]_slow_rs\|op_ldar_slow_rs" crates/lyng-js/
+grep -rn "op_store_local_[0-3]_slow_rs\|op_ldar_slow_rs" crates/lyng/
 ```
 
 Delete dead-code slow stubs; document in commit message.
 
 - [ ] **Step 6: Build + run all tests**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: clean.
 
 Run in parallel:
 ```bash
-cargo test -p lyng-js-vm --lib --release
-cargo test -p lyng-js-tests --release
+cargo test -p lyng-vm --lib --release
+cargo test -p lyng-tests --release
 ```
 Expected: 418+ vm, 1198+ + 8 (Task 2) + 3 (Ldar) = 1209+ tests.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs crates/lyng-js-tests/tests/op_ldar_inline.rs
+git add crates/lyng/vm/src/dsl/handlers/cold.rs crates/lyng-tests/tests/op_ldar_inline.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 3: op_store_local_0/1/2/3 + op_ldar inline ports
 
@@ -616,15 +616,15 @@ EOF
 ## Task 4: Add missing snippets + capture asm baselines + microbench + per-handler ported reports
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/microbench/snippets.rs` (add 3 missing snippets)
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_{load,store}_local_{0,1,2,3}.asm` + `op_ldar.asm` (9 baselines)
-- Create: `reports/js/lyng-js/dsl-handlers/op_{load,store}_local_{0,1,2,3}.md` + `op_ldar.md` (9 per-handler reports)
-- Create: `reports/js/lyng-js/dsl-1/phase-1b3-microbench.md`
+- Modify: `tools/lyng-bench/src/microbench/snippets.rs` (add 3 missing snippets)
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_{load,store}_local_{0,1,2,3}.asm` + `op_ldar.asm` (9 baselines)
+- Create: `reports/lyng/dsl-handlers/op_{load,store}_local_{0,1,2,3}.md` + `op_ldar.md` (9 per-handler reports)
+- Create: `reports/lyng/dsl-1/phase-1b3-microbench.md`
 
 - [ ] **Step 1: Verify which snippets exist**
 
 ```bash
-grep -n 'map.insert("' tools/lyng-js-bench/src/microbench/snippets.rs | head -25
+grep -n 'map.insert("' tools/lyng-bench/src/microbench/snippets.rs | head -25
 ```
 
 Per current state (HEAD `08727f92`), these snippets exist for the in-scope opcodes:
@@ -639,7 +639,7 @@ These are MISSING (need to add in this task):
 
 - [ ] **Step 2: Add the 3 missing snippets**
 
-Open `tools/lyng-js-bench/src/microbench/snippets.rs`. Find the existing `StoreLocal3` entry (around line 374). Add 3 new entries immediately after it, modeled on its shape. Example for StoreLocal0:
+Open `tools/lyng-bench/src/microbench/snippets.rs`. Find the existing `StoreLocal3` entry (around line 374). Add 3 new entries immediately after it, modeled on its shape. Example for StoreLocal0:
 
 ```rust
 // StoreLocal0: assign to first parameter inside a tight loop.
@@ -666,15 +666,15 @@ map.insert("StoreLocal0", Snippet {
 
 Run:
 ```bash
-cargo test -p lyng-js-bench --lib verify_opcodes_per_iter --release
+cargo test -p lyng-bench --lib verify_opcodes_per_iter --release
 ```
 Expected: ALL snippets pass (the existing 16 + your 3 new = 19). If the new ones fail, tune `opcodes_per_iter` based on the diagnostic output.
 
 - [ ] **Step 4: Run microbench end-to-end**
 
 ```bash
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- microbench --samples 7 --json /tmp/phase-1b3-microbench.json 2>&1 | tail -30
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- microbench --samples 7 --json /tmp/phase-1b3-microbench.json 2>&1 | tail -30
 ```
 
 Capture ns/dispatch + CI95 for all 9 in-scope opcodes:
@@ -682,27 +682,27 @@ Capture ns/dispatch + CI95 for all 9 in-scope opcodes:
 - StoreLocal0, StoreLocal1, StoreLocal2, StoreLocal3
 - Ldar
 
-Compare against LLInt reference numbers (from `tools/lyng-js-bench/hot-opcodes.toml` if listed, else from Phase 1.B.0 microbench table). All 9 must be within 2× LLInt reference.
+Compare against LLInt reference numbers (from `tools/lyng-bench/hot-opcodes.toml` if listed, else from Phase 1.B.0 microbench table). All 9 must be within 2× LLInt reference.
 
 - [ ] **Step 5: Capture asm baselines**
 
-The `lyng-js-bench asm-diff` tool may not yet support the `dsl::handlers::cold::*` namespace (per the Phase 1.B.2 finding). If so, fall back to manual extraction:
+The `lyng-bench asm-diff` tool may not yet support the `dsl::handlers::cold::*` namespace (per the Phase 1.B.2 finding). If so, fall back to manual extraction:
 
 ```bash
-cargo rustc --release -p lyng-js-vm --lib -- --emit=asm 2>&1 | tail -10
+cargo rustc --release -p lyng-vm --lib -- --emit=asm 2>&1 | tail -10
 ```
 
 Find the produced `.s` file under `target/release/deps/` and grep for each opcode symbol:
 
 ```bash
-ls target/release/deps/lyng_js_vm-*.s | head -1  # find the file
-SFILE=$(ls target/release/deps/lyng_js_vm-*.s | head -1)
+ls target/release/deps/lyng_vm-*.s | head -1  # find the file
+SFILE=$(ls target/release/deps/lyng_vm-*.s | head -1)
 # For each of the 9 opcodes:
 for OP in op_load_local_0 op_load_local_1 op_load_local_2 op_load_local_3 \
           op_store_local_0 op_store_local_1 op_store_local_2 op_store_local_3 \
           op_ldar; do
     sed -n "/_${OP}_dsl:/,/\.section/p" "$SFILE" | head -30 \
-      > "reports/js/lyng-js/dsl-asm-baseline-aarch64/${OP}.asm"
+      > "reports/lyng/dsl-asm-baseline-aarch64/${OP}.asm"
 done
 ```
 
@@ -712,7 +712,7 @@ Verify each captured baseline file has the inline asm (not the cold-stub asm). E
 
 - [ ] **Step 6: Write per-handler ported reports**
 
-For each of the 9 opcodes, create `reports/js/lyng-js/dsl-handlers/op_<name>.md`. Use `reports/js/lyng-js/dsl-handlers/op_load_const8.md` (from Phase 1.B.2) as the template.
+For each of the 9 opcodes, create `reports/lyng/dsl-handlers/op_<name>.md`. Use `reports/lyng/dsl-handlers/op_load_const8.md` (from Phase 1.B.2) as the template.
 
 Each report contains:
 - Opcode byte + layout + length
@@ -726,7 +726,7 @@ Each report contains:
 - [ ] **Step 7: Capture slow-path-share on V8 v7**
 
 ```bash
-cargo run --release -p lyng-js-bench -- v8suite --samples 3 --count-slow-path-share --json /tmp/phase-1b3-slowshare.json 2>&1 | tail -40
+cargo run --release -p lyng-bench -- v8suite --samples 3 --count-slow-path-share --json /tmp/phase-1b3-slowshare.json 2>&1 | tail -40
 ```
 
 (Or whatever the actual flag is; Phase 1.B.2 used this successfully.)
@@ -737,7 +737,7 @@ Add the slow-path-share numbers to each per-handler ported report (Step 6).
 
 - [ ] **Step 8: Write phase-1b3-microbench.md**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b3-microbench.md` mirroring `phase-1b2-microbench.md`:
+Create `reports/lyng/dsl-1/phase-1b3-microbench.md` mirroring `phase-1b2-microbench.md`:
 
 ```markdown
 # Phase 1.B.3 — Microbench + slow-path-share results
@@ -776,15 +776,15 @@ All per-opcode gates green.
 
 Run in parallel:
 ```bash
-cargo test -p lyng-js-vm --lib --release
-cargo test -p lyng-js-tests --release
+cargo test -p lyng-vm --lib --release
+cargo test -p lyng-tests --release
 ```
 Expected: 418+ / 1209+.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add tools/lyng-js-bench/src/microbench/snippets.rs reports/js/lyng-js/dsl-asm-baseline-aarch64/ reports/js/lyng-js/dsl-handlers/op_load_local_*.md reports/js/lyng-js/dsl-handlers/op_store_local_*.md reports/js/lyng-js/dsl-handlers/op_ldar.md reports/js/lyng-js/dsl-1/phase-1b3-microbench.md
+git add tools/lyng-bench/src/microbench/snippets.rs reports/lyng/dsl-asm-baseline-aarch64/ reports/lyng/dsl-handlers/op_load_local_*.md reports/lyng/dsl-handlers/op_store_local_*.md reports/lyng/dsl-handlers/op_ldar.md reports/lyng/dsl-1/phase-1b3-microbench.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 4: per-opcode gates + microbench + slow-path-share
 
@@ -795,7 +795,7 @@ DSL-1 Phase 1.B.3 Task 4: per-opcode gates + microbench + slow-path-share
   contains the expected 2-instruction body + decode + dispatch tail.
 - Microbench (7-sample medians): all 9 within 2× LLInt reference.
   Headroom varies; documented per opcode in
-  reports/js/lyng-js/dsl-handlers/op_*.md.
+  reports/lyng/dsl-handlers/op_*.md.
 - Slow-path-share on V8 v7: 0.000% for all 9 opcodes (no bail
   conditions; combined ~<n>M dispatches per V8 v7 run, all inline).
 - Per-handler ported reports complete with asm + microbench +
@@ -811,10 +811,10 @@ EOF
 ## Task 5: Same-load A/B + cumulative A/B + Test262 + sub-phase summary + reviewer dispatch
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b3-ab-comparison.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1b3-summary.md`
-- Modify: `reports/js/lyng-js/dsl-1/phase-1b-followups.md` (record op_load_env_slot deferral)
+- Create: `reports/lyng/dsl-1/phase-1b3-ab-comparison.md`
+- Create: `reports/lyng/dsl-1/phase-1b3-cumulative-ab.md`
+- Create: `reports/lyng/dsl-1/phase-1b3-summary.md`
+- Modify: `reports/lyng/dsl-1/phase-1b-followups.md` (record op_load_env_slot deferral)
 
 - [ ] **Step 1: Same-load A/B vs immediate predecessor `08727f92`**
 
@@ -824,14 +824,14 @@ Mirror Phase 1.B.2 cleanup A/B protocol (the one that used 11 samples; HEAD `78e
 uptime  # capture loadavg
 git stash --include-untracked
 git checkout 08727f92
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 --json /tmp/phase-1b3-ab-base.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 11 --json /tmp/phase-1b3-ab-base.json 2>&1 | tail -20
 uptime
-git restore reports/js/lyng-js/bench-v8.md 2>/dev/null  # if modified by bench
+git restore reports/lyng/bench-v8.md 2>/dev/null  # if modified by bench
 git checkout claude/epic-saha-8f0b96
 git stash pop 2>/dev/null  # if anything was stashed
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 --json /tmp/phase-1b3-ab-post.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 11 --json /tmp/phase-1b3-ab-post.json 2>&1 | tail -20
 uptime
 ```
 
@@ -839,7 +839,7 @@ uptime
 
 Compute per-workload deltas + geomean. Target: aggregate ≤ 2% regression, ≤ 5% per-workload.
 
-Write `reports/js/lyng-js/dsl-1/phase-1b3-ab-comparison.md` mirroring `phase-1b2-ab-comparison.md` (the cleanup re-run version, with 11 samples).
+Write `reports/lyng/dsl-1/phase-1b3-ab-comparison.md` mirroring `phase-1b2-ab-comparison.md` (the cleanup re-run version, with 11 samples).
 
 - [ ] **Step 2: Cumulative A/B vs pre-DSL-0 `d850f261`**
 
@@ -848,20 +848,20 @@ This is the umbrella §1 criterion 5 gate. Repeat the A/B protocol with base = `
 ```bash
 git stash --include-untracked
 git checkout d850f261
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 --json /tmp/phase-1b3-cumulative-base.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 11 --json /tmp/phase-1b3-cumulative-base.json 2>&1 | tail -20
 uptime
-git restore reports/js/lyng-js/bench-v8.md 2>/dev/null
+git restore reports/lyng/bench-v8.md 2>/dev/null
 git checkout claude/epic-saha-8f0b96
 git stash pop 2>/dev/null
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 --json /tmp/phase-1b3-cumulative-post.json 2>&1 | tail -20
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 11 --json /tmp/phase-1b3-cumulative-post.json 2>&1 | tail -20
 uptime
 ```
 
 **Target: aggregate ≥ +3% geomean.** This is the meaningful cumulative gate that the entire Phase 1.B was working toward.
 
-Write `reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md`:
+Write `reports/lyng/dsl-1/phase-1b3-cumulative-ab.md`:
 
 ```markdown
 # Phase 1.B.3 — Cumulative A/B vs pre-DSL-0 HEAD `d850f261`
@@ -898,7 +898,7 @@ This is the definitive umbrella gate measurement at the cumulative level; supers
 - [ ] **Step 3: Capture Test262 pass count at HEAD**
 
 ```bash
-cargo run --release -p lyng-js-test262 -- 2>&1 | tail -10
+cargo run --release -p lyng-test262 -- 2>&1 | tail -10
 ```
 
 (Or whatever the actual command is; see `phase-1b-test262-baseline.md` for the precedent from cleanup batch 2.)
@@ -909,7 +909,7 @@ Note the pass count for the sub-phase summary.
 
 - [ ] **Step 4: Record op_load_env_slot deferral formally in followups doc**
 
-Open `reports/js/lyng-js/dsl-1/phase-1b-followups.md`. Add a new entry for the LoadEnvSlot deferral with details:
+Open `reports/lyng/dsl-1/phase-1b-followups.md`. Add a new entry for the LoadEnvSlot deferral with details:
 
 ```markdown
 ### op_load_env_slot — deferred to a substrate sub-phase
@@ -944,7 +944,7 @@ Dispatch a reviewer over the full sub-phase commit range. The brief MUST include
 >
 > 1. **Runtime-dispatch coverage of new backend macros.** The Phase 1.B.1 retrospective lesson (documented in `phase-1b1-summary.md`) is that structural-only validation tests missed the x22→x24 register-pin bug. Verify that the new `load_local_fixed!` and `store_local_fixed!` macros from Task 1 are exercised by REAL handlers in Task 2 + Task 3, not just by structural symbol-existence tests. Specifically check that the integration tests in `op_locals_inline.rs` and `op_ldar_inline.rs` actually run the inlined paths (not just the cold stubs).
 >
-> 2. **Asm correctness.** For each of the 9 ported handlers, verify the captured asm baseline at `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_*.asm` matches the design's "2 body + 1 decode + 4 dispatch = 7 instr" target. Spot-check for any unexpected register pins (e.g., x22 used where x20 was intended — the analog to the 1.B.1 bug).
+> 2. **Asm correctness.** For each of the 9 ported handlers, verify the captured asm baseline at `reports/lyng/dsl-asm-baseline-aarch64/op_*.asm` matches the design's "2 body + 1 decode + 4 dispatch = 7 instr" target. Spot-check for any unexpected register pins (e.g., x22 used where x20 was intended — the analog to the 1.B.1 bug).
 >
 > 3. **Per-opcode gates.** All 9 must satisfy: ≤ 12 inline instr, microbench within 2× LLInt, slow-path-share < 20% on V8 v7, behavioral parity. Cross-check the microbench numbers from `phase-1b3-microbench.md` against the per-handler ported reports.
 >
@@ -958,7 +958,7 @@ Address any high-severity findings before sub-phase close. Append reviewer sign-
 
 - [ ] **Step 6: Write Phase 1.B.3 sub-phase summary**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b3-summary.md` mirroring `phase-1b2-summary.md` (post-cleanup version). Include:
+Create `reports/lyng/dsl-1/phase-1b3-summary.md` mirroring `phase-1b2-summary.md` (post-cleanup version). Include:
 - Range, baseline-vs-HEAD SHAs
 - Status: closed
 - Scope landed (5 tasks → commits; 9 ports detailed)
@@ -977,7 +977,7 @@ Create `reports/js/lyng-js/dsl-1/phase-1b3-summary.md` mirroring `phase-1b2-summ
 - [ ] **Step 7: Commit Task 5 + Push final HEAD**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b3-ab-comparison.md reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md reports/js/lyng-js/dsl-1/phase-1b3-summary.md reports/js/lyng-js/dsl-1/phase-1b-followups.md
+git add reports/lyng/dsl-1/phase-1b3-ab-comparison.md reports/lyng/dsl-1/phase-1b3-cumulative-ab.md reports/lyng/dsl-1/phase-1b3-summary.md reports/lyng/dsl-1/phase-1b-followups.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.3 Task 5: same-load A/B + cumulative A/B + Test262 + reviewer + sub-phase summary
 

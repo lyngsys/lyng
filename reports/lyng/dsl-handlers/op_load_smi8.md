@@ -14,7 +14,7 @@ for the tag — saves an explicit `mov` from `b` to a fresh scratch.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -34,7 +34,7 @@ in-place. `store_reg!(a, b)` then writes that register to `REGS[a]`.
 
 ## Backend macro (new in this task)
 
-`crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs`:
+`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`:
 
 ```rust
 #[macro_export]
@@ -84,10 +84,10 @@ opcodes.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_smi8.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_smi8.asm`.
 
-Captured from `target/release/deps/lyng_js_vm-*.s` after a
-`cargo rustc --release -p lyng-js-vm --lib -- --emit=asm -C debuginfo=0`
+Captured from `target/release/deps/lyng_vm-*.s` after a
+`cargo rustc --release -p lyng-vm --lib -- --emit=asm -C debuginfo=0`
 build. Effective sequence (12 instructions):
 
 ```asm
@@ -193,7 +193,7 @@ in the system JSC binary or offlineasm sources. Reference taken from
 ## Backend macro (new in this task)
 
 `tag_smi_from_signed_byte!($reg)` was added to
-`crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs` immediately
+`crates/lyng/vm/src/dsl/backend/aarch64/values.rs` immediately
 after `tag_smi_const!`. The macro is `#[macro_export]`-d and re-exported
 into the `cold.rs` import list:
 
@@ -213,7 +213,7 @@ ported — the 16-bit analog with `sxth` instead of `sxtb`).
 
 Microbench snippet not yet present for `LoadSmi8`; deferred to
 Task 10.B. The pre-phase baseline at
-`reports/js/lyng-js/dsl-1/pre-phase-1a-baseline.md` confirms this for
+`reports/lyng/dsl-1/pre-phase-1a-baseline.md` confirms this for
 all nine Phase 1.A opcodes.
 
 ## V8 v7
@@ -225,7 +225,7 @@ should produce a measurable per-iteration speedup on integer-heavy
 workloads (counter loops, array index computations, arithmetic
 chains). Phase 1.A's aggregate impact will be measured at Task 10
 against the pre-phase baseline geomean of **387.09** captured in
-`reports/js/lyng-js/dsl-1/pre-phase-1a-baseline.md`.
+`reports/lyng/dsl-1/pre-phase-1a-baseline.md`.
 
 ## Slow-path-share
 
@@ -238,8 +238,8 @@ dispatches).
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **413 passed**.
-- `cargo test -p lyng-js-tests --release` — **1186 passed (2 suites)**.
+- `cargo test -p lyng-vm --lib --release` — **413 passed**.
+- `cargo test -p lyng-tests --release` — **1186 passed (2 suites)**.
 
 Both green; behavioral parity preserved.
 
@@ -247,7 +247,7 @@ Both green; behavioral parity preserved.
 signed-byte payload, so the critical correctness check is that
 negative literals (e.g. `-1`, `-128`) sign-extend properly to
 `Value::from_smi(-1) == 0x7ff8_0004_ffff_ffff`, NOT to
-`Value::from_smi(255) == 0x7ff8_0004_0000_00ff`. The lyng-js-tests
+`Value::from_smi(255) == 0x7ff8_0004_0000_00ff`. The lyng-tests
 crate contains many JS sources with negative integer literals; the
 fact that all 1186 pass after replacing the cold-stub round-trip
 with the inline DSL fast path confirms `sxtb` is producing the

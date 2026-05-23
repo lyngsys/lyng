@@ -1,8 +1,8 @@
 [package]
-name = "lyng-js-vm-dsl"
+name = "lyng-vm-dsl"
 version = "0.1.0"
 edition = "2021"
-description = "Proc-macro crate for the lyng-js asm-DSL interpreter substrate"
+description = "Proc-macro crate for the lyng asm-DSL interpreter substrate"
 license = "MIT"
 
 [lib]

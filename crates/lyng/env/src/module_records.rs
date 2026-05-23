@@ -1,7 +1,7 @@
-use lyng_js_common::AtomId;
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_host::{ImportMetaProperties, ModuleImportAttribute, ModuleKey};
-use lyng_js_types::{CodeRef, EnvironmentRef, ObjectRef, Value};
+use lyng_common::AtomId;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_host::{ImportMetaProperties, ModuleImportAttribute, ModuleKey};
+use lyng_types::{CodeRef, EnvironmentRef, ObjectRef, Value};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModuleRequestRecord {

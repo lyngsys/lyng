@@ -36,7 +36,7 @@
 //! `Continue { pc_advance: instruction_len }` return, which is the
 //! single point at which `translate_outcome_to_step` advances PC.
 
-use lyng_js_bytecode::Opcode;
+use lyng_bytecode::Opcode;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;

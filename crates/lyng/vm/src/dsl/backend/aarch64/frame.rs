@@ -1,7 +1,7 @@
 //! Frame-context backend macro for Phase 1.B.1.
 //!
 //! [`load_state_value!`] is a 1-instruction fixed-offset
-//! [`lyng_js_types::Value`] load from
+//! [`lyng_types::Value`] load from
 //! [`LlIntState`](crate::dsl::llint_state::LlIntState) through the
 //! STATE pin (x24).
 //!
@@ -34,7 +34,7 @@
 //!
 //! See spec §3.5.
 
-/// Load a [`lyng_js_types::Value`] (8 bytes) from a fixed offset in
+/// Load a [`lyng_types::Value`] (8 bytes) from a fixed offset in
 /// [`LlIntState`](crate::dsl::llint_state::LlIntState) into `$dst_reg`.
 ///
 /// The offset is named via the `vm_state_offset = <binding>` keyword
@@ -59,7 +59,11 @@
 macro_rules! load_state_value {
     ($dst_reg:tt, vm_state_offset = $binding:ident) => {
         concat!(
-            "ldr    x", stringify!($dst_reg), ", [x24, {", stringify!($binding), "}]\n",
+            "ldr    x",
+            stringify!($dst_reg),
+            ", [x24, {",
+            stringify!($binding),
+            "}]\n",
         )
     };
 }

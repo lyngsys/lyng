@@ -2,8 +2,8 @@ use crate::selection::ProposalStage;
 
 use std::env;
 
-pub const DEFAULT_REPORT_PATH: &str = "reports/js/lyng-js/test262.md";
-pub const DEFAULT_MANIFEST_PATH: &str = "reports/js/lyng-js/test262-exclusions.txt";
+pub const DEFAULT_REPORT_PATH: &str = "reports/lyng/test262.md";
+pub const DEFAULT_MANIFEST_PATH: &str = "reports/lyng/test262-exclusions.txt";
 pub const DEFAULT_TIMEOUT_MS: u64 = 1_000;
 pub const WORKER_FLAG: &str = "--worker";
 
@@ -167,7 +167,7 @@ pub fn parse_proposal_stage_arg(value: &str) -> Option<ProposalStage> {
 
 pub fn print_help() {
     eprintln!(
-        "Usage: lyng-js-test262 [--filter <path-or-fragment>] [--report <path>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--list-failures] [--timeout-ms <N>] [-j <N>]"
+        "Usage: lyng-test262 [--filter <path-or-fragment>] [--report <path>] [--manifest <path>] [--proposal-stage <4|3|2.7>] [--no-skip] [--list-failures] [--timeout-ms <N>] [-j <N>]"
     );
 }
 

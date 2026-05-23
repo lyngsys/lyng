@@ -3,8 +3,8 @@ use super::{
     ClusterSharedMemoryHandle, HostAgentId, ParkedAgentRecord, RuntimeDomainAccounting,
     SharedBackingStoreRecord, SharedMemoryRuntime, WaitLocation, WaiterKind, WaiterRecord,
 };
-use lyng_js_host::HostSharedBufferId;
-use lyng_js_types::BackingStoreRef;
+use lyng_host::HostSharedBufferId;
+use lyng_types::BackingStoreRef;
 use std::mem::size_of;
 use std::{cell::RefCell, rc::Rc};
 

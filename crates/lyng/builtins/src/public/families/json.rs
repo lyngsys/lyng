@@ -8,9 +8,9 @@ use super::{
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::AtomId;
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::AtomId;
+use lyng_env::Agent;
+use lyng_types::{
     json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
     BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId,
 };

@@ -2,7 +2,7 @@
 
 .section __TEXT,__text,regular,pure_instructions
 	.p2align	2
-lyng_js_vm::vm::dispatch_handlers::names::op_store_or_assign_global:
+lyng_vm::vm::dispatch_handlers::names::op_store_or_assign_global:
 Lfunc_begin370:
 	.cfi_startproc
 	.cfi_personality 155, _rust_eh_personality
@@ -114,7 +114,7 @@ LBB370_12:
 LBB370_14:
 	add x8, sp, #392
 	mov x1, x28
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::environment
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::environment
 	ldr x16, [sp, #392]
 	cmp x16, x26
 	b.eq LBB370_26
@@ -184,7 +184,7 @@ LBB370_21:
 LBB370_22:
 	add x8, sp, #392
 	mov x1, x28
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::environment
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::environment
 	ldr x16, [sp, #392]
 	cmp x16, x26
 	b.eq LBB370_26
@@ -244,9 +244,9 @@ LBB370_27:
 	ldrb w8, [x9, w8, uxtw]
 LBB370_29:
 Lloh957:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh958:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x25, x8, [x19]
 	b LBB370_133
@@ -277,7 +277,7 @@ LBB370_35:
 	add x0, sp, #392
 	mov x1, x22
 	mov x3, x21
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldr x9, [sp, #392]
 	ldrb w8, [sp, #400]
 	cmp x9, x25
@@ -374,7 +374,7 @@ LBB370_46:
 	mov x1, x22
 	mov w4, #0
 	mov x5, x28
-	bl lyng_js_vm::vm::loop_iteration::<impl lyng_js_vm::vm::Vm>::environment_for_slot_access
+	bl lyng_vm::vm::loop_iteration::<impl lyng_vm::vm::Vm>::environment_for_slot_access
 	ldur x8, [x29, #-200]
 	ldur w3, [x29, #-192]
 	cmp x8, x25
@@ -384,7 +384,7 @@ LBB370_46:
 	ldr x2, [sp, #104]
 	mov x4, x28
 	ldr x5, [sp, #72]
-	bl lyng_js_vm::vm::values::<impl lyng_js_vm::vm::Vm>::write_environment_slot
+	bl lyng_vm::vm::values::<impl lyng_vm::vm::Vm>::write_environment_slot
 	b LBB370_137
 LBB370_49:
 	add x15, sp, #392
@@ -447,7 +447,7 @@ LBB370_53:
 	mov x1, x22
 	mov w4, #0
 	mov x5, x28
-	bl lyng_js_vm::vm::loop_iteration::<impl lyng_js_vm::vm::Vm>::environment_for_slot_access
+	bl lyng_vm::vm::loop_iteration::<impl lyng_vm::vm::Vm>::environment_for_slot_access
 	ldur x8, [x29, #-200]
 	ldur w3, [x29, #-192]
 	cmp x8, x25
@@ -575,7 +575,7 @@ LBB370_81:
 	mov x4, x23
 	mov x5, x28
 	ldr x6, [sp, #72]
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_store_inline_cache
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_store_inline_cache
 	and w8, w0, #0xff
 	cmp w8, #2
 	b.ne LBB370_118
@@ -595,7 +595,7 @@ LBB370_81:
 	mov w3, #1
 	mov x4, x26
 	ldr x5, [sp, #72]
-	bl lyng_js_ops::proxy::set
+	bl lyng_ops::proxy::set
 	ldr x8, [sp, #192]
 	cmp x8, x25
 	b.ne LBB370_136
@@ -606,7 +606,7 @@ LBB370_81:
 	mov x4, x28
 	mov x5, x26
 	mov w6, #1
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 	b LBB370_158
 LBB370_86:
 	ldr w8, [sp, #516]
@@ -700,7 +700,7 @@ LBB370_106:
 	mov x4, x23
 	mov x5, x28
 	ldr x6, [sp, #72]
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_store_inline_cache
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_store_inline_cache
 	and w8, w0, #0xff
 	cmp w8, #2
 	b.ne LBB370_120
@@ -716,7 +716,7 @@ LBB370_106:
 	mov x2, x28
 	mov w3, #1
 	mov x4, x26
-	bl lyng_js_ops::proxy::has_property
+	bl lyng_ops::proxy::has_property
 	ldr x9, [sp, #192]
 	ldrb w8, [sp, #200]
 	cmp x9, x25
@@ -734,7 +734,7 @@ LBB370_106:
 	tbz w8, #0, LBB370_140
 	ldr x0, [sp, #104]
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	b LBB370_124
 LBB370_115:
 	mov w8, #0
@@ -769,7 +769,7 @@ LBB370_118:
 	mov x0, x22
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 LBB370_119:
 	str x25, [sp, #112]
 	ldr x8, [sp, #424]
@@ -784,7 +784,7 @@ LBB370_120:
 	tbz w8, #0, LBB370_125
 	ldr x0, [sp, #104]
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 LBB370_124:
 	mov x8, #-9223372036854775808
 	str x8, [sp, #112]
@@ -795,7 +795,7 @@ LBB370_125:
 	mov x0, x22
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 LBB370_126:
 	str x25, [sp, #112]
 	b LBB370_148
@@ -813,7 +813,7 @@ LBB370_128:
 	mov x2, x8
 	mov w4, #1
 	mov x5, x21
-	bl lyng_js_vm::vm::dispatch::decode_abx_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abx_operands_wide
 	ldr x8, [sp, #392]
 	cmp x8, x25
 	b.ne LBB370_18
@@ -868,7 +868,7 @@ LBB370_135:
 	mov x1, x22
 	mov x4, x28
 	ldr x5, [sp, #72]
-	bl lyng_js_vm::vm::values::<impl lyng_js_vm::vm::Vm>::assign_environment_slot
+	bl lyng_vm::vm::values::<impl lyng_vm::vm::Vm>::assign_environment_slot
 	b LBB370_148
 LBB370_136:
 	ldrb w9, [sp, #200]
@@ -909,7 +909,7 @@ LBB370_140:
 	mov w3, #1
 	mov x4, x26
 	ldr x5, [sp, #72]
-	bl lyng_js_ops::proxy::set
+	bl lyng_ops::proxy::set
 	ldr x9, [sp, #192]
 	ldrb w8, [sp, #200]
 	cmp x9, x25
@@ -927,7 +927,7 @@ LBB370_140:
 	tbz w8, #0, LBB370_157
 	ldr x0, [sp, #104]
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	b LBB370_124
 LBB370_147:
 	ldur q0, [sp, #201]
@@ -981,11 +981,11 @@ LBB370_157:
 	mov x4, x28
 	mov x5, x26
 	mov w6, #1
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 LBB370_158:
 	str x25, [sp, #112]
 	add x0, sp, #392
-	bl core::ptr::drop_in_place<lyng_js_env::environment_records::GlobalEnvironmentRecord>
+	bl core::ptr::drop_in_place<lyng_env::environment_records::GlobalEnvironmentRecord>
 	b LBB370_27
 LBB370_159:
 	ldr x8, [x9, #968]
@@ -1171,12 +1171,12 @@ LBB370_200:
 	sub x1, x29, #200
 	ldr x0, [sp, #104]
 	ldr x2, [sp, #72]
-	bl lyng_js_gc::mutator::PrimitiveMutator::store_value
+	bl lyng_gc::mutator::PrimitiveMutator::store_value
 LBB370_201:
 	ldr x0, [sp, #88]
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	ldr x27, [sp, #16]
 	b LBB370_119
 LBB370_202:
@@ -1189,7 +1189,7 @@ LBB370_203:
 	sub x1, x29, #200
 	ldr x0, [sp, #104]
 	ldr x2, [sp, #72]
-	bl lyng_js_gc::mutator::PrimitiveMutator::store_value
+	bl lyng_gc::mutator::PrimitiveMutator::store_value
 	tbnz w0, #0, LBB370_208
 LBB370_205:
 	ldr x8, [sp, #24]
@@ -1199,14 +1199,14 @@ LBB370_205:
 	tbz w8, #0, LBB370_208
 	ldr x0, [sp, #104]
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	ldr x27, [sp, #8]
 	b LBB370_124
 LBB370_208:
 	ldr x0, [sp, #88]
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	ldr x27, [sp, #8]
 	b LBB370_126
 LBB370_209:
@@ -1218,12 +1218,12 @@ LBB370_210:
 	sub x1, x29, #200
 	ldr x0, [sp, #104]
 	ldr x2, [sp, #72]
-	bl lyng_js_gc::mutator::PrimitiveMutator::store_value
+	bl lyng_gc::mutator::PrimitiveMutator::store_value
 LBB370_211:
 	ldr x0, [sp, #88]
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	mov x27, x24
 	str x25, [sp, #112]
 	ldr x8, [sp, #424]
@@ -1238,7 +1238,7 @@ LBB370_214:
 	sub x1, x29, #200
 	ldr x0, [sp, #104]
 	ldr x2, [sp, #72]
-	bl lyng_js_gc::mutator::PrimitiveMutator::store_value
+	bl lyng_gc::mutator::PrimitiveMutator::store_value
 	tbnz w0, #0, LBB370_219
 LBB370_216:
 	ldr x8, [sp, #24]
@@ -1248,24 +1248,24 @@ LBB370_216:
 	tbz w8, #0, LBB370_219
 	ldr x0, [sp, #104]
 	mov w1, #5
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	ldr x27, [sp, #8]
 	b LBB370_124
 LBB370_219:
 	ldr x0, [sp, #88]
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::record_feedback_slot
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::record_feedback_slot
 	ldr x27, [sp, #8]
 	b LBB370_126
 	mov x19, x0
 	add x0, sp, #392
-	bl core::ptr::drop_in_place<lyng_js_env::environment_records::GlobalEnvironmentRecord>
+	bl core::ptr::drop_in_place<lyng_env::environment_records::GlobalEnvironmentRecord>
 	mov x0, x19
 	bl __Unwind_Resume
 	mov x19, x0
 	add x0, sp, #392
-	bl core::ptr::drop_in_place<lyng_js_env::environment_records::GlobalEnvironmentRecord>
+	bl core::ptr::drop_in_place<lyng_env::environment_records::GlobalEnvironmentRecord>
 	mov x0, x19
 	bl __Unwind_Resume
 	.loh AdrpAdd	Lloh957, Lloh958

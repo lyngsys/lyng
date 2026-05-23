@@ -6,8 +6,8 @@ use super::{
 };
 use crate::vm::DynamicImportPhase;
 use crate::vm::{DynamicImportRequest, PendingDynamicImport};
-use lyng_js_bytecode::Opcode;
-use lyng_js_env::{ModuleStatus, RealmRecord};
+use lyng_bytecode::Opcode;
+use lyng_env::{ModuleStatus, RealmRecord};
 
 enum DynamicImportEvaluationOutcome {
     Fulfilled {
@@ -114,7 +114,7 @@ impl Vm {
         )?;
         let promise = agent
             .promise_capability(capability)
-            .and_then(lyng_js_env::PromiseCapabilityRecord::promise)
+            .and_then(lyng_env::PromiseCapabilityRecord::promise)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let specifier = arguments.first().copied().unwrap_or(Value::undefined());
         let options = arguments.get(1).copied().unwrap_or(Value::undefined());
@@ -165,7 +165,7 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
         caller_frame: &FrameRecord,
         constructor: ObjectRef,
-    ) -> VmResult<lyng_js_env::PromiseCapabilityId> {
+    ) -> VmResult<lyng_env::PromiseCapabilityId> {
         let capability = agent.alloc_promise_capability();
         let executor = Self::allocate_builtin_function_object(
             agent,
@@ -174,7 +174,7 @@ impl Vm {
         )?;
         let _ = agent.alloc_promise_resolving_function(
             executor,
-            lyng_js_env::PromiseResolvingFunctionRecord::new(
+            lyng_env::PromiseResolvingFunctionRecord::new(
                 PromiseResolvingFunctionKind::CapabilityExecutor,
                 capability,
             ),
@@ -290,24 +290,24 @@ impl Vm {
     pub(crate) fn active_script_or_module_referrer(agent: &Agent) -> Option<ModuleKey> {
         agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer)
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer)
             .map(|atom| ModuleKey::new(agent.atoms().resolve(atom).to_owned().into_boxed_str()))
     }
 
     fn enqueue_dynamic_import_settle_job(
         agent: &mut Agent,
         realm: RealmRef,
-        capability: lyng_js_env::PromiseCapabilityId,
+        capability: lyng_env::PromiseCapabilityId,
         value: Value,
         rejected: bool,
     ) {
         let script_or_module_referrer = agent
             .current_execution_context()
-            .and_then(lyng_js_env::ExecutionContext::script_or_module_referrer);
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
         let _ = agent.enqueue_job_with_payload(
-            lyng_js_host::HostJobKind::Promise,
-            lyng_js_env::ExecutableId::Builtin,
-            lyng_js_env::RuntimeJobPayload::DynamicImportSettle {
+            lyng_host::HostJobKind::Promise,
+            lyng_env::ExecutableId::Builtin,
+            lyng_env::RuntimeJobPayload::DynamicImportSettle {
                 capability,
                 value,
                 rejected,
@@ -322,7 +322,7 @@ impl Vm {
         &mut self,
         agent: &mut Agent,
         realm: RealmRef,
-        capability: lyng_js_env::PromiseCapabilityId,
+        capability: lyng_env::PromiseCapabilityId,
         request: ModuleSourceRequest,
         phase: DynamicImportPhase,
     ) {
@@ -336,9 +336,9 @@ impl Vm {
             phase,
         });
         let _ = agent.enqueue_job_with_payload(
-            lyng_js_host::HostJobKind::Promise,
-            lyng_js_env::ExecutableId::Builtin,
-            lyng_js_env::RuntimeJobPayload::DynamicImportEvaluate {
+            lyng_host::HostJobKind::Promise,
+            lyng_env::ExecutableId::Builtin,
+            lyng_env::RuntimeJobPayload::DynamicImportEvaluate {
                 request: request_id,
                 script_or_module_referrer,
             },
@@ -773,10 +773,7 @@ impl Vm {
         }
     }
 
-    fn dynamic_import_host_error_value(
-        agent: &mut Agent,
-        error: &lyng_js_host::HostError,
-    ) -> Value {
+    fn dynamic_import_host_error_value(agent: &mut Agent, error: &lyng_host::HostError) -> Value {
         Value::from_string_ref(alloc_string(agent, &error.to_string(), None))
     }
 }

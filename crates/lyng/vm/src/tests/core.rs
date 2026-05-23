@@ -172,7 +172,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
         .add_feedback_site(
             0,
             FeedbackSiteKind::Arithmetic,
-            lyng_js_bytecode::FeedbackSiteMetadata::None,
+            lyng_bytecode::FeedbackSiteMetadata::None,
         )
         .expect("test bytecode feedback site should build");
     let function = builder.finish().expect("test bytecode should build");
@@ -851,21 +851,21 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
         agent
             .objects()
             .function_data(getter_object)
-            .and_then(lyng_js_objects::FunctionObjectData::entry),
+            .and_then(lyng_objects::FunctionObjectData::entry),
         Some(FunctionEntryIdentity::Bytecode(_))
     ));
     assert!(matches!(
         agent
             .objects()
             .function_data(setter_object)
-            .and_then(lyng_js_objects::FunctionObjectData::entry),
+            .and_then(lyng_objects::FunctionObjectData::entry),
         Some(FunctionEntryIdentity::Bytecode(_))
     ));
 
     let Some(FunctionEntryIdentity::Bytecode(getter_code)) = agent
         .objects()
         .function_data(getter_object)
-        .and_then(lyng_js_objects::FunctionObjectData::entry)
+        .and_then(lyng_objects::FunctionObjectData::entry)
     else {
         panic!("getter should remain backed by installed bytecode");
     };
@@ -875,7 +875,7 @@ fn vm_installs_callable_index_accessors_from_object_literals() {
     let getter_environment = agent
         .objects()
         .function_data(getter_object)
-        .and_then(lyng_js_objects::FunctionObjectData::environment)
+        .and_then(lyng_objects::FunctionObjectData::environment)
         .expect("getter closure should preserve its outer environment");
     let getter_result = vm
         .evaluate_installed(
@@ -943,36 +943,32 @@ fn bootstrap_installs_phase6_wrapper_prototypes_for_to_object() {
     );
 
     let _ = vm
-        .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+        .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
 
-    assert!(lyng_js_ops::object::to_object(agent, realm.id(), Value::from_smi(7)).is_ok());
-    assert!(
-        lyng_js_ops::object::to_object(agent, realm.id(), Value::from_string_ref(string)).is_ok()
-    );
-    assert!(
-        lyng_js_ops::object::to_object(agent, realm.id(), Value::from_bigint_ref(bigint)).is_ok()
-    );
+    assert!(lyng_ops::object::to_object(agent, realm.id(), Value::from_smi(7)).is_ok());
+    assert!(lyng_ops::object::to_object(agent, realm.id(), Value::from_string_ref(string)).is_ok());
+    assert!(lyng_ops::object::to_object(agent, realm.id(), Value::from_bigint_ref(bigint)).is_ok());
 }
 
 struct WrapperPrimitiveProbe<'a> {
-    agent: &'a mut lyng_js_env::Agent,
+    agent: &'a mut lyng_env::Agent,
     called: bool,
 }
 
-impl lyng_js_ops::object::ToPrimitiveContext for WrapperPrimitiveProbe<'_> {
-    type Error = lyng_js_types::AbruptCompletion;
+impl lyng_ops::object::ToPrimitiveContext for WrapperPrimitiveProbe<'_> {
+    type Error = lyng_types::AbruptCompletion;
 
-    fn agent(&mut self) -> &mut lyng_js_env::Agent {
+    fn agent(&mut self) -> &mut lyng_env::Agent {
         self.agent
     }
 
-    fn abrupt(&mut self, completion: lyng_js_types::AbruptCompletion) -> Self::Error {
+    fn abrupt(&mut self, completion: lyng_types::AbruptCompletion) -> Self::Error {
         completion
     }
 
     fn type_error(&mut self) -> Self::Error {
-        lyng_js_ops::errors::throw_type_error(self.agent)
+        lyng_ops::errors::throw_type_error(self.agent)
     }
 
     fn get_property_value(
@@ -985,12 +981,12 @@ impl lyng_js_ops::object::ToPrimitiveContext for WrapperPrimitiveProbe<'_> {
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
         let Some(object) = value.as_object_ref() else {
-            return Err(lyng_js_ops::errors::throw_type_error(self.agent));
+            return Err(lyng_ops::errors::throw_type_error(self.agent));
         };
         if self.agent.objects().function_data(object).is_some() {
             Ok(object)
         } else {
-            Err(lyng_js_ops::errors::throw_type_error(self.agent))
+            Err(lyng_ops::errors::throw_type_error(self.agent))
         }
     }
 
@@ -1002,12 +998,12 @@ impl lyng_js_ops::object::ToPrimitiveContext for WrapperPrimitiveProbe<'_> {
     ) -> Result<Value, Self::Error> {
         self.called = true;
         let Some(object) = this_value.as_object_ref() else {
-            return Err(lyng_js_ops::errors::throw_type_error(self.agent));
+            return Err(lyng_ops::errors::throw_type_error(self.agent));
         };
         self.agent
             .objects()
             .primitive_wrapper_value(self.agent.heap().view(), object)
-            .ok_or_else(|| lyng_js_ops::errors::throw_type_error(self.agent))
+            .ok_or_else(|| lyng_ops::errors::throw_type_error(self.agent))
     }
 }
 
@@ -1020,21 +1016,21 @@ fn bootstrap_string_wrapper_uses_bootstrapped_string_prototype_methods() {
     let string = agent.alloc_runtime_string("abc", None, AllocationLifetime::Default);
 
     let _ = vm
-        .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+        .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
 
     let string_wrapper =
-        lyng_js_ops::object::to_object(agent, realm.id(), Value::from_string_ref(string)).unwrap();
+        lyng_ops::object::to_object(agent, realm.id(), Value::from_string_ref(string)).unwrap();
     let mut probe = WrapperPrimitiveProbe {
         agent,
         called: false,
     };
 
     assert_eq!(
-        lyng_js_ops::object::to_primitive(
+        lyng_ops::object::to_primitive(
             &mut probe,
             Value::from_object_ref(string_wrapper),
-            lyng_js_ops::object::ToPrimitiveHint::Number,
+            lyng_ops::object::ToPrimitiveHint::Number,
         ),
         Ok(Value::from_string_ref(string))
     );
@@ -1050,7 +1046,7 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
     let mut vm = Vm::new();
 
     let _ = vm
-        .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+        .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
     Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
@@ -1085,7 +1081,7 @@ fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
     let mut vm = Vm::new();
 
     let _ = vm
-        .bootstrap_realm(agent, realm.id(), lyng_js_builtins::BootstrapMode::SpecOnly)
+        .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
     Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
@@ -1490,7 +1486,7 @@ fn load_const_still_rejects_builtin_constants_without_runtime_support() {
     .with_kind(BytecodeFunctionKind::Script)
     .with_register_counts(1, 0)
     .with_constants(vec![ConstantValue::Builtin(
-        lyng_js_types::BuiltinFunctionId::from_raw(9).unwrap(),
+        lyng_types::BuiltinFunctionId::from_raw(9).unwrap(),
     )])
     .with_instructions(vec![
         Instruction::abx(Opcode::LoadConst, 0, 0),
@@ -1506,9 +1502,7 @@ fn load_const_still_rejects_builtin_constants_without_runtime_support() {
         Err(VmError::UnsupportedConstant {
             code: installed.code(),
             index: 0,
-            constant: ConstantValue::Builtin(
-                lyng_js_types::BuiltinFunctionId::from_raw(9).unwrap()
-            ),
+            constant: ConstantValue::Builtin(lyng_types::BuiltinFunctionId::from_raw(9).unwrap()),
         })
     );
 }

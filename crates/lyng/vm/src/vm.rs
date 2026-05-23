@@ -1,25 +1,25 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use lyng_js_builtins::{
+use lyng_builtins::{
     bootstrap_realm, BootstrapArtifacts, BootstrapMode, BootstrapRequest, BuiltinCache,
 };
-use lyng_js_bytecode::{
+use lyng_bytecode::{
     ArgumentsMode, BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionId, CallRange,
     CompiledAtom, CompiledFunctionUnit, CompiledScriptUnit, ConstantValue, DeoptSnapshot,
     GlobalScriptInstantiationPlan, Opcode, SafepointDescriptor, SourceMapEntry,
 };
-use lyng_js_common::{AtomId, SourceId, WellKnownAtom};
-use lyng_js_compiler::dynamic::DynamicFunctionCacheKey;
-use lyng_js_env::{
+use lyng_common::{AtomId, SourceId, WellKnownAtom};
+use lyng_compiler::dynamic::DynamicFunctionCacheKey;
+use lyng_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
     EnvironmentSlotFlags, ExecutionContext, ModuleRecord, ModuleStatus, RealmRecord,
     ThisBindingStatus, ThisState,
 };
-use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport};
-use lyng_js_host::{HostHooks, ModuleKey, NoopHostHooks};
-use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation};
-use lyng_js_types::{
+use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
+use lyng_host::{HostHooks, ModuleKey, NoopHostHooks};
+use lyng_objects::{NativeFunctionRegistry, ObjectAllocation};
+use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value,
     WellKnownSymbolId,
 };
@@ -187,8 +187,7 @@ pub struct Vm {
     /// never grown thereafter — the slow path neither widens nor
     /// reallocates the flat array, only mutates per-entry content.
     /// See `crate::dsl::feedback_flat` for the storage rationale.
-    pub(crate) feedback_flat_storage:
-        Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
+    pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
     /// DSL-0c placeholder for the safepoint poll-pending byte read by
     /// `poll_safepoint!` (warm `op_loop_header` / conditional backward
     /// jumps). The asm reads `[x22, VM_POLL_PENDING_OFFSET]` where
@@ -205,8 +204,7 @@ pub struct Vm {
     builtin_cache: BuiltinCache,
     template_cache: HashMap<TemplateCacheKey, ObjectRef>,
     dynamic_function_cache: HashMap<DynamicFunctionCacheKey, InstalledCode>,
-    suspended_side_states:
-        HashMap<lyng_js_types::SuspendedExecutionRef, SuspendedExecutionSideState>,
+    suspended_side_states: HashMap<lyng_types::SuspendedExecutionRef, SuspendedExecutionSideState>,
     async_frame_states: HashMap<u32, AsyncFrameState>,
     async_generator_objects: HashSet<ObjectRef>,
     async_generator_frame_states: HashMap<u32, AsyncGeneratorFrameState>,
@@ -442,10 +440,12 @@ impl Vm {
             return None;
         }
         let counters = self.dispatch_counters.counters();
-        Some(crate::slow_path_counts::SlowPathCounts::from_dispatch_arrays(
-            &counters.slow_semantic,
-            &counters.slow_safepoint,
-        ))
+        Some(
+            crate::slow_path_counts::SlowPathCounts::from_dispatch_arrays(
+                &counters.slow_semantic,
+                &counters.slow_safepoint,
+            ),
+        )
     }
 
     #[cfg(feature = "opcode-counters")]
@@ -780,7 +780,7 @@ impl Vm {
         realm: RealmRef,
         mode: BootstrapMode,
     ) -> Result<BootstrapArtifacts, VmError> {
-        lyng_js_builtins::bootstrap_realm(
+        lyng_builtins::bootstrap_realm(
             agent,
             &mut self.builtin_cache,
             realm,
@@ -839,7 +839,7 @@ impl Vm {
             provider.install_realm_extensions(&mut installation)?;
             if !agent.mark_realm_embedding_bootstrapped(realm) {
                 return Err(VmError::BuiltinBootstrap(
-                    lyng_js_builtins::BuiltinBootstrapError::MissingRealm(realm),
+                    lyng_builtins::BuiltinBootstrapError::MissingRealm(realm),
                 ));
             }
         }
@@ -1468,7 +1468,7 @@ impl Vm {
             })
             .with_new_target(new_target)
             .with_script_or_module_referrer(script_or_module_referrer);
-        let context = if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Module {
+        let context = if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
             let module_referrer = agent
                 .module_key_for_environment(lexical_env)
                 .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
@@ -1545,7 +1545,7 @@ impl Vm {
         global_script_plan: Option<&GlobalScriptInstantiationPlan>,
         entry_override: Option<EntryExecutionOverride>,
     ) -> VmResult<(EnvironmentRef, EnvironmentRef, Value, Option<ObjectRef>)> {
-        if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Module {
+        if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
             let this_value = Value::undefined();
             if !function.needs_environment() {
                 return Ok((lexical_env, lexical_env, this_value, None));
@@ -1555,7 +1555,7 @@ impl Vm {
             }
             let layout = function
                 .environment_layout()
-                .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
+                .and_then(|layout| lyng_env::EnvironmentLayoutId::from_raw(layout.get()))
                 .ok_or(VmError::MissingEnvironmentLayout(code))?;
             let module_env = agent
                 .alloc_module_environment(Some(lexical_env), layout, AllocationLifetime::Default)
@@ -1587,7 +1587,7 @@ impl Vm {
 
         let layout = function
             .environment_layout()
-            .and_then(|layout| lyng_js_env::EnvironmentLayoutId::from_raw(layout.get()))
+            .and_then(|layout| lyng_env::EnvironmentLayoutId::from_raw(layout.get()))
             .ok_or(VmError::MissingEnvironmentLayout(code))?;
         let global_object = agent
             .realm(realm)
@@ -1611,7 +1611,7 @@ impl Vm {
                 AllocationLifetime::Default,
             )
             .ok_or(VmError::MissingEnvironmentLayout(code))?;
-        if function.kind() == lyng_js_bytecode::BytecodeFunctionKind::Script
+        if function.kind() == lyng_bytecode::BytecodeFunctionKind::Script
             && let Some(global_script_plan) = global_script_plan
         {
             Self::bind_global_script_lexical_bindings(

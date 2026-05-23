@@ -1,3 +1,3 @@
 fn main() {
-    lyng_js_test262::main_entry();
+    lyng_test262::main_entry();
 }

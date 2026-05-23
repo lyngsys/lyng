@@ -9,7 +9,7 @@ and bails to the slow path if the mirror equals
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -34,10 +34,10 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_this.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_this.asm`.
 
-Captured from `target/release/deps/lyng_js_vm-*.s` after a
-`cargo rustc --release -p lyng-js-vm --lib -- --emit=asm -C debuginfo=0`
+Captured from `target/release/deps/lyng_vm-*.s` after a
+`cargo rustc --release -p lyng-vm --lib -- --emit=asm -C debuginfo=0`
 build. Effective fast-path sequence (slow-path tail elided):
 
 ```asm
@@ -139,7 +139,7 @@ distinguished pattern).
 ## Microbench
 
 The Phase 1.B.2 plan / spec assumed a `LoadThis` snippet was added in
-Phase 1.B.0 Task 7. **It was not** — `tools/lyng-js-bench/src/microbench/snippets.rs`
+Phase 1.B.0 Task 7. **It was not** — `tools/lyng-bench/src/microbench/snippets.rs`
 at HEAD `ad240f50` adds 14 snippets but neither `LoadConst8` nor
 `LoadThis` are among them.
 
@@ -176,7 +176,7 @@ strong evidence that the sentinel-materialization cost is not on the
 critical path of the dispatch loop.
 
 The full microbench discussion lives at
-[`reports/js/lyng-js/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
+[`reports/lyng/dsl-1/phase-1b2-microbench.md`](../dsl-1/phase-1b2-microbench.md).
 
 ## V8 v7
 
@@ -190,7 +190,7 @@ magnitude), and the two workloads showing the largest improvement
 (Richards +15.06%, DeltaBlue +9.03%) are method-dispatch-heavy and
 the natural targets for an op_load_this speedup.
 
-Full A/B report: [`reports/js/lyng-js/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
+Full A/B report: [`reports/lyng/dsl-1/phase-1b2-ab-comparison.md`](../dsl-1/phase-1b2-ab-comparison.md).
 
 ## Slow-path-share
 
@@ -221,8 +221,8 @@ substantial headroom.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **418 passed**.
-- `cargo test -p lyng-js-tests --release` — **1198 passed** (1187
+- `cargo test -p lyng-vm --lib --release` — **418 passed**.
+- `cargo test -p lyng-tests --release` — **1198 passed** (1187
   baseline + 1 vm-lib prelude test + 5 op_load_const8 tests + 6 new
   op_load_this tests).
 
@@ -245,7 +245,7 @@ Integration tests cover (`tests/src/op_load_this_inline.rs`):
 **Coverage gap (documented):** the ThisState::Uninitialized arm
 (derived constructor pre-super() access throwing ReferenceError) is
 NOT directly tested through JS. Class-inheritance + super() flow
-support in the lyng-js compiler/runtime is not yet exercised by
+support in the lyng compiler/runtime is not yet exercised by
 the existing integration tests, and constructing the TDZ scenario
 reliably requires careful class-syntax setup. The sentinel-bail
 mechanism is still exercised end-to-end by the arrow-function tests
@@ -278,7 +278,7 @@ sentinel-bail arm fires (it just bails uniformly).
   (`branch_zero!`, `branch_nonzero!`, etc.).
 - **`.slow:` label convention.** Mirrors the existing
   `op_add_dsl` hot-path pattern (see
-  `crates/lyng-js/vm/src/dsl/handlers/hot.rs:71`): the DSL `.slow:`
+  `crates/lyng/vm/src/dsl/handlers/hot.rs:71`): the DSL `.slow:`
   body label is lowered to `<handler_name>slow` by the proc-macro
   prefix mechanism, avoiding cross-handler label collisions in the
   same translation unit.
@@ -293,15 +293,15 @@ sentinel-bail arm fires (it just bails uniformly).
 - **JS-level test for `ThisState::Uninitialized` arm** —
   the derived-constructor-pre-super() TDZ scenario is not directly
   tested through JS in this codebase yet. Tracked in
-  [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
-  item 1. Blocked on the lyng-js parser/compiler covering
+  [`reports/lyng/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
+  item 1. Blocked on the lyng parser/compiler covering
   class-inheritance + super() flow reliably; the inline-asm fast
   path is invariant to which sentinel-bail arm fires, so deferring
   this test does not affect the inline-port correctness.
 - **asm-diff registry extension for `dsl::handlers::cold::*`** —
   the asm baseline at
-  `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_this.asm`
+  `reports/lyng/dsl-asm-baseline-aarch64/op_load_this.asm`
   was captured manually because the structured asm-diff tool
   doesn't yet support the cold-handler namespace. Tracked in
-  [`reports/js/lyng-js/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
+  [`reports/lyng/dsl-1/phase-1b-followups.md`](../dsl-1/phase-1b-followups.md)
   item 2.

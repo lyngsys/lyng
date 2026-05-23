@@ -1,7 +1,7 @@
 
 .section __TEXT,__text,regular,pure_instructions
 	.p2align	2
-lyng_js_vm::vm::dispatch_handlers::names::op_load_global:
+lyng_vm::vm::dispatch_handlers::names::op_load_global:
 Lfunc_begin358:
 	.cfi_startproc
 	.cfi_personality 155, _rust_eh_personality
@@ -113,7 +113,7 @@ LBB358_13:
 LBB358_16:
 	mov x0, x23
 	mov x1, x26
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::environment_outer
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::environment_outer
 	tbz w0, #0, LBB358_19
 	cbnz w1, LBB358_13
 LBB358_19:
@@ -160,7 +160,7 @@ LBB358_27:
 	mov x0, x23
 	mov x1, x26
 	ldr x2, [sp, #56]
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::global_lexical_binding
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::global_lexical_binding
 	ldur w8, [x29, #-136]
 	cbz w8, LBB358_37
 	ldur w21, [x29, #-128]
@@ -172,7 +172,7 @@ LBB358_30:
 	mov x3, x26
 	mov w4, #0
 	mov x5, x21
-	bl lyng_js_vm::vm::loop_iteration::<impl lyng_js_vm::vm::Vm>::environment_for_slot_access
+	bl lyng_vm::vm::loop_iteration::<impl lyng_vm::vm::Vm>::environment_for_slot_access
 	ldur x8, [x29, #-136]
 	ldur w26, [x29, #-128]
 	cmp x8, x28
@@ -180,7 +180,7 @@ LBB358_30:
 	mov x0, x23
 	mov x1, x26
 	mov x2, x21
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::environment_slot
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::environment_slot
 	tbz w0, #0, LBB358_19
 	mov x21, x1
 	mov x8, #2
@@ -190,7 +190,7 @@ LBB358_30:
 	b.ne LBB358_78
 	mov x0, x23
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x21, x0
 	mov w26, #0
 	mov x8, #-9223372036854775808
@@ -254,7 +254,7 @@ LBB358_50:
 	sub x0, x29, #136
 	mov x2, x23
 	mov x3, x21
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldur x8, [x29, #-136]
 	ldurb w26, [x29, #-128]
 	cmp x8, x28
@@ -297,7 +297,7 @@ LBB358_59:
 	sub x0, x29, #136
 	mov w4, #1
 	mov x5, x22
-	bl lyng_js_vm::vm::dispatch::decode_abx_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abx_operands_wide
 	ldur x8, [x29, #-136]
 	cmp x8, x28
 	b.ne LBB358_24
@@ -360,7 +360,7 @@ LBB358_66:
 LBB358_69:
 	mov x0, x23
 	mov x1, x26
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::global_environment_object
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::global_environment_object
 	mov x25, x0
 	cbz w0, LBB358_19
 	ldr x12, [sp, #64]
@@ -387,7 +387,7 @@ LBB358_75:
 	mov x2, x22
 	mov x3, x24
 	mov x4, x25
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::try_named_property_load_inline_cache_hit
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::try_named_property_load_inline_cache_hit
 	tbz w0, #0, LBB358_81
 	mov x21, x1
 LBB358_78:
@@ -406,9 +406,9 @@ LBB358_78:
 	ldrb w8, [x9, w8, uxtw]
 LBB358_79:
 Lloh903:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 Lloh904:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x28, x8, [x19]
 	b LBB358_64
@@ -431,7 +431,7 @@ LBB358_81:
 	ldp x4, x3, [sp, #40]
 	ldp x6, x5, [sp, #24]
 	mov x7, x20
-	bl lyng_js_vm::vm::names::<impl lyng_js_vm::vm::Vm>::get_global_property_binding_with_context
+	bl lyng_vm::vm::names::<impl lyng_vm::vm::Vm>::get_global_property_binding_with_context
 	ldp x8, x26, [x29, #-136]
 	ldur x21, [x29, #-120]
 	cmp x8, x28
@@ -443,7 +443,7 @@ LBB358_81:
 	mov x3, x24
 	mov x4, x25
 	mov w6, #0
-	bl lyng_js_vm::vm::feedback::<impl lyng_js_vm::vm::Vm>::observe_named_property_slow_path
+	bl lyng_vm::vm::feedback::<impl lyng_vm::vm::Vm>::observe_named_property_slow_path
 	b LBB358_78
 LBB358_85:
 	mov w26, #0
@@ -460,7 +460,7 @@ LBB358_86:
 LBB358_87:
 	mov x0, x23
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x21, x0
 	mov w9, #0
 	mov w26, #0
@@ -526,11 +526,11 @@ LBB358_102:
 	add x8, sp, #144
 LBB358_104:
 	ldr x21, [x8, x9, lsl #3]
-	bl lyng_js_vm::vm::feedback::FeedbackSiteState::record_execution
+	bl lyng_vm::vm::feedback::FeedbackSiteState::record_execution
 	ldr x8, [sp, #64]
 	ldp x0, x1, [x8, #120]
 	mov x2, x22
-	bl lyng_js_vm::vm::tiering::<impl lyng_js_vm::vm::Vm>::observe_tier_feedback_event
+	bl lyng_vm::vm::tiering::<impl lyng_vm::vm::Vm>::observe_tier_feedback_event
 	b LBB358_78
 	bl core::panicking::panic_cannot_unwind
 	bl core::panicking::panic_cannot_unwind

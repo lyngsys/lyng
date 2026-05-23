@@ -4,11 +4,11 @@
 )]
 
 use super::*;
-use lyng_js_common::{AtomId, AtomLifetime};
-use lyng_js_env::RealmBootstrapState;
-use lyng_js_gc::{AllocationLifetime, AtomGcSweep};
-use lyng_js_host::NoopHostHooks;
-use lyng_js_types::{
+use lyng_common::{AtomId, AtomLifetime};
+use lyng_env::RealmBootstrapState;
+use lyng_gc::{AllocationLifetime, AtomGcSweep};
+use lyng_host::NoopHostHooks;
+use lyng_types::{
     array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
     array_buffer_slice_builtin, array_from_async_builtin, array_iterator_next_builtin,
     array_species_getter_builtin, array_values_builtin,
@@ -93,7 +93,7 @@ fn own_descriptor(
 
 #[test]
 fn bootstrap_atom_property_keys_are_permanent_after_sweep() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -185,7 +185,7 @@ fn bootstrap_atom_property_keys_are_permanent_after_sweep() {
 
 #[test]
 fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -755,7 +755,7 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_array_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -887,7 +887,7 @@ fn shared_bootstrap_installs_array_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_collection_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -979,7 +979,7 @@ fn shared_bootstrap_installs_collection_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_iterator_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1134,7 +1134,7 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_keeps_generator_iterator_method_inherited() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1185,7 +1185,7 @@ fn shared_bootstrap_keeps_generator_iterator_method_inherited() {
 
 #[test]
 fn shared_bootstrap_installs_object_reflection_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1253,7 +1253,7 @@ fn shared_bootstrap_installs_object_reflection_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_json_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1319,7 +1319,7 @@ fn shared_bootstrap_installs_json_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_string_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1434,7 +1434,7 @@ fn shared_bootstrap_installs_string_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_regexp_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1549,7 +1549,7 @@ fn shared_bootstrap_installs_regexp_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_date_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1656,7 +1656,7 @@ fn shared_bootstrap_installs_date_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_primitive_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -1861,7 +1861,7 @@ fn shared_bootstrap_installs_primitive_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_binary_data_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -2223,7 +2223,7 @@ fn shared_bootstrap_installs_binary_data_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_promise_disposal_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -2419,7 +2419,7 @@ fn shared_bootstrap_installs_promise_disposal_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_installs_error_family_descriptors() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
 
@@ -2519,7 +2519,7 @@ fn shared_bootstrap_installs_error_family_descriptors() {
 
 #[test]
 fn shared_bootstrap_supports_selected_realm_shells() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let default_realm = agent.default_realm().expect("default realm should exist");
     let extra_realm = agent.create_default_realm_shell(AllocationLifetime::Default);
@@ -2583,7 +2583,7 @@ fn shared_bootstrap_supports_selected_realm_shells() {
 
 #[test]
 fn descriptor_installer_supports_accessor_rows() {
-    let mut runtime = lyng_js_env::Runtime::new(NoopHostHooks);
+    let mut runtime = lyng_env::Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let mut cache = BuiltinCache::new();
     let artifacts = bootstrap_default_realm(

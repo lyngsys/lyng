@@ -1,8 +1,8 @@
 // DSL-1 Phase 1.C.2 op_shift_right_dsl handler asm (AArch64), captured from
-//   cargo rustc --release -p lyng-js-vm --lib -- --emit=asm
+//   cargo rustc --release -p lyng-vm --lib -- --emit=asm
 //
-// Symbol: lyng_js_vm::dsl::handlers::cold::op_shift_right_dsl
-// Source: crates/lyng-js/vm/src/dsl/handlers/cold.rs
+// Symbol: lyng_vm::dsl::handlers::cold::op_shift_right_dsl
+// Source: crates/lyng/vm/src/dsl/handlers/cold.rs
 // Layout: AbcSlot (a, b, c byte operands + 16-bit feedback slot),
 // length = 6 bytes.
 //

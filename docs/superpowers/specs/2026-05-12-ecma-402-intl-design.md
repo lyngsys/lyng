@@ -29,25 +29,25 @@ ready for future Stage 3 movement.
 ECMA-402 becomes part of the default Lyng JS realm. The implementation still keeps a hard
 internal boundary so Intl data and algorithms do not leak into VM hot paths.
 
-### `lyng-js-host`
+### `lyng-host`
 
 Define a small data-provider boundary only if ICU4X needs runtime provider plumbing. This
 is not the semantic owner of Intl. It exists to keep locale data loading/configuration
 explicit and embeddable.
 
-### `lyng-js-env`
+### `lyng-env`
 
 Own per-agent Intl data/provider state if runtime provider state is needed. Agents already
 own realm/runtime substrate, atom tables, heaps, and shared tables, so immutable default
 locale, available locale summaries, and provider handles fit here.
 
-### `lyng-js-objects`
+### `lyng-objects`
 
 Add typed Intl object payload records for formatter instances and `Intl.Locale`, similar
 in spirit to the existing Temporal payload records. These records store resolved
 internal-slot state in compact structs rather than ad hoc guest-visible properties.
 
-### `lyng-js-ops`
+### `lyng-ops`
 
 Own reusable ECMA-402 abstract operations:
 
@@ -61,13 +61,13 @@ Own reusable ECMA-402 abstract operations:
 
 Builtins should call these helpers instead of duplicating option and locale algorithms.
 
-### `lyng-js-builtins`
+### `lyng-builtins`
 
 Own the `Intl` global object, constructors/prototypes, builtin metadata, descriptor
 installation, realm builtin caches, and native dispatch. Each constructor family should
 have focused metadata, family installer, and dispatch modules.
 
-### `tools/lyng-js-test262` and `reports/js/lyng-js`
+### `tools/lyng-test262` and `reports/lyng`
 
 Move from whole-suite `intl402/*` exclusion to intentional subset tracking. The broad
 manifest exclusion should be narrowed only as constructor families become meaningful, so
@@ -154,17 +154,17 @@ conformance closure.
 ## Verification Strategy
 
 - Run focused crate tests for touched crates first:
-  - `cargo test -p lyng-js-builtins`
-  - `cargo test -p lyng-js-ops`
-  - `cargo test -p lyng-js-objects`
-  - `cargo test -p lyng-js-env`
-  - `cargo test -p lyng-js-tests`
+  - `cargo test -p lyng-builtins`
+  - `cargo test -p lyng-ops`
+  - `cargo test -p lyng-objects`
+  - `cargo test -p lyng-env`
+  - `cargo test -p lyng-tests`
 - Run targeted Intl Test262 subsets as they become runnable:
-  - `cargo run --release -p lyng-js-test262 -- --filter intl402/Locale --report /tmp/lyng-js-test262-intl-locale.md -j 4`
-  - `cargo run --release -p lyng-js-test262 -- --filter intl402/NumberFormat --report /tmp/lyng-js-test262-intl-numberformat.md -j 4`
-  - `cargo run --release -p lyng-js-test262 -- --filter intl402/DateTimeFormat --report /tmp/lyng-js-test262-intl-datetimeformat.md -j 4`
+  - `cargo run --release -p lyng-test262 -- --filter intl402/Locale --report /tmp/lyng-test262-intl-locale.md -j 4`
+  - `cargo run --release -p lyng-test262 -- --filter intl402/NumberFormat --report /tmp/lyng-test262-intl-numberformat.md -j 4`
+  - `cargo run --release -p lyng-test262 -- --filter intl402/DateTimeFormat --report /tmp/lyng-test262-intl-datetimeformat.md -j 4`
 - Run whole `intl402` sweeps before removing broad exclusions:
-  - `cargo run --release -p lyng-js-test262 -- --filter intl402 --report /tmp/lyng-js-test262-intl402.md -j 12`
+  - `cargo run --release -p lyng-test262 -- --filter intl402 --report /tmp/lyng-test262-intl402.md -j 12`
 - Run Clippy before marking implementation issues in review:
   - `cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery`
 

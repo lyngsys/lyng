@@ -9,163 +9,163 @@ pub(super) fn dispatch_temporal_zoned_date_time_builtin<Cx: PublicBuiltinDispatc
     entry: BuiltinFunctionId,
     invocation: BuiltinInvocation<'_>,
 ) -> Result<Option<Value>, Cx::Error> {
-    if entry == lyng_js_types::temporal_zoned_date_time_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_builtin() {
         return temporal_zoned_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_year_getter_builtin() {
         return temporal_zoned_date_time_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_month_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_month_getter_builtin() {
         return temporal_zoned_date_time_month_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_month_code_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_month_code_getter_builtin() {
         return temporal_zoned_date_time_month_code_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_day_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_day_getter_builtin() {
         return temporal_zoned_date_time_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_day_of_week_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_day_of_week_getter_builtin() {
         return temporal_zoned_date_time_day_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_day_of_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_day_of_year_getter_builtin() {
         return temporal_zoned_date_time_day_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_days_in_month_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_days_in_month_getter_builtin() {
         return temporal_zoned_date_time_days_in_month_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_days_in_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_days_in_year_getter_builtin() {
         return temporal_zoned_date_time_days_in_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_months_in_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_months_in_year_getter_builtin() {
         return temporal_zoned_date_time_months_in_year_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_in_leap_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_in_leap_year_getter_builtin() {
         return temporal_zoned_date_time_in_leap_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_days_in_week_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_days_in_week_getter_builtin() {
         return temporal_zoned_date_time_days_in_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_week_of_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_week_of_year_getter_builtin() {
         return temporal_zoned_date_time_week_of_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_year_of_week_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_year_of_week_getter_builtin() {
         return temporal_zoned_date_time_year_of_week_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_era_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_era_getter_builtin() {
         return temporal_zoned_date_time_era_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_era_year_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_era_year_getter_builtin() {
         return temporal_zoned_date_time_era_year_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_hour_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_hour_getter_builtin() {
         return temporal_zoned_date_time_hour_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_minute_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_minute_getter_builtin() {
         return temporal_zoned_date_time_minute_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_second_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_second_getter_builtin() {
         return temporal_zoned_date_time_second_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_millisecond_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_millisecond_getter_builtin() {
         return temporal_zoned_date_time_millisecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_microsecond_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_microsecond_getter_builtin() {
         return temporal_zoned_date_time_microsecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_nanosecond_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_nanosecond_getter_builtin() {
         return temporal_zoned_date_time_nanosecond_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_epoch_nanoseconds_getter_builtin() {
         return temporal_zoned_date_time_epoch_nanoseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_epoch_milliseconds_getter_builtin() {
         return temporal_zoned_date_time_epoch_milliseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_time_zone_id_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_time_zone_id_getter_builtin() {
         return temporal_zoned_date_time_time_zone_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_calendar_id_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_calendar_id_getter_builtin() {
         return temporal_zoned_date_time_calendar_id_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_offset_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_offset_getter_builtin() {
         return temporal_zoned_date_time_offset_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_offset_nanoseconds_getter_builtin() {
         return temporal_zoned_date_time_offset_nanoseconds_getter_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_string_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_string_builtin() {
         return temporal_zoned_date_time_to_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_json_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_json_builtin() {
         return temporal_zoned_date_time_to_json_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_locale_string_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_locale_string_builtin() {
         return temporal_zoned_date_time_to_locale_string_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_value_of_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_value_of_builtin() {
         return temporal_zoned_date_time_value_of_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_equals_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_equals_builtin() {
         return temporal_zoned_date_time_equals_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_add_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_add_builtin() {
         return temporal_zoned_date_time_add_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_round_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_round_builtin() {
         return temporal_zoned_date_time_round_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_with_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_with_builtin() {
         return temporal_zoned_date_time_with_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_subtract_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_subtract_builtin() {
         return temporal_zoned_date_time_subtract_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_with_time_zone_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_with_time_zone_builtin() {
         return temporal_zoned_date_time_with_time_zone_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_with_calendar_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_with_calendar_builtin() {
         return temporal_zoned_date_time_with_calendar_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_with_plain_time_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_with_plain_time_builtin() {
         return temporal_zoned_date_time_with_plain_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_start_of_day_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_start_of_day_builtin() {
         return temporal_zoned_date_time_start_of_day_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_get_time_zone_transition_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_get_time_zone_transition_builtin() {
         return temporal_zoned_date_time_get_time_zone_transition_builtin(context, invocation)
             .map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_hours_in_day_getter_builtin() {
         return temporal_zoned_date_time_hours_in_day_getter_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_since_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_since_builtin() {
         return temporal_zoned_date_time_since_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_until_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_until_builtin() {
         return temporal_zoned_date_time_until_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_from_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_from_builtin() {
         return temporal_zoned_date_time_from_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_compare_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_compare_builtin() {
         return temporal_zoned_date_time_compare_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_instant_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_instant_builtin() {
         return temporal_zoned_date_time_to_instant_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_time_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_plain_date_time_builtin() {
         return temporal_zoned_date_time_to_plain_date_time_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_date_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_plain_date_builtin() {
         return temporal_zoned_date_time_to_plain_date_builtin(context, invocation).map(Some);
     }
-    if entry == lyng_js_types::temporal_zoned_date_time_to_plain_time_builtin() {
+    if entry == lyng_types::temporal_zoned_date_time_to_plain_time_builtin() {
         return temporal_zoned_date_time_to_plain_time_builtin(context, invocation).map(Some);
     }
     Ok(None)
@@ -360,7 +360,7 @@ pub(super) fn temporal_now_instant_and_civil<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn temporal_atom_text<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    atom: lyng_js_common::AtomId,
+    atom: lyng_common::AtomId,
 ) -> Result<String, Cx::Error> {
     cx.agent()
         .atoms()

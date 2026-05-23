@@ -1,14 +1,14 @@
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
-use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
-use lyng_js_gc::ValueStoreTarget;
-use lyng_js_objects::{
+use lyng_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
+use lyng_gc::ValueStoreTarget;
+use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
     NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyProtoHandler, ObjectFlags,
     ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency,
 };
-use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
+use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::{cmp::Ordering, mem::size_of};
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
@@ -22,7 +22,7 @@ const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;
 /// `POLY_LIMIT` (up to `POLYMORPHIC_PROPERTY_CACHE_LIMIT`) still live in
 /// `entries` and are reached via the slow path; mega-poly transition is
 /// unchanged. Value chosen by bench evidence on V8 v7 — see
-/// `reports/js/lyng-js/phase-3f-bench.md`.
+/// `reports/lyng/phase-3f-bench.md`.
 pub(in crate::vm) const POLY_LIMIT: usize = 2;
 
 #[inline]
@@ -31,13 +31,13 @@ pub(super) fn call_feedback_builtin_is_frame_safe(entry: BuiltinFunctionId) -> b
     // strictness, dynamically compile source, or re-enter through Function.prototype
     // call helpers, so dispatching from a monomorphic feedback entry preserves the
     // general call path's caller frame and callee realm behavior.
-    entry == lyng_js_types::regexp_exec_builtin()
-        || entry == lyng_js_types::regexp_symbol_replace_builtin()
-        || entry == lyng_js_types::regexp_test_builtin()
-        || entry == lyng_js_types::string_char_code_at_builtin()
-        || entry == lyng_js_types::string_from_char_code_builtin()
-        || entry == lyng_js_types::string_replace_builtin()
-        || entry == lyng_js_types::string_to_upper_case_builtin()
+    entry == lyng_types::regexp_exec_builtin()
+        || entry == lyng_types::regexp_symbol_replace_builtin()
+        || entry == lyng_types::regexp_test_builtin()
+        || entry == lyng_types::string_char_code_at_builtin()
+        || entry == lyng_types::string_from_char_code_builtin()
+        || entry == lyng_types::string_replace_builtin()
+        || entry == lyng_types::string_to_upper_case_builtin()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -780,7 +780,7 @@ impl CallCacheEntry {
             .object_header(agent.heap().view(), callee)?
             .shape();
         let function = agent.objects().function_data(callee);
-        let realm = function.and_then(lyng_js_objects::FunctionObjectData::realm);
+        let realm = function.and_then(lyng_objects::FunctionObjectData::realm);
         let builtin = function.and_then(|function| {
             let FunctionEntryIdentity::Native(entry) = function.entry()? else {
                 return None;
@@ -827,7 +827,7 @@ impl ConstructCacheEntry {
         let realm = agent
             .objects()
             .function_data(constructor)
-            .and_then(lyng_js_objects::FunctionObjectData::realm);
+            .and_then(lyng_objects::FunctionObjectData::realm);
         let created_shape = Self::created_shape(agent, created);
         Some(Self {
             constructor,
@@ -843,7 +843,7 @@ impl ConstructCacheEntry {
             agent
                 .objects()
                 .object_header(agent.heap().view(), object)
-                .map(lyng_js_objects::ObjectHeader::shape)
+                .map(lyng_objects::ObjectHeader::shape)
         })
     }
 }
@@ -2818,10 +2818,7 @@ impl Vm {
     /// than exposing the `pub(crate)` `FeedbackSiteState` enum.
     /// Removed in DSL-0c when the legacy vector is retired.
     #[doc(hidden)]
-    pub fn feedback_flat_matches_legacy(
-        &self,
-        code: CodeRef,
-    ) -> Result<(), (usize, String)> {
+    pub fn feedback_flat_matches_legacy(&self, code: CodeRef) -> Result<(), (usize, String)> {
         let index = code_index(code);
         let legacy_sites: &[Option<FeedbackSiteState>] = self
             .feedback_vectors
@@ -2897,7 +2894,7 @@ impl Vm {
     ) -> Option<(
         &'static str,
         u8,
-        Option<lyng_js_objects::NamedPropertyCachePath>,
+        Option<lyng_objects::NamedPropertyCachePath>,
     )> {
         let state = self.feedback_vectors.get(code_index(code))?.site(slot)?;
         match state {
@@ -2952,9 +2949,9 @@ mod tests {
         call_feedback_builtin_is_frame_safe, DenseIndexCacheEntry, FeedbackVector,
         InlineCacheState, KeyedPropertyFamily, KeyedPropertyFeedback,
     };
-    use lyng_js_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
-    use lyng_js_objects::ObjectFlags;
-    use lyng_js_types::{
+    use lyng_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
+    use lyng_objects::ObjectFlags;
+    use lyng_types::{
         eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin,
         FeedbackSlotId, ShapeId,
     };

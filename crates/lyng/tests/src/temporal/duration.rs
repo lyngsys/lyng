@@ -22,7 +22,7 @@ fn temporal_duration_constructor_getters_and_stringification() {
             Object.prototype.toString.call(duration),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -46,7 +46,7 @@ fn temporal_duration_zero_and_value_of_behavior() {
         })();
         [duration.sign, duration.blank, duration.toString(), threw].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|true|PT0S|true");
@@ -75,7 +75,7 @@ fn temporal_duration_relational_comparison_invokes_throwing_value_of() {
             duration !== duration
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true|true|true|false");
@@ -88,7 +88,7 @@ fn temporal_duration_to_json_matches_to_string() {
         let duration = new Temporal.Duration(0, 0, 0, 1, 2, 3, 4, 5, 6, 7);
         [duration.toString(), duration.toJSON()].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "P1DT2H3M4.005006007S|P1DT2H3M4.005006007S");
@@ -118,7 +118,7 @@ fn temporal_duration_to_locale_string_matches_non_intl_to_string_shape() {
             brandThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -171,7 +171,7 @@ fn temporal_duration_to_string_honors_seconds_precision_options() {
             badRoundingThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -215,7 +215,7 @@ fn temporal_duration_to_string_reads_and_coerces_options_in_spec_order() {
         new Temporal.Duration(0, 0, 0, 0, 0, 0, 1, 234).toString(options);
         actual.join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -243,7 +243,7 @@ fn temporal_duration_negated_and_abs_return_duration_instances() {
             negative.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -279,7 +279,7 @@ fn temporal_duration_from_clones_duration_and_normalizes_property_bags() {
             unbalanced.milliseconds,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|P1Y2M4D|0|2|30|5|PT2H30M0.000000005S|0|1000");
@@ -322,7 +322,7 @@ fn temporal_duration_from_reads_and_converts_property_bags_in_spec_order() {
         let duration = Temporal.Duration.from(fields);
         duration.toString() + "|" + actual.join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -345,7 +345,7 @@ fn temporal_duration_from_balances_large_exact_subsecond_property_bag_values() {
         });
         positive.toString() + "|" + negative.toString();
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -380,7 +380,7 @@ fn temporal_duration_from_parses_iso_duration_strings() {
             zero.blank,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -419,7 +419,7 @@ fn temporal_duration_from_rejects_invalid_strings_and_empty_property_bags() {
         })();
         [invalidStringThrew, fractionalNonSecondsThrew, emptyBagThrew].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true");
@@ -460,7 +460,7 @@ fn temporal_duration_from_non_string_inputs_throw_type_error_for_all_options() {
             check(Temporal.Duration.prototype)
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -484,7 +484,7 @@ fn temporal_duration_compare_orders_time_only_durations_and_coerces_arguments() 
             Temporal.Duration.compare(new Temporal.Duration(0, 0, 0, 200), new Temporal.Duration(0, 0, 0, 200, 0, 0, 0, 0, 0, 1)),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "function|1|1|1|-1|0|-1|-1");
@@ -506,7 +506,7 @@ fn temporal_duration_compare_validates_options_before_equal_early_return() {
         }
         String(count);
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "5");
@@ -525,7 +525,7 @@ fn temporal_duration_compare_uses_relative_to_for_matching_calendar_units() {
             Temporal.Duration.compare(larger, smaller, { relativeTo })
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|-1|1");
@@ -561,7 +561,7 @@ fn temporal_duration_compare_round_and_total_support_zoned_relative_to() {
             rounded.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|29|29|29|P29D");
@@ -585,7 +585,7 @@ fn temporal_duration_compare_rejects_calendar_units_without_relative_to() {
         })();
         [identical, nonIdenticalThrew].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|true");
@@ -616,7 +616,7 @@ fn temporal_duration_compare_rejects_out_of_range_relative_results() {
             throwsRangeError(() => Temporal.Duration.compare(blank, oneDay, { relativeTo: zoned })),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true");
@@ -641,7 +641,7 @@ fn temporal_duration_add_and_subtract_balance_duration_parts() {
             Temporal.Duration.from({ hours: 1, seconds: 3721 }).subtract({ minutes: 61, nanoseconds: 3722000000001 }).toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -670,7 +670,7 @@ fn temporal_duration_add_and_subtract_reject_overflow_after_largest_unit_distrib
             throwsRangeError(() => negative.subtract(oneSecondAsMicroseconds)),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true");
@@ -714,7 +714,7 @@ fn temporal_duration_add_and_subtract_validate_argument_signs() {
         })();
         [addMixedThrew, subtractMixedThrew, addNumberThrew, subtractEmptyStringThrew].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true|true|true");
@@ -749,7 +749,7 @@ fn temporal_duration_add_and_subtract_reject_calendar_units() {
             throwsRangeError(() => days.subtract("P1W")),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -802,7 +802,7 @@ fn temporal_duration_with_merges_partial_duration_fields() {
             mixedThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -828,7 +828,7 @@ fn temporal_duration_round_balances_exact_time_units() {
             blank.round("seconds").toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -855,7 +855,7 @@ fn temporal_duration_total_supports_exact_time_units() {
             blank.total("hours"),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -882,7 +882,7 @@ fn temporal_duration_total_divides_exact_nanoseconds_before_float_rounding() {
             high.total("hours"),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "4000.0000000000005|4000.9999999999995");
@@ -914,7 +914,7 @@ fn temporal_duration_round_and_total_use_iso_relative_to_for_calendar_units() {
             roundedDateTime.toString()
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "29|28|708|P29D|PT36H");
@@ -947,7 +947,7 @@ fn temporal_duration_total_supports_calendar_relative_units() {
             }).toPrecision(16),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -989,7 +989,7 @@ fn temporal_duration_total_rejects_relative_targets_outside_limits() {
             })),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|RangeError|RangeError");
@@ -1029,7 +1029,7 @@ fn temporal_duration_round_balances_calendar_relative_units() {
             roundedMonth.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|0|1|0|2|0|0|0|0|1|0|0");
@@ -1066,7 +1066,7 @@ fn temporal_duration_round_largest_calendar_unit_preserves_smaller_date_units() 
             fields(fortyTwoDays.round({ relativeTo, largestUnit: "days" }))
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -1095,7 +1095,7 @@ fn temporal_duration_round_zero_duration_allows_relative_calendar_largest_units(
             rounded.toString()
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|0|0|0|0|PT0S");
@@ -1126,7 +1126,7 @@ fn temporal_duration_round_zoned_relative_days_rounds_time_remainder() {
             zoned.hours
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "3|8|3|16");
@@ -1148,7 +1148,7 @@ fn temporal_duration_round_with_calendar_units_and_day_smallest_keeps_calendar_l
             rounded.hours
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|1|0|7|0");
@@ -1173,7 +1173,7 @@ fn temporal_duration_round_calendar_duration_to_time_unit_rebalances_relative_da
             rounded.minutes
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "5|7|0|27|17|0");
@@ -1202,7 +1202,7 @@ fn temporal_duration_round_negative_calendar_month_remainder_honors_directional_
             halfExpand.months
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "-5|-7|-5|-8");
@@ -1232,7 +1232,7 @@ fn temporal_duration_round_negative_days_balances_against_relative_start_date() 
             }))
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0,-1,0,-9|0,-1,0,-11");
@@ -1256,7 +1256,7 @@ fn temporal_duration_round_years_uses_relative_year_length() {
             years(new Temporal.PlainDate(2020, 7, 1))
         ].join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2,1,1,1,2");
@@ -1276,7 +1276,7 @@ fn temporal_duration_round_rejects_null_relative_to_as_wrong_type() {
             error.constructor.name;
         }
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "TypeError");
@@ -1309,7 +1309,7 @@ fn temporal_duration_round_validates_relative_to_property_bag_offset() {
             outcome({ toString: function() { return "+00:00"; } })
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|TypeError|ok");
@@ -1329,7 +1329,7 @@ fn temporal_duration_round_rejects_relative_to_string_offset_mismatch() {
             error.constructor.name;
         }
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError");
@@ -1362,7 +1362,7 @@ fn temporal_duration_round_validates_relative_to_time_zone_string_annotation() {
             outcome("2021-08-19T17:30-07:00:00")
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "ok|RangeError|ok|RangeError");
@@ -1384,7 +1384,7 @@ fn temporal_duration_round_zero_zoned_day_largest_validates_next_day_boundary() 
             error.constructor.name;
         }
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError");
@@ -1406,7 +1406,7 @@ fn temporal_duration_round_zoned_day_rejects_total_nanoseconds_outside_instant_r
             error.constructor.name;
         }
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError");
@@ -1434,7 +1434,7 @@ fn temporal_duration_round_relative_to_edge_strings_validate_after_early_return(
             outcome(duration, "-271821-04-19T01:00")
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "ok|RangeError|RangeError|RangeError|RangeError");
@@ -1460,7 +1460,7 @@ fn temporal_duration_round_stores_float64_representable_exact_components() {
             rerounded.microseconds
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -1504,7 +1504,7 @@ fn temporal_duration_rejects_out_of_range_components_after_balancing() {
         }).sign;
         [yearsThrew, maxYears, daysThrew, balancedSecondsThrew, maxTime].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|4294967295|true|true|1");

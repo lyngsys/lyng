@@ -88,21 +88,21 @@ use super::{
     PublicBuiltinDispatchContext,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, BigIntSign};
-use lyng_js_host::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, BigIntSign};
+use lyng_host::{
     TemporalCivilDateTime, TemporalCivilTime, TemporalCivilToInstantRequest,
     TemporalCurrentInstantRequest, TemporalDefaultTimeZoneRequest, TemporalDisambiguation,
     TemporalInstantToCivilRequest,
 };
-use lyng_js_objects::{
+use lyng_objects::{
     ObjectAllocation, ObjectColdData, OrdinaryObjectData, TemporalDurationObjectData,
     TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind, TemporalPlainDateObjectData,
     TemporalPlainDateTimeObjectData, TemporalPlainMonthDayObjectData, TemporalPlainTimeObjectData,
     TemporalPlainYearMonthObjectData, TemporalZonedDateTimeObjectData,
 };
-use lyng_js_ops::temporal::{
+use lyng_ops::temporal::{
     duration_default_largest_exact_unit as temporal_duration_default_largest_exact_unit,
     duration_exact_unit_allows_largest_smallest as temporal_duration_exact_unit_allows_largest_smallest,
     duration_has_lower_than_month_units as temporal_duration_has_lower_than_month_units,
@@ -144,8 +144,8 @@ use lyng_js_ops::temporal::{
     NANOS_PER_MINUTE as TEMPORAL_NANOS_PER_MINUTE, NANOS_PER_SECOND as TEMPORAL_NANOS_PER_SECOND,
     SAFE_INTEGER_MAX as TEMPORAL_SAFE_INTEGER_MAX, UTC_TIME_ZONE_ID as TEMPORAL_UTC_TIME_ZONE_ID,
 };
-use lyng_js_ops::{object, temporal as temporal_ops};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
+use lyng_ops::{object, temporal as temporal_ops};
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey, Value};
 use std::fmt::Write as _;
 
 pub(super) fn create_temporal_instant_object<Cx: PublicBuiltinDispatchContext>(

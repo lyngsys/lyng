@@ -1,14 +1,14 @@
 use super::{binary_data, PublicBuiltinDispatchContext};
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, StringEncoding};
-use lyng_js_objects::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, StringEncoding};
+use lyng_objects::{
     FunctionEntryIdentity, ObjectAllocation, ObjectColdData, ObjectFlags, ObjectKind,
     OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, TypedArrayObjectData,
 };
-use lyng_js_ops::{errors, iterator, object, proxy, read, typed_array};
-use lyng_js_types::{
+use lyng_ops::{errors, iterator, object, proxy, read, typed_array};
+use lyng_types::{
     object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor,
     PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
 };
@@ -37,7 +37,7 @@ impl<Cx: PublicBuiltinDispatchContext> object::ToPrimitiveContext
 
     fn get_property_value(
         &mut self,
-        object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
         key: PropertyKey,
     ) -> Result<Value, Self::Error> {
         self.cx
@@ -47,13 +47,13 @@ impl<Cx: PublicBuiltinDispatchContext> object::ToPrimitiveContext
     fn require_callable_object(
         &mut self,
         value: Value,
-    ) -> Result<lyng_js_types::ObjectRef, Self::Error> {
+    ) -> Result<lyng_types::ObjectRef, Self::Error> {
         self.cx.require_callable_object(value)
     }
 
     fn call_to_completion(
         &mut self,
-        callee_object: lyng_js_types::ObjectRef,
+        callee_object: lyng_types::ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> Result<Value, Self::Error> {
@@ -63,9 +63,9 @@ impl<Cx: PublicBuiltinDispatchContext> object::ToPrimitiveContext
 
     fn default_to_primitive_result(
         &mut self,
-        object: lyng_js_types::ObjectRef,
-        method_name: lyng_js_common::AtomId,
-        method_object: lyng_js_types::ObjectRef,
+        object: lyng_types::ObjectRef,
+        method_name: lyng_common::AtomId,
+        method_object: lyng_types::ObjectRef,
     ) -> Result<Option<Value>, Self::Error> {
         if method_name != WellKnownAtom::toString.id()
             || builtin_function_entry(self.cx.agent(), method_object)
@@ -163,7 +163,7 @@ pub(super) fn intrinsic_error<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn map_completion<Cx: PublicBuiltinDispatchContext, T>(
     cx: &mut Cx,
-    result: lyng_js_types::Completion<T>,
+    result: lyng_types::Completion<T>,
 ) -> Result<T, Cx::Error> {
     result.map_err(|completion| cx.abrupt(completion))
 }
@@ -180,7 +180,7 @@ pub(super) fn allocate_json_raw_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     realm: RealmRef,
     raw_text: StringRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -207,7 +207,7 @@ pub(super) fn allocate_proxy_object<Cx: PublicBuiltinDispatchContext>(
     realm: RealmRef,
     target: ObjectRef,
     handler: ObjectRef,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -218,7 +218,7 @@ pub(super) fn allocate_proxy_object<Cx: PublicBuiltinDispatchContext>(
         agent
             .objects()
             .object_header(agent.heap().view(), target)
-            .and_then(lyng_js_objects::ObjectHeader::prototype)
+            .and_then(lyng_objects::ObjectHeader::prototype)
     };
     let (callable, constructible) = {
         let objects = cx.agent().objects();
@@ -279,7 +279,7 @@ pub(super) fn to_bigint_for_builtin<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn define_data_property_with_attrs<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
     value: Value,
     writable: bool,
@@ -301,7 +301,7 @@ pub(super) fn define_data_property_with_attrs<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn set_data_property_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
     value: Value,
 ) -> Result<(), Cx::Error> {
@@ -328,7 +328,7 @@ pub(super) fn length_value_u64(length: u64) -> Value {
 
 pub(super) fn is_engine_array<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
 ) -> bool {
     let agent = cx.agent();
     agent
@@ -339,7 +339,7 @@ pub(super) fn is_engine_array<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn is_array_for_species<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
 ) -> Result<bool, Cx::Error> {
     if is_engine_array(cx, object) {
         return Ok(true);
@@ -363,7 +363,7 @@ pub(super) fn is_array_for_species<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn is_any_realm_array_constructor<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
 ) -> bool {
     let agent = cx.agent();
     agent.realm_refs().iter().copied().any(|realm| {
@@ -376,7 +376,7 @@ pub(super) fn is_any_realm_array_constructor<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn builtin_function_entry(
     agent: &Agent,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
 ) -> Option<BuiltinFunctionId> {
     let data = agent.objects().function_data(object)?;
     let FunctionEntryIdentity::Native(entry) = data.entry()? else {
@@ -387,7 +387,7 @@ pub(super) fn builtin_function_entry(
 
 pub(super) fn array_like_join_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
     separator: Option<&[u16]>,
 ) -> Result<Value, Cx::Error> {
     let length = array_like_length(cx, object)?;
@@ -396,7 +396,7 @@ pub(super) fn array_like_join_value<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn array_like_join_value_for_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
     length: u32,
     separator: Option<&[u16]>,
 ) -> Result<Value, Cx::Error> {
@@ -421,7 +421,7 @@ pub(super) fn array_like_join_value_for_length<Cx: PublicBuiltinDispatchContext>
 
 pub(super) fn array_like_to_string_fallback_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object: lyng_js_types::ObjectRef,
+    object: lyng_types::ObjectRef,
 ) -> Result<Value, Cx::Error> {
     array_like_join_value(cx, object, None)
 }
@@ -806,7 +806,7 @@ pub(super) fn proxy_delete_property<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn get_property_from_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
 ) -> Result<Value, Cx::Error> {
     cx.get_property_value(Value::from_object_ref(object_ref), key)
@@ -814,7 +814,7 @@ pub(super) fn get_property_from_object<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn get_property_from_object_with_receiver<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
     receiver: Value,
 ) -> Result<Value, Cx::Error> {
@@ -863,7 +863,7 @@ pub(super) fn property_key_value<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn has_property_on_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
     proxy_has_property(cx, object_ref, key)
@@ -871,7 +871,7 @@ pub(super) fn has_property_on_object<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn set_property_on_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
     value: Value,
 ) -> Result<(), Cx::Error> {
@@ -915,7 +915,7 @@ pub(super) fn typed_array_index_is_valid<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn set_property_on_object_with_receiver<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
     value: Value,
     receiver: Value,
@@ -925,7 +925,7 @@ pub(super) fn set_property_on_object_with_receiver<Cx: PublicBuiltinDispatchCont
 
 pub(super) fn delete_property_from_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
 ) -> Result<(), Cx::Error> {
     if !try_delete_property_from_object(cx, object_ref, key)? {
@@ -936,7 +936,7 @@ pub(super) fn delete_property_from_object<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn try_delete_property_from_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
     proxy_delete_property(cx, object_ref, key)
@@ -944,7 +944,7 @@ pub(super) fn try_delete_property_from_object<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn define_array_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     length: u32,
 ) -> Result<(), Cx::Error> {
     let mut descriptor = PropertyDescriptor::new();
@@ -1010,7 +1010,7 @@ pub(super) fn to_boolean_for_builtin<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn array_like_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> Result<u32, Cx::Error> {
     let length = get_property_from_object(
         cx,
@@ -1022,7 +1022,7 @@ pub(super) fn array_like_length<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn array_like_length_u64<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> Result<u64, Cx::Error> {
     let length = get_property_from_object(
         cx,
@@ -1066,7 +1066,7 @@ pub(super) fn array_like_index_property_key<Cx: PublicBuiltinDispatchContext>(
 pub(super) fn create_array_result<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     length_hint: usize,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     cx.create_array_object(cx.builtin_realm(), length_hint)
 }
 
@@ -1075,7 +1075,7 @@ pub(super) fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContex
     realm: RealmRef,
     prototype: ObjectRef,
     length_hint: usize,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let root_shape = {
         let agent = cx.agent();
         agent.realm(realm).and_then(|realm| realm.root_shape())
@@ -1122,7 +1122,7 @@ pub(super) fn array_result_capacity_hint(length: u64) -> usize {
 pub(super) fn create_array_result_for_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     length: u64,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let length = u32::try_from(length).map_err(|_| range_error(cx))?;
     let array = create_array_result(cx, array_result_capacity_hint(u64::from(length)))?;
     define_array_length(cx, array, length)?;
@@ -1131,9 +1131,9 @@ pub(super) fn create_array_result_for_length<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn array_species_create_for_length<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    original: lyng_js_types::ObjectRef,
+    original: lyng_types::ObjectRef,
     length: u64,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     if !is_array_for_species(cx, original)? {
         return create_array_result_for_length(cx, length);
     }
@@ -1207,7 +1207,7 @@ pub(super) fn is_concat_spreadable<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn set_length_property<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
     length: u64,
 ) -> Result<(), Cx::Error> {
     let key = PropertyKey::from_atom(WellKnownAtom::length.id());
@@ -1493,7 +1493,7 @@ pub(super) fn radix_argument<Cx: PublicBuiltinDispatchContext>(
 
 pub(super) fn symbol_descriptive_string<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    symbol: lyng_js_types::SymbolRef,
+    symbol: lyng_types::SymbolRef,
 ) -> Result<String, Cx::Error> {
     let description = {
         let agent = cx.agent();
@@ -1909,7 +1909,7 @@ pub(super) fn to_index_for_builtin<Cx: PublicBuiltinDispatchContext>(
 pub(super) fn allocate_array_like_result<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     length: u32,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     let object = create_array_result(cx, array_result_capacity_hint(u64::from(length)))?;
     define_array_length(cx, object, length)?;
     Ok(object)
@@ -1918,7 +1918,7 @@ pub(super) fn allocate_array_like_result<Cx: PublicBuiltinDispatchContext>(
 pub(super) fn callable_object_from_value<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-) -> Option<lyng_js_types::ObjectRef> {
+) -> Option<lyng_types::ObjectRef> {
     let object_ref = value.as_object_ref()?;
     let header = {
         let agent = cx.agent();

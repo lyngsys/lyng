@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the measurement infrastructure (three new `lyng-js-bench` subcommands, slow-path-share counter mode, opcode-share config) and three evidence reports (value-layout, ABI, safepoints) that gate the asm-DSL interpreter work specified in [docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](../../lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+**Goal:** Build the measurement infrastructure (three new `lyng-bench` subcommands, slow-path-share counter mode, opcode-share config) and three evidence reports (value-layout, ABI, safepoints) that gate the asm-DSL interpreter work specified in [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 
-**Architecture:** Extend the existing `tools/lyng-js-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/lyng-js/vm/` behind the existing `opcode-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/lyng-js/AGENTS.md`, `docs/lyng-js/engineering-standards.md`, `docs/lyng-js/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/js/lyng-js/`.
+**Architecture:** Extend the existing `tools/lyng-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/lyng/vm/` behind the existing `opcode-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/lyng/AGENTS.md`, `docs/lyng/engineering-standards.md`, `docs/lyng/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/lyng/`.
 
-**Tech Stack:** Rust stable (rustc ≥ 1.88 needed for DSL phase; R-0 itself uses any current stable), `serde_json` (already in `lyng-js-bench` deps), `toml` (new dep for `hot-opcodes.toml`), system tools (`otool` on macOS for LLInt capture), `cargo asm` (optional convenience; fallback to `cargo rustc --emit=asm`).
+**Tech Stack:** Rust stable (rustc ≥ 1.88 needed for DSL phase; R-0 itself uses any current stable), `serde_json` (already in `lyng-bench` deps), `toml` (new dep for `hot-opcodes.toml`), system tools (`otool` on macOS for LLInt capture), `cargo asm` (optional convenience; fallback to `cargo rustc --emit=asm`).
 
 ---
 
@@ -26,7 +26,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  ls -la docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md
+  ls -la docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md
   ```
   Expected: file exists. If absent, abort — the plan presumes the spec is the source of truth.
 
@@ -43,7 +43,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo build --release -p lyng-js-bench
+  cargo build --release -p lyng-bench
   ```
   Expected: clean build, no warnings.
 
@@ -51,7 +51,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
   ```
   Expected: all tests pass. Note the count; you'll compare at the end.
 
@@ -86,7 +86,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   dcat create "R-0: asm-DSL tooling and evidence reports" --type epic --priority 1 \
     --parent lyng-49qk \
     --labels js,performance,tooling,vm,roadmap \
-    -d "Tooling and evidence reports specified in §10 of docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md. See plan at docs/superpowers/plans/2026-05-16-r0-tooling-and-evidence.md."
+    -d "Tooling and evidence reports specified in §10 of docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md. See plan at docs/superpowers/plans/2026-05-16-r0-tooling-and-evidence.md."
   ```
   Record the returned ID; this is the parent for the next sub-tickets.
 
@@ -96,9 +96,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
   ```sh
   dcat create "Update unsafe policy docs for DSL boundary" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,docs
   dcat create "Add hot-opcodes.toml from measured V8 v7 dispatch counts" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench
-  dcat create "lyng-js-bench asm-diff subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench,perf
-  dcat create "lyng-js-bench microbench subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench,perf
-  dcat create "lyng-js-bench capture-llint subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench
+  dcat create "lyng-bench asm-diff subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench,perf
+  dcat create "lyng-bench microbench subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench,perf
+  dcat create "lyng-bench capture-llint subcommand" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,tooling,bench
   dcat create "Slow-path-share counter mode" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,vm,counters
   dcat create "Evidence report: value layout, ABI, safepoints" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,docs,vm
   dcat create "R-0 baselines and determinism verification" --type task --priority 1 --parent <R0_PARENT_ID> --labels js,bench,verification
@@ -116,10 +116,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 ---
 
-### Task 2: Update `crates/lyng-js/AGENTS.md` to scope-allow DSL unsafe
+### Task 2: Update `crates/lyng/AGENTS.md` to scope-allow DSL unsafe
 
 **Files:**
-- Modify: `crates/lyng-js/AGENTS.md:142`
+- Modify: `crates/lyng/AGENTS.md:142`
 
 - [ ] **Step 1: Mark the ticket in progress**
 
@@ -132,13 +132,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  sed -n '139,148p' crates/lyng-js/AGENTS.md
+  sed -n '139,148p' crates/lyng/AGENTS.md
   ```
   Expected: shows the "Memory And Safety" section including `- Do not use unsafe code in Lyng JS crates.`
 
 - [ ] **Step 3: Replace the blanket prohibition with the scoped allowance**
 
-  Use Edit on `crates/lyng-js/AGENTS.md` to replace:
+  Use Edit on `crates/lyng/AGENTS.md` to replace:
   ```
   - Do not use `unsafe` code in Lyng JS crates.
   ```
@@ -146,10 +146,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
   ```
   - `unsafe` code is permitted only in the DSL substrate modules listed below, and
     only behind macro-generated code with audited invariants:
-    - `crates/lyng-js-vm-dsl/` (proc-macro crate; not yet created)
-    - `crates/lyng-js/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
-    - Existing narrow unsafe blocks in `crates/lyng-js/vm/src/vm/dispatch_state.rs` and
-      `crates/lyng-js/types/src/value.rs` (bounds-check elision, NaN-box construction).
+    - `crates/lyng/vm-dsl/` (proc-macro crate; not yet created)
+    - `crates/lyng/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
+    - Existing narrow unsafe blocks in `crates/lyng/vm/src/vm/dispatch_state.rs` and
+      `crates/lyng/types/src/value.rs` (bounds-check elision, NaN-box construction).
     Hand-written `unsafe` outside these locations is forbidden. Every `unsafe` block
     must carry a `// SAFETY:` comment naming the invariant the caller must uphold.
   ```
@@ -158,7 +158,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  head -160 crates/lyng-js/AGENTS.md | tail -30
+  head -160 crates/lyng/AGENTS.md | tail -30
   ```
   Expected: section reads cleanly; bullet list structure intact.
 
@@ -166,13 +166,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  git add crates/lyng-js/AGENTS.md
+  git add crates/lyng/AGENTS.md
   git commit -m "$(cat <<'EOF'
   R-0: scope-allow unsafe in DSL substrate modules
 
-  Replace the blanket no-unsafe rule in crates/lyng-js/AGENTS.md with a
+  Replace the blanket no-unsafe rule in crates/lyng/AGENTS.md with a
   scoped allowance for the asm-DSL substrate modules. Per §12 of
-  docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md.
+  docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md.
 
   Co-Authored-By: <your-name>
   EOF
@@ -188,27 +188,27 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 ---
 
-### Task 3: Update `docs/lyng-js/engineering-standards.md` Safety Rules section
+### Task 3: Update `docs/lyng/engineering-standards.md` Safety Rules section
 
 **Files:**
-- Modify: `docs/lyng-js/engineering-standards.md:62-69`
+- Modify: `docs/lyng/engineering-standards.md:62-69`
 
 - [ ] **Step 1: Read current Safety Rules**
 
   Run:
   ```sh
-  sed -n '62,69p' docs/lyng-js/engineering-standards.md
+  sed -n '62,69p' docs/lyng/engineering-standards.md
   ```
 
 - [ ] **Step 2: Add DSL-boundary text**
 
-  Edit `docs/lyng-js/engineering-standards.md` to append after the existing Safety Rules bullets (before `## Testing Rules`):
+  Edit `docs/lyng/engineering-standards.md` to append after the existing Safety Rules bullets (before `## Testing Rules`):
   ```
-  - DSL boundary: the asm-DSL substrate (`crates/lyng-js-vm-dsl/` and
-    `crates/lyng-js/vm/src/dsl/`) is the audited home for inline assembly,
+  - DSL boundary: the asm-DSL substrate (`crates/lyng/vm-dsl/` and
+    `crates/lyng/vm/src/dsl/`) is the audited home for inline assembly,
     `#[unsafe(naked)]` functions, and the slow-path bridge. Changes to those
     modules require: a `// SAFETY:` invariant comment per unsafe block, an asm
-    snapshot diff via `lyng-js-bench asm-diff` (when the DSL handler set is
+    snapshot diff via `lyng-bench asm-diff` (when the DSL handler set is
     populated), and Miri coverage for the shim layer.
   ```
 
@@ -216,7 +216,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  git add docs/lyng-js/engineering-standards.md
+  git add docs/lyng/engineering-standards.md
   git commit -m "R-0: document DSL substrate audit expectations in engineering-standards"
   ```
 
@@ -238,7 +238,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo build --release -p lyng-js-bench --features lyng-js-vm/opcode-counters
+  cargo build --release -p lyng-bench --features lyng-vm/opcode-counters
   ```
   Expected: clean build.
 
@@ -246,7 +246,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo run --release -p lyng-js-bench -- v8suite --count-opcodes \
+  cargo run --release -p lyng-bench -- v8suite --count-opcodes \
     --json /tmp/r0-opcode-counts.json --samples 3
   ```
   Expected: JSON file emitted with per-workload per-opcode dispatch counts.
@@ -288,34 +288,34 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Copy the JSON and TSV into the reports tree:
   ```sh
-  mkdir -p reports/js/lyng-js/r0/
-  cp /tmp/r0-opcode-counts.json reports/js/lyng-js/r0/v8-v7-opcode-counts.json
-  cp /tmp/r0-top30.tsv reports/js/lyng-js/r0/v8-v7-top30.tsv
+  mkdir -p reports/lyng/r0/
+  cp /tmp/r0-opcode-counts.json reports/lyng/r0/v8-v7-opcode-counts.json
+  cp /tmp/r0-top30.tsv reports/lyng/r0/v8-v7-top30.tsv
   ```
 
 - [ ] **Step 7: Commit raw data**
 
   Run:
   ```sh
-  git add reports/js/lyng-js/r0/v8-v7-opcode-counts.json reports/js/lyng-js/r0/v8-v7-top30.tsv
+  git add reports/lyng/r0/v8-v7-opcode-counts.json reports/lyng/r0/v8-v7-top30.tsv
   git commit -m "R-0: measured V8 v7 opcode dispatch counts (raw data)"
   ```
 
 ---
 
-### Task 5: Write `tools/lyng-js-bench/hot-opcodes.toml`
+### Task 5: Write `tools/lyng-bench/hot-opcodes.toml`
 
 **Files:**
-- Create: `tools/lyng-js-bench/hot-opcodes.toml`
+- Create: `tools/lyng-bench/hot-opcodes.toml`
 
 - [ ] **Step 1: Draft the TOML using Task 4 data**
 
-  Write `tools/lyng-js-bench/hot-opcodes.toml`:
+  Write `tools/lyng-bench/hot-opcodes.toml`:
   ```toml
   # Hot-opcode configuration for the asm-DSL substrate.
   #
   # The `hot` list is the top-30 opcodes by measured dispatch share on the
-  # V8 v7 benchmark suite (see reports/js/lyng-js/r0/v8-v7-top30.tsv for
+  # V8 v7 benchmark suite (see reports/lyng/r0/v8-v7-top30.tsv for
   # the source data; refresh when the compiler emits a major new pattern).
   #
   # `target_slow_path_share` is the DSL-1 invariant: each hot opcode must
@@ -324,12 +324,12 @@ Before starting, verify the prerequisites are met. Run from repo root.
   #
   # `aarch64_max_instructions` and `x86_64_max_instructions` are the
   # asm-diff per-handler budgets (instructions, not bytes) used by
-  # `lyng-js-bench asm-diff`. Calibrated in DSL-0b from real measurements.
+  # `lyng-bench asm-diff`. Calibrated in DSL-0b from real measurements.
   # Placeholder values here (0 = no enforcement); update during DSL-0b.
 
   [meta]
-  source_data = "reports/js/lyng-js/r0/v8-v7-top30.tsv"
-  refresh_command = "cargo run --release -p lyng-js-bench -- v8suite --count-opcodes --json /tmp/r0-opcode-counts.json"
+  source_data = "reports/lyng/r0/v8-v7-top30.tsv"
+  refresh_command = "cargo run --release -p lyng-bench -- v8suite --count-opcodes --json /tmp/r0-opcode-counts.json"
   default_target_slow_path_share = 0.20
 
   [[opcodes]]
@@ -340,11 +340,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   # ... (repeat for each of the 30 opcodes from /tmp/r0-top30.tsv)
   ```
-  Fill in one `[[opcodes]]` block per opcode from the top-30 list. Use the opcode names as they appear in `lyng_js_bytecode::Opcode` (PascalCase).
+  Fill in one `[[opcodes]]` block per opcode from the top-30 list. Use the opcode names as they appear in `lyng_bytecode::Opcode` (PascalCase).
 
 - [ ] **Step 2: Add a `toml` dev/build dep to the bench tool**
 
-  Edit `tools/lyng-js-bench/Cargo.toml`. After `serde_json = "1"`, add:
+  Edit `tools/lyng-bench/Cargo.toml`. After `serde_json = "1"`, add:
   ```toml
   toml = "0.8"
   serde = { version = "1", features = ["derive"] }
@@ -354,7 +354,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo build --release -p lyng-js-bench
+  cargo build --release -p lyng-bench
   ```
   Expected: clean build with new deps.
 
@@ -362,7 +362,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  git add tools/lyng-js-bench/hot-opcodes.toml tools/lyng-js-bench/Cargo.toml Cargo.lock
+  git add tools/lyng-bench/hot-opcodes.toml tools/lyng-bench/Cargo.toml Cargo.lock
   git commit -m "R-0: hot-opcodes.toml with measured top-30 opcodes from V8 v7"
   ```
 
@@ -371,14 +371,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 6: Add `hot_opcodes` config-parser module
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/hot_opcodes.rs`
-- Modify: `tools/lyng-js-bench/src/lib.rs`
+- Create: `tools/lyng-bench/src/hot_opcodes.rs`
+- Modify: `tools/lyng-bench/src/lib.rs`
 
 - [ ] **Step 1: Write failing test for config parsing**
 
-  Create `tools/lyng-js-bench/src/hot_opcodes.rs`:
+  Create `tools/lyng-bench/src/hot_opcodes.rs`:
   ```rust
-  //! Parser for `tools/lyng-js-bench/hot-opcodes.toml`.
+  //! Parser for `tools/lyng-bench/hot-opcodes.toml`.
   //!
   //! Consumed by `asm-diff`, `microbench`, and `--count-slow-path-share`.
   //! The config is the single source of truth for which opcodes count
@@ -494,13 +494,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Wire the new module into lib.rs**
 
-  Edit `tools/lyng-js-bench/src/lib.rs` to add `pub mod hot_opcodes;` after the existing `pub mod cli;` line.
+  Edit `tools/lyng-bench/src/lib.rs` to add `pub mod hot_opcodes;` after the existing `pub mod cli;` line.
 
 - [ ] **Step 3: Run the new tests**
 
   Run:
   ```sh
-  cargo test -p lyng-js-bench hot_opcodes::tests
+  cargo test -p lyng-bench hot_opcodes::tests
   ```
   Expected: all 3 tests pass.
 
@@ -521,14 +521,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 5: Run smoke test**
 
   ```sh
-  cargo test -p lyng-js-bench hot_opcodes::tests::parses_the_committed
+  cargo test -p lyng-bench hot_opcodes::tests::parses_the_committed
   ```
   Expected: pass.
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/hot_opcodes.rs tools/lyng-js-bench/src/lib.rs
+  git add tools/lyng-bench/src/hot_opcodes.rs tools/lyng-bench/src/lib.rs
   git commit -m "R-0: hot_opcodes config parser module with TOML round-trip tests"
   ```
 
@@ -545,22 +545,22 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 7: Write the asm normalization rule set
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`
 
 - [ ] **Step 1: Create the directory**
 
   ```sh
-  mkdir -p reports/js/lyng-js/dsl-asm-baseline-aarch64
+  mkdir -p reports/lyng/dsl-asm-baseline-aarch64
   ```
 
 - [ ] **Step 2: Write the normalization spec**
 
-  Create `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`:
+  Create `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`:
   ```markdown
   # asm-diff normalization rules
 
   This document is the single source of truth for the normalization
-  rules applied by `lyng-js-bench asm-diff` before comparing handler
+  rules applied by `lyng-bench asm-diff` before comparing handler
   asm to committed baselines. Changes to these rules require a separate,
   explicitly-reasoned commit.
 
@@ -602,14 +602,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
   above are incomplete — file a bug.
 
   Cross-rustc-version stability is NOT guaranteed. When upgrading
-  rustc, run `lyng-js-bench asm-diff --mode update` to refresh
+  rustc, run `lyng-bench asm-diff --mode update` to refresh
   baselines; commit message must include `[asm-baseline-refresh: rustc <old>→<new>]`.
   ```
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md
+  git add reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md
   git commit -m "R-0: asm-diff normalization rule set"
   ```
 
@@ -618,9 +618,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 8: Add `asm-diff` subcommand skeleton + cli wiring
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/asm_diff.rs`
-- Modify: `tools/lyng-js-bench/src/cli.rs`
-- Modify: `tools/lyng-js-bench/src/lib.rs`
+- Create: `tools/lyng-bench/src/asm_diff.rs`
+- Modify: `tools/lyng-bench/src/cli.rs`
+- Modify: `tools/lyng-bench/src/lib.rs`
 
 - [ ] **Step 1: Mark ticket in progress**
 
@@ -630,9 +630,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Create the skeleton module**
 
-  Create `tools/lyng-js-bench/src/asm_diff.rs`:
+  Create `tools/lyng-bench/src/asm_diff.rs`:
   ```rust
-  //! `lyng-js-bench asm-diff` — capture, normalize, and diff handler asm
+  //! `lyng-bench asm-diff` — capture, normalize, and diff handler asm
   //! against committed per-arch baselines.
 
   use std::path::PathBuf;
@@ -678,8 +678,8 @@ Before starting, verify the prerequisites are met. Run from repo root.
   }
 
   fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
-      let mut opcodes_config = PathBuf::from("tools/lyng-js-bench/hot-opcodes.toml");
-      let mut baseline_dir = PathBuf::from("reports/js/lyng-js/dsl-asm-baseline-aarch64");
+      let mut opcodes_config = PathBuf::from("tools/lyng-bench/hot-opcodes.toml");
+      let mut baseline_dir = PathBuf::from("reports/lyng/dsl-asm-baseline-aarch64");
       let mut output_dir = PathBuf::from("/tmp/asm-current");
       let mut mode = Mode::Check;
       let mut capture_mode = CaptureMode::Auto;
@@ -730,10 +730,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   fn help_text() -> String {
       [
-          "Usage: lyng-js-bench asm-diff [options]",
+          "Usage: lyng-bench asm-diff [options]",
           "",
           "Options:",
-          "  --opcodes-config PATH   Path to hot-opcodes.toml (default: tools/lyng-js-bench/hot-opcodes.toml)",
+          "  --opcodes-config PATH   Path to hot-opcodes.toml (default: tools/lyng-bench/hot-opcodes.toml)",
           "  --baseline DIR          Directory containing committed baselines",
           "  --output DIR            Directory for current-build asm capture",
           "  --mode check|update     check: fail on diff; update: overwrite baselines (default: check)",
@@ -773,7 +773,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Wire into CLI**
 
-  Edit `tools/lyng-js-bench/src/cli.rs`:
+  Edit `tools/lyng-bench/src/cli.rs`:
 
   Add to the `Command` enum:
   ```rust
@@ -789,7 +789,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 4: Wire into lib.rs**
 
-  Edit `tools/lyng-js-bench/src/lib.rs`:
+  Edit `tools/lyng-bench/src/lib.rs`:
   ```rust
   pub mod asm_diff;
   ```
@@ -802,21 +802,21 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 5: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench
+  cargo test -p lyng-bench
   ```
   Expected: all tests pass; new asm_diff tests appear.
 
 - [ ] **Step 6: Smoke-test the CLI wiring**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- asm-diff --help 2>&1 | head -10
+  cargo run --release -p lyng-bench -- asm-diff --help 2>&1 | head -10
   ```
   Expected: help text appears (returned as Err but printed).
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/asm_diff.rs tools/lyng-js-bench/src/cli.rs tools/lyng-js-bench/src/lib.rs
+  git add tools/lyng-bench/src/asm_diff.rs tools/lyng-bench/src/cli.rs tools/lyng-bench/src/lib.rs
   git commit -m "R-0: asm-diff subcommand skeleton with CLI wiring"
   ```
 
@@ -825,7 +825,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 9: Implement `cargo asm` capture + `rustc --emit=asm` fallback
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/asm_diff.rs`
+- Modify: `tools/lyng-bench/src/asm_diff.rs`
 
 - [ ] **Step 1: Write failing test for capture**
 
@@ -833,21 +833,21 @@ Before starting, verify the prerequisites are met. Run from repo root.
   ```rust
   #[test]
   fn capture_via_rustc_returns_asm_for_existing_symbol() {
-      // Pick a symbol that definitely exists in lyng-js-vm.
+      // Pick a symbol that definitely exists in lyng-vm.
       let result = capture_symbol(
-          "lyng-js-vm",
-          "lyng_js_vm::Vm::new",
+          "lyng-vm",
+          "lyng_vm::Vm::new",
           CaptureMode::RustcEmit,
       );
       let asm = result.expect("capture should succeed");
-      assert!(asm.contains("lyng_js_vm::Vm::new"));
+      assert!(asm.contains("lyng_vm::Vm::new"));
   }
   ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
   ```sh
-  cargo test -p lyng-js-bench capture_via_rustc
+  cargo test -p lyng-bench capture_via_rustc
   ```
   Expected: FAIL (function not yet defined).
 
@@ -981,14 +981,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run the test**
 
   ```sh
-  cargo test -p lyng-js-bench capture_via_rustc
+  cargo test -p lyng-bench capture_via_rustc
   ```
   Expected: PASS. Note: this test runs a real `cargo rustc` build under the hood; it will take ~1 minute.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/asm_diff.rs
+  git add tools/lyng-bench/src/asm_diff.rs
   git commit -m "R-0: asm-diff capture via cargo-asm with rustc --emit=asm fallback"
   ```
 
@@ -997,7 +997,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 10: Implement asm normalization
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/asm_diff.rs`
+- Modify: `tools/lyng-bench/src/asm_diff.rs`
 
 - [ ] **Step 1: Write failing tests for normalization rules**
 
@@ -1043,7 +1043,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 2: Run tests to verify they fail**
 
   ```sh
-  cargo test -p lyng-js-bench asm_diff::tests::normalize
+  cargo test -p lyng-bench asm_diff::tests::normalize
   ```
   Expected: 4 FAIL (normalize not defined).
 
@@ -1054,7 +1054,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   use std::collections::HashMap;
 
   /// Normalize raw asm output per the rules in
-  /// `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`.
+  /// `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`.
   #[must_use]
   pub fn normalize(raw: &str) -> String {
       let mut label_map: HashMap<String, String> = HashMap::new();
@@ -1144,14 +1144,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run normalization tests**
 
   ```sh
-  cargo test -p lyng-js-bench asm_diff::tests::normalize
+  cargo test -p lyng-bench asm_diff::tests::normalize
   ```
   Expected: 4 PASS.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/asm_diff.rs
+  git add tools/lyng-bench/src/asm_diff.rs
   git commit -m "R-0: asm-diff normalization rules per NORMALIZATION.md"
   ```
 
@@ -1160,7 +1160,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 11: Implement diff + per-opcode budget enforcement + `--mode check/update`
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/asm_diff.rs`
+- Modify: `tools/lyng-bench/src/asm_diff.rs`
 
 - [ ] **Step 1: Write failing test for budget enforcement**
 
@@ -1192,12 +1192,12 @@ Before starting, verify the prerequisites are met. Run from repo root.
   }
   ```
 
-  Add `tempdir = "0.3"` to `tools/lyng-js-bench/Cargo.toml` under `[dev-dependencies]` if absent.
+  Add `tempdir = "0.3"` to `tools/lyng-bench/Cargo.toml` under `[dev-dependencies]` if absent.
 
 - [ ] **Step 2: Run to verify failure**
 
   ```sh
-  cargo test -p lyng-js-bench asm_diff::tests::check_mode
+  cargo test -p lyng-bench asm_diff::tests::check_mode
   ```
   Expected: FAIL (function not defined).
 
@@ -1313,7 +1313,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench asm_diff::tests::check_mode
+  cargo test -p lyng-bench asm_diff::tests::check_mode
   ```
   Expected: PASS.
 
@@ -1321,7 +1321,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Replace the placeholder body of `pub fn run` with logic that:
   1. Loads `hot_opcodes::HotOpcodesConfig` from `options.opcodes_config`.
-  2. For each opcode in `config.opcodes`, computes the symbol name (e.g., `lyng_js_vm::vm::dispatch_handlers::{family}::op_{name}` — the existing handlers in `crates/lyng-js/vm/src/vm/dispatch_handlers/` follow this pattern; verify with `nm target/release/libl*.rlib` if uncertain).
+  2. For each opcode in `config.opcodes`, computes the symbol name (e.g., `lyng_vm::vm::dispatch_handlers::{family}::op_{name}` — the existing handlers in `crates/lyng/vm/src/vm/dispatch_handlers/` follow this pattern; verify with `nm target/release/libl*.rlib` if uncertain).
   3. In Check mode: capture asm, call `check_one_symbol`, collect outcomes, report.
   4. In Update mode: capture asm, call `update_one_baseline`.
 
@@ -1336,7 +1336,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
       for entry in &config.opcodes {
           let symbol = symbol_name_for(&entry.name);
-          let asm = match capture_symbol("lyng-js-vm", &symbol, options.capture_mode) {
+          let asm = match capture_symbol("lyng-vm", &symbol, options.capture_mode) {
               Ok(text) => text,
               Err(err) => {
                   failures.push(format!("{}: capture failed: {err}", entry.name));
@@ -1384,7 +1384,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
       // can be derived heuristically or via a table. Use a hand-maintained
       // mapping for now and verify against nm output.
       let snake = pascal_to_snake(opcode_name);
-      format!("lyng_js_vm::vm::dispatch_handlers::op_{snake}")
+      format!("lyng_vm::vm::dispatch_handlers::op_{snake}")
   }
 
   fn pascal_to_snake(s: &str) -> String {
@@ -1406,25 +1406,25 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 6: Smoke-test against the real binary**
 
   ```sh
-  cargo build --release -p lyng-js-bench
-  cargo build --release -p lyng-js-vm
-  cargo run --release -p lyng-js-bench -- asm-diff --mode update \
-    --opcodes-config tools/lyng-js-bench/hot-opcodes.toml \
-    --baseline reports/js/lyng-js/dsl-asm-baseline-aarch64
+  cargo build --release -p lyng-bench
+  cargo build --release -p lyng-vm
+  cargo run --release -p lyng-bench -- asm-diff --mode update \
+    --opcodes-config tools/lyng-bench/hot-opcodes.toml \
+    --baseline reports/lyng/dsl-asm-baseline-aarch64
   ```
-  Expected: writes one baseline file per opcode under `reports/js/lyng-js/dsl-asm-baseline-aarch64/`. Note: some symbol paths may not resolve under the current handler layout — for each failure, either fix `symbol_name_for` heuristic or accept that those opcodes have non-standard handler paths and document in the report.
+  Expected: writes one baseline file per opcode under `reports/lyng/dsl-asm-baseline-aarch64/`. Note: some symbol paths may not resolve under the current handler layout — for each failure, either fix `symbol_name_for` heuristic or accept that those opcodes have non-standard handler paths and document in the report.
 
 - [ ] **Step 7: Run a check pass against the freshly-written baselines**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- asm-diff --mode check
+  cargo run --release -p lyng-bench -- asm-diff --mode check
   ```
   Expected: clean exit (all match).
 
 - [ ] **Step 8: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/asm_diff.rs reports/js/lyng-js/dsl-asm-baseline-aarch64/
+  git add tools/lyng-bench/src/asm_diff.rs reports/lyng/dsl-asm-baseline-aarch64/
   git commit -m "R-0: asm-diff check/update with per-opcode budget enforcement + initial alpha baselines"
   ```
 
@@ -1441,9 +1441,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 12: Add microbench subcommand skeleton + isolation gate
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/microbench.rs`
-- Modify: `tools/lyng-js-bench/src/cli.rs`
-- Modify: `tools/lyng-js-bench/src/lib.rs`
+- Create: `tools/lyng-bench/src/microbench.rs`
+- Modify: `tools/lyng-bench/src/cli.rs`
+- Modify: `tools/lyng-bench/src/lib.rs`
 
 - [ ] **Step 1: Mark ticket in progress**
 
@@ -1453,9 +1453,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Write failing test for loadavg gate**
 
-  Create `tools/lyng-js-bench/src/microbench.rs`:
+  Create `tools/lyng-bench/src/microbench.rs`:
   ```rust
-  //! `lyng-js-bench microbench` — per-opcode ns/dispatch with confidence interval.
+  //! `lyng-bench microbench` — per-opcode ns/dispatch with confidence interval.
   //!
   //! Loop construction: each opcode has a hand-written JS source snippet that
   //! exercises the opcode in a tight inner loop; the harness compiles it,
@@ -1548,7 +1548,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   }
 
   fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
-      let mut opcodes_config = PathBuf::from("tools/lyng-js-bench/hot-opcodes.toml");
+      let mut opcodes_config = PathBuf::from("tools/lyng-bench/hot-opcodes.toml");
       let mut baseline: Option<PathBuf> = None;
       let mut samples = 7;
       let mut iters = 5_000_000;
@@ -1581,7 +1581,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   fn help_text() -> String {
       [
-          "Usage: lyng-js-bench microbench [options]",
+          "Usage: lyng-bench microbench [options]",
           "",
           "Options:",
           "  --opcodes-config PATH    Path to hot-opcodes.toml",
@@ -1616,7 +1616,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Wire into CLI**
 
-  Edit `tools/lyng-js-bench/src/cli.rs`:
+  Edit `tools/lyng-bench/src/cli.rs`:
 
   Add to `Command` enum:
   ```rust
@@ -1635,21 +1635,21 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench microbench
+  cargo test -p lyng-bench microbench
   ```
   Expected: pass.
 
 - [ ] **Step 5: Smoke test isolation gate (interactive)**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- microbench --require-isolation --help 2>&1 | tail -5
+  cargo run --release -p lyng-bench -- microbench --require-isolation --help 2>&1 | tail -5
   ```
   Expected: help text shows (gate not triggered because --help returns first).
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/microbench.rs tools/lyng-js-bench/src/cli.rs tools/lyng-js-bench/src/lib.rs
+  git add tools/lyng-bench/src/microbench.rs tools/lyng-bench/src/cli.rs tools/lyng-bench/src/lib.rs
   git commit -m "R-0: microbench subcommand skeleton + cross-platform loadavg gate"
   ```
 
@@ -1658,19 +1658,19 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 13: Implement per-opcode loop generator (JS snippet per opcode)
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/microbench/snippets.rs` (sub-module)
-- Modify: `tools/lyng-js-bench/src/microbench.rs`
+- Create: `tools/lyng-bench/src/microbench/snippets.rs` (sub-module)
+- Modify: `tools/lyng-bench/src/microbench.rs`
 
 - [ ] **Step 1: Convert microbench.rs to a module directory**
 
   ```sh
-  mkdir -p tools/lyng-js-bench/src/microbench
-  git mv tools/lyng-js-bench/src/microbench.rs tools/lyng-js-bench/src/microbench/mod.rs
+  mkdir -p tools/lyng-bench/src/microbench
+  git mv tools/lyng-bench/src/microbench.rs tools/lyng-bench/src/microbench/mod.rs
   ```
 
 - [ ] **Step 2: Create snippets.rs**
 
-  Create `tools/lyng-js-bench/src/microbench/snippets.rs`:
+  Create `tools/lyng-bench/src/microbench/snippets.rs`:
   ```rust
   //! Per-opcode JS source snippets used to drive the microbench inner loop.
   //!
@@ -1683,7 +1683,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   #[derive(Debug, Clone)]
   pub struct Snippet {
-      /// Pascal-case opcode name from `lyng_js_bytecode::Opcode`.
+      /// Pascal-case opcode name from `lyng_bytecode::Opcode`.
       pub opcode: &'static str,
       /// JS source — a function named `bench` that takes `iters` and runs the loop.
       pub source: &'static str,
@@ -1694,7 +1694,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   /// Hand-maintained snippet table. Add entries as new opcodes need coverage.
   /// Snippets that need accurate per-iter counts can be verified by running
-  /// the snippet under `lyng-js-bench runtime --count-opcodes`.
+  /// the snippet under `lyng-bench runtime --count-opcodes`.
   #[must_use]
   pub fn all_snippets() -> HashMap<&'static str, Snippet> {
       let mut map = HashMap::new();
@@ -1779,7 +1779,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Wire into mod.rs**
 
-  Add to `tools/lyng-js-bench/src/microbench/mod.rs` near the top:
+  Add to `tools/lyng-bench/src/microbench/mod.rs` near the top:
   ```rust
   mod snippets;
   pub use snippets::{Snippet, all_snippets, for_opcode};
@@ -1812,14 +1812,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 5: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench microbench
+  cargo test -p lyng-bench microbench
   ```
   Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/microbench/
+  git add tools/lyng-bench/src/microbench/
   git commit -m "R-0: per-opcode JS snippets for microbench inner loop"
   ```
 
@@ -1828,12 +1828,12 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 14: Implement timing harness + sample collection
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/microbench/timing.rs`
-- Modify: `tools/lyng-js-bench/src/microbench/mod.rs`
+- Create: `tools/lyng-bench/src/microbench/timing.rs`
+- Modify: `tools/lyng-bench/src/microbench/mod.rs`
 
 - [ ] **Step 1: Write failing tests**
 
-  Create `tools/lyng-js-bench/src/microbench/timing.rs`:
+  Create `tools/lyng-bench/src/microbench/timing.rs`:
   ```rust
   //! Timing harness: high-resolution monotonic clock + sample aggregation.
 
@@ -1956,14 +1956,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 3: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench microbench::timing
+  cargo test -p lyng-bench microbench::timing
   ```
   Expected: 3 PASS.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/microbench/timing.rs tools/lyng-js-bench/src/microbench/mod.rs
+  git add tools/lyng-bench/src/microbench/timing.rs tools/lyng-bench/src/microbench/mod.rs
   git commit -m "R-0: microbench timing harness + sample stats with robust CI"
   ```
 
@@ -1972,11 +1972,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 15: Wire end-to-end microbench runner
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/microbench/mod.rs`
+- Modify: `tools/lyng-bench/src/microbench/mod.rs`
 
 - [ ] **Step 1: Implement the end-to-end runner**
 
-  Replace the placeholder `pub fn run` body in `tools/lyng-js-bench/src/microbench/mod.rs`:
+  Replace the placeholder `pub fn run` body in `tools/lyng-bench/src/microbench/mod.rs`:
   ```rust
   pub fn run(args: &[String]) -> Result<(), String> {
       let options = parse_args(args)?;
@@ -2044,12 +2044,12 @@ Before starting, verify the prerequisites are met. Run from repo root.
       // `time_once`. Compute dispatches = iters * opcodes_per_iter.
       //
       // Real implementation depends on the existing
-      // lyng_js_vm::Vm public API for compile+invoke; see
-      // tools/lyng-js-bench/src/runtime.rs for the patterns used by
+      // lyng_vm::Vm public API for compile+invoke; see
+      // tools/lyng-bench/src/runtime.rs for the patterns used by
       // the runtime suite.
       use std::sync::Arc;
       // (Pseudocode — real wiring uses Vm::evaluate_script_*; consult
-      // tools/lyng-js-bench/src/runtime.rs:480-560 for the working pattern.)
+      // tools/lyng-bench/src/runtime.rs:480-560 for the working pattern.)
       let _ = (snippet, iters, samples);
       let mut out: Vec<timing::Sample> = Vec::new();
       // Warm-up: run once unmeasured.
@@ -2070,11 +2070,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Replace the placeholder `run_snippet` with real wiring**
 
-  Read `tools/lyng-js-bench/src/runtime.rs` lines 480-560 to find the pattern for compiling + invoking a function. Adapt it for `run_snippet`. Typical shape:
+  Read `tools/lyng-bench/src/runtime.rs` lines 480-560 to find the pattern for compiling + invoking a function. Adapt it for `run_snippet`. Typical shape:
 
   ```rust
-  let agent = lyng_js_env::Agent::new();
-  let mut vm = lyng_js_vm::Vm::new();
+  let agent = lyng_env::Agent::new();
+  let mut vm = lyng_vm::Vm::new();
   // ... evaluate script that defines `bench` ...
   // ... find the `bench` global ...
   // ... for each sample: time_once { vm.invoke(bench, [iters_as_value]) } ...
@@ -2085,15 +2085,15 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 3: Build & smoke test**
 
   ```sh
-  cargo build --release -p lyng-js-bench
-  cargo run --release -p lyng-js-bench -- microbench --samples 3 --iters 100000
+  cargo build --release -p lyng-bench
+  cargo run --release -p lyng-bench -- microbench --samples 3 --iters 100000
   ```
   Expected: prints a markdown table to stdout with at least the 4 hand-written snippets (Move, Add, GetNamedProperty, Jump) showing ns/dispatch numbers.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/microbench/mod.rs
+  git add tools/lyng-bench/src/microbench/mod.rs
   git commit -m "R-0: microbench end-to-end runner with per-opcode snippets"
   ```
 
@@ -2102,32 +2102,32 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 16: Write initial `microbench-baseline.md`
 
 **Files:**
-- Create: `reports/js/lyng-js/microbench-baseline.md`
+- Create: `reports/lyng/microbench-baseline.md`
 
 - [ ] **Step 1: Run microbench in isolation**
 
   Quiesce the machine (close other apps, wait for loadavg < 2.0). Then:
 
   ```sh
-  cargo run --release -p lyng-js-bench -- microbench \
+  cargo run --release -p lyng-bench -- microbench \
     --require-isolation \
     --samples 7 \
     --iters 5000000 \
-    --output reports/js/lyng-js/microbench-baseline.md
+    --output reports/lyng/microbench-baseline.md
   ```
   Expected: writes baseline file.
 
 - [ ] **Step 2: Verify the file is sensibly formatted**
 
   ```sh
-  head -30 reports/js/lyng-js/microbench-baseline.md
+  head -30 reports/lyng/microbench-baseline.md
   ```
   Expected: well-formed markdown table.
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add reports/js/lyng-js/microbench-baseline.md
+  git add reports/lyng/microbench-baseline.md
   git commit -m "R-0: initial microbench baseline (pre-DSL alpha substrate)"
   ```
 
@@ -2144,9 +2144,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 17: capture-llint skeleton + system mode
 
 **Files:**
-- Create: `tools/lyng-js-bench/src/capture_llint.rs`
-- Modify: `tools/lyng-js-bench/src/cli.rs`
-- Modify: `tools/lyng-js-bench/src/lib.rs`
+- Create: `tools/lyng-bench/src/capture_llint.rs`
+- Modify: `tools/lyng-bench/src/cli.rs`
+- Modify: `tools/lyng-bench/src/lib.rs`
 
 - [ ] **Step 1: Mark ticket in progress**
 
@@ -2156,9 +2156,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Create the module**
 
-  Create `tools/lyng-js-bench/src/capture_llint.rs`:
+  Create `tools/lyng-bench/src/capture_llint.rs`:
   ```rust
-  //! `lyng-js-bench capture-llint` — extract JSC LLInt handler asm/source.
+  //! `lyng-bench capture-llint` — extract JSC LLInt handler asm/source.
   //!
   //! Source-mode strategy:
   //! - `auto`: try system → local → excerpt in order; report which mode produced each opcode.
@@ -2208,7 +2208,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
       }
 
       // Write a summary report at output_dir/README.md.
-      let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-js-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
+      let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
       for (opcode, mode) in &produced {
           summary.push_str(&format!("| `{opcode}` | {mode:?} |\n"));
       }
@@ -2345,7 +2345,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
       let mut jsc_binary: Option<PathBuf> = None;
       let mut jsc_source: Option<PathBuf> = None;
       let mut opcodes: Vec<String> = Vec::new();
-      let mut output_dir = PathBuf::from("reports/js/lyng-js/llint-reference");
+      let mut output_dir = PathBuf::from("reports/lyng/llint-reference");
 
       let mut iter = args.iter().peekable();
       while let Some(arg) = iter.next() {
@@ -2378,14 +2378,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   fn help_text() -> String {
       [
-          "Usage: lyng-js-bench capture-llint --opcodes <list> [options]",
+          "Usage: lyng-bench capture-llint --opcodes <list> [options]",
           "",
           "Options:",
           "  --source auto|system|local|excerpt   Capture strategy (default auto)",
           "  --jsc-binary PATH                    JSC binary for system/local mode",
           "  --jsc-source PATH                    WebKit source root for excerpt mode",
           "  --opcodes a,b,c                      Comma-separated LLInt opcode names (without `_llint_` prefix)",
-          "  --output PATH                        Output directory (default reports/js/lyng-js/llint-reference)",
+          "  --output PATH                        Output directory (default reports/lyng/llint-reference)",
       ]
       .join("\n")
   }
@@ -2419,14 +2419,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run tests**
 
   ```sh
-  cargo test -p lyng-js-bench capture_llint
+  cargo test -p lyng-bench capture_llint
   ```
   Expected: pass.
 
 - [ ] **Step 5: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/capture_llint.rs tools/lyng-js-bench/src/cli.rs tools/lyng-js-bench/src/lib.rs
+  git add tools/lyng-bench/src/capture_llint.rs tools/lyng-bench/src/cli.rs tools/lyng-bench/src/lib.rs
   git commit -m "R-0: capture-llint subcommand with auto/system/local/excerpt modes"
   ```
 
@@ -2435,15 +2435,15 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 18: Write `llint-reference-setup.md` for local mode
 
 **Files:**
-- Create: `docs/lyng-js/llint-reference-setup.md`
+- Create: `docs/lyng/llint-reference-setup.md`
 
 - [ ] **Step 1: Write the setup doc**
 
-  Create `docs/lyng-js/llint-reference-setup.md`:
+  Create `docs/lyng/llint-reference-setup.md`:
   ```markdown
   # JSC LLInt reference capture — local-build setup
 
-  `lyng-js-bench capture-llint` uses three modes (`system`, `local`, `excerpt`).
+  `lyng-bench capture-llint` uses three modes (`system`, `local`, `excerpt`).
   This doc covers the `local` mode: building JSC from source so the binary
   retains `_llint_op_*` symbols even when the system framework is stripped.
 
@@ -2475,11 +2475,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
   ## Running capture-llint in local mode
 
   ```sh
-  cargo run --release -p lyng-js-bench -- capture-llint \
+  cargo run --release -p lyng-bench -- capture-llint \
     --source local \
     --jsc-binary /path/to/WebKitBuild/Debug/bin/jsc \
     --opcodes op_add,op_mov,op_jmp,op_get_by_id,op_put_by_id,op_call,op_ret \
-    --output reports/js/lyng-js/llint-reference
+    --output reports/lyng/llint-reference
   ```
 
   ## Running capture-llint in excerpt mode (no build required)
@@ -2488,11 +2488,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
   source checkout — no compilation needed.
 
   ```sh
-  cargo run --release -p lyng-js-bench -- capture-llint \
+  cargo run --release -p lyng-bench -- capture-llint \
     --source excerpt \
     --jsc-source /Users/sondre/dev/WebKit \
     --opcodes op_add,op_mov,op_jmp,op_get_by_id \
-    --output reports/js/lyng-js/llint-reference
+    --output reports/lyng/llint-reference
   ```
 
   This produces source-level (offlineasm pseudo-code) reference rather than
@@ -2503,7 +2503,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 2: Commit**
 
   ```sh
-  git add docs/lyng-js/llint-reference-setup.md
+  git add docs/lyng/llint-reference-setup.md
   git commit -m "R-0: setup doc for capture-llint local-build mode"
   ```
 
@@ -2512,35 +2512,35 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 19: Capture initial LLInt references
 
 **Files:**
-- Create: `reports/js/lyng-js/llint-reference/` (one file per opcode + README)
+- Create: `reports/lyng/llint-reference/` (one file per opcode + README)
 
 - [ ] **Step 1: Identify the top-30 opcodes' LLInt equivalents**
 
-  Map each lyng-js opcode name to its JSC counterpart (e.g., `Add` → `op_add`, `GetNamedProperty` → `op_get_by_id`, `Move` → `op_mov`, `Jump` → `op_jmp`, `Return` → `op_ret`, `LoadLocal0` → handled by `op_mov` family, etc.). Some opcodes will have no direct equivalent — note those in the README.
+  Map each lyng opcode name to its JSC counterpart (e.g., `Add` → `op_add`, `GetNamedProperty` → `op_get_by_id`, `Move` → `op_mov`, `Jump` → `op_jmp`, `Return` → `op_ret`, `LoadLocal0` → handled by `op_mov` family, etc.). Some opcodes will have no direct equivalent — note those in the README.
 
 - [ ] **Step 2: Run capture-llint in auto mode for the mappable subset**
 
   ```sh
-  cargo run --release -p lyng-js-bench -- capture-llint \
+  cargo run --release -p lyng-bench -- capture-llint \
     --source auto \
     --jsc-binary /System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc \
     --jsc-source /Users/sondre/dev/WebKit \
     --opcodes op_add,op_mov,op_jmp,op_get_by_id,op_put_by_id,op_call,op_ret,op_loop_hint,op_jtrue,op_jfalse,op_jmp_short,op_get_array_length,op_sub,op_mul,op_negate,op_bitand,op_bitor,op_bitxor,op_lshift,op_rshift,op_to_property_key \
-    --output reports/js/lyng-js/llint-reference
+    --output reports/lyng/llint-reference
   ```
-  Expected: per-opcode markdown files emitted under `reports/js/lyng-js/llint-reference/`, plus a `README.md` summary listing which mode produced each.
+  Expected: per-opcode markdown files emitted under `reports/lyng/llint-reference/`, plus a `README.md` summary listing which mode produced each.
 
 - [ ] **Step 3: Spot-check one output file**
 
   ```sh
-  cat reports/js/lyng-js/llint-reference/op_add.md
+  cat reports/lyng/llint-reference/op_add.md
   ```
   Expected: a clean reference file with asm or offlineasm content.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add reports/js/lyng-js/llint-reference/
+  git add reports/lyng/llint-reference/
   git commit -m "R-0: initial JSC LLInt reference asm for top-20 opcodes"
   ```
 
@@ -2557,10 +2557,10 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 20: Add `SlowPathCounterStore` to VM
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/slow_path_counts.rs`
-- Modify: `crates/lyng-js/vm/src/lib.rs`
-- Modify: `crates/lyng-js/vm/src/vm.rs`
-- Modify: `crates/lyng-js/vm/Cargo.toml` (if feature flag absent)
+- Create: `crates/lyng/vm/src/slow_path_counts.rs`
+- Modify: `crates/lyng/vm/src/lib.rs`
+- Modify: `crates/lyng/vm/src/vm.rs`
+- Modify: `crates/lyng/vm/Cargo.toml` (if feature flag absent)
 
 - [ ] **Step 1: Mark ticket in progress**
 
@@ -2580,7 +2580,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   //! carry no counter code.
 
   use std::cell::Cell;
-  use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
+  use lyng_bytecode::{Opcode, OPCODE_COUNT};
 
   const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 
@@ -2649,7 +2649,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   #[cfg(test)]
   mod tests {
       use super::*;
-      use lyng_js_bytecode::Opcode;
+      use lyng_bytecode::Opcode;
 
       #[test]
       fn records_semantic_independently_of_safepoint() {
@@ -2677,13 +2677,13 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Wire into the VM crate**
 
-  Edit `crates/lyng-js/vm/src/lib.rs` to add:
+  Edit `crates/lyng/vm/src/lib.rs` to add:
   ```rust
   #[cfg(feature = "opcode-counters")]
   pub mod slow_path_counts;
   ```
 
-  In `crates/lyng-js/vm/src/vm.rs`, find the `opcode_dispatch_counts` field (around line 157) and add a sibling:
+  In `crates/lyng/vm/src/vm.rs`, find the `opcode_dispatch_counts` field (around line 157) and add a sibling:
   ```rust
   #[cfg(feature = "opcode-counters")]
   slow_path_counts: Option<crate::slow_path_counts::SlowPathCounterStore>,
@@ -2730,22 +2730,22 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run tests**
 
   ```sh
-  cargo test --features opcode-counters -p lyng-js-vm slow_path_counts
+  cargo test --features opcode-counters -p lyng-vm slow_path_counts
   ```
   Expected: 2 PASS.
 
 - [ ] **Step 5: Verify Vm public API still compiles**
 
   ```sh
-  cargo build --release -p lyng-js-vm --features opcode-counters
-  cargo build --release -p lyng-js-vm   # without feature
+  cargo build --release -p lyng-vm --features opcode-counters
+  cargo build --release -p lyng-vm   # without feature
   ```
   Expected: both succeed.
 
 - [ ] **Step 6: Commit**
 
   ```sh
-  git add crates/lyng-js/vm/src/slow_path_counts.rs crates/lyng-js/vm/src/lib.rs crates/lyng-js/vm/src/vm.rs
+  git add crates/lyng/vm/src/slow_path_counts.rs crates/lyng/vm/src/lib.rs crates/lyng/vm/src/vm.rs
   git commit -m "R-0: SlowPathCounterStore for slow-path-semantic vs safepoint counts"
   ```
 
@@ -2754,12 +2754,12 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 21: Wire `--count-slow-path-share` flag in bench tool
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/runtime.rs` (where `--count-opcodes` lives)
-- Modify: `tools/lyng-js-bench/src/v8suite.rs` (same)
+- Modify: `tools/lyng-bench/src/runtime.rs` (where `--count-opcodes` lives)
+- Modify: `tools/lyng-bench/src/v8suite.rs` (same)
 
 - [ ] **Step 1: Add the flag to runtime suite options**
 
-  Find the `--count-opcodes` arg parsing in `tools/lyng-js-bench/src/runtime.rs:232` and add a sibling:
+  Find the `--count-opcodes` arg parsing in `tools/lyng-bench/src/runtime.rs:232` and add a sibling:
   ```rust
   "--count-slow-path-share" => {
       options.count_slow_path_share = true;
@@ -2797,26 +2797,26 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 4: Add the same flag to v8suite.rs**
 
-  Mirror Step 1-3 in `tools/lyng-js-bench/src/v8suite.rs`.
+  Mirror Step 1-3 in `tools/lyng-bench/src/v8suite.rs`.
 
 - [ ] **Step 5: Run tests**
 
   ```sh
-  cargo test --features lyng-js-vm/opcode-counters -p lyng-js-bench
+  cargo test --features lyng-vm/opcode-counters -p lyng-bench
   ```
   Expected: pass.
 
 - [ ] **Step 6: Smoke test**
 
   ```sh
-  cargo run --release -p lyng-js-bench --features lyng-js-vm/opcode-counters -- runtime --count-opcodes --count-slow-path-share --preset inner-loop
+  cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- runtime --count-opcodes --count-slow-path-share --preset inner-loop
   ```
   Expected: report includes the slow-path-share table. Counts will all be 0 until DSL handlers actually call `record_semantic`/`record_safepoint` — that wiring lands in DSL-0a/b. The R-0 deliverable is the *infrastructure*, not yet the actual increments.
 
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/runtime.rs tools/lyng-js-bench/src/v8suite.rs
+  git add tools/lyng-bench/src/runtime.rs tools/lyng-bench/src/v8suite.rs
   git commit -m "R-0: --count-slow-path-share flag and report integration"
   ```
 
@@ -2825,7 +2825,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 22: Synthetic test that the flag wiring works end-to-end
 
 **Files:**
-- Modify: `tools/lyng-js-bench/src/runtime.rs` (or wherever the existing test lives)
+- Modify: `tools/lyng-bench/src/runtime.rs` (or wherever the existing test lives)
 
 - [ ] **Step 1: Write an integration test**
 
@@ -2844,14 +2844,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-js-bench count_slow_path_share_flag
+  cargo test -p lyng-bench count_slow_path_share_flag
   ```
   Expected: pass.
 
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add tools/lyng-js-bench/src/runtime.rs
+  git add tools/lyng-bench/src/runtime.rs
   git commit -m "R-0: integration test for --count-slow-path-share flag wiring"
   ```
 
@@ -2868,7 +2868,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 23: Write `llint-dsl-value-layout.md`
 
 **Files:**
-- Create: `reports/js/lyng-js/llint-dsl-value-layout.md`
+- Create: `reports/lyng/llint-dsl-value-layout.md`
 
 - [ ] **Step 1: Mark evidence-reports ticket in progress**
 
@@ -2879,7 +2879,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 2: Read the current Value implementation**
 
   ```sh
-  wc -l crates/lyng-js/types/src/value.rs
+  wc -l crates/lyng/types/src/value.rs
   ```
   Then read the file. Capture:
   - Value byte layout (size, alignment, internal `u64` encoding)
@@ -2894,25 +2894,25 @@ Before starting, verify the prerequisites are met. Run from repo root.
   For each operation the DSL will eventually need, identify the equivalent existing Rust call site (e.g., `Value::is_smi` in dispatch_handlers/arithmetic.rs op_add). Use `cargo asm` to capture the codegen.
 
   ```sh
-  cargo run --release -p lyng-js-bench -- asm-diff --mode update \
-    --opcodes-config tools/lyng-js-bench/hot-opcodes.toml \
-    --baseline reports/js/lyng-js/dsl-asm-baseline-aarch64
+  cargo run --release -p lyng-bench -- asm-diff --mode update \
+    --opcodes-config tools/lyng-bench/hot-opcodes.toml \
+    --baseline reports/lyng/dsl-asm-baseline-aarch64
   ```
-  This populates `reports/js/lyng-js/dsl-asm-baseline-aarch64/Add.asm` etc., which you can reference.
+  This populates `reports/lyng/dsl-asm-baseline-aarch64/Add.asm` etc., which you can reference.
 
 - [ ] **Step 4: Draft the report**
 
-  Create `reports/js/lyng-js/llint-dsl-value-layout.md`. Structure:
+  Create `reports/lyng/llint-dsl-value-layout.md`. Structure:
   ```markdown
   # Lyng-js Value layout — DSL substrate prerequisite report
 
-  This report documents the current `Value` representation in lyng-js as the
+  This report documents the current `Value` representation in lyng as the
   source of truth for the DSL backend's `check_*!` / `tag_*!` macros. It is
   one of three R-0 evidence reports required before DSL-0 begins.
 
   ## Source
 
-  Implementation: [crates/lyng-js/types/src/value.rs](../../crates/lyng-js/types/src/value.rs)
+  Implementation: [crates/lyng/types/src/value.rs](../../crates/lyng/types/src/value.rs)
   Reference: JSC `Source/JavaScriptCore/runtime/JSCJSValue.h`
 
   ## Encoding overview
@@ -2968,7 +2968,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 5: Cross-reference the actual code**
 
-  Read `crates/lyng-js/types/src/value.rs` and fill in the exact masks and bit positions. Cite `value.rs:LINE` for each fact.
+  Read `crates/lyng/types/src/value.rs` and fill in the exact masks and bit positions. Cite `value.rs:LINE` for each fact.
 
 - [ ] **Step 6: Validate the report's asm snippets compile**
 
@@ -2977,7 +2977,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 7: Commit**
 
   ```sh
-  git add reports/js/lyng-js/llint-dsl-value-layout.md
+  git add reports/lyng/llint-dsl-value-layout.md
   git commit -m "R-0: llint-dsl-value-layout.md evidence report"
   ```
 
@@ -2986,7 +2986,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 24: Write `llint-dsl-abi.md`
 
 **Files:**
-- Create: `reports/js/lyng-js/llint-dsl-abi.md`
+- Create: `reports/lyng/llint-dsl-abi.md`
 
 - [ ] **Step 1: Read the relevant design sections**
 
@@ -2994,7 +2994,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 2: Draft the report**
 
-  Create `reports/js/lyng-js/llint-dsl-abi.md`. Structure:
+  Create `reports/lyng/llint-dsl-abi.md`. Structure:
   ```markdown
   # asm-DSL ABI — DSL substrate prerequisite report
 
@@ -3006,7 +3006,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   ## Source
 
-  Design: [docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md) §5-§6.
+  Design: [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md) §5-§6.
 
   ## `LlIntState` layout
 
@@ -3095,14 +3095,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Compute real offsets via a one-off test**
 
-  Add a temporary unit test under `crates/lyng-js/vm/src/tests/` that builds a placeholder `LlIntState` struct (matching the design's spec exactly) and prints `offset_of!` for each field. Run it, capture the output, and update the table in the report.
+  Add a temporary unit test under `crates/lyng/vm/src/tests/` that builds a placeholder `LlIntState` struct (matching the design's spec exactly) and prints `offset_of!` for each field. Run it, capture the output, and update the table in the report.
 
   Delete the temporary test after the table is filled in; the real `LlIntState` lands in DSL-0b with proper tests.
 
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add reports/js/lyng-js/llint-dsl-abi.md
+  git add reports/lyng/llint-dsl-abi.md
   git commit -m "R-0: llint-dsl-abi.md evidence report with computed field offsets"
   ```
 
@@ -3111,20 +3111,20 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 25: Write `llint-dsl-safepoints.md`
 
 **Files:**
-- Create: `reports/js/lyng-js/llint-dsl-safepoints.md`
+- Create: `reports/lyng/llint-dsl-safepoints.md`
 
 - [ ] **Step 1: Read the relevant code paths today**
 
   Read each:
-  - `crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs` (op_loop_header, op_jump, op_jump8)
-  - `crates/lyng-js/vm/src/vm/dispatch_handlers/prefix.rs` (op_wide, op_extra_wide)
+  - `crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs` (op_loop_header, op_jump, op_jump8)
+  - `crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs` (op_wide, op_extra_wide)
   - GC poll: search for `poll_incremental_mark_step`
   - Debugger pause: search for `debug_state.should_poll`, `request_debug_pause`
-  - Tier-up: read `crates/lyng-js/vm/src/vm/tiering.rs`
+  - Tier-up: read `crates/lyng/vm/src/vm/tiering.rs`
 
 - [ ] **Step 2: Draft the report**
 
-  Create `reports/js/lyng-js/llint-dsl-safepoints.md`. Structure:
+  Create `reports/lyng/llint-dsl-safepoints.md`. Structure:
   ```markdown
   # asm-DSL safepoints, polling, and prefix dispatch — R-0 evidence report
 
@@ -3137,9 +3137,9 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Design: §6 (safepoints + prefix dispatch), §10 (tier accounting deferral).
   Current code:
-  - [crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs](../../crates/lyng-js/vm/src/vm/dispatch_handlers/control_flow.rs) — op_loop_header, op_jump, op_jump8.
-  - [crates/lyng-js/vm/src/vm/dispatch_handlers/prefix.rs](../../crates/lyng-js/vm/src/vm/dispatch_handlers/prefix.rs) — op_wide, op_extra_wide.
-  - [crates/lyng-js/vm/src/vm/tiering.rs](../../crates/lyng-js/vm/src/vm/tiering.rs) — observe_tier_backedge_event.
+  - [crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs](../../crates/lyng/vm/src/vm/dispatch_handlers/control_flow.rs) — op_loop_header, op_jump, op_jump8.
+  - [crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs](../../crates/lyng/vm/src/vm/dispatch_handlers/prefix.rs) — op_wide, op_extra_wide.
+  - [crates/lyng/vm/src/vm/tiering.rs](../../crates/lyng/vm/src/vm/tiering.rs) — observe_tier_backedge_event.
 
   ## Today's safepoint surface
 
@@ -3245,7 +3245,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add reports/js/lyng-js/llint-dsl-safepoints.md
+  git add reports/lyng/llint-dsl-safepoints.md
   git commit -m "R-0: llint-dsl-safepoints.md evidence report"
   ```
 
@@ -3273,8 +3273,8 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   ```sh
   for i in 1 2 3 4 5; do
-    cargo run --release -p lyng-js-bench -- asm-diff --mode check > /tmp/asm-diff-$i.txt
-    cargo run --release -p lyng-js-bench -- microbench --samples 3 --iters 100000 > /tmp/microbench-$i.txt
+    cargo run --release -p lyng-bench -- asm-diff --mode check > /tmp/asm-diff-$i.txt
+    cargo run --release -p lyng-bench -- microbench --samples 3 --iters 100000 > /tmp/microbench-$i.txt
   done
   diff /tmp/asm-diff-1.txt /tmp/asm-diff-2.txt /tmp/asm-diff-3.txt /tmp/asm-diff-4.txt /tmp/asm-diff-5.txt
   ```
@@ -3282,7 +3282,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 3: Document determinism evidence**
 
-  Create `reports/js/lyng-js/r0/determinism.md`:
+  Create `reports/lyng/r0/determinism.md`:
   ```markdown
   # R-0 subcommand determinism verification
 
@@ -3297,7 +3297,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Commit**
 
   ```sh
-  git add reports/js/lyng-js/r0/determinism.md
+  git add reports/lyng/r0/determinism.md
   git commit -m "R-0: determinism verification evidence"
   ```
 
@@ -3310,22 +3310,22 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 1: Run focused test suites**
 
   ```sh
-  cargo test -p lyng-js-vm -p lyng-js-bytecode -p lyng-js-objects -p lyng-js-tests -p lyng-js-compiler
+  cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
   ```
   Expected: same pass count as Pre-flight 5.
 
 - [ ] **Step 2: Run Test262 whole-corpus**
 
   ```sh
-  cargo run --release -p lyng-js-test262 -- --report /tmp/r0-test262.md -j 4
+  cargo run --release -p lyng-test262 -- --report /tmp/r0-test262.md -j 4
   ```
-  Expected: pass count ≥ 49722/49729 (per [reports/js/lyng-js/test262.md](../../reports/js/lyng-js/test262.md)).
+  Expected: pass count ≥ 49722/49729 (per [reports/lyng/test262.md](../../reports/lyng/test262.md)).
 
 - [ ] **Step 3: Commit the test262 report**
 
   ```sh
-  cp /tmp/r0-test262.md reports/js/lyng-js/r0/test262-after-r0.md
-  git add reports/js/lyng-js/r0/test262-after-r0.md
+  cp /tmp/r0-test262.md reports/lyng/r0/test262-after-r0.md
+  git add reports/lyng/r0/test262-after-r0.md
   git commit -m "R-0: Test262 pass-count evidence (no regression)"
   ```
 
@@ -3334,8 +3334,8 @@ Before starting, verify the prerequisites are met. Run from repo root.
 ### Task 28: Update architecture.md and final R-0 status report
 
 **Files:**
-- Modify: `docs/lyng-js/architecture.md`
-- Create: `reports/js/lyng-js/r0/status.md`
+- Modify: `docs/lyng/architecture.md`
+- Create: `reports/lyng/r0/status.md`
 
 - [ ] **Step 1: Add a forward-pointing note to architecture.md**
 
@@ -3345,15 +3345,15 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   The dispatch substrate is moving from today's α (extern "C" handlers
   returning `Step`) to an asm-DSL substrate documented in
-  [docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
+  [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
   R-0 (tooling and evidence reports) is the first milestone; see
-  [reports/js/lyng-js/r0/status.md](../../reports/js/lyng-js/r0/status.md)
+  [reports/lyng/r0/status.md](../../reports/lyng/r0/status.md)
   for current progress.
   ```
 
 - [ ] **Step 2: Write R-0 status report**
 
-  Create `reports/js/lyng-js/r0/status.md`:
+  Create `reports/lyng/r0/status.md`:
   ```markdown
   # R-0 status
 
@@ -3361,20 +3361,20 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   | Deliverable | Status | Path |
   |---|---|---|
-  | `microbench` subcommand | done | tools/lyng-js-bench/src/microbench/ |
-  | `asm-diff` subcommand | done | tools/lyng-js-bench/src/asm_diff.rs |
-  | `capture-llint` subcommand | done | tools/lyng-js-bench/src/capture_llint.rs |
-  | `--count-slow-path-share` infrastructure | done | crates/lyng-js/vm/src/slow_path_counts.rs |
-  | hot-opcodes.toml from measured data | done | tools/lyng-js-bench/hot-opcodes.toml |
-  | LLInt reference capture | done | reports/js/lyng-js/llint-reference/ |
-  | microbench-baseline.md | done | reports/js/lyng-js/microbench-baseline.md |
-  | dsl-asm-baseline-aarch64/NORMALIZATION.md | done | reports/js/lyng-js/dsl-asm-baseline-aarch64/ |
-  | llint-dsl-value-layout.md | done | reports/js/lyng-js/llint-dsl-value-layout.md |
-  | llint-dsl-abi.md | done | reports/js/lyng-js/llint-dsl-abi.md |
-  | llint-dsl-safepoints.md | done | reports/js/lyng-js/llint-dsl-safepoints.md |
-  | Policy doc updates | done | crates/lyng-js/AGENTS.md, docs/lyng-js/engineering-standards.md |
-  | Determinism evidence | done | reports/js/lyng-js/r0/determinism.md |
-  | Test262 no-regression | done | reports/js/lyng-js/r0/test262-after-r0.md |
+  | `microbench` subcommand | done | tools/lyng-bench/src/microbench/ |
+  | `asm-diff` subcommand | done | tools/lyng-bench/src/asm_diff.rs |
+  | `capture-llint` subcommand | done | tools/lyng-bench/src/capture_llint.rs |
+  | `--count-slow-path-share` infrastructure | done | crates/lyng/vm/src/slow_path_counts.rs |
+  | hot-opcodes.toml from measured data | done | tools/lyng-bench/hot-opcodes.toml |
+  | LLInt reference capture | done | reports/lyng/llint-reference/ |
+  | microbench-baseline.md | done | reports/lyng/microbench-baseline.md |
+  | dsl-asm-baseline-aarch64/NORMALIZATION.md | done | reports/lyng/dsl-asm-baseline-aarch64/ |
+  | llint-dsl-value-layout.md | done | reports/lyng/llint-dsl-value-layout.md |
+  | llint-dsl-abi.md | done | reports/lyng/llint-dsl-abi.md |
+  | llint-dsl-safepoints.md | done | reports/lyng/llint-dsl-safepoints.md |
+  | Policy doc updates | done | crates/lyng/AGENTS.md, docs/lyng/engineering-standards.md |
+  | Determinism evidence | done | reports/lyng/r0/determinism.md |
+  | Test262 no-regression | done | reports/lyng/r0/test262-after-r0.md |
 
   ## Exit-criterion verification
 
@@ -3395,7 +3395,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 3: Commit**
 
   ```sh
-  git add docs/lyng-js/architecture.md reports/js/lyng-js/r0/status.md
+  git add docs/lyng/architecture.md reports/lyng/r0/status.md
   git commit -m "R-0: status report + architecture.md forward-pointer to design"
   ```
 
@@ -3407,11 +3407,11 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
 - [ ] **Step 5: Ask the user for final approval before closing**
 
-  Notify the user: "R-0 complete. All deliverables landed; status report at `reports/js/lyng-js/r0/status.md`. May I close the R-0 ticket and its sub-tickets?"
+  Notify the user: "R-0 complete. All deliverables landed; status report at `reports/lyng/r0/status.md`. May I close the R-0 ticket and its sub-tickets?"
 
   Wait for explicit approval. Only after the user confirms:
   ```sh
-  dcat close <R0_PARENT_ID> --reason "R-0 done; see reports/js/lyng-js/r0/status.md"
+  dcat close <R0_PARENT_ID> --reason "R-0 done; see reports/lyng/r0/status.md"
   ```
   (Close sub-tickets similarly.)
 
@@ -3422,15 +3422,15 @@ Before starting, verify the prerequisites are met. Run from repo root.
 After completing all tasks, verify:
 
 - [ ] All 8 dcat sub-tickets land as `in_review` or `closed`.
-- [ ] `cargo build --release -p lyng-js-bench` is clean.
-- [ ] `cargo test -p lyng-js-bench` passes.
-- [ ] `cargo test -p lyng-js-vm --features opcode-counters` passes.
-- [ ] `lyng-js-bench asm-diff --mode check` exits 0.
-- [ ] `lyng-js-bench microbench --samples 3 --iters 100000` exits 0.
-- [ ] `lyng-js-bench capture-llint --opcodes op_add --source excerpt --jsc-source /Users/sondre/dev/WebKit` exits 0.
+- [ ] `cargo build --release -p lyng-bench` is clean.
+- [ ] `cargo test -p lyng-bench` passes.
+- [ ] `cargo test -p lyng-vm --features opcode-counters` passes.
+- [ ] `lyng-bench asm-diff --mode check` exits 0.
+- [ ] `lyng-bench microbench --samples 3 --iters 100000` exits 0.
+- [ ] `lyng-bench capture-llint --opcodes op_add --source excerpt --jsc-source /Users/sondre/dev/WebKit` exits 0.
 - [ ] Test262 pass count ≥ 49722/49729.
 - [ ] All three evidence reports exist and cite real `file.rs:LINE` references.
-- [ ] `crates/lyng-js/AGENTS.md` line 142 area no longer contains a blanket no-unsafe rule.
+- [ ] `crates/lyng/AGENTS.md` line 142 area no longer contains a blanket no-unsafe rule.
 - [ ] No new `unsafe` blocks outside the modules explicitly allowed by the updated policy.
 
 If any of these fail, stop and resolve before declaring R-0 done.

@@ -1,6 +1,6 @@
-use lyng_js_ast::{Decl, Expr, ExprId, ForInOfLeft, ForInit, Stmt, StmtId, VariableKind};
-use lyng_js_common::{Span, WellKnownAtom};
-use lyng_js_lexer::TokenKind;
+use lyng_ast::{Decl, Expr, ExprId, ForInOfLeft, ForInit, Stmt, StmtId, VariableKind};
+use lyng_common::{Span, WellKnownAtom};
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 
@@ -72,7 +72,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let using_for_of_ambiguity = self.at_using_declaration()
             && matches!(
                 self.peek().payload,
-                lyng_js_lexer::TokenPayload::Atom(id) if id == WellKnownAtom::of.id()
+                lyng_lexer::TokenPayload::Atom(id) if id == WellKnownAtom::of.id()
             )
             && !matches!(
                 self.peek_second().kind,
@@ -243,7 +243,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.parse_for_rest(start, Some(ForInit::Declaration(decl)))
     }
 
-    fn parse_for_declaration(&mut self) -> lyng_js_ast::DeclId {
+    fn parse_for_declaration(&mut self) -> lyng_ast::DeclId {
         let start = self.current_span();
         let kind = match self.current_kind() {
             TokenKind::Var => {
@@ -295,7 +295,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         })
     }
 
-    fn validate_for_in_of_declaration(&mut self, decl: lyng_js_ast::DeclId) {
+    fn validate_for_in_of_declaration(&mut self, decl: lyng_ast::DeclId) {
         let is_for_in = self.at(TokenKind::In);
         let (kind, declarators, span) = match self.ast().get_decl(decl) {
             Decl::Variable {
@@ -328,7 +328,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             && declarators.len() == 1
             && matches!(
                 self.ast().get_pattern(declarators[0].id),
-                lyng_js_ast::Pattern::Identifier { .. }
+                lyng_ast::Pattern::Identifier { .. }
             );
         for declarator in declarators {
             if declarator.init.is_some() && !annex_b_allows_initializer {

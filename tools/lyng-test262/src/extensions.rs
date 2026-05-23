@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lyng_js_host::{
+use lyng_host::{
     HostError, HostHooks, HostResult, ImportMetaProperties, ImportMetaProperty, ImportMetaRequest,
     ImportMetaValue, LoadedModuleSource, ModuleKey, ModuleSourceRequest, ParkAgentRequest,
     ParkAgentResult, ParkAgentStatus, TemporalCurrentInstantRequest, TemporalDefaultTimeZone,
@@ -146,7 +146,7 @@ impl Test262Host {
             })
     }
 
-    fn recognized_module_type(attributes: &[lyng_js_host::ModuleImportAttribute]) -> Option<&str> {
+    fn recognized_module_type(attributes: &[lyng_host::ModuleImportAttribute]) -> Option<&str> {
         attributes
             .iter()
             .find(|attribute| attribute.key == "type")
@@ -158,7 +158,7 @@ impl Test262Host {
 
     fn module_key_for_import(
         path: &Path,
-        attributes: &[lyng_js_host::ModuleImportAttribute],
+        attributes: &[lyng_host::ModuleImportAttribute],
     ) -> ModuleKey {
         let path = path.display();
         if let Some(module_type) = Self::recognized_module_type(attributes) {
@@ -169,7 +169,7 @@ impl Test262Host {
 
     fn source_text_from_import_attributes(
         raw_source: &str,
-        attributes: &[lyng_js_host::ModuleImportAttribute],
+        attributes: &[lyng_host::ModuleImportAttribute],
     ) -> Option<String> {
         let module_type = Self::recognized_module_type(attributes)?;
         match module_type {
@@ -304,7 +304,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
-    use lyng_js_host::{HostHooks, ModuleImportAttribute, ModuleSourceRequest, TemporalInstant};
+    use lyng_host::{HostHooks, ModuleImportAttribute, ModuleSourceRequest, TemporalInstant};
 
     use crate::helpers::HelperCatalog;
 

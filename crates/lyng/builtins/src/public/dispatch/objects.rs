@@ -9,11 +9,11 @@ use super::{
     PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
 };
 use crate::BuiltinInvocation;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_objects::PrimitiveWrapperKind;
-use lyng_js_ops::{iterator, read};
-use lyng_js_types::{
+use lyng_common::WellKnownAtom;
+use lyng_gc::AllocationLifetime;
+use lyng_objects::PrimitiveWrapperKind;
+use lyng_ops::{iterator, read};
+use lyng_types::{
     BuiltinFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, Value, WellKnownSymbolId,
 };
 
@@ -154,7 +154,7 @@ fn dispatch_object_prototype_builtin<Cx: PublicBuiltinDispatchContext>(
 
 fn is_error_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> bool {
     let agent = cx.agent();
     agent
@@ -236,7 +236,7 @@ fn object_create_builtin<Cx: PublicBuiltinDispatchContext>(
 
 fn define_properties_from_source<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    target: lyng_js_types::ObjectRef,
+    target: lyng_types::ObjectRef,
     properties: Value,
 ) -> Result<(), Cx::Error> {
     let props = cx.to_object_for_builtin_value(cx.builtin_realm(), properties)?;
@@ -270,7 +270,7 @@ fn define_properties_from_source<Cx: PublicBuiltinDispatchContext>(
 
 fn define_property_or_throw_builtin<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    target: lyng_js_types::ObjectRef,
+    target: lyng_types::ObjectRef,
     key: PropertyKey,
     descriptor: PropertyDescriptor,
 ) -> Result<(), Cx::Error> {

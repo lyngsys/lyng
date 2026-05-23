@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm_dsl::llint_handler;
 
 // =====================================================================
 // op_loop_header (B43) — Ax layout, length = 4. Polls the safepoint
@@ -106,8 +106,7 @@ pub extern "C" fn op_jump_if_true_slow_rs(
         delta,
         instruction_len: 4,
     };
-    let outcome =
-        crate::vm::semantics::control_flow::op_jump_if_true_semantic(&mut dispatch, args);
+    let outcome = crate::vm::semantics::control_flow::op_jump_if_true_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
 }
 
@@ -247,7 +246,7 @@ pub extern "C" fn op_wide_set_prefix_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let outcome = run_prefix(&mut dispatch, lyng_js_bytecode::Opcode::Wide);
+    let outcome = run_prefix(&mut dispatch, lyng_bytecode::Opcode::Wide);
     dispatch.translate_outcome(outcome)
 }
 
@@ -261,7 +260,7 @@ pub extern "C" fn op_extra_wide_set_prefix_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let outcome = run_prefix(&mut dispatch, lyng_js_bytecode::Opcode::ExtraWide);
+    let outcome = run_prefix(&mut dispatch, lyng_bytecode::Opcode::ExtraWide);
     dispatch.translate_outcome(outcome)
 }
 
@@ -275,7 +274,7 @@ pub extern "C" fn op_extra_wide_set_prefix_rs(
 #[cfg(target_arch = "aarch64")]
 fn run_prefix(
     dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
-    prefix: lyng_js_bytecode::Opcode,
+    prefix: lyng_bytecode::Opcode,
 ) -> crate::dsl::slow_path::SemanticOutcome {
     use crate::dsl::slow_path::SemanticOutcome;
     {

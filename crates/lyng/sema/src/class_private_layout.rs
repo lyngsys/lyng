@@ -1,7 +1,7 @@
 //! Stable class-private layout metadata keyed by class body.
 
-use lyng_js_ast::{ClassElementId, NodeList};
-use lyng_js_common::{AtomId, Span};
+use lyng_ast::{ClassElementId, NodeList};
+use lyng_common::{AtomId, Span};
 use std::collections::HashMap;
 
 use crate::ids::ScopeId;

@@ -1,6 +1,6 @@
 use crate::{BytecodeEnvironmentBinding, EnvironmentLayoutRef};
-use lyng_js_common::{AtomId, SourceId};
-use lyng_js_types::{BuiltinFunctionId, FeedbackSlotId, ShapeId};
+use lyng_common::{AtomId, SourceId};
+use lyng_types::{BuiltinFunctionId, FeedbackSlotId, ShapeId};
 
 /// Activation policy for the `arguments` object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

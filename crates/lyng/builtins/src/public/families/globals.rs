@@ -1,7 +1,7 @@
 use super::{install_public_builtin_function, FamilyInstallContext, GlobalFunctionFamilyBuiltins};
 use crate::public::PublicRealmBuiltins;
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_env::Agent;
+use lyng_types::{
     decode_uri_builtin, decode_uri_component_builtin, encode_uri_builtin,
     encode_uri_component_builtin, escape_builtin, eval_builtin, is_finite_builtin, is_nan_builtin,
     parse_float_builtin, parse_int_builtin, unescape_builtin, BuiltinFunctionId, ObjectRef,

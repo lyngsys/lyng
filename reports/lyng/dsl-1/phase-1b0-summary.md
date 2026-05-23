@@ -20,7 +20,7 @@
 
 ## Counter correctness
 
-Single-sample V8 v7 run, top-15 by dispatch count, compared to [`reports/js/lyng-js/r0/v8-v7-top30.tsv`](../r0/v8-v7-top30.tsv):
+Single-sample V8 v7 run, top-15 by dispatch count, compared to [`reports/lyng/r0/v8-v7-top30.tsv`](../r0/v8-v7-top30.tsv):
 
 | Rank | Opcode             | Measured (1 sample) | Reference (3 samples) | Match? |
 |-----:|--------------------|--------------------:|----------------------:|--------|
@@ -91,18 +91,18 @@ Per spec §4: no workload regressed > 5% (overhead budget). **Result: pass.**
 
 ## Behavioral parity
 
-- `cargo test -p lyng-js-vm --lib --release`: **413 passing** ✓
-- `cargo test -p lyng-js-tests --release`: **1186 passing** ✓
-- `cargo test -p lyng-js-vm --tests` (integration): all DSL validation tests passing; 2 pre-existing `feedback_flat_consistency` failures (`dual_write_keeps_smi_add_legacy_and_flat_in_sync`, `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`) verified pre-existing from Phase 1.A end state — unrelated to Phase 1.B.0 changes.
+- `cargo test -p lyng-vm --lib --release`: **413 passing** ✓
+- `cargo test -p lyng-tests --release`: **1186 passing** ✓
+- `cargo test -p lyng-vm --tests` (integration): all DSL validation tests passing; 2 pre-existing `feedback_flat_consistency` failures (`dual_write_keeps_smi_add_legacy_and_flat_in_sync`, `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`) verified pre-existing from Phase 1.A end state — unrelated to Phase 1.B.0 changes.
 
 ## Lessons / observations
 
 - **Option B (lowerer rewrites)** for slow-path counter wiring was clean: the lowerer's `inject_opcode_byte` pass walks each body macro-call TokenStream and appends `opcode_byte = N` to `call_slow!` / `poll_safepoint!` invocations, threading the handler signature's byte through without per-callsite edits.
-- **Register clobber bug surfaced and fixed:** initial slow-path counter macros used `x9`/`x10` which conflict with live operands after the decode prologue. Fixed in Task 5 by switching to `x16`/`x17` (AAPCS64 IP0/IP1, reloaded by `call_slow!`'s bridge). Documented in [counters.rs](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs).
+- **Register clobber bug surfaced and fixed:** initial slow-path counter macros used `x9`/`x10` which conflict with live operands after the decode prologue. Fixed in Task 5 by switching to `x16`/`x17` (AAPCS64 IP0/IP1, reloaded by `call_slow!`'s bridge). Documented in [counters.rs](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs).
 - **Snapshot routing required correction:** `Vm::slow_path_counts()` was reading from the legacy `SlowPathCounterStore` (never written to). Routed to the asm-driven `DispatchCounters` banks in Task 5.
 - **Microbench snippet calibration is subtle:** the `let undefined`/`let null`/etc. patterns suggested in the plan compile to `LoadGlobal` (bare `undefined` is a global lookup), not the target opcode. Fixed by using `void 0`, function parameters (slots 0..N), and a verify test that catches drift via the dispatch counter.
 - **Counter overhead is negligible on Apple Silicon.** The 4-instruction increment per dispatch costs ≈ 0% V8 v7 geomean; the slow-path counters add no measurable overhead (only fire on slow paths).
-- **`lyng-js-bench` has hard dependencies on the counter API**, so feature-off measurement requires same-load A/B against the pre-wiring HEAD rather than a true `--no-default-features` build. This methodology is documented in the overhead report; if a true counter-off baseline ever becomes necessary, the bench tool's counter-API uses would need to be feature-gated.
+- **`lyng-bench` has hard dependencies on the counter API**, so feature-off measurement requires same-load A/B against the pre-wiring HEAD rather than a true `--no-default-features` build. This methodology is documented in the overhead report; if a true counter-off baseline ever becomes necessary, the bench tool's counter-API uses would need to be feature-gated.
 
 ## Phase 1.B.0 exit criteria assessment
 

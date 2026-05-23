@@ -97,17 +97,17 @@ through `||` short-circuits.
 
 ### Test suites
 
-- `cargo test -p lyng-js-vm`: **401 passed** (default features)
-- `cargo test --features opcode-counters -p lyng-js-vm`: **410 passed**
-- `cargo test -p lyng-js-vm -p lyng-js-tests -p lyng-js-bytecode -p lyng-js-compiler`: **1704 passed**
+- `cargo test -p lyng-vm`: **401 passed** (default features)
+- `cargo test --features opcode-counters -p lyng-vm`: **410 passed**
+- `cargo test -p lyng-vm -p lyng-tests -p lyng-bytecode -p lyng-compiler`: **1704 passed**
 - `cargo fmt --check` clean on all touched files
-  ([opcode_counts.rs](../../crates/lyng-js/vm/src/opcode_counts.rs),
-  [lib.rs](../../crates/lyng-js/vm/src/lib.rs),
-  [vm.rs](../../crates/lyng-js/vm/src/vm.rs),
-  [vm/call.rs](../../crates/lyng-js/vm/src/vm/call.rs),
-  [vm/bytecode_calls.rs](../../crates/lyng-js/vm/src/vm/bytecode_calls.rs),
-  [tests/core.rs](../../crates/lyng-js/vm/src/tests/core.rs))
-- `cargo clippy --features opcode-counters -p lyng-js-vm --tests`: 0 errors;
+  ([opcode_counts.rs](../../crates/lyng/vm/src/opcode_counts.rs),
+  [lib.rs](../../crates/lyng/vm/src/lib.rs),
+  [vm.rs](../../crates/lyng/vm/src/vm.rs),
+  [vm/call.rs](../../crates/lyng/vm/src/vm/call.rs),
+  [vm/bytecode_calls.rs](../../crates/lyng/vm/src/vm/bytecode_calls.rs),
+  [tests/core.rs](../../crates/lyng/vm/src/tests/core.rs))
+- `cargo clippy --features opcode-counters -p lyng-vm --tests`: 0 errors;
   the 7 remaining warnings are pre-existing in files not touched by this
   change (`dispatch.rs`, `dispatch/property.rs`, `feedback.rs`,
   `dispatch_handlers/arithmetic.rs`).

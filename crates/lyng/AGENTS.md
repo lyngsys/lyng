@@ -1,8 +1,8 @@
 # AGENTS
 
 This file is the Lyng JS operating guide for coding agents. Read it before touching
-`crates/lyng-js/*`, `docs/lyng-js/*`, `tools/lyng-js-test262`,
-`tools/lyng-js-bench`, `reports/js/lyng-js/*`, or Test262-related fixtures.
+`crates/lyng/*`, `docs/lyng/*`, `tools/lyng-test262`,
+`tools/lyng-bench`, `reports/lyng/*`, or Test262-related fixtures.
 
 Lyng JS is the repository JavaScript engine. The goal is a gold-standard ECMA-262
 implementation in Rust: spec-compliant, fast, readable, maintainable, and disciplined
@@ -49,21 +49,21 @@ underlying design instead.
 
 Start with:
 
-- `crates/lyng-js/README.md`
-- `docs/lyng-js/README.md`
-- `docs/lyng-js/architecture.md`
-- `docs/lyng-js/engineering-standards.md`
+- `crates/lyng/README.md`
+- `docs/lyng/README.md`
+- `docs/lyng/architecture.md`
+- `docs/lyng/engineering-standards.md`
 
 Then read the subsystem note and nearby tests for the area being changed:
 
-- Frontend: `docs/lyng-js/frontend-architecture.md`
-- Runtime model: `docs/lyng-js/runtime-model.md`
-- Runtime primitives: `docs/lyng-js/runtime-primitives.md`
-- Runtime substrate, realms, agents, jobs, modules: `docs/lyng-js/runtime-substrate.md`
-- Shared memory and backing stores: `docs/lyng-js/shared-memory-and-backing-stores.md`
-- Bytecode, VM, and feedback: `docs/lyng-js/bytecode-and-vm.md`
-- Builtin bootstrap: `docs/lyng-js/builtin-bootstrap.md`
-- Dynamic scope and eval: `docs/lyng-js/dynamic-scope-and-eval.md`
+- Frontend: `docs/lyng/frontend-architecture.md`
+- Runtime model: `docs/lyng/runtime-model.md`
+- Runtime primitives: `docs/lyng/runtime-primitives.md`
+- Runtime substrate, realms, agents, jobs, modules: `docs/lyng/runtime-substrate.md`
+- Shared memory and backing stores: `docs/lyng/shared-memory-and-backing-stores.md`
+- Bytecode, VM, and feedback: `docs/lyng/bytecode-and-vm.md`
+- Builtin bootstrap: `docs/lyng/builtin-bootstrap.md`
+- Dynamic scope and eval: `docs/lyng/dynamic-scope-and-eval.md`
 
 ## Crate Ownership
 
@@ -83,7 +83,7 @@ Respect these boundaries:
 - `vm`: bytecode installation and interpretation
 - `builtins`: realm bootstrap, intrinsic objects, builtin descriptors, native dispatch
 - `host`: embedding hooks and host-defined behavior
-- `cli`, `tests`, `tools/lyng-js-test262`, `tools/lyng-js-bench`: entrypoints and
+- `cli`, `tests`, `tools/lyng-test262`, `tools/lyng-bench`: entrypoints and
   verification tooling
 
 Do not move semantics sideways to make a local patch easier. If a VM change needs object
@@ -133,7 +133,7 @@ Hot-path expectations:
 - Avoid trait-object dispatch in interpreter loops unless measurement justifies it.
 - Keep runtime feedback separate from immutable bytecode templates.
 
-Run `tools/lyng-js-bench` when a change plausibly affects runtime throughput, allocation
+Run `tools/lyng-bench` when a change plausibly affects runtime throughput, allocation
 behavior, memory reporting, or bytecode density.
 
 ## Memory And Safety
@@ -141,10 +141,10 @@ behavior, memory reporting, or bytecode density.
 - Rooting and tracing must be explicit around allocation paths.
 - `unsafe` code is permitted only in the DSL substrate modules listed below, and
   only behind macro-generated code with audited invariants:
-  - `crates/lyng-js-vm-dsl/` (proc-macro crate; not yet created)
-  - `crates/lyng-js/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
-  - Existing narrow unsafe blocks in `crates/lyng-js/vm/src/vm/dispatch_state.rs` and
-    `crates/lyng-js/types/src/value.rs` (bounds-check elision, NaN-box construction).
+  - `crates/lyng/vm-dsl/` (proc-macro crate; not yet created)
+  - `crates/lyng/vm/src/dsl/` (DSL backend, entry/exit shims, slow-path bridge)
+  - Existing narrow unsafe blocks in `crates/lyng/vm/src/vm/dispatch_state.rs` and
+    `crates/lyng/types/src/value.rs` (bounds-check elision, NaN-box construction).
   Hand-written `unsafe` outside these locations is forbidden. Every `unsafe` block
   must carry a `// SAFETY:` comment naming the invariant the caller must uphold.
 - Preserve compact handle and value representations unless the task explicitly requires a
@@ -161,10 +161,10 @@ shared semantics or hot paths.
 Focused crate tests:
 
 ```sh
-cargo test -p lyng-js-parser
-cargo test -p lyng-js-compiler
-cargo test -p lyng-js-vm
-cargo test -p lyng-js-tests
+cargo test -p lyng-parser
+cargo test -p lyng-compiler
+cargo test -p lyng-vm
+cargo test -p lyng-tests
 ```
 
 Linting:
@@ -181,20 +181,20 @@ choice, and document the reason.
 Targeted Test262:
 
 ```sh
-cargo run --release -p lyng-js-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-js-test262-temporal.md -j 4
+cargo run --release -p lyng-test262 -- --filter built-ins/Temporal/Instant --report /tmp/lyng-test262-temporal.md -j 4
 ```
 
 Whole-corpus Test262, when broad semantic changes justify it:
 
 ```sh
-cargo run --release -p lyng-js-test262 -- --report /tmp/lyng-js-test262-report.md -j 12
+cargo run --release -p lyng-test262 -- --report /tmp/lyng-test262-report.md -j 12
 ```
 
 Benchmarks and density reports:
 
 ```sh
-cargo run --release -p lyng-js-bench -- runtime --report /tmp/lyng-js-bench.md
-cargo run --release -p lyng-js-bench -- density --report /tmp/lyng-js-bytecode-density.md
+cargo run --release -p lyng-bench -- runtime --report /tmp/lyng-bench.md
+cargo run --release -p lyng-bench -- density --report /tmp/lyng-bytecode-density.md
 ```
 
 Do not claim a change is complete just because a targeted Test262 slice passes. Report

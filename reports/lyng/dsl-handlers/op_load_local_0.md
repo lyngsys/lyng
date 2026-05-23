@@ -7,7 +7,7 @@ LoadLocal0 anchor; V8 v7 aggregate (3 samples × 6 workloads) =
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -25,7 +25,7 @@ llint_handler! {
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_local_0.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_local_0.asm`.
 
 ```asm
 op_load_local_0_dsl:
@@ -45,14 +45,14 @@ op_load_local_0_dsl:
 ## Slow path
 
 **Deleted.** `op_load_local_0_slow_rs` had no callers after this port
-landed (verified via grep across `crates/lyng-js/`). The semantic body
-in `crates/lyng-js/vm/src/vm/semantics/loads.rs:436-448` is `dst =
+landed (verified via grep across `crates/lyng/`). The semantic body
+in `crates/lyng/vm/src/vm/semantics/loads.rs:436-448` is `dst =
 registers[0]` with no bail conditions. No runtime failure mode exists.
 
 ## LLInt reference
 
 The structural baseline at
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/LoadLocal0.asm`
+`reports/lyng/dsl-asm-baseline-aarch64/LoadLocal0.asm`
 shows the LLInt path: a function call into `op_load_local_0` with
 stack-frame setup + bounds check + indexed load + store, then a
 dispatch jump. ~33 instructions including the function prologue / 
@@ -101,12 +101,12 @@ Gate (< 20%) satisfied with maximum headroom.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **418 passed**.
-- `cargo test -p lyng-js-tests --release` — **1209 passed** (1198
+- `cargo test -p lyng-vm --lib --release` — **418 passed**.
+- `cargo test -p lyng-tests --release` — **1209 passed** (1198
   baseline + 8 new `op_locals_inline.rs` + 3 new `op_ldar_inline.rs`
   integration tests).
 
-Integration tests in `crates/lyng-js/tests/src/op_locals_inline.rs`
+Integration tests in `crates/lyng/tests/src/op_locals_inline.rs`
 cover:
 1. `load_local_0_returns_first_parameter` — direct first-param read.
 5. `load_locals_aggregate` — `a + b + c + d` exercises 0..3 together.
@@ -119,9 +119,9 @@ The same tests passed pre-port (with the cold stub) and post-port
 
 - **Slow-path shim deleted.** `op_load_local_0_slow_rs` had no
   callers after this port landed and was removed alongside the
-  handler-body change. Grep across `crates/lyng-js/` confirms no
+  handler-body change. Grep across `crates/lyng/` confirms no
   remaining references.
 - **No new substrate.** Re-uses Phase 1.A's `load_acc!` macro from
-  `crates/lyng-js/vm/src/dsl/backend/aarch64/operands.rs:126`. The
+  `crates/lyng/vm/src/dsl/backend/aarch64/operands.rs:126`. The
   new Phase 1.B.3 `load_local_fixed!` macro is NOT used here (slot 0
   has its own dedicated `load_acc!` macro).

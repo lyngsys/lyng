@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::loads::op_ldar:
+lyng_vm::vm::dispatch_handlers::loads::op_ldar:
 L0:
 	stp x29, x30, [sp, #-16]!
 	mov x29, sp
@@ -44,9 +44,9 @@ L5:
 	ldr x9, [x11, #48]
 	ldrb w9, [x9, w12, uxtw]
 L6:
-	adrp x11, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x11, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L7:
-	add x11, x11, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x11, x11, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x9, [x11, x9, lsl #3]
 	b L8
 L2:
@@ -62,9 +62,9 @@ L2:
 	b L9
 L3:
 L10:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L11:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x9, [x9, x15, lsl #3]
 L8:
 	stp x10, x9, [x8]

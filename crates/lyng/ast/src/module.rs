@@ -1,6 +1,6 @@
 //! Module root node.
 
-use lyng_js_common::Span;
+use lyng_common::Span;
 
 use crate::ids::{NodeList, StmtId};
 

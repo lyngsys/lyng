@@ -1,7 +1,7 @@
 //! Phase 1.C.3 Task 11: verify the SMI-elision writeback claim for
 //! `op_increment` and `op_decrement` against the non-SMI slow path.
 //!
-//! Tasks 9 / 10 (`crates/lyng-js/vm/src/dsl/handlers/cold.rs:1892-1909`
+//! Tasks 9 / 10 (`crates/lyng/vm/src/dsl/handlers/cold.rs:1892-1909`
 //! and 1968-1985) ported the inline fast path for `op_increment` /
 //! `op_decrement` to:
 //!
@@ -20,7 +20,7 @@
 //! ```
 //!
 //! The semantic body
-//! (`crates/lyng-js/vm/src/vm/semantics/arithmetic.rs:796-833`) writes
+//! (`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`) writes
 //! `numeric = ToNumeric(src)` back to `args.src` BEFORE storing the
 //! updated `value` to `args.dst`. The inline fast path ELIDES that
 //! writeback because for SMI src, `ToNumeric(SMI) == SMI` — the
@@ -30,7 +30,7 @@
 //!
 //! This test locks down the slow-path writeback by forcing a non-SMI
 //! src via a string source. The compiler's
-//! `lower_update_expression` (crates/lyng-js/compiler/src/script/
+//! `lower_update_expression` (crates/lyng/compiler/src/script/
 //! property_exprs.rs:12-33) emits a `Move`/load into a `current` temp
 //! followed by `Increment result, current` / `Decrement result, current`
 //! followed by a store back to the variable AND an
@@ -66,18 +66,18 @@
 //! would hold the original string and `typeof r === "number"` would
 //! be `false`, returning 0 and failing the assertion.
 //!
-//! See `reports/js/lyng-js/dsl-handlers/op_increment.md` and
+//! See `reports/lyng/dsl-handlers/op_increment.md` and
 //! `op_decrement.md` § SMI-elision-of-src-writeback for the structural
 //! claim this test backstops.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Compile + execute `src` in a fresh realm, returning the script's
 /// completion value. Mirrors the helper used by `op_ldar_inline.rs`,

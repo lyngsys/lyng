@@ -1,9 +1,9 @@
 use super::support::{compile_and_run, compile_and_run_string, compile_unit};
-use lyng_js_common::AtomTable;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::AtomTable;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 #[test]
 fn phase6_classes_execute_base_constructors_methods_and_instance_fields() {
@@ -514,7 +514,7 @@ fn phase6_async_private_methods_async_arrows_capture_parent_arguments() {
         .promise_record(promise)
         .expect("promise should remain tracked after evaluation");
 
-    assert_eq!(record.state(), lyng_js_env::PromiseState::Fulfilled);
+    assert_eq!(record.state(), lyng_env::PromiseState::Fulfilled);
     assert_eq!(record.result(), Value::from_bool(true));
 }
 
@@ -1929,7 +1929,7 @@ fn phase6_methods_record_home_object_for_super_dispatch() {
         agent
             .objects()
             .function_data(method)
-            .and_then(lyng_js_objects::FunctionObjectData::home_object)
+            .and_then(lyng_objects::FunctionObjectData::home_object)
             .is_some(),
         "method closures using super should retain [[HomeObject]] metadata"
     );

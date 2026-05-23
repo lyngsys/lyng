@@ -1,6 +1,6 @@
 use super::*;
-use lyng_js_ast::*;
-use lyng_js_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span, WellKnownAtom};
+use lyng_ast::*;
+use lyng_common::{AtomId, AtomTable, DiagnosticList, SourceId, Span, WellKnownAtom};
 
 fn span() -> Span {
     Span::from_offsets(SourceId::new(0), 0, 10)
@@ -1672,7 +1672,7 @@ fn for_let_creates_loop_scope() {
         });
         let test = ast.alloc_expr(Expr::BinaryExpression {
             span: span(),
-            operator: lyng_js_ast::BinaryOp::Lt,
+            operator: lyng_ast::BinaryOp::Lt,
             left: test_left,
             right: test_right,
         });
@@ -1683,7 +1683,7 @@ fn for_let_creates_loop_scope() {
         });
         let update = ast.alloc_expr(Expr::UpdateExpression {
             span: span(),
-            operator: lyng_js_ast::UpdateOp::Increment,
+            operator: lyng_ast::UpdateOp::Increment,
             argument: update_arg,
             prefix: false,
         });

@@ -66,7 +66,7 @@ explicit-assignment mode).
 
 | Check | Phase 3a | Phase 3b | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-gc -p lyng-js-objects -p lyng-js-vm -p lyng-js-tests` | 1707 passed | 1709 passed | +2 (new writable-bit packing tests) |
+| `cargo test -p lyng-gc -p lyng-objects -p lyng-vm -p lyng-tests` | 1707 passed | 1709 passed | +2 (new writable-bit packing tests) |
 | `cargo clippy --workspace --all-targets` | 0 errors, 62 warnings | 0 errors, 64 warnings | +2 (both in `crates/html_parser`, unrelated to Phase 3b code) |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
@@ -89,8 +89,8 @@ property-mutation-heavy benchmarks. Splay (tree-node mutations)
 benefits in 3b where it was flat in 3a. No benchmark regresses >1%.
 
 Reports:
-- `reports/js/lyng-js/phase-3b-bench.md`
-- `reports/js/lyng-js/phase-3b-bench.json`
+- `reports/lyng/phase-3b-bench.md`
+- `reports/lyng/phase-3b-bench.json`
 
 ### `cargo asm` on `op_set_named_property_common`
 
@@ -115,7 +115,7 @@ Slow-path `bl` targets remain: `try_named_property_store_inline_cache`
 (cache update on miss).
 
 Report:
-- `reports/js/lyng-js/phase-3b-op_set_named_property_common.asm`
+- `reports/lyng/phase-3b-op_set_named_property_common.asm`
 
 ### Test262
 
@@ -135,7 +135,7 @@ layout change continues to reproduce in 3b. Tracked as `lyng-2tr1`;
 unrelated to the 3b code path (3b doesn't change the layout further).
 
 Report:
-- `reports/js/lyng-js/phase-3b-test262.md`
+- `reports/lyng/phase-3b-test262.md`
 
 ## What's deferred
 
@@ -146,11 +146,11 @@ Report:
 
 ## Files changed
 
-- `crates/lyng-js/objects/src/shapes.rs` — `NamedPropertyHandler` writable bit (bit 30 of low half); `from_entry` extracts `entry.attrs().writable()`; new `writable()` accessor; `slot_location()` masks bit 30 off the offset.
-- `crates/lyng-js/objects/src/tests.rs` — `synthesize_own_data_entry` takes a `writable` parameter; 2 new tests (`packs_writable_bit_for_read_only_entry`, `writable_bit_does_not_alias_slot_offset`); 6 existing tests updated to pass `writable: true`.
-- `crates/lyng-js/vm/src/vm/dispatch/property.rs` — `ValueStoreTarget` import added; cache-hit branch of `execute_set_named_property_opcode` rewritten as the inlined fast path; slow chain (lines below the new block) unchanged.
+- `crates/lyng/objects/src/shapes.rs` — `NamedPropertyHandler` writable bit (bit 30 of low half); `from_entry` extracts `entry.attrs().writable()`; new `writable()` accessor; `slot_location()` masks bit 30 off the offset.
+- `crates/lyng/objects/src/tests.rs` — `synthesize_own_data_entry` takes a `writable` parameter; 2 new tests (`packs_writable_bit_for_read_only_entry`, `writable_bit_does_not_alias_slot_offset`); 6 existing tests updated to pass `writable: true`.
+- `crates/lyng/vm/src/vm/dispatch/property.rs` — `ValueStoreTarget` import added; cache-hit branch of `execute_set_named_property_opcode` rewritten as the inlined fast path; slow chain (lines below the new block) unchanged.
 
-No changes in `crates/lyng-js/vm/src/vm/feedback.rs` — the
+No changes in `crates/lyng/vm/src/vm/feedback.rs` — the
 `monomorphic_fast`, `monomorphic_fast_dependency_epoch`,
 `named_property_fast_handler`, and `refresh_monomorphic_fast`
 infrastructure from Phase 3a is reused unchanged.

@@ -16,23 +16,23 @@
 ## File structure overview
 
 ### Created
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs` — backend macro `load_constant!` (new file in existing backend module)
-- `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs` — synthetic-handler integration test exercising both new macros end-to-end
-- `crates/lyng-js-tests/tests/gc_stress_frame_context.rs` — gc-stress integration test (closure + this + allocation pressure)
-- `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md` — GC root-scanning review doc
-- `reports/js/lyng-js/dsl-1/phase-1b1-ab-comparison.md` — same-load V8 v7 A/B data
-- `reports/js/lyng-js/dsl-1/phase-1b1-summary.md` — final sub-phase summary
+- `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs` — backend macro `load_constant!` (new file in existing backend module)
+- `crates/lyng/vm/tests/dsl_validation_frame_context.rs` — synthetic-handler integration test exercising both new macros end-to-end
+- `crates/lyng-tests/tests/gc_stress_frame_context.rs` — gc-stress integration test (closure + this + allocation pressure)
+- `reports/lyng/dsl-1/phase-1b1-gc-review.md` — GC root-scanning review doc
+- `reports/lyng/dsl-1/phase-1b1-ab-comparison.md` — same-load V8 v7 A/B data
+- `reports/lyng/dsl-1/phase-1b1-summary.md` — final sub-phase summary
 
 ### Modified
-- `crates/lyng-js/vm/src/dsl/llint_state.rs` — add two fields to `LlIntState`, add `resolve_initial_this_value` helper + unit tests, update `ll_int_state_offsets_stable`
-- `crates/lyng-js/vm/src/dsl/reg_convention.rs` — add two new `LLINT_STATE_*` offset consts
-- `crates/lyng-js/vm/src/dsl/entry.rs` — populate new fields at `run_via_dsl` entry (lines 116-128 area)
-- `crates/lyng-js/vm/src/dsl/slow_path.rs` — refresh new fields in `translate_outcome` Refresh arm (lines 240-296 area); add debug-only stability assertion
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs` — declare new `constants` submodule
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs` (or new `state.rs`) — add `load_state_value!` macro
+- `crates/lyng/vm/src/dsl/llint_state.rs` — add two fields to `LlIntState`, add `resolve_initial_this_value` helper + unit tests, update `ll_int_state_offsets_stable`
+- `crates/lyng/vm/src/dsl/reg_convention.rs` — add two new `LLINT_STATE_*` offset consts
+- `crates/lyng/vm/src/dsl/entry.rs` — populate new fields at `run_via_dsl` entry (lines 116-128 area)
+- `crates/lyng/vm/src/dsl/slow_path.rs` — refresh new fields in `translate_outcome` Refresh arm (lines 240-296 area); add debug-only stability assertion
+- `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` — declare new `constants` submodule
+- `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` (or new `state.rs`) — add `load_state_value!` macro
 
 ### Untouched (verifying invariant)
-- All existing opcode handlers in `crates/lyng-js/vm/src/dsl/handlers/`. No handler changes in 1.B.1.
+- All existing opcode handlers in `crates/lyng/vm/src/dsl/handlers/`. No handler changes in 1.B.1.
 
 ---
 
@@ -41,20 +41,20 @@
 - **User deny rules respected:** NEVER use `git -C <path>` or `cd <path> && git ...`. Always run git from the worktree's working directory (the harness already starts there).
 - **Commits:** Each task ends with a self-contained commit. Use the `Co-Authored-By: Claude` footer per the standard convention.
 - **Untracked planning docs:** `docs/superpowers/plans/*.md` and `docs/superpowers/specs/*.md` files for this work are left untracked unless explicitly added (per user discipline).
-- **`reports/js/lyng-js/bench-v8.md`** is a side-effect of `cargo run -p lyng-js-bench -- v8suite`. Leave it unstaged throughout.
-- **Behavioral parity at every commit:** `cargo test -p lyng-js-vm --lib --release` (413+) and `cargo test -p lyng-js-tests --release` (1186+) must pass after each task. The 2 pre-existing `feedback_flat_consistency` failures are unchanged.
+- **`reports/lyng/bench-v8.md`** is a side-effect of `cargo run -p lyng-bench -- v8suite`. Leave it unstaged throughout.
+- **Behavioral parity at every commit:** `cargo test -p lyng-vm --lib --release` (413+) and `cargo test -p lyng-tests --release` (1186+) must pass after each task. The 2 pre-existing `feedback_flat_consistency` failures are unchanged.
 
 ---
 
 ## Task 1: Add `frame_const_base` and `frame_this_value` fields to `LlIntState`
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/llint_state.rs:25-36` (struct definition + tests)
-- Modify: `crates/lyng-js/vm/src/dsl/reg_convention.rs` (add two new offset consts)
+- Modify: `crates/lyng/vm/src/dsl/llint_state.rs:25-36` (struct definition + tests)
+- Modify: `crates/lyng/vm/src/dsl/reg_convention.rs` (add two new offset consts)
 
 - [ ] **Step 1: Write the failing offset-stability test**
 
-Open `crates/lyng-js/vm/src/dsl/llint_state.rs` and update the `ll_int_state_offsets_stable` test (around lines 91-102):
+Open `crates/lyng/vm/src/dsl/llint_state.rs` and update the `ll_int_state_offsets_stable` test (around lines 91-102):
 
 ```rust
 #[test]
@@ -79,12 +79,12 @@ fn ll_int_state_offsets_stable() {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test -p lyng-js-vm --lib ll_int_state_offsets_stable`
+Run: `cargo test -p lyng-vm --lib ll_int_state_offsets_stable`
 Expected: FAIL — `LLINT_STATE_FRAME_CONST_BASE` does not exist yet (unresolved import / compile error).
 
 - [ ] **Step 3: Add the two new offset consts to `reg_convention.rs`**
 
-Open `crates/lyng-js/vm/src/dsl/reg_convention.rs`. After the existing `LLINT_STATE_FRAME_FV_BASE` declaration (around line 42), add:
+Open `crates/lyng/vm/src/dsl/reg_convention.rs`. After the existing `LLINT_STATE_FRAME_FV_BASE` declaration (around line 42), add:
 
 ```rust
 pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
@@ -95,7 +95,7 @@ Keep the existing `LLINT_STATE_PREFIX` declaration as-is — `offset_of!` will c
 
 - [ ] **Step 4: Add the two new fields to `LlIntState`**
 
-In `crates/lyng-js/vm/src/dsl/llint_state.rs`, update the struct (lines 25-36):
+In `crates/lyng/vm/src/dsl/llint_state.rs`, update the struct (lines 25-36):
 
 ```rust
 #[repr(C)]
@@ -139,7 +139,7 @@ let mut state = LlIntState {
     frame_fv_base: fv_base,
     // Phase 1.B.1 Task 1: placeholders. Task 3 wires real values.
     frame_const_base: std::ptr::null(),
-    frame_this_value: lyng_js_types::Value::undefined(),
+    frame_this_value: lyng_types::Value::undefined(),
     frame_depth: frame_depth as u32,
     frame_check_epoch: 0,
     rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>
@@ -151,23 +151,23 @@ let mut state = LlIntState {
 
 - [ ] **Step 6: Run the offset-stability test to verify it passes**
 
-Run: `cargo test -p lyng-js-vm --lib ll_int_state_offsets_stable`
+Run: `cargo test -p lyng-vm --lib ll_int_state_offsets_stable`
 Expected: PASS.
 
 - [ ] **Step 7: Run full vm test suite to confirm no regression**
 
-Run: `cargo test -p lyng-js-vm --lib --release`
+Run: `cargo test -p lyng-vm --lib --release`
 Expected: 413+ passing (matches Phase 1.B.0 baseline).
 
-- [ ] **Step 8: Run lyng-js-tests to confirm integration parity**
+- [ ] **Step 8: Run lyng-tests to confirm integration parity**
 
-Run: `cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-tests --release`
 Expected: 1186+ passing.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/llint_state.rs crates/lyng-js/vm/src/dsl/reg_convention.rs crates/lyng-js/vm/src/dsl/entry.rs
+git add crates/lyng/vm/src/dsl/llint_state.rs crates/lyng/vm/src/dsl/reg_convention.rs crates/lyng/vm/src/dsl/entry.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 1: add frame_const_base + frame_this_value to LlIntState
 
@@ -190,11 +190,11 @@ EOF
 ## Task 2: Add `resolve_initial_this_value` helper with unit tests
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/llint_state.rs` (add helper + unit tests)
+- Modify: `crates/lyng/vm/src/dsl/llint_state.rs` (add helper + unit tests)
 
 - [ ] **Step 1: Write the failing unit tests**
 
-In `crates/lyng-js/vm/src/dsl/llint_state.rs`, replace the existing `tests` mod block (lines 86-103) with an expanded version that includes both the existing offset test and four new helper tests:
+In `crates/lyng/vm/src/dsl/llint_state.rs`, replace the existing `tests` mod block (lines 86-103) with an expanded version that includes both the existing offset test and four new helper tests:
 
 ```rust
 #[cfg(test)]
@@ -208,8 +208,8 @@ mod tests {
     // to unit-test, with a thin wrapper that takes Agent + FrameRecord
     // and delegates. Adopt that pattern if FrameRecord stubs are hard
     // to construct.
-    use lyng_js_env::execution::ThisState;
-    use lyng_js_types::Value;
+    use lyng_env::execution::ThisState;
+    use lyng_types::Value;
 
     #[test]
     fn ll_int_state_offsets_stable() {
@@ -255,15 +255,15 @@ mod tests {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cargo test -p lyng-js-vm --lib resolve_this_state`
+Run: `cargo test -p lyng-vm --lib resolve_this_state`
 Expected: FAIL — `resolve_this_state_to_mirror` is undefined (compile error or `unresolved import`).
 
 - [ ] **Step 3: Implement the helper**
 
-In `crates/lyng-js/vm/src/dsl/llint_state.rs`, add the helper just before the `#[cfg(test)]` block. Use this exact signature pair:
+In `crates/lyng/vm/src/dsl/llint_state.rs`, add the helper just before the `#[cfg(test)]` block. Use this exact signature pair:
 
 ```rust
-use lyng_js_env::execution::ThisState;
+use lyng_env::execution::ThisState;
 
 /// Lower-level helper: maps a (`ThisState`, frame-`this`-value
 /// fallback) pair to the mirror value stored in
@@ -295,7 +295,7 @@ pub(crate) fn resolve_this_state_to_mirror(
 
 /// Top-level helper: derives the mirror from an `Agent` + a
 /// `FrameRecord`. Mirrors the read path in
-/// `crates/lyng-js/vm/src/vm/semantics/names.rs:600-627` so the
+/// `crates/lyng/vm/src/vm/semantics/names.rs:600-627` so the
 /// pre-resolution matches `op_load_this` semantics exactly.
 ///
 /// Called from:
@@ -304,7 +304,7 @@ pub(crate) fn resolve_this_state_to_mirror(
 ///   (Refresh arm)
 #[inline]
 pub(crate) fn resolve_initial_this_value(
-    agent: &lyng_js_env::Agent,
+    agent: &lyng_env::Agent,
     frame: &crate::FrameRecord,
 ) -> Value {
     let this_state = agent
@@ -315,22 +315,22 @@ pub(crate) fn resolve_initial_this_value(
 }
 ```
 
-**Note on imports:** the exact path to `ThisState` may be `lyng_js_env::execution::ThisState` or `lyng_js_env::ThisState` depending on re-exports — check with `grep "pub use.*ThisState" crates/lyng-js/env/src/lib.rs` if the first import fails. Similarly for `agent.current_execution_context()` — verify against the research report's `env/src/agent/execution_contexts.rs`.
+**Note on imports:** the exact path to `ThisState` may be `lyng_env::execution::ThisState` or `lyng_env::ThisState` depending on re-exports — check with `grep "pub use.*ThisState" crates/lyng/env/src/lib.rs` if the first import fails. Similarly for `agent.current_execution_context()` — verify against the research report's `env/src/agent/execution_contexts.rs`.
 
 - [ ] **Step 4: Run unit tests to verify they pass**
 
-Run: `cargo test -p lyng-js-vm --lib resolve_this_state`
+Run: `cargo test -p lyng-vm --lib resolve_this_state`
 Expected: 4 passing (`resolve_this_state_value_passthrough`, `..._uninitialized_returns_sentinel`, `..._lexical_returns_sentinel`, `..._none_falls_back_to_frame_this`).
 
 - [ ] **Step 5: Run full vm suite for parity**
 
-Run: `cargo test -p lyng-js-vm --lib --release`
+Run: `cargo test -p lyng-vm --lib --release`
 Expected: 417+ passing (413 baseline + 4 new).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/llint_state.rs
+git add crates/lyng/vm/src/dsl/llint_state.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 2: add resolve_initial_this_value helper
 
@@ -358,7 +358,7 @@ EOF
 ## Task 3: Populate `frame_const_base` and `frame_this_value` at trampoline entry
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/entry.rs:38-128` (the `run_via_dsl` function)
+- Modify: `crates/lyng/vm/src/dsl/entry.rs:38-128` (the `run_via_dsl` function)
 
 - [ ] **Step 1: Compute the new field values before the DispatchState move**
 
@@ -375,12 +375,12 @@ Insert these computations after the `regs_base` block (line 90) and before `let 
     // See spec §3.4.
     //
     // The chain mirrors `Vm::read_constant` in
-    // crates/lyng-js/vm/src/vm/values.rs:795-806.
+    // crates/lyng/vm/src/vm/values.rs:795-806.
     let const_base: *const Value = agent
         .heap()
         .view()
         .code(frame.code())
-        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+        .and_then(lyng_gc::RuntimeCodeRecord::constants)
         .and_then(|slots| agent.heap().view().code_slots(slots))
         .map(|s| s.as_ptr())
         .unwrap_or(std::ptr::null());
@@ -418,17 +418,17 @@ Update the `LlIntState` literal (around lines 116-128, the lines added in Task 1
 
 - [ ] **Step 3: Build to verify it compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
-Expected: builds cleanly. If `lyng_js_gc::RuntimeCodeRecord` is not in scope, add the import at the top of `entry.rs`; if `agent.heap()` requires a different qualifier, follow the pattern from `vm/src/vm/values.rs:795-806`.
+Run: `cargo build -p lyng-vm --release`
+Expected: builds cleanly. If `lyng_gc::RuntimeCodeRecord` is not in scope, add the import at the top of `entry.rs`; if `agent.heap()` requires a different qualifier, follow the pattern from `vm/src/vm/values.rs:795-806`.
 
 - [ ] **Step 4: Run vm tests for parity**
 
-Run: `cargo test -p lyng-js-vm --lib --release`
+Run: `cargo test -p lyng-vm --lib --release`
 Expected: 417+ passing (4 new from Task 2 + 413 baseline).
 
-- [ ] **Step 5: Run lyng-js-tests for integration parity**
+- [ ] **Step 5: Run lyng-tests for integration parity**
 
-Run: `cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-tests --release`
 Expected: 1186+ passing.
 
 No handler reads `frame_const_base` or `frame_this_value` yet — these tests pass because the new fields are written but never read by asm. They just have to not break the build or existing semantics.
@@ -436,7 +436,7 @@ No handler reads `frame_const_base` or `frame_this_value` yet — these tests pa
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/entry.rs
+git add crates/lyng/vm/src/dsl/entry.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 3: populate frame_const_base + frame_this_value at trampoline entry
 
@@ -462,7 +462,7 @@ EOF
 ## Task 4: Refresh `frame_const_base` and `frame_this_value` in the slow-path Refresh arm
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/slow_path.rs:240-296` (Refresh arm in `translate_outcome`)
+- Modify: `crates/lyng/vm/src/dsl/slow_path.rs:240-296` (Refresh arm in `translate_outcome`)
 
 - [ ] **Step 1: Add the new field derivations in the Refresh arm**
 
@@ -472,13 +472,13 @@ In `slow_path.rs`, inside the existing Refresh arm (lines 240-296), AFTER the ex
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
-                    let const_base: *const lyng_js_types::Value = rust
+                    let const_base: *const lyng_types::Value = rust
                         .dispatch
                         .agent
                         .heap()
                         .view()
                         .code(active_frame.code())
-                        .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+                        .and_then(lyng_gc::RuntimeCodeRecord::constants)
                         .and_then(|slots| {
                             rust.dispatch.agent.heap().view().code_slots(slots)
                         })
@@ -538,13 +538,13 @@ Immediately after the unsafe block above, add:
                     // `frame_pb_base` already relies on. See spec §3.6.
                     #[cfg(debug_assertions)]
                     {
-                        let recomputed: *const lyng_js_types::Value = rust
+                        let recomputed: *const lyng_types::Value = rust
                             .dispatch
                             .agent
                             .heap()
                             .view()
                             .code(active_frame.code())
-                            .and_then(lyng_js_gc::RuntimeCodeRecord::constants)
+                            .and_then(lyng_gc::RuntimeCodeRecord::constants)
                             .and_then(|slots| {
                                 rust.dispatch.agent.heap().view().code_slots(slots)
                             })
@@ -559,17 +559,17 @@ Immediately after the unsafe block above, add:
 
 - [ ] **Step 4: Build to verify it compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
-Expected: builds cleanly. If `lyng_js_gc::RuntimeCodeRecord` is not in scope at the top of `slow_path.rs`, add the import alongside the existing `use lyng_js_gc::...` lines (or use the fully-qualified path inline as shown).
+Run: `cargo build -p lyng-vm --release`
+Expected: builds cleanly. If `lyng_gc::RuntimeCodeRecord` is not in scope at the top of `slow_path.rs`, add the import alongside the existing `use lyng_gc::...` lines (or use the fully-qualified path inline as shown).
 
 - [ ] **Step 5: Run vm tests for parity**
 
-Run: `cargo test -p lyng-js-vm --lib --release`
+Run: `cargo test -p lyng-vm --lib --release`
 Expected: 417+ passing.
 
-- [ ] **Step 6: Run lyng-js-tests**
+- [ ] **Step 6: Run lyng-tests**
 
-Run: `cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-tests --release`
 Expected: 1186+ passing.
 
 The fields are now refreshed correctly across every Refresh egress, but still no asm handler reads them. Behavior unchanged; this is the substrate.
@@ -577,7 +577,7 @@ The fields are now refreshed correctly across every Refresh egress, but still no
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/slow_path.rs
+git add crates/lyng/vm/src/dsl/slow_path.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 4: refresh frame_const_base + frame_this_value on slow-path Refresh egress
 
@@ -606,24 +606,24 @@ EOF
 ## Task 5: Add `load_constant!` and `load_state_value!` backend macros
 
 **Files:**
-- Create: `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs`
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs` (add `load_state_value!` macro)
+- Create: `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` (declare new submodule)
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs` (add `load_state_value!` macro)
 
 - [ ] **Step 1: Read the existing aarch64 backend module structure for context**
 
-Run: `ls -la crates/lyng-js/vm/src/dsl/backend/aarch64/`
+Run: `ls -la crates/lyng/vm/src/dsl/backend/aarch64/`
 And read the existing `counters.rs` file (created in Phase 1.B.0) for the macro shape template:
 
 ```bash
-cat crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs | head -80
+cat crates/lyng/vm/src/dsl/backend/aarch64/counters.rs | head -80
 ```
 
 This shows the macro_rules pattern used in the DSL backend: the macros emit asm strings that the proc-macro lowerer splices into handler bodies. Use the same pattern.
 
 - [ ] **Step 2: Create `constants.rs` with the `load_constant!` macro**
 
-Create `crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs`:
+Create `crates/lyng/vm/src/dsl/backend/aarch64/constants.rs`:
 
 ```rust
 //! Constants-access backend macros for Phase 1.B.1.
@@ -659,11 +659,11 @@ macro_rules! load_constant {
 pub use load_constant;
 ```
 
-**Note on the macro shape:** the exact `macro_rules!` arity and binding pattern depends on the existing DSL backend conventions. Inspect `counters.rs` (added in Phase 1.B.0) — it uses a binding like `vm_counter_base = const ::lyng_js_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET`. Use the analogous binding for `LLINT_STATE_FRAME_CONST_BASE`. If `counters.rs` resolves its offset by passing the const as a parameter from the lowerer, mirror that wiring; if it inlines the offset directly, do the same.
+**Note on the macro shape:** the exact `macro_rules!` arity and binding pattern depends on the existing DSL backend conventions. Inspect `counters.rs` (added in Phase 1.B.0) — it uses a binding like `vm_counter_base = const ::lyng_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET`. Use the analogous binding for `LLINT_STATE_FRAME_CONST_BASE`. If `counters.rs` resolves its offset by passing the const as a parameter from the lowerer, mirror that wiring; if it inlines the offset directly, do the same.
 
 - [ ] **Step 3: Declare the new submodule in `aarch64/mod.rs`**
 
-Open `crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs` and add:
+Open `crates/lyng/vm/src/dsl/backend/aarch64/mod.rs` and add:
 
 ```rust
 pub mod constants;
@@ -673,7 +673,7 @@ next to the existing `pub mod counters;`, `pub mod control;`, etc.
 
 - [ ] **Step 4: Add `load_state_value!` to `frame.rs`**
 
-In `crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs`, add a new macro alongside the existing frame-context macros:
+In `crates/lyng/vm/src/dsl/backend/aarch64/frame.rs`, add a new macro alongside the existing frame-context macros:
 
 ```rust
 /// Load a `Value` (8 bytes) from a fixed offset in `LlIntState`.
@@ -701,28 +701,28 @@ pub use load_state_value;
 
 - [ ] **Step 5: Wire the lowerer to recognize the new macros (if applicable)**
 
-If the DSL proc-macro lowerer in `crates/lyng-js-vm-dsl/src/lower.rs` needs to inject `vm_const_base` / `vm_state_offset` bindings for these macros (mirroring how it injects `vm_counter_base` for the counter macros — see Phase 1.B.0 Task 4), add that wiring.
+If the DSL proc-macro lowerer in `crates/lyng/vm-dsl/src/lower.rs` needs to inject `vm_const_base` / `vm_state_offset` bindings for these macros (mirroring how it injects `vm_counter_base` for the counter macros — see Phase 1.B.0 Task 4), add that wiring.
 
 Find the existing `vm_counter_base` injection in `lower.rs`; the new macros need analogous injections:
-- `load_constant!` → inject `vm_const_base = const ::lyng_js_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE`
+- `load_constant!` → inject `vm_const_base = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE`
 - `load_state_value!` → no injection needed; the const is supplied at the call site
 
 If `lower.rs` doesn't need changes (e.g. if these macros are designed to be called with the const supplied at the handler site without auto-injection), skip this step.
 
 - [ ] **Step 6: Build to verify it compiles**
 
-Run: `cargo build -p lyng-js-vm --release`
+Run: `cargo build -p lyng-vm --release`
 Expected: builds cleanly. No handler uses these macros yet — they're substrate. The validation test in Task 6 exercises them.
 
 - [ ] **Step 7: Run vm tests for parity**
 
-Run: `cargo test -p lyng-js-vm --lib --release`
+Run: `cargo test -p lyng-vm --lib --release`
 Expected: 417+ passing.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/backend/aarch64/constants.rs crates/lyng-js/vm/src/dsl/backend/aarch64/mod.rs crates/lyng-js/vm/src/dsl/backend/aarch64/frame.rs crates/lyng-js-vm-dsl/src/lower.rs
+git add crates/lyng/vm/src/dsl/backend/aarch64/constants.rs crates/lyng/vm/src/dsl/backend/aarch64/mod.rs crates/lyng/vm/src/dsl/backend/aarch64/frame.rs crates/lyng/vm-dsl/src/lower.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 5: load_constant! and load_state_value! backend macros
 
@@ -734,7 +734,7 @@ Adds two new aarch64 backend macros:
   Value load from LlIntState. Used for frame_this_value initially;
   generalizable to any 8-byte Value field.
 
-The lowerer in lyng-js-vm-dsl injects `vm_const_base` binding for
+The lowerer in lyng-vm-dsl injects `vm_const_base` binding for
 `load_constant!` mirroring the Phase 1.B.0 `vm_counter_base` pattern.
 
 These macros are substrate; no handler exercises them yet. Task 6
@@ -750,21 +750,21 @@ EOF
 ## Task 6: Synthetic validation handler exercising the new fields end-to-end
 
 **Files:**
-- Create: `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`
+- Create: `crates/lyng/vm/tests/dsl_validation_frame_context.rs`
 
 - [ ] **Step 1: Read the existing dsl_validation_*.rs tests for the template shape**
 
-Run: `ls crates/lyng-js/vm/tests/ | grep dsl_validation`
+Run: `ls crates/lyng/vm/tests/ | grep dsl_validation`
 
 These are integration-test files where the proc-macro `llint_handler!` macro is invoked to build synthetic handlers, which are then run end-to-end through the DSL trampoline. The Phase 1.B.0 Task 4 fix (`845cee79`) updated three of them; that fix landing point is a good reference.
 
-Run: `cat crates/lyng-js/vm/tests/dsl_validation_empty.rs`
+Run: `cat crates/lyng/vm/tests/dsl_validation_empty.rs`
 
 to see the simplest template.
 
 - [ ] **Step 2: Create the new validation test file**
 
-Create `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`. Follow the structure of `dsl_validation_empty.rs`:
+Create `crates/lyng/vm/tests/dsl_validation_frame_context.rs`. Follow the structure of `dsl_validation_empty.rs`:
 
 ```rust
 //! Phase 1.B.1 Task 6: validate that frame_const_base and
@@ -784,9 +784,9 @@ Create `crates/lyng-js/vm/tests/dsl_validation_frame_context.rs`. Follow the str
 
 #![cfg(target_arch = "aarch64")]
 
-use lyng_js_vm::dsl::{/* same imports as dsl_validation_empty.rs */};
-use lyng_js_vm_dsl::llint_handler;
-use lyng_js_types::Value;
+use lyng_vm::dsl::{/* same imports as dsl_validation_empty.rs */};
+use lyng_vm_dsl::llint_handler;
+use lyng_types::Value;
 
 // Three llint_handler! invocations follow the same pattern as
 // dsl_validation_empty.rs but with opcode_byte = 210, 211, 212
@@ -834,7 +834,7 @@ fn load_this_value_reads_sentinel_for_uninitialized() {
 
 - [ ] **Step 3: Run the new tests — they should panic from the `todo!()` placeholders**
 
-Run: `cargo test -p lyng-js-vm --test dsl_validation_frame_context`
+Run: `cargo test -p lyng-vm --test dsl_validation_frame_context`
 Expected: 3 tests, all panic with "not yet implemented" from `todo!()`. The test file compiles cleanly.
 
 - [ ] **Step 4: Implement the test bodies**
@@ -845,18 +845,18 @@ For the ThisState::Uninitialized case: this may require a test-only helper to pu
 
 - [ ] **Step 5: Run the tests — they should all pass**
 
-Run: `cargo test -p lyng-js-vm --test dsl_validation_frame_context`
+Run: `cargo test -p lyng-vm --test dsl_validation_frame_context`
 Expected: 3 tests passing.
 
-- [ ] **Step 6: Run all vm tests + lyng-js-tests for parity**
+- [ ] **Step 6: Run all vm tests + lyng-tests for parity**
 
-Run: `cargo test -p lyng-js-vm --release && cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-vm --release && cargo test -p lyng-tests --release`
 Expected: all green; integration test count goes up by 3.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng-js/vm/tests/dsl_validation_frame_context.rs
+git add crates/lyng/vm/tests/dsl_validation_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 6: synthetic validation handlers for frame_const_base + frame_this_value
 
@@ -886,22 +886,22 @@ EOF
 ## Task 7: Add a GC-stress integration test for frame-context refresh
 
 **Files:**
-- Create: `crates/lyng-js-tests/tests/gc_stress_frame_context.rs`
+- Create: `crates/lyng-tests/tests/gc_stress_frame_context.rs`
 
 - [ ] **Step 1: Investigate the existing GC-stress mechanism**
 
 Look for an existing pattern:
 
 ```bash
-grep -rln "gc_stress\|force_minor_gc\|force_major_gc\|trigger_gc" crates/lyng-js/ | head -10
-grep -rln "cfg.*gc_stress\|feature.*gc_stress" crates/lyng-js/ | head -10
+grep -rln "gc_stress\|force_minor_gc\|force_major_gc\|trigger_gc" crates/lyng/ | head -10
+grep -rln "cfg.*gc_stress\|feature.*gc_stress" crates/lyng/ | head -10
 ```
 
 If a `--cfg gc_stress` or similar feature exists, use it. If only manual triggers like `vm.force_gc()` are available, use those. If neither exists, use a tight allocating loop and rely on the GC to trigger on its own threshold; document in the test comment that it depends on the default GC trigger being aggressive enough.
 
 - [ ] **Step 2: Write the GC-stress test**
 
-Create `crates/lyng-js-tests/tests/gc_stress_frame_context.rs`:
+Create `crates/lyng-tests/tests/gc_stress_frame_context.rs`:
 
 ```rust
 //! Phase 1.B.1 Task 7: GC-stress test for the frame_const_base +
@@ -925,13 +925,13 @@ Create `crates/lyng-js-tests/tests/gc_stress_frame_context.rs`:
 //! or if frame_this_value isn't refreshed after a GC, the test will
 //! observe wrong values and fail.
 
-use lyng_js_vm::Vm;
-// (other imports per the existing lyng-js-tests harness)
+use lyng_vm::Vm;
+// (other imports per the existing lyng-tests harness)
 
 #[test]
 fn frame_context_survives_gc_pressure() {
     let mut vm = Vm::new_for_tests();
-    // (other setup mirroring an existing test in lyng-js-tests)
+    // (other setup mirroring an existing test in lyng-tests)
 
     // The JS program runs a closure that:
     // - captures `this`
@@ -960,11 +960,11 @@ fn frame_context_survives_gc_pressure() {
 }
 ```
 
-**Note:** the iteration count, source-program shape, and `Vm::new_for_tests` invocation should match what other tests in `crates/lyng-js-tests/tests/` already use. If there's a dedicated `gc_stress_*` test pattern, follow it. If `Vm` is constructed differently (e.g. via a helper in `lyng-js-tests/src/lib.rs`), use that helper.
+**Note:** the iteration count, source-program shape, and `Vm::new_for_tests` invocation should match what other tests in `crates/lyng-tests/tests/` already use. If there's a dedicated `gc_stress_*` test pattern, follow it. If `Vm` is constructed differently (e.g. via a helper in `lyng-tests/src/lib.rs`), use that helper.
 
 - [ ] **Step 3: Run the test to verify it passes under normal GC settings**
 
-Run: `cargo test -p lyng-js-tests --test gc_stress_frame_context --release`
+Run: `cargo test -p lyng-tests --test gc_stress_frame_context --release`
 Expected: PASS. If it doesn't run any GC during the loop, increase the iter count (10x) until a `vm.gc_event_count()` or similar shows at least one GC happened during the loop.
 
 - [ ] **Step 4: If a gc-stress cfg exists, also run with it enabled**
@@ -972,7 +972,7 @@ Expected: PASS. If it doesn't run any GC during the loop, increase the iter coun
 If `--cfg gc_stress` or similar exists, run:
 
 ```bash
-RUSTFLAGS="--cfg gc_stress" cargo test -p lyng-js-tests --test gc_stress_frame_context --release
+RUSTFLAGS="--cfg gc_stress" cargo test -p lyng-tests --test gc_stress_frame_context --release
 ```
 
 Expected: PASS. This forces a GC at every allocation; if the mirror discipline is broken, the test fails immediately.
@@ -981,15 +981,15 @@ Expected: PASS. This forces a GC at every allocation; if the mirror discipline i
 
 Add an `eprintln!()` (temporarily) showing GC event counts before and after the loop, run the test, and confirm GCs happened during the loop body (not just at startup). Remove the `eprintln!()` before committing.
 
-- [ ] **Step 6: Run the full lyng-js-tests suite for parity**
+- [ ] **Step 6: Run the full lyng-tests suite for parity**
 
-Run: `cargo test -p lyng-js-tests --release`
+Run: `cargo test -p lyng-tests --release`
 Expected: 1187+ passing (1186 baseline + 1 new from this task).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/lyng-js-tests/tests/gc_stress_frame_context.rs
+git add crates/lyng-tests/tests/gc_stress_frame_context.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 7: GC-stress test for frame_const_base + frame_this_value mirror discipline
 
@@ -1013,8 +1013,8 @@ EOF
 ## Task 8: Same-load A/B vs `ae8b7766` and write GC review doc
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b1-ab-comparison.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`
+- Create: `reports/lyng/dsl-1/phase-1b1-ab-comparison.md`
+- Create: `reports/lyng/dsl-1/phase-1b1-gc-review.md`
 
 - [ ] **Step 1: Capture loadavg snapshot**
 
@@ -1023,7 +1023,7 @@ Note the 1-min and 5-min loadavg.
 
 - [ ] **Step 2: Stash any uncommitted work**
 
-Run: `git status` to verify the only uncommitted state is `reports/js/lyng-js/bench-v8.md` (the bench tool's side-effect from earlier runs) and untracked planning docs. If anything else is uncommitted, stash it:
+Run: `git status` to verify the only uncommitted state is `reports/lyng/bench-v8.md` (the bench tool's side-effect from earlier runs) and untracked planning docs. If anything else is uncommitted, stash it:
 
 Run: `git stash --include-untracked`
 (Only if needed. The expected state is "clean except for bench-v8.md and untracked planning docs".)
@@ -1031,15 +1031,15 @@ Run: `git stash --include-untracked`
 - [ ] **Step 3: Checkout the base HEAD `ae8b7766` and bench**
 
 Run: `git checkout ae8b7766`
-Run: `cargo build --release -p lyng-js-bench`
-Run: `cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b1-base.json`
+Run: `cargo build --release -p lyng-bench`
+Run: `cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b1-base.json`
 Capture loadavg: `uptime`
 
 - [ ] **Step 4: Checkout the Task-7-end HEAD and bench**
 
 Run: `git checkout -` (returns to the feature branch HEAD)
-Run: `cargo build --release -p lyng-js-bench`
-Run: `cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b1-post.json`
+Run: `cargo build --release -p lyng-bench`
+Run: `cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b1-post.json`
 Capture loadavg: `uptime`
 
 If the post-run loadavg differs from the base-run loadavg by more than 20%, abort and re-run during a quieter window.
@@ -1050,7 +1050,7 @@ If you stashed in Step 2, run: `git stash pop`.
 
 - [ ] **Step 6: Compute deltas and write the A/B comparison report**
 
-Compute per-workload deltas and geomean delta from the two JSONs (the bench tool prints these; or pipe through `jq`). Write the comparison to `reports/js/lyng-js/dsl-1/phase-1b1-ab-comparison.md`. Use the Phase 1.B.0 counter-overhead report as the template (`reports/js/lyng-js/dsl-1/phase-1b0-counter-overhead.md`):
+Compute per-workload deltas and geomean delta from the two JSONs (the bench tool prints these; or pipe through `jq`). Write the comparison to `reports/lyng/dsl-1/phase-1b1-ab-comparison.md`. Use the Phase 1.B.0 counter-overhead report as the template (`reports/lyng/dsl-1/phase-1b0-counter-overhead.md`):
 
 ```markdown
 # Phase 1.B.1 — Same-load A/B comparison vs `ae8b7766`
@@ -1091,7 +1091,7 @@ Per parent spec §4 same-load A/B protocol. Both runs on the same physical machi
 
 - [ ] **Step 7: Write the GC review doc**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`. Cover:
+Create `reports/lyng/dsl-1/phase-1b1-gc-review.md`. Cover:
 1. **Field-by-field reachability proof** — for each new LlIntState field, show the canonical source (which already-scanned struct holds the live value) and the path the existing tracer takes to reach it.
 2. **Mirror-staleness argument** — why reads through the mirror always see post-GC-valid values (mirror discipline: reads only happen between Refresh egress events; GC only during slow-path bridges; Refresh runs after the bridge).
 3. **Arena pointer stability argument** — why `frame_const_base` (pointing into a `RuntimeCodeRecord::constants` arena slot) doesn't shift across a Refresh egress: the precedent is `frame_pb_base` (already in production); the debug-only assertion (Task 4 Step 3) catches violations in dev.
@@ -1101,7 +1101,7 @@ Create `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`. Cover:
 - [ ] **Step 8: Commit both reports**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b1-ab-comparison.md reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md
+git add reports/lyng/dsl-1/phase-1b1-ab-comparison.md reports/lyng/dsl-1/phase-1b1-gc-review.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 8: same-load A/B + GC review docs
 
@@ -1124,18 +1124,18 @@ EOF
 ## Task 9: Reviewer dispatch and address findings
 
 **Files:**
-- Append findings to: `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`
+- Append findings to: `reports/lyng/dsl-1/phase-1b1-gc-review.md`
 - Address findings inline (per-finding commits as needed)
 
 - [ ] **Step 1: Dispatch the reviewer**
 
 Use the `Agent` tool with `subagent_type: feature-dev:code-reviewer`. Brief:
 
-> Review the Phase 1.B.1 frame-context refactor commit range (`ae8b7766..HEAD`). Spec at `docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`. Plan at `docs/superpowers/plans/2026-05-19-dsl-1-phase-1b1-frame-context-refactor.md`. GC review draft at `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`.
+> Review the Phase 1.B.1 frame-context refactor commit range (`ae8b7766..HEAD`). Spec at `docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`. Plan at `docs/superpowers/plans/2026-05-19-dsl-1-phase-1b1-frame-context-refactor.md`. GC review draft at `reports/lyng/dsl-1/phase-1b1-gc-review.md`.
 >
 > Focus areas (high-priority, per spec §6 risks):
 > 1. GC root scanning — does the trace logic in `vm/src/vm/state.rs` keep both new LlIntState fields' canonical sources alive across every safepoint that can occur during dispatch? Are there any code paths where a slow-path bridge can run GC but NOT return through the Refresh arm?
-> 2. `resolve_initial_this_value` semantics vs `op_load_this` semantic body — read both side-by-side (`crates/lyng-js/vm/src/dsl/llint_state.rs` resolver vs `crates/lyng-js/vm/src/vm/semantics/names.rs:600-627`). Do they implement the same rule for the three ThisState arms + the no-EC fallback? Any drift would surface as throw-at-wrong-PC bugs.
+> 2. `resolve_initial_this_value` semantics vs `op_load_this` semantic body — read both side-by-side (`crates/lyng/vm/src/dsl/llint_state.rs` resolver vs `crates/lyng/vm/src/vm/semantics/names.rs:600-627`). Do they implement the same rule for the three ThisState arms + the no-EC fallback? Any drift would surface as throw-at-wrong-PC bugs.
 > 3. Arena pointer stability — confirm `RuntimeCodeRecord::constants` arena slot's data pointer is stable across the slow-path call. Cross-check the existing `frame_pb_base` precedent (which has the same dependency).
 > 4. Continue arm correctness — confirm super() / mid-frame this_value mutations always egress through Refresh, not Continue. If any continue-path semantic body mutates `frame.this_value()`, that's a bug.
 >
@@ -1153,14 +1153,14 @@ The reviewer returns a structured report. Triage each finding:
 For each high-severity finding, write a commit titled `Phase 1.B.1 Task 9 review: <short fix description>`. Run the standard test suites after each fix:
 
 ```bash
-cargo test -p lyng-js-vm --lib --release && cargo test -p lyng-js-tests --release
+cargo test -p lyng-vm --lib --release && cargo test -p lyng-tests --release
 ```
 
 Expected: 417+ / 1187+ passing throughout.
 
 - [ ] **Step 4: Append reviewer sign-off to the GC review doc**
 
-In `reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md`, append a section:
+In `reports/lyng/dsl-1/phase-1b1-gc-review.md`, append a section:
 
 ```markdown
 ## Reviewer dispatch sign-off
@@ -1184,7 +1184,7 @@ All high-severity findings resolved. Phase 1.B.1 substrate is GC-safe and semant
 - [ ] **Step 5: Commit the appended review section**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b1-gc-review.md
+git add reports/lyng/dsl-1/phase-1b1-gc-review.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1 Task 9: reviewer dispatch sign-off
 
@@ -1202,16 +1202,16 @@ EOF
 ## Task 10: Phase 1.B.1 sub-phase summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b1-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1b1-summary.md`
 
 - [ ] **Step 1: Draft the summary**
 
-Use `reports/js/lyng-js/dsl-1/phase-1b0-summary.md` as the template. Include:
+Use `reports/lyng/dsl-1/phase-1b0-summary.md` as the template. Include:
 - Date range and baseline-vs-HEAD commit SHAs.
 - Status: closed.
 - Scope landed table (10 tasks → commits).
 - Field-level decisions made (cite spec §9 decisions).
-- Test results summary (vm 417+/lyng-js-tests 1187+/Test262 baseline match/gc-stress green).
+- Test results summary (vm 417+/lyng-tests 1187+/Test262 baseline match/gc-stress green).
 - Same-load A/B summary (link to `phase-1b1-ab-comparison.md`).
 - GC review verdict (link to `phase-1b1-gc-review.md`).
 - Lessons / observations.
@@ -1235,7 +1235,7 @@ If any gate is ❌, the sub-phase is NOT closed; back to the relevant task to fi
 - [ ] **Step 3: Commit the summary**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b1-summary.md
+git add reports/lyng/dsl-1/phase-1b1-summary.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.1: phase summary — frame-context refactor complete
 
@@ -1245,7 +1245,7 @@ Phase 1.B.2 picks up op_load_const8 + op_load_this inline ports.
 
 All exit gates green:
 - Layout stable; ll_int_state_offsets_stable passing (size 72 bytes)
-- Behavioral parity: 417+ vm tests, 1187+ lyng-js-tests
+- Behavioral parity: 417+ vm tests, 1187+ lyng-tests
 - Test262 ≥ Phase 1.B.0 baseline
 - gc-stress test passing
 - Same-load A/B vs `ae8b7766`: <delta>% V8 v7 regression (within 2% gate)

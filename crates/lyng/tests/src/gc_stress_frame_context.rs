@@ -7,7 +7,7 @@
 //! `LlIntState` (`frame_const_base` and `frame_this_value`) stay
 //! valid across GC events because every slow-path bridge that can
 //! trigger GC also goes through the Refresh arm in
-//! `crates/lyng-js/vm/src/dsl/slow_path.rs`, which refreshes both
+//! `crates/lyng/vm/src/dsl/slow_path.rs`, which refreshes both
 //! fields from canonical sources (the active code record's
 //! pre-resolved constants arena slot, and the active frame's
 //! `this_value`).
@@ -84,20 +84,20 @@
 //! safepoint), this test should also be run under that flag:
 //!
 //! ```text
-//! RUSTFLAGS="--cfg gc_stress" cargo test -p lyng-js-tests --release gc_stress_frame_context
+//! RUSTFLAGS="--cfg gc_stress" cargo test -p lyng-tests --release gc_stress_frame_context
 //! ```
 //!
 //! The mirror-discipline invariant being tested is unchanged; only
 //! the GC frequency increases.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_types::Value;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_types::Value;
+use lyng_vm::Vm;
 
 /// Closure-with-captured-`this` workload.
 ///
@@ -187,8 +187,7 @@ fn frame_context_survives_gc_pressure_in_closure_loop() {
         "gc-stress script should pass sema: {:?}",
         sema.diagnostics.as_slice()
     );
-    let unit =
-        compile_script(&parsed, &sema, &mut atoms).expect("gc-stress script should compile");
+    let unit = compile_script(&parsed, &sema, &mut atoms).expect("gc-stress script should compile");
 
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

@@ -18,7 +18,7 @@
 //! stubs in place and `build_dispatch_table` is updated to install the
 //! α handler — no manifest change required.
 
-use lyng_js_bytecode::Opcode;
+use lyng_bytecode::Opcode;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;

@@ -1,5 +1,5 @@
 use super::super::{BuiltinEntryMetadata, PublicBuiltinMetadataRow};
-use lyng_js_types::{
+use lyng_types::{
     array_at_builtin, array_builtin, array_concat_builtin, array_copy_within_builtin,
     array_entries_builtin, array_every_builtin, array_fill_builtin, array_filter_builtin,
     array_find_builtin, array_find_index_builtin, array_find_last_builtin,

@@ -57,8 +57,8 @@
 //! on `Ok(Some(_))` we record the slot before deciding `ExitDone` vs
 //! `Refresh`; on `Ok(None)` we skip recording.
 
-use lyng_js_bytecode::CallRange;
-use lyng_js_types::{FeedbackSlotId, Value};
+use lyng_bytecode::CallRange;
+use lyng_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::vm::dispatch_state::DispatchState;
@@ -377,4 +377,3 @@ pub(crate) fn op_create_closure_semantic(
         pc_advance: args.instruction_len,
     }
 }
-

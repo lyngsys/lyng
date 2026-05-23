@@ -1,5 +1,5 @@
-use lyng_js_env::Agent;
-use lyng_js_types::{CodeRef, EnvironmentRef, Value};
+use lyng_env::Agent;
+use lyng_types::{CodeRef, EnvironmentRef, Value};
 
 use crate::{FrameRecord, Vm};
 

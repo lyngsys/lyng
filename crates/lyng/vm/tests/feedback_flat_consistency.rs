@@ -20,15 +20,15 @@
 //!   `FeedbackEntry { state }` carries every sidecar automatically
 //!   per design §9.
 
-use lyng_js_common::{AtomTable, SourceId};
-use lyng_js_compiler::compile_script;
-use lyng_js_env::Runtime;
-use lyng_js_host::NoopHostHooks;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-use lyng_js_vm::Vm;
+use lyng_common::{AtomTable, SourceId};
+use lyng_compiler::compile_script;
+use lyng_env::Runtime;
+use lyng_host::NoopHostHooks;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+use lyng_vm::Vm;
 
-fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_js_types::CodeRef) {
+fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_types::CodeRef) {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(&mut atoms, SourceId::new(1), source);
     assert!(!parsed.diagnostics.has_errors(), "parse error");
@@ -38,9 +38,7 @@ fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_js_types::Co
 
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
-    let realm = agent
-        .default_realm()
-        .expect("default realm should exist");
+    let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm
         .install_script(agent, realm.id(), &unit)

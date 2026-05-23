@@ -127,7 +127,7 @@ Run independently after the cumulative A/B (the v8suite measurement
 doesn't touch Test262):
 
 ```
-cargo run --release -p lyng-js-tests -- --test-source test262 --summary
+cargo run --release -p lyng-tests -- --test-source test262 --summary
 ```
 
 Expected: ≥ 49729 passing files (Phase 1.B baseline). Confirmation will

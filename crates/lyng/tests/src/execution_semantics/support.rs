@@ -1,25 +1,25 @@
-use lyng_js_bytecode::CompiledScriptUnit;
-pub(super) use lyng_js_common::AtomTable;
-use lyng_js_common::SourceId;
-use lyng_js_compiler::compile_script;
-use lyng_js_env::{Agent, RealmRecord, Runtime};
-use lyng_js_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveStringView};
-use lyng_js_host::NoopHostHooks;
-use lyng_js_objects::{
+use lyng_bytecode::CompiledScriptUnit;
+pub(super) use lyng_common::AtomTable;
+use lyng_common::SourceId;
+use lyng_compiler::compile_script;
+use lyng_env::{Agent, RealmRecord, Runtime};
+use lyng_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveStringView};
+use lyng_host::NoopHostHooks;
+use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
     NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
     ObjectColdData, ObjectRuntime,
 };
-use lyng_js_ops::object::ordinary_create_data_property;
-use lyng_js_parser::parse_script;
-use lyng_js_sema::analyze_script;
-pub(super) use lyng_js_types::{
+use lyng_ops::object::ordinary_create_data_property;
+use lyng_parser::parse_script;
+use lyng_sema::analyze_script;
+pub(super) use lyng_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
     internal_object_has_own_property_builtin, internal_object_to_string_builtin,
     internal_string_index_of_builtin, internal_string_replace_builtin, Value,
 };
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, PropertyKey};
-use lyng_js_vm::Vm;
+use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey};
+use lyng_vm::Vm;
 
 pub(super) fn compile_unit(source: &str, atoms: &mut AtomTable) -> CompiledScriptUnit {
     let parsed = parse_script(atoms, SourceId::new(0), source);

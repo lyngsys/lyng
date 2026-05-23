@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Public CLI error category for the thin `lyng-js` embedding surface.
+/// Public CLI error category for the thin `lyng` embedding surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CliErrorKind {
     Usage,

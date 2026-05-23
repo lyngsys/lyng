@@ -1,9 +1,9 @@
-//! Interpreter and runtime installation for the lyng-js VM layer.
+//! Interpreter and runtime installation for the lyng VM layer.
 //!
-//! Ownership: `lyng_js_vm` owns runtime installation, frame records, register-window
+//! Ownership: `lyng_vm` owns runtime installation, frame records, register-window
 //! bookkeeping, and bytecode execution entrypoints. It does not own lowering, object
-//! semantics, or environment semantics that belong in `lyng_js_compiler`, `lyng_js_ops`,
-//! `lyng_js_objects`, or `lyng_js_env`.
+//! semantics, or environment semantics that belong in `lyng_compiler`, `lyng_ops`,
+//! `lyng_objects`, or `lyng_env`.
 
 #![allow(
     clippy::module_name_repetitions,
@@ -13,13 +13,13 @@
 )]
 
 // `extern crate self as ...` lets the proc-macro lowerer in
-// `lyng-js-vm-dsl::lower` emit absolute paths like
-// `::lyng_js_vm::dsl::reg_convention::...` that resolve correctly even
-// when the macro is invoked from inside `lyng_js_vm` itself. Without
+// `lyng-vm-dsl::lower` emit absolute paths like
+// `::lyng_vm::dsl::reg_convention::...` that resolve correctly even
+// when the macro is invoked from inside `lyng_vm` itself. Without
 // this, the path can only be found from external test crates that
-// have `lyng-js-vm` as a Cargo dep — the proc-macro can't tell the
+// have `lyng-vm` as a Cargo dep — the proc-macro can't tell the
 // difference at lower time.
-extern crate self as lyng_js_vm;
+extern crate self as lyng_vm;
 
 mod activation;
 pub mod dsl;
@@ -49,8 +49,8 @@ pub use frame::{
 pub use installed::InstalledCode;
 #[cfg(feature = "opcode-counters")]
 pub use opcode_counts::{
-    CallArgumentCopyCounts, DispatchCounters, OpcodeDispatchCount, OpcodeDispatchCounts,
-    OpcodeDispatchCounterStore,
+    CallArgumentCopyCounts, DispatchCounters, OpcodeDispatchCount, OpcodeDispatchCounterStore,
+    OpcodeDispatchCounts,
 };
 #[cfg(feature = "opcode-counters")]
 pub use slow_path_counts::{SlowPathCounterStore, SlowPathCounts};

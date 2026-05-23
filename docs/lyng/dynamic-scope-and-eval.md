@@ -6,18 +6,18 @@ and slot based.
 
 ## Ownership
 
-- `lyng-js-parser` parses direct eval call syntax, indirect eval expressions, `with`
+- `lyng-parser` parses direct eval call syntax, indirect eval expressions, `with`
   statements, dynamic import expressions, and function constructor source.
-- `lyng-js-sema` marks lexical scopes affected by direct eval, object environments,
+- `lyng-sema` marks lexical scopes affected by direct eval, object environments,
   unscopables, and dynamic lookup.
-- `lyng-js-compiler` emits direct-eval metadata, dynamic lookup operations, and environment
+- `lyng-compiler` emits direct-eval metadata, dynamic lookup operations, and environment
   materialization requirements.
-- `lyng-js-bytecode` stores direct-eval lexical site metadata and environment layout
+- `lyng-bytecode` stores direct-eval lexical site metadata and environment layout
   references.
-- `lyng-js-env` owns object environments, declarative environments, global environments,
+- `lyng-env` owns object environments, declarative environments, global environments,
   and execution-context state.
-- `lyng-js-vm` executes eval and dynamic lookup paths.
-- `lyng-js-builtins` dispatches `eval`, `Function`, dynamic import helpers, and related
+- `lyng-vm` executes eval and dynamic lookup paths.
+- `lyng-builtins` dispatches `eval`, `Function`, dynamic import helpers, and related
   native builtin entrypoints.
 
 ## Eval Forms
@@ -52,8 +52,8 @@ Dynamic lookup is explicit in bytecode and runtime environment operations. It is
 - global lookup sites whose behavior is host or realm observable
 - named operations that must consult unscopables or object internal methods
 
-The VM delegates object and environment semantics to `lyng-js-ops`, `lyng-js-env`, and
-`lyng-js-objects`.
+The VM delegates object and environment semantics to `lyng-ops`, `lyng-env`, and
+`lyng-objects`.
 
 ## Invariants
 

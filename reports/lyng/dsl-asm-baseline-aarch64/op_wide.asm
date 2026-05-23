@@ -1,6 +1,6 @@
 // DSL-0b op_wide handler asm (AArch64).
-// Symbol: lyng_js_vm::dsl::handlers::warm::op_wide
-// Source: crates/lyng-js/vm/src/dsl/handlers/warm.rs (B45)
+// Symbol: lyng_vm::dsl::handlers::warm::op_wide
+// Source: crates/lyng/vm/src/dsl/handlers/warm.rs (B45)
 // Layout: None (no operands), length = 1 byte.
 
 op_wide:

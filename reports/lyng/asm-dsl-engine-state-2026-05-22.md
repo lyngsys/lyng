@@ -2,29 +2,29 @@
 
 **HEAD:** `4867393a` (Phase 1.C closed; cumulative A/B + summary + followups committed).
 **Cumulative V8 v7 vs pre-DSL-0 `d850f261`:** **+13.66% geomean** (11-sample direct measurement at Phase 1.C close).
-**Behavioral parity:** 418 `lyng-js-vm --lib` + 1209 `lyng-js-tests` + 4 new `dsl_increment_writeback` tests passing. Test262: **49729 files passing / 0 failing / 100.00% rate** on runnable.
-**Parent design:** [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md).
+**Behavioral parity:** 418 `lyng-vm --lib` + 1209 `lyng-tests` + 4 new `dsl_increment_writeback` tests passing. Test262: **49729 files passing / 0 failing / 100.00% rate** on runnable.
+**Parent design:** [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 **DSL-1 epic spec:** [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md).
 
 ---
 
 ## 1. What this engine is
 
-The asm-DSL interpreter is a hand-shaped LLInt-style fast path for lyng-js's JavaScript bytecode dispatch. Per the parent design §3, the goal is to replicate JSC's `LowLevelInterpreter64.asm` discipline — direct asm handlers tail-jumping through a dispatch table — but expressed in a Rust proc-macro DSL so the substrate stays in-language and the slow-path semantic bodies are shared with the original Rust dispatcher.
+The asm-DSL interpreter is a hand-shaped LLInt-style fast path for lyng's JavaScript bytecode dispatch. Per the parent design §3, the goal is to replicate JSC's `LowLevelInterpreter64.asm` discipline — direct asm handlers tail-jumping through a dispatch table — but expressed in a Rust proc-macro DSL so the substrate stays in-language and the slow-path semantic bodies are shared with the original Rust dispatcher.
 
 The architecture uses:
 
 - **Pinned registers** (AArch64: x19=PC, x20=REGS, x21=FV, x22=VM, x23=TABLE, x24=STATE) across the whole handler chain.
 - **`#[repr(C)] LlIntState`** as the asm-visible state record — a fixed-layout struct read directly by handlers via offset constants.
-- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/lyng-js/vm/src/dsl/backend/aarch64/`.
+- **`naked_asm!` handlers** built via `llint_handler!` proc-macro + `macro_rules!` backend ops in `crates/lyng/vm/src/dsl/backend/aarch64/`.
 - **Slow-path bridge** (`crate::dsl::slow_path::LlIntDispatchState`) for opcodes that can't (or shouldn't) inline. Each bridge call goes through a uniform shim that snapshots PC + register window, runs the existing semantic body, and returns one of {Continue, Refresh, ExitDone, ExitError}.
 - **Mirror discipline** for arena pointers (instruction bytes, constants array, register window, feedback slab): the `LlIntState` fields are pointers into GC-or-arena-allocated storage, refreshed by the Refresh arm of `translate_outcome` after any slow-path call.
 - **Record-smi shim pattern** (since DSL-0, formalized in Phase 1.C): inline-ported opcodes with feedback slots invoke a per-opcode `op_xxx_record_smi_rs` shim via `call_slow!` from the fast-path tail, which calls `vm.record_feedback_slot(code, slot)` and returns `Continue { pc_advance: <length> }`. The shim approach is a workaround for the placeholder `entry_observed` offset binding in feedback.rs; inline `record_smi!` is structurally available but not yet wired.
 
 The DSL is implemented across two crates:
 
-- `crates/lyng-js-vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
-- `crates/lyng-js/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
+- `crates/lyng/vm-dsl/` — the proc-macro lowerer (parse `llint_handler!`, emit `naked_asm!` with universal named bindings for offsets/scratch regs).
+- `crates/lyng/vm/src/dsl/` — the runtime side: `LlIntState`, register-convention constants, `entry.rs` trampoline shim, `slow_path.rs` bridge, `backend/aarch64/` operation vocabulary, `handlers/{cold,warm,hot}.rs` opcode handlers.
 
 ---
 
@@ -40,7 +40,7 @@ The substrate phases (DSL-0a, 0b, 0c) brought up the entire DSL infrastructure: 
 
 7 trivial-load opcodes inline-ported in `cold.rs`. V8 v7 vs `d850f261`: +1.7%. Two opcodes (`op_load_const8`, `op_load_this`) deferred to Phase 1.B due to substrate gaps.
 
-Summary: [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md).
+Summary: [`reports/lyng/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md).
 
 ### DSL-1 Phase 1.B (closed at `aa3ab9fc`)
 
@@ -97,7 +97,7 @@ Two inline ports + 1 unit test:
 
 The shortest inline paths in Phase 1.C — 27 instructions each, saving ~9 instructions vs binary ports thanks to unary single-source layout (no rhs operand decode/check_smi/untag). The new substrate macros `inc_smi_overflow!`/`dec_smi_overflow!` are now runtime-verified by these inline ports.
 
-**SMI-elision pattern (correctness-load-bearing).** The inline fast paths SKIP the src register writeback that the semantic body normally performs. For SMI src, `ToNumeric(SMI) == SMI` is identity (verified by reading `to_primitive` + `to_number`), so the writeback is observationally a no-op. Non-SMI src bails to slow which performs the writeback via the semantic body. Verified by `crates/lyng-js/tests/src/dsl_increment_writeback.rs` (Task 11, 4 tests pass).
+**SMI-elision pattern (correctness-load-bearing).** The inline fast paths SKIP the src register writeback that the semantic body normally performs. For SMI src, `ToNumeric(SMI) == SMI` is identity (verified by reading `to_primitive` + `to_number`), so the writeback is observationally a no-op. Non-SMI src bails to slow which performs the writeback via the semantic body. Verified by `crates/lyng/tests/src/dsl_increment_writeback.rs` (Task 11, 4 tests pass).
 
 Same-load mini A/B vs 1.C.2 close: **+3.19% geomean**, NavierStokes +13.56% standout (588M Increments per benchmark cycle).
 
@@ -171,7 +171,7 @@ Existing from prior phases (operand decode, register-window access, frame/state 
 **Modified in Phase 1.C** (Task 3, in `dsl/backend/aarch64/arithmetic.rs`):
 - `mul_smi_overflow!` — extended from 4 → 7 instructions: original `smull + sxtw + cmp + b.ne` + new `cbnz + orr + tbnz` for ECMAScript -0 deferral.
 
-Vocabulary documented in `crates/lyng-js/vm/src/dsl/ops.md`. AArch64-only; x86_64 backend deferred to DSL-2 per parent design §2.
+Vocabulary documented in `crates/lyng/vm/src/dsl/ops.md`. AArch64-only; x86_64 backend deferred to DSL-2 per parent design §2.
 
 ### Per-opcode `op_xxx_record_smi_rs` shims (Phase 1.C addition pattern)
 
@@ -181,9 +181,9 @@ The record-smi shim pattern (originally introduced as `op_add_record_smi_rs` in 
 
 Unchanged from Phase 1.B close, plus:
 
-- **Microbench snippets:** 6 new snippets in `tools/lyng-js-bench/src/microbench/snippets.rs` (Sub, Mul, BitAnd, ShiftLeft, ShiftRight, Increment, Decrement — 7 total counting the Increment loop-body shape). All use the two-locals pattern to avoid `*Smi` peephole optimizations.
+- **Microbench snippets:** 6 new snippets in `tools/lyng-bench/src/microbench/snippets.rs` (Sub, Mul, BitAnd, ShiftLeft, ShiftRight, Increment, Decrement — 7 total counting the Increment loop-body shape). All use the two-locals pattern to avoid `*Smi` peephole optimizations.
 - **`hot-opcodes.toml`:** 7 budgets calibrated from real measurements + 2 headroom (Sub=38, Mul=42, BitAnd=37, ShiftLeft=38, ShiftRight=38, Increment=29, Decrement=29).
-- **Unit test:** `crates/lyng-js/tests/src/dsl_increment_writeback.rs` (4 tests, verifies the SMI-elision claim for non-SMI src reaching slow path).
+- **Unit test:** `crates/lyng/tests/src/dsl_increment_writeback.rs` (4 tests, verifies the SMI-elision claim for non-SMI src reaching slow path).
 
 ### GC integration
 
@@ -279,7 +279,7 @@ User-deny rules consistently honored: no `git -C`, no `cd && git`, no `--no-veri
 
 ### Design docs
 
-- Parent design: [`docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md)
+- Parent design: [`docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md`](../../docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md)
 - DSL-1 epic spec: [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md)
 - Phase 1.B umbrella: [`docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](../../docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md)
 - Phase 1.B.1 spec: [`docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md`](../../docs/superpowers/specs/2026-05-19-dsl-1-phase-1b1-frame-context-refactor-design.md)
@@ -290,8 +290,8 @@ User-deny rules consistently honored: no `git -C`, no `cd && git`, no `--no-veri
 
 ### Phase summaries (chronological)
 
-- DSL-0c close: [`reports/js/lyng-js/dsl-0c-status.md`](dsl-0c-status.md)
-- Phase 1.A: [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md)
+- DSL-0c close: [`reports/lyng/dsl-0c-status.md`](dsl-0c-status.md)
+- Phase 1.A: [`reports/lyng/dsl-1/phase-1a-summary.md`](dsl-1/phase-1a-summary.md)
 - Phase 1.B umbrella: [`phase-1b-summary.md`](dsl-1/phase-1b-summary.md)
 - Phase 1.C umbrella: [`phase-1c-summary.md`](dsl-1/phase-1c-summary.md)
 - Phase 1.C sub-phases: [`phase-1c1-summary.md`](dsl-1/phase-1c1-summary.md), [`phase-1c2-summary.md`](dsl-1/phase-1c2-summary.md), [`phase-1c3-summary.md`](dsl-1/phase-1c3-summary.md)
@@ -312,11 +312,11 @@ Phase 1.B.3: 9 reports — `op_load_local_{0,1,2,3}.md`, `op_store_local_{0,1,2,
 
 Phase 1.C: 7 reports — `op_sub.md`, `op_mul.md`, `op_bit_and.md`, `op_shift_left.md`, `op_shift_right.md`, `op_increment.md`, `op_decrement.md`.
 
-All under [`reports/js/lyng-js/dsl-handlers/`](dsl-handlers/).
+All under [`reports/lyng/dsl-handlers/`](dsl-handlers/).
 
 ### Asm baselines
 
-`reports/js/lyng-js/dsl-asm-baseline-aarch64/` contains captured asm for each inline-ported handler (25 opcodes).
+`reports/lyng/dsl-asm-baseline-aarch64/` contains captured asm for each inline-ported handler (25 opcodes).
 
 ### Key A/B comparison artifacts
 
@@ -327,10 +327,10 @@ All under [`reports/js/lyng-js/dsl-handlers/`](dsl-handlers/).
 
 ### Source code anchors
 
-- DSL substrate: `crates/lyng-js/vm/src/dsl/`
-- AArch64 backend macros: `crates/lyng-js/vm/src/dsl/backend/aarch64/`
-- Opcode handlers: `crates/lyng-js/vm/src/dsl/handlers/{cold,warm,hot}.rs`
-- Lowerer proc-macro: `crates/lyng-js-vm-dsl/src/`
-- Bench tool: `tools/lyng-js-bench/`
-- Test262 runner: `tools/lyng-js-test262/`
-- Phase 1.C SMI-elision verification test: `crates/lyng-js/tests/src/dsl_increment_writeback.rs`
+- DSL substrate: `crates/lyng/vm/src/dsl/`
+- AArch64 backend macros: `crates/lyng/vm/src/dsl/backend/aarch64/`
+- Opcode handlers: `crates/lyng/vm/src/dsl/handlers/{cold,warm,hot}.rs`
+- Lowerer proc-macro: `crates/lyng/vm-dsl/src/`
+- Bench tool: `tools/lyng-bench/`
+- Test262 runner: `tools/lyng-test262/`
+- Phase 1.C SMI-elision verification test: `crates/lyng/tests/src/dsl_increment_writeback.rs`

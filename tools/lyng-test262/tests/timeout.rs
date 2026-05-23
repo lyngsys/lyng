@@ -21,7 +21,7 @@ fn make_temp_dir() -> PathBuf {
         .as_nanos();
     let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
     let path = std::env::temp_dir().join(format!(
-        "lyng-js-test262-timeout-{}-{}-{}",
+        "lyng-test262-timeout-{}-{}-{}",
         std::process::id(),
         nonce,
         counter
@@ -37,7 +37,7 @@ fn whole_suite_runner_times_out_hanging_tests() {
     let report_path = root.join("report.md");
     fs::write(&hang_path, "while (true) {}\n").expect("fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             hang_path.to_str().expect("path should be utf-8"),
@@ -74,7 +74,7 @@ fn worker_mode_handles_multiple_requests_in_one_process() {
     fs::write(&first_path, "assert.sameValue(1, 1);\n").expect("first fixture should be written");
     fs::write(&second_path, "assert.sameValue(2, 2);\n").expect("second fixture should be written");
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .arg("--worker")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -119,11 +119,11 @@ fn worker_mode_handles_multiple_requests_in_one_process() {
     );
 
     assert!(
-        first_response.contains("__lyng_js_test262_result__:1:PASS"),
+        first_response.contains("__lyng_test262_result__:1:PASS"),
         "unexpected first response:\n{first_response}"
     );
     assert!(
-        second_response.contains("__lyng_js_test262_result__:2:PASS"),
+        second_response.contains("__lyng_test262_result__:2:PASS"),
         "unexpected second response:\n{second_response}"
     );
 
@@ -139,7 +139,7 @@ fn whole_suite_runner_recovers_after_timed_out_test() {
     fs::write(&hang_path, "while (true) {}\n").expect("hang fixture should be written");
     fs::write(&pass_path, "assert.sameValue(1, 1);\n").expect("pass fixture should be written");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_lyng-js-test262"))
+    let output = Command::new(env!("CARGO_BIN_EXE_lyng-test262"))
         .args([
             "--filter",
             root.to_str().expect("path should be utf-8"),

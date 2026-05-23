@@ -4,12 +4,12 @@
 )]
 
 use super::*;
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_gc::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_gc::{
     PrimitiveHeap, PrimitiveRoots, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeRealmRecord,
     ValueStoreTarget,
 };
-use lyng_js_types::{BuiltinFunctionId, NativeFunctionId, SymbolRef, Value};
+use lyng_types::{BuiltinFunctionId, NativeFunctionId, SymbolRef, Value};
 use std::collections::HashMap;
 use std::mem::size_of;
 
@@ -747,7 +747,7 @@ fn string_exotic_properties_surface_length_indices_and_extra_keys() {
     let mut mutator = heap.mutator();
     let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let string = mutator.alloc_string(
-        lyng_js_gc::StringEncoding::Latin1,
+        lyng_gc::StringEncoding::Latin1,
         3,
         b"cat",
         None,
@@ -765,7 +765,7 @@ fn string_exotic_properties_surface_length_indices_and_extra_keys() {
     );
     for (index, byte) in b"cat".iter().copied().enumerate() {
         let element = mutator.alloc_string(
-            lyng_js_gc::StringEncoding::Latin1,
+            lyng_gc::StringEncoding::Latin1,
             1,
             &[byte],
             None,
@@ -846,7 +846,7 @@ fn string_exotic_properties_reject_incompatible_redefinition_and_deletion() {
     let mut mutator = heap.mutator();
     let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let string = mutator.alloc_string(
-        lyng_js_gc::StringEncoding::Latin1,
+        lyng_gc::StringEncoding::Latin1,
         2,
         b"hi",
         None,
@@ -864,7 +864,7 @@ fn string_exotic_properties_reject_incompatible_redefinition_and_deletion() {
     );
     for (index, byte) in b"hi".iter().copied().enumerate() {
         let element = mutator.alloc_string(
-            lyng_js_gc::StringEncoding::Latin1,
+            lyng_gc::StringEncoding::Latin1,
             1,
             &[byte],
             None,

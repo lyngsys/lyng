@@ -10,8 +10,8 @@ use super::super::{
 };
 use super::{allocate_typed_array_object, typed_array_this_record};
 use crate::BuiltinInvocation;
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, RealmRef, Value};
+use lyng_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_types::{BuiltinFunctionId, ObjectRef, RealmRef, Value};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Base64Alphabet {

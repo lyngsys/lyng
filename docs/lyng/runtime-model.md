@@ -81,7 +81,7 @@ enum PropertyKey {
 
 ## Heap And Rooting
 
-`lyng-js-gc` owns typed allocation domains, explicit rooting, tracing support, and weak
+`lyng-gc` owns typed allocation domains, explicit rooting, tracing support, and weak
 state management. Runtime storage is separated by record family rather than placed in a
 single untyped arena.
 
@@ -91,7 +91,7 @@ Heap mutation routes through centralized helpers so store policy remains visible
 
 ## Objects
 
-`lyng-js-objects` owns object records, shapes, named slots, indexed elements, dictionary
+`lyng-objects` owns object records, shapes, named slots, indexed elements, dictionary
 fallback, receiver payloads, primitive wrappers, private elements, and ordinary internal
 method implementations.
 
@@ -110,7 +110,7 @@ objects whose property shape no longer fits compact slot storage.
 
 ## Environments, Realms, And Jobs
 
-`lyng-js-env` owns runtime, cluster, agent, realm, execution context, environment, module
+`lyng-env` owns runtime, cluster, agent, realm, execution context, environment, module
 record, backing-store, symbol, and job-queue substrate.
 
 Environment records cover declarative, function, global, object, module, and private
@@ -122,7 +122,7 @@ points. Job queues and host hooks sit at the runtime/agent boundary.
 
 ## Host Boundary
 
-`lyng-js-host` defines embedding hooks for jobs, module loading, dynamic import, and realm
+`lyng-host` defines embedding hooks for jobs, module loading, dynamic import, and realm
 extensions. Host behavior is explicit and does not leak into parser, compiler, object, or
 builtin ownership.
 

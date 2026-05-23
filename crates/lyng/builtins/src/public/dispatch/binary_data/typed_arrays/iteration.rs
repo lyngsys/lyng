@@ -13,7 +13,7 @@ use super::{
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_iteration_builtin<
     Cx: PublicBuiltinDispatchContext,

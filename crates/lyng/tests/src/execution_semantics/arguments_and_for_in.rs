@@ -1,5 +1,5 @@
 use super::support::{compile_and_run, compile_and_run_string};
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 #[test]
 fn phase4_arguments_map_simple_sloppy_parameters() {

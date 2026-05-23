@@ -8,8 +8,8 @@
 //! The 3 forward-pointer `#[ignore]`-d tests that were placeholders for
 //! Phase 1.B.2's canonical opcodes are removed. End-to-end coverage of
 //! `op_load_const8` and `op_load_this` now lives in
-//! `crates/lyng-js-tests/tests/op_load_const8_inline.rs` and
-//! `crates/lyng-js-tests/tests/op_load_this_inline.rs` respectively.
+//! `crates/lyng-tests/tests/op_load_const8_inline.rs` and
+//! `crates/lyng-tests/tests/op_load_this_inline.rs` respectively.
 //!
 //! The 4 structural compiles-and-links tests remain — they catch
 //! macro-emit and lowerer-binding regressions before they hit
@@ -34,7 +34,7 @@
 //! macro-emit / lowerer-binding regression catchers only.
 //!
 //! See
-//! `reports/js/lyng-js/dsl-1/phase-1b1-summary.md` §
+//! `reports/lyng/dsl-1/phase-1b1-summary.md` §
 //! "Retrospective: structural-only validation tests insufficient for
 //! substrate macros" for the full lesson.
 //!
@@ -82,10 +82,10 @@
 //!    `pub(crate)`-scoped behind `dsl::handlers`), or (b) installing a
 //!    real bytecode program whose opcodes match the synthetic IDs —
 //!    which can't go through the compiler pipeline without registering
-//!    them in `lyng-js-bytecode::Opcode`.
+//!    them in `lyng-bytecode::Opcode`.
 //!
 //! End-to-end coverage now lives in the per-opcode integration test
-//! files in `lyng-js-tests`; these structural tests are kept for the
+//! files in `lyng-tests`; these structural tests are kept for the
 //! macro-emit / lowerer-binding regression-catching role they play.
 //!
 //! ## What this file proves
@@ -99,12 +99,12 @@
 //! - The resulting `extern "C" fn` symbols are addressable at runtime.
 
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm::{
+use lyng_vm::{
     dispatch, load_constant, load_local_fixed, load_state_value, load_uninit_lex_sentinel,
     store_local_fixed,
 };
 #[cfg(target_arch = "aarch64")]
-use lyng_js_vm_dsl::llint_handler;
+use lyng_vm_dsl::llint_handler;
 
 // `layout = None` keeps the prologue empty so the body only references
 // the macros under test. `t0` / `t1` are internal scratch slots that
@@ -166,7 +166,7 @@ llint_handler! {
 // (structural-only validation tests insufficient for substrate macros),
 // real handler dispatch through this macro lands in Phase 1.B.3
 // Tasks 2 + 3 via `op_load_local_1/2/3_dsl` and the per-opcode
-// integration tests in `crates/lyng-js/tests/src/op_locals_inline.rs`.
+// integration tests in `crates/lyng/tests/src/op_locals_inline.rs`.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_test_load_local_fixed_dsl, opcode_byte = 214, layout = None, length = 1, || {
@@ -182,7 +182,7 @@ llint_handler! {
 //
 // Real handler dispatch through this macro lands in Phase 1.B.3
 // Task 3 via `op_store_local_0/1/2/3_dsl` and the per-opcode
-// integration tests in `crates/lyng-js/tests/src/op_locals_inline.rs`.
+// integration tests in `crates/lyng/tests/src/op_locals_inline.rs`.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_test_store_local_fixed_dsl, opcode_byte = 215, layout = None, length = 1, || {
@@ -194,42 +194,42 @@ llint_handler! {
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_constant_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_load_constant_dsl);
 }
 
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_this_value_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_load_this_value_dsl);
 }
 
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_this_sentinel_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_load_this_sentinel_dsl);
 }
 
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_uninit_lex_sentinel_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_load_uninit_lex_sentinel_dsl);
 }
 
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn load_local_fixed_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_load_local_fixed_dsl);
 }
 
 #[cfg(target_arch = "aarch64")]
 #[test]
 fn store_local_fixed_handler_compiles_and_links() {
-    use lyng_js_vm::dsl::test_helpers::DslHarness;
+    use lyng_vm::dsl::test_helpers::DslHarness;
     DslHarness::assert_handler_symbol_exists(op_test_store_local_fixed_dsl);
 }
 
@@ -270,4 +270,3 @@ fn load_local_fixed_handler_compiles_and_links() {
 fn store_local_fixed_handler_compiles_and_links() {
     // No-op on non-aarch64; the asm-DSL backend isn't compiled here.
 }
-

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use lyng_js_common::AtomId;
-use lyng_js_env::ObjectEnvironmentRecord;
-use lyng_js_types::EnvironmentRef;
+use lyng_common::AtomId;
+use lyng_env::ObjectEnvironmentRecord;
+use lyng_types::EnvironmentRef;
 
 use crate::RegisterWindow;
 

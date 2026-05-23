@@ -1,6 +1,6 @@
 use super::template::BytecodeFunction;
 use crate::ids::BytecodeFunctionId;
-use lyng_js_common::{AtomId, SourceId};
+use lyng_common::{AtomId, SourceId};
 
 /// Frozen compiled-unit atom payload preserved across compiler -> VM install.
 #[derive(Clone, Debug, PartialEq, Eq)]

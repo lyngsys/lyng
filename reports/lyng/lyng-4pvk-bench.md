@@ -2,7 +2,7 @@
 
 **Issue:** `lyng-4pvk` — Remove `argument_scratch` Vec materialization for ordinary VM calls
 **Baseline commit:** `d9243123` (Phase 4c deferral)
-**Bench command:** `cargo run --release -p lyng-js-bench -- runtime --preset baseline --count-opcodes`
+**Bench command:** `cargo run --release -p lyng-bench -- runtime --preset baseline --count-opcodes`
 **Profile:** `release`, aarch64-apple-darwin
 **Samples per benchmark:** 7
 **Runs per sample:** 9

@@ -67,7 +67,7 @@ pub(super) fn iterator_to_string_tag_setter_builtin<Cx: PublicBuiltinDispatchCon
         .unwrap_or(Value::undefined());
     let symbol_ref = cx
         .agent()
-        .well_known_symbol(lyng_js_types::WellKnownSymbolId::ToStringTag)
+        .well_known_symbol(lyng_types::WellKnownSymbolId::ToStringTag)
         .ok_or_else(|| type_error(cx))?;
     let symbol_key = PropertyKey::from_symbol(symbol_ref);
     super::define_data_property_with_attrs(
@@ -128,7 +128,7 @@ pub(super) fn iterator_constructor_setter_builtin<Cx: PublicBuiltinDispatchConte
 // only access we need (GetIteratorDirect from the spec).
 pub(super) fn iterator_direct_record<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) -> Result<iterator::IteratorRecord, Cx::Error> {
     let next_key = property_key_from_text(cx, "next");
     let next_value = cx.get_property_value(Value::from_object_ref(object_ref), next_key)?;
@@ -142,7 +142,7 @@ pub(super) fn iterator_direct_record<Cx: PublicBuiltinDispatchContext>(
 // populated yet (so we can't use the regular IteratorRecord-based close).
 pub(super) fn iterator_close_for_validation_failure<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    object_ref: lyng_js_types::ObjectRef,
+    object_ref: lyng_types::ObjectRef,
 ) {
     let return_key = property_key_from_text(cx, "return");
     let Ok(return_value) = cx.get_property_value(Value::from_object_ref(object_ref), return_key)
@@ -162,6 +162,6 @@ pub(super) fn iterator_close_for_validation_failure<Cx: PublicBuiltinDispatchCon
 pub(super) fn iterator_this_object<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     value: Value,
-) -> Result<lyng_js_types::ObjectRef, Cx::Error> {
+) -> Result<lyng_types::ObjectRef, Cx::Error> {
     value.as_object_ref().ok_or_else(|| type_error(cx))
 }

@@ -33,7 +33,7 @@ impl ObjectRuntime {
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
-        environment: Option<lyng_js_types::EnvironmentRef>,
+        environment: Option<lyng_types::EnvironmentRef>,
     ) -> bool {
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
@@ -50,7 +50,7 @@ impl ObjectRuntime {
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         id: ObjectRef,
-        private_env: Option<lyng_js_types::EnvironmentRef>,
+        private_env: Option<lyng_types::EnvironmentRef>,
     ) -> bool {
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
@@ -256,15 +256,15 @@ impl ObjectRuntime {
 
     fn bound_function_record(
         &self,
-        heap: lyng_js_gc::PrimitiveHeapView<'_>,
+        heap: lyng_gc::PrimitiveHeapView<'_>,
         id: ObjectRef,
-    ) -> InternalMethodResult<lyng_js_gc::RuntimeBoundFunctionRecord> {
+    ) -> InternalMethodResult<lyng_gc::RuntimeBoundFunctionRecord> {
         let payload = self
             .require_function_data(id)?
             .gc_payload()
             .ok_or(InternalMethodError::MissingFunctionPayload)?;
         heap.function_payload(payload)
-            .and_then(lyng_js_gc::RuntimeFunctionRecord::bound)
+            .and_then(lyng_gc::RuntimeFunctionRecord::bound)
             .ok_or(InternalMethodError::MissingFunctionPayload)
     }
 }

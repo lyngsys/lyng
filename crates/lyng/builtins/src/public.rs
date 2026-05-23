@@ -3,19 +3,19 @@ mod families;
 mod metadata;
 mod temporal;
 
-pub use lyng_js_types::regexp_unicode_sets_getter_builtin;
+pub use lyng_types::regexp_unicode_sets_getter_builtin;
 pub use metadata::{builtin_metadata, public_builtin_metadata};
 
 use crate::internal::{InternalBuiltinCache, InternalRealmBuiltins};
 use crate::BuiltinEntryMetadata;
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
-use lyng_js_objects::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
+use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
     ObjectColdData, PrimitiveWrapperKind,
 };
-use lyng_js_types::{
+use lyng_types::{
     abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
     aggregate_error_builtin, array_at_builtin, array_buffer_builtin,
     array_buffer_byte_length_getter_builtin, array_buffer_detached_getter_builtin,
@@ -1150,7 +1150,7 @@ pub fn allocate_builtin_primitive_wrapper_object(
     wrapper_kind: PrimitiveWrapperKind,
     value: Value,
 ) -> ObjectRef {
-    lyng_js_ops::object::allocate_primitive_wrapper_object(
+    lyng_ops::object::allocate_primitive_wrapper_object(
         agent,
         root_shape,
         prototype,
@@ -1246,7 +1246,7 @@ pub fn allocate_builtin_function_object(
             && agent
                 .objects()
                 .object_header(agent.heap().view(), prototype_object)
-                .and_then(lyng_js_objects::ObjectHeader::prototype)
+                .and_then(lyng_objects::ObjectHeader::prototype)
                 .is_none()
         {
             let _ = agent.with_heap_and_objects(|heap, objects| {
@@ -1271,7 +1271,7 @@ pub(in crate::public) fn define_builtin_data_property(
     enumerable: bool,
     configurable: bool,
 ) {
-    let mut descriptor = lyng_js_types::PropertyDescriptor::new();
+    let mut descriptor = lyng_types::PropertyDescriptor::new();
     descriptor.set_value(value);
     descriptor.set_writable(writable);
     descriptor.set_enumerable(enumerable);
@@ -1301,7 +1301,7 @@ pub(in crate::public) fn define_builtin_accessor_property(
     enumerable: bool,
     configurable: bool,
 ) {
-    let mut descriptor = lyng_js_types::PropertyDescriptor::new();
+    let mut descriptor = lyng_types::PropertyDescriptor::new();
     descriptor.set_getter(getter.map_or_else(Value::undefined, Value::from_object_ref));
     descriptor.set_setter(setter.map_or_else(Value::undefined, Value::from_object_ref));
     descriptor.set_enumerable(enumerable);

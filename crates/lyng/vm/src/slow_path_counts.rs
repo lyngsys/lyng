@@ -5,8 +5,8 @@
 //! Gated behind the `opcode-counters` Cargo feature. Production builds
 //! carry no counter code.
 
+use lyng_bytecode::{Opcode, OPCODE_COUNT};
 use std::cell::Cell;
-use lyng_js_bytecode::{Opcode, OPCODE_COUNT};
 
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 
@@ -18,8 +18,14 @@ pub struct SlowPathCounterStore {
 impl SlowPathCounterStore {
     pub fn new() -> Self {
         Self {
-            semantic: (0..OPCODE_COUNT_LEN).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice(),
-            safepoint: (0..OPCODE_COUNT_LEN).map(|_| Cell::new(0)).collect::<Vec<_>>().into_boxed_slice(),
+            semantic: (0..OPCODE_COUNT_LEN)
+                .map(|_| Cell::new(0))
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            safepoint: (0..OPCODE_COUNT_LEN)
+                .map(|_| Cell::new(0))
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
         }
     }
 
@@ -36,8 +42,12 @@ impl SlowPathCounterStore {
     }
 
     pub fn reset(&self) {
-        for slot in &self.semantic { slot.set(0); }
-        for slot in &self.safepoint { slot.set(0); }
+        for slot in &self.semantic {
+            slot.set(0);
+        }
+        for slot in &self.safepoint {
+            slot.set(0);
+        }
     }
 
     pub fn snapshot(&self) -> SlowPathCounts {
@@ -75,19 +85,25 @@ impl SlowPathCounts {
 
     #[must_use]
     pub fn semantic(&self, opcode: Opcode) -> u64 {
-        self.semantic.get(usize::from(opcode as u8)).copied().unwrap_or(0)
+        self.semantic
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
     }
 
     #[must_use]
     pub fn safepoint(&self, opcode: Opcode) -> u64 {
-        self.safepoint.get(usize::from(opcode as u8)).copied().unwrap_or(0)
+        self.safepoint
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_bytecode::Opcode;
+    use lyng_bytecode::Opcode;
 
     #[test]
     fn records_semantic_independently_of_safepoint() {

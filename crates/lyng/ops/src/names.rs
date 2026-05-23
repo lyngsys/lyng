@@ -2,10 +2,10 @@ use crate::{
     errors::{internal_method_error, throw_reference_error, throw_type_error},
     object, read,
 };
-use lyng_js_common::AtomId;
-use lyng_js_env::{Agent, EnvironmentLayoutId, EnvironmentRecord, ObjectEnvironmentRecord};
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{Completion, EnvironmentRef, PropertyKey, Value, WellKnownSymbolId};
+use lyng_common::AtomId;
+use lyng_env::{Agent, EnvironmentLayoutId, EnvironmentRecord, ObjectEnvironmentRecord};
+use lyng_gc::AllocationLifetime;
+use lyng_types::{Completion, EnvironmentRef, PropertyKey, Value, WellKnownSymbolId};
 
 fn lookup_environment_binding(
     agent: &Agent,
@@ -29,7 +29,7 @@ fn lookup_environment_binding(
 
 fn lookup_global_lexical_binding(
     agent: &Agent,
-    record: &lyng_js_env::GlobalEnvironmentRecord,
+    record: &lyng_env::GlobalEnvironmentRecord,
     name: AtomId,
 ) -> Option<Value> {
     let binding = record.lexical_binding(name)?;
@@ -230,13 +230,13 @@ pub fn has_identifier_binding(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_env::{
+    use lyng_env::{
         Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind,
         EnvironmentSlotFlags, Runtime,
     };
-    use lyng_js_gc::AllocationLifetime;
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_objects::ObjectAllocation;
+    use lyng_gc::AllocationLifetime;
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::ObjectAllocation;
 
     const GLOBAL_LEXICAL: AtomId = AtomId::from_raw(601);
     const GLOBAL_VAR: AtomId = AtomId::from_raw(602);
@@ -284,7 +284,7 @@ mod tests {
 
         agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
-            let mut descriptor = lyng_js_types::PropertyDescriptor::new();
+            let mut descriptor = lyng_types::PropertyDescriptor::new();
             descriptor.set_value(Value::from_smi(20));
             descriptor.set_writable(true);
             descriptor.set_enumerable(true);
@@ -299,7 +299,7 @@ mod tests {
                 )
                 .unwrap());
 
-            let mut binding = lyng_js_types::PropertyDescriptor::new();
+            let mut binding = lyng_types::PropertyDescriptor::new();
             binding.set_value(Value::from_smi(30));
             binding.set_writable(true);
             binding.set_enumerable(true);

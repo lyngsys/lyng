@@ -1,9 +1,9 @@
 // DSL-0b op_move handler asm (AArch64), captured via:
-//   cargo rustc --release -p lyng-js-vm --lib -- --emit=asm
-// then extracted from target/release/deps/lyng_js_vm-<hash>.s.
+//   cargo rustc --release -p lyng-vm --lib -- --emit=asm
+// then extracted from target/release/deps/lyng_vm-<hash>.s.
 //
-// Symbol: lyng_js_vm::dsl::handlers::hot::op_move
-// Source: crates/lyng-js/vm/src/dsl/handlers/hot.rs (B39)
+// Symbol: lyng_vm::dsl::handlers::hot::op_move
+// Source: crates/lyng/vm/src/dsl/handlers/hot.rs (B39)
 // Layout: Ab (two register-index byte operands), length = 3 bytes.
 
 op_move:

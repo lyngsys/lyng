@@ -1,4 +1,4 @@
-//! `lyng-js-bench capture-llint` — extract JSC LLInt handler asm/source.
+//! `lyng-bench capture-llint` — extract JSC LLInt handler asm/source.
 //!
 //! Source-mode strategy:
 //! - `auto`: try system → local → excerpt in order; report which mode produced each opcode.
@@ -48,7 +48,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
 
     // Write a summary report at output_dir/README.md.
-    let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-js-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
+    let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
     for (opcode, mode) in &produced {
         summary.push_str(&format!("| `{opcode}` | {mode:?} |\n"));
     }
@@ -56,7 +56,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
     std::fs::write(&summary_path, summary)
         .map_err(|err| format!("write {}: {err}", summary_path.display()))?;
 
-    println!("captured {} opcodes, {} failures", produced.len(), failures.len());
+    println!(
+        "captured {} opcodes, {} failures",
+        produced.len(),
+        failures.len()
+    );
     for failure in &failures {
         eprintln!("  {failure}");
     }
@@ -103,7 +107,9 @@ fn try_mode(mode: Source, opcode: &str, options: &CaptureLlintOptions) -> Result
             capture_from_binary(&binary, opcode)
         }
         Source::Excerpt => {
-            let source_root = options.jsc_source.clone()
+            let source_root = options
+                .jsc_source
+                .clone()
                 .ok_or("--jsc-source required for excerpt mode")?;
             capture_from_source(&source_root, opcode)
         }
@@ -113,11 +119,19 @@ fn try_mode(mode: Source, opcode: &str, options: &CaptureLlintOptions) -> Result
 
 fn capture_from_binary(binary: &std::path::Path, opcode: &str) -> Result<String, String> {
     let symbol = format!("_llint_{opcode}");
-    let tool = if cfg!(target_os = "macos") { "otool" } else { "objdump" };
+    let tool = if cfg!(target_os = "macos") {
+        "otool"
+    } else {
+        "objdump"
+    };
     let args: Vec<String> = if cfg!(target_os = "macos") {
         vec!["-tvV".into(), binary.display().to_string()]
     } else {
-        vec!["-d".into(), "--no-show-raw-insn".into(), binary.display().to_string()]
+        vec![
+            "-d".into(),
+            "--no-show-raw-insn".into(),
+            binary.display().to_string(),
+        ]
     };
     let output = std::process::Command::new(tool)
         .args(args)
@@ -151,7 +165,9 @@ fn extract_llint_symbol(disasm: &str, symbol: &str) -> Result<String, String> {
         }
     }
     if !found {
-        return Err(format!("symbol {symbol} not found (binary may be stripped)"));
+        return Err(format!(
+            "symbol {symbol} not found (binary may be stripped)"
+        ));
     }
     Ok(body.join("\n"))
 }
@@ -230,7 +246,9 @@ fn capture_from_source(source_root: &std::path::Path, opcode: &str) -> Result<St
     }
 
     for file in &candidates {
-        let Ok(text) = std::fs::read_to_string(file) else { continue; };
+        let Ok(text) = std::fs::read_to_string(file) else {
+            continue;
+        };
         for needle in &needles {
             if let Some(start) = text.find(needle.as_str()) {
                 // For the `\n    <short>,` form, back up to the start of the
@@ -248,7 +266,11 @@ fn capture_from_source(source_root: &std::path::Path, opcode: &str) -> Result<St
                 } else {
                     start
                 };
-                let body: String = text[start..].lines().take(80).collect::<Vec<_>>().join("\n");
+                let body: String = text[start..]
+                    .lines()
+                    .take(80)
+                    .collect::<Vec<_>>()
+                    .join("\n");
                 return Ok(body);
             }
         }
@@ -261,7 +283,7 @@ fn parse_args(args: &[String]) -> Result<CaptureLlintOptions, String> {
     let mut jsc_binary: Option<PathBuf> = None;
     let mut jsc_source: Option<PathBuf> = None;
     let mut opcodes: Vec<String> = Vec::new();
-    let mut output_dir = PathBuf::from("reports/js/lyng-js/llint-reference");
+    let mut output_dir = PathBuf::from("reports/lyng/llint-reference");
 
     let mut iter = args.iter().peekable();
     while let Some(arg) = iter.next() {
@@ -274,34 +296,51 @@ fn parse_args(args: &[String]) -> Result<CaptureLlintOptions, String> {
                 Some(other) => return Err(format!("--source: unknown {other}")),
                 None => return Err("--source requires a value".into()),
             },
-            "--jsc-binary" => jsc_binary = Some(iter.next().ok_or("--jsc-binary requires a path")?.into()),
-            "--jsc-source" => jsc_source = Some(iter.next().ok_or("--jsc-source requires a path")?.into()),
+            "--jsc-binary" => {
+                jsc_binary = Some(iter.next().ok_or("--jsc-binary requires a path")?.into())
+            }
+            "--jsc-source" => {
+                jsc_source = Some(iter.next().ok_or("--jsc-source requires a path")?.into())
+            }
             "--opcodes" => {
-                let list = iter.next().ok_or("--opcodes requires a comma-separated list")?;
+                let list = iter
+                    .next()
+                    .ok_or("--opcodes requires a comma-separated list")?;
                 opcodes.extend(list.split(',').map(str::trim).map(String::from));
             }
             "--output" => output_dir = iter.next().ok_or("--output requires a path")?.into(),
             "--help" | "-h" => return Err(help_text()),
-            other => return Err(format!("capture-llint: unknown arg {other}\n\n{}", help_text())),
+            other => {
+                return Err(format!(
+                    "capture-llint: unknown arg {other}\n\n{}",
+                    help_text()
+                ))
+            }
         }
     }
 
     if opcodes.is_empty() {
         return Err("--opcodes <comma-separated list> is required".into());
     }
-    Ok(CaptureLlintOptions { source, jsc_binary, jsc_source, opcodes, output_dir })
+    Ok(CaptureLlintOptions {
+        source,
+        jsc_binary,
+        jsc_source,
+        opcodes,
+        output_dir,
+    })
 }
 
 fn help_text() -> String {
     [
-        "Usage: lyng-js-bench capture-llint --opcodes <list> [options]",
+        "Usage: lyng-bench capture-llint --opcodes <list> [options]",
         "",
         "Options:",
         "  --source auto|system|local|excerpt   Capture strategy (default auto)",
         "  --jsc-binary PATH                    JSC binary for system/local mode",
         "  --jsc-source PATH                    WebKit source root for excerpt mode",
         "  --opcodes a,b,c                      Comma-separated LLInt opcode names (without `_llint_` prefix)",
-        "  --output PATH                        Output directory (default reports/js/lyng-js/llint-reference)",
+        "  --output PATH                        Output directory (default reports/lyng/llint-reference)",
     ]
     .join("\n")
 }
@@ -312,10 +351,7 @@ mod tests {
 
     #[test]
     fn parses_minimal_args() {
-        let opts = parse_args(&[
-            "--opcodes".into(),
-            "op_add,op_mov".into(),
-        ]).unwrap();
+        let opts = parse_args(&["--opcodes".into(), "op_add,op_mov".into()]).unwrap();
         assert_eq!(opts.source, Source::Auto);
         assert_eq!(opts.opcodes, vec!["op_add", "op_mov"]);
     }

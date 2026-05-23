@@ -1,18 +1,18 @@
 //! Cross-crate coverage for the public compile, install, and evaluate pipeline.
 
-use lyng_js_bytecode::{
+use lyng_bytecode::{
     disassemble, BytecodeBuilder, BytecodeFunctionId, BytecodeFunctionKind, CompiledScriptUnit,
     DeoptFrameValue, DeoptValueSource, FeedbackSiteKind, FeedbackSiteMetadata, Opcode,
     SafepointKind,
 };
-use lyng_js_common::{AtomTable, SourceId, WellKnownAtom};
-use lyng_js_compiler::{compile_module, compile_script};
-use lyng_js_env::{ExecutionContext, ExecutionContextKind, ModuleStatus, Runtime};
-use lyng_js_host::{ModuleKey, NoopHostHooks};
-use lyng_js_parser::{parse_module, parse_script};
-use lyng_js_sema::{analyze_module, analyze_script};
-use lyng_js_types::{CodeRef, EnvironmentRef, RealmRef, Value};
-use lyng_js_vm::{seed_registers, FrameRecord, RegisterWindow, Vm};
+use lyng_common::{AtomTable, SourceId, WellKnownAtom};
+use lyng_compiler::{compile_module, compile_script};
+use lyng_env::{ExecutionContext, ExecutionContextKind, ModuleStatus, Runtime};
+use lyng_host::{ModuleKey, NoopHostHooks};
+use lyng_parser::{parse_module, parse_script};
+use lyng_sema::{analyze_module, analyze_script};
+use lyng_types::{CodeRef, EnvironmentRef, RealmRef, Value};
+use lyng_vm::{seed_registers, FrameRecord, RegisterWindow, Vm};
 
 #[test]
 fn runtime_context_and_frame_records_seed_register_windows() {
@@ -55,7 +55,7 @@ fn vm_installs_and_executes_hand_authored_bytecode() {
         .alloc_registers(2)
         .expect("test bytecode registers should allocate");
     let constant = builder
-        .add_constant(lyng_js_bytecode::ConstantValue::Smi(12))
+        .add_constant(lyng_bytecode::ConstantValue::Smi(12))
         .expect("test bytecode constant should build");
     builder
         .emit_abx(Opcode::LoadConst, 0, constant)

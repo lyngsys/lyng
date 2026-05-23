@@ -1,7 +1,7 @@
 use super::Agent;
 use crate::{ExecutableId, JobId, JobQueueKind, RuntimeJob, RuntimeJobPayload};
-use lyng_js_host::HostJobKind;
-use lyng_js_types::RealmRef;
+use lyng_host::HostJobKind;
+use lyng_types::RealmRef;
 
 impl Agent {
     #[cfg(test)]

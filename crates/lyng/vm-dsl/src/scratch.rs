@@ -7,7 +7,7 @@
 //! to spill or share registers.
 //!
 //! See design §5 of
-//! `docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md` for the
+//! `docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md` for the
 //! pinned-register split (PC/CFR/JSST/FB/etc. occupy x16+ on AArch64,
 //! leaving x9..x15 for scratch).
 

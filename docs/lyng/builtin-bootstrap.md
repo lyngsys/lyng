@@ -1,6 +1,6 @@
 # Lyng JS Builtin Bootstrap
 
-`lyng-js-builtins` creates the default realm builtin surface and dispatches native builtin
+`lyng-builtins` creates the default realm builtin surface and dispatches native builtin
 functions. It owns builtin metadata, descriptor tables, realm builtin caches, bootstrap
 entrypoints, and public/internal builtin dispatch.
 

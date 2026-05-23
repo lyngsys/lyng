@@ -6,9 +6,9 @@ use super::{install_public_builtin_function, FamilyInstallContext, ObjectFamilyB
 use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     object_assign_builtin, object_builtin, object_create_builtin, object_define_getter_builtin,
     object_define_properties_builtin, object_define_property_builtin, object_define_setter_builtin,
     object_entries_builtin, object_freeze_builtin, object_from_entries_builtin,

@@ -178,7 +178,7 @@ impl FunctionCompiler<'_, '_> {
                     home_object
                 };
                 self.emit_internal_builtin_call(
-                    lyng_js_types::internal_capture_arrow_context_builtin(),
+                    lyng_types::internal_capture_arrow_context_builtin(),
                     &[dest, this_override, home_object],
                     span,
                 )?;
@@ -189,7 +189,7 @@ impl FunctionCompiler<'_, '_> {
 
     pub(super) fn lower_sequence_expression(
         &mut self,
-        expressions: lyng_js_ast::NodeList<ExprId>,
+        expressions: lyng_ast::NodeList<ExprId>,
         dest: u16,
     ) -> LoweringResult<()> {
         let expressions = self.ast().get_expr_list(expressions).to_vec();
@@ -221,7 +221,7 @@ impl FunctionCompiler<'_, '_> {
         let phase_value = self.alloc_temp()?;
         self.emit_load_smi(phase_value, phase.encoded())?;
         self.emit_internal_builtin_call_into(
-            lyng_js_types::internal_dynamic_import_builtin(),
+            lyng_types::internal_dynamic_import_builtin(),
             &[source_value, options_value, phase_value],
             self.ast().get_expr(source).span(),
             dest,
@@ -298,7 +298,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_array_expression(
         &mut self,
         expr_id: ExprId,
-        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        elements: lyng_ast::NodeList<Option<ExprId>>,
         dest: u16,
     ) -> LoweringResult<()> {
         let saved_result_registers = std::mem::take(&mut self.array_literal_result_registers);
@@ -312,7 +312,7 @@ impl FunctionCompiler<'_, '_> {
     fn lower_array_expression_at_depth(
         &mut self,
         expr_id: ExprId,
-        elements: lyng_js_ast::NodeList<Option<ExprId>>,
+        elements: lyng_ast::NodeList<Option<ExprId>>,
         dest: u16,
         depth: usize,
     ) -> LoweringResult<()> {
@@ -469,7 +469,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_regexp_literal(
         &mut self,
         expr_id: ExprId,
-        value: lyng_js_ast::RegExpLiteralId,
+        value: lyng_ast::RegExpLiteralId,
         dest: u16,
     ) -> LoweringResult<()> {
         let literal = self.ast().literals().get_regexp(value).clone();
@@ -486,7 +486,7 @@ impl FunctionCompiler<'_, '_> {
 
         let span = self.ast().get_expr(expr_id).span();
         self.emit_internal_builtin_call_into(
-            lyng_js_types::internal_regexp_literal_builtin(),
+            lyng_types::internal_regexp_literal_builtin(),
             &[site, pattern, flags],
             span,
             dest,
@@ -496,7 +496,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_bigint_literal(
         &mut self,
         expr_id: ExprId,
-        value: lyng_js_ast::BigIntLiteralId,
+        value: lyng_ast::BigIntLiteralId,
         dest: u16,
     ) -> LoweringResult<()> {
         let callee = self.alloc_temp()?;

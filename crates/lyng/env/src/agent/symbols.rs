@@ -1,8 +1,8 @@
 use super::{Agent, RecentShortLatin1String, RecentTwoCodeUnitString};
 use crate::{AllocationLifetime, AtomTable, BootstrapAtoms, GlobalSymbolRegistryEntry};
-use lyng_js_common::AtomId;
-use lyng_js_gc::{StringEncoding, SymbolFlags};
-use lyng_js_types::{StringRef, SymbolRef, WellKnownSymbolId};
+use lyng_common::AtomId;
+use lyng_gc::{StringEncoding, SymbolFlags};
+use lyng_types::{StringRef, SymbolRef, WellKnownSymbolId};
 
 impl Agent {
     #[inline]

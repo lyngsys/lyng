@@ -1,8 +1,8 @@
 use crate::typed_array;
-use lyng_js_env::Agent;
-use lyng_js_host::WaitLocation;
-use lyng_js_objects::{TypedArrayElementKind, TypedArrayObjectData};
-use lyng_js_types::{ObjectRef, Value};
+use lyng_env::Agent;
+use lyng_host::WaitLocation;
+use lyng_objects::{TypedArrayElementKind, TypedArrayObjectData};
+use lyng_types::{ObjectRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AtomicAccessError {

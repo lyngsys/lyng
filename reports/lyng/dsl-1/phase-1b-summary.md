@@ -171,8 +171,8 @@ doc):** addressed findings #4, #5, and produced this umbrella summary.
 
 ## Behavioral parity at current HEAD `8ee22da7` (Phase 1.B.3 close)
 
-`cargo test -p lyng-js-vm --lib --release`: **418 passing** ✓ (matches Phase 1.B.2 close baseline)
-`cargo test -p lyng-js-tests --release`: **1209 passing** ✓ (+11 from 1.B.3's per-opcode integration tests: 8 op_locals_inline + 3 op_ldar_inline)
+`cargo test -p lyng-vm --lib --release`: **418 passing** ✓ (matches Phase 1.B.2 close baseline)
+`cargo test -p lyng-tests --release`: **1209 passing** ✓ (+11 from 1.B.3's per-opcode integration tests: 8 op_locals_inline + 3 op_ldar_inline)
 
 Test262 at 1.B.3 close: **49729 passing files / 0 failing / 100.00% rate** ✓
 (matches mid-phase baseline captured in cleanup batch 2; no semantic
@@ -191,7 +191,7 @@ Per-handler reports (11 total — 2 from 1.B.2, 9 from 1.B.3):
 - [`op_store_local_3.md`](../dsl-handlers/op_store_local_3.md) ✓
 - [`op_ldar.md`](../dsl-handlers/op_ldar.md) ✓
 
-Per-handler asm baselines: 11 captured under `reports/js/lyng-js/dsl-asm-baseline-aarch64/` ✓
+Per-handler asm baselines: 11 captured under `reports/lyng/dsl-asm-baseline-aarch64/` ✓
 
 ## Lessons / observations (Phase 1.B umbrella level)
 
@@ -251,7 +251,7 @@ Recorded formally in [`phase-1b-followups.md`](phase-1b-followups.md).
 
 **StoreLocal0 functional unreachability** was discovered during
 Phase 1.B.3 Task 1-4 implementation. The bytecode-builder peephole at
-`crates/lyng-js/bytecode/src/builder.rs:150-166` rewrites `Move dst=0,
+`crates/lyng/bytecode/src/builder.rs:150-166` rewrites `Move dst=0,
 src=B` → `Ldar B` before the `store_local_opcode` branch fires, so
 StoreLocal0 cannot be emitted from compiled JS source. The inline
 port is correct and cheap; it just has 0 V8 v7 dispatches in practice.

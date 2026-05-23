@@ -1,6 +1,6 @@
-//! Cold-path host integration boundary for the lyng-js runtime substrate.
+//! Cold-path host integration boundary for the lyng runtime substrate.
 //!
-//! Ownership: `lyng_js_host` owns host-facing traits, typed request and response
+//! Ownership: `lyng_host` owns host-facing traits, typed request and response
 //! shells, host errors, and default host test doubles only. It does not own
 //! runtime state, queue order, or object semantics.
 
@@ -36,8 +36,8 @@ pub use test_host::{HostCall, NoopHostHooks, TestHost, TestHostSnapshot};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::{Severity, SourceId, Span};
-    use lyng_js_types::{BackingStoreRef, BuiltinFunctionId, RealmRef, Value};
+    use lyng_common::{Severity, SourceId, Span};
+    use lyng_types::{BackingStoreRef, BuiltinFunctionId, RealmRef, Value};
 
     fn assert_host_hooks<T: HostHooks>() {}
 

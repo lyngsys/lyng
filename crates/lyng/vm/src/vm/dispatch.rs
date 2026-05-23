@@ -1,9 +1,9 @@
 use super::registers::absolute_register;
 use super::{
-    Agent, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm,
-    VmError, VmResult,
+    Agent, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm, VmError,
+    VmResult,
 };
-use lyng_js_types::{AbruptCompletion, FeedbackSlotId};
+use lyng_types::{AbruptCompletion, FeedbackSlotId};
 
 pub(in crate::vm) mod arithmetic;
 pub(in crate::vm) mod property;
@@ -13,7 +13,7 @@ mod tests {
     /// Phase 1 sub-8 (`lyng-9gyk`) exit invariant: dispatch.rs must contain
     /// **no** `match` expression with more than 10 arms.
     ///
-    /// The roadmap (`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`) chose
+    /// The roadmap (`reports/lyng/jsc-aligned-engine-roadmap.md`) chose
     /// Option α — per-handler `extern "C" fn` table with a central trampoline
     /// — over the legacy single-`match` interpreter. If a regression
     /// reintroduces a wide opcode-match in this file, it would re-grow the
@@ -367,5 +367,4 @@ impl Vm {
     ) -> VmResult<Value> {
         self.run_via_dsl(agent, host, registry)
     }
-
 }

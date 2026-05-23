@@ -1,5 +1,5 @@
-use lyng_js_gc::{PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::ObjectRef;
+use lyng_gc::{PrimitiveTracer, TraceHeapEdges};
+use lyng_types::ObjectRef;
 
 /// Typed placeholder table for realm-owned intrinsics.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

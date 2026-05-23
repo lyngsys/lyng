@@ -13,8 +13,8 @@ use crate::metadata::{
     SafepointKind, SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands,
 };
 use crate::Opcode;
-use lyng_js_common::{AtomId, SourceId, Span};
-use lyng_js_types::FeedbackSlotId;
+use lyng_common::{AtomId, SourceId, Span};
+use lyng_types::FeedbackSlotId;
 use std::collections::HashMap;
 
 mod peephole;
@@ -28,12 +28,11 @@ mod peephole;
 /// u16 so the bytecode round-trips through [`crate::instruction::write_feedback_slot`]
 /// without tripping its narrow-encoding assertion.
 const PENDING_FEEDBACK_SLOT_RAW: u32 = u16::MAX as u32;
-const PENDING_FEEDBACK_SLOT: FeedbackSlotId = match FeedbackSlotId::from_raw(
-    PENDING_FEEDBACK_SLOT_RAW,
-) {
-    Some(slot) => slot,
-    None => unreachable!(),
-};
+const PENDING_FEEDBACK_SLOT: FeedbackSlotId =
+    match FeedbackSlotId::from_raw(PENDING_FEEDBACK_SLOT_RAW) {
+        Some(slot) => slot,
+        None => unreachable!(),
+    };
 
 pub type BytecodeBuildResult<T> = Result<T, BytecodeBuildError>;
 
@@ -1268,8 +1267,8 @@ impl BytecodeBuilder {
         instruction_offset: u32,
         scopes: Vec<DirectEvalLexicalScope>,
         flags: DirectEvalSiteFlags,
-        annex_b_catch_names: Vec<lyng_js_common::AtomId>,
-        parameter_names: Vec<lyng_js_common::AtomId>,
+        annex_b_catch_names: Vec<lyng_common::AtomId>,
+        parameter_names: Vec<lyng_common::AtomId>,
     ) {
         self.direct_eval_lexical_sites
             .push(DirectEvalLexicalSite::new(
@@ -1387,11 +1386,10 @@ impl BytecodeBuilder {
             .collect::<HashMap<_, _>>();
         let mut result = Vec::with_capacity(logical_instructions.len());
         for (offset, instruction) in logical_instructions.iter().copied().enumerate() {
-            let logical_offset = u32::try_from(offset).map_err(|_| {
-                BytecodeBuildError::LimitExceeded {
+            let logical_offset =
+                u32::try_from(offset).map_err(|_| BytecodeBuildError::LimitExceeded {
                     kind: BytecodeLimitKind::InstructionStream,
-                }
-            })?;
+                })?;
             // IC-shaped instructions emitted with the sentinel placeholder must
             // bind a real feedback slot before the bytecode is finalized.
             // Compiler sites that already called `add_feedback_site` have one
@@ -1419,9 +1417,12 @@ impl BytecodeBuilder {
                 None
             };
             let updated = match (slot, instruction) {
-                (Some(slot), Instruction::AbcSlot { opcode, a, b, c, .. }) => {
-                    Instruction::abc_slot(opcode, a, b, c, slot)
-                }
+                (
+                    Some(slot),
+                    Instruction::AbcSlot {
+                        opcode, a, b, c, ..
+                    },
+                ) => Instruction::abc_slot(opcode, a, b, c, slot),
                 (Some(slot), Instruction::AbxSlot { opcode, a, bx, .. }) => {
                     Instruction::abx_slot(opcode, a, bx, slot)
                 }
@@ -1757,12 +1758,7 @@ mod tests {
         );
         assert_eq!(
             function.instructions().get(1),
-            Some(Instruction::abx_slot(
-                Opcode::LoadGlobal,
-                0,
-                7,
-                global_slot
-            ))
+            Some(Instruction::abx_slot(Opcode::LoadGlobal, 0, 7, global_slot))
         );
         Ok(())
     }
@@ -1797,12 +1793,7 @@ mod tests {
         );
         assert_eq!(
             function.instruction_at(6),
-            Some(Instruction::abx_slot(
-                Opcode::LoadGlobal,
-                0,
-                7,
-                global_slot
-            ))
+            Some(Instruction::abx_slot(Opcode::LoadGlobal, 0, 7, global_slot))
         );
         assert_eq!(function.feedback_sites()[0].instruction_offset(), 0);
         assert_eq!(function.feedback_sites()[1].instruction_offset(), 6);

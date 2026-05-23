@@ -1,12 +1,12 @@
 use crate::error::VmResult;
 use crate::{FrameRecord, Vm, VmError};
-use lyng_js_builtins::BootstrapArtifacts;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, PrimitiveCollectionReport};
-use lyng_js_host::HostHooks;
-use lyng_js_objects::{NativeFunctionRegistry, ObjectAllocation, ObjectFlags};
-use lyng_js_ops::errors;
-use lyng_js_types::{
+use lyng_builtins::BootstrapArtifacts;
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
+use lyng_host::HostHooks;
+use lyng_objects::{NativeFunctionRegistry, ObjectAllocation, ObjectFlags};
+use lyng_ops::errors;
+use lyng_types::{
     BuiltinFunctionId, EmbeddingFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
     Value,
 };
@@ -314,7 +314,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
         self.agent
             .objects()
             .function_data(self.callee_object)
-            .and_then(lyng_js_objects::FunctionObjectData::realm)
+            .and_then(lyng_objects::FunctionObjectData::realm)
             .unwrap_or_else(|| self.caller_frame.realm())
     }
 

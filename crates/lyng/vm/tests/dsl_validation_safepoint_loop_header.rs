@@ -20,12 +20,12 @@
 //!
 //! For now we land:
 //!
-//! - A structural test that the [`lyng_js_vm::dsl::test_helpers::DslHarness`]
+//! - A structural test that the [`lyng_vm::dsl::test_helpers::DslHarness`]
 //!   exists and is constructible (gates the harness's bootstrap path
 //!   against drift).
 //! - The `#[ignore]`d end-to-end test as a forward-pointer.
 
-use lyng_js_vm::dsl::test_helpers::DslHarness;
+use lyng_vm::dsl::test_helpers::DslHarness;
 
 #[test]
 fn dsl_harness_bootstraps_for_loop_header_safepoint_case() {
@@ -46,7 +46,7 @@ fn loop_header_warm_path_polls_when_pending_set() {
     // handler + `compile_and_run_with_poll_forced` — exist).
     //
     // Pseudo-code:
-    //   let result = lyng_js_vm::test_helpers::compile_and_run_with_poll_forced(
+    //   let result = lyng_vm::test_helpers::compile_and_run_with_poll_forced(
     //       "let i = 0; for (let j = 0; j < 100; j += 1) { i += j }",
     //   );
     //   assert!(result.poll_fired_count >= 1);

@@ -270,10 +270,10 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn emit_load_numeric(
         &mut self,
         dest: u16,
-        value: lyng_js_ast::NumericLiteral,
+        value: lyng_ast::NumericLiteral,
     ) -> LoweringResult<()> {
         match value {
-            lyng_js_ast::NumericLiteral::Int32(number) => {
+            lyng_ast::NumericLiteral::Int32(number) => {
                 if let Ok(number) = i16::try_from(number) {
                     self.emit_load_smi(dest, number)
                 } else {
@@ -283,7 +283,7 @@ impl FunctionCompiler<'_, '_> {
                     Ok(())
                 }
             }
-            lyng_js_ast::NumericLiteral::Number(number) => {
+            lyng_ast::NumericLiteral::Number(number) => {
                 let index = self.constant_float(number.to_bits())?;
                 self.builder
                     .emit_abx(Opcode::LoadConst, self.encode_register(dest)?, index)?;
@@ -295,12 +295,12 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn emit_load_string(
         &mut self,
         dest: u16,
-        value: lyng_js_ast::StringLiteralId,
+        value: lyng_ast::StringLiteralId,
     ) -> LoweringResult<()> {
         let literal = self.ast().literals().get_string_value(value).clone();
         let atom = match literal {
-            lyng_js_ast::StringLiteralValue::Utf8(text) => self.state.atoms.intern(&text),
-            lyng_js_ast::StringLiteralValue::Utf16(units) => self.state.atoms.intern_utf16(&units),
+            lyng_ast::StringLiteralValue::Utf8(text) => self.state.atoms.intern(&text),
+            lyng_ast::StringLiteralValue::Utf16(units) => self.state.atoms.intern_utf16(&units),
         };
         let index = self.constant_atom(atom)?;
         self.builder
@@ -524,13 +524,13 @@ impl FunctionCompiler<'_, '_> {
             Expr::StringLiteral { value, .. } => {
                 let literal = self.ast().literals().get_string_value(value).clone();
                 match literal {
-                    lyng_js_ast::StringLiteralValue::Utf8(text) => {
+                    lyng_ast::StringLiteralValue::Utf8(text) => {
                         if is_canonical_array_index_string(&text) {
                             return None;
                         }
                         Some(self.state.atoms.intern(&text))
                     }
-                    lyng_js_ast::StringLiteralValue::Utf16(units) => {
+                    lyng_ast::StringLiteralValue::Utf16(units) => {
                         Some(self.state.atoms.intern_utf16(&units))
                     }
                 }
@@ -1000,7 +1000,7 @@ impl FunctionCompiler<'_, '_> {
         u16::try_from(index).map_err(|_| LoweringError::ConstantIndexOverflow { index })
     }
 
-    pub(super) const fn ast(&self) -> &lyng_js_ast::Ast {
+    pub(super) const fn ast(&self) -> &lyng_ast::Ast {
         self.state.program.ast
     }
 
@@ -1033,7 +1033,7 @@ impl FunctionCompiler<'_, '_> {
                 kind: BytecodeLimitKind::FinalRegisterWindow,
             })?;
         let safepoint_id = self.builder.alloc_safepoint_id()?;
-        let runtime_state = lyng_js_bytecode::RuntimeStateCapture::new()
+        let runtime_state = lyng_bytecode::RuntimeStateCapture::new()
             .with_lexical_env(true)
             .with_variable_env(true)
             .with_this_value(true)
@@ -1043,7 +1043,7 @@ impl FunctionCompiler<'_, '_> {
             .with_completion_state(
                 self.completion_registers.is_some() || matches!(kind, SafepointKind::ExceptionEdge),
             );
-        let descriptor = lyng_js_bytecode::SafepointDescriptor::new(
+        let descriptor = lyng_bytecode::SafepointDescriptor::new(
             safepoint_id,
             instruction_offset,
             kind,
@@ -1094,5 +1094,5 @@ fn is_canonical_array_index_string(text: &str) -> bool {
     let Ok(index) = text.parse::<u64>() else {
         return false;
     };
-    lyng_js_types::PropertyKey::from_array_index(index).is_some() && index.to_string() == text
+    lyng_types::PropertyKey::from_array_index(index).is_some() && index.to_string() == text
 }

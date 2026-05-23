@@ -19,8 +19,8 @@ use super::{
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
-use lyng_js_objects::{float16_bits_to_f64, TypedArrayElementKind};
-use lyng_js_types::{BuiltinFunctionId, ObjectRef, Value};
+use lyng_objects::{float16_bits_to_f64, TypedArrayElementKind};
+use lyng_types::{BuiltinFunctionId, ObjectRef, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_mutation_builtin<
     Cx: PublicBuiltinDispatchContext,
@@ -199,7 +199,7 @@ fn counting_sort_typed_array_default_elements(
 
 fn counting_sort_typed_array_default_record<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    record: lyng_js_objects::TypedArrayObjectData,
+    record: lyng_objects::TypedArrayObjectData,
 ) -> Result<bool, Cx::Error> {
     let range = match record.kind() {
         TypedArrayElementKind::Int16 | TypedArrayElementKind::Uint16 => 1_usize << 16,
@@ -603,7 +603,7 @@ fn typed_array_copy_within_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
 
 fn typed_array_element_byte_start<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    record: lyng_js_objects::TypedArrayObjectData,
+    record: lyng_objects::TypedArrayObjectData,
     index: usize,
 ) -> Result<usize, Cx::Error> {
     index
@@ -614,7 +614,7 @@ fn typed_array_element_byte_start<Cx: PublicBuiltinDispatchContext>(
 
 fn typed_array_write_storage_bits_at_byte_start<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    record: lyng_js_objects::TypedArrayObjectData,
+    record: lyng_objects::TypedArrayObjectData,
     byte_start: usize,
     bits: u64,
 ) -> Result<(), Cx::Error> {
@@ -631,7 +631,7 @@ fn typed_array_write_storage_bits_at_byte_start<Cx: PublicBuiltinDispatchContext
 
 fn typed_array_write_next_storage_bits<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    record: lyng_js_objects::TypedArrayObjectData,
+    record: lyng_objects::TypedArrayObjectData,
     byte_start: &mut usize,
     bits: u64,
 ) -> Result<(), Cx::Error> {
@@ -785,7 +785,7 @@ fn uint8_array_subarray_builtin_dispatch<Cx: PublicBuiltinDispatchContext>(
         )?,
     );
     let end_argument = invocation.arguments().get(1).copied();
-    let end_is_undefined = end_argument.is_none_or(lyng_js_types::Value::is_undefined);
+    let end_is_undefined = end_argument.is_none_or(lyng_types::Value::is_undefined);
     let end = match end_argument {
         Some(value) if value.is_undefined() => source_length,
         Some(value) => normalize_relative_index_u64(

@@ -21,13 +21,13 @@
 //! Same reasoning as B31: `sync_from_asm` only touches
 //! `state.frame_pc_offset` (read) and `rust.frame` (write). No
 //! trampoline involvement; the harness's
-//! [`invoke_semantic_directly`](`lyng_js_vm::dsl::test_helpers::DslHarness::invoke_semantic_directly`)
+//! [`invoke_semantic_directly`](`lyng_vm::dsl::test_helpers::DslHarness::invoke_semantic_directly`)
 //! drives the bridge directly.
 
 use std::cell::Cell;
 
-use lyng_js_vm::dsl::slow_path::SemanticOutcome;
-use lyng_js_vm::dsl::test_helpers::{DslHarness, HarnessOutcome};
+use lyng_vm::dsl::slow_path::SemanticOutcome;
+use lyng_vm::dsl::test_helpers::{DslHarness, HarnessOutcome};
 
 #[test]
 fn semantic_body_sees_post_dispatch_pc() {

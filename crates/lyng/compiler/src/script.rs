@@ -1,12 +1,12 @@
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU32;
 
-use lyng_js_ast::{
+use lyng_ast::{
     AssignOp, Ast, BinaryOp, CatchClause, Decl, DeclId, Expr, ExprId, ForInOfLeft, ForInit,
     FunctionId, FunctionKind, ImportExpressionPhase, NodeList, Pattern, Property, PropertyKind,
     Stmt, StmtId, SwitchCase, VariableKind,
 };
-use lyng_js_bytecode::{
+use lyng_bytecode::{
     ArgumentsMode, BytecodeBuildError, BytecodeBuilder, BytecodeEnvironmentBinding,
     BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId,
     BytecodeFunctionKind, BytecodeLimitKind, CallRange, CaptureDescriptor, CaptureSource,
@@ -15,12 +15,12 @@ use lyng_js_bytecode::{
     FeedbackSiteKind, FeedbackSiteMetadata, Opcode, RuntimeStateCapture, SafepointDescriptor,
     SafepointKind, ThisMode,
 };
-use lyng_js_common::{AtomId, AtomTable, Span, WellKnownAtom};
-use lyng_js_sema::{
+use lyng_common::{AtomId, AtomTable, Span, WellKnownAtom};
+use lyng_sema::{
     DeclarationKind, FunctionSemaId, ProgramSemaView, ResolutionKind, ScopeId, ScopeKind,
     SemanticBindingId, StorageClass, UseSiteRecord,
 };
-use lyng_js_types::{
+use lyng_types::{
     add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin, bigint_builtin,
     create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
     dispose_scope_async_builtin, dispose_scope_builtin, eval_builtin,

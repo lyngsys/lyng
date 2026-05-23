@@ -7,7 +7,7 @@ once a bottleneck has been isolated.
 
 > **Strategic goal update (2026-05-14).** The earlier "match QuickJS" target was
 > scoped too low. The current strategic plan is the
-> [JSC-aligned engine roadmap](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md):
+> [JSC-aligned engine roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md):
 > aim for JSC LLInt-class interpreter performance (~2.5–4× past QuickJS) and JSC
 > Baseline-class JIT performance (~8–12× past QuickJS). The measurement workflow
 > below is unchanged; the framing of *what counts as a good result* shifted.
@@ -64,7 +64,7 @@ before and after runs so the report can render deltas from the previous JSON bas
 Start with the slowest checked-in Test262 timings:
 
 ```sh
-sed -n '/^## Slowest Test Timings/,$p' reports/js/lyng-js/test262.md
+sed -n '/^## Slowest Test Timings/,$p' reports/lyng/test262.md
 ```
 
 The current top groups include:
@@ -87,11 +87,11 @@ Use a tiny targeted run to check whether a suspected target is still slow and wh
 diagnostic path works:
 
 ```sh
-cargo run --release -p lyng-js-bench -- test262 \
+cargo run --release -p lyng-bench -- test262 \
   --preset smoke \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-  --report /tmp/lyng-js-test262-perf-smoke.md \
-  --json /tmp/lyng-js-test262-perf-smoke.json \
+  --report /tmp/lyng-test262-perf-smoke.md \
+  --json /tmp/lyng-test262-perf-smoke.json \
   -j 4
 ```
 
@@ -104,11 +104,11 @@ JSON path. The `test262` benchmark reads the previous JSON at the same path befo
 writing the new report, so repeated runs produce report-only deltas.
 
 ```sh
-cargo run --release -p lyng-js-bench -- test262 \
+cargo run --release -p lyng-bench -- test262 \
   --preset baseline \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-  --report /tmp/lyng-js-test262-perf-date-dst.md \
-  --json /tmp/lyng-js-test262-perf-date-dst.json \
+  --report /tmp/lyng-test262-perf-date-dst.md \
+  --json /tmp/lyng-test262-perf-date-dst.json \
   --sample-files 2 \
   --timeout-ms 3000 \
   -j 4
@@ -125,13 +125,13 @@ variant in a separate profile loop. That loop is intentionally not folded back i
 Markdown or JSON medians.
 
 ```sh
-cargo build --release -p lyng-js-bench
+cargo build --release -p lyng-bench
 
-target/release/lyng-js-bench test262 \
+target/release/lyng-bench test262 \
   --preset profile-target \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-  --report /tmp/lyng-js-test262-profile.md \
-  --json /tmp/lyng-js-test262-profile.json \
+  --report /tmp/lyng-test262-profile.md \
+  --json /tmp/lyng-test262-profile.json \
   --profile-loop-ms 30000 \
   --print-counters
 ```
@@ -140,15 +140,15 @@ For macOS `sample`, launch the workload directly from the release binary, then a
 the profile loop:
 
 ```sh
-target/release/lyng-js-bench test262 \
+target/release/lyng-bench test262 \
   --preset profile-target \
   --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-  --report /tmp/lyng-js-test262-profile.md \
-  --json /tmp/lyng-js-test262-profile.json \
+  --report /tmp/lyng-test262-profile.md \
+  --json /tmp/lyng-test262-profile.json \
   --profile-loop-ms 30000 \
   --print-counters &
 bench_pid=$!
-sample "$bench_pid" 10 -file /tmp/lyng-js-test262-profile.sample.txt
+sample "$bench_pid" 10 -file /tmp/lyng-test262-profile.sample.txt
 wait "$bench_pid"
 ```
 
@@ -158,13 +158,13 @@ template:
 ```sh
 xcrun xctrace record \
   --template 'Time Profiler' \
-  --output /tmp/lyng-js-test262-profile.trace \
+  --output /tmp/lyng-test262-profile.trace \
   --launch -- \
-  target/release/lyng-js-bench test262 \
+  target/release/lyng-bench test262 \
     --preset profile-target \
     --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-    --report /tmp/lyng-js-test262-profile.md \
-    --json /tmp/lyng-js-test262-profile.json \
+    --report /tmp/lyng-test262-profile.md \
+    --json /tmp/lyng-test262-profile.json \
     --profile-loop-ms 30000 \
     --print-counters
 ```
@@ -173,26 +173,26 @@ Use the runtime and density profile presets when Test262 is too broad or the sus
 path is already represented by an in-repo workload:
 
 ```sh
-target/release/lyng-js-bench runtime \
+target/release/lyng-bench runtime \
   --preset profile-target \
-  --report /tmp/lyng-js-runtime-profile.md \
-  --json /tmp/lyng-js-runtime-profile.json
+  --report /tmp/lyng-runtime-profile.md \
+  --json /tmp/lyng-runtime-profile.json
 
-target/release/lyng-js-bench density \
+target/release/lyng-bench density \
   --preset profile-target \
-  --report /tmp/lyng-js-density-profile.md \
-  --json /tmp/lyng-js-density-profile.json
+  --report /tmp/lyng-density-profile.md \
+  --json /tmp/lyng-density-profile.json
 ```
 
 Add `--count-opcodes` to runtime benchmark runs when the question is which bytecode
 operations dominate an executable workload row:
 
 ```sh
-cargo run --release -p lyng-js-bench -- runtime \
+cargo run --release -p lyng-bench -- runtime \
   --preset smoke \
   --count-opcodes \
-  --report /tmp/lyng-js-runtime-opcodes.md \
-  --json /tmp/lyng-js-runtime-opcodes.json
+  --report /tmp/lyng-runtime-opcodes.md \
+  --json /tmp/lyng-runtime-opcodes.json
 ```
 
 The flag enables optional VM dispatch counters for the timed runtime rows and adds an
@@ -204,11 +204,11 @@ stable JSON report path before and after the change:
 
 ```sh
 for run in 1 2 3 4 5; do
-  time target/release/lyng-js-bench test262 \
+  time target/release/lyng-bench test262 \
     --preset inner-loop \
     --filter staging/sm/Date/dst-offset-caching-2-of-8 \
-    --report /tmp/lyng-js-test262-profile.md \
-    --json /tmp/lyng-js-test262-profile.json \
+    --report /tmp/lyng-test262-profile.md \
+    --json /tmp/lyng-test262-profile.json \
     --sample-files 1 \
     -j 1
 done
@@ -223,20 +223,20 @@ loop; it is not a replacement for Test262 diagnostics.
 Build the Lyng JS CLI and benchmark runner first:
 
 ```sh
-cargo build --release -p lyng-js-cli -p lyng-js-bench
+cargo build --release -p lyng-cli -p lyng-bench
 ```
 
 Run the smoke comparison to check local wiring:
 
 ```sh
-target/release/lyng-js-bench compare \
+target/release/lyng-bench compare \
   --preset smoke \
-  --report /tmp/lyng-js-external-compare-smoke.md \
-  --json /tmp/lyng-js-external-compare-smoke.json
+  --report /tmp/lyng-external-compare-smoke.md \
+  --json /tmp/lyng-external-compare-smoke.json
 ```
 
 The default `synthetic` corpus writes three standalone scripts under
-`/tmp/lyng-js-bench-compare-scripts`:
+`/tmp/lyng-bench-compare-scripts`:
 
 - `arithmetic-loop.js`: arithmetic, branches, and loop backedges.
 - `array-object-loop.js`: array growth, dense indexed reads, object literals, and named
@@ -244,17 +244,17 @@ The default `synthetic` corpus writes three standalone scripts under
 - `builtin-string-regexp-loop.js`: string case mapping, RegExp replacement, URI decoding,
   and character access.
 
-Defaults use `target/release/lyng-js`, `/opt/homebrew/bin/qjs` when present, and
+Defaults use `target/release/lyng`, `/opt/homebrew/bin/qjs` when present, and
 `/opt/homebrew/bin/boa` when present. Override paths explicitly when needed:
 
 ```sh
-target/release/lyng-js-bench compare \
+target/release/lyng-bench compare \
   --preset baseline \
-  --lyng-js target/release/lyng-js \
+  --lyng target/release/lyng \
   --qjs /opt/homebrew/bin/qjs \
   --boa /opt/homebrew/bin/boa \
-  --report reports/js/lyng-js/external-engine-compare.md \
-  --json reports/js/lyng-js/external-engine-compare.json
+  --report reports/lyng/external-engine-compare.md \
+  --json reports/lyng/external-engine-compare.json
 ```
 
 Each engine/workload attempt has a timeout. The default is 30000ms, `profile-target`
@@ -274,17 +274,17 @@ upstream notice preserved. Use it when comparing old Octane-style workloads such
 Richards, DeltaBlue, Crypto, RayTrace, EarleyBoyer, RegExp, Splay, and NavierStokes:
 
 ```sh
-target/release/lyng-js-bench compare \
+target/release/lyng-bench compare \
   --corpus v8-v7 \
   --filter Richards \
   --preset smoke \
   --timeout-ms 30000 \
-  --report /tmp/lyng-js-v8-v7-richards-smoke.md \
-  --json /tmp/lyng-js-v8-v7-richards-smoke.json
+  --report /tmp/lyng-v8-v7-richards-smoke.md \
+  --json /tmp/lyng-v8-v7-richards-smoke.json
 ```
 
 Filtered V8 v7 runs generate one standalone script per selected benchmark. Lyng JS uses
-`target/release/lyng-js --shell` for this corpus so the benchmark harness can call
+`target/release/lyng --shell` for this corpus so the benchmark harness can call
 `print`; QuickJS keeps `--script`, and Boa runs with its normal command form. V8 v7
 reports use benchmark scores as the primary metric: QuickJS score ratio is
 `quickjs score / engine score`, so QuickJS is `1.00x` and lower is better for other
@@ -294,22 +294,22 @@ profiling setup.
 Use the full V8 v7 suite only for wider checkpoints, not the inner loop:
 
 ```sh
-target/release/lyng-js-bench compare \
+target/release/lyng-bench compare \
   --corpus v8-v7 \
   --full-suite \
   --preset baseline \
-  --report /tmp/lyng-js-v8-v7-full.md \
-  --json /tmp/lyng-js-v8-v7-full.json
+  --report /tmp/lyng-v8-v7-full.md \
+  --json /tmp/lyng-v8-v7-full.json
 ```
 
 For profiling, regenerate scripts with a longer loop and use the report's generated
 `sample` or `xctrace` commands:
 
 ```sh
-target/release/lyng-js-bench compare \
+target/release/lyng-bench compare \
   --preset profile-target \
-  --report /tmp/lyng-js-external-compare-profile.md \
-  --json /tmp/lyng-js-external-compare-profile.json
+  --report /tmp/lyng-external-compare-profile.md \
+  --json /tmp/lyng-external-compare-profile.json
 ```
 
 When a Test262 bottleneck is too harness-specific for external engines, extract only the
@@ -329,11 +329,11 @@ observable hot path into a standalone script:
 Use a filtered sweep when one family has many candidate files:
 
 ```sh
-cargo run --release -p lyng-js-bench -- test262 \
+cargo run --release -p lyng-bench -- test262 \
   --preset ci-regression \
   --filter built-ins/RegExp/property-escapes/generated \
-  --report /tmp/lyng-js-test262-perf-regexp-properties.md \
-  --json /tmp/lyng-js-test262-perf-regexp-properties.json \
+  --report /tmp/lyng-test262-perf-regexp-properties.md \
+  --json /tmp/lyng-test262-perf-regexp-properties.json \
   --timeout-ms 3000 \
   -j 8
 ```
@@ -341,10 +341,10 @@ cargo run --release -p lyng-js-bench -- test262 \
 Use the whole-corpus performance diagnostic mode only when a broad ranking is needed:
 
 ```sh
-cargo run --release -p lyng-js-bench -- test262 \
+cargo run --release -p lyng-bench -- test262 \
   --preset ci-regression \
-  --report /tmp/lyng-js-test262-perf.md \
-  --json /tmp/lyng-js-test262-perf.json \
+  --report /tmp/lyng-test262-perf.md \
+  --json /tmp/lyng-test262-perf.json \
   -j 12
 ```
 
@@ -357,8 +357,8 @@ Use the main Test262 runner to verify broad conformance and refresh the slowest 
 table after material performance work:
 
 ```sh
-cargo run --release -p lyng-js-test262 -- \
-  --report reports/js/lyng-js/test262.md \
+cargo run --release -p lyng-test262 -- \
+  --report reports/lyng/test262.md \
   -j 12
 ```
 
@@ -432,7 +432,7 @@ target when:
   state that can be represented directly.
 - The needed measurement is not visible in Test262 diagnostics.
 
-Microbenchmarks should live in `tools/lyng-js-bench` unless there is a stronger ownership
+Microbenchmarks should live in `tools/lyng-bench` unless there is a stronger ownership
 reason. Profiler targets should use the same source as the Test262 finding when possible,
 so the link between conformance evidence and performance evidence stays clear.
 

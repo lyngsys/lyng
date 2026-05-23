@@ -317,7 +317,7 @@ pub(super) fn iterator_helper_concat_return<Cx: PublicBuiltinDispatchContext>(
             iterator::iterator_close(
                 &mut bridge,
                 &mut iterator_record,
-                Ok::<(), lyng_js_types::AbruptCompletion>(()),
+                Ok::<(), lyng_types::AbruptCompletion>(()),
             )
         };
         close_result?;
@@ -982,8 +982,8 @@ fn get_iterator_flattenable_for_iterator_from<Cx: PublicBuiltinDispatchContext>(
 
 fn iterator_prototype_in_chain<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
-    start: lyng_js_types::ObjectRef,
-    target_prototype: lyng_js_types::ObjectRef,
+    start: lyng_types::ObjectRef,
+    target_prototype: lyng_types::ObjectRef,
 ) -> Result<bool, Cx::Error> {
     let mut current = Some(start);
     let mut steps = 0_u32;

@@ -1,8 +1,8 @@
 use crate::{errors::throw_type_error, object, read};
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
-use lyng_js_types::{
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
+use lyng_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
 
@@ -278,7 +278,7 @@ pub fn create_iterator_result_object(
         let mut mutator = heap.mutator();
         objects.alloc_object(
             &mut mutator,
-            lyng_js_objects::ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            lyng_objects::ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
             AllocationLifetime::Default,
         )
     });
@@ -480,14 +480,14 @@ pub fn iterator_close<Cx: IteratorOpsContext, T>(
 mod tests {
     use super::*;
     use crate::{errors, object};
-    use lyng_js_env::Runtime;
-    use lyng_js_host::NoopHostHooks;
-    use lyng_js_objects::{
+    use lyng_env::Runtime;
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::{
         FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
         NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
         ObjectColdData, ObjectRuntime,
     };
-    use lyng_js_types::BuiltinFunctionId;
+    use lyng_types::BuiltinFunctionId;
 
     const ITERATOR_ENTRY: u32 = 7001;
     const NEXT_ENTRY: u32 = 7002;
@@ -507,7 +507,7 @@ mod tests {
         fn call(
             &mut self,
             _runtime: &mut ObjectRuntime,
-            _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+            _heap: &mut lyng_gc::PrimitiveMutator<'_>,
             request: NativeCallRequest<'_>,
         ) -> InternalMethodResult<Value> {
             let raw = request
@@ -530,7 +530,7 @@ mod tests {
                     Ok(Value::from_object_ref(self.next_results[0]))
                 }
                 THROWING_RETURN_ENTRY | THROWING_NEXT_ENTRY => {
-                    Err(lyng_js_objects::InternalMethodError::NotCallable)
+                    Err(lyng_objects::InternalMethodError::NotCallable)
                 }
                 other => panic!("unexpected native entry {other}"),
             }
@@ -539,10 +539,10 @@ mod tests {
         fn construct(
             &mut self,
             _runtime: &mut ObjectRuntime,
-            _heap: &mut lyng_js_gc::PrimitiveMutator<'_>,
+            _heap: &mut lyng_gc::PrimitiveMutator<'_>,
             _request: NativeConstructRequest<'_>,
         ) -> InternalMethodResult<ObjectRef> {
-            Err(lyng_js_objects::InternalMethodError::NotConstructible)
+            Err(lyng_objects::InternalMethodError::NotConstructible)
         }
     }
 

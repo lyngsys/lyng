@@ -1,9 +1,9 @@
-use lyng_js_ast::{
+use lyng_ast::{
     AssignOp, Expr, ExprId, FormalParameters, Function, FunctionKind, NumericLiteral,
     NumericLiteralSyntax, Property, PropertyKind, StringLiteralSyntax,
 };
-use lyng_js_common::{AtomId, Span, WellKnownAtom};
-use lyng_js_lexer::{TokenKind, TokenPayload};
+use lyng_common::{AtomId, Span, WellKnownAtom};
+use lyng_lexer::{TokenKind, TokenPayload};
 
 use super::is_property_name_token;
 use crate::parser::Parser;
@@ -621,8 +621,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     fn parse_arrow_function_body(
         &mut self,
         start: Span,
-        params: &[lyng_js_ast::PatternId],
-        rest: Option<lyng_js_ast::PatternId>,
+        params: &[lyng_ast::PatternId],
+        rest: Option<lyng_ast::PatternId>,
         is_async: bool,
     ) -> ExprId {
         self.expect(TokenKind::Arrow); // eat `=>`
@@ -716,17 +716,15 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         param_span: Span,
         param_name: AtomId,
     ) -> ExprId {
-        let pat = self
-            .ast_mut()
-            .alloc_pattern(lyng_js_ast::Pattern::Identifier {
-                span: param_span,
-                name: param_name,
-            });
+        let pat = self.ast_mut().alloc_pattern(lyng_ast::Pattern::Identifier {
+            span: param_span,
+            name: param_name,
+        });
         self.parse_arrow_function_body(async_span, &[pat], None, true)
     }
 
     /// Converts expressions to patterns for arrow function parameters.
-    fn convert_exprs_to_patterns(&mut self, exprs: &[ExprId]) -> Vec<lyng_js_ast::PatternId> {
+    fn convert_exprs_to_patterns(&mut self, exprs: &[ExprId]) -> Vec<lyng_ast::PatternId> {
         exprs
             .iter()
             .map(|&expr_id| {
@@ -738,8 +736,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     fn validate_arrow_parameters(
         &mut self,
-        params: &[lyng_js_ast::PatternId],
-        rest: Option<lyng_js_ast::PatternId>,
+        params: &[lyng_ast::PatternId],
+        rest: Option<lyng_ast::PatternId>,
         is_async: bool,
         inherited_await_restriction: bool,
         inherited_yield_restriction: bool,
@@ -758,9 +756,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
 
         if let Some(rest_param) = rest {
-            if let lyng_js_ast::Pattern::Assignment { span, .. } =
-                self.ast().get_pattern(rest_param)
-            {
+            if let lyng_ast::Pattern::Assignment { span, .. } = self.ast().get_pattern(rest_param) {
                 self.error_at(
                     *span,
                     "rest parameter must not have a default initializer".to_string(),
@@ -777,14 +773,14 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     fn validate_arrow_pattern(
         &mut self,
-        pattern_id: lyng_js_ast::PatternId,
+        pattern_id: lyng_ast::PatternId,
         await_restricted: bool,
         yield_restricted: bool,
         bound_names: &mut Vec<AtomId>,
     ) {
         let pattern = self.ast().get_pattern(pattern_id).clone();
         match pattern {
-            lyng_js_ast::Pattern::Identifier { span, name } => {
+            lyng_ast::Pattern::Identifier { span, name } => {
                 if await_restricted && name == WellKnownAtom::r#await.id() {
                     self.error_at(
                         span,
@@ -803,7 +799,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     bound_names.push(name);
                 }
             }
-            lyng_js_ast::Pattern::Object {
+            lyng_ast::Pattern::Object {
                 properties, rest, ..
             } => {
                 let props = self.ast().get_obj_pattern_prop_list(properties).to_vec();
@@ -831,7 +827,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     );
                 }
             }
-            lyng_js_ast::Pattern::Array { elements, rest, .. } => {
+            lyng_ast::Pattern::Array { elements, rest, .. } => {
                 let elems = self.ast().get_opt_pattern_elem_list(elements).to_vec();
                 for elem in elems.into_iter().flatten() {
                     self.validate_arrow_pattern(
@@ -850,11 +846,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     );
                 }
             }
-            lyng_js_ast::Pattern::Assignment { left, right, .. } => {
+            lyng_ast::Pattern::Assignment { left, right, .. } => {
                 self.validate_arrow_pattern(left, await_restricted, yield_restricted, bound_names);
                 self.validate_arrow_param_expr(right, await_restricted, yield_restricted);
             }
-            lyng_js_ast::Pattern::InvalidPattern { .. } => {}
+            lyng_ast::Pattern::InvalidPattern { .. } => {}
         }
     }
 
@@ -1189,12 +1185,12 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
     }
 
-    fn convert_expr_to_pattern(&mut self, expr_id: ExprId) -> lyng_js_ast::PatternId {
+    fn convert_expr_to_pattern(&mut self, expr_id: ExprId) -> lyng_ast::PatternId {
         let expr = self.ast().get_expr(expr_id).clone();
         match expr {
             Expr::Identifier { span, name } => self
                 .ast_mut()
-                .alloc_pattern(lyng_js_ast::Pattern::Identifier { span, name }),
+                .alloc_pattern(lyng_ast::Pattern::Identifier { span, name }),
             Expr::AssignmentExpression {
                 span,
                 operator: AssignOp::Assign,
@@ -1202,12 +1198,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 right,
             } => {
                 let left_pat = self.convert_expr_to_pattern(left);
-                self.ast_mut()
-                    .alloc_pattern(lyng_js_ast::Pattern::Assignment {
-                        span,
-                        left: left_pat,
-                        right,
-                    })
+                self.ast_mut().alloc_pattern(lyng_ast::Pattern::Assignment {
+                    span,
+                    left: left_pat,
+                    right,
+                })
             }
             Expr::ArrayExpression { span, elements, .. } => {
                 let src_elems = self.ast().get_opt_expr_list(elements).to_vec();
@@ -1228,14 +1223,14 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
                     let pat = self.convert_expr_to_pattern(elem);
                     let pat_span = self.ast().get_pattern(pat).span();
-                    elems.push(Some(lyng_js_ast::ArrayPatternElement {
+                    elems.push(Some(lyng_ast::ArrayPatternElement {
                         span: pat_span,
                         pattern: pat,
                     }));
                 }
 
                 let list = self.ast_mut().alloc_opt_pattern_elem_list(&elems);
-                self.ast_mut().alloc_pattern(lyng_js_ast::Pattern::Array {
+                self.ast_mut().alloc_pattern(lyng_ast::Pattern::Array {
                     span,
                     elements: list,
                     rest,
@@ -1255,37 +1250,36 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                         break;
                     }
 
-                    let value_pat =
-                        if prop.shorthand {
-                            match self.ast().get_expr(prop.key).clone() {
-                                Expr::Identifier { span, name } => {
-                                    let base = self.ast_mut().alloc_pattern(
-                                        lyng_js_ast::Pattern::Identifier { span, name },
-                                    );
-                                    if prop.value != prop.key {
-                                        let right = prop.value;
-                                        let right_span = self.ast().get_expr(right).span();
-                                        let full_span = span.cover(right_span);
-                                        self.ast_mut().alloc_pattern(
-                                            lyng_js_ast::Pattern::Assignment {
-                                                span: full_span,
-                                                left: base,
-                                                right,
-                                            },
-                                        )
-                                    } else {
-                                        base
-                                    }
+                    let value_pat = if prop.shorthand {
+                        match self.ast().get_expr(prop.key).clone() {
+                            Expr::Identifier { span, name } => {
+                                let base = self
+                                    .ast_mut()
+                                    .alloc_pattern(lyng_ast::Pattern::Identifier { span, name });
+                                if prop.value != prop.key {
+                                    let right = prop.value;
+                                    let right_span = self.ast().get_expr(right).span();
+                                    let full_span = span.cover(right_span);
+                                    self.ast_mut().alloc_pattern(lyng_ast::Pattern::Assignment {
+                                        span: full_span,
+                                        left: base,
+                                        right,
+                                    })
+                                } else {
+                                    base
                                 }
-                                _ => self.ast_mut().alloc_pattern(
-                                    lyng_js_ast::Pattern::InvalidPattern { span: prop.span },
-                                ),
                             }
-                        } else {
-                            self.convert_expr_to_pattern(prop.value)
-                        };
+                            _ => self
+                                .ast_mut()
+                                .alloc_pattern(lyng_ast::Pattern::InvalidPattern {
+                                    span: prop.span,
+                                }),
+                        }
+                    } else {
+                        self.convert_expr_to_pattern(prop.value)
+                    };
 
-                    props.push(lyng_js_ast::ObjectPatternProperty {
+                    props.push(lyng_ast::ObjectPatternProperty {
                         span: prop.span,
                         key: prop.key,
                         value: value_pat,
@@ -1295,7 +1289,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 }
 
                 let list = self.ast_mut().alloc_obj_pattern_prop_list(&props);
-                self.ast_mut().alloc_pattern(lyng_js_ast::Pattern::Object {
+                self.ast_mut().alloc_pattern(lyng_ast::Pattern::Object {
                     span,
                     properties: list,
                     rest,
@@ -1312,7 +1306,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                 let span = expr.span();
                 self.error_at(span, "invalid destructuring target".to_string());
                 self.ast_mut()
-                    .alloc_pattern(lyng_js_ast::Pattern::InvalidPattern { span })
+                    .alloc_pattern(lyng_ast::Pattern::InvalidPattern { span })
             }
         }
     }

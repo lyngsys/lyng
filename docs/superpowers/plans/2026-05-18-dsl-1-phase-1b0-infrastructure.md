@@ -4,9 +4,9 @@
 
 **Goal:** Wire the slow-path-share and per-opcode dispatch counters into the DSL `dispatch!`/`call_slow!`/`poll_safepoint!` macros (Task 10.A), and add microbench snippets for the 14 in-scope opcodes (Task 10.B). These two infra deliverables make per-opcode gates enforceable for the rest of DSL-1.
 
-**Architecture:** Replace the `Option<OpcodeDispatchCounterStore>` field on `Vm` with an asm-stable `Box<DispatchCounters>` containing three flat `[u64; 256]` banks (dispatch, slow_semantic, slow_safepoint). The pointer offset is exposed via `offset_of!` and bound into the per-handler `naked_asm!` block. The proc-macro lowerer emits `inc_counter!` at handler entry; `call_slow!` and `poll_safepoint!` macros gain inline counter increments for the slow-path banks. Microbench snippets follow the existing pattern in [`tools/lyng-js-bench/src/microbench/snippets.rs`](../../../tools/lyng-js-bench/src/microbench/snippets.rs).
+**Architecture:** Replace the `Option<OpcodeDispatchCounterStore>` field on `Vm` with an asm-stable `Box<DispatchCounters>` containing three flat `[u64; 256]` banks (dispatch, slow_semantic, slow_safepoint). The pointer offset is exposed via `offset_of!` and bound into the per-handler `naked_asm!` block. The proc-macro lowerer emits `inc_counter!` at handler entry; `call_slow!` and `poll_safepoint!` macros gain inline counter increments for the slow-path banks. Microbench snippets follow the existing pattern in [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs).
 
-**Tech Stack:** Rust 2024 stable (≥1.88 for `naked_asm!`), `lyng-js-vm-dsl` proc-macro (modified), AArch64 backend macros, `cargo-features` for `opcode-counters` gate.
+**Tech Stack:** Rust 2024 stable (≥1.88 for `naked_asm!`), `lyng-vm-dsl` proc-macro (modified), AArch64 backend macros, `cargo-features` for `opcode-counters` gate.
 
 **Parent spec:** [`docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](../specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md) — Phase 1.B.0.
 
@@ -26,30 +26,30 @@ At plan completion: counter infrastructure produces correct per-opcode dispatch 
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| [`crates/lyng-js/vm/src/opcode_counts.rs`](../../../crates/lyng-js/vm/src/opcode_counts.rs) | Modify | Add `DispatchCounters` `#[repr(C)]` struct with 3 flat counter banks. Update `OpcodeDispatchCounterStore` API to read from flat arrays. |
-| [`crates/lyng-js/vm/src/vm.rs`](../../../crates/lyng-js/vm/src/vm.rs) | Modify | Replace `Option<OpcodeDispatchCounterStore>` field with `Box<DispatchCounters>` (always allocated when feature is on). |
-| [`crates/lyng-js/vm/src/dsl/reg_convention.rs`](../../../crates/lyng-js/vm/src/dsl/reg_convention.rs) | Modify | Add `VM_DISPATCH_COUNTERS_PTR_OFFSET`, `DISPATCH_COUNTER_BANK_DISPATCH`, `DISPATCH_COUNTER_BANK_SLOW_SEMANTIC`, `DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT` consts via `offset_of!`. |
-| [`crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs) | Modify | Replace existing `inc_counter!` macro with three new variants: `inc_dispatch_counter!`, `inc_slow_semantic_counter!`, `inc_slow_safepoint_counter!`, each taking `$opcode_byte:literal`. |
-| [`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs) | Modify | Wire `inc_slow_semantic_counter!` into `call_slow!` macros (needs opcode-byte parameter). Wire `inc_slow_safepoint_counter!` into the slow path of `poll_safepoint!`. |
-| [`crates/lyng-js-vm-dsl/src/lower.rs`](../../../crates/lyng-js-vm-dsl/src/lower.rs) | Modify | Emit `inc_dispatch_counter!(OPCODE_BYTE)` at the start of every generated handler body. Map handler name → Opcode discriminant. Also pass `opcode_byte` as a binding so the call_slow!/poll_safepoint! macros can use it. |
-| [`tools/lyng-js-bench/src/microbench/snippets.rs`](../../../tools/lyng-js-bench/src/microbench/snippets.rs) | Modify | Add 14 new `Snippet` entries: 7 Phase-1.A opcodes + 7 Phase-1.B anchors. |
-| [`crates/lyng-js/vm/tests/`](../../../crates/lyng-js/vm/tests/) | Modify or Create | Update `ll_int_state_offsets_stable` to also check `Vm` size + `dispatch_counters` offset. Add counter-correctness test (Move dispatch count on Richards ≈ 4.66B ± 5%). |
-| [`reports/js/lyng-js/dsl-1/phase-1b0-summary.md`](../../../reports/js/lyng-js/dsl-1/) | Create | Sub-phase gate summary with measured counter overhead + CI95 confirmation per opcode. |
+| [`crates/lyng/vm/src/opcode_counts.rs`](../../../crates/lyng/vm/src/opcode_counts.rs) | Modify | Add `DispatchCounters` `#[repr(C)]` struct with 3 flat counter banks. Update `OpcodeDispatchCounterStore` API to read from flat arrays. |
+| [`crates/lyng/vm/src/vm.rs`](../../../crates/lyng/vm/src/vm.rs) | Modify | Replace `Option<OpcodeDispatchCounterStore>` field with `Box<DispatchCounters>` (always allocated when feature is on). |
+| [`crates/lyng/vm/src/dsl/reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs) | Modify | Add `VM_DISPATCH_COUNTERS_PTR_OFFSET`, `DISPATCH_COUNTER_BANK_DISPATCH`, `DISPATCH_COUNTER_BANK_SLOW_SEMANTIC`, `DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT` consts via `offset_of!`. |
+| [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs) | Modify | Replace existing `inc_counter!` macro with three new variants: `inc_dispatch_counter!`, `inc_slow_semantic_counter!`, `inc_slow_safepoint_counter!`, each taking `$opcode_byte:literal`. |
+| [`crates/lyng/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) | Modify | Wire `inc_slow_semantic_counter!` into `call_slow!` macros (needs opcode-byte parameter). Wire `inc_slow_safepoint_counter!` into the slow path of `poll_safepoint!`. |
+| [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) | Modify | Emit `inc_dispatch_counter!(OPCODE_BYTE)` at the start of every generated handler body. Map handler name → Opcode discriminant. Also pass `opcode_byte` as a binding so the call_slow!/poll_safepoint! macros can use it. |
+| [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs) | Modify | Add 14 new `Snippet` entries: 7 Phase-1.A opcodes + 7 Phase-1.B anchors. |
+| [`crates/lyng/vm/tests/`](../../../crates/lyng/vm/tests/) | Modify or Create | Update `ll_int_state_offsets_stable` to also check `Vm` size + `dispatch_counters` offset. Add counter-correctness test (Move dispatch count on Richards ≈ 4.66B ± 5%). |
+| [`reports/lyng/dsl-1/phase-1b0-summary.md`](../../../reports/lyng/dsl-1/) | Create | Sub-phase gate summary with measured counter overhead + CI95 confirmation per opcode. |
 
 ---
 
 ## Task 0: Kickoff — verify starting state
 
 **Files:**
-- Read: [`reports/js/lyng-js/dsl-1/phase-1a-summary.md`](../../../reports/js/lyng-js/dsl-1/phase-1a-summary.md)
-- Read: [`crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs)
-- Read: [`crates/lyng-js-vm-dsl/src/lower.rs`](../../../crates/lyng-js-vm-dsl/src/lower.rs)
+- Read: [`reports/lyng/dsl-1/phase-1a-summary.md`](../../../reports/lyng/dsl-1/phase-1a-summary.md)
+- Read: [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)
+- Read: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs)
 
 - [ ] **Step 1: Verify all tests pass at starting HEAD**
 
 ```bash
-cargo test -p lyng-js-vm --lib --release 2>&1 | tail -3
-cargo test -p lyng-js-tests --release 2>&1 | tail -3
+cargo test -p lyng-vm --lib --release 2>&1 | tail -3
+cargo test -p lyng-tests --release 2>&1 | tail -3
 ```
 
 Expected: 413 + 1186 passing (matching Phase 1.A's end state).
@@ -57,16 +57,16 @@ Expected: 413 + 1186 passing (matching Phase 1.A's end state).
 - [ ] **Step 2: Verify counter feature compiles cleanly**
 
 ```bash
-cargo build --release -p lyng-js-bench 2>&1 | tail -5
+cargo build --release -p lyng-bench 2>&1 | tail -5
 ```
 
-`lyng-js-bench` already enables `lyng-js-vm/opcode-counters` in its Cargo.toml. Verify clean build.
+`lyng-bench` already enables `lyng-vm/opcode-counters` in its Cargo.toml. Verify clean build.
 
 - [ ] **Step 3: Capture baseline V8 v7 (for later same-load A/B)**
 
 ```bash
 git rev-parse HEAD > /tmp/phase-1b0-base-sha
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b0-base-v8.json 2>&1 | tail -10
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b0-base-v8.json 2>&1 | tail -10
 uptime > /tmp/phase-1b0-base-uptime
 ```
 
@@ -75,7 +75,7 @@ Records the starting HEAD SHA, V8 v7 numbers, and machine load for the eventual 
 - [ ] **Step 4: Locate `Opcode` enum + OPCODE_COUNT**
 
 ```bash
-grep -n "pub enum Opcode\|OPCODE_COUNT" crates/lyng-js/bytecode/src/lib.rs crates/lyng-js/bytecode/src/*.rs 2>&1 | head -10
+grep -n "pub enum Opcode\|OPCODE_COUNT" crates/lyng/bytecode/src/lib.rs crates/lyng/bytecode/src/*.rs 2>&1 | head -10
 ```
 
 Confirm: `OPCODE_COUNT` is a `u8` const for the number of opcode variants (likely 152). Verify the `Opcode` enum's discriminant assignment is `#[repr(u8)]` so `opcode as u8` gives the dispatch byte.
@@ -84,7 +84,7 @@ This is needed for the lowerer task — the lowerer must resolve a handler symbo
 
 - [ ] **Step 5: Inspect the proc-macro lowerer**
 
-Read [`crates/lyng-js-vm-dsl/src/lower.rs`](../../../crates/lyng-js-vm-dsl/src/lower.rs) (276 lines). Note:
+Read [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) (276 lines). Note:
 - How the lowerer builds the `naked_asm!` template (the bindings section).
 - Where in the emission order the operand-decode prologue is emitted.
 - What named-arg bindings are already in place (`length`, `state_pc`, `state_pb`, `state_regs`, `state_fv`, `state_prefix`, `vm_poll`, `entry_stride_shift`, `entry_observed`, `exit`).
@@ -111,9 +111,9 @@ No git commit needed — the baseline files are in /tmp. This step exists to rec
 ## Task 1: Add `DispatchCounters` struct + replace `Option<...>` Vm field
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/opcode_counts.rs:1-130` (add `DispatchCounters` struct; rewrite `OpcodeDispatchCounterStore` to wrap it)
-- Modify: `crates/lyng-js/vm/src/vm.rs:166` (replace field) + `vm.rs:253` (replace initializer) + `vm.rs:309-368` (rewrite the enable/disable/reset/snapshot/maybe_record API)
-- Test: `crates/lyng-js/vm/tests/dispatch_counters_layout.rs` (new — verify struct size + offset stability)
+- Modify: `crates/lyng/vm/src/opcode_counts.rs:1-130` (add `DispatchCounters` struct; rewrite `OpcodeDispatchCounterStore` to wrap it)
+- Modify: `crates/lyng/vm/src/vm.rs:166` (replace field) + `vm.rs:253` (replace initializer) + `vm.rs:309-368` (rewrite the enable/disable/reset/snapshot/maybe_record API)
+- Test: `crates/lyng/vm/tests/dispatch_counters_layout.rs` (new — verify struct size + offset stability)
 
 - [ ] **Step 1: Add `DispatchCounters` struct to `opcode_counts.rs`**
 
@@ -167,11 +167,11 @@ impl DispatchCounters {
         snapshot
     }
 
-    pub fn slow_semantic_count(&self, opcode: lyng_js_bytecode::Opcode) -> u64 {
+    pub fn slow_semantic_count(&self, opcode: lyng_bytecode::Opcode) -> u64 {
         self.slow_semantic[opcode as u8 as usize]
     }
 
-    pub fn slow_safepoint_count(&self, opcode: lyng_js_bytecode::Opcode) -> u64 {
+    pub fn slow_safepoint_count(&self, opcode: lyng_bytecode::Opcode) -> u64 {
         self.slow_safepoint[opcode as u8 as usize]
     }
 }
@@ -228,7 +228,7 @@ impl OpcodeDispatchCounterStore {
     }
 
     #[inline]
-    pub fn increment(&self, opcode: lyng_js_bytecode::Opcode) {
+    pub fn increment(&self, opcode: lyng_bytecode::Opcode) {
         // SAFETY: single-threaded VM; counter writes are tear-free on
         // aligned u64. The asm path uses non-atomic `add x10, x10, #1`
         // which has the same single-threaded guarantee.
@@ -259,7 +259,7 @@ Note: this changes the previous interior-mutability via `Cell<u64>` to direct `u
 
 - [ ] **Step 3: Update `Vm` struct field**
 
-In `crates/lyng-js/vm/src/vm.rs` around line 166, replace:
+In `crates/lyng/vm/src/vm.rs` around line 166, replace:
 
 ```rust
 opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
@@ -329,7 +329,7 @@ Remove the `maybe_record_opcode_dispatch` function entirely. Any callers (search
 
 - [ ] **Step 5: Add the layout-stability test**
 
-Create `crates/lyng-js/vm/tests/dispatch_counters_layout.rs`:
+Create `crates/lyng/vm/tests/dispatch_counters_layout.rs`:
 
 ```rust
 //! Verify `DispatchCounters` layout is stable for asm access.
@@ -344,7 +344,7 @@ Create `crates/lyng-js/vm/tests/dispatch_counters_layout.rs`:
 
 use std::mem::{offset_of, size_of};
 
-use lyng_js_vm::DispatchCounters;
+use lyng_vm::DispatchCounters;
 
 #[test]
 fn dispatch_counters_size_is_expected() {
@@ -360,13 +360,13 @@ fn dispatch_counters_field_offsets_are_stable() {
 }
 ```
 
-You'll need to add `pub use opcode_counts::DispatchCounters;` to `crates/lyng-js/vm/src/lib.rs` for the test to find it.
+You'll need to add `pub use opcode_counts::DispatchCounters;` to `crates/lyng/vm/src/lib.rs` for the test to find it.
 
 - [ ] **Step 6: Build + run tests**
 
 ```bash
-cargo build --release -p lyng-js-vm
-cargo test -p lyng-js-vm --lib --release 2>&1 | tail -3
+cargo build --release -p lyng-vm
+cargo test -p lyng-vm --lib --release 2>&1 | tail -3
 cargo test --release --test dispatch_counters_layout 2>&1 | tail -5
 ```
 
@@ -378,10 +378,10 @@ If the build fails on a removed `maybe_record_opcode_dispatch` caller, fix it (l
 
 ```bash
 git add \
-  crates/lyng-js/vm/src/opcode_counts.rs \
-  crates/lyng-js/vm/src/vm.rs \
-  crates/lyng-js/vm/src/lib.rs \
-  crates/lyng-js/vm/tests/dispatch_counters_layout.rs
+  crates/lyng/vm/src/opcode_counts.rs \
+  crates/lyng/vm/src/vm.rs \
+  crates/lyng/vm/src/lib.rs \
+  crates/lyng/vm/tests/dispatch_counters_layout.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 1: add DispatchCounters with asm-stable layout
 
@@ -407,19 +407,19 @@ EOF
 ## Task 2: Add asm-stable offset consts in reg_convention.rs
 
 **Files:**
-- Modify: [`crates/lyng-js/vm/src/dsl/reg_convention.rs`](../../../crates/lyng-js/vm/src/dsl/reg_convention.rs)
+- Modify: [`crates/lyng/vm/src/dsl/reg_convention.rs`](../../../crates/lyng/vm/src/dsl/reg_convention.rs)
 
 - [ ] **Step 1: Read the existing offset-const layout**
 
 ```bash
-cat crates/lyng-js/vm/src/dsl/reg_convention.rs
+cat crates/lyng/vm/src/dsl/reg_convention.rs
 ```
 
 Identify the existing offset consts (`LLINT_STATE_FRAME_PC_OFFSET`, etc.) and the pattern they use.
 
 - [ ] **Step 2: Add the new VM-relative consts**
 
-In `crates/lyng-js/vm/src/dsl/reg_convention.rs`, after the existing offset consts (likely near the bottom, before the closing `}` if there's a module), add:
+In `crates/lyng/vm/src/dsl/reg_convention.rs`, after the existing offset consts (likely near the bottom, before the closing `}` if there's a module), add:
 
 ```rust
 // =============================================================================
@@ -468,7 +468,7 @@ This is TWO loads to reach the counter array — one for the Box pointer, then i
 - [ ] **Step 3: Build + verify**
 
 ```bash
-cargo build --release -p lyng-js-vm 2>&1 | tail -5
+cargo build --release -p lyng-vm 2>&1 | tail -5
 ```
 
 Expected: clean build. If `offset_of!` complains about field access, make `dispatch_counters` `pub(crate)` in vm.rs.
@@ -476,7 +476,7 @@ Expected: clean build. If `offset_of!` complains about field access, make `dispa
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/reg_convention.rs crates/lyng-js/vm/src/vm.rs
+git add crates/lyng/vm/src/dsl/reg_convention.rs crates/lyng/vm/src/vm.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 2: add VM-relative counter offset consts
 
@@ -494,7 +494,7 @@ EOF
 ## Task 3: Replace `inc_counter!` macro with three bank variants
 
 **Files:**
-- Modify: [`crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs)
+- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/counters.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/counters.rs)
 
 - [ ] **Step 1: Read the existing macro**
 
@@ -502,7 +502,7 @@ The current macro at lines 24-41 takes `$opcode_byte:literal` and emits 4 instru
 
 - [ ] **Step 2: Replace with three bank-specific macros**
 
-Rewrite `crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs` to:
+Rewrite `crates/lyng/vm/src/dsl/backend/aarch64/counters.rs` to:
 
 ```rust
 //! Opcode-counter increments, gated by `--features opcode-counters`.
@@ -615,8 +615,8 @@ If no uses (expected — it wasn't wired in), the old macro is gone in the rewri
 - [ ] **Step 4: Build**
 
 ```bash
-cargo build --release -p lyng-js-vm 2>&1 | tail -5
-cargo build --release -p lyng-js-vm --no-default-features 2>&1 | tail -5
+cargo build --release -p lyng-vm 2>&1 | tail -5
+cargo build --release -p lyng-vm --no-default-features 2>&1 | tail -5
 ```
 
 Expected: clean build in both configurations. The macros must be no-op when the feature is off.
@@ -624,7 +624,7 @@ Expected: clean build in both configurations. The macros must be no-op when the 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/backend/aarch64/counters.rs
+git add crates/lyng/vm/src/dsl/backend/aarch64/counters.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 3: three bank-specific counter macros
 
@@ -647,15 +647,15 @@ EOF
 ## Task 4: Wire `inc_dispatch_counter!` into the proc-macro lowerer
 
 **Files:**
-- Modify: [`crates/lyng-js-vm-dsl/src/lower.rs`](../../../crates/lyng-js-vm-dsl/src/lower.rs)
-- Modify: [`crates/lyng-js-vm-dsl/src/parse.rs`](../../../crates/lyng-js-vm-dsl/src/parse.rs) (possibly — if the parsed handler signature needs to expose the opcode byte)
+- Modify: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs)
+- Modify: [`crates/lyng/vm-dsl/src/parse.rs`](../../../crates/lyng/vm-dsl/src/parse.rs) (possibly — if the parsed handler signature needs to expose the opcode byte)
 
 This is the most involved change in Phase 1.B.0. The lowerer must map each handler symbol (e.g., `op_load_undefined_dsl`) to its `Opcode` discriminant byte (e.g., the LoadUndefined variant) and emit `inc_dispatch_counter!(BYTE)` at the start of every handler.
 
 - [ ] **Step 1: Read the lowerer's symbol-handling code**
 
 ```bash
-cat crates/lyng-js-vm-dsl/src/lower.rs | head -150
+cat crates/lyng/vm-dsl/src/lower.rs | head -150
 ```
 
 Identify: where the handler's symbol name (the `op_xxx_dsl` ident) is consumed. Look for `quote::format_ident!` or similar that builds the generated `fn op_xxx_dsl()` definition.
@@ -666,7 +666,7 @@ The lowerer needs to compute the Opcode discriminant byte for a given handler na
 
 **(a)** Hard-code the mapping in the lowerer (`match handler_name { "op_load_undefined_dsl" => 5_u8, ... }`) — brittle, requires updating the lowerer for every new opcode.
 
-**(b)** Use the `crate::DSL_DISPATCH_TABLE` manifest from `crates/lyng-js/vm/src/dsl/opcode_manifest.rs` to map handler-symbol → Opcode at COMPILE TIME via a build script.
+**(b)** Use the `crate::DSL_DISPATCH_TABLE` manifest from `crates/lyng/vm/src/dsl/opcode_manifest.rs` to map handler-symbol → Opcode at COMPILE TIME via a build script.
 
 **(c)** Make the user supply the opcode byte in the `llint_handler!` invocation: `llint_handler! { op_load_undefined_dsl, opcode = 5, layout = Abx, ... }`. Lowerer reads the opcode arg.
 
@@ -682,7 +682,7 @@ Actually the cleanest: the lowerer emits `inc_dispatch_counter!(OPCODE_BYTE)` wh
 ```rust
 #[unsafe(naked)]
 pub extern "C" fn op_load_undefined_dsl() -> ! {
-    const OPCODE_BYTE: u8 = lyng_js_bytecode::Opcode::LoadUndefined as u8;
+    const OPCODE_BYTE: u8 = lyng_bytecode::Opcode::LoadUndefined as u8;
     ::core::arch::naked_asm!(
         inc_dispatch_counter!(OPCODE_BYTE),  // <-- BUT this is a $literal! macro
         // ... rest of body ...
@@ -710,7 +710,7 @@ llint_handler! {
 The user passes the literal byte; lowerer trusts it; a compile-time assert in the generated code verifies it matches `Opcode::LoadUndefined as u8`:
 
 ```rust
-const _: () = assert!(5_u8 == lyng_js_bytecode::Opcode::LoadUndefined as u8);
+const _: () = assert!(5_u8 == lyng_bytecode::Opcode::LoadUndefined as u8);
 ```
 
 This is option (c-revised) with safety check. Most flexible; lowerer doesn't need a hard-coded mapping.
@@ -719,7 +719,7 @@ This is option (c-revised) with safety check. Most flexible; lowerer doesn't nee
 
 - [ ] **Step 3: Update the parser to accept `opcode_byte = N`**
 
-In `crates/lyng-js-vm-dsl/src/parse.rs`, find the handler-signature parsing (likely a struct like `ParsedHandler` or similar). Add an `opcode_byte: u8` field. Parse it from `opcode_byte = <LITERAL>` in the signature.
+In `crates/lyng/vm-dsl/src/parse.rs`, find the handler-signature parsing (likely a struct like `ParsedHandler` or similar). Add an `opcode_byte: u8` field. Parse it from `opcode_byte = <LITERAL>` in the signature.
 
 ```rust
 // Existing field set probably has: name, layout, length, args, body.
@@ -760,7 +760,7 @@ In the generated handler body (before `naked_asm!`), emit:
 
 ```rust
 const _: () = {
-    use lyng_js_bytecode::Opcode;
+    use lyng_bytecode::Opcode;
     // The handler name without `_dsl` suffix should match a Pascal-case
     // Opcode variant. The user-supplied opcode_byte must match.
     assert!(<opcode_byte_literal>_u8 == /* expected */);
@@ -814,16 +814,16 @@ Reframing this step:
 **Step 4 (revised):** Investigate the lowerer's symbol-handling. Decide on the opcode-byte resolution strategy based on what's available:
 
 - If `crate::DSL_DISPATCH_TABLE` is available at proc-macro time (via a build script or similar), use option (b): look up the byte from the manifest.
-- If the lowerer can call `lyng_js_bytecode` at proc-macro time (rare — proc-macros can't depend on the same crate they're emitting for, due to dependency cycles), use direct lookup.
+- If the lowerer can call `lyng_bytecode` at proc-macro time (rare — proc-macros can't depend on the same crate they're emitting for, due to dependency cycles), use direct lookup.
 - Otherwise use option (c-revised): require the user to pass `opcode_byte = N` as a literal in `llint_handler!`. Add a compile-time assert in the generated code that verifies the byte matches the expected `Opcode` variant.
 
 Whatever approach the subagent picks, the emission goal is the same: every generated handler begins with `inc_dispatch_counter!(OPCODE_BYTE_LITERAL)` before the decode prologue, gated by `#[cfg(feature = "opcode-counters")]` at the macro expansion level.
 
 - [ ] **Step 5 (continued): Update all 152 `llint_handler!` callsites if needed**
 
-If the subagent chose option (c-revised), every existing `llint_handler!` callsite in [`crates/lyng-js/vm/src/dsl/handlers/`](../../../crates/lyng-js/vm/src/dsl/handlers/) (hot.rs, warm.rs, cold.rs) needs the new `opcode_byte = N` parameter added.
+If the subagent chose option (c-revised), every existing `llint_handler!` callsite in [`crates/lyng/vm/src/dsl/handlers/`](../../../crates/lyng/vm/src/dsl/handlers/) (hot.rs, warm.rs, cold.rs) needs the new `opcode_byte = N` parameter added.
 
-Use `grep -n "llint_handler!" crates/lyng-js/vm/src/dsl/handlers/*.rs` to find them all.
+Use `grep -n "llint_handler!" crates/lyng/vm/src/dsl/handlers/*.rs` to find them all.
 
 For each, look up the corresponding `Opcode::X as u8` value (from `bytecode/src/lib.rs`'s `Opcode` enum, or by inspecting the dispatch table) and add the literal.
 
@@ -832,7 +832,7 @@ This is ~152 mechanical edits. The subagent can scripts this with sed if the pat
 - [ ] **Step 6: Build**
 
 ```bash
-cargo build --release -p lyng-js-vm 2>&1 | tail -20
+cargo build --release -p lyng-vm 2>&1 | tail -20
 ```
 
 Expected: clean build. If the const-assert fires for any handler, the user-supplied `opcode_byte` doesn't match the `Opcode` variant — fix the callsite.
@@ -840,8 +840,8 @@ Expected: clean build. If the const-assert fires for any handler, the user-suppl
 - [ ] **Step 7: Run behavioral tests**
 
 ```bash
-cargo test -p lyng-js-vm --lib --release 2>&1 | tail -3
-cargo test -p lyng-js-tests --release 2>&1 | tail -3
+cargo test -p lyng-vm --lib --release 2>&1 | tail -3
+cargo test -p lyng-tests --release 2>&1 | tail -3
 ```
 
 Expected: 413 + 1186 passing (or more if the dispatch_counters_layout test runs in the lib suite). Failing tests would indicate the counter wiring corrupts asm state — investigate immediately.
@@ -849,7 +849,7 @@ Expected: 413 + 1186 passing (or more if the dispatch_counters_layout test runs 
 - [ ] **Step 8: Run a Richards bench to verify counter correctness**
 
 ```bash
-cargo run --release -p lyng-js-bench -- v8suite --samples 1 --count-opcodes \
+cargo run --release -p lyng-bench -- v8suite --samples 1 --count-opcodes \
   --counts-json /tmp/post-task4-counter.json 2>&1 | tail -10
 ```
 
@@ -859,11 +859,11 @@ Inspect `/tmp/post-task4-counter.json`. The Move opcode count should be ~4.66B (
 
 ```bash
 git add \
-  crates/lyng-js-vm-dsl/src/lower.rs \
-  crates/lyng-js-vm-dsl/src/parse.rs \
-  crates/lyng-js/vm/src/dsl/handlers/hot.rs \
-  crates/lyng-js/vm/src/dsl/handlers/warm.rs \
-  crates/lyng-js/vm/src/dsl/handlers/cold.rs
+  crates/lyng/vm-dsl/src/lower.rs \
+  crates/lyng/vm-dsl/src/parse.rs \
+  crates/lyng/vm/src/dsl/handlers/hot.rs \
+  crates/lyng/vm/src/dsl/handlers/warm.rs \
+  crates/lyng/vm/src/dsl/handlers/cold.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 4: wire inc_dispatch_counter! into lowerer
 
@@ -887,9 +887,9 @@ EOF
 ## Task 5: Wire slow-path counters into call_slow! and poll_safepoint!
 
 **Files:**
-- Modify: [`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs) (`call_slow!` macros)
-- Modify: [`crates/lyng-js/vm/src/dsl/backend/aarch64/safepoint.rs`](../../../crates/lyng-js/vm/src/dsl/backend/aarch64/safepoint.rs) (`poll_safepoint!` macro)
-- Modify: [`crates/lyng-js-vm-dsl/src/lower.rs`](../../../crates/lyng-js-vm-dsl/src/lower.rs) (pass `opcode_byte` as a binding so the macros can reference it)
+- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/control.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/control.rs) (`call_slow!` macros)
+- Modify: [`crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs`](../../../crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs) (`poll_safepoint!` macro)
+- Modify: [`crates/lyng/vm-dsl/src/lower.rs`](../../../crates/lyng/vm-dsl/src/lower.rs) (pass `opcode_byte` as a binding so the macros can reference it)
 
 - [ ] **Step 1: Pass `opcode_byte` as a named binding**
 
@@ -903,7 +903,7 @@ So the per-handler `naked_asm!` has access to `{opcode_byte}` as a literal that 
 
 - [ ] **Step 2: Update `call_slow!` macros to emit slow-semantic counter increment**
 
-In `crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs`, modify the `call_slow!` macros (each arity variant). Before the `bl {<shim>}` instruction, insert `inc_slow_semantic_counter!({opcode_byte})`.
+In `crates/lyng/vm/src/dsl/backend/aarch64/control.rs`, modify the `call_slow!` macros (each arity variant). Before the `bl {<shim>}` instruction, insert `inc_slow_semantic_counter!({opcode_byte})`.
 
 Concretely, for the 0-arg variant (lines 97-106):
 
@@ -974,14 +974,14 @@ If this is too involved, the alternative is to drop slow-path-share-counter wiri
 
 - [ ] **Step 3: If slow-path counter wiring proves too complex, document the deferral**
 
-If the subagent finds the lowerer transformation is non-trivial (>1 day work) for the slow-path counters, write `reports/js/lyng-js/dsl-1/phase-1b0-slow-counter-deferred.md` documenting the issue and recommending it be addressed in a focused refactor before Phase 1.C.
+If the subagent finds the lowerer transformation is non-trivial (>1 day work) for the slow-path counters, write `reports/lyng/dsl-1/phase-1b0-slow-counter-deferred.md` documenting the issue and recommending it be addressed in a focused refactor before Phase 1.C.
 
 The dispatch counter alone (Task 4) is sufficient to enable per-opcode dispatch-share measurement, which is the most-needed gate. Slow-path-share enforcement can wait if needed.
 
 - [ ] **Step 4: If wiring works, run a Richards bench with slow-path-share counting**
 
 ```bash
-cargo run --release -p lyng-js-bench --features lyng-js-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
   --samples 1 --count-opcodes --count-slow-path-share \
   --counts-json /tmp/post-task5-slow-counter.json 2>&1 | tail -10
 ```
@@ -994,9 +994,9 @@ If counts look sensible, commit.
 
 ```bash
 git add \
-  crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs \
-  crates/lyng-js/vm/src/dsl/backend/aarch64/safepoint.rs \
-  crates/lyng-js-vm-dsl/src/lower.rs
+  crates/lyng/vm/src/dsl/backend/aarch64/control.rs \
+  crates/lyng/vm/src/dsl/backend/aarch64/safepoint.rs \
+  crates/lyng/vm-dsl/src/lower.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 5: wire slow-path counters into call_slow! / poll_safepoint!
 
@@ -1018,24 +1018,24 @@ EOF
 ## Task 6: Measure counter overhead + commit findings
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b0-counter-overhead.md`
+- Create: `reports/lyng/dsl-1/phase-1b0-counter-overhead.md`
 
 - [ ] **Step 1: Run Richards with and without `--features opcode-counters`**
 
 ```bash
-# Without counters (default; lyng-js-bench currently enables them by default — need to override)
-cargo run --release -p lyng-js-bench --no-default-features -- v8suite --samples 7 --json /tmp/no-counters.json 2>&1 | tail -5
+# Without counters (default; lyng-bench currently enables them by default — need to override)
+cargo run --release -p lyng-bench --no-default-features -- v8suite --samples 7 --json /tmp/no-counters.json 2>&1 | tail -5
 # With counters
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/with-counters.json 2>&1 | tail -5
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/with-counters.json 2>&1 | tail -5
 ```
 
-Note: `lyng-js-bench`'s Cargo.toml enables `lyng-js-vm/opcode-counters` by default. To get the no-counter measurement, may need to add a `--no-default-features` flag OR build a separate binary with counters disabled. If the bench tool doesn't easily support this, instead use:
+Note: `lyng-bench`'s Cargo.toml enables `lyng-vm/opcode-counters` by default. To get the no-counter measurement, may need to add a `--no-default-features` flag OR build a separate binary with counters disabled. If the bench tool doesn't easily support this, instead use:
 
 ```bash
-# Build lyng-js-vm without counters
-cargo build --release -p lyng-js-vm --no-default-features
+# Build lyng-vm without counters
+cargo build --release -p lyng-vm --no-default-features
 
-# Then bench (the lyng-js-bench Cargo features may need adjusting)
+# Then bench (the lyng-bench Cargo features may need adjusting)
 ```
 
 This is a measurement detail the subagent will work through.
@@ -1048,7 +1048,7 @@ Target: ≤5% (per parent §13.12 open question).
 
 - [ ] **Step 3: Write the overhead report**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b0-counter-overhead.md`:
+Create `reports/lyng/dsl-1/phase-1b0-counter-overhead.md`:
 
 ```markdown
 # Phase 1.B.0 — opcode-counter overhead measurement
@@ -1081,7 +1081,7 @@ If overhead exceeds 5%, consider:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b0-counter-overhead.md
+git add reports/lyng/dsl-1/phase-1b0-counter-overhead.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 6: measure counter overhead
 
@@ -1098,11 +1098,11 @@ EOF
 ## Task 7: Add microbench snippets for 7 Phase-1.A opcodes
 
 **Files:**
-- Modify: [`tools/lyng-js-bench/src/microbench/snippets.rs`](../../../tools/lyng-js-bench/src/microbench/snippets.rs)
+- Modify: [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs)
 
 - [ ] **Step 1: Read the existing snippet pattern**
 
-Inspect `tools/lyng-js-bench/src/microbench/snippets.rs`. Note:
+Inspect `tools/lyng-bench/src/microbench/snippets.rs`. Note:
 - `Snippet` struct shape (`opcode`, `source`, `opcodes_per_iter`).
 - The `all_snippets()` function builds a HashMap of opcode-name → Snippet.
 - Existing snippets for Move (4 ops/iter), Add (1 op/iter), GetNamedProperty (3 ops/iter), Jump (probably 1 op/iter).
@@ -1246,12 +1246,12 @@ map.insert("LoadSmi8", Snippet {
 });
 ```
 
-**CRITICAL:** the `opcodes_per_iter` count must be verified by running the snippet through the dispatch counter (use `cargo run -p lyng-js-bench -- runtime --count-opcodes` per the file's docstring) and confirming the target opcode is dispatched the expected number of times per loop iteration. The compiler may emit different opcodes than expected (e.g., LoadZero for `0`, or constant-pool LoadConst for some literals). Adjust the source to actually exercise the target opcode if needed.
+**CRITICAL:** the `opcodes_per_iter` count must be verified by running the snippet through the dispatch counter (use `cargo run -p lyng-bench -- runtime --count-opcodes` per the file's docstring) and confirming the target opcode is dispatched the expected number of times per loop iteration. The compiler may emit different opcodes than expected (e.g., LoadZero for `0`, or constant-pool LoadConst for some literals). Adjust the source to actually exercise the target opcode if needed.
 
 - [ ] **Step 3: Build + verify snippets**
 
 ```bash
-cargo build --release -p lyng-js-bench 2>&1 | tail -3
+cargo build --release -p lyng-bench 2>&1 | tail -3
 ```
 
 Expected: clean build.
@@ -1259,8 +1259,8 @@ Expected: clean build.
 - [ ] **Step 4: Run microbench against the new snippets**
 
 ```bash
-cargo run --release -p lyng-js-bench -- microbench \
-  --opcodes-config tools/lyng-js-bench/hot-opcodes.toml \
+cargo run --release -p lyng-bench -- microbench \
+  --opcodes-config tools/lyng-bench/hot-opcodes.toml \
   --samples 7 --output /tmp/phase-1a-microbench.md 2>&1 | tail -20
 ```
 
@@ -1271,7 +1271,7 @@ If `opcodes_per_iter` is wrong (e.g., the compiler emitted only 3 LoadUndefined 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tools/lyng-js-bench/src/microbench/snippets.rs
+git add tools/lyng-bench/src/microbench/snippets.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 7: microbench snippets for 7 Phase-1.A opcodes
 
@@ -1293,7 +1293,7 @@ EOF
 ## Task 8: Add microbench snippets for 7 Phase-1.B anchor opcodes
 
 **Files:**
-- Modify: [`tools/lyng-js-bench/src/microbench/snippets.rs`](../../../tools/lyng-js-bench/src/microbench/snippets.rs)
+- Modify: [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs)
 
 - [ ] **Step 1: Append the Phase-1.B anchor snippets**
 
@@ -1424,7 +1424,7 @@ map.insert("Ldar", Snippet {
 });
 ```
 
-CRITICAL: As with Task 7, verify each `opcodes_per_iter` count via dispatch counter. The lyng-js compiler may emit different opcodes than expected — adjust source patterns until the target opcode is actually dispatched the expected number of times.
+CRITICAL: As with Task 7, verify each `opcodes_per_iter` count via dispatch counter. The lyng compiler may emit different opcodes than expected — adjust source patterns until the target opcode is actually dispatched the expected number of times.
 
 For `LoadLocal0/1/2/3`: the slot assignment depends on the compiler's local-slot allocation. Verify with the dispatch counter that the intended slot is being read.
 
@@ -1433,8 +1433,8 @@ For `Ldar`: the `s;` statement-expression pattern may compile to Move or just be
 - [ ] **Step 2: Build + verify**
 
 ```bash
-cargo build --release -p lyng-js-bench 2>&1 | tail -3
-cargo run --release -p lyng-js-bench -- microbench --samples 7 --output /tmp/phase-1b-microbench.md 2>&1 | tail -20
+cargo build --release -p lyng-bench 2>&1 | tail -3
+cargo run --release -p lyng-bench -- microbench --samples 7 --output /tmp/phase-1b-microbench.md 2>&1 | tail -20
 ```
 
 Expected: all 14 new snippets (7 Phase-1.A + 7 Phase-1.B) produce ns/dispatch with CI95.
@@ -1442,7 +1442,7 @@ Expected: all 14 new snippets (7 Phase-1.A + 7 Phase-1.B) produce ns/dispatch wi
 - [ ] **Step 3: Commit**
 
 ```bash
-git add tools/lyng-js-bench/src/microbench/snippets.rs
+git add tools/lyng-bench/src/microbench/snippets.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 8: microbench snippets for 7 Phase-1.B anchors
 
@@ -1464,12 +1464,12 @@ EOF
 ## Task 9: Sub-phase 1.B.0 gate verification + summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1b0-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1b0-summary.md`
 
 - [ ] **Step 1: Run full counter sanity check**
 
 ```bash
-cargo run --release -p lyng-js-bench -- v8suite \
+cargo run --release -p lyng-bench -- v8suite \
   --samples 1 --count-opcodes --count-slow-path-share \
   --counts-json /tmp/phase-1b0-end-counter.json 2>&1 | tail -10
 ```
@@ -1484,7 +1484,7 @@ Inspect `/tmp/phase-1b0-end-counter.json`:
 - [ ] **Step 2: Run full microbench**
 
 ```bash
-cargo run --release -p lyng-js-bench -- microbench --samples 7 --output /tmp/phase-1b0-end-microbench.md 2>&1 | tail -30
+cargo run --release -p lyng-bench -- microbench --samples 7 --output /tmp/phase-1b0-end-microbench.md 2>&1 | tail -30
 ```
 
 Verify: all 14 in-scope opcodes show ns/dispatch with CI95. No "no snippet" entries.
@@ -1492,8 +1492,8 @@ Verify: all 14 in-scope opcodes show ns/dispatch with CI95. No "no snippet" entr
 - [ ] **Step 3: Run full behavioral test suite**
 
 ```bash
-cargo test -p lyng-js-vm --lib --release 2>&1 | tail -3
-cargo test -p lyng-js-tests --release 2>&1 | tail -3
+cargo test -p lyng-vm --lib --release 2>&1 | tail -3
+cargo test -p lyng-tests --release 2>&1 | tail -3
 ```
 
 Expected: 413 + 1186 + new dispatch_counters_layout tests passing.
@@ -1505,13 +1505,13 @@ Per spec §4 protocol:
 ```bash
 git stash --include-untracked
 git checkout $(cat /tmp/phase-1b0-base-sha)
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b0-ab-base.json
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b0-ab-base.json
 uptime > /tmp/phase-1b0-ab-base-uptime
 
 git checkout claude/epic-saha-8f0b96
-cargo build --release -p lyng-js-bench
-cargo run --release -p lyng-js-bench -- v8suite --samples 7 --json /tmp/phase-1b0-ab-post.json
+cargo build --release -p lyng-bench
+cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/phase-1b0-ab-post.json
 uptime > /tmp/phase-1b0-ab-post-uptime
 
 # Verify uptime within ±20%; if not, re-run.
@@ -1522,7 +1522,7 @@ Compute per-workload deltas; the counter overhead (≤5%) should be the dominant
 
 - [ ] **Step 5: Write the phase summary**
 
-Create `reports/js/lyng-js/dsl-1/phase-1b0-summary.md`:
+Create `reports/lyng/dsl-1/phase-1b0-summary.md`:
 
 ```markdown
 # DSL-1 Phase 1.B.0 — Infrastructure (summary)
@@ -1592,7 +1592,7 @@ Fill placeholders with real data.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1b0-summary.md
+git add reports/lyng/dsl-1/phase-1b0-summary.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0: phase summary
 

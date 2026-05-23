@@ -2,9 +2,9 @@ use super::{
     allocate_builtin_function_object, define_builtin_accessor_property,
     define_builtin_data_property, public_builtin_metadata,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_env::Agent;
-use lyng_js_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
+use lyng_common::WellKnownAtom;
+use lyng_env::Agent;
+use lyng_types::{EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value};
 
 #[derive(Clone, Copy)]
 pub(super) struct DurationBootstrapContext {
@@ -106,8 +106,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_builtin())?,
+        lyng_types::temporal_duration_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_builtin())?,
         Some(duration_prototype),
     );
     let years_getter = allocate_builtin_function_object(
@@ -117,8 +117,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_years_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_years_getter_builtin())?,
+        lyng_types::temporal_duration_years_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_years_getter_builtin())?,
         None,
     );
     let months_getter = allocate_builtin_function_object(
@@ -128,8 +128,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_months_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_months_getter_builtin())?,
+        lyng_types::temporal_duration_months_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_months_getter_builtin())?,
         None,
     );
     let weeks_getter = allocate_builtin_function_object(
@@ -139,8 +139,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_weeks_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_weeks_getter_builtin())?,
+        lyng_types::temporal_duration_weeks_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_weeks_getter_builtin())?,
         None,
     );
     let days_getter = allocate_builtin_function_object(
@@ -150,8 +150,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_days_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_days_getter_builtin())?,
+        lyng_types::temporal_duration_days_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_days_getter_builtin())?,
         None,
     );
     let hours_getter = allocate_builtin_function_object(
@@ -161,8 +161,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_hours_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_hours_getter_builtin())?,
+        lyng_types::temporal_duration_hours_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_hours_getter_builtin())?,
         None,
     );
     let minutes_getter = allocate_builtin_function_object(
@@ -172,8 +172,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_minutes_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_minutes_getter_builtin())?,
+        lyng_types::temporal_duration_minutes_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_minutes_getter_builtin())?,
         None,
     );
     let seconds_getter = allocate_builtin_function_object(
@@ -183,8 +183,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_seconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_seconds_getter_builtin())?,
+        lyng_types::temporal_duration_seconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_seconds_getter_builtin())?,
         None,
     );
     let milliseconds_getter = allocate_builtin_function_object(
@@ -194,8 +194,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_milliseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_milliseconds_getter_builtin())?,
+        lyng_types::temporal_duration_milliseconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_milliseconds_getter_builtin())?,
         None,
     );
     let microseconds_getter = allocate_builtin_function_object(
@@ -205,8 +205,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_microseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_microseconds_getter_builtin())?,
+        lyng_types::temporal_duration_microseconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_microseconds_getter_builtin())?,
         None,
     );
     let nanoseconds_getter = allocate_builtin_function_object(
@@ -216,8 +216,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_nanoseconds_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_nanoseconds_getter_builtin())?,
+        lyng_types::temporal_duration_nanoseconds_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_nanoseconds_getter_builtin())?,
         None,
     );
     let sign_getter = allocate_builtin_function_object(
@@ -227,8 +227,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_sign_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_sign_getter_builtin())?,
+        lyng_types::temporal_duration_sign_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_sign_getter_builtin())?,
         None,
     );
     let blank_getter = allocate_builtin_function_object(
@@ -238,8 +238,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_blank_getter_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_blank_getter_builtin())?,
+        lyng_types::temporal_duration_blank_getter_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_blank_getter_builtin())?,
         None,
     );
     let to_string = allocate_builtin_function_object(
@@ -249,8 +249,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_to_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_to_string_builtin())?,
+        lyng_types::temporal_duration_to_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_to_string_builtin())?,
         None,
     );
     let to_json = allocate_builtin_function_object(
@@ -260,8 +260,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_to_json_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_to_json_builtin())?,
+        lyng_types::temporal_duration_to_json_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_to_json_builtin())?,
         None,
     );
     let to_locale_string = allocate_builtin_function_object(
@@ -271,8 +271,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_to_locale_string_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_to_locale_string_builtin())?,
+        lyng_types::temporal_duration_to_locale_string_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_to_locale_string_builtin())?,
         None,
     );
     let negated = allocate_builtin_function_object(
@@ -282,8 +282,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_negated_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_negated_builtin())?,
+        lyng_types::temporal_duration_negated_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_negated_builtin())?,
         None,
     );
     let abs = allocate_builtin_function_object(
@@ -293,8 +293,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_abs_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_abs_builtin())?,
+        lyng_types::temporal_duration_abs_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_abs_builtin())?,
         None,
     );
     let with = allocate_builtin_function_object(
@@ -304,8 +304,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_with_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_with_builtin())?,
+        lyng_types::temporal_duration_with_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_with_builtin())?,
         None,
     );
     let round = allocate_builtin_function_object(
@@ -315,8 +315,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_round_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_round_builtin())?,
+        lyng_types::temporal_duration_round_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_round_builtin())?,
         None,
     );
     let total = allocate_builtin_function_object(
@@ -326,8 +326,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_total_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_total_builtin())?,
+        lyng_types::temporal_duration_total_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_total_builtin())?,
         None,
     );
     let add = allocate_builtin_function_object(
@@ -337,8 +337,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_add_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_add_builtin())?,
+        lyng_types::temporal_duration_add_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_add_builtin())?,
         None,
     );
     let subtract = allocate_builtin_function_object(
@@ -348,8 +348,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_subtract_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_subtract_builtin())?,
+        lyng_types::temporal_duration_subtract_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_subtract_builtin())?,
         None,
     );
     let value_of = allocate_builtin_function_object(
@@ -359,8 +359,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_value_of_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_value_of_builtin())?,
+        lyng_types::temporal_duration_value_of_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_value_of_builtin())?,
         None,
     );
     let from = allocate_builtin_function_object(
@@ -370,8 +370,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_from_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_from_builtin())?,
+        lyng_types::temporal_duration_from_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_from_builtin())?,
         None,
     );
     let compare = allocate_builtin_function_object(
@@ -381,8 +381,8 @@ pub(super) fn allocate_functions(
         context.root_shape,
         context.function_prototype,
         context.object_prototype,
-        lyng_js_types::temporal_duration_compare_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_duration_compare_builtin())?,
+        lyng_types::temporal_duration_compare_builtin(),
+        public_builtin_metadata(lyng_types::temporal_duration_compare_builtin())?,
         None,
     );
 

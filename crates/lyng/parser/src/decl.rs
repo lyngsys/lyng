@@ -1,11 +1,11 @@
 //! Declaration parsing (variable, function, class, import, export).
 
-use lyng_js_ast::{
+use lyng_ast::{
     ClassElement, Decl, DeclId, Expr, FunctionKind, MethodKind, NodeList, Pattern, Stmt, StmtId,
     VariableDeclarator, VariableKind,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_lexer::TokenKind;
+use lyng_common::WellKnownAtom;
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 
@@ -164,7 +164,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
     }
 
-    fn validate_lexical_binding_pattern(&mut self, pattern_id: lyng_js_ast::PatternId) {
+    fn validate_lexical_binding_pattern(&mut self, pattern_id: lyng_ast::PatternId) {
         match self.ast().get_pattern(pattern_id).clone() {
             Pattern::Identifier { name, span } => {
                 if name == WellKnownAtom::let_.id() {
@@ -377,7 +377,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     /// Parses a class body: `{ elements }`.
-    pub fn parse_class_body(&mut self) -> NodeList<lyng_js_ast::ClassElementId> {
+    pub fn parse_class_body(&mut self) -> NodeList<lyng_ast::ClassElementId> {
         self.expect(TokenKind::LBrace);
         let mut elements = Vec::new();
 
@@ -393,7 +393,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.ast_mut().alloc_class_element_list(&elements)
     }
 
-    fn parse_class_element(&mut self) -> lyng_js_ast::ClassElementId {
+    fn parse_class_element(&mut self) -> lyng_ast::ClassElementId {
         let decorator_start = self.current_span();
         if self.at(TokenKind::At) {
             self.parse_decorator_list_syntax_only();
@@ -557,13 +557,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     fn finish_class_property(
         &mut self,
-        start: lyng_js_common::Span,
-        key: lyng_js_ast::ExprId,
+        start: lyng_common::Span,
+        key: lyng_ast::ExprId,
         computed: bool,
         private: bool,
         is_static: bool,
-        auto_accessor_private_name: Option<lyng_js_common::AtomId>,
-    ) -> lyng_js_ast::ClassElementId {
+        auto_accessor_private_name: Option<lyng_common::AtomId>,
+    ) -> lyng_ast::ClassElementId {
         let value = if self.eat(TokenKind::Eq) {
             let prev_await = self.allow_await;
             let prev_yield = self.allow_yield;
@@ -594,22 +594,19 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         })
     }
 
-    fn auto_accessor_private_name(
-        &mut self,
-        start: lyng_js_common::Span,
-    ) -> lyng_js_common::AtomId {
+    fn auto_accessor_private_name(&mut self, start: lyng_common::Span) -> lyng_common::AtomId {
         self.lexer
             .intern_atom(&format!("\0auto_accessor_{}", start.range.start.raw()))
     }
 
-    fn parse_class_element_name(&mut self) -> (lyng_js_ast::ExprId, bool, bool) {
+    fn parse_class_element_name(&mut self) -> (lyng_ast::ExprId, bool, bool) {
         if self.at(TokenKind::PrivateIdentifier) {
             let span = self.current_span();
             let name = self.current_atom().unwrap_or(WellKnownAtom::Empty.id());
             self.advance();
             let expr = self
                 .ast_mut()
-                .alloc_expr(lyng_js_ast::Expr::Identifier { span, name });
+                .alloc_expr(lyng_ast::Expr::Identifier { span, name });
             (expr, false, true)
         } else {
             let (key, computed) = self.parse_property_name();
@@ -617,17 +614,17 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         }
     }
 
-    fn class_element_key_is_constructor(&self, key: lyng_js_ast::ExprId) -> bool {
+    fn class_element_key_is_constructor(&self, key: lyng_ast::ExprId) -> bool {
         match self.ast().get_expr(key) {
-            lyng_js_ast::Expr::Identifier { name, .. } => *name == WellKnownAtom::constructor.id(),
-            lyng_js_ast::Expr::StringLiteral { value, .. } => {
+            lyng_ast::Expr::Identifier { name, .. } => *name == WellKnownAtom::constructor.id(),
+            lyng_ast::Expr::StringLiteral { value, .. } => {
                 self.ast().literals().get_string(*value) == WellKnownAtom::constructor.as_str()
             }
             _ => false,
         }
     }
 
-    pub(crate) fn validate_class_heritage_expression(&mut self, expr: lyng_js_ast::ExprId) {
+    pub(crate) fn validate_class_heritage_expression(&mut self, expr: lyng_ast::ExprId) {
         if matches!(
             self.ast().get_expr(expr),
             Expr::ArrowFunctionExpression { .. }

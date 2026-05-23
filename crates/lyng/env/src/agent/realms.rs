@@ -3,8 +3,8 @@ use crate::{
     realm_index, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutKind, Intrinsics,
     RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
 };
-use lyng_js_objects::ObjectAllocation;
-use lyng_js_types::{ObjectRef, RealmRef, ShapeId};
+use lyng_objects::ObjectAllocation;
+use lyng_types::{ObjectRef, RealmRef, ShapeId};
 
 impl Agent {
     #[inline]

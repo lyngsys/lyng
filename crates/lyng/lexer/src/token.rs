@@ -1,7 +1,7 @@
 //! Token types for the ECMA-262 lexical grammar.
 
 use bitflags::bitflags;
-use lyng_js_common::{AtomId, Span};
+use lyng_common::{AtomId, Span};
 
 /// A compact, copyable identifier for literal side-table entries.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

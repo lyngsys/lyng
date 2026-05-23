@@ -25,10 +25,10 @@
 //! handler chain — the harness builds them directly. The naked
 //! trampoline is not invoked.
 
-use lyng_js_types::Value;
-use lyng_js_vm::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
-use lyng_js_vm::dsl::test_helpers::{DslHarness, HarnessOutcome};
-use lyng_js_vm::VmError;
+use lyng_types::Value;
+use lyng_vm::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
+use lyng_vm::dsl::test_helpers::{DslHarness, HarnessOutcome};
+use lyng_vm::VmError;
 
 // Each semantic is a closure passed to `invoke_semantic_directly`. We
 // keep them inline so the test reads top-to-bottom; in production code
@@ -38,9 +38,8 @@ use lyng_js_vm::VmError;
 #[test]
 fn continue_outcome_round_trips() {
     let mut harness = DslHarness::new();
-    let outcome = harness.invoke_semantic_directly(0x10, |_state| {
-        SemanticOutcome::Continue { pc_advance: 4 }
-    });
+    let outcome = harness
+        .invoke_semantic_directly(0x10, |_state| SemanticOutcome::Continue { pc_advance: 4 });
     match outcome {
         HarnessOutcome::Continued { new_pc_offset } => {
             // `translate_outcome` sets `state.frame_pc_offset` to

@@ -9,7 +9,7 @@ fast path has no bailout-on-overflow branch.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -62,7 +62,7 @@ shape JSC's `op_lshift` uses on AArch64.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm`.
 
 Fast path (from `op_shift_left_dsl:` through
 `bl _op_shift_left_record_smi_rs` inclusive): **36 instructions** —
@@ -146,7 +146,7 @@ Notes:
   `--require-isolation` gate rejected the first attempt; rerun
   without strict gate per spec §1.6.
 - The microbench snippet for ShiftLeft was added in this task at
-  `tools/lyng-js-bench/src/microbench/snippets.rs` (using
+  `tools/lyng-bench/src/microbench/snippets.rs` (using
   `x = i << y` with two locals to mirror the BitAnd snippet shape).
   No `ShiftLeftSmi` opcode exists in the bytecode-builder, so the
   two-locals form is for direct shape comparison with BitAnd, not
@@ -181,7 +181,7 @@ This is the known measurement artifact, not a real regression: every
 fast-path SMI left-shift calls
 `call_slow!(op_shift_left_record_smi_rs, args = [slot])` which is
 instrumented by `inc_slow_semantic_counter!` in
-`crates/lyng-js/vm/src/dsl/backend/aarch64/control.rs:116` (every
+`crates/lyng/vm/src/dsl/backend/aarch64/control.rs:116` (every
 `call_slow!` arm with `opcode_byte = N` bumps the counter,
 regardless of label scope). The result: feedback-recording fast-path
 entries are counted as if they were full slow-path entries.
@@ -193,7 +193,7 @@ fast paths still need a shim for feedback recording (`Add`, `Sub`,
 should remain enforced **once the substrate distinguishes
 "feedback-recording shim" from "true slow path"** — that work is a
 substrate fix tracked as a Phase 1.C followup (gate counter-injection
-on label-boundary state in `crates/lyng-js-vm-dsl/src/lower.rs`
+on label-boundary state in `crates/lyng/vm-dsl/src/lower.rs`
 `inject_opcode_byte`) and is not scheduled within Phase 1.C scope.
 
 Crypto's 148M ShiftLeft dispatches are dominated by 32-bit modular
@@ -216,16 +216,16 @@ section should be re-measured.
 
 ## Behavioral tests
 
-- `cargo test --release -p lyng-js-vm --lib`: **418 passed**.
-- `cargo test --release -p lyng-js-tests`: **1209 passed**.
-- Test262 left-shift slice: `cargo run --release -p lyng-js-test262
+- `cargo test --release -p lyng-vm --lib`: **418 passed**.
+- `cargo test --release -p lyng-tests`: **1209 passed**.
+- Test262 left-shift slice: `cargo run --release -p lyng-test262
   -- --filter language/expressions/left-shift` → **89/89 variants
   passed across 45 files** (100% pass rate). Includes the
   `S11.7.1_*` and `bigint-*` left-shift semantics tests covering
   ToInt32(lhs) + ToUint32(rhs) + 5-bit-mask + signed-i32 result
   invariants.
 - Two pre-existing failures in
-  `crates/lyng-js/vm/tests/feedback_flat_consistency.rs`
+  `crates/lyng/vm/tests/feedback_flat_consistency.rs`
   (`dual_write_keeps_smi_add_legacy_and_flat_in_sync` and
   `dual_write_keeps_polymorphic_property_access_legacy_and_flat_in_sync`)
   reproduce at HEAD `ce9edf4b` (Task 5 close) with the op_shift_left
@@ -262,4 +262,4 @@ Per-workload gate status per spec §1.6 + §5:
 - — N/A: Richards, DeltaBlue, RayTrace, NavierStokes (don't emit
   ShiftLeft)
 
-See [`reports/js/lyng-js/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.
+See [`reports/lyng/dsl-1/phase-1c-post-fix-slow-path-share.md`](../dsl-1/phase-1c-post-fix-slow-path-share.md) for the consolidated post-fix re-measurement across all 8 inline-ported arithmetic-family opcodes.

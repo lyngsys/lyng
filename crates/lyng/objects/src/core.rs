@@ -1,4 +1,4 @@
-use lyng_js_gc::ObjectSlotsRef;
+use lyng_gc::ObjectSlotsRef;
 
 /// Coarse object kinds frozen by the runtime-substrate design.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

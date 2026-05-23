@@ -2,7 +2,7 @@
 //!
 //! Each opcode's asm-DSL handler is a `#[unsafe(naked)] extern "C" fn`
 //! that the trampoline tail-jumps to via the dispatch table. The
-//! actual handler bodies are emitted by the `lyng_js_vm_dsl::llint_handler!`
+//! actual handler bodies are emitted by the `lyng_vm_dsl::llint_handler!`
 //! proc-macro across three "temperature" families:
 //!
 //! - [`hot`]   — populated by B39–B42 (hottest opcodes: SMI arith, register
@@ -58,10 +58,10 @@ unsafe extern "C" fn unimplemented_dsl_handler() -> ! {
 //    instead of a runtime trap.
 //
 // Adding a new opcode means (a) extending `Opcode`, (b) regenerating
-// `cold.rs` via `cargo run -p lyng-js-dsl-codegen`, and (c) adding
+// `cold.rs` via `cargo run -p lyng-dsl-codegen`, and (c) adding
 // the corresponding entry to this table indexed by opcode byte. The
 // `dsl_dispatch_table_resolves_every_opcode` test in
-// `crates/lyng-js/vm/tests/dsl_dispatch_table.rs` walks the manifest
+// `crates/lyng/vm/tests/dsl_dispatch_table.rs` walks the manifest
 // against this table at link time to catch drift.
 // =====================================================================
 
@@ -83,7 +83,7 @@ pub static DSL_DISPATCH_TABLE: [DslHandler; 256] = [unimplemented_dsl_handler; 2
 /// site, so the result is a static array of function pointers.
 #[cfg(target_arch = "aarch64")]
 const fn build_dispatch_table() -> [DslHandler; 256] {
-    use lyng_js_bytecode::Opcode;
+    use lyng_bytecode::Opcode;
 
     let mut table: [DslHandler; 256] = [unimplemented_dsl_handler; 256];
     // Macro to assign one slot. `Opcode as u8` is const-castable
@@ -119,7 +119,10 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
 
     // -- loads family (35 - 1 Move = 34 cold) --
     assign!(Opcode::LoadUndefined, cold::op_load_undefined_dsl);
-    assign!(Opcode::LoadUninitializedLexical, cold::op_load_uninitialized_lexical_dsl);
+    assign!(
+        Opcode::LoadUninitializedLexical,
+        cold::op_load_uninitialized_lexical_dsl
+    );
     assign!(Opcode::LoadNull, cold::op_load_null_dsl);
     assign!(Opcode::LoadTrue, cold::op_load_true_dsl);
     assign!(Opcode::LoadFalse, cold::op_load_false_dsl);
@@ -173,7 +176,10 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
     assign!(Opcode::BitNot, cold::op_bit_not_dsl);
     assign!(Opcode::ShiftLeft, cold::op_shift_left_dsl);
     assign!(Opcode::ShiftRight, cold::op_shift_right_dsl);
-    assign!(Opcode::UnsignedShiftRight, cold::op_unsigned_shift_right_dsl);
+    assign!(
+        Opcode::UnsignedShiftRight,
+        cold::op_unsigned_shift_right_dsl
+    );
     assign!(Opcode::Negate, cold::op_negate_dsl);
     assign!(Opcode::Increment, cold::op_increment_dsl);
     assign!(Opcode::Decrement, cold::op_decrement_dsl);
@@ -192,14 +198,32 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
     // -- property family (21 cold) --
     assign!(Opcode::GetNamedProperty, cold::op_get_named_property_dsl);
     assign!(Opcode::SetNamedProperty, cold::op_set_named_property_dsl);
-    assign!(Opcode::AssignNamedProperty, cold::op_assign_named_property_dsl);
-    assign!(Opcode::StrictAssignNamedProperty, cold::op_strict_assign_named_property_dsl);
+    assign!(
+        Opcode::AssignNamedProperty,
+        cold::op_assign_named_property_dsl
+    );
+    assign!(
+        Opcode::StrictAssignNamedProperty,
+        cold::op_strict_assign_named_property_dsl
+    );
     assign!(Opcode::GetKeyedProperty, cold::op_get_keyed_property_dsl);
     assign!(Opcode::SetKeyedProperty, cold::op_set_keyed_property_dsl);
-    assign!(Opcode::AssignKeyedProperty, cold::op_assign_keyed_property_dsl);
-    assign!(Opcode::StrictAssignKeyedProperty, cold::op_strict_assign_keyed_property_dsl);
-    assign!(Opcode::DefineNamedProperty, cold::op_define_named_property_dsl);
-    assign!(Opcode::DefineKeyedProperty, cold::op_define_keyed_property_dsl);
+    assign!(
+        Opcode::AssignKeyedProperty,
+        cold::op_assign_keyed_property_dsl
+    );
+    assign!(
+        Opcode::StrictAssignKeyedProperty,
+        cold::op_strict_assign_keyed_property_dsl
+    );
+    assign!(
+        Opcode::DefineNamedProperty,
+        cold::op_define_named_property_dsl
+    );
+    assign!(
+        Opcode::DefineKeyedProperty,
+        cold::op_define_keyed_property_dsl
+    );
     assign!(Opcode::CreateObject, cold::op_create_object_dsl);
     assign!(Opcode::CreateArray, cold::op_create_array_dsl);
     assign!(Opcode::StoreDenseElement, cold::op_store_dense_element_dsl);
@@ -207,10 +231,19 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
     assign!(Opcode::DeleteProperty, cold::op_delete_property_dsl);
     assign!(Opcode::In, cold::op_in_dsl);
     assign!(Opcode::ToPropertyKey, cold::op_to_property_key_dsl);
-    assign!(Opcode::CopyDataProperties, cold::op_copy_data_properties_dsl);
+    assign!(
+        Opcode::CopyDataProperties,
+        cold::op_copy_data_properties_dsl
+    );
     assign!(Opcode::SetFunctionName, cold::op_set_function_name_dsl);
-    assign!(Opcode::CheckObjectCoercible, cold::op_check_object_coercible_dsl);
-    assign!(Opcode::ThrowIfUninitialized, cold::op_throw_if_uninitialized_dsl);
+    assign!(
+        Opcode::CheckObjectCoercible,
+        cold::op_check_object_coercible_dsl
+    );
+    assign!(
+        Opcode::ThrowIfUninitialized,
+        cold::op_throw_if_uninitialized_dsl
+    );
 
     // -- names family (17 cold) --
     assign!(Opcode::LoadGlobal, cold::op_load_global_dsl);
@@ -221,12 +254,21 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
     assign!(Opcode::ResolveName, cold::op_resolve_name_dsl);
     assign!(Opcode::ResolveGlobal, cold::op_resolve_global_dsl);
     assign!(Opcode::AssignName, cold::op_assign_name_dsl);
-    assign!(Opcode::AssignVariableName, cold::op_assign_variable_name_dsl);
+    assign!(
+        Opcode::AssignVariableName,
+        cold::op_assign_variable_name_dsl
+    );
     assign!(Opcode::DeleteName, cold::op_delete_name_dsl);
     assign!(Opcode::CaptureName, cold::op_capture_name_dsl);
     assign!(Opcode::LoadCapturedName, cold::op_load_captured_name_dsl);
-    assign!(Opcode::LoadCapturedNameThis, cold::op_load_captured_name_this_dsl);
-    assign!(Opcode::AssignCapturedName, cold::op_assign_captured_name_dsl);
+    assign!(
+        Opcode::LoadCapturedNameThis,
+        cold::op_load_captured_name_this_dsl
+    );
+    assign!(
+        Opcode::AssignCapturedName,
+        cold::op_assign_captured_name_dsl
+    );
     assign!(Opcode::LoadThis, cold::op_load_this_dsl);
     assign!(Opcode::LoadCallee, cold::op_load_callee_dsl);
     assign!(Opcode::LoadNewTarget, cold::op_load_new_target_dsl);
@@ -262,7 +304,10 @@ const fn build_dispatch_table() -> [DslHandler; 256] {
     assign!(Opcode::CloseIterator, cold::op_close_iterator_dsl);
 
     // -- generators family (6 cold) --
-    assign!(Opcode::SuspendGeneratorStart, cold::op_suspend_generator_start_dsl);
+    assign!(
+        Opcode::SuspendGeneratorStart,
+        cold::op_suspend_generator_start_dsl
+    );
     assign!(Opcode::Yield, cold::op_yield_dsl);
     assign!(Opcode::DelegateYield, cold::op_delegate_yield_dsl);
     assign!(Opcode::Await, cold::op_await_dsl);

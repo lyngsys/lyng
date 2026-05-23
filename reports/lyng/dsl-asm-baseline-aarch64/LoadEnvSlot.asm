@@ -1,4 +1,4 @@
-lyng_js_vm::vm::dispatch_handlers::scope::op_load_env_slot:
+lyng_vm::vm::dispatch_handlers::scope::op_load_env_slot:
 L0:
 	sub sp, sp, #176
 	stp x28, x27, [sp, #80]
@@ -38,7 +38,7 @@ L4:
 	and w5, w28, #0xffffff
 	mov x1, x21
 	mov x2, x23
-	bl lyng_js_vm::vm::loop_iteration::<impl lyng_js_vm::vm::Vm>::environment_for_slot_access
+	bl lyng_vm::vm::loop_iteration::<impl lyng_vm::vm::Vm>::environment_for_slot_access
 	ldr x8, [sp, #32]
 	cmp x8, x25
 	b.ne L5
@@ -46,7 +46,7 @@ L4:
 	and w2, w28, #0xffffff
 	mov x0, x23
 	mov x1, x24
-	bl lyng_js_env::agent::environments::<impl lyng_js_env::agent::Agent>::environment_slot
+	bl lyng_env::agent::environments::<impl lyng_env::agent::Agent>::environment_slot
 	tbz w0, #0, L6
 	mov x8, #2
 	movk x8, #9, lsl #32
@@ -55,7 +55,7 @@ L4:
 	b.ne L7
 	mov x0, x23
 	mov w1, #3
-	bl lyng_js_ops::errors::error_value
+	bl lyng_ops::errors::error_value
 	mov x22, x0
 	ldr x27, [x20, #136]
 	cbz x27, L8
@@ -77,7 +77,7 @@ L8:
 	mov x1, x21
 	mov x2, x23
 	mov x3, x22
-	bl lyng_js_vm::vm::exceptions::<impl lyng_js_vm::vm::Vm>::transfer_to_exception_handler
+	bl lyng_vm::vm::exceptions::<impl lyng_vm::vm::Vm>::transfer_to_exception_handler
 	ldr x8, [sp, #32]
 	ldrb w24, [sp, #40]
 	cmp x8, x25
@@ -150,9 +150,9 @@ L7:
 	ldrb w8, [x9, w8, uxtw]
 L12:
 L15:
-	adrp x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
+	adrp x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGE
 L16:
-	add x9, x9, lyng_js_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
+	add x9, x9, lyng_vm::vm::dispatch_state::DISPATCH_TABLE@PAGEOFF
 	ldr x8, [x9, x8, lsl #3]
 	stp x25, x8, [x19]
 	b L13
@@ -186,7 +186,7 @@ L18:
 L2:
 	add x0, sp, #32
 	mov w4, #0
-	bl lyng_js_vm::vm::dispatch::decode_abx_operands_wide
+	bl lyng_vm::vm::dispatch::decode_abx_operands_wide
 	ldr x8, [sp, #32]
 	cmp x8, x25
 	b.ne L5

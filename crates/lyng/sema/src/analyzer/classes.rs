@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use lyng_js_ast::{ClassElement, Expr, FunctionKind, MethodKind};
-use lyng_js_common::{AtomId, Span, WellKnownAtom};
+use lyng_ast::{ClassElement, Expr, FunctionKind, MethodKind};
+use lyng_common::{AtomId, Span, WellKnownAtom};
 
 use super::{Analyzer, ContainmentQuery, PrivateNameUsage};
 use crate::class_private_layout::{
@@ -12,7 +12,7 @@ use crate::private_use::PrivateUseRecord;
 use crate::scope::ScopeKind;
 
 impl Analyzer<'_> {
-    fn class_element_name_is(&self, key: lyng_js_ast::ExprId, atom: WellKnownAtom) -> bool {
+    fn class_element_name_is(&self, key: lyng_ast::ExprId, atom: WellKnownAtom) -> bool {
         match self.ast.get_expr(key) {
             Expr::Identifier { name: actual, .. } => *actual == atom.id(),
             Expr::StringLiteral { value, .. } => {
@@ -22,7 +22,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn expr_is_private_member_reference(&self, expr_id: lyng_js_ast::ExprId) -> bool {
+    pub(super) fn expr_is_private_member_reference(&self, expr_id: lyng_ast::ExprId) -> bool {
         match self.ast.get_expr(expr_id) {
             Expr::PrivateMemberExpression { .. } => true,
             Expr::ParenthesizedExpression { expression, .. } => {
@@ -34,10 +34,10 @@ impl Analyzer<'_> {
 
     pub(super) fn walk_class_body(
         &mut self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::ClassElementId>,
+        body: lyng_ast::NodeList<lyng_ast::ClassElementId>,
         span: Span,
         class_name: Option<AtomId>,
-        super_class: Option<lyng_js_ast::ExprId>,
+        super_class: Option<lyng_ast::ExprId>,
         has_heritage: bool,
     ) {
         let scope_id = self.push_scope(ScopeKind::ClassBody);
@@ -347,7 +347,7 @@ impl Analyzer<'_> {
         None
     }
 
-    pub(super) fn record_private_use(&mut self, expr: lyng_js_ast::ExprId, name: AtomId) {
+    pub(super) fn record_private_use(&mut self, expr: lyng_ast::ExprId, name: AtomId) {
         if let Some((defining_scope, class_depth)) = self.resolve_private_name(name) {
             self.private_uses.alloc(PrivateUseRecord::new(
                 expr,
@@ -358,7 +358,7 @@ impl Analyzer<'_> {
         }
     }
 
-    fn walk_class_field_initializer(&mut self, expr_id: lyng_js_ast::ExprId) {
+    fn walk_class_field_initializer(&mut self, expr_id: lyng_ast::ExprId) {
         let old_ctx = (
             self.ctx.current_function,
             self.ctx.in_function,

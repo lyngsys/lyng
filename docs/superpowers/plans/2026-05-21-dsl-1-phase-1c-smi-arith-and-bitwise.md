@@ -4,9 +4,9 @@
 
 **Goal:** Port 7 SMI arithmetic + bitwise opcodes from cold-stub delegation to inline DSL fast paths, adding ~1.75B inlined dispatches per V8 v7 run on top of Phase 1.B's +8.51% cumulative baseline.
 
-**Architecture:** Three sub-phases grouped by asm shape. 1.C.1 binary-with-overflow (op_sub, op_mul); 1.C.2 bitwise-no-overflow (op_bit_and, op_shift_left, op_shift_right); 1.C.3 unary-with-new-macros (op_increment, op_decrement). Each port replaces a cold-stub `llint_handler!` body in `crates/lyng-js/vm/src/dsl/handlers/cold.rs` with inline asm assembled from existing backend macros (`check_smi!`, `untag_smi!`, the arithmetic macros `*_smi_overflow!` / `*_smi!`, `tag_smi!`, `store_reg!`), plus a per-opcode `op_xxx_record_smi_rs` shim for fast-path feedback recording (mirrors `op_add_record_smi_rs` in `hot.rs`).
+**Architecture:** Three sub-phases grouped by asm shape. 1.C.1 binary-with-overflow (op_sub, op_mul); 1.C.2 bitwise-no-overflow (op_bit_and, op_shift_left, op_shift_right); 1.C.3 unary-with-new-macros (op_increment, op_decrement). Each port replaces a cold-stub `llint_handler!` body in `crates/lyng/vm/src/dsl/handlers/cold.rs` with inline asm assembled from existing backend macros (`check_smi!`, `untag_smi!`, the arithmetic macros `*_smi_overflow!` / `*_smi!`, `tag_smi!`, `store_reg!`), plus a per-opcode `op_xxx_record_smi_rs` shim for fast-path feedback recording (mirrors `op_add_record_smi_rs` in `hot.rs`).
 
-**Tech Stack:** Rust 2024 edition, `naked_asm!` (AArch64-only), proc-macro lowerer `lyng-js-vm-dsl`, `lyng-js-bench` measurement tool (microbench / asm-diff / v8suite / count-slow-path-share / require-isolation). All work targets aarch64-apple-darwin.
+**Tech Stack:** Rust 2024 edition, `naked_asm!` (AArch64-only), proc-macro lowerer `lyng-vm-dsl`, `lyng-bench` measurement tool (microbench / asm-diff / v8suite / count-slow-path-share / require-isolation). All work targets aarch64-apple-darwin.
 
 **Spec:** [`docs/superpowers/specs/2026-05-21-dsl-1-phase-1c-smi-arith-and-bitwise-design.md`](../specs/2026-05-21-dsl-1-phase-1c-smi-arith-and-bitwise-design.md).
 
@@ -14,13 +14,13 @@
 
 ## Bench tool CLI reference (read this first)
 
-Per `cargo run --release -p lyng-js-bench -- <subcommand> --help`, the actual CLIs are:
+Per `cargo run --release -p lyng-bench -- <subcommand> --help`, the actual CLIs are:
 
 **Microbench** — runs ALL opcodes from `hot-opcodes.toml`; filter output post-hoc.
 ```bash
 # Check loadavg first (--require-isolation aborts if 1-min loadavg > 2.0):
 uptime
-cargo run --release -p lyng-js-bench -- microbench --require-isolation --samples 7 \
+cargo run --release -p lyng-bench -- microbench --require-isolation --samples 7 \
   --output /tmp/microbench-<context>.md
 grep -A 1 "<OpcodeName>" /tmp/microbench-<context>.md  # extract specific opcode row
 ```
@@ -28,7 +28,7 @@ grep -A 1 "<OpcodeName>" /tmp/microbench-<context>.md  # extract specific opcode
 **Per-opcode slow-path-share** — requires `--count-opcodes --count-slow-path-share` (NOT `--require-isolation`; the v8suite subcommand doesn't accept that flag — manage loadavg manually by checking `uptime` before/after).
 ```bash
 uptime  # verify loadavg <= 2.0 before starting
-cargo run --release -p lyng-js-bench -- v8suite --samples 5 \
+cargo run --release -p lyng-bench -- v8suite --samples 5 \
   --count-opcodes --count-slow-path-share \
   --counts-json /tmp/v8-share-<context>.json \
   --report /tmp/v8-counts-<context>.md
@@ -37,30 +37,30 @@ uptime  # record loadavg at end too
 jq '.workloads[] | {name, opcodes: [.opcodes[] | select(.name == "<OpcodeName>")]}' /tmp/v8-share-<context>.json
 ```
 
-**V8 v7 A/B between two binaries** — there is NO `ab` subcommand. The protocol from Phase 1.B.3 (see `reports/js/lyng-js/dsl-1/phase-1b3-cumulative-ab.md`) is:
+**V8 v7 A/B between two binaries** — there is NO `ab` subcommand. The protocol from Phase 1.B.3 (see `reports/lyng/dsl-1/phase-1b3-cumulative-ab.md`) is:
 ```bash
 # Build the base binary in a worktree
 git worktree add /tmp/wt-base <base-commit-sha>
-(cd /tmp/wt-base && cargo build --release -p lyng-js)
-cp /tmp/wt-base/target/release/lyng-js /tmp/lyng-js-base
+(cd /tmp/wt-base && cargo build --release -p lyng)
+cp /tmp/wt-base/target/release/lyng /tmp/lyng-base
 git worktree remove /tmp/wt-base
 
 # Record loadavg, then run v8suite against base binary
 uptime
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 \
-  --lyng-bin /tmp/lyng-js-base \
+cargo run --release -p lyng-bench -- v8suite --samples 11 \
+  --lyng-bin /tmp/lyng-base \
   --report /tmp/v8-base.md \
   --json /tmp/v8-base.json
 uptime  # record loadavg at end
 
 # Build the post binary (current HEAD)
-cargo build --release -p lyng-js
-cp target/release/lyng-js /tmp/lyng-js-post
+cargo build --release -p lyng
+cp target/release/lyng /tmp/lyng-post
 
 # Record loadavg, run v8suite against post binary
 uptime
-cargo run --release -p lyng-js-bench -- v8suite --samples 11 \
-  --lyng-bin /tmp/lyng-js-post \
+cargo run --release -p lyng-bench -- v8suite --samples 11 \
+  --lyng-bin /tmp/lyng-post \
   --report /tmp/v8-post.md \
   --json /tmp/v8-post.json
 uptime
@@ -70,15 +70,15 @@ uptime
 # - Compute ±% overlap at the 5-min point
 # - Tabulate per-workload medians from /tmp/v8-base.md vs /tmp/v8-post.md
 # - Compute geomean delta
-# - Save to reports/js/lyng-js/dsl-1/phase-1c<N>-{ab-comparison|cumulative-ab}.md
+# - Save to reports/lyng/dsl-1/phase-1c<N>-{ab-comparison|cumulative-ab}.md
 ```
 
 **Asm baseline capture** — `asm-diff --check` doesn't auto-discover `dsl::handlers::cold::*` symbols (Phase 1.B followup), so each port task captures manually:
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
 awk '/^_op_<name>_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" \
-  > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_<name>.asm
+  > reports/lyng/dsl-asm-baseline-aarch64/op_<name>.asm
 ```
 
 Apply this reference whenever the per-task bench commands below appear — they're written in the same form.
@@ -89,19 +89,19 @@ Apply this reference whenever the per-task bench commands below appear — they'
 
 ### Modified files
 
-- `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace 7 cold-stub `llint_handler!` bodies with inline fast paths; add 7 new `op_xxx_record_smi_rs` shims; update macro imports.
-- `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs` — add 2 new macros (`inc_smi_overflow!`, `dec_smi_overflow!`).
-- `crates/lyng-js/vm/src/dsl/ops.md` — add entries for the 2 new macros.
-- `tools/lyng-js-bench/hot-opcodes.toml` — calibrate `aarch64_max_instructions` budgets for the 7 ports (replacing 0 placeholders).
+- `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace 7 cold-stub `llint_handler!` bodies with inline fast paths; add 7 new `op_xxx_record_smi_rs` shims; update macro imports.
+- `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` — add 2 new macros (`inc_smi_overflow!`, `dec_smi_overflow!`).
+- `crates/lyng/vm/src/dsl/ops.md` — add entries for the 2 new macros.
+- `tools/lyng-bench/hot-opcodes.toml` — calibrate `aarch64_max_instructions` budgets for the 7 ports (replacing 0 placeholders).
 
 ### Created files
 
-- `reports/js/lyng-js/dsl-handlers/op_sub.md` (and 6 more, one per ported opcode).
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm` (and 6 more — manual captures per Phase 1.B precedent).
-- `reports/js/lyng-js/dsl-1/phase-1c1-summary.md`, `phase-1c2-summary.md`, `phase-1c3-summary.md`.
-- `reports/js/lyng-js/dsl-1/phase-1c-summary.md`, `phase-1c-followups.md`, `phase-1c-cumulative-ab.md`.
-- `crates/lyng-js/tests/src/dsl_increment_writeback.rs` (1 unit test for the SMI-elision claim in 1.C.3).
-- `reports/js/lyng-js/asm-dsl-engine-state-<date>.md` (post-phase engine snapshot — optional, can be a followup).
+- `reports/lyng/dsl-handlers/op_sub.md` (and 6 more, one per ported opcode).
+- `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm` (and 6 more — manual captures per Phase 1.B precedent).
+- `reports/lyng/dsl-1/phase-1c1-summary.md`, `phase-1c2-summary.md`, `phase-1c3-summary.md`.
+- `reports/lyng/dsl-1/phase-1c-summary.md`, `phase-1c-followups.md`, `phase-1c-cumulative-ab.md`.
+- `crates/lyng/tests/src/dsl_increment_writeback.rs` (1 unit test for the SMI-elision claim in 1.C.3).
+- `reports/lyng/asm-dsl-engine-state-<date>.md` (post-phase engine snapshot — optional, can be a followup).
 
 ---
 
@@ -112,12 +112,12 @@ Two new backend macros for inc/dec, ~1 day. Self-review acceptable; runtime veri
 ## Task 1: Add `inc_smi_overflow!` and `dec_smi_overflow!` macros
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs` (append after `bit_not_smi!`, around line 170)
-- Modify: `crates/lyng-js/vm/src/dsl/ops.md` (add entries in the arithmetic section)
+- Modify: `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` (append after `bit_not_smi!`, around line 170)
+- Modify: `crates/lyng/vm/src/dsl/ops.md` (add entries in the arithmetic section)
 
 - [ ] **Step 1: Append `inc_smi_overflow!` and `dec_smi_overflow!` to arithmetic.rs**
 
-Open `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs` and append after the last existing macro (`bit_not_smi!`):
+Open `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` and append after the last existing macro (`bit_not_smi!`):
 
 ```rust
 /// 32-bit signed increment by 1 with overflow detection.
@@ -163,7 +163,7 @@ macro_rules! dec_smi_overflow {
 
 - [ ] **Step 2: Add `ops.md` entries**
 
-Open `crates/lyng-js/vm/src/dsl/ops.md`. Find the arithmetic table (search for `add_smi_overflow`). Add two rows after the bitwise rows for `bit_not_smi!`:
+Open `crates/lyng/vm/src/dsl/ops.md`. Find the arithmetic table (search for `add_smi_overflow`). Add two rows after the bitwise rows for `bit_not_smi!`:
 
 ```markdown
 | `inc_smi_overflow!` | `src => dst, label`   | `adds wDst, wSrc, #1; b.vs label; sxtw xDst, wDst`  | 3 instr |
@@ -176,13 +176,13 @@ Open `crates/lyng-js/vm/src/dsl/ops.md`. Find the arithmetic table (search for `
 
 Run:
 ```
-cargo build --release -p lyng-js-vm
+cargo build --release -p lyng-vm
 ```
 Expected: compiles cleanly (no handlers use the new macros yet — they're only defined).
 
 - [ ] **Step 4: Self-review**
 
-Open `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
+Open `crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
 - Both macros emit exactly 3 instructions.
 - `inc_smi_overflow!` uses `adds` + `b.vs` + `sxtw`.
 - `dec_smi_overflow!` uses `subs` + `b.vs` + `sxtw`.
@@ -191,7 +191,7 @@ Open `crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs` and confirm:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/backend/aarch64/arithmetic.rs crates/lyng-js/vm/src/dsl/ops.md
+git add crates/lyng/vm/src/dsl/backend/aarch64/arithmetic.rs crates/lyng/vm/src/dsl/ops.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.0 Task 1: inc_smi_overflow!/dec_smi_overflow! macros
 
@@ -218,14 +218,14 @@ Two ports, ~3-4 days. op_sub first (mechanical mirror of op_add), then op_mul (s
 ## Task 2: Port op_sub inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_sub_dsl` body (around line 1050) and add `op_sub_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_sub.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Sub`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_sub_dsl` body (around line 1050) and add `op_sub_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_sub.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Sub`
 
 - [ ] **Step 1: Read the current cold-stub**
 
-Open `crates/lyng-js/vm/src/dsl/handlers/cold.rs` and locate `op_sub_dsl` (currently around line 1050). The body looks like:
+Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and locate `op_sub_dsl` (currently around line 1050). The body looks like:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -281,7 +281,7 @@ llint_handler! {
 
 - [ ] **Step 4: Add the `op_sub_record_smi_rs` shim immediately after the `op_sub_dsl` block**
 
-Add this shim (modeled on `op_add_record_smi_rs` in `crates/lyng-js/vm/src/dsl/handlers/hot.rs:88-106`) directly after the `op_sub_dsl` `llint_handler!` block and before the existing `op_sub_slow_rs`:
+Add this shim (modeled on `op_add_record_smi_rs` in `crates/lyng/vm/src/dsl/handlers/hot.rs:88-106`) directly after the `op_sub_dsl` `llint_handler!` block and before the existing `op_sub_slow_rs`:
 
 ```rust
 /// Fast-path feedback-recording shim for `op_sub`. Mirrors
@@ -303,7 +303,7 @@ pub extern "C" fn op_sub_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -315,7 +315,7 @@ pub extern "C" fn op_sub_record_smi_rs(
 
 Run:
 ```
-cargo build --release -p lyng-js-vm
+cargo build --release -p lyng-vm
 ```
 Expected: clean compile. If a macro-expansion error fires, the most likely cause is a missing import (Step 2) or a label collision (the `.slow:` label is local to each `naked_asm!` block per `op_add`'s precedent, so should be fine).
 
@@ -323,7 +323,7 @@ Expected: clean compile. If a macro-expansion error fires, the most likely cause
 
 Run:
 ```
-cargo test --release -p lyng-js-vm -p lyng-js-tests
+cargo test --release -p lyng-vm -p lyng-tests
 ```
 Expected: 418 + 1209 tests pass. If any failure references op_sub or arithmetic, the inline path is wrong — re-read the op_add shape from `hot.rs:57-75` and compare.
 
@@ -331,7 +331,7 @@ Expected: 418 + 1209 tests pass. If any failure references op_sub or arithmetic,
 
 Run:
 ```
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/subtraction
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/subtraction
 ```
 Expected: same pass rate as before. (If no matching filter exists, run `--filter language/expressions` for the broader slice.)
 
@@ -340,36 +340,36 @@ Expected: same pass rate as before. (If no matching filter exists, run `--filter
 `asm-diff --check` does not yet auto-discover the `dsl::handlers::cold::*` namespace (Phase 1.B followup). Capture manually:
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
 # Find the emitted asm file
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
 # Extract the op_sub_dsl symbol body
-awk '/^_op_sub_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm
+awk '/^_op_sub_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm
 ```
 
-Open `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm` and confirm it contains the inline fast path (instructions for `ldr`/`movz`/`movk`/`and`/`movz`/`movk`/`cmp`/`b.ne`/... pattern matching op_add's baseline). If the file is empty or contains only `b op_sub_slow_rs`, the inline path was not emitted — debug.
+Open `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm` and confirm it contains the inline fast path (instructions for `ldr`/`movz`/`movk`/`and`/`movz`/`movk`/`cmp`/`b.ne`/... pattern matching op_add's baseline). If the file is empty or contains only `b op_sub_slow_rs`, the inline path was not emitted — debug.
 
 - [ ] **Step 9: Run microbench**
 
 Run:
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes Sub --require-isolation
+cargo run --release -p lyng-bench -- microbench --opcodes Sub --require-isolation
 ```
 Expected output: ns/dispatch value with confidence interval. Record the number for the ported report. Per the per-opcode gate, the ns/dispatch should be within 2× of JSC LLInt's op_sub.
 
-If `microbench --opcodes Sub` reports "no snippet found" or similar, check `reports/js/lyng-js/dsl-1/phase-1b0-summary.md` for the snippet list and ensure a Sub microbench snippet exists in the bench tool's config. If not, add one mirroring the Add snippet from Phase 1.B.0 (this is a sub-task — handle it before continuing).
+If `microbench --opcodes Sub` reports "no snippet found" or similar, check `reports/lyng/dsl-1/phase-1b0-summary.md` for the snippet list and ensure a Sub microbench snippet exists in the bench tool's config. If not, add one mirroring the Add snippet from Phase 1.B.0 (this is a sub-task — handle it before continuing).
 
 - [ ] **Step 10: Run slow-path-share isolated V8 v7 sweep**
 
 Run:
 ```
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Sub
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Sub
 ```
 Expected: per-opcode slow-path-share table. The Sub row must show < 20% on all V8 v7 workloads (or document a per-workload waiver in the ported report against an LLInt-on-same-workload baseline).
 
 - [ ] **Step 11: Write the ported report**
 
-Create `reports/js/lyng-js/dsl-handlers/op_sub.md`. Use this template (copy verbatim, then fill in the captured data):
+Create `reports/lyng/dsl-handlers/op_sub.md`. Use this template (copy verbatim, then fill in the captured data):
 
 ````markdown
 # `op_sub` DSL port (opcode 33, B33)
@@ -379,7 +379,7 @@ mirroring the op_add shape from DSL-0 / Phase 1.A.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs` (around line 1050):
+`crates/lyng/vm/src/dsl/handlers/cold.rs` (around line 1050):
 
 ```rust
 llint_handler! {
@@ -405,11 +405,11 @@ llint_handler! {
 ## Slow-path shims
 
 - `op_sub_slow_rs` (unchanged; pre-existing cold-stub shim — invoked from the `.slow` label on SMI miss or overflow).
-- `op_sub_record_smi_rs` (NEW; fast-path feedback recording — mirrors `op_add_record_smi_rs`). Lives next to the handler. See `crates/lyng-js/vm/src/dsl/handlers/cold.rs` around line <line>.
+- `op_sub_record_smi_rs` (NEW; fast-path feedback recording — mirrors `op_add_record_smi_rs`). Lives next to the handler. See `crates/lyng/vm/src/dsl/handlers/cold.rs` around line <line>.
 
 ## Current asm
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm`.
 
 Fast path: <X> instructions. Side-by-side with LLInt:
 
@@ -458,7 +458,7 @@ Threshold per spec §5 + epic spec §1 criterion 6: < 20% per workload.
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm -p lyng-js-tests` passes.
+- `cargo test -p lyng-vm -p lyng-tests` passes.
 - Test262 `language/expressions/subtraction` slice: <pass count>/<total>.
 ````
 
@@ -466,14 +466,14 @@ Fill in the captured numbers from Steps 8-10. Commit the report.
 
 - [ ] **Step 12: Update `hot-opcodes.toml` budget for Sub**
 
-Open `tools/lyng-js-bench/hot-opcodes.toml`. Find the `[[opcodes]]` block for `name = "Sub"`. Update:
+Open `tools/lyng-bench/hot-opcodes.toml`. Find the `[[opcodes]]` block for `name = "Sub"`. Update:
 
 ```toml
 [[opcodes]]
 name = "Sub"
 target_slow_path_share = 0.20
 # DSL-1 Phase 1.C.1: inline DSL port landed. Budget = <measured + 2>.
-# Captured from reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm.
+# Captured from reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm.
 aarch64_max_instructions = <measured + 2>
 x86_64_max_instructions = 0
 ```
@@ -483,10 +483,10 @@ Set `<measured + 2>` to the instruction count from the ported report (~28-32 exp
 - [ ] **Step 13: Commit the op_sub port**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_sub.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_sub.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_sub.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_sub.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.1 Task 2: op_sub inline port
 
@@ -498,7 +498,7 @@ Per-opcode gates per spec §5:
 - Asm shape: <X> instructions (within 5 of LLInt's op_sub)
 - Microbench: <Y> ns/dispatch (Z× LLInt op_sub)
 - Slow-path-share: <W>% max across V8 v7 workloads
-- Behavioral parity: cargo test -p lyng-js-vm -p lyng-js-tests pass
+- Behavioral parity: cargo test -p lyng-vm -p lyng-tests pass
 - Test262 subtraction slice unchanged
 
 hot-opcodes.toml budget for Sub calibrated to measured + 2 headroom.
@@ -511,14 +511,14 @@ EOF
 ## Task 3: Port op_mul inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_mul_dsl` body (around line 1120) and add `op_mul_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_mul.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_mul.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Mul`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_mul_dsl` body (around line 1120) and add `op_mul_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_mul.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Mul`
 
 - [ ] **Step 1: Read the current cold-stub**
 
-Open `crates/lyng-js/vm/src/dsl/handlers/cold.rs` and locate `op_mul_dsl` (around line 1120). Current body:
+Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and locate `op_mul_dsl` (around line 1120). Current body:
 
 ```rust
 #[cfg(target_arch = "aarch64")]
@@ -584,7 +584,7 @@ pub extern "C" fn op_mul_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -595,30 +595,30 @@ pub extern "C" fn op_mul_record_smi_rs(
 - [ ] **Step 5: Build verify**
 
 ```
-cargo build --release -p lyng-js-vm
+cargo build --release -p lyng-vm
 ```
 Expected: clean compile.
 
 - [ ] **Step 6: Run behavioral tests**
 
 ```
-cargo test --release -p lyng-js-vm -p lyng-js-tests
+cargo test --release -p lyng-vm -p lyng-tests
 ```
 Expected: 418 + 1209 tests pass.
 
 - [ ] **Step 7: Run a focused Test262 slice**
 
 ```
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/multiplication
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/multiplication
 ```
 Expected: same pass rate as before.
 
 - [ ] **Step 8: Capture asm baseline manually**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_mul_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_mul.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_mul_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm
 ```
 
 Confirm the file shows the inline path (smull + sxtw + cmp + b.ne for overflow check).
@@ -626,26 +626,26 @@ Confirm the file shows the inline path (smull + sxtw + cmp + b.ne for overflow c
 - [ ] **Step 9: Run microbench**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes Mul --require-isolation
+cargo run --release -p lyng-bench -- microbench --opcodes Mul --require-isolation
 ```
 Record ns/dispatch with confidence interval.
 
 - [ ] **Step 10: Run slow-path-share isolated V8 v7 sweep (CRITICAL for op_mul)**
 
 ```
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Mul
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Mul
 ```
 
 **This is the gating measurement for Phase 1.C.1.** Per spec §8 risk row 1: op_mul slow-path-share on float-heavy workloads (RayTrace, NavierStokes) is the largest unknown.
 
 Capture per-workload share. If any workload exceeds 20%:
-- Run `lyng-js-bench v8suite --workload <name> --count-slow-path-share --opcodes Mul,Add` to get LLInt-on-same-workload share as the baseline.
+- Run `lyng-bench v8suite --workload <name> --count-slow-path-share --opcodes Mul,Add` to get LLInt-on-same-workload share as the baseline.
 - If LLInt also exceeds 20% on that workload, document a per-opcode waiver in the ported report (the threshold is about our fast-path matching LLInt's, not absolute share).
 - If LLInt is well below 20% on that workload and ours exceeds, something is wrong with our fast path; investigate before continuing.
 
 - [ ] **Step 11: Write the ported report**
 
-Create `reports/js/lyng-js/dsl-handlers/op_mul.md` using the same template as `op_sub.md` from Task 2 Step 11, adapted for op_mul:
+Create `reports/lyng/dsl-handlers/op_mul.md` using the same template as `op_sub.md` from Task 2 Step 11, adapted for op_mul:
 - DSL source: the new inline fast path above.
 - Slow-path shims: `op_mul_slow_rs` (unchanged) + `op_mul_record_smi_rs` (NEW).
 - Asm shape table: note the 4-instruction overflow check (smull + sxtw + cmp + b.ne) vs op_sub's 3.
@@ -670,10 +670,10 @@ If a per-workload waiver was documented in the ported report, also update `targe
 - [ ] **Step 13: Commit the op_mul port**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_mul.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_mul.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_mul.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_mul.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.1 Task 3: op_mul inline port
 
@@ -701,8 +701,8 @@ EOF
 ## Task 4: Phase 1.C.1 close — mini A/B + sub-phase summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1c1-ab-comparison.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1c1-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1c1-ab-comparison.md`
+- Create: `reports/lyng/dsl-1/phase-1c1-summary.md`
 
 - [ ] **Step 1: Capture pre-1.C.1 HEAD**
 
@@ -722,33 +722,33 @@ Build both binaries:
 
 ```bash
 # Save the current op_mul-landed binary
-cp target/release/lyng-js-bench /tmp/lyng-js-bench-post-1c1
+cp target/release/lyng-bench /tmp/lyng-bench-post-1c1
 
 # Build the pre-1.C.1 binary
 git worktree add /tmp/wt-pre-1c1 "$PRE_C1"
-(cd /tmp/wt-pre-1c1 && cargo build --release -p lyng-js-bench 2>/dev/null)
-cp /tmp/wt-pre-1c1/target/release/lyng-js-bench /tmp/lyng-js-bench-pre-1c1
+(cd /tmp/wt-pre-1c1 && cargo build --release -p lyng-bench 2>/dev/null)
+cp /tmp/wt-pre-1c1/target/release/lyng-bench /tmp/lyng-bench-pre-1c1
 git worktree remove /tmp/wt-pre-1c1
 ```
 
 Run the A/B (11 samples per side, loadavg-overlap-checked):
 
 ```bash
-cargo run --release -p lyng-js-bench -- ab \
-  --baseline /tmp/lyng-js-bench-pre-1c1 \
-  --candidate /tmp/lyng-js-bench-post-1c1 \
+cargo run --release -p lyng-bench -- ab \
+  --baseline /tmp/lyng-bench-pre-1c1 \
+  --candidate /tmp/lyng-bench-post-1c1 \
   --samples 11 \
   --require-isolation \
-  --output reports/js/lyng-js/dsl-1/phase-1c1-ab-comparison.md
+  --output reports/lyng/dsl-1/phase-1c1-ab-comparison.md
 ```
 
-If the bench tool's `ab` subcommand requires different flags, adapt to the convention used in `reports/js/lyng-js/dsl-1/phase-1b3-ab-comparison.md`.
+If the bench tool's `ab` subcommand requires different flags, adapt to the convention used in `reports/lyng/dsl-1/phase-1b3-ab-comparison.md`.
 
 Verify loadavg overlap is < ±20% in the captured report. If exceeded, re-run.
 
 - [ ] **Step 3: Write the sub-phase summary**
 
-Create `reports/js/lyng-js/dsl-1/phase-1c1-summary.md`:
+Create `reports/lyng/dsl-1/phase-1c1-summary.md`:
 
 ```markdown
 # DSL-1 Phase 1.C.1 — Binary arith with overflow — Summary
@@ -781,8 +781,8 @@ Combined dispatch share added: 654M / V8 v7 run.
 
 ## Per-opcode reports
 
-- [`reports/js/lyng-js/dsl-handlers/op_sub.md`](../dsl-handlers/op_sub.md)
-- [`reports/js/lyng-js/dsl-handlers/op_mul.md`](../dsl-handlers/op_mul.md)
+- [`reports/lyng/dsl-handlers/op_sub.md`](../dsl-handlers/op_sub.md)
+- [`reports/lyng/dsl-handlers/op_mul.md`](../dsl-handlers/op_mul.md)
 
 ## Gates passed
 
@@ -802,7 +802,7 @@ Fill in the captured numbers.
 - [ ] **Step 4: Commit the sub-phase summary + A/B artifact**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1c1-summary.md reports/js/lyng-js/dsl-1/phase-1c1-ab-comparison.md
+git add reports/lyng/dsl-1/phase-1c1-summary.md reports/lyng/dsl-1/phase-1c1-ab-comparison.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.1: phase summary — binary arith with overflow
 
@@ -829,10 +829,10 @@ Three ports, ~3 days. All use the no-overflow shape (no `b.vs` branch — the `*
 ## Task 5: Port op_bit_and inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_bit_and_dsl` body (around line 1435) and add `op_bit_and_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_bit_and.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `BitAnd`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_bit_and_dsl` body (around line 1435) and add `op_bit_and_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_bit_and.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `BitAnd`
 
 - [ ] **Step 1: Verify macro imports**
 
@@ -886,7 +886,7 @@ pub extern "C" fn op_bit_and_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -897,28 +897,28 @@ pub extern "C" fn op_bit_and_record_smi_rs(
 - [ ] **Step 4: Build + behavioral tests**
 
 ```
-cargo build --release -p lyng-js-vm
-cargo test --release -p lyng-js-vm -p lyng-js-tests
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/bitwise-and
+cargo build --release -p lyng-vm
+cargo test --release -p lyng-vm -p lyng-tests
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/bitwise-and
 ```
 Expected: clean compile; 418 + 1209 tests pass; Test262 bitwise-and slice unchanged.
 
 - [ ] **Step 5: Capture asm baseline manually**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_bit_and_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_bit_and_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm
 ```
 
 - [ ] **Step 6: Microbench + slow-path-share**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes BitAnd --require-isolation
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes BitAnd
+cargo run --release -p lyng-bench -- microbench --opcodes BitAnd --require-isolation
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes BitAnd
 ```
 
-- [ ] **Step 7: Write `reports/js/lyng-js/dsl-handlers/op_bit_and.md`**
+- [ ] **Step 7: Write `reports/lyng/dsl-handlers/op_bit_and.md`**
 
 Use the same template as `op_sub.md`. Note in the LLInt reference section that JSC's op_bitand also has no overflow branch. The asm shape should be ~3-4 instructions shorter than op_sub due to no `b.vs`.
 
@@ -936,10 +936,10 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_bit_and.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_bit_and.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_bit_and.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_bit_and.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.2 Task 5: op_bit_and inline port
 
@@ -960,10 +960,10 @@ EOF
 ## Task 6: Port op_shift_left inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_shift_left_dsl` body (around line 1539) and add `op_shift_left_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_shift_left.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftLeft`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_shift_left_dsl` body (around line 1539) and add `op_shift_left_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_shift_left.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftLeft`
 
 - [ ] **Step 1: Verify macro imports**
 
@@ -1014,7 +1014,7 @@ pub extern "C" fn op_shift_left_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -1025,27 +1025,27 @@ pub extern "C" fn op_shift_left_record_smi_rs(
 - [ ] **Step 4: Build + behavioral tests**
 
 ```
-cargo build --release -p lyng-js-vm
-cargo test --release -p lyng-js-vm -p lyng-js-tests
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/left-shift
+cargo build --release -p lyng-vm
+cargo test --release -p lyng-vm -p lyng-tests
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/left-shift
 ```
 
 - [ ] **Step 5: Capture asm baseline**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_shift_left_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_shift_left_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm
 ```
 
 - [ ] **Step 6: Microbench + slow-path-share**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes ShiftLeft --require-isolation
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes ShiftLeft
+cargo run --release -p lyng-bench -- microbench --opcodes ShiftLeft --require-isolation
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes ShiftLeft
 ```
 
-- [ ] **Step 7: Write `reports/js/lyng-js/dsl-handlers/op_shift_left.md`**
+- [ ] **Step 7: Write `reports/lyng/dsl-handlers/op_shift_left.md`**
 
 Use the same template as `op_bit_and.md`. Note the rhs-mask step (low 5 bits) per ECMAScript `<<` semantics.
 
@@ -1063,10 +1063,10 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_shift_left.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_left.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_shift_left.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_shift_left.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.2 Task 6: op_shift_left inline port
 
@@ -1085,10 +1085,10 @@ EOF
 ## Task 7: Port op_shift_right inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_shift_right_dsl` body (around line 1574) and add `op_shift_right_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_shift_right.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_right.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftRight`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_shift_right_dsl` body (around line 1574) and add `op_shift_right_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_shift_right.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `ShiftRight`
 
 - [ ] **Step 1: Verify macro imports**
 
@@ -1139,7 +1139,7 @@ pub extern "C" fn op_shift_right_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -1150,29 +1150,29 @@ pub extern "C" fn op_shift_right_record_smi_rs(
 - [ ] **Step 4: Build + behavioral tests**
 
 ```
-cargo build --release -p lyng-js-vm
-cargo test --release -p lyng-js-vm -p lyng-js-tests
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/right-shift
+cargo build --release -p lyng-vm
+cargo test --release -p lyng-vm -p lyng-tests
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/right-shift
 ```
 
 - [ ] **Step 5: Capture asm baseline**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_shift_right_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_right.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_shift_right_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm
 ```
 
 - [ ] **Step 6: Microbench + slow-path-share (CRITICAL — top-30 #10)**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes ShiftRight --require-isolation
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes ShiftRight
+cargo run --release -p lyng-bench -- microbench --opcodes ShiftRight --require-isolation
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes ShiftRight
 ```
 
 This is the largest dispatch share in Phase 1.C.2 (266M / V8 v7 run). If slow-path-share is high on Crypto (the workload that exercises shifts heaviest), investigate before continuing.
 
-- [ ] **Step 7: Write `reports/js/lyng-js/dsl-handlers/op_shift_right.md`**
+- [ ] **Step 7: Write `reports/lyng/dsl-handlers/op_shift_right.md`**
 
 Same template. Note this is the arithmetic (sign-preserving) right shift — distinct from `op_unsigned_shift_right` which uses `lsr` and has a uint32-can't-be-SMI bail-out.
 
@@ -1190,10 +1190,10 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_shift_right.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_shift_right.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_shift_right.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_shift_right.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.2 Task 7: op_shift_right inline port
 
@@ -1214,8 +1214,8 @@ EOF
 ## Task 8: Phase 1.C.2 close — mini A/B + sub-phase summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1c2-ab-comparison.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1c2-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1c2-ab-comparison.md`
+- Create: `reports/lyng/dsl-1/phase-1c2-summary.md`
 
 - [ ] **Step 1: Capture pre-1.C.2 HEAD**
 
@@ -1229,23 +1229,23 @@ echo "$PRE_C2"
 Build both binaries and run the A/B (mirror Task 4 Step 2):
 
 ```bash
-cp target/release/lyng-js-bench /tmp/lyng-js-bench-post-1c2
+cp target/release/lyng-bench /tmp/lyng-bench-post-1c2
 git worktree add /tmp/wt-pre-1c2 "$PRE_C2"
-(cd /tmp/wt-pre-1c2 && cargo build --release -p lyng-js-bench 2>/dev/null)
-cp /tmp/wt-pre-1c2/target/release/lyng-js-bench /tmp/lyng-js-bench-pre-1c2
+(cd /tmp/wt-pre-1c2 && cargo build --release -p lyng-bench 2>/dev/null)
+cp /tmp/wt-pre-1c2/target/release/lyng-bench /tmp/lyng-bench-pre-1c2
 git worktree remove /tmp/wt-pre-1c2
 
-cargo run --release -p lyng-js-bench -- ab \
-  --baseline /tmp/lyng-js-bench-pre-1c2 \
-  --candidate /tmp/lyng-js-bench-post-1c2 \
+cargo run --release -p lyng-bench -- ab \
+  --baseline /tmp/lyng-bench-pre-1c2 \
+  --candidate /tmp/lyng-bench-post-1c2 \
   --samples 11 \
   --require-isolation \
-  --output reports/js/lyng-js/dsl-1/phase-1c2-ab-comparison.md
+  --output reports/lyng/dsl-1/phase-1c2-ab-comparison.md
 ```
 
 Verify loadavg overlap < ±20%.
 
-- [ ] **Step 3: Write `reports/js/lyng-js/dsl-1/phase-1c2-summary.md`**
+- [ ] **Step 3: Write `reports/lyng/dsl-1/phase-1c2-summary.md`**
 
 ```markdown
 # DSL-1 Phase 1.C.2 — Bitwise / shifts — Summary
@@ -1287,7 +1287,7 @@ Combined dispatch share added: 453M / V8 v7 run.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1c2-summary.md reports/js/lyng-js/dsl-1/phase-1c2-ab-comparison.md
+git add reports/lyng/dsl-1/phase-1c2-summary.md reports/lyng/dsl-1/phase-1c2-ab-comparison.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.2: phase summary — bitwise / shifts
 
@@ -1312,14 +1312,14 @@ Two ports + 1 unit test, ~3 days. Uses the new `inc_smi_overflow!`/`dec_smi_over
 ## Task 9: Port op_increment inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_increment_dsl` body (around line 1678) and add `op_increment_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_increment.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Increment`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_increment_dsl` body (around line 1678) and add `op_increment_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_increment.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Increment`
 
 - [ ] **Step 1: Re-confirm the SMI-elision claim by reading the semantic**
 
-Open `crates/lyng-js/vm/src/dsl/handlers/cold.rs` and `crates/lyng-js/vm/src/vm/semantics/arithmetic.rs:796-833` side by side. Confirm:
+Open `crates/lyng/vm/src/dsl/handlers/cold.rs` and `crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833` side by side. Confirm:
 
 1. `op_update_register_semantic` (the shared body for op_increment/op_decrement) writes `numeric` to `args.src` BEFORE writing `value` to `args.dst` (line 825).
 2. For SMI src, `numeric` equals the original src value (the Vm helper `update_register_value` returns `(numeric=ToNumeric(src), value=numeric±1)`; ToNumeric on SMI is identity).
@@ -1378,7 +1378,7 @@ pub extern "C" fn op_increment_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -1389,19 +1389,19 @@ pub extern "C" fn op_increment_record_smi_rs(
 - [ ] **Step 5: Build + behavioral tests**
 
 ```
-cargo build --release -p lyng-js-vm
-cargo test --release -p lyng-js-vm -p lyng-js-tests
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/postfix-increment
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/prefix-increment
+cargo build --release -p lyng-vm
+cargo test --release -p lyng-vm -p lyng-tests
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/postfix-increment
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/prefix-increment
 ```
 Expected: all pass.
 
 - [ ] **Step 6: Capture asm baseline**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_increment_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_increment_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm
 ```
 
 Verify the file shows the inline path with `adds w?, w?, #1` (immediate form) and `b.vs` overflow branch.
@@ -1409,13 +1409,13 @@ Verify the file shows the inline path with `adds w?, w?, #1` (immediate form) an
 - [ ] **Step 7: Microbench + slow-path-share**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes Increment --require-isolation
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Increment
+cargo run --release -p lyng-bench -- microbench --opcodes Increment --require-isolation
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Increment
 ```
 
 Top-30 #5, 541M dispatches — second-largest dispatch share in Phase 1.C. The slow-path-share matters a lot.
 
-- [ ] **Step 8: Write `reports/js/lyng-js/dsl-handlers/op_increment.md`**
+- [ ] **Step 8: Write `reports/lyng/dsl-handlers/op_increment.md`**
 
 Use the same template as the prior ports, with an extra section documenting the SMI-elision claim:
 
@@ -1423,7 +1423,7 @@ Use the same template as the prior ports, with an extra section documenting the 
 ## SMI-elision of src register writeback
 
 The semantic body `op_update_register_semantic` (at
-[`crates/lyng-js/vm/src/vm/semantics/arithmetic.rs:796-833`](../../../crates/lyng-js/vm/src/vm/semantics/arithmetic.rs#L796-L833))
+[`crates/lyng/vm/src/vm/semantics/arithmetic.rs:796-833`](../../../crates/lyng/vm/src/vm/semantics/arithmetic.rs#L796-L833))
 writes `numeric = ToNumeric(src)` back to the src register before
 writing the post-update value to dst. For SMI src, `ToNumeric` is
 identity (`Value::from_smi(s).as_smi() == Some(s)`), so the writeback
@@ -1431,7 +1431,7 @@ is observationally a no-op.
 
 The inline fast path elides this writeback. The slow path (entered on
 non-SMI src) still performs it via `op_increment_semantic`. The
-[`dsl_increment_writeback`](../../../crates/lyng-js/tests/src/dsl_increment_writeback.rs)
+[`dsl_increment_writeback`](../../../crates/lyng/tests/src/dsl_increment_writeback.rs)
 unit test exercises a non-SMI src reaching the slow path and asserts
 the writeback still happens.
 ```
@@ -1450,10 +1450,10 @@ x86_64_max_instructions = 0
 - [ ] **Step 10: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_increment.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_increment.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_increment.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_increment.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.3 Task 9: op_increment inline port
 
@@ -1478,10 +1478,10 @@ EOF
 ## Task 10: Port op_decrement inline fast path
 
 **Files:**
-- Modify: `crates/lyng-js/vm/src/dsl/handlers/cold.rs` — replace `op_decrement_dsl` body (around line 1712) and add `op_decrement_record_smi_rs` shim
-- Create: `reports/js/lyng-js/dsl-handlers/op_decrement.md`
-- Create: `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm`
-- Modify: `tools/lyng-js-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Decrement`
+- Modify: `crates/lyng/vm/src/dsl/handlers/cold.rs` — replace `op_decrement_dsl` body (around line 1712) and add `op_decrement_record_smi_rs` shim
+- Create: `reports/lyng/dsl-handlers/op_decrement.md`
+- Create: `reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm`
+- Modify: `tools/lyng-bench/hot-opcodes.toml` — set `aarch64_max_instructions` for `Decrement`
 
 - [ ] **Step 1: Verify macro imports**
 
@@ -1530,7 +1530,7 @@ pub extern "C" fn op_decrement_record_smi_rs(
         let code = inner.code();
         inner
             .vm
-            .record_feedback_slot(code, lyng_js_types::FeedbackSlotId::from_raw(feedback_slot));
+            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
     }
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue {
         pc_advance: 6,
@@ -1541,18 +1541,18 @@ pub extern "C" fn op_decrement_record_smi_rs(
 - [ ] **Step 4: Build + behavioral tests**
 
 ```
-cargo build --release -p lyng-js-vm
-cargo test --release -p lyng-js-vm -p lyng-js-tests
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/postfix-decrement
-cargo run --release -p lyng-js-tests -- --test-source test262 --filter language/expressions/prefix-decrement
+cargo build --release -p lyng-vm
+cargo test --release -p lyng-vm -p lyng-tests
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/postfix-decrement
+cargo run --release -p lyng-tests -- --test-source test262 --filter language/expressions/prefix-decrement
 ```
 
 - [ ] **Step 5: Capture asm baseline**
 
 ```bash
-cargo rustc --release -p lyng-js-vm -- --emit=asm 2>/dev/null
-ASM_FILE=$(ls -t target/release/deps/lyng_js_vm-*.s 2>/dev/null | head -1)
-awk '/^_op_decrement_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm
+cargo rustc --release -p lyng-vm -- --emit=asm 2>/dev/null
+ASM_FILE=$(ls -t target/release/deps/lyng_vm-*.s 2>/dev/null | head -1)
+awk '/^_op_decrement_dsl:/,/^[[:space:]]*\.cfi_endproc/' "$ASM_FILE" > reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm
 ```
 
 Verify shows `subs w?, w?, #1` immediate form.
@@ -1560,11 +1560,11 @@ Verify shows `subs w?, w?, #1` immediate form.
 - [ ] **Step 6: Microbench + slow-path-share**
 
 ```
-cargo run --release -p lyng-js-bench -- microbench --opcodes Decrement --require-isolation
-cargo run --release -p lyng-js-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Decrement
+cargo run --release -p lyng-bench -- microbench --opcodes Decrement --require-isolation
+cargo run --release -p lyng-bench -- v8suite --require-isolation --count-slow-path-share --opcodes Decrement
 ```
 
-- [ ] **Step 7: Write `reports/js/lyng-js/dsl-handlers/op_decrement.md`**
+- [ ] **Step 7: Write `reports/lyng/dsl-handlers/op_decrement.md`**
 
 Mirror op_increment.md exactly — same SMI-elision section, just `dec_smi_overflow!` and "decrement"/"-1" instead of inc.
 
@@ -1582,10 +1582,10 @@ x86_64_max_instructions = 0
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/lyng-js/vm/src/dsl/handlers/cold.rs \
-        reports/js/lyng-js/dsl-handlers/op_decrement.md \
-        reports/js/lyng-js/dsl-asm-baseline-aarch64/op_decrement.asm \
-        tools/lyng-js-bench/hot-opcodes.toml
+git add crates/lyng/vm/src/dsl/handlers/cold.rs \
+        reports/lyng/dsl-handlers/op_decrement.md \
+        reports/lyng/dsl-asm-baseline-aarch64/op_decrement.asm \
+        tools/lyng-bench/hot-opcodes.toml
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.3 Task 10: op_decrement inline port
 
@@ -1608,25 +1608,25 @@ EOF
 ## Task 11: Unit test for inc/dec non-SMI-src writeback
 
 **Files:**
-- Create: `crates/lyng-js/tests/src/dsl_increment_writeback.rs`
-- Modify: `crates/lyng-js/tests/src/lib.rs` — add `mod dsl_increment_writeback;` (if `lib.rs` uses module declarations) or update the relevant test-module index
+- Create: `crates/lyng/tests/src/dsl_increment_writeback.rs`
+- Modify: `crates/lyng/tests/src/lib.rs` — add `mod dsl_increment_writeback;` (if `lib.rs` uses module declarations) or update the relevant test-module index
 
 - [ ] **Step 1: Locate the existing test crate's module index**
 
-Open `crates/lyng-js/tests/src/lib.rs`. Look for how other dsl_* tests are registered (e.g., `mod dsl_validation_xyz;` lines). The new test file must follow the same registration pattern.
+Open `crates/lyng/tests/src/lib.rs`. Look for how other dsl_* tests are registered (e.g., `mod dsl_validation_xyz;` lines). The new test file must follow the same registration pattern.
 
 - [ ] **Step 2: Identify what JS expression compiles to op_increment with non-SMI src**
 
 Run a quick disassembly check to find a minimal JS expression that emits `Increment` with a non-SMI input. Likely candidates:
 
 ```bash
-cargo run --release -p lyng-js-vm --bin lyng-js-vm -- --disassemble -e 'let s = "1"; s++'
+cargo run --release -p lyng-vm --bin lyng-vm -- --disassemble -e 'let s = "1"; s++'
 ```
 
 Look for `Increment r<N>, r<M>` in the disassembly. If the compiler does constant folding or peephole optimization that prevents this, try:
 
 ```bash
-cargo run --release -p lyng-js-vm --bin lyng-js-vm -- --disassemble -e 'function f(x) { x++; return x; } f("1")'
+cargo run --release -p lyng-vm --bin lyng-vm -- --disassemble -e 'function f(x) { x++; return x; } f("1")'
 ```
 
 The expression that emits Increment with a string-typed source is the test input.
@@ -1635,7 +1635,7 @@ If no JS expression in the current language surface compiles to `op_increment` w
 
 - [ ] **Step 3: Write the failing test**
 
-Create `crates/lyng-js/tests/src/dsl_increment_writeback.rs`:
+Create `crates/lyng/tests/src/dsl_increment_writeback.rs`:
 
 ```rust
 //! Verifies that `op_increment` and `op_decrement` still perform the
@@ -1644,7 +1644,7 @@ Create `crates/lyng-js/tests/src/dsl_increment_writeback.rs`:
 //! The DSL inline fast path elides the writeback for SMI src because
 //! `ToNumeric(SMI) == SMI` makes the write a no-op. This test exercises
 //! the non-SMI case to confirm the writeback happens via the semantic
-//! body's slow path. See `reports/js/lyng-js/dsl-handlers/op_increment.md`
+//! body's slow path. See `reports/lyng/dsl-handlers/op_increment.md`
 //! § SMI-elision.
 
 #[test]
@@ -1655,7 +1655,7 @@ fn increment_string_src_writes_coerced_numeric_back_to_src() {
     // ToNumber("1") = 1; replace `<EXPECTED_DST>` with the post-update
     // value (1 + 1 = 2 for increment).
 
-    let result = lyng_js_vm::test_helpers::eval_expr(
+    let result = lyng_vm::test_helpers::eval_expr(
         // Example shape — adjust to whatever compiles to op_increment with non-SMI src:
         r#"
         function f() {
@@ -1675,7 +1675,7 @@ fn increment_string_src_writes_coerced_numeric_back_to_src() {
 
 #[test]
 fn decrement_string_src_writes_coerced_numeric_back_to_src() {
-    let result = lyng_js_vm::test_helpers::eval_expr(
+    let result = lyng_vm::test_helpers::eval_expr(
         r#"
         function f() {
             let s = "2";
@@ -1689,12 +1689,12 @@ fn decrement_string_src_writes_coerced_numeric_back_to_src() {
 }
 ```
 
-If `lyng_js_vm::test_helpers::eval_expr` doesn't exist, look for the equivalent existing helper in `crates/lyng-js/tests/src/` (check how other dsl_* tests evaluate JS) and adapt the call.
+If `lyng_vm::test_helpers::eval_expr` doesn't exist, look for the equivalent existing helper in `crates/lyng/tests/src/` (check how other dsl_* tests evaluate JS) and adapt the call.
 
 - [ ] **Step 4: Run the test and verify it passes**
 
 ```
-cargo test --release -p lyng-js-tests dsl_increment_writeback
+cargo test --release -p lyng-tests dsl_increment_writeback
 ```
 Expected: both tests pass. The DSL fast path bails on non-SMI src, the slow path runs the full semantic, the writeback happens, the test passes.
 
@@ -1705,7 +1705,7 @@ If the test fails, the most likely cause is either:
 - [ ] **Step 5: Commit the unit test**
 
 ```bash
-git add crates/lyng-js/tests/src/dsl_increment_writeback.rs crates/lyng-js/tests/src/lib.rs
+git add crates/lyng/tests/src/dsl_increment_writeback.rs crates/lyng/tests/src/lib.rs
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.3 Task 11: inc/dec non-SMI src writeback test
 
@@ -1729,8 +1729,8 @@ EOF
 ## Task 12: Phase 1.C.3 close — mini A/B + sub-phase summary
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1c3-ab-comparison.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1c3-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1c3-ab-comparison.md`
+- Create: `reports/lyng/dsl-1/phase-1c3-summary.md`
 
 - [ ] **Step 1: Capture pre-1.C.3 HEAD**
 
@@ -1744,21 +1744,21 @@ echo "$PRE_C3"
 Mirror Task 4 Step 2 / Task 8 Step 2.
 
 ```bash
-cp target/release/lyng-js-bench /tmp/lyng-js-bench-post-1c3
+cp target/release/lyng-bench /tmp/lyng-bench-post-1c3
 git worktree add /tmp/wt-pre-1c3 "$PRE_C3"
-(cd /tmp/wt-pre-1c3 && cargo build --release -p lyng-js-bench 2>/dev/null)
-cp /tmp/wt-pre-1c3/target/release/lyng-js-bench /tmp/lyng-js-bench-pre-1c3
+(cd /tmp/wt-pre-1c3 && cargo build --release -p lyng-bench 2>/dev/null)
+cp /tmp/wt-pre-1c3/target/release/lyng-bench /tmp/lyng-bench-pre-1c3
 git worktree remove /tmp/wt-pre-1c3
 
-cargo run --release -p lyng-js-bench -- ab \
-  --baseline /tmp/lyng-js-bench-pre-1c3 \
-  --candidate /tmp/lyng-js-bench-post-1c3 \
+cargo run --release -p lyng-bench -- ab \
+  --baseline /tmp/lyng-bench-pre-1c3 \
+  --candidate /tmp/lyng-bench-post-1c3 \
   --samples 11 \
   --require-isolation \
-  --output reports/js/lyng-js/dsl-1/phase-1c3-ab-comparison.md
+  --output reports/lyng/dsl-1/phase-1c3-ab-comparison.md
 ```
 
-- [ ] **Step 3: Write `reports/js/lyng-js/dsl-1/phase-1c3-summary.md`**
+- [ ] **Step 3: Write `reports/lyng/dsl-1/phase-1c3-summary.md`**
 
 ```markdown
 # DSL-1 Phase 1.C.3 — Unary update (inc/dec) — Summary
@@ -1808,7 +1808,7 @@ idempotent. Slow path (non-SMI src) still performs the writeback. See
 - [ ] **Step 4: Commit**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1c3-summary.md reports/js/lyng-js/dsl-1/phase-1c3-ab-comparison.md
+git add reports/lyng/dsl-1/phase-1c3-summary.md reports/lyng/dsl-1/phase-1c3-ab-comparison.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C.3: phase summary — unary update (inc/dec)
 
@@ -1834,40 +1834,40 @@ EOF
 ## Task 13: Phase-close cumulative A/B vs pre-DSL-0 d850f261
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1c-cumulative-ab.md`
+- Create: `reports/lyng/dsl-1/phase-1c-cumulative-ab.md`
 
 - [ ] **Step 1: Build the pre-DSL-0 baseline binary**
 
 ```bash
 git worktree add /tmp/wt-pre-dsl0 d850f261
-(cd /tmp/wt-pre-dsl0 && cargo build --release -p lyng-js-bench 2>/dev/null)
-cp /tmp/wt-pre-dsl0/target/release/lyng-js-bench /tmp/lyng-js-bench-pre-dsl0
+(cd /tmp/wt-pre-dsl0 && cargo build --release -p lyng-bench 2>/dev/null)
+cp /tmp/wt-pre-dsl0/target/release/lyng-bench /tmp/lyng-bench-pre-dsl0
 git worktree remove /tmp/wt-pre-dsl0
 ```
 
 - [ ] **Step 2: Use the current (post-1.C.3) binary as the candidate**
 
 ```bash
-cargo build --release -p lyng-js-bench
-cp target/release/lyng-js-bench /tmp/lyng-js-bench-post-1c
+cargo build --release -p lyng-bench
+cp target/release/lyng-bench /tmp/lyng-bench-post-1c
 ```
 
 - [ ] **Step 3: Run 11-sample cumulative A/B**
 
 ```bash
-cargo run --release -p lyng-js-bench -- ab \
-  --baseline /tmp/lyng-js-bench-pre-dsl0 \
-  --candidate /tmp/lyng-js-bench-post-1c \
+cargo run --release -p lyng-bench -- ab \
+  --baseline /tmp/lyng-bench-pre-dsl0 \
+  --candidate /tmp/lyng-bench-post-1c \
   --samples 11 \
   --require-isolation \
-  --output reports/js/lyng-js/dsl-1/phase-1c-cumulative-ab.md
+  --output reports/lyng/dsl-1/phase-1c-cumulative-ab.md
 ```
 
 Verify loadavg overlap < ±20%. If exceeded, re-run.
 
 - [ ] **Step 4: Open the captured A/B report and confirm the umbrella gate**
 
-Open `reports/js/lyng-js/dsl-1/phase-1c-cumulative-ab.md`. Confirm:
+Open `reports/lyng/dsl-1/phase-1c-cumulative-ab.md`. Confirm:
 1. Cumulative geomean is positive vs `d850f261` (must be > +8.51%, Phase 1.B close).
 2. All 6 V8 v7 workloads have positive or near-flat deltas.
 3. If any workload has > 5% regression, that's an off-ramp consideration per spec §7 (epic spec §1 criterion 3).
@@ -1877,7 +1877,7 @@ The re-baselined target per spec §3 is **+13% to +16% cumulative**. Document th
 - [ ] **Step 5: Commit the A/B artifact**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1c-cumulative-ab.md
+git add reports/lyng/dsl-1/phase-1c-cumulative-ab.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C cumulative A/B vs pre-DSL-0 d850f261
 
@@ -1899,17 +1899,17 @@ EOF
 ## Task 14: Phase 1.C summary + followups
 
 **Files:**
-- Create: `reports/js/lyng-js/dsl-1/phase-1c-summary.md`
-- Create: `reports/js/lyng-js/dsl-1/phase-1c-followups.md`
+- Create: `reports/lyng/dsl-1/phase-1c-summary.md`
+- Create: `reports/lyng/dsl-1/phase-1c-followups.md`
 
 - [ ] **Step 1: Run the final Test262 check at phase HEAD**
 
 ```bash
-cargo run --release -p lyng-js-tests -- --test-source test262 --summary
+cargo run --release -p lyng-tests -- --test-source test262 --summary
 ```
 Expected: ≥ 49729 passing files (Phase 1.B baseline). Record the exact count for the summary.
 
-- [ ] **Step 2: Write `reports/js/lyng-js/dsl-1/phase-1c-summary.md`**
+- [ ] **Step 2: Write `reports/lyng/dsl-1/phase-1c-summary.md`**
 
 ```markdown
 # DSL-1 Phase 1.C — SMI arithmetic + bitwise — Summary
@@ -2022,16 +2022,16 @@ LoadEnvSlot substrate sub-phase remains a deferred followup (Phase 1.B.3 origin)
 
 - DSL-1 epic spec: [`docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md`](../../../docs/superpowers/specs/2026-05-18-dsl-1-hot-opcode-rollout-design.md)
 - Phase 1.B umbrella summary: [`phase-1b-summary.md`](phase-1b-summary.md)
-- Engine state at Phase 1.B close: [`reports/js/lyng-js/asm-dsl-engine-state-2026-05-21.md`](../asm-dsl-engine-state-2026-05-21.md)
+- Engine state at Phase 1.B close: [`reports/lyng/asm-dsl-engine-state-2026-05-21.md`](../asm-dsl-engine-state-2026-05-21.md)
 - Phase 1.C sub-phase summaries: [`phase-1c1-summary.md`](phase-1c1-summary.md), [`phase-1c2-summary.md`](phase-1c2-summary.md), [`phase-1c3-summary.md`](phase-1c3-summary.md)
 - Phase 1.C cumulative A/B: [`phase-1c-cumulative-ab.md`](phase-1c-cumulative-ab.md)
-- Per-opcode ported reports: under [`reports/js/lyng-js/dsl-handlers/`](../dsl-handlers/)
+- Per-opcode ported reports: under [`reports/lyng/dsl-handlers/`](../dsl-handlers/)
 - Followups: [`phase-1c-followups.md`](phase-1c-followups.md)
 ```
 
 Fill in the captured numbers from Task 13.
 
-- [ ] **Step 3: Write `reports/js/lyng-js/dsl-1/phase-1c-followups.md`**
+- [ ] **Step 3: Write `reports/lyng/dsl-1/phase-1c-followups.md`**
 
 Aggregate followups discovered during the phase. Template:
 
@@ -2080,7 +2080,7 @@ non-SMI src, document here.)
 - [ ] **Step 4: Commit phase summary + followups**
 
 ```bash
-git add reports/js/lyng-js/dsl-1/phase-1c-summary.md reports/js/lyng-js/dsl-1/phase-1c-followups.md
+git add reports/lyng/dsl-1/phase-1c-summary.md reports/lyng/dsl-1/phase-1c-followups.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.C: phase summary + followups + cumulative-A/B framing
 
@@ -2108,19 +2108,19 @@ EOF
 ## Task 15: Engine state snapshot refresh (optional but recommended)
 
 **Files:**
-- Create: `reports/js/lyng-js/asm-dsl-engine-state-<phase-close-date>.md`
+- Create: `reports/lyng/asm-dsl-engine-state-<phase-close-date>.md`
 
 - [ ] **Step 1: Copy the previous engine state snapshot as a starting point**
 
 ```bash
 DATE=$(date +%Y-%m-%d)
-cp reports/js/lyng-js/asm-dsl-engine-state-2026-05-21.md \
-   reports/js/lyng-js/asm-dsl-engine-state-${DATE}.md
+cp reports/lyng/asm-dsl-engine-state-2026-05-21.md \
+   reports/lyng/asm-dsl-engine-state-${DATE}.md
 ```
 
 - [ ] **Step 2: Update the snapshot**
 
-Edit `reports/js/lyng-js/asm-dsl-engine-state-${DATE}.md`. Update:
+Edit `reports/lyng/asm-dsl-engine-state-${DATE}.md`. Update:
 
 - Title date.
 - HEAD commit to phase-1c-close hash.
@@ -2138,7 +2138,7 @@ Edit `reports/js/lyng-js/asm-dsl-engine-state-${DATE}.md`. Update:
 - [ ] **Step 3: Commit the engine state snapshot**
 
 ```bash
-git add reports/js/lyng-js/asm-dsl-engine-state-${DATE}.md
+git add reports/lyng/asm-dsl-engine-state-${DATE}.md
 git commit -m "$(cat <<'EOF'
 Add asm-DSL engine state-of-the-engine snapshot ($(date +%Y-%m-%d))
 
@@ -2157,7 +2157,7 @@ Covers:
 - Next-step recommendation: Phase 1.D (comparison + branch) vs
   LoadEnvSlot substrate sub-phase
 
-Companion to the per-phase summaries under reports/js/lyng-js/dsl-1/.
+Companion to the per-phase summaries under reports/lyng/dsl-1/.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF

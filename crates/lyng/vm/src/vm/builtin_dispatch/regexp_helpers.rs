@@ -1,6 +1,6 @@
 use super::{errors, Agent, FrameRecord, Value, Vm, VmError, VmResult};
-use lyng_js_objects::RegExpPayload;
-use lyng_js_parser::validate_regexp_literal;
+use lyng_objects::RegExpPayload;
+use lyng_parser::validate_regexp_literal;
 
 impl Vm {
     pub(super) fn regexp_literal_builtin(

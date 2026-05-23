@@ -1,6 +1,6 @@
 //! asm-visible state record + Rust-only context per design §5.
 
-use lyng_js_types::Value;
+use lyng_types::Value;
 
 use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
@@ -113,20 +113,21 @@ impl Default for LlIntExitSlot {
 /// which handles the throw / lex-env walk as appropriate.
 #[inline]
 pub(crate) fn resolve_this_state_to_mirror(
-    this_state: Option<lyng_js_env::ThisState>,
+    this_state: Option<lyng_env::ThisState>,
     fallback_frame_this: Value,
 ) -> Value {
     match this_state {
-        Some(lyng_js_env::ThisState::Value(v)) => v,
-        Some(lyng_js_env::ThisState::Uninitialized)
-        | Some(lyng_js_env::ThisState::Lexical) => Value::uninitialized_lexical(),
+        Some(lyng_env::ThisState::Value(v)) => v,
+        Some(lyng_env::ThisState::Uninitialized) | Some(lyng_env::ThisState::Lexical) => {
+            Value::uninitialized_lexical()
+        }
         None => fallback_frame_this,
     }
 }
 
 /// Top-level helper: derives the mirror from an `Agent` + a
 /// `FrameRecord`. Mirrors the read path in
-/// `crates/lyng-js/vm/src/vm/semantics/names.rs` so the pre-resolution
+/// `crates/lyng/vm/src/vm/semantics/names.rs` so the pre-resolution
 /// matches `op_load_this` semantics exactly.
 ///
 /// Called from:
@@ -135,7 +136,7 @@ pub(crate) fn resolve_this_state_to_mirror(
 ///   (Refresh arm)
 #[inline]
 pub(crate) fn resolve_initial_this_value(
-    agent: &lyng_js_env::Agent,
+    agent: &lyng_env::Agent,
     frame: &crate::FrameRecord,
 ) -> Value {
     let this_state = agent.current_execution_context().map(|ec| ec.this_state());
@@ -147,8 +148,8 @@ pub(crate) fn resolve_initial_this_value(
 mod tests {
     use super::*;
     use crate::dsl::reg_convention as r;
-    use lyng_js_env::ThisState;
-    use lyng_js_types::Value;
+    use lyng_env::ThisState;
+    use lyng_types::Value;
 
     #[test]
     fn ll_int_state_offsets_stable() {

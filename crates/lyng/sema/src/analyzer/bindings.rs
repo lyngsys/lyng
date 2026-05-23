@@ -1,5 +1,5 @@
-use lyng_js_ast::{Decl, Stmt};
-use lyng_js_common::{AtomId, Span, WellKnownAtom};
+use lyng_ast::{Decl, Stmt};
+use lyng_common::{AtomId, Span, WellKnownAtom};
 
 use super::Analyzer;
 use crate::binding::{BindingRecord, DeclarationKind, StorageClass};
@@ -139,7 +139,7 @@ impl Analyzer<'_> {
 
     pub(super) fn annex_b_if_clause_function_skips_var_name(
         &self,
-        stmt_id: lyng_js_ast::StmtId,
+        stmt_id: lyng_ast::StmtId,
         scope_kind: ScopeKind,
     ) -> bool {
         if self.ctx.strict || !matches!(scope_kind, ScopeKind::Global | ScopeKind::Function) {
@@ -239,12 +239,7 @@ impl Analyzer<'_> {
             || name == WellKnownAtom::yield_.id()
     }
 
-    pub(super) fn record_use(
-        &mut self,
-        expr: Option<lyng_js_ast::ExprId>,
-        name: AtomId,
-        _span: Span,
-    ) {
+    pub(super) fn record_use(&mut self, expr: Option<lyng_ast::ExprId>, name: AtomId, _span: Span) {
         let (binding, kind) = self.resolve_name(name);
         let scope = self.ctx.current_scope;
         self.use_sites.alloc(UseSiteRecord {

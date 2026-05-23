@@ -26,13 +26,13 @@
 //! semantic's first branch produces the `DoublePrefix` error without
 //! ever touching the asm trampoline or running any handler chain.
 
-use lyng_js_bytecode::Opcode;
-use lyng_js_vm::dsl::slow_path::SemanticOutcome;
-use lyng_js_vm::dsl::test_helpers::prefix_semantics::{
+use lyng_bytecode::Opcode;
+use lyng_vm::dsl::slow_path::SemanticOutcome;
+use lyng_vm::dsl::test_helpers::prefix_semantics::{
     invoke_extra_wide_semantic_via_dsl_harness, invoke_wide_semantic_via_dsl_harness,
 };
-use lyng_js_vm::dsl::test_helpers::DslHarness;
-use lyng_js_vm::VmError;
+use lyng_vm::dsl::test_helpers::DslHarness;
+use lyng_vm::VmError;
 
 #[test]
 fn op_wide_followed_by_op_wide_raises_double_prefix() {
@@ -88,9 +88,8 @@ fn op_wide_alone_records_prefix_and_continues() {
     // PC past the full wide instruction itself — the semantic body's
     // role here is the prefix bit-flip plus double-prefix guard.
     let mut harness = DslHarness::new();
-    let outcome = harness.with_alpha_dispatch(None, |state| {
-        invoke_wide_semantic_via_dsl_harness(state)
-    });
+    let outcome =
+        harness.with_alpha_dispatch(None, |state| invoke_wide_semantic_via_dsl_harness(state));
     match outcome {
         SemanticOutcome::Continue { pc_advance } => {
             assert_eq!(pc_advance, 0, "prefix should not advance PC");

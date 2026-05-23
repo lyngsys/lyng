@@ -38,7 +38,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint] [suite-options]",
+        "Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint] [suite-options]",
         "",
         "Suites:",
         "  runtime       Lyng JS runtime, frontend, and memory benchmark report",
@@ -51,7 +51,7 @@ pub fn help_text() -> String {
         "  microbench    Per-opcode ns/dispatch with confidence interval (R-0 Phase 4)",
         "  capture-llint Extract JSC LLInt handler asm or offlineasm source (R-0 Phase 5)",
         "",
-        "Run `lyng-js-bench <suite> --help` for suite-specific options.",
+        "Run `lyng-bench <suite> --help` for suite-specific options.",
     ]
     .join("\n")
 }
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn defaults_to_runtime_suite_when_no_suite_is_provided() {
         assert_eq!(
-            parse_command(&args(&["lyng-js-bench"])).unwrap(),
+            parse_command(&args(&["lyng-bench"])).unwrap(),
             Command::Runtime(vec![])
         );
     }
@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn parses_density_suite_without_phase_names() {
         assert_eq!(
-            parse_command(&args(&["lyng-js-bench", "density", "--samples", "3"])).unwrap(),
+            parse_command(&args(&["lyng-bench", "density", "--samples", "3"])).unwrap(),
             Command::Density(vec!["--samples".to_string(), "3".to_string()])
         );
     }
@@ -84,7 +84,7 @@ mod tests {
     fn parses_test262_suite_for_agent_diagnostics() {
         assert_eq!(
             parse_command(&args(&[
-                "lyng-js-bench",
+                "lyng-bench",
                 "test262",
                 "--filter",
                 "built-ins/Date"
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn parses_external_engine_compare_suite() {
         assert_eq!(
-            parse_command(&args(&["lyng-js-bench", "compare", "--samples", "3"])).unwrap(),
+            parse_command(&args(&["lyng-bench", "compare", "--samples", "3"])).unwrap(),
             Command::Compare(vec!["--samples".to_string(), "3".to_string()])
         );
     }
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-js-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint]"));
+        assert!(help.contains("Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint]"));
         assert!(help.contains("test262"));
         assert!(help.contains("Test262 performance diagnostics for agents"));
         assert!(help.contains("compare"));
@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn parses_v8suite_subcommand_with_passthrough_args() {
         assert_eq!(
-            parse_command(&args(&["lyng-js-bench", "v8suite", "--samples", "5"])).unwrap(),
+            parse_command(&args(&["lyng-bench", "v8suite", "--samples", "5"])).unwrap(),
             Command::V8Suite(vec!["--samples".to_string(), "5".to_string()])
         );
     }
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn parses_v8suite_subcommand_with_no_args() {
         assert_eq!(
-            parse_command(&args(&["lyng-js-bench", "v8suite"])).unwrap(),
+            parse_command(&args(&["lyng-bench", "v8suite"])).unwrap(),
             Command::V8Suite(vec![])
         );
     }

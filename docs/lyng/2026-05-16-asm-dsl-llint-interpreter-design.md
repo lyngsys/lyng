@@ -2,21 +2,21 @@
 
 **Date:** 2026-05-16
 **Status:** Design approved; ready for implementation planning.
-**Supersedes (in spirit):** parts of [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md) — specifically its Option α substrate commitment and Phase 1/Phase 3 acceptance criteria.
-**Companion document:** [`reports/js/lyng-js/llint-parity-state-of-engine.md`](../../reports/js/lyng-js/llint-parity-state-of-engine.md) — the measurement-driven retrospective that motivated this design.
+**Supersedes (in spirit):** parts of [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md) — specifically its Option α substrate commitment and Phase 1/Phase 3 acceptance criteria.
+**Companion document:** [`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md) — the measurement-driven retrospective that motivated this design.
 
 ---
 
 ## 1. Context
 
-The previous JSC-aligned roadmap (`lyng-49qk`) committed to Option α — a Rust `extern "C" fn` per-handler dispatch table with a central trampoline returning a `Step` enum. After landing Phase 1 through Phase 3f + Phase 4a-b, isolated bench numbers (`reports/js/lyng-js/external-engine-compare.md`) show lyng-js at:
+The previous JSC-aligned roadmap (`lyng-49qk`) committed to Option α — a Rust `extern "C" fn` per-handler dispatch table with a central trampoline returning a `Step` enum. After landing Phase 1 through Phase 3f + Phase 4a-b, isolated bench numbers (`reports/lyng/external-engine-compare.md`) show lyng at:
 
 - **5-12× slower than JSC LLInt** across V8 v7 (Richards 318 vs LLInt 1871).
 - **1.6-3.7× slower than QuickJS** — the engine the original roadmap called "ceiling too low."
 
 The retrospective established that α has a structural ~13× substrate overhead vs LLInt that no amount of IC layering can amortize. The substrate decision itself is the rate-limiting step.
 
-This design specifies a new substrate path that targets **near-LLInt interpreter performance on stable Rust with contained unsafe.** It draws on JSC's LLInt as a reference architecture — its source is the gold-standard implementation of this design class — but lyng-js retains complete control over data layout, dispatch macros, and runtime decisions. No JSC code is vendored; we read JSC, understand the patterns, and re-implement them in our own Rust DSL.
+This design specifies a new substrate path that targets **near-LLInt interpreter performance on stable Rust with contained unsafe.** It draws on JSC's LLInt as a reference architecture — its source is the gold-standard implementation of this design class — but lyng retains complete control over data layout, dispatch macros, and runtime decisions. No JSC code is vendored; we read JSC, understand the patterns, and re-implement them in our own Rust DSL.
 
 The user's stance on unsafe: **anything stable Rust supports, if contained behind a clean macro layer.** The user's stance on time: **not a constraint** — the project has the resources to do this right.
 
@@ -34,7 +34,7 @@ The user's stance on unsafe: **anything stable Rust supports, if contained behin
 ### Non-goals
 
 - **JIT.** Out of scope for this design. The Baseline JIT (original Phases 5-6) remains valid in shape and stays deferred behind the interpreter milestone. We will not start JIT work until the interpreter substrate is complete and measured.
-- **x86_64 support in the initial implementation.** Deferred until lyng-js has a concrete x86_64 user. AArch64 (Apple Silicon dev hardware) is the only initial target.
+- **x86_64 support in the initial implementation.** Deferred until lyng has a concrete x86_64 user. AArch64 (Apple Silicon dev hardware) is the only initial target.
 - **CI enforcement.** No CI infrastructure exists today; this design assumes developer-driven discipline (committed artifacts, manual baseline refresh). CI is a follow-up.
 - **Adopting JSC's runtime data layout.** We read JSC as reference, not as a layout source-of-truth. Our `Value`, `Cell`, `Shape`, `FeedbackVector` remain our designs (subject to evidence-driven refactor during this work).
 
@@ -429,7 +429,7 @@ The single-implementation invariant (§10) includes prefix decoding: prefix logi
 ### Crate and module layout
 
 ```
-crates/lyng-js-vm-dsl/                  -- proc-macro crate, new
+crates/lyng/vm-dsl/                  -- proc-macro crate, new
 ├── Cargo.toml                          -- proc-macro = true
 └── src/
     ├── lib.rs                          -- llint_handler! entry point
@@ -437,7 +437,7 @@ crates/lyng-js-vm-dsl/                  -- proc-macro crate, new
     ├── layouts.rs                      -- operand-layout descriptors
     └── lower.rs                        -- AST → asm string assembly
 
-crates/lyng-js/vm/src/dsl/              -- runtime-side support
+crates/lyng/vm/src/dsl/              -- runtime-side support
 ├── mod.rs                              -- re-exports llint_handler!, declares backend
 ├── reg_convention.rs                   -- pinned-register docs + LlIntState const offsets
 ├── llint_state.rs                      -- LlIntState repr(C), LlIntRustContext, LlIntExitSlot, ExitKind
@@ -506,12 +506,12 @@ The build is `cargo build`. No external tools, no code generators, no Ruby. The 
 
 ### `cargo asm` automation
 
-A new subcommand of the existing `lyng-js-bench` tool:
+A new subcommand of the existing `lyng-bench` tool:
 
 ```sh
-cargo run --release -p lyng-js-bench -- asm-diff \
-  --opcodes-config tools/lyng-js-bench/hot-opcodes.toml \
-  --baseline       reports/js/lyng-js/dsl-asm-baseline-aarch64/ \
+cargo run --release -p lyng-bench -- asm-diff \
+  --opcodes-config tools/lyng-bench/hot-opcodes.toml \
+  --baseline       reports/lyng/dsl-asm-baseline-aarch64/ \
   --output         /tmp/asm-current/ \
   --mode           check    # or `update`
 ```
@@ -521,11 +521,11 @@ Reads the hot-opcode list, captures the per-handler asm, normalizes, diffs again
 **Asm capture strategy.** `cargo-asm` (the third-party crate) is the convenient developer-facing tool but is not a Cargo build dependency. The subcommand shells out to whichever capture mechanism is available:
 
 1. `cargo asm` if installed (`cargo install cargo-asm`).
-2. Fallback: `cargo rustc --release -p lyng-js-vm -- --emit=asm` and parse the resulting `.s` files for the named symbols. This path has no external-crate dependency.
+2. Fallback: `cargo rustc --release -p lyng-vm -- --emit=asm` and parse the resulting `.s` files for the named symbols. This path has no external-crate dependency.
 
 The subcommand prefers (1) for convenience, falls back to (2) automatically, and supports `--capture-mode=rustc` for the deterministic path.
 
-**Normalization is spec'd up front.** Before any baseline is captured, the normalization rules are committed to `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`:
+**Normalization is spec'd up front.** Before any baseline is captured, the normalization rules are committed to `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`:
 
 - Strip `.cfi_*` directives and other debug metadata.
 - Strip file/line/column comments (`# /path/to/file.rs:N:C`).
@@ -539,7 +539,7 @@ This rule set is the single source of truth for baseline diffs; changes to it re
 ### Asm baselines: in-repo
 
 ```
-reports/js/lyng-js/dsl-asm-baseline-aarch64/
+reports/lyng/dsl-asm-baseline-aarch64/
 ├── op_add.asm
 ├── op_move.asm
 ├── op_get_named_property.asm
@@ -551,18 +551,18 @@ Small text files (0.5-5 KB each). Diffable in git. Reviewers read them in change
 ### LLInt reference capture (one-shot tool)
 
 ```sh
-cargo run --release -p lyng-js-bench -- capture-llint \
+cargo run --release -p lyng-bench -- capture-llint \
   --source [auto|system|local|excerpt] \
   --jsc-binary <path>                    # required for system/local
   --jsc-source <path>                    # required for excerpt mode
   --opcodes op_get_by_id,op_put_by_id,op_add,op_mov,op_jmp,op_call,op_ret \
-  --output  reports/js/lyng-js/llint-reference/
+  --output  reports/lyng/llint-reference/
 ```
 
 Three source modes for resilience:
 
 - **`system`**: invokes `otool -tvV` (macOS) / `objdump -d` (Linux) on the system JSC binary. Finds `_llint_op_*` symbols. **Falls through to `local` if symbols are stripped** (some macOS releases ship stripped JavaScriptCore).
-- **`local`**: same approach but on a locally built `JavaScriptCore` (WebKit checkout at known path). Required for users on stripped systems. Documented setup steps in `docs/lyng-js/llint-reference-setup.md` produced as part of R-0.
+- **`local`**: same approach but on a locally built `JavaScriptCore` (WebKit checkout at known path). Required for users on stripped systems. Documented setup steps in `docs/lyng/llint-reference-setup.md` produced as part of R-0.
 - **`excerpt`**: extracts handler bodies from JSC's `LowLevelInterpreter*.asm` source files directly via offlineasm-aware parsing. Produces *source-level* reference (offlineasm pseudo-code) rather than concrete asm. Always available; used as a last-resort fallback.
 - **`auto`** (default): tries `system`, falls back to `local`, falls back to `excerpt`. Reports which mode produced each opcode in the output.
 
@@ -573,7 +573,7 @@ Reference material; re-captured only when JSC ships a major version or when our 
 For each DSL handler we author:
 
 ```
-reports/js/lyng-js/dsl-handlers/
+reports/lyng/dsl-handlers/
 ├── op_add.md
 ├── op_get_named_property.md
 └── ...
@@ -593,9 +593,9 @@ These are the audit artifact per handler. They replace today's `phase-N-*.asm` f
 ### Microbench harness
 
 ```sh
-cargo run --release -p lyng-js-bench -- microbench \
-  --opcodes-config tools/lyng-js-bench/hot-opcodes.toml \
-  --baseline       reports/js/lyng-js/microbench-baseline.md \
+cargo run --release -p lyng-bench -- microbench \
+  --opcodes-config tools/lyng-bench/hot-opcodes.toml \
+  --baseline       reports/lyng/microbench-baseline.md \
   --samples        7 \
   --iters          5000000 \
   --require-isolation
@@ -608,10 +608,10 @@ Each opcode has a hot-loop test case (a JS function compiled to bytecode exercis
 Discipline is developer-driven, artifact-based. Per change:
 
 1. Build with `cargo build --release`.
-2. Run `cargo run -p lyng-js-bench -- asm-diff --check`.
-3. If a hot opcode's asm changed, run `cargo run -p lyng-js-bench -- microbench` for the affected opcodes.
+2. Run `cargo run -p lyng-bench -- asm-diff --check`.
+3. If a hot opcode's asm changed, run `cargo run -p lyng-bench -- microbench` for the affected opcodes.
 4. If touching IC / property / arithmetic: run isolated V8 v7 sweep.
-5. Run `cargo test -p lyng-js-vm -p lyng-js-tests` for behavioral coverage.
+5. Run `cargo test -p lyng-vm -p lyng-tests` for behavioral coverage.
 6. Run focused Test262 slice; whole-corpus for substantive changes.
 7. Commit asm baselines + ported reports + handler source + bench reports together.
 
@@ -643,7 +643,7 @@ Expected surfaces (we'll learn more during DSL-0):
 | `Cell` 8-byte header layout (JSC-equivalent)                       | DSL-1 (if needed)      | ~2-3 weeks       | If asm-diff shows our object-record access is multi-instruction where LLInt is one |
 | `Shape` transition representation                                  | DSL-1 (if hot)         | TBD; evaluate when porting `op_get_named_property` / IC opcodes | Audit during porting; refactor only if evidence supports |
 
-The `Value` layout verification is **not a refactor** — it's an R-0 deliverable. R-0 produces `reports/js/lyng-js/llint-dsl-value-layout.md` documenting exact masks (`notCellMask`-equivalent, SMI tag bits, double encoding offset, undefined/null/bool encodings), expected asm sequences per check/tag operation on AArch64, and any irreducible deltas vs LLInt. The DSL backend's `check_*!` / `tag_*!` macros are implemented against this report. If the report uncovers a Value-layout problem severe enough to need a refactor, that becomes a separate ticket; DSL-0 does not start until the report exists.
+The `Value` layout verification is **not a refactor** — it's an R-0 deliverable. R-0 produces `reports/lyng/llint-dsl-value-layout.md` documenting exact masks (`notCellMask`-equivalent, SMI tag bits, double encoding offset, undefined/null/bool encodings), expected asm sequences per check/tag operation on AArch64, and any irreducible deltas vs LLInt. The DSL backend's `check_*!` / `tag_*!` macros are implemented against this report. If the report uncovers a Value-layout problem severe enough to need a refactor, that becomes a separate ticket; DSL-0 does not start until the report exists.
 
 ### `FeedbackVector` flat-array lifecycle
 
@@ -651,7 +651,7 @@ Today's `FeedbackVector` is `Vec<Option<FeedbackSiteState>>` with lazy allocatio
 
 - **Eager allocation at code installation.** When `InstalledFunction` is constructed from compiled bytecode, the flat IC-entry array is allocated to the bytecode's feedback-slot count. Slow paths never grow it at runtime.
 - **Pointer stability for the installed function's lifetime.** Storage is `Box<[FeedbackEntry]>` (or equivalent fixed-storage). The `FV` pin survives any slow-path call, including allocations and GC.
-- **Per-entry content unchanged.** Phase 3f's packed monomorphic/proto/polymorphic sidecars stay inside each `FeedbackEntry`. The flattening is about *vector storage*, not *entry content*. Existing IC fast-path evidence (`reports/js/lyng-js/phase-3f-status.md`) carries forward.
+- **Per-entry content unchanged.** Phase 3f's packed monomorphic/proto/polymorphic sidecars stay inside each `FeedbackEntry`. The flattening is about *vector storage*, not *entry content*. Existing IC fast-path evidence (`reports/lyng/phase-3f-status.md`) carries forward.
 - **Closures sharing code share `FeedbackEntry` storage.** Consistent with today's per-function-not-per-closure feedback. Pin pointer is per-active-frame, refreshed on call/return.
 - **Compatibility with current rich state.** The flat array becomes the hot path. The legacy `FeedbackVector` may stay as a side-table for rare-but-rich state (e.g., recent observation types, tier-up counters that don't fit in the IC entry). Decide which fields move into the entry vs stay on the side-table based on which the DSL hot paths read.
 
@@ -667,24 +667,24 @@ The measurement infrastructure the original roadmap needed and lacked, plus thre
 
 **Tooling deliverables:**
 
-- `lyng-js-bench microbench` subcommand: per-opcode ns/dispatch with confidence interval, isolated execution, loadavg gate.
-- `lyng-js-bench asm-diff` subcommand: cargo-asm/`rustc --emit=asm` capture, normalization, baseline comparison, budget enforcement.
-- `lyng-js-bench capture-llint` subcommand: auto/system/local/excerpt source modes (§8).
-- **Slow-path-share counter mode** (the DSL-1 invariant's leading indicator). `lyng-js-bench` subcommands gain a `--count-slow-path-share` flag behind the existing `opcode-counters` Cargo feature. Each `call_slow!` invocation increments a per-opcode counter; counters are separated into `slow_path_semantic` (for `op_xxx_slow_rs` shims invoked from cold stubs or hot-handler fall-back) and `slow_path_safepoint` (for warm-handler poll bridges like `op_loop_header_poll_rs`). The DSL-1 invariant uses only `slow_path_semantic`; safepoint polls fire when scheduled and don't reflect fast-path failure. Counter mode is feature-flagged so the un-instrumented binary runs benchmarks without perturbation. Output format compatible with `tools/lyng-js-bench/hot-opcodes.toml`'s per-opcode `target_slow_path_share` thresholds (default 0.20, per-opcode waiver supported).
+- `lyng-bench microbench` subcommand: per-opcode ns/dispatch with confidence interval, isolated execution, loadavg gate.
+- `lyng-bench asm-diff` subcommand: cargo-asm/`rustc --emit=asm` capture, normalization, baseline comparison, budget enforcement.
+- `lyng-bench capture-llint` subcommand: auto/system/local/excerpt source modes (§8).
+- **Slow-path-share counter mode** (the DSL-1 invariant's leading indicator). `lyng-bench` subcommands gain a `--count-slow-path-share` flag behind the existing `opcode-counters` Cargo feature. Each `call_slow!` invocation increments a per-opcode counter; counters are separated into `slow_path_semantic` (for `op_xxx_slow_rs` shims invoked from cold stubs or hot-handler fall-back) and `slow_path_safepoint` (for warm-handler poll bridges like `op_loop_header_poll_rs`). The DSL-1 invariant uses only `slow_path_semantic`; safepoint polls fire when scheduled and don't reflect fast-path failure. Counter mode is feature-flagged so the un-instrumented binary runs benchmarks without perturbation. Output format compatible with `tools/lyng-bench/hot-opcodes.toml`'s per-opcode `target_slow_path_share` thresholds (default 0.20, per-opcode waiver supported).
 - **Opcode-counter mode under naked dispatch.** Current opcode counter is updated by the trampoline; once dispatch is tail-jumped, the counter needs a new insertion point. Decision: build-time feature flag with conditional DSL emission. When `--features opcode-counters` is set, the `llint_handler!` proc-macro emits an extra `inc_counter!` op at the start of every handler (per-arch: ~3 instrs of `ldr/add/str` against a counter array keyed by opcode ID). When the feature is off, the proc-macro emits a no-op — zero per-dispatch overhead. Slow-path-share counters share the same feature flag with separate counter banks.
 
 **Configuration and baselines committed:**
 
-- `tools/lyng-js-bench/hot-opcodes.toml`: top-30 opcodes by *measured* dispatch count from running the opcode counter on V8 v7 + internal benchmarks. Not guessed. Per-opcode `target_slow_path_share` thresholds (default 0.20).
-- `reports/js/lyng-js/llint-reference/`: LLInt reference asm/source for the top-30 opcodes (whichever capture mode succeeds per-opcode).
-- `reports/js/lyng-js/microbench-baseline.md`: current ns/dispatch baseline before any DSL work.
-- `reports/js/lyng-js/dsl-asm-baseline-aarch64/NORMALIZATION.md`: the normalization rule set committed before any baselines.
+- `tools/lyng-bench/hot-opcodes.toml`: top-30 opcodes by *measured* dispatch count from running the opcode counter on V8 v7 + internal benchmarks. Not guessed. Per-opcode `target_slow_path_share` thresholds (default 0.20).
+- `reports/lyng/llint-reference/`: LLInt reference asm/source for the top-30 opcodes (whichever capture mode succeeds per-opcode).
+- `reports/lyng/microbench-baseline.md`: current ns/dispatch baseline before any DSL work.
+- `reports/lyng/dsl-asm-baseline-aarch64/NORMALIZATION.md`: the normalization rule set committed before any baselines.
 
 **Evidence reports (the three the review called out):**
 
-- `reports/js/lyng-js/llint-dsl-value-layout.md`: exact current `Value` layout (NaN tag header, kind bits, payload encoding), masks for SMI/cell-ref/undefined/null/bool/double checks, expected AArch64 asm sequences for each `check_*!` and `tag_*!` operation, irreducible deltas vs LLInt's pointer-identity-cell vocabulary, decision: DSL-0 uses current tags. This report is the source of truth for the `values.rs` macros in the DSL backend.
-- `reports/js/lyng-js/llint-dsl-abi.md`: `LlIntState` and `LlIntRustContext` layouts with field offsets, the `LlIntRustContextOpaque` erased pointer pattern, pinned-register convention with const expressions, slow-path return ABI, exit-slot protocol, entry shim (`Vm::run_via_trampoline` builds both records, points `state.rust_context` at the opaque-typed pointer), exit shim (`_interpreter_exit` reads `rust_context.exit`), pre-slow-path sync protocol (§6) with explicit per-shim sequence, four-layer state sync rules (pinned regs / `LlIntState.frame_*` / `LlIntRustContext.frame` / `vm.frames`), offset-generation tests, Miri tests on the slow-path shim layer, the PC-sync invariant test that confirms a semantic body sees the post-dispatch PC.
-- `reports/js/lyng-js/llint-dsl-safepoints.md`: GC poll semantics under the DSL substrate (same-thread `Vm.poll_pending: u8`, `GC_PENDING | DEBUG_PAUSE` bits only — tier accounting explicitly deferred from DSL-0 per §10), debugger pause integration via existing `&mut self` APIs, prefix dispatch semantics (`op_wide` / `op_extra_wide`), warm-opcode safepoint coverage, invariant tests for: tight `op_add` + `op_loop_header` loop reaches poll; tight backward `op_jump` loop (no loop header) reaches poll; conditional backward-jump loop reaches poll; Wide-prefixed instruction decodes correctly; double-prefix raises expected error.
+- `reports/lyng/llint-dsl-value-layout.md`: exact current `Value` layout (NaN tag header, kind bits, payload encoding), masks for SMI/cell-ref/undefined/null/bool/double checks, expected AArch64 asm sequences for each `check_*!` and `tag_*!` operation, irreducible deltas vs LLInt's pointer-identity-cell vocabulary, decision: DSL-0 uses current tags. This report is the source of truth for the `values.rs` macros in the DSL backend.
+- `reports/lyng/llint-dsl-abi.md`: `LlIntState` and `LlIntRustContext` layouts with field offsets, the `LlIntRustContextOpaque` erased pointer pattern, pinned-register convention with const expressions, slow-path return ABI, exit-slot protocol, entry shim (`Vm::run_via_trampoline` builds both records, points `state.rust_context` at the opaque-typed pointer), exit shim (`_interpreter_exit` reads `rust_context.exit`), pre-slow-path sync protocol (§6) with explicit per-shim sequence, four-layer state sync rules (pinned regs / `LlIntState.frame_*` / `LlIntRustContext.frame` / `vm.frames`), offset-generation tests, Miri tests on the slow-path shim layer, the PC-sync invariant test that confirms a semantic body sees the post-dispatch PC.
+- `reports/lyng/llint-dsl-safepoints.md`: GC poll semantics under the DSL substrate (same-thread `Vm.poll_pending: u8`, `GC_PENDING | DEBUG_PAUSE` bits only — tier accounting explicitly deferred from DSL-0 per §10), debugger pause integration via existing `&mut self` APIs, prefix dispatch semantics (`op_wide` / `op_extra_wide`), warm-opcode safepoint coverage, invariant tests for: tight `op_add` + `op_loop_header` loop reaches poll; tight backward `op_jump` loop (no loop header) reaches poll; conditional backward-jump loop reaches poll; Wide-prefixed instruction decodes correctly; double-prefix raises expected error.
 
 **Exit criteria:**
 
@@ -714,7 +714,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 
 **DSL-0a exit criterion:** every opcode has its semantic body extracted into a free function. Alpha handlers are wrappers only. The invariant is enforced by a **structural manifest**, not by source-grep alone:
 
-- `crates/lyng-js/vm/src/dsl/opcode_manifest.rs` declares `const OPCODES: &[OpcodeEntry]` with one entry per `Opcode` variant (`opcode`, `semantic_symbol: &'static str`, `dsl_handler_symbol: &'static str`, `category: OpcodeCategory`).
+- `crates/lyng/vm/src/dsl/opcode_manifest.rs` declares `const OPCODES: &[OpcodeEntry]` with one entry per `Opcode` variant (`opcode`, `semantic_symbol: &'static str`, `dsl_handler_symbol: &'static str`, `category: OpcodeCategory`).
 - Test 1: `OPCODES` length equals `Opcode` variant count (exhaustive coverage).
 - Test 2: each `semantic_symbol` resolves to a real Rust function in the binary (linker reference).
 - Test 3: each `dsl_handler_symbol` resolves to a real handler (linker reference, applies after DSL-0b).
@@ -722,7 +722,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 
 **DSL-0b — DSL infrastructure + hot ports + cold stubs (~4-5 weeks):**
 
-- `lyng-js-vm-dsl` proc-macro crate created.
+- `lyng-vm-dsl` proc-macro crate created.
 - `vm/src/dsl/backend/aarch64/` populated with the operations the spike needs (~20-25 ops, including direct-memory ops for warm handlers, `dispatch_prefixed!` for prefix opcodes, and `inc_counter!` for opcode-counter mode).
 - `LlIntState` `#[repr(C)]` + `LlIntRustContext` + `LlIntRustContextOpaque` defined per §5. Const field-offsets exposed via `offset_of!`. Offset-generation tests in place.
 - Register-pin convention enforced; `Vm::run` entry shim builds `LlIntRustContext`, points `state.rust_context` at it (cast to `*mut LlIntRustContextOpaque`), loads pinned registers, tail-jumps into dispatch. `_interpreter_exit` consumes `rust_context.exit` and builds `VmResult<Value>`.
@@ -751,7 +751,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 - Re-run all behavioral tests; re-run microbench + V8 v7.
 - **Verify the single-implementation invariant via the manifest (§10 DSL-0a):**
   - Test 5: every `OpcodeEntry.dsl_handler_symbol` resolves to a function in the binary (linker check).
-  - Test 6: `dispatch_handlers` module path does not exist in `crates/lyng-js/vm/src/`; source-grep confirms no `dispatch_next!`, `Step`, or `DISPATCH_TABLE` references in opcode semantic modules.
+  - Test 6: `dispatch_handlers` module path does not exist in `crates/lyng/vm/src/`; source-grep confirms no `dispatch_next!`, `Step`, or `DISPATCH_TABLE` references in opcode semantic modules.
   - Test 7: opcode-counter mode (when compiled with `--features opcode-counters`) produces correct per-opcode dispatch counts under the DSL substrate, matching alpha-path counts within a documented per-handler instrumentation delta.
 
 **DSL-0 exit criteria (no waivers):**
@@ -759,7 +759,7 @@ During DSL-0a, the legacy alpha handler in `dispatch_handlers/` is thinned to op
 1. **Single-implementation invariant via manifest.** `OpcodeEntry` manifest covers every `Opcode` variant (Test 1 exhaustive); every `semantic_symbol` and `dsl_handler_symbol` resolves (Tests 2, 3, 5); source-grep smoke test (Tests 4, 6) shows no handler-shaped logic outside the manifest-listed locations; opcode-counter mode preserves per-opcode counts under DSL dispatch (Test 7).
 2. **Asm shape vs LLInt (softened).** Each ported hot handler's main hit path is within 5 instructions of LLInt's matching handler, plus any documented irreducible delta from the current `Value`/`ObjectRef` layout captured in `llint-dsl-value-layout.md`. The ported report quantifies the delta per opcode.
 3. **Microbench vs LLInt-equivalent.** Each ported hot opcode's ns/dispatch is within 2× of JSC LLInt's matching opcode, measured on the same dev MacBook with `--require-isolation`, 7-sample medians, identical iteration counts.
-4. **Behavioral parity.** `cargo test -p lyng-js-vm -p lyng-js-tests` passes. Test262 pass count ≥ the pre-DSL-0 pristine baseline captured at the start of R-0 (currently `49722/49729` per [test262.md](../../reports/js/lyng-js/test262.md), refresh during R-0).
+4. **Behavioral parity.** `cargo test -p lyng-vm -p lyng-tests` passes. Test262 pass count ≥ the pre-DSL-0 pristine baseline captured at the start of R-0 (currently `49722/49729` per [test262.md](../../reports/lyng/test262.md), refresh during R-0).
 5. **V8 v7 directional check (executable now).** Geomean across V8 v7 workloads moves by **≥ +20%** vs pre-DSL-0 baseline. Richards specifically ≥ +30%. The gate works because all 152 opcodes are on the new substrate; the 5 fully-ported hot handlers carry the win.
 6. **All 9 DSL-0b validation cases pass** (slow-path round-trip, PC-sync, three safepoint coverage cases, three prefix cases — see DSL-0b scope).
 7. **No mysterious regressions.** Per-opcode dispatch-counter output before and after DSL-0 differs only in opcodes that legitimately changed.
@@ -780,7 +780,7 @@ Port the remaining ~25 hot opcodes (top-30 minus the 5 from DSL-0) from cold stu
 4. Run `cargo asm` on the handler; inspect; iterate until shape is right.
 5. Run microbench; capture into ported report.
 6. Run isolated V8 v7 sweep; capture into ported report.
-7. Write `reports/js/lyng-js/dsl-handlers/op_xxx.md` with side-by-side LLInt diff + data.
+7. Write `reports/lyng/dsl-handlers/op_xxx.md` with side-by-side LLInt diff + data.
 8. Commit asm baseline + ported report + handler source as one cohesive change.
 
 **Port order (priority by dispatch share + risk):**
@@ -807,7 +807,7 @@ Port the remaining ~25 hot opcodes (top-30 minus the 5 from DSL-0) from cold stu
 
 Not in initial scope. Activates when:
 
-- lyng-js has a concrete x86_64 user / deployment, **or**
+- lyng has a concrete x86_64 user / deployment, **or**
 - A contributor wants to work on x86_64 specifically.
 
 When activated: ~6 weeks of porting `backend/aarch64/` to `backend/x86_64/`. DSL surface is identical; only the per-arch macros change. All handlers (hot and cold) recompile against the new backend.
@@ -859,21 +859,21 @@ Orthogonal to the DSL work. Spec compliance is about *semantics* (does `Array.pr
 | Cold-stub authoring overhead during DSL-0b                             | medium     | low    | ~15-30 min per stub × 145 ≈ 1.5 weeks. Mechanical work. If the per-stub time blows out, the slow-path-bridge protocol is fundamentally wrong and we should know in DSL-0b week 2. |
 | Per-arch divergence in handler behavior                                | low        | high   | Behavioral tests cover both arches. Per-arch asm baselines acknowledge shape differences but behavior is one source of truth. |
 | Rust toolchain bugs in `#[unsafe(naked)]` / `core::arch::naked_asm!`   | low        | medium | Asm baselines catch codegen changes immediately. Can pin known-good rustc if needed. `naked_asm!` is stable as of Rust 1.88; mature enough for production use. |
-| AGENTS.md / engineering-standards.md current "no unsafe in lyng-js" policy contradicts the DSL | high (if not pre-fixed) | medium | Policy doc updates **must land in the same change as the DSL crate** to avoid contradictory instructions to future agents. See §12. |
+| AGENTS.md / engineering-standards.md current "no unsafe in lyng" policy contradicts the DSL | high (if not pre-fixed) | medium | Policy doc updates **must land in the same change as the DSL crate** to avoid contradictory instructions to future agents. See §12. |
 | Recruiting / onboarding cost for DSL fluency                           | medium     | low    | DSL is small. Cold opcodes stay simple stubs. Documentation + JSC reference files lower the bar.      |
 | Data-layout refactors stall on GC integration (specifically pointer-identity cells) | medium | medium | Each refactor is its own ticket with own evidence requirement. Refactor only when DSL-0/1 surfaces hot need. |
 | Microbench / V8 v7 measurement noise on dev machine                    | high       | low    | `--require-isolation` enforces loadavg < 2.0. Document quiescing steps. Accept higher variance on multi-purpose machines. |
 
 ## 12. Policy and issue-tracker alignment (must land with the design)
 
-The current `crates/lyng-js/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future agents see consistent guidance.
+The current `crates/lyng/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future agents see consistent guidance.
 
 **Required updates:**
 
-- **`crates/lyng-js/AGENTS.md`** — replace the blanket no-unsafe rule with a scoped exception: `unsafe` is allowed only in (a) the `lyng-js-vm-dsl` crate, (b) `crates/lyng-js/vm/src/dsl/` (the DSL backend, entry/exit shims, slow-path bridge module), and (c) bridge modules explicitly named in this design. Hand-written `unsafe` outside these locations remains forbidden.
-- **`docs/lyng-js/engineering-standards.md`** — add a section on the DSL substrate boundary, the unsafe surface within it, and the audit/review expectations for changes to those modules.
-- **`docs/lyng-js/architecture.md`** — reflect the new dispatch substrate (DSL handlers, tail-jump dispatch, `LlIntState` ABI) replacing the α trampoline description.
-- **Lint or source-level test** — a `cargo test` that walks `crates/lyng-js/**/*.rs` and fails if `unsafe` appears outside the approved module paths. Mechanical enforcement of the policy.
+- **`crates/lyng/AGENTS.md`** — replace the blanket no-unsafe rule with a scoped exception: `unsafe` is allowed only in (a) the `lyng-vm-dsl` crate, (b) `crates/lyng/vm/src/dsl/` (the DSL backend, entry/exit shims, slow-path bridge module), and (c) bridge modules explicitly named in this design. Hand-written `unsafe` outside these locations remains forbidden.
+- **`docs/lyng/engineering-standards.md`** — add a section on the DSL substrate boundary, the unsafe surface within it, and the audit/review expectations for changes to those modules.
+- **`docs/lyng/architecture.md`** — reflect the new dispatch substrate (DSL handlers, tail-jump dispatch, `LlIntState` ABI) replacing the α trampoline description.
+- **Lint or source-level test** — a `cargo test` that walks `crates/lyng/**/*.rs` and fails if `unsafe` appears outside the approved module paths. Mechanical enforcement of the policy.
 
 **Issue-tracker alignment:**
 
@@ -901,27 +901,27 @@ These don't block the design but should be answered with data, not speculation:
 
 ## 14. References
 
-- **Companion retrospective:** [`reports/js/lyng-js/llint-parity-state-of-engine.md`](../../reports/js/lyng-js/llint-parity-state-of-engine.md) — the measurement-driven analysis of why the original roadmap missed.
+- **Companion retrospective:** [`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md) — the measurement-driven analysis of why the original roadmap missed.
 - **Design review feedback (Codex, first pass, 2026-05-16):** the review that triggered the first revision. P0/P1 findings (`naked_asm!` vs `asm!`, slow-path ABI insufficient for `VmError`, `DispatchState` not C-ABI, safepoint coverage gap, Value-layout vocabulary mismatch, DSL-0 V8-v7 gate not executable, FV lifecycle underspecified) are addressed in §3, §4, §5, §6, §7, §9, and §10.
 - **Design review feedback (Codex, second pass, 2026-05-16):** the review that triggered the second revision. P0/P1 findings (trait-object fat pointers can't erase to `c_void`, `LlIntState` missing full frame/install context, cold stubs need semantic-extraction subphase, `op_loop_header` is a marker not a jump, backward-jump poll coverage, `FV` mutability, `LlIntExitSlot` should be Rust-side, `poll_pending` producer model, `sym` operand specification, no-unwind policy) are addressed by introducing `LlIntRustContext` (§5), the DSL-0a semantic-extraction subphase (§10), the warm backward-jump handler category (§3, §6), and the slow-path-share invariant in DSL-1 (§10).
 - **Design review feedback (Codex, third pass, 2026-05-16):** the review that triggered the third revision. Verdict: no P0 blockers; P1/P2 findings to fold in before R-0. Findings (`'static` lifetime stand-in is misleading, `AtomicU8` over-specifies cross-thread debugger, tier-up counter has circular producer problem, pre-slow-path PC sync underspecified, prefix dispatch needs explicit DSL design, slow-path-share instrumentation must be R-0 deliverable, source-grep too weak for invariant, opcode-counter mode under naked dispatch unspecified) are addressed by the `LlIntRustContextOpaque` erasure (§5), the same-thread `Vm.poll_pending: u8` design (§6), the deliberate deferral of tier accounting from DSL-0 (§6, §10), the pre-slow-path sync protocol (§6), the `dispatch_prefixed!` DSL operation and three prefix validation cases (§6, §10), slow-path-share counters as an R-0 deliverable (§10), the opcode manifest with seven structural invariant tests (§10), and feature-flagged `inc_counter!` for opcode-counter mode (§10).
-- **Original roadmap (superseded in scope):** [`reports/js/lyng-js/jsc-aligned-engine-roadmap.md`](../../reports/js/lyng-js/jsc-aligned-engine-roadmap.md) — Phase 1-6 plan. The interpreter-track substrate decision (Option α) is reversed by this design; the Baseline JIT track (Phases 5-6) remains valid in shape, deferred behind this work.
+- **Original roadmap (superseded in scope):** [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md) — Phase 1-6 plan. The interpreter-track substrate decision (Option α) is reversed by this design; the Baseline JIT track (Phases 5-6) remains valid in shape, deferred behind this work.
 - **JSC LLInt source (reference, not vendored):** `/Users/sondre/dev/WebKit/Source/JavaScriptCore/llint/`
   - `LowLevelInterpreter.asm` — dispatch macros, wrapper macros (`llintOp*`).
   - `LowLevelInterpreter64.asm` — 64-bit handler bodies including `performGetByIDHelper`.
   - `offlineasm/` — Ruby DSL compiler (architectural reference for our DSL's design).
 - **JSC IC metadata reference:** `Source/JavaScriptCore/bytecode/GetByIdMetadata.h` — the `GetByIdMode` enum design our `op_get_named_property` mode-byte refactor mirrors.
 - **JSC value layout reference:** `Source/JavaScriptCore/runtime/JSCJSValue.h` — for the R-0 `llint-dsl-value-layout.md` comparison.
-- **Our current Value implementation:** [`crates/lyng-js/types/src/value.rs`](../../crates/lyng-js/types/src/value.rs) — the source of truth for the value-layout report.
+- **Our current Value implementation:** [`crates/lyng/types/src/value.rs`](../../crates/lyng/types/src/value.rs) — the source of truth for the value-layout report.
 - **Our current dispatch substrate (to be replaced):**
-  - [`crates/lyng-js/vm/src/vm/dispatch_state.rs`](../../crates/lyng-js/vm/src/vm/dispatch_state.rs)
-  - [`crates/lyng-js/vm/src/vm/dispatch_handlers/`](../../crates/lyng-js/vm/src/vm/dispatch_handlers/)
-  - [`crates/lyng-js/vm/src/vm/dispatch/`](../../crates/lyng-js/vm/src/vm/dispatch/)
-  - [`crates/lyng-js/vm/src/vm/feedback.rs`](../../crates/lyng-js/vm/src/vm/feedback.rs)
-- **Existing bench tool to be extended:** [`tools/lyng-js-bench/src/cli.rs`](../../tools/lyng-js-bench/src/cli.rs) — currently has `runtime`, `density`, `test262`, `compare`, `v8suite`. R-0 adds `microbench`, `asm-diff`, `capture-llint`.
+  - [`crates/lyng/vm/src/vm/dispatch_state.rs`](../../crates/lyng/vm/src/vm/dispatch_state.rs)
+  - [`crates/lyng/vm/src/vm/dispatch_handlers/`](../../crates/lyng/vm/src/vm/dispatch_handlers/)
+  - [`crates/lyng/vm/src/vm/dispatch/`](../../crates/lyng/vm/src/vm/dispatch/)
+  - [`crates/lyng/vm/src/vm/feedback.rs`](../../crates/lyng/vm/src/vm/feedback.rs)
+- **Existing bench tool to be extended:** [`tools/lyng-bench/src/cli.rs`](../../tools/lyng-bench/src/cli.rs) — currently has `runtime`, `density`, `test262`, `compare`, `v8suite`. R-0 adds `microbench`, `asm-diff`, `capture-llint`.
 - **Project standards (subject to update per §12):**
   - [`AGENTS.md`](../../AGENTS.md) — repo-level guide.
-  - [`crates/lyng-js/AGENTS.md`](../../crates/lyng-js/AGENTS.md) — Lyng JS operating guide. **Update required**: scope-allow `unsafe` in DSL modules.
-  - [`docs/lyng-js/engineering-standards.md`](engineering-standards.md) — code quality bar. **Update required**: DSL boundary review expectations.
-  - [`docs/lyng-js/architecture.md`](architecture.md) — system architecture. **Update required**: reflect new dispatch substrate.
-  - [`docs/lyng-js/performance-workflow.md`](performance-workflow.md) — existing perf measurement conventions; the DSL workflow extends these.
+  - [`crates/lyng/AGENTS.md`](../../crates/lyng/AGENTS.md) — Lyng JS operating guide. **Update required**: scope-allow `unsafe` in DSL modules.
+  - [`docs/lyng/engineering-standards.md`](engineering-standards.md) — code quality bar. **Update required**: DSL boundary review expectations.
+  - [`docs/lyng/architecture.md`](architecture.md) — system architecture. **Update required**: reflect new dispatch substrate.
+  - [`docs/lyng/performance-workflow.md`](performance-workflow.md) — existing perf measurement conventions; the DSL workflow extends these.

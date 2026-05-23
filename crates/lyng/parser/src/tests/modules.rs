@@ -1,5 +1,5 @@
 use super::*;
-use lyng_js_common::WellKnownAtom;
+use lyng_common::WellKnownAtom;
 
 // ===========================================================================
 // Modules (import/export)

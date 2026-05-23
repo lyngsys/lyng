@@ -1,11 +1,11 @@
-//! Builtin bootstrap and native builtin dispatch for lyng-js.
+//! Builtin bootstrap and native builtin dispatch for lyng.
 //!
-//! Ownership: `lyng_js_builtins` owns builtin registration tables, descriptor
+//! Ownership: `lyng_builtins` owns builtin registration tables, descriptor
 //! table shapes, bootstrap entrypoint surfaces, and builtin call contracts. It
 //! owns the public core builtin namespace, while the reserved
 //! `internal_*` builtin IDs remain a separate lowering-helper lane bridged
 //! through this crate. It does not own VM dispatch, runtime state, or object
-//! semantics that belong in `lyng_js_vm`, `lyng_js_env`, or `lyng_js_objects`.
+//! semantics that belong in `lyng_vm`, `lyng_env`, or `lyng_objects`.
 
 #![allow(
     clippy::module_name_repetitions,

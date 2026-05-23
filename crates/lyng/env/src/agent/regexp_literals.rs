@@ -1,7 +1,7 @@
 use super::{Agent, RegExpLiteralCacheKey};
 use crate::RuntimeDomainAccounting;
-use lyng_js_objects::RegExpPayload;
-use lyng_js_types::{CodeRef, RealmRef};
+use lyng_objects::RegExpPayload;
+use lyng_types::{CodeRef, RealmRef};
 use std::collections::hash_map::Entry;
 use std::mem::size_of;
 

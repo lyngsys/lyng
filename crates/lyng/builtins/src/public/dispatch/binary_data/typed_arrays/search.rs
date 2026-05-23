@@ -12,8 +12,8 @@ use super::{
     typed_array_storage_bits_to_value, typed_array_validated_record_and_length,
 };
 use crate::BuiltinInvocation;
-use lyng_js_ops::read;
-use lyng_js_types::{BuiltinFunctionId, Value};
+use lyng_ops::read;
+use lyng_types::{BuiltinFunctionId, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_search_builtin<
     Cx: PublicBuiltinDispatchContext,

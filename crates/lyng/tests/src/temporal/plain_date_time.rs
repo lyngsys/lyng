@@ -31,7 +31,7 @@ fn temporal_plain_date_time_constructor_getters_and_serialization() {
             threw,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -61,7 +61,7 @@ fn temporal_plain_date_time_iso_derived_getters_use_date_part() {
             common.inLeapYear,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "4|60|29|366|12|true|7|365|31|365|12|false");
@@ -94,7 +94,7 @@ fn temporal_plain_date_time_from_clones_date_times_and_normalizes_property_bags(
             bag.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -134,7 +134,7 @@ fn temporal_plain_date_time_from_defaults_to_constrain_and_reads_options_for_fas
             plainDateLog,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -165,7 +165,7 @@ fn temporal_plain_date_time_from_validates_month_code_syntax_before_year_type() 
         })();
         [badSyntax, badIsoMonthCode].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "RangeError|TypeError");
@@ -195,7 +195,7 @@ fn temporal_plain_date_time_calendar_strings_handle_time_strings_and_annotations
             .calendarId;
         [withCalendarCalendarId, invalidFirstCalendarAnnotation, ignoredSecondCalendar].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "iso8601|true|iso8601");
@@ -251,7 +251,7 @@ fn temporal_plain_date_time_with_replaces_date_and_time_fields() {
             timeZoneField,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -279,7 +279,7 @@ fn temporal_plain_date_time_with_plain_time_replaces_only_time_fields() {
             dateTime.toString()
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -320,7 +320,7 @@ fn temporal_plain_date_time_arithmetic_rounding_and_difference_compose_date_and_
             until.minutes,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -362,7 +362,7 @@ fn temporal_plain_date_time_difference_balances_calendar_units() {
             negative.days,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -392,7 +392,7 @@ fn temporal_plain_date_time_difference_rounds_calendar_units_relative_to_start()
             truncYears.months,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "3|0|32|0|139|0|2|0");
@@ -413,7 +413,7 @@ fn temporal_plain_date_time_since_rounds_calendar_units_relative_to_receiver() {
             negative.months,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "1|0|-2|0");
@@ -450,7 +450,7 @@ fn temporal_plain_date_time_difference_accepts_leap_second_inputs() {
             fromBag.seconds,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "0|0|0|0|0|0|0|0|0|0|0|0|0|0");
@@ -518,7 +518,7 @@ fn temporal_plain_date_time_difference_reads_options_before_validation() {
         }
         [threw, actual.join(",")].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -586,7 +586,7 @@ fn temporal_plain_date_time_difference_reads_other_bag_in_spec_order() {
         instance.since(other, { largestUnit: "years" });
         actual.join(",");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -619,7 +619,7 @@ fn temporal_plain_date_time_difference_rejects_string_arguments_outside_limits()
             throwsRange(() => instance.until(invalidUpper)),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "false|false|true|true");
@@ -645,7 +645,7 @@ fn temporal_plain_date_time_difference_rejects_rounding_outside_iso_limits() {
             throwsRange(() => from.until(to, options)),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|true");
@@ -681,7 +681,7 @@ fn temporal_plain_date_time_add_subtract_validate_overflow_options() {
             rejectedSubtract,
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "2024-02-29T23:30:00|true|2023-02-28T23:30:00|true");
@@ -701,7 +701,7 @@ fn temporal_plain_date_time_converts_to_plain_date_and_time() {
             time.toString(),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(result, "true|1976-11-18|true|01:02:03.004005006");
@@ -722,7 +722,7 @@ fn temporal_plain_date_time_to_string_honors_precision_and_calendar_options() {
             dateTime.toJSON({ smallestUnit: "minute" }),
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -767,7 +767,7 @@ fn temporal_plain_date_time_to_zoned_date_time_resolves_civil_time() {
             badDisambiguationThrew
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(
@@ -813,7 +813,7 @@ fn temporal_plain_date_time_to_zoned_date_time_handles_fixed_offset_limits() {
             String(oneHour)
         ].join("|");
         "#,
-        lyng_js_host::NoopHostHooks,
+        lyng_host::NoopHostHooks,
     );
 
     assert_eq!(

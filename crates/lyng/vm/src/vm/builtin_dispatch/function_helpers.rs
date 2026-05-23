@@ -231,7 +231,7 @@ impl Vm {
             .object_header(agent.heap().view(), object)
             .is_some_and(|header| header.flags().is_engine_array())
             || !Self::engine_array_index_prototype_chain_is_clear(agent, object)
-            || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
+            || agent.objects().element_mode(object) == Some(lyng_objects::ElementMode::Sparse)
         {
             return Ok(None);
         }
@@ -289,7 +289,7 @@ impl Vm {
             .object_header(agent.heap().view(), object)
             .is_some_and(|header| header.flags().is_engine_array())
             || !Self::engine_array_index_prototype_chain_is_clear(agent, object)
-            || agent.objects().element_mode(object) == Some(lyng_js_objects::ElementMode::Sparse)
+            || agent.objects().element_mode(object) == Some(lyng_objects::ElementMode::Sparse)
         {
             return Ok(None);
         }
@@ -403,7 +403,7 @@ impl Vm {
     pub(super) fn source_function_source_text(
         &self,
         agent: &mut Agent,
-        code: lyng_js_types::CodeRef,
+        code: lyng_types::CodeRef,
         function: ObjectRef,
     ) -> VmResult<String> {
         let Some(installed) = self.installed_function(code) else {
@@ -441,7 +441,7 @@ impl Vm {
     }
 
     fn trim_function_source_prefix(
-        source: lyng_js_common::SourceId,
+        source: lyng_common::SourceId,
         candidate: &str,
     ) -> Option<String> {
         let mut atoms = AtomTable::new();
@@ -460,7 +460,7 @@ impl Vm {
 
     fn function_source_candidate_parses(
         atoms: &mut AtomTable,
-        source: lyng_js_common::SourceId,
+        source: lyng_common::SourceId,
         source_text: &str,
     ) -> bool {
         if !parse_script(atoms, source, source_text)

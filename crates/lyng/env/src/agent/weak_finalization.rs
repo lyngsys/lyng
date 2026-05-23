@@ -1,8 +1,8 @@
 use super::{Agent, AgentCollectionSnapshot};
 use crate::{ExecutableId, RuntimeJobPayload};
-use lyng_js_gc::{PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
-use lyng_js_host::HostJobKind;
-use lyng_js_types::{internal_finalization_registry_cleanup_job_builtin, ObjectRef, Value};
+use lyng_gc::{PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
+use lyng_host::HostJobKind;
+use lyng_types::{internal_finalization_registry_cleanup_job_builtin, ObjectRef, Value};
 
 struct AgentCollectionRoots<'a, T: TraceHeapEdges + ?Sized> {
     snapshot: AgentCollectionSnapshot,
@@ -80,7 +80,7 @@ impl Agent {
         let realm = self
             .finalization_cleanup_callback(registry)
             .and_then(|callback| self.objects.function_data(callback))
-            .and_then(lyng_js_objects::FunctionObjectData::realm);
+            .and_then(lyng_objects::FunctionObjectData::realm);
         let _ = self.enqueue_job_with_payload(
             HostJobKind::Native(internal_finalization_registry_cleanup_job_builtin()),
             ExecutableId::Builtin,

@@ -1,5 +1,5 @@
 use crate::{metadata::CallRange, Opcode};
-use lyng_js_types::FeedbackSlotId;
+use lyng_types::FeedbackSlotId;
 
 pub const INSTRUCTION_WIDTH: usize = 4;
 const WIDE_INSTRUCTION_WIDTH: usize = 8;
@@ -566,8 +566,7 @@ mod tests {
     fn extra_wide_abc_prefix_inlines_high_operand_bytes() {
         let slot = FeedbackSlotId::from_raw(1).expect("test slot should be non-zero");
         // IC-shaped Add now carries the slot directly without a *Profiled mirror.
-        let bytes =
-            Instruction::abc_slot(Opcode::Add, 0x0223, 0x0045, 0x01ab, slot).encode_bytes();
+        let bytes = Instruction::abc_slot(Opcode::Add, 0x0223, 0x0045, 0x01ab, slot).encode_bytes();
         assert_eq!(bytes[0], Opcode::ExtraWide as u8);
         assert_eq!(bytes[1], Opcode::Add as u8);
         assert_eq!(&bytes[8..], &[1, 0]);
@@ -576,13 +575,9 @@ mod tests {
     #[test]
     fn call_range_is_inline() {
         let slot = FeedbackSlotId::from_raw(7).expect("test slot should be non-zero");
-        let bytes =
-            Instruction::call_range(Opcode::Call, 1, 2, 3, CallRange::new(4, 5), slot)
-                .encode_bytes();
-        assert_eq!(
-            bytes,
-            vec![Opcode::Call as u8, 1, 2, 3, 5, 0, 4, 0, 7, 0]
-        );
+        let bytes = Instruction::call_range(Opcode::Call, 1, 2, 3, CallRange::new(4, 5), slot)
+            .encode_bytes();
+        assert_eq!(bytes, vec![Opcode::Call as u8, 1, 2, 3, 5, 0, 4, 0, 7, 0]);
     }
 
     #[test]

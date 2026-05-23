@@ -6,13 +6,13 @@ locations. It does not allocate runtime values or execute guest code.
 
 ## Crate Ownership
 
-- `lyng-js-common` owns shared frontend IDs, source spans, string interning identifiers, and
+- `lyng-common` owns shared frontend IDs, source spans, string interning identifiers, and
   small cross-crate helper types.
-- `lyng-js-lexer` owns source scanning and token production.
-- `lyng-js-ast` owns arena-backed AST node storage and typed node IDs.
-- `lyng-js-parser` owns grammar recognition, cover grammar handling, recovery, and parse
+- `lyng-lexer` owns source scanning and token production.
+- `lyng-ast` owns arena-backed AST node storage and typed node IDs.
+- `lyng-parser` owns grammar recognition, cover grammar handling, recovery, and parse
   root construction.
-- `lyng-js-sema` owns early errors, lexical scope construction, binding tables, capture
+- `lyng-sema` owns early errors, lexical scope construction, binding tables, capture
   analysis, private-name analysis, and layout metadata consumed by the compiler.
 
 The frontend dependency direction is:
@@ -45,7 +45,7 @@ Token payloads stay compact:
 
 ## AST
 
-`lyng-js-ast` stores nodes in arenas and refers to them through typed IDs. The AST keeps
+`lyng-ast` stores nodes in arenas and refers to them through typed IDs. The AST keeps
 script roots, module roots, declarations, statements, expressions, patterns, literals,
 functions, classes, template literals, private names, and source spans distinct.
 
@@ -75,7 +75,7 @@ successful parses.
 
 ## Semantic Analysis
 
-`lyng-js-sema` converts syntax into compiler-facing semantic facts:
+`lyng-sema` converts syntax into compiler-facing semantic facts:
 
 - scope table
 - binding table
@@ -109,5 +109,5 @@ scope IDs, binding IDs, atoms, spans, and layout data.
 - Frontend crates do not allocate `Value`, `ObjectRef`, `EnvironmentRef`, or `CodeRef`.
 - Source spans remain available through parser, sema, compiler, and bytecode metadata.
 - Lexical access decisions are made before bytecode execution.
-- Runtime semantics remain in `lyng-js-ops`, `lyng-js-env`, `lyng-js-objects`,
-  `lyng-js-vm`, and `lyng-js-builtins`, not in the parser.
+- Runtime semantics remain in `lyng-ops`, `lyng-env`, `lyng-objects`,
+  `lyng-vm`, and `lyng-builtins`, not in the parser.

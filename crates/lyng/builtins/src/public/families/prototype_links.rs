@@ -1,5 +1,5 @@
 use crate::public::{reparent_builtin_object, PublicRealmBuiltins};
-use lyng_js_env::Agent;
+use lyng_env::Agent;
 
 pub(in crate::public) fn link_installed_family_prototypes(
     agent: &mut Agent,

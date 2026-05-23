@@ -9,7 +9,7 @@
 //! polls the GC at least once when `poll_pending` is forced. The
 //! warm-path conditional-jump handler lands in Batch 7.
 
-use lyng_js_vm::dsl::test_helpers::DslHarness;
+use lyng_vm::dsl::test_helpers::DslHarness;
 
 #[test]
 fn dsl_harness_bootstraps_for_backward_cond_jump_safepoint_case() {

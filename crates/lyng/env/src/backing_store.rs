@@ -1,5 +1,5 @@
 use super::RuntimeDomainAccounting;
-use lyng_js_types::BackingStoreRef;
+use lyng_types::BackingStoreRef;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex};
 

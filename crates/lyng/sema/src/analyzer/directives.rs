@@ -1,12 +1,12 @@
-use lyng_js_ast::{Expr, Stmt};
-use lyng_js_common::Span;
+use lyng_ast::{Expr, Stmt};
+use lyng_common::Span;
 
 use super::{Analyzer, ContainmentQuery};
 
 impl Analyzer<'_> {
     pub(super) fn check_global_code_contains(
         &mut self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        body: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) {
         let stmts = self.ast.get_stmt_list(body);
         let Some(&first_stmt) = stmts.first() else {
@@ -23,10 +23,7 @@ impl Analyzer<'_> {
         }
     }
 
-    pub(super) fn apply_directive_prologue(
-        &mut self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
-    ) {
+    pub(super) fn apply_directive_prologue(&mut self, body: lyng_ast::NodeList<lyng_ast::StmtId>) {
         let (strict_span, legacy_escape_span) = self.strict_directive_info(body);
         if let Some(span) = legacy_escape_span {
             self.diagnostics.error(
@@ -43,7 +40,7 @@ impl Analyzer<'_> {
 
     fn strict_directive_info(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        body: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) -> (Option<Span>, Option<Span>) {
         let stmts = self.ast.get_stmt_list(body);
         let mut legacy_escape_span = None;
@@ -72,7 +69,7 @@ impl Analyzer<'_> {
 
     pub(super) fn strict_directive_span(
         &self,
-        body: lyng_js_ast::NodeList<lyng_js_ast::StmtId>,
+        body: lyng_ast::NodeList<lyng_ast::StmtId>,
     ) -> Option<Span> {
         self.strict_directive_info(body).0
     }

@@ -1,6 +1,6 @@
-use lyng_js_ast::{Expr, ExprId, NodeList};
-use lyng_js_common::WellKnownAtom;
-use lyng_js_lexer::TokenKind;
+use lyng_ast::{Expr, ExprId, NodeList};
+use lyng_common::WellKnownAtom;
+use lyng_lexer::TokenKind;
 
 use crate::parser::Parser;
 

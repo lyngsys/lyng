@@ -1,14 +1,14 @@
-use lyng_js_ast::{
+use lyng_ast::{
     Ast, Decl, Expr, ForInOfLeft, ForInit, FunctionId, ParsedScript, Pattern, Stmt, StmtId,
     VariableKind,
 };
-use lyng_js_bytecode::CompiledScriptUnit;
-use lyng_js_common::{AtomId, AtomTable, SourceId};
-use lyng_js_parser::{parse_script, parse_script_with_initial_strict};
-use lyng_js_sema::{
+use lyng_bytecode::CompiledScriptUnit;
+use lyng_common::{AtomId, AtomTable, SourceId};
+use lyng_parser::{parse_script, parse_script_with_initial_strict};
+use lyng_sema::{
     analyze_direct_eval_script, analyze_script, DirectEvalScriptAnalysisOptions, ScriptSema,
 };
-use lyng_js_types::RealmRef;
+use lyng_types::RealmRef;
 
 use crate::compile_script;
 
@@ -123,7 +123,7 @@ fn push_unique_atom(names: &mut Vec<AtomId>, name: AtomId) {
 
 fn collect_var_initializer_names_from_pattern(
     ast: &Ast,
-    pattern: lyng_js_ast::PatternId,
+    pattern: lyng_ast::PatternId,
     names: &mut Vec<AtomId>,
 ) {
     match ast.get_pattern(pattern) {
@@ -155,7 +155,7 @@ fn collect_var_initializer_names_from_pattern(
 
 fn collect_var_initializer_names_from_decl(
     ast: &Ast,
-    decl: lyng_js_ast::DeclId,
+    decl: lyng_ast::DeclId,
     names: &mut Vec<AtomId>,
 ) {
     let Decl::Variable {

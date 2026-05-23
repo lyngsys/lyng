@@ -1,7 +1,7 @@
-//! Allocation, rooting, tracing, and storage ownership for lyng-js runtime domains.
+//! Allocation, rooting, tracing, and storage ownership for lyng runtime domains.
 //!
-//! Ownership: `lyng_js_gc` owns heap policy and dereference paths for runtime
-//! data types defined in `lyng_js_types`.
+//! Ownership: `lyng_gc` owns heap policy and dereference paths for runtime
+//! data types defined in `lyng_types`.
 
 #![allow(
     clippy::module_name_repetitions,
@@ -12,8 +12,8 @@
 
 use std::{cell::OnceCell, fmt};
 
-use lyng_js_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};
-use lyng_js_types::StringRef;
+use lyng_common::{AtomCollection, AtomId, AtomSweepStats, AtomTable};
+use lyng_types::StringRef;
 
 mod arena;
 mod card_table;
@@ -495,8 +495,8 @@ const fn expected_string_payload_len(encoding: StringEncoding, code_unit_len: u3
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lyng_js_common::AtomLifetime;
-    use lyng_js_types::{ObjectRef, Value};
+    use lyng_common::AtomLifetime;
+    use lyng_types::{ObjectRef, Value};
 
     #[test]
     fn heap_writer_updates_value_and_typed_ref_slots_as_chokepoint() {

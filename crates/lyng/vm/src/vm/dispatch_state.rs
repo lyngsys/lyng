@@ -17,11 +17,11 @@
 
 use std::sync::Arc;
 
-use lyng_js_bytecode::Opcode;
-use lyng_js_env::Agent;
-use lyng_js_host::HostHooks;
-use lyng_js_objects::NativeFunctionRegistry;
-use lyng_js_types::{CodeRef, Value};
+use lyng_bytecode::Opcode;
+use lyng_env::Agent;
+use lyng_host::HostHooks;
+use lyng_objects::NativeFunctionRegistry;
+use lyng_types::{CodeRef, Value};
 
 use crate::error::{VmError, VmResult};
 use crate::FrameRecord;
@@ -209,7 +209,10 @@ impl Vm {
     /// Look up the `Arc<InstalledFunction>` for a given `CodeRef`. Used by
     /// `DispatchState::refresh_from_active_frame` after a frame transition.
     #[inline]
-    pub(in crate::vm) fn installed_for_code(&self, code: CodeRef) -> Option<Arc<InstalledFunction>> {
+    pub(in crate::vm) fn installed_for_code(
+        &self,
+        code: CodeRef,
+    ) -> Option<Arc<InstalledFunction>> {
         self.installed
             .get(code_index(code))
             .and_then(Option::as_ref)
@@ -249,10 +252,10 @@ impl Vm {
     #[inline]
     pub(in crate::vm) fn for_in_advance(
         &mut self,
-        agent: &mut lyng_js_env::Agent,
+        agent: &mut lyng_env::Agent,
         base: u32,
         register: u16,
-    ) -> VmResult<Option<lyng_js_types::PropertyKey>> {
+    ) -> VmResult<Option<lyng_types::PropertyKey>> {
         self.for_in_states.advance(agent, base, register)
     }
 
@@ -262,7 +265,7 @@ impl Vm {
         &mut self,
         base: u32,
         register: u16,
-        enumerator: lyng_js_ops::enumeration::ForInEnumerator,
+        enumerator: lyng_ops::enumeration::ForInEnumerator,
     ) {
         self.for_in_states.insert(base, register, enumerator);
     }
@@ -279,7 +282,7 @@ impl Vm {
         &mut self,
         base: u32,
         register: u16,
-        iterator: lyng_js_ops::iterator::IteratorRecord,
+        iterator: lyng_ops::iterator::IteratorRecord,
     ) {
         self.iterator_states.insert(base, register, iterator);
     }

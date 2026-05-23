@@ -51,7 +51,7 @@
 //! emitter's explicit handler-leave sequence. Returns
 //! `Continue { pc_advance: instruction_len }`.
 
-use lyng_js_types::AbruptCompletion;
+use lyng_types::AbruptCompletion;
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
@@ -171,4 +171,3 @@ pub(crate) fn op_load_exception_semantic(
         pc_advance: args.instruction_len,
     }
 }
-

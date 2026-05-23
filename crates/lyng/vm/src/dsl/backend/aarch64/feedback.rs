@@ -25,8 +25,12 @@
 macro_rules! load_feedback_site {
     ($slot:tt => $dst:tt) => {
         concat!(
-            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
-            "add    x", stringify!($dst), ", x21, x16\n",
+            "lsl    x16, x",
+            stringify!($slot),
+            ", {entry_stride_shift}\n",
+            "add    x",
+            stringify!($dst),
+            ", x21, x16\n",
         )
     };
 }
@@ -37,7 +41,9 @@ macro_rules! load_feedback_site {
 macro_rules! record_smi {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "lsl    x16, x",
+            stringify!($slot),
+            ", {entry_stride_shift}\n",
             "add    x16, x21, x16\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x1\n",
@@ -51,7 +57,9 @@ macro_rules! record_smi {
 macro_rules! record_object {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "lsl    x16, x",
+            stringify!($slot),
+            ", {entry_stride_shift}\n",
             "add    x16, x21, x16\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x2\n",
@@ -65,7 +73,9 @@ macro_rules! record_object {
 macro_rules! record_double {
     ($slot:tt) => {
         concat!(
-            "lsl    x16, x", stringify!($slot), ", {entry_stride_shift}\n",
+            "lsl    x16, x",
+            stringify!($slot),
+            ", {entry_stride_shift}\n",
             "add    x16, x21, x16\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x4\n",

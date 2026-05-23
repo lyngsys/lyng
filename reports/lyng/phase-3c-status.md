@@ -13,7 +13,7 @@ now use the same packed-handler inline IC fast path as Phase 3a/3b.
 Globals share `NamedPropertyFeedback` — the helpers
 `load_global_with_feedback`, `store_global_with_feedback`, and
 `assign_global_with_feedback` in
-[crates/lyng-js/vm/src/vm/names.rs](crates/lyng-js/vm/src/vm/names.rs)
+[crates/lyng/vm/src/vm/names.rs](crates/lyng/vm/src/vm/names.rs)
 were already calling `try_named_property_load_inline_cache_hit` and
 `try_named_property_store_inline_cache` with `global_object` as the
 receiver. Phase 3c just replaces those calls with the inlined fast
@@ -53,8 +53,8 @@ in `names.rs`.
 
 | Check | Phase 3b | Phase 3c | Δ |
 |---|---:|---:|---|
-| `cargo test -p lyng-js-gc -p lyng-js-objects -p lyng-js-vm -p lyng-js-tests` | 1709 passed | 1709 passed | unchanged |
-| `cargo clippy -p lyng-js-vm` | 0 errors, 6 warnings | 0 errors, 7 warnings | +1 (collapsible-if at `names.rs:550`, same pattern as Phase 3a's `property.rs:111`) |
+| `cargo test -p lyng-gc -p lyng-objects -p lyng-vm -p lyng-tests` | 1709 passed | 1709 passed | unchanged |
+| `cargo clippy -p lyng-vm` | 0 errors, 6 warnings | 0 errors, 7 warnings | +1 (collapsible-if at `names.rs:550`, same pattern as Phase 3a's `property.rs:111`) |
 
 ### V8 v7 sweep (11 samples per benchmark, isolated subprocesses)
 
@@ -80,8 +80,8 @@ i-cache pressure on workloads that don't touch globals much. Acceptable
 for the cumulative win.
 
 Reports:
-- `reports/js/lyng-js/phase-3c-bench.md`
-- `reports/js/lyng-js/phase-3c-bench.json`
+- `reports/lyng/phase-3c-bench.md`
+- `reports/lyng/phase-3c-bench.json`
 
 ### `cargo asm`
 
@@ -91,8 +91,8 @@ Reports:
 | `op_store_or_assign_global` | `PrimitiveMutator::store_value` + `record_feedback_slot` (same as Phase 3b store) — IC chain helper (`try_named_property_store_inline_cache`) is now slow-path-only |
 
 Reports:
-- `reports/js/lyng-js/phase-3c-op_load_global.asm`
-- `reports/js/lyng-js/phase-3c-op_store_or_assign_global.asm`
+- `reports/lyng/phase-3c-op_load_global.asm`
+- `reports/lyng/phase-3c-op_store_or_assign_global.asm`
 
 ### Test262
 
@@ -112,7 +112,7 @@ Same 9 failures as Phase 3a:
 No new deterministic failures from Phase 3c.
 
 Report:
-- `reports/js/lyng-js/phase-3c-test262.md`
+- `reports/lyng/phase-3c-test262.md`
 
 ## What's deferred
 
@@ -122,7 +122,7 @@ Report:
 
 ## Files changed
 
-- `crates/lyng-js/vm/src/vm/names.rs` — added `lyng_js_gc::ValueStoreTarget` and `lyng_js_objects::SlotLocation` imports; inlined fast path in `load_global_with_feedback`, `store_global_with_feedback`, `assign_global_with_feedback`. Slow chain (existing IC helpers + global property lookup) untouched.
+- `crates/lyng/vm/src/vm/names.rs` — added `lyng_gc::ValueStoreTarget` and `lyng_objects::SlotLocation` imports; inlined fast path in `load_global_with_feedback`, `store_global_with_feedback`, `assign_global_with_feedback`. Slow chain (existing IC helpers + global property lookup) untouched.
 
 No changes elsewhere — Phase 3a/3b infrastructure reused verbatim.
 

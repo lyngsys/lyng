@@ -1,5 +1,5 @@
 use super::super::{BuiltinEntryMetadata, PublicBuiltinMetadataRow};
-use lyng_js_types::{
+use lyng_types::{
     json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
     proxy_builtin, proxy_revocable_builtin, proxy_revoke_builtin, reflect_apply_builtin,
     reflect_construct_builtin, reflect_define_property_builtin, reflect_delete_property_builtin,

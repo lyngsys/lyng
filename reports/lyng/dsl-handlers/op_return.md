@@ -2,7 +2,7 @@
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/hot.rs`:
+`crates/lyng/vm/src/dsl/handlers/hot.rs`:
 
 ```rust
 llint_handler! {
@@ -33,13 +33,13 @@ the slow-path bridge.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_return.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_return.asm`.
 
 13 instructions, same shape as op_jump.
 
 ## LLInt reference
 
-See `reports/js/lyng-js/llint-reference/op_ret.md` (or equivalent).
+See `reports/lyng/llint-reference/op_ret.md` (or equivalent).
 
 JSC's op_ret is short: load the return value, pop the frame, dispatch
 into the caller. Lyng's slow-path bridge has the overhead of going

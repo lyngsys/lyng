@@ -5,9 +5,9 @@ use crate::{
     },
     errors::{throw_range_error, throw_syntax_error, throw_type_error},
 };
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{Completion, Value};
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{Completion, Value};
 
 /// Converts one already-primitive ECMAScript value into a `BigInt`.
 ///
@@ -20,7 +20,7 @@ pub fn primitive_to_bigint(agent: &mut Agent, value: Value) -> Completion<Value>
     }
     if let Some(boolean) = value.as_bool() {
         let bigint = agent.heap_mut().mutator().alloc_bigint(
-            lyng_js_gc::BigIntSign::NonNegative,
+            lyng_gc::BigIntSign::NonNegative,
             &[u64::from(boolean)],
             AllocationLifetime::Default,
         );

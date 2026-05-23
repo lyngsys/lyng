@@ -6,13 +6,13 @@ use super::{
     Opcode, Property, PropertyKind, ReferenceUsage, ResolutionKind, SafepointKind, Span,
     StorageClass, WellKnownAtom,
 };
-use lyng_js_types::internal_import_meta_builtin;
+use lyng_types::internal_import_meta_builtin;
 
 impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_update_expression(
         &mut self,
         expr_id: ExprId,
-        operator: lyng_js_ast::UpdateOp,
+        operator: lyng_ast::UpdateOp,
         argument: ExprId,
         prefix: bool,
         dest: u16,
@@ -35,12 +35,12 @@ impl FunctionCompiler<'_, '_> {
     fn lower_updated_value(
         &mut self,
         current: u16,
-        operator: lyng_js_ast::UpdateOp,
+        operator: lyng_ast::UpdateOp,
     ) -> LoweringResult<u16> {
         let result = self.alloc_temp()?;
         let opcode = match operator {
-            lyng_js_ast::UpdateOp::Increment => Opcode::Increment,
-            lyng_js_ast::UpdateOp::Decrement => Opcode::Decrement,
+            lyng_ast::UpdateOp::Increment => Opcode::Increment,
+            lyng_ast::UpdateOp::Decrement => Opcode::Decrement,
         };
         self.emit_profiled_update(opcode, result, current)?;
         Ok(result)
@@ -97,7 +97,7 @@ impl FunctionCompiler<'_, '_> {
     pub(super) fn lower_object_expression(
         &mut self,
         expr_id: ExprId,
-        properties: lyng_js_ast::NodeList<Property>,
+        properties: lyng_ast::NodeList<Property>,
         dest: u16,
     ) -> LoweringResult<()> {
         let properties = self.ast().get_property_list(properties).to_vec();
@@ -404,11 +404,11 @@ impl FunctionCompiler<'_, '_> {
             Expr::UnaryExpression {
                 operator, argument, ..
             } => match operator {
-                lyng_js_ast::UnaryOp::Delete => {
+                lyng_ast::UnaryOp::Delete => {
                     let temp = self.alloc_temp()?;
                     self.lower_delete_expression(argument, temp)
                 }
-                lyng_js_ast::UnaryOp::TypeOf => {
+                lyng_ast::UnaryOp::TypeOf => {
                     if matches!(self.ast().get_expr(argument), Expr::Identifier { .. }) {
                         let use_site = self.use_site(argument)?;
                         if matches!(
@@ -422,11 +422,11 @@ impl FunctionCompiler<'_, '_> {
                     }
                     self.lower_delete_operand_effect(argument)
                 }
-                lyng_js_ast::UnaryOp::Minus
-                | lyng_js_ast::UnaryOp::Plus
-                | lyng_js_ast::UnaryOp::Not
-                | lyng_js_ast::UnaryOp::BitNot
-                | lyng_js_ast::UnaryOp::Void => self.lower_delete_operand_effect(argument),
+                lyng_ast::UnaryOp::Minus
+                | lyng_ast::UnaryOp::Plus
+                | lyng_ast::UnaryOp::Not
+                | lyng_ast::UnaryOp::BitNot
+                | lyng_ast::UnaryOp::Void => self.lower_delete_operand_effect(argument),
             },
             _ => {
                 let temp = self.alloc_temp()?;

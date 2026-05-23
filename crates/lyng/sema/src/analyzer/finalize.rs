@@ -260,7 +260,7 @@ impl Analyzer<'_> {
     fn mark_dynamic_outer_binding_captured(
         &mut self,
         scope_id: ScopeId,
-        name: lyng_js_common::AtomId,
+        name: lyng_common::AtomId,
     ) {
         let mut current = Some(scope_id);
         let mut crossed_function = false;

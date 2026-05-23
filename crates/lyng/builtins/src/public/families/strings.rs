@@ -11,9 +11,9 @@ use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
 };
-use lyng_js_common::{AtomId, WellKnownAtom};
-use lyng_js_env::Agent;
-use lyng_js_types::{
+use lyng_common::{AtomId, WellKnownAtom};
+use lyng_env::Agent;
+use lyng_types::{
     string_anchor_builtin, string_at_builtin, string_big_builtin, string_blink_builtin,
     string_bold_builtin, string_builtin, string_char_at_builtin, string_char_code_at_builtin,
     string_code_point_at_builtin, string_concat_builtin, string_ends_with_builtin,

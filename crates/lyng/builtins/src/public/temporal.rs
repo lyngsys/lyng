@@ -2,9 +2,9 @@ use super::{
     allocate_builtin_function_object, allocate_builtin_ordinary_object,
     define_builtin_accessor_property, define_builtin_data_property, public_builtin_metadata,
 };
-use lyng_js_env::Agent;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{
+use lyng_env::Agent;
+use lyng_gc::AllocationLifetime;
+use lyng_types::{
     EnvironmentRef, ObjectRef, PropertyKey, RealmRef, ShapeId, Value, WellKnownSymbolId,
 };
 mod duration;
@@ -201,8 +201,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_instant_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_instant_builtin())?,
+        lyng_types::temporal_now_instant_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_instant_builtin())?,
         None,
     );
     let now_time_zone_id = allocate_builtin_function_object(
@@ -212,8 +212,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_time_zone_id_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_time_zone_id_builtin())?,
+        lyng_types::temporal_now_time_zone_id_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_time_zone_id_builtin())?,
         None,
     );
     let now_plain_date_iso = allocate_builtin_function_object(
@@ -223,8 +223,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_plain_date_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_plain_date_iso_builtin())?,
+        lyng_types::temporal_now_plain_date_iso_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_plain_date_iso_builtin())?,
         None,
     );
     let now_plain_time_iso = allocate_builtin_function_object(
@@ -234,8 +234,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_plain_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_plain_time_iso_builtin())?,
+        lyng_types::temporal_now_plain_time_iso_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_plain_time_iso_builtin())?,
         None,
     );
     let now_plain_date_time_iso = allocate_builtin_function_object(
@@ -245,8 +245,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_plain_date_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_plain_date_time_iso_builtin())?,
+        lyng_types::temporal_now_plain_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_plain_date_time_iso_builtin())?,
         None,
     );
     let now_zoned_date_time_iso = allocate_builtin_function_object(
@@ -256,8 +256,8 @@ pub(super) fn install_temporal_public_objects(
         root_shape,
         function_prototype,
         object_prototype,
-        lyng_js_types::temporal_now_zoned_date_time_iso_builtin(),
-        public_builtin_metadata(lyng_js_types::temporal_now_zoned_date_time_iso_builtin())?,
+        lyng_types::temporal_now_zoned_date_time_iso_builtin(),
+        public_builtin_metadata(lyng_types::temporal_now_zoned_date_time_iso_builtin())?,
         None,
     );
 

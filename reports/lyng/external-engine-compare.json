@@ -1,8 +1,8 @@
 {
   "engines": [
     {
-      "executable": "target/release/lyng-js",
-      "name": "lyng-js",
+      "executable": "target/release/lyng",
+      "name": "lyng",
       "pre_args": []
     },
     {
@@ -24,11 +24,11 @@
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 2026.593208,
       "median_ms": 2023.50225,
@@ -46,7 +46,7 @@
         318.0,
         319.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
       "workload": "Richards"
     },
@@ -55,7 +55,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -75,7 +75,7 @@
         911.0,
         949.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
       "workload": "Richards"
     },
@@ -84,7 +84,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -104,18 +104,18 @@
         1871.0,
         1883.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-richards.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-richards.js",
       "status": "completed",
       "workload": "Richards"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 2048.702417,
       "median_ms": 2045.3583750000003,
@@ -133,7 +133,7 @@
         361.0,
         345.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js",
       "status": "completed",
       "workload": "DeltaBlue"
     },
@@ -142,7 +142,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -162,7 +162,7 @@
         1022.0,
         983.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js",
       "status": "completed",
       "workload": "DeltaBlue"
     },
@@ -171,7 +171,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -191,18 +191,18 @@
         1712.0,
         1633.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-deltablue.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-deltablue.js",
       "status": "completed",
       "workload": "DeltaBlue"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 17532.699875,
       "median_ms": 17396.332625,
@@ -220,7 +220,7 @@
         267.0,
         270.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js",
       "status": "completed",
       "workload": "Crypto"
     },
@@ -229,7 +229,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -249,7 +249,7 @@
         802.0,
         804.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js",
       "status": "completed",
       "workload": "Crypto"
     },
@@ -258,7 +258,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -278,18 +278,18 @@
         2119.0,
         2124.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-crypto.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-crypto.js",
       "status": "completed",
       "workload": "Crypto"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 7608.57475,
       "median_ms": 7575.0845,
@@ -307,7 +307,7 @@
         424.0,
         433.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js",
       "status": "completed",
       "workload": "RayTrace"
     },
@@ -316,7 +316,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -336,7 +336,7 @@
         1009.0,
         1000.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js",
       "status": "completed",
       "workload": "RayTrace"
     },
@@ -345,7 +345,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -365,18 +365,18 @@
         4547.0,
         4574.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-raytrace.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-raytrace.js",
       "status": "completed",
       "workload": "RayTrace"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 22062.889417000002,
       "median_ms": 21860.17725,
@@ -394,7 +394,7 @@
         518.0,
         523.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js",
       "status": "completed",
       "workload": "EarleyBoyer"
     },
@@ -403,7 +403,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -423,7 +423,7 @@
         1927.0,
         1903.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js",
       "status": "completed",
       "workload": "EarleyBoyer"
     },
@@ -432,7 +432,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -452,18 +452,18 @@
         6084.0,
         5853.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-earley-boyer.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-earley-boyer.js",
       "status": "completed",
       "workload": "EarleyBoyer"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 32083.1005,
       "median_ms": 32063.137417,
@@ -481,7 +481,7 @@
         101.0,
         101.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js",
       "status": "completed",
       "workload": "RegExp"
     },
@@ -490,7 +490,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -510,7 +510,7 @@
         261.0,
         264.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js",
       "status": "completed",
       "workload": "RegExp"
     },
@@ -519,7 +519,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -539,18 +539,18 @@
         1071.0,
         1047.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-regexp.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-regexp.js",
       "status": "completed",
       "workload": "RegExp"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 2647.921833,
       "median_ms": 2646.73475,
@@ -568,7 +568,7 @@
         1361.0,
         1372.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js",
       "status": "completed",
       "workload": "Splay"
     },
@@ -577,7 +577,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -597,7 +597,7 @@
         2263.0,
         2200.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js",
       "status": "completed",
       "workload": "Splay"
     },
@@ -606,7 +606,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -626,18 +626,18 @@
         9869.0,
         10300.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-splay.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-splay.js",
       "status": "completed",
       "workload": "Splay"
     },
     {
       "category": "v8-v7",
       "command": [
-        "target/release/lyng-js",
+        "target/release/lyng",
         "--shell",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js"
       ],
-      "engine": "lyng-js",
+      "engine": "lyng",
       "error": null,
       "max_ms": 13010.566334,
       "median_ms": 12350.631083,
@@ -655,7 +655,7 @@
         449.0,
         448.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js",
       "status": "completed",
       "workload": "NavierStokes"
     },
@@ -664,7 +664,7 @@
       "command": [
         "/opt/homebrew/bin/qjs",
         "--script",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js"
       ],
       "engine": "quickjs",
       "error": null,
@@ -684,7 +684,7 @@
         1325.0,
         1325.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js",
       "status": "completed",
       "workload": "NavierStokes"
     },
@@ -693,7 +693,7 @@
       "command": [
         "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc",
         "--useJIT=false",
-        "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js"
+        "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js"
       ],
       "engine": "jsc-llint",
       "error": null,
@@ -713,7 +713,7 @@
         2943.0,
         2931.0
       ],
-      "script_path": "/tmp/lyng-js-bench-compare-scripts/v8-v7-navier-stokes.js",
+      "script_path": "/tmp/lyng-bench-compare-scripts/v8-v7-navier-stokes.js",
       "status": "completed",
       "workload": "NavierStokes"
     }
@@ -723,16 +723,16 @@
     "corpus": "v8-v7",
     "filter": null,
     "full_suite": false,
-    "json_path": "reports/js/lyng-js/external-engine-compare.json",
+    "json_path": "reports/lyng/external-engine-compare.json",
     "loop_trips": 2048,
     "policy": {
       "parity_rule": "Evaluate measured gaps per workload family rather than exact equality everywhere.",
       "primary_baseline": "quickjs",
       "secondary_reference": "jsc-llint"
     },
-    "report_path": "reports/js/lyng-js/external-engine-compare.md",
+    "report_path": "reports/lyng/external-engine-compare.md",
     "samples": 3,
-    "scripts_dir": "/tmp/lyng-js-bench-compare-scripts",
+    "scripts_dir": "/tmp/lyng-bench-compare-scripts",
     "timeout_ms": 60000,
     "warmup_samples": 1
   },

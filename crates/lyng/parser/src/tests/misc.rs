@@ -1,5 +1,5 @@
 use super::*;
-use lyng_js_ast::ImportExpressionPhase;
+use lyng_ast::ImportExpressionPhase;
 
 // ===========================================================================
 // ASI (Automatic Semicolon Insertion)
@@ -212,8 +212,8 @@ fn parse_import_expression_second_argument_allows_in_operator() {
     if let Stmt::For {
         init: Some(init), ..
     } = p.ast.get_stmt(stmts[0])
-        && let lyng_js_ast::ForInit::Declaration(decl) = init
-        && let lyng_js_ast::Decl::Variable { declarators, .. } = p.ast.get_decl(*decl)
+        && let lyng_ast::ForInit::Declaration(decl) = init
+        && let lyng_ast::Decl::Variable { declarators, .. } = p.ast.get_decl(*decl)
     {
         let declarators = p.ast.get_var_declarator_list(*declarators).to_vec();
         assert_eq!(declarators.len(), 1);

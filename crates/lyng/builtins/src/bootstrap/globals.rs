@@ -259,7 +259,7 @@ pub(super) fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(proxy_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::proxy_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_types::proxy_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
@@ -269,24 +269,22 @@ pub(super) fn default_global_descriptors(
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(suppressed_error_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::suppressed_error_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_types::suppressed_error_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(disposable_stack_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::disposable_stack_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_types::disposable_stack_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(async_disposable_stack_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(
-                lyng_js_types::async_disposable_stack_builtin(),
-            ),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_types::async_disposable_stack_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(
             BuiltinPropertyKeySpec::from_atom(iterator_atom),
-            BuiltinPropertyValueSpec::BuiltinFunction(lyng_js_types::iterator_builtin()),
+            BuiltinPropertyValueSpec::BuiltinFunction(lyng_types::iterator_builtin()),
             BuiltinAttributes::new(true, false, true),
         ),
         BuiltinPropertyDescriptor::new(

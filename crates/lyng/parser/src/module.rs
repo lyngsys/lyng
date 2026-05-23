@@ -1,11 +1,11 @@
 //! Module-specific parsing (import/export declarations).
 
-use lyng_js_ast::{
+use lyng_ast::{
     Decl, ExportDefaultDecl, ExportKind, ExportSpecifier, FunctionKind, ImportAttribute,
     ImportSpecifier, Stmt, StmtId,
 };
-use lyng_js_common::WellKnownAtom;
-use lyng_js_lexer::{Token, TokenKind, TokenPayload};
+use lyng_common::WellKnownAtom;
+use lyng_lexer::{Token, TokenKind, TokenPayload};
 
 use crate::parser::Parser;
 
@@ -281,7 +281,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         })
     }
 
-    fn parse_export_default(&mut self, start: lyng_js_common::Span) -> StmtId {
+    fn parse_export_default(&mut self, start: lyng_common::Span) -> StmtId {
         let declaration = match self.current_kind() {
             TokenKind::Function => {
                 // `export default function [name]() {}`
@@ -350,7 +350,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.ast_mut().alloc_stmt(Stmt::Declaration { span, decl })
     }
 
-    fn parse_export_all(&mut self, start: lyng_js_common::Span) -> StmtId {
+    fn parse_export_all(&mut self, start: lyng_common::Span) -> StmtId {
         self.advance(); // eat `*`
 
         let exported = if self.at_contextual(WellKnownAtom::as_) {
@@ -378,7 +378,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         self.ast_mut().alloc_stmt(Stmt::Declaration { span, decl })
     }
 
-    fn parse_export_named(&mut self, start: lyng_js_common::Span) -> StmtId {
+    fn parse_export_named(&mut self, start: lyng_common::Span) -> StmtId {
         self.expect(TokenKind::LBrace);
         let mut specifiers = Vec::new();
         let mut local_is_string = Vec::new();
@@ -470,7 +470,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
     /// Parses a module export name — identifiers, keywords, and string
     /// literals are all valid (ModuleExportName).
-    fn parse_export_name(&mut self) -> lyng_js_common::AtomId {
+    fn parse_export_name(&mut self) -> lyng_common::AtomId {
         if self.at(TokenKind::StringLiteral) {
             if !self.current_string_literal_is_well_formed_unicode() {
                 self.error_at(
@@ -486,7 +486,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
                     let s = self.lexer.literals.get_string(lit_id).to_string_lossy();
                     self.lexer.intern_atom(&s)
                 }
-                _ => lyng_js_common::WellKnownAtom::Empty.id(),
+                _ => lyng_common::WellKnownAtom::Empty.id(),
             };
             self.advance();
             atom
@@ -588,7 +588,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     /// Parses a module specifier (string literal) and returns its StringLiteralId.
-    fn parse_module_specifier(&mut self) -> lyng_js_ast::StringLiteralId {
+    fn parse_module_specifier(&mut self) -> lyng_ast::StringLiteralId {
         if self.at(TokenKind::StringLiteral) {
             let value = match self.current().payload {
                 TokenPayload::Literal(lit_id) => {

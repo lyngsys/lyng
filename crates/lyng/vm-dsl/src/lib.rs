@@ -1,7 +1,7 @@
 //! Proc-macro crate emitting `#[unsafe(naked)] extern "C" fn` DSL handlers.
 //!
 //! `llint_handler!` parses an offlineasm-flavored handler body (see
-//! `docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md` §4) and
+//! `docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md` §4) and
 //! lowers it to a single `core::arch::naked_asm!` block.
 //!
 //! Submodules:
@@ -19,7 +19,7 @@ mod scratch;
 
 /// Define a DSL handler.
 ///
-/// Syntax (see `docs/lyng-js/2026-05-16-asm-dsl-llint-interpreter-design.md` §4):
+/// Syntax (see `docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md` §4):
 ///
 /// ```ignore
 /// llint_handler! {

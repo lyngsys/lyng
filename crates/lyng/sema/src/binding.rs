@@ -1,6 +1,6 @@
 //! Binding table: records every declaration-level binding and its metadata.
 
-use lyng_js_common::AtomId;
+use lyng_common::AtomId;
 
 use crate::ids::{ScopeId, SemanticBindingId};
 

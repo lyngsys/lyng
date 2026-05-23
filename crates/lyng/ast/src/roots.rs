@@ -4,7 +4,7 @@
 //! the parser. They own the `Ast` container, root ID, diagnostics, and
 //! directive-prologue summary.
 
-use lyng_js_common::DiagnosticList;
+use lyng_common::DiagnosticList;
 
 use crate::ids::{ModuleId, ScriptId};
 use crate::Ast;

@@ -14,7 +14,7 @@ full tagged Value is `0x7ff8_0004_0000_0001`.
 
 ## DSL source
 
-`crates/lyng-js/vm/src/dsl/handlers/cold.rs`:
+`crates/lyng/vm/src/dsl/handlers/cold.rs`:
 
 ```rust
 llint_handler! {
@@ -28,7 +28,7 @@ llint_handler! {
 
 ## Backend macro (reused from Task 5)
 
-`crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs`:
+`crates/lyng/vm/src/dsl/backend/aarch64/values.rs`:
 
 ```rust
 #[macro_export]
@@ -52,10 +52,10 @@ byte-for-byte identical between the two call sites.
 
 ## Current asm (AArch64)
 
-See `reports/js/lyng-js/dsl-asm-baseline-aarch64/op_load_one.asm`.
+See `reports/lyng/dsl-asm-baseline-aarch64/op_load_one.asm`.
 
-Captured from `target/release/deps/lyng_js_vm-*.s` after a
-`cargo rustc --release -p lyng-js-vm --lib -- --emit=asm -C debuginfo=0`
+Captured from `target/release/deps/lyng_vm-*.s` after a
+`cargo rustc --release -p lyng-vm --lib -- --emit=asm -C debuginfo=0`
 build. Effective sequence:
 
 ```asm
@@ -175,7 +175,7 @@ binary path failed; reference taken from local WebKit checkout at
 
 Microbench snippet not yet present for `LoadOne`; deferred to
 Task 10.B. The pre-phase baseline at
-`reports/js/lyng-js/dsl-1/pre-phase-1a-baseline.md` confirms this for
+`reports/lyng/dsl-1/pre-phase-1a-baseline.md` confirms this for
 all nine Phase 1.A opcodes.
 
 ## V8 v7
@@ -184,7 +184,7 @@ A single-opcode port is not expected to move the V8 v7 geomean
 measurably — the LoadOne dispatch share is sub-percent on the
 V8 v7 suite. Phase 1.A's aggregate impact will be measured at Task 10
 against the pre-phase baseline geomean of **387.09** captured in
-`reports/js/lyng-js/dsl-1/pre-phase-1a-baseline.md`.
+`reports/lyng/dsl-1/pre-phase-1a-baseline.md`.
 
 ## Slow-path-share
 
@@ -197,8 +197,8 @@ dispatches).
 
 ## Behavioral tests
 
-- `cargo test -p lyng-js-vm --lib --release` — **413 passed**.
-- `cargo test -p lyng-js-tests --release` — **1186 passed (2 suites)**.
+- `cargo test -p lyng-vm --lib --release` — **413 passed**.
+- `cargo test -p lyng-tests --release` — **1186 passed (2 suites)**.
 
 Both green; behavioral parity preserved.
 
@@ -212,7 +212,7 @@ Both green; behavioral parity preserved.
   macros, no new imports, no codegen-side changes — pure handler-body
   swap + slow-shim deletion.
 - **`tag_smi_const!` macro reused from Task 5.** No source change to
-  `crates/lyng-js/vm/src/dsl/backend/aarch64/values.rs` in this task.
+  `crates/lyng/vm/src/dsl/backend/aarch64/values.rs` in this task.
   The macro covers both `op_load_zero` (payload = 0) and `op_load_one`
   (payload = 1). Larger SMI payloads (op_load_smi8 sign-extension,
   op_load_smi 16-bit) need different handling — out of scope here;

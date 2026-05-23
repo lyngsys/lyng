@@ -1,6 +1,6 @@
 use crate::proxy;
-use lyng_js_gc::AllocationLifetime;
-use lyng_js_types::{ObjectRef, PropertyDescriptor, PropertyKey, Value};
+use lyng_gc::AllocationLifetime;
+use lyng_types::{ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 mod bigint;
 mod conversions;
