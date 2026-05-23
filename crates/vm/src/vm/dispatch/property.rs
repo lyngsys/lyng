@@ -305,6 +305,75 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        reason = "DSL fast helper keeps opcode operands explicit while reusing the existing named-store IC machinery"
+    )]
+    pub(crate) fn try_assign_named_property_fast_for_dsl(
+        &mut self,
+        agent: &mut Agent,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+        receiver_register: u16,
+        value_register: u16,
+    ) -> bool {
+        let registers = frame.registers();
+        let receiver = self.read_register(registers, receiver_register);
+        let value = self.read_register(registers, value_register);
+        let Some(object) = receiver.as_object_ref() else {
+            return false;
+        };
+
+        let fast_target = self
+            .named_property_fast_handler(frame.code(), feedback_slot)
+            .and_then(|(handler, cached_epoch)| {
+                let view = agent.heap().view();
+                let record = view.object_ref(object)?;
+                if record.shape() != handler.receiver_shape()
+                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
+                    || !handler.writable()
+                {
+                    return None;
+                }
+                match handler.slot_location() {
+                    SlotLocation::Inline(index) => {
+                        Some(ValueStoreTarget::InlineNamedSlot(object, index))
+                    }
+                    SlotLocation::OutOfLine(offset) => {
+                        let slots = record.named_slots()?;
+                        Some(ValueStoreTarget::ObjectSlot(slots, offset))
+                    }
+                }
+            });
+        if let Some(target) = fast_target {
+            let stored = agent.with_heap_and_objects(|heap, _objects| {
+                let mut mutator = heap.mutator();
+                mutator.mut_store_value(target, value)
+            });
+            if stored {
+                self.record_feedback_slot(frame.code(), feedback_slot);
+                advance_dispatch_frame(frame, instruction_len);
+                return true;
+            }
+            return false;
+        }
+
+        if let Some(Some(true)) = self.try_named_property_polymorphic_fast_store(
+            agent,
+            frame.code(),
+            feedback_slot,
+            object,
+            value,
+        ) {
+            self.record_feedback_slot(frame.code(), feedback_slot);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        false
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     pub(in crate::vm) fn execute_set_named_property_opcode(
