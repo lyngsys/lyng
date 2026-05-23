@@ -1,9 +1,8 @@
 # Lyng
 
-Lyng is a Rust workspace laid out as the skeleton of a complete browser engine — JS, HTML,
-CSS, layout, gfx, networking, platform, and a webview shell are all represented in the
-crate tree. Most of those are placeholders. At this stage, the singular focus is
-**Lyng JS**.
+Lyng is a Rust JavaScript engine, distributed as a Cargo workspace of small,
+single-responsibility crates (frontend, compiler, runtime substrate, builtins,
+CLI) plus the verification tooling around it.
 
 ## What this is
 
@@ -19,11 +18,10 @@ organized, and held to a real quality bar despite being agent-written. The `AGEN
 the repo root and the one inside `crates/lyng-js/` encode the standards the agents are
 held to.
 
-## Current focus
+## Current state
 
-Lyng JS is the only active implementation track. As of May 2026, Lyng JS passes 100% of
-Test262 in every category except `intl402`, which has not been started. Current work is
-on runtime performance.
+As of May 2026, Lyng passes 100% of Test262 in every category except `intl402`, which
+has not been started. Current work is on runtime performance.
 
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -39,13 +37,11 @@ on runtime performance.
 ## Workspace shape
 
 - `crates/lyng-js/`: engine crates, integration tests, runtime/compiler implementation
-- `crates/html_parser/`: WHATWG-style HTML tokenizer and tree builder
-- `crates/dom/`: arena-backed DOM used by the HTML parser
-- `crates/{css,gfx,layout,net,platform}/`, `components/webview/`: placeholders, not active workspace crates
-- `tools/`: html5lib runner, Lyng JS Test262 runner, Lyng JS benchmarks
+- `crates/lyng-js-vm-dsl/`: proc-macro substrate for the asm-DSL interpreter
+- `tools/`: Test262 runner, benchmark/runtime-report tooling, DSL codegen
 
 ## Read next
 
-- [Lyng JS overview](crates/lyng-js/README.md)
-- [Lyng JS docs index](docs/lyng-js/README.md)
+- [Engine overview](crates/lyng-js/README.md)
+- [Docs index](docs/lyng-js/README.md)
 - [Repo-level agent guide](AGENTS.md)

@@ -1,10 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    # HTML/DOM
-    "crates/dom",
-    "crates/html_parser",
-    # JS3 engine
+    # Lyng JS engine
     "crates/lyng-js/common",
     "crates/lyng-js/lexer",
     "crates/lyng-js/ast",
@@ -25,7 +22,6 @@ members = [
     "crates/lyng-js/tests",
     "crates/lyng-js-vm-dsl",
     # Tools
-    "tools/html5lib_runner",
     "tools/lyng-js-bench",
     "tools/lyng-js-dsl-codegen",
     "tools/lyng-js-test262",
@@ -46,10 +42,7 @@ ryu = "1"
 smallvec = "1"
 unicode-id-start = "1"
 
-# DOM/HTML
-lyng-dom = { path = "crates/dom" }
-
-# JS3 engine
+# Lyng JS engine
 lyng-js-common = { path = "crates/lyng-js/common" }
 lyng-js-lexer = { path = "crates/lyng-js/lexer" }
 lyng-js-ast = { path = "crates/lyng-js/ast" }

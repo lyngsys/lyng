@@ -1,3 +1,0 @@
-# Net
-
-Placeholder for networking.
