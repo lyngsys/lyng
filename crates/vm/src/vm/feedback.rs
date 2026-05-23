@@ -928,6 +928,7 @@ impl NamedPropertyFeedback {
                         self.monomorphic_fast_dependency_epoch =
                             Self::entry_dependency_epoch(entry, 0);
                     }
+                    NamedPropertyCachePath::OwnDataTransition => {}
                     NamedPropertyCachePath::PrototypeData => {
                         let handler = NamedPropertyProtoHandler::from_entry(entry);
                         if handler.is_valid() {
@@ -999,7 +1000,13 @@ impl NamedPropertyFeedback {
     }
 
     #[inline]
-    fn try_store(&self, agent: &mut Agent, receiver: ObjectRef, value: Value) -> Option<bool> {
+    fn try_store(
+        &self,
+        agent: &mut Agent,
+        receiver: ObjectRef,
+        atom: AtomId,
+        value: Value,
+    ) -> Option<bool> {
         match self.cache_state {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
@@ -1011,7 +1018,13 @@ impl NamedPropertyFeedback {
         let entry = self.entries[self.find_entry_index(receiver_shape)?]?;
         let result = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
-            objects.store_to_named_property_cache(&mut mutator, receiver, entry, value)
+            objects.store_to_named_property_cache(
+                &mut mutator,
+                receiver,
+                PropertyKey::from_atom(atom),
+                entry,
+                value,
+            )
         });
         if let Ok(Some(stored)) = result {
             return Some(stored);
@@ -1233,6 +1246,7 @@ impl KeyedPropertyFeedback {
                         .unwrap_or(0);
                 }
             }
+            NamedPropertyCachePath::OwnDataTransition => {}
             NamedPropertyCachePath::PrototypeData => {
                 let handler = NamedPropertyProtoHandler::from_entry(keyed_entry.entry);
                 if handler.is_valid() {
@@ -1299,7 +1313,13 @@ impl KeyedPropertyFeedback {
         let entry = self.named_entries[self.find_named_entry_index(atom, receiver_shape)?]?;
         let result = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
-            objects.store_to_named_property_cache(&mut mutator, receiver, entry.entry, value)
+            objects.store_to_named_property_cache(
+                &mut mutator,
+                receiver,
+                PropertyKey::from_atom(atom),
+                entry.entry,
+                value,
+            )
         });
         if let Ok(Some(stored)) = result {
             return Some(stored);
@@ -2531,11 +2551,12 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
+        atom: AtomId,
         value: Value,
     ) -> Option<bool> {
         match self.feedback_site_for_slot(code, slot?) {
             Some(FeedbackSiteState::NamedProperty(feedback)) => {
-                feedback.try_store(agent, receiver, value)
+                feedback.try_store(agent, receiver, atom, value)
             }
             _ => None,
         }
@@ -2564,6 +2585,28 @@ impl Vm {
             )
             .ok()
             .flatten();
+        self.record_named_property_cache_entry(code, slot, plan);
+    }
+
+    pub(super) fn observe_named_property_cache_entry(
+        &mut self,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+        plan: Option<NamedPropertyCacheEntry>,
+    ) {
+        let Some(slot) = slot else {
+            return;
+        };
+        let _ = self.ensure_feedback_slot_execution(code, slot);
+        self.record_named_property_cache_entry(code, slot, plan);
+    }
+
+    fn record_named_property_cache_entry(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        plan: Option<NamedPropertyCacheEntry>,
+    ) {
         let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::NamedProperty(feedback) = site {
                 feedback.observe_slow_path(plan);

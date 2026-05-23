@@ -138,6 +138,41 @@ impl ObjectRuntime {
         }
     }
 
+    /// Directly probes ordinary shape-stable named data properties without materializing a
+    /// `PropertyDescriptor`.
+    ///
+    /// Returns `None` when the path is not safely serviceable by the fast probe: proxies,
+    /// dictionary-backed/exotic objects, or accessor properties. Returns
+    /// [`NamedPropertyFastGet::Absent`] only after proving the full ordinary prototype chain has
+    /// no matching property.
+    #[inline]
+    pub fn try_fast_get_named_data_property(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        receiver: ObjectRef,
+        key: PropertyKey,
+    ) -> Option<NamedPropertyFastGet> {
+        if key.is_index() {
+            return None;
+        }
+        let mut current = Some(receiver);
+        while let Some(object) = current {
+            let header = self.object_header(heap, object)?;
+            if !self.named_data_get_object_is_cacheable(header) {
+                return None;
+            }
+            if let Some(property) = self.shape_property(header.shape(), key) {
+                if property.kind() != ShapePropertyKind::Data {
+                    return None;
+                }
+                let value = self.read_named_property_slot(heap, object, property.slot_offset())?;
+                return Some(NamedPropertyFastGet::Data(value));
+            }
+            current = header.prototype();
+        }
+        Some(NamedPropertyFastGet::Absent)
+    }
+
     /// Attempts to store one value through a previously planned named-property cache entry.
     ///
     /// Same inline/out-of-line dispatch as the load path. Inline writes are followed by an
@@ -152,11 +187,17 @@ impl ObjectRuntime {
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
         receiver: ObjectRef,
+        key: PropertyKey,
         entry: NamedPropertyCacheEntry,
         value: Value,
     ) -> InternalMethodResult<Option<bool>> {
-        if entry.path() != NamedPropertyCachePath::OwnData {
-            return Ok(None);
+        match entry.path() {
+            NamedPropertyCachePath::OwnData => {}
+            NamedPropertyCachePath::OwnDataTransition => {
+                return self
+                    .store_to_named_property_transition_cache(heap, receiver, key, entry, value);
+            }
+            NamedPropertyCachePath::PrototypeData => return Ok(None),
         }
         let Some(holder) =
             Self::validated_named_property_cache_holder(heap.view(), receiver, entry)?
@@ -185,6 +226,163 @@ impl ObjectRuntime {
                 Ok(Some(true))
             }
         }
+    }
+
+    /// Builds a transition-store cache entry for `Set` on an absent own named data property.
+    ///
+    /// The entry records the receiver's pre-store shape, the post-store transition shape, and
+    /// dependencies for the receiver and every prototype object observed to be property-free.
+    /// Applying the entry later is valid for same-shaped fresh receivers with the same unchanged
+    /// prototype chain.
+    ///
+    /// # Errors
+    /// Returns an error when the receiver, a traversed prototype, or shape/slot metadata is
+    /// missing or internally inconsistent while building the transition entry.
+    pub fn plan_named_property_transition_store_entry(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        receiver: ObjectRef,
+        key: PropertyKey,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<Option<NamedPropertyCacheEntry>> {
+        if key.is_index() {
+            return Ok(None);
+        }
+        let receiver_header = self
+            .object_header(heap.view(), receiver)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if !self.transition_store_object_is_cacheable(receiver_header) {
+            return Ok(None);
+        }
+        if self.shape_property(receiver_header.shape(), key).is_some() {
+            return Ok(None);
+        }
+        let receiver_record = heap
+            .view()
+            .object(receiver)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if self.has_reserved_named_slots(heap.view(), receiver_record) {
+            return Ok(None);
+        }
+        if self
+            .shape(heap.view(), receiver_header.shape())
+            .is_some_and(|shape| {
+                shape.property_count() >= NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT
+            })
+        {
+            return Ok(None);
+        }
+        if self.object_metadata(receiver).is_some_and(|metadata| {
+            metadata.named_property_additions >= NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT
+        }) {
+            return Ok(None);
+        }
+
+        let mut dependencies = [None; PROPERTY_CACHE_MAX_DEPENDENCIES];
+        let mut dependency_count = 0u8;
+        if !Self::push_property_cache_dependency(
+            heap.view(),
+            &mut dependencies,
+            &mut dependency_count,
+            receiver,
+        )? {
+            return Ok(None);
+        }
+
+        let mut current = receiver_header.prototype();
+        while let Some(object) = current {
+            let header = self
+                .object_header(heap.view(), object)
+                .ok_or(InternalMethodError::MissingObject)?;
+            if !self.transition_store_object_is_cacheable(header) {
+                return Ok(None);
+            }
+            if !Self::push_property_cache_dependency(
+                heap.view(),
+                &mut dependencies,
+                &mut dependency_count,
+                object,
+            )? {
+                return Ok(None);
+            }
+            if self.shape_property(header.shape(), key).is_some() {
+                return Ok(None);
+            }
+            current = header.prototype();
+        }
+
+        let attrs = ordinary_property_attrs();
+        let transition = ShapeTransitionKey::new(key, ShapePropertyKind::Data, attrs);
+        let Some(next_shape) =
+            self.transition_shape(heap, receiver_header.shape(), transition, lifetime)
+        else {
+            return Ok(None);
+        };
+        let property = self
+            .shape_property(next_shape, key)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        Ok(Some(NamedPropertyCacheEntry::new(
+            receiver_header.shape(),
+            receiver,
+            next_shape,
+            property.slot_offset(),
+            attrs,
+            NamedPropertyCachePath::OwnDataTransition,
+            dependency_count,
+            dependencies,
+        )))
+    }
+
+    fn store_to_named_property_transition_cache(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        receiver: ObjectRef,
+        key: PropertyKey,
+        entry: NamedPropertyCacheEntry,
+        value: Value,
+    ) -> InternalMethodResult<Option<bool>> {
+        let Some(record) =
+            Self::validated_named_property_transition_receiver(heap.view(), receiver, entry)?
+        else {
+            return Ok(None);
+        };
+        let header = self
+            .object_header(heap.view(), receiver)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if !self.transition_store_object_is_cacheable(header) {
+            return Ok(None);
+        }
+        if !header.flags().is_extensible() {
+            return Ok(Some(false));
+        }
+        if self.has_reserved_named_slots(heap.view(), record) {
+            return Ok(None);
+        }
+        if self.object_metadata(receiver).is_some_and(|metadata| {
+            metadata.named_property_additions >= NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT
+        }) {
+            return Ok(None);
+        }
+        let updated = self.ordinary_define_absent_shaped_named_property(
+            heap,
+            receiver,
+            key,
+            NamedPropertyValue::data(value),
+            entry.attrs(),
+            AllocationLifetime::Default,
+        )?;
+        if !updated {
+            return Ok(Some(false));
+        }
+        let new_shape = heap
+            .view()
+            .object(receiver)
+            .and_then(RuntimeObjectRecord::shape)
+            .ok_or(InternalMethodError::CorruptObjectState)?;
+        if new_shape != entry.holder_shape() {
+            return Ok(Some(true));
+        }
+        Ok(Some(true))
     }
 
     #[allow(
@@ -246,6 +444,7 @@ impl ObjectRuntime {
                 }
                 Ok(Some(receiver_record))
             }
+            NamedPropertyCachePath::OwnDataTransition => Ok(None),
             NamedPropertyCachePath::PrototypeData => {
                 let mut current = receiver_record.prototype();
                 let mut holder = None;
@@ -288,6 +487,84 @@ impl ObjectRuntime {
     ) -> bool {
         record.shape() == Some(dependency.shape())
             && record.last_invalidation_epoch() == dependency.invalidation_epoch()
+    }
+
+    #[inline]
+    fn validated_named_property_transition_receiver(
+        heap: PrimitiveHeapView<'_>,
+        receiver: ObjectRef,
+        entry: NamedPropertyCacheEntry,
+    ) -> InternalMethodResult<Option<RuntimeObjectRecord>> {
+        if entry.path() != NamedPropertyCachePath::OwnDataTransition {
+            return Ok(None);
+        }
+        let Some(receiver_dependency) = entry.dependency(0) else {
+            return Ok(None);
+        };
+        let receiver_record = heap
+            .object(receiver)
+            .ok_or(InternalMethodError::MissingObject)?;
+        if !Self::record_matches_cache_dependency(receiver_record, receiver_dependency)
+            || receiver_record.shape() != Some(entry.receiver_shape())
+        {
+            return Ok(None);
+        }
+
+        let mut current = receiver_record.prototype();
+        for index in 1..usize::from(entry.dependency_count()) {
+            let Some(dependency) = entry.dependency(index) else {
+                return Ok(None);
+            };
+            let Some(object) = current else {
+                return Ok(None);
+            };
+            if object != dependency.object() {
+                return Ok(None);
+            }
+            let record = heap
+                .object(object)
+                .ok_or(InternalMethodError::MissingObject)?;
+            if !Self::record_matches_cache_dependency(record, dependency) {
+                return Ok(None);
+            }
+            current = record.prototype();
+        }
+        if current.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(receiver_record))
+    }
+
+    #[inline]
+    fn transition_store_object_is_cacheable(&self, header: ObjectHeader) -> bool {
+        self.has_plain_fast_named_properties(header)
+            && header.flags().is_extensible()
+            && !header.flags().uses_named_property_dictionary()
+            && !header.flags().is_engine_array()
+            && !header.flags().is_arguments_object()
+            && !self.is_module_namespace_object(header.id())
+            && !self.is_typed_array_object(header.id())
+            && !self.is_string_exotic_object(header.id())
+    }
+
+    #[inline]
+    fn named_data_get_object_is_cacheable(&self, header: ObjectHeader) -> bool {
+        self.has_plain_fast_named_properties(header)
+            && !header.flags().uses_named_property_dictionary()
+            && !header.flags().is_engine_array()
+            && !header.flags().is_arguments_object()
+            && !self.is_module_namespace_object(header.id())
+            && !self.is_typed_array_object(header.id())
+            && !self.is_string_exotic_object(header.id())
+    }
+
+    #[inline]
+    fn has_plain_fast_named_properties(&self, header: ObjectHeader) -> bool {
+        matches!(
+            self.object_metadata(header.id())
+                .map(|metadata| &metadata.cold),
+            Some(ObjectColdData::Ordinary(OrdinaryObjectData::Plain) | ObjectColdData::Function(_))
+        )
     }
 
     fn push_property_cache_dependency(

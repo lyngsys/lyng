@@ -76,11 +76,11 @@ pub use self::runtime::{
 pub use self::shapes::{
     ElementMode, InvalidationCause, InvalidationEvent, KeyedDenseIndexHandler,
     NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
-    NamedPropertyDictionaryEntry, NamedPropertyHandler, NamedPropertyProtoHandler,
-    NamedPropertyStorageMode, NamedPropertyValue, PropertyCacheDependency, ShapeAllocation,
-    ShapeProperty, ShapePropertyKind, ShapeRecord, ShapeTransitionKey, SlotLocation,
-    SparseElementEntry, INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG,
-    PROPERTY_CACHE_MAX_DEPENDENCIES,
+    NamedPropertyDictionaryEntry, NamedPropertyFastGet, NamedPropertyHandler,
+    NamedPropertyProtoHandler, NamedPropertyStorageMode, NamedPropertyValue,
+    PropertyCacheDependency, ShapeAllocation, ShapeProperty, ShapePropertyKind, ShapeRecord,
+    ShapeTransitionKey, SlotLocation, SparseElementEntry, INLINE_NAMED_SLOT_COUNT,
+    INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 pub use self::temporal::{
     TemporalDurationObjectData, TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind,

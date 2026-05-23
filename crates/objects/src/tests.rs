@@ -706,7 +706,7 @@ fn named_property_store_cache_hits_own_slots_and_invalidates_on_dictionary_trans
     assert_eq!(cache.path(), NamedPropertyCachePath::OwnData);
     assert_eq!(
         runtime
-            .store_to_named_property_cache(&mut mutator, object, cache, Value::from_smi(5))
+            .store_to_named_property_cache(&mut mutator, object, key, cache, Value::from_smi(5))
             .unwrap(),
         Some(true)
     );
@@ -734,7 +734,101 @@ fn named_property_store_cache_hits_own_slots_and_invalidates_on_dictionary_trans
     );
     assert_eq!(
         runtime
-            .store_to_named_property_cache(&mut mutator, object, cache, Value::from_smi(7))
+            .store_to_named_property_cache(&mut mutator, object, key, cache, Value::from_smi(7))
+            .unwrap(),
+        None
+    );
+}
+
+#[test]
+fn named_property_transition_store_cache_adds_absent_own_data_properties() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(905));
+
+    let first = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    let cache = runtime
+        .plan_named_property_transition_store_entry(
+            &mut mutator,
+            first,
+            key,
+            AllocationLifetime::Default,
+        )
+        .unwrap()
+        .expect("absent own named data property should be transition-cacheable");
+    assert_eq!(cache.path(), NamedPropertyCachePath::OwnDataTransition);
+    assert_eq!(cache.receiver_shape(), root);
+    assert_ne!(cache.holder_shape(), root);
+    assert_eq!(
+        runtime
+            .store_to_named_property_cache(&mut mutator, first, key, cache, Value::from_smi(11))
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        runtime.get(mutator.view(), first, key, Value::from_object_ref(first)),
+        Ok(Value::from_smi(11))
+    );
+
+    let second = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert_eq!(
+        runtime
+            .store_to_named_property_cache(&mut mutator, second, key, cache, Value::from_smi(22))
+            .unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        runtime.get(mutator.view(), second, key, Value::from_object_ref(second)),
+        Ok(Value::from_smi(22))
+    );
+}
+
+#[test]
+fn named_property_transition_store_cache_rejects_inherited_properties() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(906));
+
+    let prototype = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            prototype,
+            key,
+            data_descriptor(Value::from_smi(7), true, true),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
+        AllocationLifetime::Default,
+    );
+
+    assert_eq!(
+        runtime
+            .plan_named_property_transition_store_entry(
+                &mut mutator,
+                object,
+                key,
+                AllocationLifetime::Default,
+            )
             .unwrap(),
         None
     );
@@ -1200,6 +1294,81 @@ fn named_property_load_cache_rejects_same_shaped_receivers_with_different_protot
         runtime
             .load_from_named_property_cache(mutator.view(), second, cache)
             .unwrap(),
+        None
+    );
+}
+
+#[test]
+fn fast_named_data_property_probe_reads_data_and_rejects_accessors() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(907));
+    let accessor_key = PropertyKey::from_atom(AtomId::from_raw(908));
+
+    let prototype = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            prototype,
+            key,
+            data_descriptor(Value::from_smi(31), true, true),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
+        AllocationLifetime::Default,
+    );
+
+    assert_eq!(
+        runtime.try_fast_get_named_data_property(mutator.view(), object, key),
+        Some(NamedPropertyFastGet::Data(Value::from_smi(31)))
+    );
+    assert_eq!(
+        runtime.try_fast_get_named_data_property(
+            mutator.view(),
+            object,
+            PropertyKey::from_atom(AtomId::from_raw(909)),
+        ),
+        Some(NamedPropertyFastGet::Absent)
+    );
+
+    let mut accessor = PropertyDescriptor::new();
+    accessor.set_getter(Value::undefined());
+    accessor.set_setter(Value::undefined());
+    accessor.set_enumerable(true);
+    accessor.set_configurable(true);
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            prototype,
+            accessor_key,
+            accessor,
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+
+    assert_eq!(
+        runtime.try_fast_get_named_data_property(mutator.view(), object, accessor_key),
+        None
+    );
+
+    let data_view_like = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root)
+            .with_prototype(Some(prototype))
+            .with_cold_data(ObjectColdData::Ordinary(OrdinaryObjectData::DataView)),
+        AllocationLifetime::Default,
+    );
+    assert_eq!(
+        runtime.try_fast_get_named_data_property(mutator.view(), data_view_like, key),
         None
     );
 }

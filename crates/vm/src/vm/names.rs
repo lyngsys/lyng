@@ -689,7 +689,14 @@ impl Vm {
         }
         // Slow path: entries[POLY_LIMIT..] / PrototypeData / megamorphic / miss.
         if self
-            .try_named_property_store_inline_cache(agent, code, feedback_slot, global_object, value)
+            .try_named_property_store_inline_cache(
+                agent,
+                code,
+                feedback_slot,
+                global_object,
+                name,
+                value,
+            )
             .is_some()
         {
             self.record_feedback_slot(code, feedback_slot);
@@ -812,6 +819,7 @@ impl Vm {
             code,
             feedback_slot,
             global_object,
+            name,
             value,
         ) {
             if !stored && self.frame_is_strict(frame) {

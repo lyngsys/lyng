@@ -522,7 +522,7 @@ impl ObjectRuntime {
         Ok(descriptor_from_payload(payload, property.attrs()))
     }
 
-    fn has_reserved_named_slots(
+    pub(super) fn has_reserved_named_slots(
         &self,
         heap: PrimitiveHeapView<'_>,
         record: RuntimeObjectRecord,

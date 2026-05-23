@@ -95,7 +95,15 @@ pub enum NamedPropertyCachePurpose {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NamedPropertyCachePath {
     OwnData,
+    OwnDataTransition,
     PrototypeData,
+}
+
+/// Result of a direct named-data-property probe.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NamedPropertyFastGet {
+    Data(Value),
+    Absent,
 }
 
 /// Substrate-owned cache record for one shaped named-property access path.
@@ -222,7 +230,9 @@ impl NamedPropertyHandler {
     pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
         match entry.path() {
             NamedPropertyCachePath::OwnData => {}
-            NamedPropertyCachePath::PrototypeData => return Self::NONE,
+            NamedPropertyCachePath::OwnDataTransition | NamedPropertyCachePath::PrototypeData => {
+                return Self::NONE;
+            }
         }
         if entry.dependency_count() != 1 {
             return Self::NONE;
@@ -338,7 +348,9 @@ impl NamedPropertyProtoHandler {
     #[must_use]
     pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
         match entry.path() {
-            NamedPropertyCachePath::OwnData => return Self::NONE,
+            NamedPropertyCachePath::OwnData | NamedPropertyCachePath::OwnDataTransition => {
+                return Self::NONE;
+            }
             NamedPropertyCachePath::PrototypeData => {}
         }
         if entry.dependency_count() != 2 {

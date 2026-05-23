@@ -844,6 +844,112 @@ fn named_property_store_ic_caches_own_data_paths() {
 }
 
 #[test]
+fn named_property_store_ic_caches_absent_own_data_transitions() {
+    let unit = compile_test_unit(
+        154,
+        r"
+        function Box(value) {
+            this.value = value;
+        }
+        var first = new Box(1);
+        var second = new Box(2);
+        var third = new Box(3);
+        third.value;
+        ",
+    );
+    let entry = unit.function(unit.entry()).unwrap();
+    let constructor = unit
+        .functions()
+        .iter()
+        .find(|function| function.name() == Some(unit_atom(&unit, "Box")))
+        .expect("Box constructor should be lowered as a child function");
+    let store_slot = constructor
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("constructor should contain a named-store site");
+    let constructor_child_index = entry
+        .child_functions()
+        .iter()
+        .position(|child| *child == constructor.id())
+        .and_then(|index| u32::try_from(index).ok())
+        .expect("entry script should install Box as a direct child");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let constructor_code = vm
+        .installed_child_code(installed.code(), constructor_child_index)
+        .expect("Box constructor should have installed code");
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(3)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(constructor_code, store_slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnDataTransition)
+        ))
+    );
+}
+
+#[test]
+fn absent_named_property_load_records_without_megamorphic_feedback() {
+    let unit = compile_test_unit(155, "source.missing;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let missing_atom = unit_atom(&unit, "missing");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(missing_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.missing");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .unwrap(),
+            Value::undefined()
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some(("Uninitialized", 0, None))
+    );
+    assert_eq!(vm.feedback_execution_count(installed.code(), slot), Some(2));
+}
+
+#[test]
 fn keyed_named_atom_ic_becomes_monomorphic() {
     let unit = compile_test_unit(33, "source[\"value\"];");
     let entry = unit.function(unit.entry()).unwrap();

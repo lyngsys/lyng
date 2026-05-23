@@ -8,7 +8,10 @@ use lyng_common::AtomId;
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, ValueStoreTarget};
 use lyng_host::HostHooks;
-use lyng_objects::{NamedPropertyCachePurpose, NativeFunctionRegistry, SlotLocation};
+use lyng_objects::{
+    InternalMethodError, NamedPropertyCacheEntry, NamedPropertyCachePurpose, NamedPropertyFastGet,
+    NativeFunctionRegistry, SlotLocation,
+};
 use lyng_ops::{errors, object};
 use lyng_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
@@ -160,6 +163,32 @@ impl Vm {
                 feedback_slot,
                 object,
             ) {
+                self.register_stack[target_index] = value;
+                advance_dispatch_frame(frame, instruction_len);
+                return Ok(());
+            }
+            if let Some(fast_get) =
+                agent
+                    .objects()
+                    .try_fast_get_named_data_property(agent.heap().view(), object, key)
+            {
+                let value = match fast_get {
+                    NamedPropertyFastGet::Data(value) => {
+                        self.observe_named_property_slow_path(
+                            agent,
+                            frame.code(),
+                            feedback_slot,
+                            object,
+                            atom,
+                            NamedPropertyCachePurpose::Load,
+                        );
+                        value
+                    }
+                    NamedPropertyFastGet::Absent => {
+                        self.record_feedback_slot(frame.code(), feedback_slot);
+                        Value::undefined()
+                    }
+                };
                 self.register_stack[target_index] = value;
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
@@ -329,6 +358,7 @@ impl Vm {
                 frame.code(),
                 feedback_slot,
                 object,
+                atom,
                 value,
             ) {
                 if assignment {
@@ -347,6 +377,44 @@ impl Vm {
                 self.record_feedback_slot(frame.code(), feedback_slot);
                 advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
+            }
+            match Self::try_named_property_transition_store(
+                agent,
+                object,
+                key,
+                value,
+                AllocationLifetime::Default,
+            ) {
+                Ok(Some((stored, plan))) => {
+                    if assignment {
+                        let assignment_result = self.check_property_assignment_result(
+                            agent,
+                            frame,
+                            stored,
+                            strict_assignment,
+                        );
+                        let Some(()) = self.handle_dispatch_result(
+                            agent,
+                            frame_depth,
+                            frame,
+                            assignment_result,
+                        )?
+                        else {
+                            return Ok(());
+                        };
+                    }
+                    self.observe_named_property_cache_entry(
+                        frame.code(),
+                        feedback_slot,
+                        Some(plan),
+                    );
+                    advance_dispatch_frame(frame, instruction_len);
+                    return Ok(());
+                }
+                Ok(None) => {}
+                Err(_error) => {
+                    return Err(VmError::Abrupt(errors::throw_type_error(agent)));
+                }
             }
             let set_result = if Self::prototype_chain_has_proxy(agent, object) {
                 self.set_property_on_value(agent, host, registry, frame, receiver, key, value)
@@ -1533,6 +1601,30 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(())
+    }
+
+    fn try_named_property_transition_store(
+        agent: &mut Agent,
+        object: ObjectRef,
+        key: PropertyKey,
+        value: Value,
+        lifetime: AllocationLifetime,
+    ) -> Result<Option<(bool, NamedPropertyCacheEntry)>, InternalMethodError> {
+        agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            let Some(plan) = objects.plan_named_property_transition_store_entry(
+                &mut mutator,
+                object,
+                key,
+                lifetime,
+            )?
+            else {
+                return Ok(None);
+            };
+            let stored =
+                objects.store_to_named_property_cache(&mut mutator, object, key, plan, value)?;
+            Ok(stored.map(|stored| (stored, plan)))
+        })
     }
 
     /// Phase 3d dense-keyed load fast path. Returns the cached element
