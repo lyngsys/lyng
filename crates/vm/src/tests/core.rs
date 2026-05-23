@@ -275,6 +275,57 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
+fn add_smi_hit_avoids_semantic_slow_path() {
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(18).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AddSmi, 1, 0, 41)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(18), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::AddSmi), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::AddSmi),
+        0,
+        "AddSmi LLInt SMI hit should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
 fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
     // Originally Phase 4b's `vm_star_fusion_elides_star_dispatch_after_lda`
     // regression: the α dispatch loop's `dispatch_next_with_value!` peephole
