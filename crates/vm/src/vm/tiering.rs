@@ -129,12 +129,12 @@ impl TieringState {
     }
 
     #[inline]
-    fn observe_feedback_event(&mut self) {
+    fn observe_feedback_events(&mut self, count: u32) {
         if !self.eligible {
             return;
         }
-        self.feedback_events = self.feedback_events.saturating_add(1);
-        self.observe_hotness(FEEDBACK_EVENT_WEIGHT);
+        self.feedback_events = self.feedback_events.saturating_add(count);
+        self.observe_hotness(FEEDBACK_EVENT_WEIGHT.saturating_mul(count));
     }
 
     // DSL-0c C6: observe_backedge_event deleted with α path's
@@ -192,12 +192,17 @@ impl Vm {
 
     #[inline]
     pub(super) fn observe_tier_feedback_event(&mut self, code: CodeRef) {
+        self.observe_tier_feedback_events(code, 1);
+    }
+
+    #[inline]
+    pub(super) fn observe_tier_feedback_events(&mut self, code: CodeRef, count: u32) {
         if let Some(state) = self
             .tiering
             .get_mut(code_index(code))
             .and_then(Option::as_mut)
         {
-            state.observe_feedback_event();
+            state.observe_feedback_events(count);
         }
     }
 

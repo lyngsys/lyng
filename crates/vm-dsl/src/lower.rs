@@ -16,7 +16,7 @@
 //! #[unsafe(naked)]
 //! pub extern "C" fn op_xxx() -> ! {
 //!     ::core::arch::naked_asm!(
-//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_object_records}{state_prefix}{vm_poll}{feedback_entry_stride}{entry_observed} */\n",
+//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_object_records}{state_prefix}{vm_poll}{feedback_entry_stride}{entry_observed}{feedback_scalar_execution_count} */\n",
 //!         decode_<layout>!(<operand idents as scratch regs>),
 //!         m1!(...),                  // macro call returning &'static str (via concat!)
 //!         m2!(...),                  // ditto
@@ -133,12 +133,11 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     // vs label-free cold stubs:
     //
     // - `call_slow!` BEFORE any label in a handler that later declares
-    //   a label: these are hit-side tail invocations (e.g.
-    //   `call_slow!(op_xxx_record_smi_rs, args = [slot])` for feedback
-    //   recording). They run on every successful inline dispatch, NOT
-    //   just on slow-path entry. Injecting `opcode_byte = N` here would
-    //   emit `inc_slow_semantic_counter!` on every dispatch and falsely
-    //   report ~100% slow-path-share for every record-smi-shim opcode.
+    //   a label: these are hit-side tail invocations. They run on every
+    //   successful inline dispatch, NOT just on slow-path entry.
+    //   Injecting `opcode_byte = N` here would emit
+    //   `inc_slow_semantic_counter!` on every dispatch and falsely
+    //   report ~100% slow-path-share for that opcode.
     // - `call_slow!` AFTER the first label: these are inside a label
     //   scope (typically `.slow:`), executed only when the inline hit path
     //   bails. Counter-injection here is semantically correct.
@@ -238,7 +237,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_observed={entry_observed} obj_shape={object_shape} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -253,7 +252,8 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 feedback_mode = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_MODE_OFFSET,
                 feedback_named_handler_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET,
                 feedback_named_epoch = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
-                entry_observed = const 0_u32,
+                entry_observed = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET,
+                feedback_scalar_execution_count = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
                 object_shape = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_SHAPE_OFFSET,
                 object_named_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET,
                 object_last_epoch = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET,
@@ -597,10 +597,11 @@ mod tests {
     }
 
     #[test]
-    fn hit_side_recording_call_slow_skipped_when_gated() {
-        // The shape of a record-smi shim invocation as it appears in
-        // an op_add-style hit-side tail: `call_slow!(shim, args = [slot])`.
-        let tokens: TokenStream = syn::parse_str("call_slow!(op_add_record_smi_rs, args = [slot])")
+    fn pre_label_call_slow_skipped_when_gated() {
+        // A pre-label call_slow is a hit-side tail bridge, not a semantic
+        // slow-path entry. The lowerer must not inject slow-path counters
+        // there.
+        let tokens: TokenStream = syn::parse_str("call_slow!(op_tail_bridge_rs, args = [slot])")
             .expect("parse hit-side call_slow!");
         let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ true);
         assert!(

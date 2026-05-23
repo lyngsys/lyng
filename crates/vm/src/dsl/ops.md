@@ -48,7 +48,8 @@ inside its `naked_asm!`.
 | `{vm_poll}`              | `const VM_POLL_PENDING_OFFSET` (placeholder until Batch 7)              |
 | `{vm_counter_base}`      | `const VM_OPCODE_COUNTER_OFFSET` (placeholder until Batch 7)            |
 | `{entry_stride_shift}`   | log2(size_of::<FeedbackEntry>()) — proc-macro literal                   |
-| `{entry_observed}`       | `const offset_of!(FeedbackEntry, state.observed)` — Batch 6             |
+| `{entry_observed}`       | `const offset_of!(FeedbackEntry, scalar_observed_bits)`                 |
+| `{feedback_scalar_execution_count}` | `const offset_of!(FeedbackEntry, scalar_execution_count)`      |
 | `{record_shape}`         | `const offset_of!(ObjectRecord, shape)` — Batch 6                       |
 | `{record_inline_slots}`  | `const offset_of!(ObjectRecord, inline_slots)` — Batch 6                |
 | `{record_outline_slots}` | `const offset_of!(ObjectRecord, outline_slots)` — Batch 6               |

@@ -44,6 +44,22 @@ fn llint_rust_probes_are_explicitly_enumerated() {
 }
 
 #[test]
+fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
+    let cold_handlers = include_str!("../dsl/handlers/cold.rs");
+    let hot_handlers = include_str!("../dsl/handlers/hot.rs");
+    let forbidden = "_record_smi_rs";
+
+    assert!(
+        !cold_handlers.contains(forbidden),
+        "SMI arithmetic LLInt hits must record feedback through asm-visible flat feedback, not Rust feedback shims"
+    );
+    assert!(
+        !hot_handlers.contains(forbidden),
+        "hot LLInt handlers must not call hit-side Rust feedback shims"
+    );
+}
+
+#[test]
 fn rust_vm_hot_paths_do_not_use_llint_fast_path_terminology() {
     let files = [
         ("vm/feedback.rs", include_str!("../vm/feedback.rs")),

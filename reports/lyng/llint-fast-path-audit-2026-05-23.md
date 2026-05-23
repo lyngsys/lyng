@@ -59,11 +59,13 @@ dispatch from the returned payload.
 | `LoadGlobal` | `call_rust_probe!(op_load_global_rust_probe_rs, ...)` | `Vm::try_load_global_rust_probe_for_dsl` | LLInt-readable global/property IC metadata and inline load-global checks |
 | `AssignNamedProperty` | `call_rust_probe!(op_assign_named_property_rust_probe_rs, ...)` | `Vm::try_assign_named_property_rust_probe_for_dsl` | LLInt mode-byte property IC probe and inline store |
 
-## Hybrid SMI Paths That Still Call Rust
+## Hybrid SMI Paths Removed
 
-These handlers compute the SMI result in DSL asm, but the hit side still calls
-Rust to record feedback. They should be treated as hybrid inline hit paths until
-the feedback write is moved into the DSL or the feedback design changes.
+These handlers previously computed the SMI result in DSL asm, but the hit side
+still called Rust to record feedback. That made them hybrid inline hit paths,
+not true LLInt fast paths. The live implementation now records pending SMI
+feedback through the asm-visible flat feedback sidecar with `record_smi!`, then
+drains that sidecar at explicit VM run boundaries.
 
 - `op_add` in `crates/vm/src/dsl/handlers/hot.rs`
 - `op_sub`
@@ -74,11 +76,10 @@ the feedback write is moved into the DSL or the feedback design changes.
 - `op_increment`
 - `op_decrement`
 
-The blocker is the feedback layout. The old inline `record_smi!` route cannot
-be used while the `entry_observed` offset binding is still a placeholder;
-writing at offset `0` would corrupt the legacy `Option<FeedbackSiteState>`
-discriminant. This needs a real LLInt-readable feedback header or a deliberate
-policy that the LLInt hit path does not record this feedback.
+The fix was to add scalar feedback words to the LLInt-readable `FeedbackEntry`
+header: `scalar_observed_bits` and `scalar_execution_count`. The legacy
+`Option<FeedbackSiteState>` remains a Rust-side semantic mirror; LLInt no longer
+writes into that enum layout on hit-side scalar arithmetic.
 
 ## Terminology Sweep
 
@@ -105,25 +106,34 @@ terminology.
 
 ## Current Richards Evidence
 
-The current counted Richards run after the equality and `GetNamedProperty`
-changes shows:
+The current counted Richards run after removing the scalar feedback hybrids
+shows:
 
 | Opcode | Dispatches | Semantic slow-path hits | Semantic share |
 | --- | ---: | ---: | ---: |
-| `GetNamedProperty` | 193,595,668 | 127,299,374 | 65.76% |
-| `AssignNamedProperty` | 48,609,118 | 94,467 | 0.19% |
-| `LoadGlobal` | 39,622,359 | 655 | 0.00% |
-| `StrictEqual` | 27,659,513 | 0 | 0.00% |
-| `Equal` | 61,381,799 | 31,883,918 | 51.94% |
+| `GetNamedProperty` | 38,759,508 | 25,486,423 | 65.76% |
+| `Equal` | 12,289,161 | 6,383,433 | 51.94% |
+| `AssignNamedProperty` | 9,731,961 | 18,913 | 0.19% |
+| `LoadGlobal` | 7,932,735 | 131 | 0.00% |
+| `StrictEqual` | 5,537,671 | 0 | 0.00% |
+| `BitAnd` | 2,240,640 | 0 | 0.00% |
+| `Increment` | 983,619 | 0 | 0.00% |
+| `Decrement` | 192,000 | 0 | 0.00% |
+| `ShiftRight` | 191,808 | 0 | 0.00% |
+| `AddSmi` | 178,752 | 178,752 | 100.00% |
 
 `GetNamedProperty` is now a real LLInt hit path for monomorphic OwnData inline
 slots, but Richards still has a large semantic slow share because prototype,
 polymorphic, out-of-line, non-object, and cold/miss cases are intentionally
 still semantic slow-path entries. `StrictEqual` is clean on this workload.
 `Equal` is not: the SMI path is inline, but non-SMI equality still falls
-through to Rust.
+through to Rust. The hot former scalar feedback-bridge handlers visible in this
+run (`BitAnd`, `Increment`, `Decrement`, `ShiftRight`) now show zero semantic
+slow-path entries. `AddSmi` is a separate missing LLInt opcode, not a feedback
+hybrid: it is still a cold stub and should be tracked as missing opcode
+coverage.
 
-The current release samples for this tree are 290, 289, and 291 on Richards:
+The current release samples for this tree are 287, 286, and 286 on Richards:
 
 ```sh
 cargo run --release -p lyng-bench -- v8suite --filter Richards --timeout-secs 120
@@ -134,10 +144,14 @@ values printed by `lyng-bench`; they are not QJS parity targets.
 
 ## Suggested Next Steps
 
-1. Extend the LLInt-readable feedback/IC header to cover store and global-load
+1. Port `AddSmi` to a real LLInt handler. It is the remaining high-confidence
+   scalar cold stub in Richards (`178,752` dispatches, all semantic slow).
+2. Extend the LLInt-readable feedback/IC header to cover store and global-load
    modes. The Rust enum-backed feedback state should remain the semantic source
    of truth, but the LLInt needs compact mode-specific header words.
-2. Port `LoadGlobal` and `AssignNamedProperty` from Rust probes to DSL asm in
+3. Port `LoadGlobal` and `AssignNamedProperty` from Rust probes to DSL asm in
    that order.
-3. Replace or remove the arithmetic `*_record_smi_rs` shims so the SMI hit
-   paths no longer call Rust.
+4. Continue the same audit discipline for any remaining claimed fast path:
+   the hit side must dispatch from DSL asm without entering Rust. The known
+   remaining Rust-probe cleanup candidates are still `LoadGlobal` and
+   `AssignNamedProperty`.

@@ -470,6 +470,79 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
 }
 
 #[test]
+fn llint_scalar_feedback_batch_drain_preserves_warmup_execution_counts() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        SourceId::new(57),
+        r"
+            function four(x) {
+                x = x + 1;
+                x = x + 1;
+                x = x + 1;
+                x = x + 1;
+                return x;
+            }
+            four(0);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let four_name = unit_atom(&unit, "four");
+    let four_function = unit
+        .functions()
+        .iter()
+        .find(|function| function.name() == Some(four_name))
+        .expect("four function should be lowered");
+    let arithmetic_slots: Vec<_> = four_function
+        .feedback_sites()
+        .iter()
+        .filter(|descriptor| descriptor.kind() == FeedbackSiteKind::Arithmetic)
+        .map(|descriptor| descriptor.slot())
+        .collect();
+    assert_eq!(
+        arithmetic_slots.len(),
+        4,
+        "straight-line test shape should produce four arithmetic feedback sites"
+    );
+    let four_child_index = unit
+        .function(unit.entry())
+        .expect("entry function should exist")
+        .child_functions()
+        .iter()
+        .position(|child| *child == four_function.id())
+        .and_then(|index| u32::try_from(index).ok())
+        .expect("script should install four as a direct child");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let four_code = vm
+        .installed_child_code(installed.code(), four_child_index)
+        .expect("four function should have installed code");
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(4));
+    assert_eq!(vm.feedback_warmup_counter(four_code), Some(2));
+    assert!(vm.has_feedback_vector(four_code));
+    assert_eq!(
+        vm.feedback_execution_count(four_code, arithmetic_slots[0]),
+        Some(0),
+        "first scalar hit should only warm the vector before allocation"
+    );
+    for slot in &arithmetic_slots[1..] {
+        assert_eq!(vm.feedback_execution_count(four_code, *slot), Some(1));
+    }
+}
+
+#[test]
 fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries() {
     let unit = compile_test_unit(40, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();

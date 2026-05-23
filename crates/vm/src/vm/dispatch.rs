@@ -365,6 +365,8 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
-        self.run_via_dsl(agent, host, registry)
+        let result = self.run_via_dsl(agent, host, registry);
+        self.drain_llint_scalar_feedback();
+        result
     }
 }

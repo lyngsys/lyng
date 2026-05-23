@@ -11,14 +11,15 @@
 //! Bindings expected from the proc-macro lowerer:
 //!
 //! - `{feedback_entry_stride}` — `size_of::<FeedbackEntry>()`.
-//! - `{feedback_mode}` — byte offset of the LLInt IC mode byte.
+//! - `{feedback_mode}` — byte offset of the `LLInt` IC mode byte.
 //! - `{feedback_named_handler_bits}` — byte offset of the packed named
 //!   property handler word.
 //! - `{feedback_named_epoch}` — byte offset of the named-property
 //!   invalidation epoch snapshot.
 //! - `{entry_observed}` — byte offset of the "observed types" word
-//!   inside `FeedbackEntry`. Resolved when the recording handlers
-//!   land in Batch 6.
+//!   inside `FeedbackEntry`.
+//! - `{feedback_scalar_execution_count}` — byte offset of the pending
+//!   scalar feedback execution count inside `FeedbackEntry`.
 
 /// Compute a pointer to the `FeedbackEntry` at slot `$slot` and write
 /// it into `$dst`. Feedback slot ids are one-based, so the computed
@@ -42,7 +43,7 @@ macro_rules! load_feedback_site {
 }
 
 /// Branch to `$label` unless the flat feedback entry is a named
-/// monomorphic OwnData inline-slot load header.
+/// monomorphic `OwnData` inline-slot load header.
 #[macro_export]
 macro_rules! branch_named_own_inline_mode {
     ($entry:tt, $label:tt) => {
@@ -122,8 +123,8 @@ macro_rules! load_named_handler_shape {
     };
 }
 
-/// Record that an SMI was observed at slot `$slot` (OR-in the SMI bit
-/// of the observed-types word). Used by warmup recording handlers.
+/// Record that an SMI was observed at slot `$slot` and saturating-increment
+/// the pending scalar execution count. Used by inline scalar `LLInt` hits.
 #[macro_export]
 macro_rules! record_smi {
     ($slot:tt) => {
@@ -139,6 +140,10 @@ macro_rules! record_smi {
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x1\n",
             "str    w17, [x16, {entry_observed}]\n",
+            "ldr    w17, [x16, {feedback_scalar_execution_count}]\n",
+            "adds   w17, w17, #1\n",
+            "csinv  w17, w17, wzr, cc\n",
+            "str    w17, [x16, {feedback_scalar_execution_count}]\n",
         )
     };
 }
@@ -159,6 +164,10 @@ macro_rules! record_object {
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x2\n",
             "str    w17, [x16, {entry_observed}]\n",
+            "ldr    w17, [x16, {feedback_scalar_execution_count}]\n",
+            "adds   w17, w17, #1\n",
+            "csinv  w17, w17, wzr, cc\n",
+            "str    w17, [x16, {feedback_scalar_execution_count}]\n",
         )
     };
 }
@@ -179,6 +188,10 @@ macro_rules! record_double {
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x4\n",
             "str    w17, [x16, {entry_observed}]\n",
+            "ldr    w17, [x16, {feedback_scalar_execution_count}]\n",
+            "adds   w17, w17, #1\n",
+            "csinv  w17, w17, wzr, cc\n",
+            "str    w17, [x16, {feedback_scalar_execution_count}]\n",
         )
     };
 }

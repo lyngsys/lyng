@@ -14,15 +14,15 @@
 //!    slots, calls the semantic body in
 //!    `crate::vm::semantics::<family>::op_xxx_semantic`, and
 //!    translates the outcome back to `SlowPathReturn`.
-//! 3. For inline-ported opcodes only: a
-//!    `extern "C" fn op_xxx_record_smi_rs` shim invoked from the
-//!    hit path's tail to record SMI feedback through the legacy
-//!    `vm.record_feedback_slot` bookkeeping.
+//! 3. For inline-ported scalar opcodes: the hit path records pending
+//!    scalar feedback into the flat LLInt feedback sidecar with
+//!    `record_smi!`; Rust drains that sidecar at explicit VM run
+//!    boundaries.
 //!
 //! Cold stubs: re-run `cargo run -p lyng-dsl-codegen` to
 //! regenerate after touching `tools/lyng-dsl-codegen/src/main.rs`.
-//! Inline hit paths and `*_record_smi_rs` shims: hand-maintained;
-//! see `docs/superpowers/plans/2026-05-21-dsl-1-phase-1c-smi-arith-and-bitwise.md`
+//! Inline hit paths are hand-maintained; see
+//! `docs/superpowers/plans/2026-05-21-dsl-1-phase-1c-smi-arith-and-bitwise.md`
 //! and adjacent plans.
 
 #[cfg(target_arch = "aarch64")]
@@ -35,10 +35,10 @@ use crate::{
     load_local_fixed, load_named_epoch, load_named_handler_bits, load_named_handler_shape,
     load_named_inline_slot_index_or_branch, load_object_record_from_state_or_branch,
     load_record_inline_slot, load_record_last_epoch, load_record_shape, load_reg, load_state_value,
-    load_uninit_lex_sentinel, mul_smi_overflow, shift_left_smi, shift_right_smi, store_acc,
-    store_local_fixed, store_reg, sub_smi_overflow, tag_bool_const, tag_bool_payload, tag_null,
-    tag_smi, tag_smi_const, tag_smi_from_signed_byte, tag_undefined, tagged_kind_or_branch,
-    untag_object_ref, untag_smi,
+    load_uninit_lex_sentinel, mul_smi_overflow, record_smi, shift_left_smi, shift_right_smi,
+    store_acc, store_local_fixed, store_reg, sub_smi_overflow, tag_bool_const, tag_bool_payload,
+    tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
+    tagged_kind_or_branch, untag_object_ref, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -1134,40 +1134,13 @@ llint_handler! {
         sub_smi_overflow!(t0, t1 => t2, .slow);
         tag_smi!(t2);
         store_reg!(a, t2);
-        call_slow!(op_sub_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_sub_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_sub`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by op_sub's
-/// encoded length without re-entering `op_sub_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_sub_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -1242,40 +1215,13 @@ llint_handler! {
         mul_smi_overflow!(t0, t1 => t2, .slow);
         tag_smi!(t2);
         store_reg!(a, t2);
-        call_slow!(op_mul_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_mul_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_mul`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_mul's encoded length without re-entering `op_mul_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_mul_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -1595,41 +1541,13 @@ llint_handler! {
         bit_and_smi!(t0, t1 => t2);
         tag_smi!(t2);
         store_reg!(a, t2);
-        call_slow!(op_bit_and_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_bit_and_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_bit_and`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_bit_and's encoded length without re-entering
-/// `op_bit_and_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_bit_and_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -1738,41 +1656,13 @@ llint_handler! {
         shift_left_smi!(t0, t1 => t2);
         tag_smi!(t2);
         store_reg!(a, t2);
-        call_slow!(op_shift_left_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_shift_left_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_shift_left`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_shift_left's encoded length without re-entering
-/// `op_shift_left_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_shift_left_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -1812,41 +1702,13 @@ llint_handler! {
         shift_right_smi!(t0, t1 => t2);
         tag_smi!(t2);
         store_reg!(a, t2);
-        call_slow!(op_shift_right_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_shift_right_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_shift_right`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_shift_right's encoded length without re-entering
-/// `op_shift_right_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_shift_right_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -1957,41 +1819,13 @@ llint_handler! {
         // semantic's writeback of `numeric` to src (vm/semantics/arithmetic.rs:825)
         // is idempotent. Non-SMI src takes the slow path which still
         // performs the writeback.
-        call_slow!(op_increment_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_increment_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_increment`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_increment's encoded length without re-entering
-/// `op_increment_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_increment_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]
@@ -2030,41 +1864,13 @@ llint_handler! {
         // SMI hit-side elision: see op_increment. ToNumeric(SMI)==SMI so
         // the semantic's writeback to src is idempotent for SMI src;
         // non-SMI src takes slow path which still writes back.
-        call_slow!(op_decrement_record_smi_rs, args = [slot]);
-        dispatch_after_slow!();
+        record_smi!(slot);
+        dispatch!();
         .slow:
         call_slow!(op_decrement_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
 }
-
-/// Hit-side feedback-recording shim for `op_decrement`. Mirrors
-/// `op_add_record_smi_rs` in hot.rs: bumps the warmup counter,
-/// allocates the legacy vector at threshold, mirrors legacy state to
-/// the flat array, observes the tier feedback event. Returns
-/// `Continue { pc_advance: 6 }` so the asm bridge advances PC by
-/// op_decrement's encoded length without re-entering
-/// `op_decrement_semantic`.
-#[cfg(target_arch = "aarch64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_decrement_record_smi_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    feedback_slot: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    {
-        let inner = dispatch.dispatch_state();
-        let code = inner.code();
-        inner
-            .vm
-            .record_feedback_slot(code, lyng_types::FeedbackSlotId::from_raw(feedback_slot));
-    }
-    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance: 6 })
-}
-
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_variables)]
 #[unsafe(no_mangle)]

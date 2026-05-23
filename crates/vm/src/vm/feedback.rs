@@ -1873,24 +1873,29 @@ impl FeedbackSiteState {
 
     #[inline]
     const fn record_execution(&mut self) {
+        self.record_execution_count(1);
+    }
+
+    #[inline]
+    const fn record_execution_count(&mut self, count: u32) {
         match self {
             Self::Arithmetic(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
             Self::Comparison(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
             Self::NamedProperty(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
             Self::KeyedProperty(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
             Self::Call(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
             Self::Construct(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(1);
+                feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
         }
     }
@@ -2221,6 +2226,107 @@ impl Vm {
             return;
         }
         let _ = self.ensure_feedback_slot_execution(code, slot);
+    }
+
+    pub(in crate::vm) fn drain_llint_scalar_feedback(&mut self) {
+        let mut pending = Vec::new();
+        for (code_index, entries) in self.feedback_flat_storage.iter_mut().enumerate() {
+            let Some(code_raw) = u32::try_from(code_index)
+                .ok()
+                .and_then(|index| index.checked_add(1))
+            else {
+                continue;
+            };
+            let Some(code) = CodeRef::from_raw(code_raw) else {
+                continue;
+            };
+            for (slot_index, entry) in entries.iter_mut().enumerate() {
+                let Some(update) = entry.take_scalar_feedback() else {
+                    continue;
+                };
+                let Some(slot_raw) = u32::try_from(slot_index)
+                    .ok()
+                    .and_then(|index| index.checked_add(1))
+                else {
+                    continue;
+                };
+                if let Some(slot) = FeedbackSlotId::from_raw(slot_raw) {
+                    pending.push((code, slot, update));
+                }
+            }
+        }
+
+        for (code, slot, update) in pending {
+            self.record_llint_scalar_feedback_update(code, slot, update);
+        }
+    }
+
+    fn record_llint_scalar_feedback_update(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        update: crate::dsl::feedback_flat::ScalarFeedbackUpdate,
+    ) {
+        if update.execution_count == 0
+            || update.observed_bits & crate::dsl::feedback_flat::LLINT_FEEDBACK_OBSERVED_SMI == 0
+        {
+            return;
+        }
+        self.record_feedback_slot_batch(code, slot, update.execution_count);
+    }
+
+    fn record_feedback_slot_batch(&mut self, code: CodeRef, slot: FeedbackSlotId, count: u32) {
+        if count == 0 {
+            return;
+        }
+        self.ensure_feedback_capacity(code);
+        let index = code_index(code);
+        let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
+            return;
+        };
+        if installed.feedback_descriptor_for_slot(slot).is_none() {
+            return;
+        }
+        let slot_descriptors = if self.feedback_vectors[index].is_allocated() {
+            None
+        } else {
+            Some(installed.feedback_slot_descriptors().to_vec())
+        };
+
+        let mut recorded_count = count;
+        let vector = &mut self.feedback_vectors[index];
+        if !vector.is_allocated() {
+            let events_until_allocation = u32::from(
+                FEEDBACK_ALLOCATION_THRESHOLD
+                    .saturating_sub(vector.warmup_counter())
+                    .max(1),
+            );
+            let warmup_events = count.min(events_until_allocation);
+            let warmup_increment =
+                u16::try_from(warmup_events).expect("feedback warmup threshold fits in u16");
+            vector.warmup_counter = vector.warmup_counter.saturating_add(warmup_increment);
+            if count < events_until_allocation {
+                recorded_count = 0;
+            } else {
+                if let Some(slot_descriptors) = slot_descriptors.filter(|slots| !slots.is_empty()) {
+                    vector.allocate_sites(&slot_descriptors);
+                }
+                recorded_count = count - events_until_allocation + 1;
+            }
+        }
+
+        let wrote = if recorded_count == 0 {
+            false
+        } else if let Some(site) = vector.site_mut(slot) {
+            site.record_execution_count(recorded_count);
+            true
+        } else {
+            false
+        };
+        if wrote {
+            self.mirror_flat_slot(code, slot);
+        }
+        self.observe_tier_feedback_events(code, count);
     }
 
     #[inline]
@@ -2895,14 +3001,18 @@ impl Vm {
                     || entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     || entry.named_handler_bits() != 0
                     || entry.named_epoch() != 0
+                    || entry.scalar_observed_bits() != 0
+                    || entry.scalar_execution_count() != 0
                 {
                     return Err((
                         i,
                         format!(
-                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} state={:?}",
+                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={} state={:?}",
                             entry.mode(),
                             entry.named_handler_bits(),
                             entry.named_epoch(),
+                            entry.scalar_observed_bits(),
+                            entry.scalar_execution_count(),
                             entry.state
                         ),
                     ));
@@ -2937,30 +3047,38 @@ impl Vm {
                     if flat_entry.mode()
                         == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
                         && flat_entry.named_handler_bits() == handler_bits
-                        && flat_entry.named_epoch() == epoch => {}
+                        && flat_entry.named_epoch() == epoch
+                        && flat_entry.scalar_observed_bits() == 0
+                        && flat_entry.scalar_execution_count() == 0 => {}
                 Some((handler_bits, epoch)) => {
                     return Err((
                         i,
                         format!(
-                            "slot {i} header diverges: expected mode={} handler={handler_bits:#x} epoch={epoch}, flat mode={} handler={:#x} epoch={}",
+                            "slot {i} header diverges: expected mode={} handler={handler_bits:#x} epoch={epoch}, flat mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={}",
                             crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
                             flat_entry.mode(),
                             flat_entry.named_handler_bits(),
-                            flat_entry.named_epoch()
+                            flat_entry.named_epoch(),
+                            flat_entry.scalar_observed_bits(),
+                            flat_entry.scalar_execution_count()
                         ),
                     ));
                 }
                 None if flat_entry.mode() == crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     && flat_entry.named_handler_bits() == 0
-                    && flat_entry.named_epoch() == 0 => {}
+                    && flat_entry.named_epoch() == 0
+                    && flat_entry.scalar_observed_bits() == 0
+                    && flat_entry.scalar_execution_count() == 0 => {}
                 None => {
                     return Err((
                         i,
                         format!(
-                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} epoch={}",
+                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={}",
                             flat_entry.mode(),
                             flat_entry.named_handler_bits(),
-                            flat_entry.named_epoch()
+                            flat_entry.named_epoch(),
+                            flat_entry.scalar_observed_bits(),
+                            flat_entry.scalar_execution_count()
                         ),
                     ));
                 }
