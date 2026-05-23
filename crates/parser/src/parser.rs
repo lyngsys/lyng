@@ -584,8 +584,6 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     fn label_identifier_is_reserved(&self, atom: AtomId) -> bool {
-        let raw = atom.raw();
-
         if atom == WellKnownAtom::yield_.id() {
             return self.allow_yield || self.strict;
         }
@@ -594,11 +592,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return self.allow_await || self.is_module || self.in_static_block;
         }
 
-        if (2..=37).contains(&raw) {
+        if WellKnownAtom::is_keyword(atom) {
             return true;
         }
 
-        self.strict && (39..=46).contains(&raw)
+        self.strict && WellKnownAtom::is_strict_reserved_word(atom)
     }
 
     /// Parses a `LabelIdentifier`.
@@ -701,12 +699,13 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     pub(crate) fn has_line_terminator_before_first_non_trivia(&self, start: u32, end: u32) -> bool {
-        self.next_non_trivia_in_range(start, end)
+        lyng_lexer::next_non_trivia(self.source, start, end)
             .is_some_and(|(_, _, saw_line_terminator)| saw_line_terminator)
     }
 
     pub(crate) fn has_trailing_comma_before_closing_paren(&self, start: u32, end: u32) -> bool {
-        let Some((first, first_pos, _)) = self.next_non_trivia_in_range(start, end) else {
+        let Some((first, first_pos, _)) = lyng_lexer::next_non_trivia(self.source, start, end)
+        else {
             return false;
         };
         if first != ',' {
@@ -715,97 +714,9 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
 
         let next_start = first_pos + first.len_utf8() as u32;
         matches!(
-            self.next_non_trivia_in_range(next_start, end),
+            lyng_lexer::next_non_trivia(self.source, next_start, end),
             Some((')', _, _))
         )
-    }
-
-    fn next_non_trivia_in_range(&self, start: u32, end: u32) -> Option<(char, u32, bool)> {
-        let bytes = self.source.as_bytes();
-        let mut pos = start as usize;
-        let end = end as usize;
-        let mut saw_line_terminator = false;
-
-        while pos < end {
-            match bytes[pos] {
-                b' ' | b'\t' | 0x0B | 0x0C => pos += 1,
-                b'\r' => {
-                    saw_line_terminator = true;
-                    pos += 1;
-                    if pos < end && bytes[pos] == b'\n' {
-                        pos += 1;
-                    }
-                }
-                b'\n' => {
-                    saw_line_terminator = true;
-                    pos += 1;
-                }
-                b'/' if pos + 1 < end && bytes[pos + 1] == b'/' => {
-                    pos += 2;
-                    while pos < end {
-                        match bytes[pos] {
-                            b'\r' => {
-                                saw_line_terminator = true;
-                                pos += 1;
-                                if pos < end && bytes[pos] == b'\n' {
-                                    pos += 1;
-                                }
-                                break;
-                            }
-                            b'\n' => {
-                                saw_line_terminator = true;
-                                pos += 1;
-                                break;
-                            }
-                            _ => pos += 1,
-                        }
-                    }
-                }
-                b'/' if pos + 1 < end && bytes[pos + 1] == b'*' => {
-                    pos += 2;
-                    while pos < end {
-                        if pos + 1 < end && bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
-                            pos += 2;
-                            break;
-                        }
-                        match bytes[pos] {
-                            b'\r' => {
-                                saw_line_terminator = true;
-                                pos += 1;
-                                if pos < end && bytes[pos] == b'\n' {
-                                    pos += 1;
-                                }
-                            }
-                            b'\n' => {
-                                saw_line_terminator = true;
-                                pos += 1;
-                            }
-                            0xE2 if pos + 2 < end
-                                && bytes[pos + 1] == 0x80
-                                && matches!(bytes[pos + 2], 0xA8 | 0xA9) =>
-                            {
-                                saw_line_terminator = true;
-                                pos += 3;
-                            }
-                            _ => pos += 1,
-                        }
-                    }
-                }
-                0xE2 if pos + 2 < end
-                    && bytes[pos + 1] == 0x80
-                    && matches!(bytes[pos + 2], 0xA8 | 0xA9) =>
-                {
-                    saw_line_terminator = true;
-                    pos += 3;
-                }
-                _ => {
-                    let ch = self.source[pos..end].chars().next().unwrap_or_default();
-                    return Some((ch, pos as u32, saw_line_terminator));
-                }
-            }
-        }
-
-        None
     }
 
     // -----------------------------------------------------------------------
@@ -815,58 +726,10 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Converts the current keyword token to its atom ID.
     /// Used for property names where keywords are valid identifiers.
     pub const fn keyword_to_atom(&self) -> AtomId {
-        Self::keyword_kind_to_atom(self.current.kind)
-    }
-
-    const fn keyword_kind_to_atom(kind: TokenKind) -> AtomId {
-        // Map keyword TokenKind → WellKnownAtom discriminant (1..=38)
-        let idx = match kind {
-            TokenKind::Await => 1,
-            TokenKind::Break => 2,
-            TokenKind::Case => 3,
-            TokenKind::Catch => 4,
-            TokenKind::Class => 5,
-            TokenKind::Const => 6,
-            TokenKind::Continue => 7,
-            TokenKind::Debugger => 8,
-            TokenKind::Default => 9,
-            TokenKind::Delete => 10,
-            TokenKind::Do => 11,
-            TokenKind::Else => 12,
-            TokenKind::Enum => 13,
-            TokenKind::Export => 14,
-            TokenKind::Extends => 15,
-            TokenKind::False => 16,
-            TokenKind::Finally => 17,
-            TokenKind::For => 18,
-            TokenKind::Function => 19,
-            TokenKind::If => 20,
-            TokenKind::Import => 21,
-            TokenKind::In => 22,
-            TokenKind::Instanceof => 23,
-            TokenKind::New => 24,
-            TokenKind::Null => 25,
-            TokenKind::Return => 26,
-            TokenKind::Super => 27,
-            TokenKind::Switch => 28,
-            TokenKind::This => 29,
-            TokenKind::Throw => 30,
-            TokenKind::True => 31,
-            TokenKind::Try => 32,
-            TokenKind::Typeof => 33,
-            TokenKind::Var => 34,
-            TokenKind::Void => 35,
-            TokenKind::While => 36,
-            TokenKind::With => 37,
-            TokenKind::Yield => 38,
-            _ => 0,
-        };
-        AtomId::from_raw(idx)
+        keyword_kind_to_atom(self.current.kind)
     }
 
     pub fn identifier_reference_is_reserved(&self, atom: AtomId) -> bool {
-        let raw = atom.raw();
-
         if atom == WellKnownAtom::yield_.id() {
             return self.allow_yield || self.strict;
         }
@@ -875,11 +738,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return self.allow_await || self.in_static_block;
         }
 
-        if (2..=37).contains(&raw) {
+        if WellKnownAtom::is_keyword(atom) {
             return true;
         }
 
-        self.strict && (39..=46).contains(&raw)
+        self.strict && WellKnownAtom::is_strict_reserved_word(atom)
     }
 
     pub fn validate_identifier_reference_atom(&mut self, atom: AtomId, span: Span) {
@@ -893,8 +756,6 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     }
 
     pub fn binding_identifier_is_reserved(&self, atom: AtomId, strict_context: bool) -> bool {
-        let raw = atom.raw();
-
         if atom == WellKnownAtom::yield_.id() {
             return self.allow_yield || strict_context;
         }
@@ -903,11 +764,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             return self.allow_await || self.is_module || self.in_static_block;
         }
 
-        if (2..=37).contains(&raw) {
+        if WellKnownAtom::is_keyword(atom) {
             return true;
         }
 
-        strict_context && (39..=46).contains(&raw)
+        strict_context && WellKnownAtom::is_strict_reserved_word(atom)
     }
 
     // -----------------------------------------------------------------------
@@ -919,9 +780,8 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Unicode escape sequences and resolve to a keyword are not valid.
     pub(crate) fn check_escaped_keyword_identifier(&mut self) {
         if let Some(atom) = self.current_atom() {
-            let raw = atom.raw();
-            // WellKnownAtom keyword range: 1 (await) through 38 (yield)
-            let is_keyword = (1..=38).contains(&raw) || (self.strict && (39..=46).contains(&raw));
+            let is_keyword = WellKnownAtom::is_keyword(atom)
+                || (self.strict && WellKnownAtom::is_strict_reserved_word(atom));
             if is_keyword {
                 let name = self.lexer.resolve_atom(atom);
                 self.error(format!(
@@ -948,7 +808,70 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
     /// Consumes the parser and returns the AST and diagnostics.
     pub fn finish(mut self) -> (Ast, DiagnosticList) {
         // Drain lexer diagnostics into parser diagnostics
-        self.diagnostics.extend(&mut self.lexer.diagnostics);
+        self.diagnostics.extend(self.lexer.diagnostics_mut());
         (self.ast, self.diagnostics)
     }
 }
+
+/// Maps a keyword `TokenKind` back to its `WellKnownAtom` discriminant
+/// (1..=38). Non-keyword kinds map to 0 (the Empty sentinel).
+///
+/// Inverse of [`lyng_lexer::KEYWORD_TOKEN_KIND`]; see the const round-trip
+/// check below.
+const fn keyword_kind_to_atom(kind: TokenKind) -> AtomId {
+    let idx = match kind {
+        TokenKind::Await => 1,
+        TokenKind::Break => 2,
+        TokenKind::Case => 3,
+        TokenKind::Catch => 4,
+        TokenKind::Class => 5,
+        TokenKind::Const => 6,
+        TokenKind::Continue => 7,
+        TokenKind::Debugger => 8,
+        TokenKind::Default => 9,
+        TokenKind::Delete => 10,
+        TokenKind::Do => 11,
+        TokenKind::Else => 12,
+        TokenKind::Enum => 13,
+        TokenKind::Export => 14,
+        TokenKind::Extends => 15,
+        TokenKind::False => 16,
+        TokenKind::Finally => 17,
+        TokenKind::For => 18,
+        TokenKind::Function => 19,
+        TokenKind::If => 20,
+        TokenKind::Import => 21,
+        TokenKind::In => 22,
+        TokenKind::Instanceof => 23,
+        TokenKind::New => 24,
+        TokenKind::Null => 25,
+        TokenKind::Return => 26,
+        TokenKind::Super => 27,
+        TokenKind::Switch => 28,
+        TokenKind::This => 29,
+        TokenKind::Throw => 30,
+        TokenKind::True => 31,
+        TokenKind::Try => 32,
+        TokenKind::Typeof => 33,
+        TokenKind::Var => 34,
+        TokenKind::Void => 35,
+        TokenKind::While => 36,
+        TokenKind::With => 37,
+        TokenKind::Yield => 38,
+        _ => 0,
+    };
+    AtomId::from_raw(idx)
+}
+
+// Compile-time check: `keyword_kind_to_atom` and `KEYWORD_TOKEN_KIND` are
+// inverse over the keyword discriminant range. Catches silent drift if
+// either side is reordered without updating the other.
+const _: () = {
+    let mut i: u32 = 1;
+    while i <= 38 {
+        let kind = lyng_lexer::KEYWORD_TOKEN_KIND[i as usize];
+        let back = keyword_kind_to_atom(kind).raw();
+        assert!(back == i);
+        i += 1;
+    }
+};

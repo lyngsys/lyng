@@ -80,9 +80,9 @@ pub struct Lexer<'src, 'atoms> {
     /// The shared atom table.
     atoms: &'atoms mut AtomTable,
     /// Accumulated diagnostics (errors/warnings).
-    pub diagnostics: DiagnosticList,
+    diagnostics: DiagnosticList,
     /// Literal side tables.
-    pub literals: LiteralTable,
+    literals: LiteralTable,
     /// The current lexer mode.
     mode: LexerMode,
     /// Whether a line terminator was seen since the last token.
@@ -140,6 +140,19 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
     #[inline]
     pub const fn literal_table(&self) -> &LiteralTable {
         &self.literals
+    }
+
+    /// Returns a reference to the accumulated diagnostics.
+    #[inline]
+    pub const fn diagnostics(&self) -> &DiagnosticList {
+        &self.diagnostics
+    }
+
+    /// Returns a mutable reference to the accumulated diagnostics. The parser
+    /// uses this at finish time to drain lexer-side errors into its own list.
+    #[inline]
+    pub const fn diagnostics_mut(&mut self) -> &mut DiagnosticList {
+        &mut self.diagnostics
     }
 
     /// Returns the original source text covered by the given span.

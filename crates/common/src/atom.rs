@@ -164,6 +164,26 @@ impl WellKnownAtom {
     pub const fn as_str(self) -> &'static str {
         WELL_KNOWN_ATOM_STRINGS[self as usize]
     }
+
+    /// Returns `true` if `atom` is an ECMA-262 §12.6.2 reserved keyword
+    /// (`await`..=`yield`, discriminants 1..=38).
+    ///
+    /// Callers that need to distinguish `await`/`yield` from the rest
+    /// (because those words are context-sensitive) must do so before
+    /// consulting this predicate.
+    #[inline]
+    pub const fn is_keyword(atom: AtomId) -> bool {
+        let raw = atom.raw();
+        raw >= Self::r#await as u32 && raw <= Self::yield_ as u32
+    }
+
+    /// Returns `true` if `atom` is a strict-mode reserved word
+    /// (`implements`..=`static`, discriminants 39..=46).
+    #[inline]
+    pub const fn is_strict_reserved_word(atom: AtomId) -> bool {
+        let raw = atom.raw();
+        raw >= Self::implements as u32 && raw <= Self::r#static as u32
+    }
 }
 
 /// The string values for each well-known atom, indexed by discriminant.

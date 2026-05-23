@@ -79,7 +79,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         };
         let value = match self.current().payload {
             TokenPayload::Literal(lit_id) => {
-                let literal = self.lexer.literals.get_string(lit_id).clone();
+                let literal = self.lexer.literal_table().get_string(lit_id).clone();
                 if let Some(text) = literal.as_str() {
                     self.ast.literals_mut().alloc_string(text)
                 } else {
@@ -101,7 +101,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let span = self.current_span();
         let value = match self.current().payload {
             TokenPayload::Literal(lit_id) => {
-                let s = &self.lexer.literals.get_bigint(lit_id).raw;
+                let s = &self.lexer.literal_table().get_bigint(lit_id).raw;
                 self.ast.literals_mut().alloc_bigint(s)
             }
             _ => self.ast.literals_mut().alloc_bigint("0"),
@@ -114,7 +114,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let span = self.current_span();
         let value = match self.current().payload {
             TokenPayload::Literal(lit_id) => {
-                let reg = self.lexer.literals.get_regexp(lit_id);
+                let reg = self.lexer.literal_table().get_regexp(lit_id);
                 let pattern = reg.pattern.clone();
                 let flags = reg.flags.clone();
                 if let Err(message) = validate_regexp_literal(&pattern, &flags) {

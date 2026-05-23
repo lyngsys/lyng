@@ -483,7 +483,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             // (reading the literal table vs mutating the atom table).
             let atom = match self.current().payload {
                 TokenPayload::Literal(lit_id) => {
-                    let s = self.lexer.literals.get_string(lit_id).to_string_lossy();
+                    let s = self
+                        .lexer
+                        .literal_table()
+                        .get_string(lit_id)
+                        .to_string_lossy();
                     self.lexer.intern_atom(&s)
                 }
                 _ => lyng_common::WellKnownAtom::Empty.id(),
@@ -531,7 +535,11 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             } else if self.at(TokenKind::StringLiteral) {
                 let value = match self.current().payload {
                     TokenPayload::Literal(lit_id) => {
-                        let text = self.lexer.literals.get_string(lit_id).to_string_lossy();
+                        let text = self
+                            .lexer
+                            .literal_table()
+                            .get_string(lit_id)
+                            .to_string_lossy();
                         Some((self.lexer.intern_atom(&text), text))
                     }
                     _ => None,
@@ -558,7 +566,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
             if self.at(TokenKind::StringLiteral) {
                 let value = match self.current().payload {
                     TokenPayload::Literal(lit_id) => {
-                        let literal = self.lexer.literals.get_string(lit_id).clone();
+                        let literal = self.lexer.literal_table().get_string(lit_id).clone();
                         if let Some(text) = literal.as_str() {
                             self.ast.literals_mut().alloc_string(text)
                         } else {
@@ -592,7 +600,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         if self.at(TokenKind::StringLiteral) {
             let value = match self.current().payload {
                 TokenPayload::Literal(lit_id) => {
-                    let literal = self.lexer.literals.get_string(lit_id).clone();
+                    let literal = self.lexer.literal_table().get_string(lit_id).clone();
                     if let Some(text) = literal.as_str() {
                         self.ast.literals_mut().alloc_string(text)
                     } else {

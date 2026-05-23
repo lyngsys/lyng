@@ -333,7 +333,7 @@ impl<'src, 'atoms> Parser<'src, 'atoms> {
         let token = self.current();
         match token.payload {
             TokenPayload::Literal(lit_id) => {
-                let chunk = self.lexer.literals.get_template(lit_id);
+                let chunk = self.lexer.literal_table().get_template(lit_id);
                 let raw = self.ast.literals_mut().alloc_string(&chunk.raw);
                 let cooked = chunk.cooked.as_ref().map(|value| match value {
                     LexerStringLiteral::Utf8(text) => self.ast.literals_mut().alloc_string(text),

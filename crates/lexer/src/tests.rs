@@ -219,7 +219,7 @@ fn raw_multibyte_identifier_start_and_continue_are_lexed_as_one_identifier() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("πβ", source_id, &mut atoms);
     let tok = lexer.next_token();
-    let had_errors = lexer.diagnostics.has_errors();
+    let had_errors = lexer.diagnostics().has_errors();
     drop(lexer);
 
     assert_eq!(tok.kind, TokenKind::Identifier);
@@ -262,7 +262,7 @@ fn bigint_decimal() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::BigIntLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_bigint(id).raw, "123");
+    assert_eq!(lexer.literal_table().get_bigint(id).raw, "123");
 }
 
 #[test]
@@ -273,7 +273,7 @@ fn bigint_hex() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::BigIntLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_bigint(id).raw, "0xFF");
+    assert_eq!(lexer.literal_table().get_bigint(id).raw, "0xFF");
 }
 
 #[test]
@@ -319,7 +319,7 @@ fn numeric_followed_by_identifier_reports_error() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("3in", source_id, &mut atoms);
     let _ = lexer.next_token();
-    assert!(lexer.diagnostics.has_errors());
+    assert!(lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -328,7 +328,7 @@ fn invalid_bigint_leading_zero_reports_error() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("01n", source_id, &mut atoms);
     let _ = lexer.next_token();
-    assert!(lexer.diagnostics.has_errors());
+    assert!(lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -337,7 +337,7 @@ fn invalid_separator_after_radix_prefix_reports_error() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("0x_1", source_id, &mut atoms);
     let _ = lexer.next_token();
-    assert!(lexer.diagnostics.has_errors());
+    assert!(lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn numeric_literal_before_nbsp_is_allowed() {
     let mut lexer = Lexer::new("2\u{00A0};", source_id, &mut atoms);
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert!(!lexer.diagnostics.has_errors());
+    assert!(!lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -357,7 +357,7 @@ fn numeric_literal_before_line_separator_is_allowed() {
     let mut lexer = Lexer::new("1\u{2028};", source_id, &mut atoms);
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NumericLiteral);
-    assert!(!lexer.diagnostics.has_errors());
+    assert!(!lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -366,7 +366,7 @@ fn numeric_literal_before_unicode_identifier_start_reports_error() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("1π", source_id, &mut atoms);
     let _ = lexer.next_token();
-    assert!(lexer.diagnostics.has_errors());
+    assert!(lexer.diagnostics().has_errors());
 }
 
 // =========================================================================
@@ -381,7 +381,7 @@ fn double_quoted_string() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("hello"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("hello"));
 }
 
 #[test]
@@ -392,7 +392,7 @@ fn single_quoted_string() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("world"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("world"));
 }
 
 #[test]
@@ -403,7 +403,10 @@ fn string_escape_sequences() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("a\nb\tc\\\""));
+    assert_eq!(
+        lexer.literal_table().get_string(id).as_str(),
+        Some("a\nb\tc\\\"")
+    );
 }
 
 #[test]
@@ -414,7 +417,7 @@ fn string_hex_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("A"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("A"));
 }
 
 #[test]
@@ -425,7 +428,7 @@ fn string_unicode_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("A"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("A"));
 }
 
 #[test]
@@ -436,7 +439,10 @@ fn string_unicode_braced_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("\u{1F600}"));
+    assert_eq!(
+        lexer.literal_table().get_string(id).as_str(),
+        Some("\u{1F600}")
+    );
 }
 
 #[test]
@@ -448,10 +454,10 @@ fn string_unicode_braced_surrogate_escape_preserves_utf16() {
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
     assert_eq!(
-        lexer.literals.get_string(id).code_units(),
+        lexer.literal_table().get_string(id).code_units(),
         vec![0xD800, 0xDC00]
     );
-    assert!(lexer.diagnostics.is_empty());
+    assert!(lexer.diagnostics().is_empty());
 }
 
 #[test]
@@ -462,7 +468,7 @@ fn string_identity_escape_consumes_full_unicode_character() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("А"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("А"));
 }
 
 #[test]
@@ -473,7 +479,7 @@ fn string_line_continuation_accepts_unicode_line_terminators() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some(""));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some(""));
 }
 
 #[test]
@@ -484,7 +490,7 @@ fn empty_string() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some(""));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some(""));
 }
 
 #[test]
@@ -507,7 +513,7 @@ fn string_literal_allows_line_separator() {
     let mut lexer = Lexer::new("\"\u{2028}\"", source_id, &mut atoms);
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
-    assert!(!lexer.diagnostics.has_errors());
+    assert!(!lexer.diagnostics().has_errors());
 }
 
 #[test]
@@ -534,7 +540,7 @@ fn no_substitution_template() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(
         chunk.cooked.as_ref().and_then(|value| value.as_str()),
         Some("hello")
@@ -553,7 +559,7 @@ fn template_with_substitution() {
     let id = literal_id(&head);
     assert_eq!(
         lexer
-            .literals
+            .literal_table()
             .get_template(id)
             .cooked
             .as_ref()
@@ -580,7 +586,7 @@ fn template_with_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(
         chunk.cooked.as_ref().and_then(|value| value.as_str()),
         Some("a\nb")
@@ -596,7 +602,7 @@ fn template_with_surrogate_pair_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(
         chunk.cooked.as_ref().and_then(|value| value.as_str()),
         Some("\u{1F438}")
@@ -612,7 +618,7 @@ fn template_with_lone_surrogate_escape_preserves_utf16() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(
         chunk
             .cooked
@@ -631,7 +637,7 @@ fn template_with_invalid_hex_escape_keeps_closing_backtick() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(chunk.cooked, None);
     assert_eq!(chunk.raw, "\\xg");
 }
@@ -644,7 +650,7 @@ fn template_with_invalid_braced_unicode_escape_keeps_closing_backtick() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::NoSubstitutionTemplate);
     let id = literal_id(&tok);
-    let chunk = lexer.literals.get_template(id);
+    let chunk = lexer.literal_table().get_template(id);
     assert_eq!(chunk.cooked, None);
     assert_eq!(chunk.raw, "\\u{0");
 }
@@ -662,7 +668,7 @@ fn simple_regexp() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::RegExpLiteral);
     let id = literal_id(&tok);
-    let re = lexer.literals.get_regexp(id);
+    let re = lexer.literal_table().get_regexp(id);
     assert_eq!(re.pattern, "abc");
     assert_eq!(re.flags, "gi");
 }
@@ -676,7 +682,7 @@ fn regexp_with_class() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::RegExpLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_regexp(id).pattern, "[a-z]");
+    assert_eq!(lexer.literal_table().get_regexp(id).pattern, "[a-z]");
 }
 
 #[test]
@@ -688,7 +694,7 @@ fn regexp_with_escaped_slash() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::RegExpLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_regexp(id).pattern, "a\\/b");
+    assert_eq!(lexer.literal_table().get_regexp(id).pattern, "a\\/b");
 }
 
 #[test]
@@ -980,7 +986,7 @@ fn no_diagnostics_for_valid_source() {
             break;
         }
     }
-    assert!(lexer.diagnostics.is_empty());
+    assert!(lexer.diagnostics().is_empty());
 }
 
 #[test]
@@ -989,7 +995,7 @@ fn unterminated_string_reports_error() {
     let source_id = SourceId::new(0);
     let mut lexer = Lexer::new("\"hello", source_id, &mut atoms);
     let _ = lexer.next_token();
-    assert!(lexer.diagnostics.has_errors());
+    assert!(lexer.diagnostics().has_errors());
 }
 
 // =========================================================================
@@ -1004,7 +1010,7 @@ fn string_with_null_escape() {
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("a\0b"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("a\0b"));
 }
 
 #[test]
@@ -1014,9 +1020,9 @@ fn string_with_surrogate_pair_escape() {
     let mut lexer = Lexer::new("\"\\ud801\\udc28\"", source_id, &mut atoms);
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
-    assert!(lexer.diagnostics.is_empty());
+    assert!(lexer.diagnostics().is_empty());
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), Some("𐐨"));
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), Some("𐐨"));
 }
 
 #[test]
@@ -1026,10 +1032,13 @@ fn string_with_lone_surrogate_escape_does_not_error() {
     let mut lexer = Lexer::new("\"\\ud801\"", source_id, &mut atoms);
     let tok = lexer.next_token();
     assert_eq!(tok.kind, TokenKind::StringLiteral);
-    assert!(lexer.diagnostics.is_empty());
+    assert!(lexer.diagnostics().is_empty());
     let id = literal_id(&tok);
-    assert_eq!(lexer.literals.get_string(id).as_str(), None);
-    assert_eq!(lexer.literals.get_string(id).code_units(), vec![0xD801]);
+    assert_eq!(lexer.literal_table().get_string(id).as_str(), None);
+    assert_eq!(
+        lexer.literal_table().get_string(id).code_units(),
+        vec![0xD801]
+    );
 }
 
 // =========================================================================

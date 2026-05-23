@@ -73,7 +73,7 @@ pub fn parse_script_with_initial_strict(
         if !token.contains_escape()
             && let TokenPayload::Literal(lit_id) = token.payload
         {
-            let lit = parser.lexer().literals.get_string(lit_id);
+            let lit = parser.lexer().literal_table().get_string(lit_id);
             if lit.equals_text("use strict") {
                 strict = true;
                 parser.set_strict(true);
