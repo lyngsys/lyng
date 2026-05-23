@@ -198,6 +198,10 @@ enum LlIntNamedPropertyHeader {
         handler_bits: u64,
         epoch: u64,
     },
+    OwnOutline {
+        handler_bits: u64,
+        epoch: u64,
+    },
     ProtoInline {
         receiver_word: u64,
         proto_word: u64,
@@ -2159,6 +2163,10 @@ impl Vm {
                 handler_bits,
                 epoch,
             }) => entry.set_named_own_inline_load(handler_bits, epoch),
+            Some(LlIntNamedPropertyHeader::OwnOutline {
+                handler_bits,
+                epoch,
+            }) => entry.set_named_own_outline_load(handler_bits, epoch),
             Some(LlIntNamedPropertyHeader::ProtoInline {
                 receiver_word,
                 proto_word,
@@ -2192,6 +2200,18 @@ impl Vm {
     }
 
     #[inline]
+    fn named_own_outline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
+        let FeedbackSiteState::NamedProperty(feedback) = site else {
+            return None;
+        };
+        let handler = feedback.monomorphic_own_data_handler;
+        if !handler.is_valid() || !matches!(handler.slot_location(), SlotLocation::OutOfLine(_)) {
+            return None;
+        }
+        Some((handler.bits(), feedback.monomorphic_own_data_epoch))
+    }
+
+    #[inline]
     fn named_proto_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64, u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
@@ -2212,6 +2232,12 @@ impl Vm {
     fn named_llint_load_header(site: &FeedbackSiteState) -> Option<LlIntNamedPropertyHeader> {
         if let Some((handler_bits, epoch)) = Self::named_own_inline_load_header(site) {
             return Some(LlIntNamedPropertyHeader::OwnInline {
+                handler_bits,
+                epoch,
+            });
+        }
+        if let Some((handler_bits, epoch)) = Self::named_own_outline_load_header(site) {
+            return Some(LlIntNamedPropertyHeader::OwnOutline {
                 handler_bits,
                 epoch,
             });
@@ -3122,6 +3148,17 @@ impl Vm {
                     && flat_entry.named_aux_epoch() == 0
                     && flat_entry.scalar_observed_bits() == 0
                     && flat_entry.scalar_execution_count() == 0 => {}
+                Some(LlIntNamedPropertyHeader::OwnOutline {
+                    handler_bits,
+                    epoch,
+                }) if flat_entry.mode()
+                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD
+                    && flat_entry.named_handler_bits() == handler_bits
+                    && flat_entry.named_epoch() == epoch
+                    && flat_entry.named_aux_bits() == 0
+                    && flat_entry.named_aux_epoch() == 0
+                    && flat_entry.scalar_observed_bits() == 0
+                    && flat_entry.scalar_execution_count() == 0 => {}
                 Some(LlIntNamedPropertyHeader::ProtoInline {
                     receiver_word,
                     proto_word,
@@ -3180,6 +3217,13 @@ impl Vm {
             } => format!(
                 "mode={} handler={handler_bits:#x} epoch={epoch} aux_bits=0x0 aux_epoch=0",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
+            ),
+            LlIntNamedPropertyHeader::OwnOutline {
+                handler_bits,
+                epoch,
+            } => format!(
+                "mode={} handler={handler_bits:#x} epoch={epoch} aux_bits=0x0 aux_epoch=0",
+                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD,
             ),
             LlIntNamedPropertyHeader::ProtoInline {
                 receiver_word,

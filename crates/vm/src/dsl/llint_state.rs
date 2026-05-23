@@ -29,6 +29,7 @@ pub struct LlIntState {
     pub frame_regs_base: *mut Value,
     pub frame_fv_base: *mut FeedbackEntry,
     pub object_records_base: *const *const lyng_gc::RuntimeObjectRecord,
+    pub object_slots_base: *const *const Value,
     // Phase 1.B.1: asm-visible frame context. `frame_const_base`
     // points into the active code record's pre-resolved constants
     // array (`RuntimeCodeRecord::constants` → `CodeSlotsRef`,
@@ -162,12 +163,14 @@ mod tests {
         assert_eq!(r::LLINT_STATE_FRAME_REGS_BASE, 16);
         assert_eq!(r::LLINT_STATE_FRAME_FV_BASE, 24);
         assert_eq!(r::LLINT_STATE_OBJECT_RECORDS_BASE, 32);
-        // Phase 1.B.1: const/this mirrors plus the LLInt object table
-        // occupy three 8-byte slots before the scalar block.
-        assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 40);
-        assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 48);
-        assert_eq!(r::LLINT_STATE_PREFIX, 72);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 80);
+        assert_eq!(r::LLINT_STATE_OBJECT_SLOTS_BASE, 40);
+        // Phase 1.B.1 plus outline-slot LLInt substrate: const/this
+        // mirrors plus the two heap pointer tables occupy four 8-byte
+        // slots before the scalar block.
+        assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
+        assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
+        assert_eq!(r::LLINT_STATE_PREFIX, 80);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 88);
     }
 
     #[test]

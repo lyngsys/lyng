@@ -252,6 +252,7 @@ impl DslHarness {
             frame_regs_base: core::ptr::null_mut(),
             frame_fv_base: core::ptr::null_mut(),
             object_records_base: core::ptr::null(),
+            object_slots_base: core::ptr::null(),
             // Phase 1.B.1: harness doesn't exercise these fields;
             // null / undefined placeholders are safe.
             frame_const_base: core::ptr::null(),

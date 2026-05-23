@@ -38,6 +38,7 @@ pub struct PrimitiveHeap {
     value_cells: SlotArena<PrimitiveValueCellRecord, PrimitiveValueCellRef>,
     objects: SlotArena<RuntimeObjectRecord, ObjectRef>,
     object_record_ptrs: Vec<*const RuntimeObjectRecord>,
+    object_slot_ptrs: Vec<*const Value>,
     function_payloads: SlotArena<RuntimeFunctionRecord, FunctionPayloadRef>,
     object_slots: ValueSlotAllocator<ObjectSlotsRef>,
     suspended_executions: SlotArena<RuntimeSuspendedExecutionRecord, SuspendedExecutionRef>,
@@ -602,10 +603,21 @@ impl PrimitiveHeap {
         self.object_record_ptrs.as_ptr()
     }
 
+    #[inline]
+    pub(crate) const fn object_slots_ptr_table(&self) -> *const *const Value {
+        self.object_slot_ptrs.as_ptr()
+    }
+
     #[cfg(test)]
     #[inline]
     fn object_record_ptr_table_for_test(&self) -> &[*const RuntimeObjectRecord] {
         &self.object_record_ptrs
+    }
+
+    #[cfg(test)]
+    #[inline]
+    fn object_slots_ptr_table_for_test(&self) -> &[*const Value] {
+        &self.object_slot_ptrs
     }
 
     #[inline]
@@ -663,10 +675,10 @@ impl PrimitiveHeap {
     pub(crate) fn free_object(&mut self, id: ObjectRef) -> Option<RuntimeObjectRecord> {
         let record = self.objects.free(id)?;
         if let Some(slots) = record.named_slots() {
-            self.object_slots.free(slots);
+            self.free_object_slots(slots);
         }
         if let Some(elements) = record.elements() {
-            self.object_slots.free(elements);
+            self.free_object_slots(elements);
         }
         if let Some(function_payload) = record.function_payload() {
             self.function_payloads.free(function_payload);
@@ -816,7 +828,35 @@ impl PrimitiveHeap {
             generation,
             fill,
         );
+        self.refresh_object_slots_ptr(id);
         id
+    }
+
+    fn refresh_object_slots_ptr(&mut self, id: ObjectSlotsRef) {
+        let index = id.get() as usize;
+        if self.object_slot_ptrs.len() <= index {
+            self.object_slot_ptrs.resize(index + 1, std::ptr::null());
+        }
+        self.object_slot_ptrs[index] = self
+            .object_slots
+            .get(id)
+            .map_or(std::ptr::null(), <[Value]>::as_ptr);
+    }
+
+    fn free_object_slots(&mut self, id: ObjectSlotsRef) {
+        Self::free_object_slots_in(&mut self.object_slots, &mut self.object_slot_ptrs, id);
+    }
+
+    fn free_object_slots_in(
+        object_slots: &mut ValueSlotAllocator<ObjectSlotsRef>,
+        object_slot_ptrs: &mut [*const Value],
+        id: ObjectSlotsRef,
+    ) {
+        let index = id.get() as usize;
+        let _ = object_slots.free(id);
+        if let Some(ptr) = object_slot_ptrs.get_mut(index) {
+            *ptr = std::ptr::null();
+        }
     }
 
     #[inline]
@@ -1481,18 +1521,22 @@ impl PrimitiveHeap {
             }
         }));
         merge!(self.value_cells.sweep_young(tenuring_threshold, |_| {}));
+        let object_slots = &mut self.object_slots;
+        let object_slot_ptrs = &mut self.object_slot_ptrs;
+        let function_payloads = &mut self.function_payloads;
+        let value_cells = &mut self.value_cells;
         merge!(self.objects.sweep_young(tenuring_threshold, |record| {
             if let Some(slots) = record.named_slots() {
-                self.object_slots.free(slots);
+                Self::free_object_slots_in(object_slots, object_slot_ptrs, slots);
             }
             if let Some(elements) = record.elements() {
-                self.object_slots.free(elements);
+                Self::free_object_slots_in(object_slots, object_slot_ptrs, elements);
             }
             if let Some(function_payload) = record.function_payload() {
-                self.function_payloads.free(function_payload);
+                function_payloads.free(function_payload);
             }
             if let Some(ordinary_payload) = record.ordinary_payload() {
-                self.value_cells.free(ordinary_payload);
+                value_cells.free(ordinary_payload);
             }
         }));
         merge!(self
@@ -1541,6 +1585,7 @@ impl Default for PrimitiveHeap {
             value_cells: SlotArena::default(),
             objects: SlotArena::default(),
             object_record_ptrs: Vec::new(),
+            object_slot_ptrs: Vec::new(),
             function_payloads: SlotArena::default(),
             object_slots: ValueSlotAllocator::default(),
             suspended_executions: SlotArena::default(),
@@ -1776,6 +1821,43 @@ mod tests {
         assert_eq!(
             grown_table[second.get() as usize],
             std::ptr::from_ref(heap.object_ref(second).unwrap())
+        );
+    }
+
+    #[test]
+    fn object_slots_pointer_table_tracks_allocated_slots() {
+        let mut heap = PrimitiveHeap::new();
+        let first = heap.alloc_object_slots(2, Value::undefined(), AllocationLifetime::Default);
+        let second = heap.alloc_object_slots(3, Value::null(), AllocationLifetime::Default);
+
+        let table = heap.object_slots_ptr_table_for_test();
+        assert!(!heap.object_slots_ptr_table().is_null());
+        assert_eq!(
+            table[first.get() as usize],
+            heap.object_slots(first).unwrap().as_ptr()
+        );
+        assert_eq!(
+            table[second.get() as usize],
+            heap.object_slots(second).unwrap().as_ptr()
+        );
+        heap.free_object_slots(first);
+        assert_eq!(
+            heap.object_slots_ptr_table_for_test()[first.get() as usize],
+            std::ptr::null()
+        );
+        let replacement =
+            heap.alloc_object_slots(2, Value::from_smi(7), AllocationLifetime::Default);
+        assert_eq!(replacement, first);
+
+        let grown_table = heap.object_slots_ptr_table_for_test();
+        assert_ne!(grown_table[first.get() as usize], std::ptr::null());
+        assert_eq!(
+            grown_table[first.get() as usize],
+            heap.object_slots(replacement).unwrap().as_ptr()
+        );
+        assert_eq!(
+            grown_table[second.get() as usize],
+            heap.object_slots(second).unwrap().as_ptr()
         );
     }
 

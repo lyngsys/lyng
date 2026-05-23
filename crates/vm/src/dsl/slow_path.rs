@@ -214,6 +214,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
+                    let object_slots_base =
+                        rust.dispatch.agent.heap().view().object_slots_ptr_table();
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
@@ -227,6 +229,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
                         (**state).object_records_base = object_records_base;
+                        (**state).object_slots_base = object_slots_base;
                     }
                 }
                 // The asm bridge's `dispatch_after_slow!` Continue
@@ -296,6 +299,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
+                    let object_slots_base =
+                        rust.dispatch.agent.heap().view().object_slots_ptr_table();
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
@@ -324,6 +329,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
                         (**state).object_records_base = object_records_base;
+                        (**state).object_slots_base = object_slots_base;
                         // Phase 1.B.1: refresh the new fields.
                         (**state).frame_const_base = const_base;
                         (**state).frame_this_value = this_value;

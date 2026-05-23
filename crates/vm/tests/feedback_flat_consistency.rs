@@ -83,8 +83,8 @@ fn flat_header_clears_for_polymorphic_property_access() {
     // `{x, y, z}`), driving the named-property IC into the
     // polymorphic state and exercising the Phase 3f packed
     // `polymorphic_own_data_handlers` sidecar. The flat LLInt header must clear
-    // because this initial port only handles monomorphic OwnData
-    // inline-slot loads.
+    // because the LLInt named-load headers are intentionally restricted to
+    // monomorphic cases.
     let (vm, code) = run_script_n_times(
         r"
             (function poly() {

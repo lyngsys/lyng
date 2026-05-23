@@ -206,6 +206,11 @@ impl<'a> PrimitiveHeapView<'a> {
     }
 
     #[inline]
+    pub const fn object_slots_ptr_table(self) -> *const *const Value {
+        self.heap.object_slots_ptr_table()
+    }
+
+    #[inline]
     pub fn function_payload(self, id: FunctionPayloadRef) -> Option<RuntimeFunctionRecord> {
         self.heap.function_payload(id)
     }

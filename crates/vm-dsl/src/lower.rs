@@ -16,7 +16,7 @@
 //! #[unsafe(naked)]
 //! pub extern "C" fn op_xxx() -> ! {
 //!     ::core::arch::naked_asm!(
-//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_object_records}{state_prefix}{vm_poll}{feedback_entry_stride}{entry_observed}{feedback_scalar_execution_count} */\n",
+//!         "/* len={length} regs={state_pc}{state_pb}{state_regs}{state_fv}{state_object_records}{state_object_slots}{state_prefix}{vm_poll}{feedback_entry_stride}{entry_observed}{feedback_scalar_execution_count} */\n",
 //!         decode_<layout>!(<operand idents as scratch regs>),
 //!         m1!(...),                  // macro call returning &'static str (via concat!)
 //!         m2!(...),                  // ditto
@@ -237,7 +237,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_named_aux_bits={feedback_named_aux_bits} fb_named_aux_epoch={feedback_named_aux_epoch} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_epoch={feedback_named_epoch} fb_named_aux_bits={feedback_named_aux_bits} fb_named_aux_epoch={feedback_named_aux_epoch} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -245,6 +245,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
                 state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
                 state_object_records = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_RECORDS_BASE,
+                state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
                 entry_stride_shift = const 6_u32,

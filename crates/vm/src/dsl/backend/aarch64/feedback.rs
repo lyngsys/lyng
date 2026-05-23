@@ -80,6 +80,23 @@ macro_rules! branch_named_proto_inline_mode {
     };
 }
 
+/// Branch to `$label` unless the flat feedback entry is a named
+/// monomorphic `OwnData` out-of-line-slot load header.
+#[macro_export]
+macro_rules! branch_named_own_outline_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #3\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 #[macro_export]
 macro_rules! load_named_handler_bits {
     ($entry:tt => $dst:tt) => {
@@ -144,6 +161,31 @@ macro_rules! load_named_inline_slot_index_or_branch {
             stringify!($label),
             "\n",
             "tbz    x",
+            stringify!($handler),
+            ", #31, ",
+            stringify!($label),
+            "\n",
+            "ubfx   x",
+            stringify!($slot_index),
+            ", x",
+            stringify!($handler),
+            ", #0, #30\n",
+        )
+    };
+}
+
+/// Validate a packed named-property handler as an out-of-line-slot
+/// handler and extract its low 30-bit slot index.
+#[macro_export]
+macro_rules! load_named_outline_slot_index_or_branch {
+    ($handler:tt => $slot_index:tt, $label:tt) => {
+        concat!(
+            "cbz    x",
+            stringify!($handler),
+            ", ",
+            stringify!($label),
+            "\n",
+            "tbnz   x",
             stringify!($handler),
             ", #31, ",
             stringify!($label),

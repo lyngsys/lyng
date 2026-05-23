@@ -12,6 +12,8 @@
 //!
 //! - `{state_object_records}` — offset of
 //!   `LlIntState::object_records_base`.
+//! - `{state_object_slots}` — offset of
+//!   `LlIntState::object_slots_base`.
 //! - `{object_shape}` — offset of the raw `Option<ShapeId>` word
 //!   inside `RuntimeObjectRecord`.
 //! - `{object_prototype}` — offset of the raw `Option<ObjectRef>` word
@@ -133,24 +135,44 @@ macro_rules! store_record_inline_slot {
     };
 }
 
-/// Load the outline-slots pointer from an ObjectRecord at `$rec` into
-/// `$dst`. Outline slots live in a separately-allocated `Vec<Value>`
-/// whose base pointer hangs off the record.
+/// Resolve an ObjectRecord's named-slot handle to an outline-slots
+/// base pointer in `$dst`. Branches to `$label` when the object has no
+/// named-slot storage or the pointer table has no live entry.
 #[macro_export]
-macro_rules! load_record_outline_slots {
-    ($rec:tt => $dst:tt) => {
+macro_rules! load_record_outline_slots_from_state_or_branch {
+    ($rec:tt => $dst:tt, $label:tt) => {
         concat!(
-            "ldr    x",
+            "ldr    w",
             stringify!($dst),
             ", [x",
             stringify!($rec),
             ", {object_named_slots}]\n",
+            "cbz    x",
+            stringify!($dst),
+            ", ",
+            stringify!($label),
+            "\n",
+            "ldr    x16, [x24, {state_object_slots}]\n",
+            "cbz    x16, ",
+            stringify!($label),
+            "\n",
+            "ldr    x",
+            stringify!($dst),
+            ", [x16, x",
+            stringify!($dst),
+            ", lsl #3]\n",
+            "cbz    x",
+            stringify!($dst),
+            ", ",
+            stringify!($label),
+            "\n",
         )
     };
 }
 
 /// Load outline slot `$idx` given an outline-slots base pointer in
-/// `$base` (typically the result of `load_record_outline_slots!`).
+/// `$base` (typically the result of
+/// `load_record_outline_slots_from_state_or_branch!`).
 #[macro_export]
 macro_rules! load_outline_slot {
     ($base:tt, $idx:tt => $dst:tt) => {

@@ -41,6 +41,7 @@ pub(crate) use crate::vm::FeedbackSiteState;
 pub const LLINT_IC_MODE_EMPTY: u8 = 0;
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
 pub const LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
+pub const LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 
 #[repr(u8)]
@@ -49,6 +50,7 @@ pub(crate) enum LlIntIcMode {
     Empty = LLINT_IC_MODE_EMPTY,
     NamedOwnInlineLoad = LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
     NamedProtoInlineLoad = LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
+    NamedOwnOutlineLoad = LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -123,6 +125,15 @@ impl FeedbackEntry {
     #[inline]
     pub(crate) const fn set_named_own_inline_load(&mut self, handler_bits: u64, epoch: u64) {
         self.mode = LlIntIcMode::NamedOwnInlineLoad as u8;
+        self.named_handler_bits = handler_bits;
+        self.named_epoch = epoch;
+        self.named_aux_bits = 0;
+        self.named_aux_epoch = 0;
+    }
+
+    #[inline]
+    pub(crate) const fn set_named_own_outline_load(&mut self, handler_bits: u64, epoch: u64) {
+        self.mode = LlIntIcMode::NamedOwnOutlineLoad as u8;
         self.named_handler_bits = handler_bits;
         self.named_epoch = epoch;
         self.named_aux_bits = 0;

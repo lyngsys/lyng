@@ -32,14 +32,16 @@
 use crate::{
     add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
-    branch_named_proto_inline_mode, branch_nonzero, branch_raw_equal_strict_result,
-    call_rust_probe, call_slow, check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne,
-    dec_smi_overflow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax,
-    dispatch, dispatch_after_slow, dispatch_from_payload, inc_smi_overflow, load_acc,
-    load_constant, load_feedback_site, load_local_fixed, load_named_aux_bits, load_named_aux_epoch,
-    load_named_epoch, load_named_handler_bits, load_named_handler_shape,
-    load_named_inline_slot_index_or_branch, load_object_record_from_state_or_branch,
-    load_record_inline_slot, load_record_last_epoch, load_record_prototype_or_branch,
+    branch_named_own_outline_mode, branch_named_proto_inline_mode, branch_nonzero,
+    branch_raw_equal_strict_result, call_rust_probe, call_slow, check_object_ref, check_smi,
+    cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a, decode_ab, decode_abc,
+    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow, dispatch_from_payload,
+    inc_smi_overflow, load_acc, load_constant, load_feedback_site, load_local_fixed,
+    load_named_aux_bits, load_named_aux_epoch, load_named_epoch, load_named_handler_bits,
+    load_named_handler_shape, load_named_inline_slot_index_or_branch,
+    load_named_outline_slot_index_or_branch, load_object_record_from_state_or_branch,
+    load_outline_slot, load_record_inline_slot, load_record_last_epoch,
+    load_record_outline_slots_from_state_or_branch, load_record_prototype_or_branch,
     load_record_shape, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
     record_smi, shift_left_smi, shift_right_smi, store_acc, store_local_fixed, store_reg,
     sub_smi_overflow, tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte,
@@ -2600,7 +2602,7 @@ llint_handler! {
         check_object_ref!(b, .slow);
         untag_object_ref!(b);
         load_feedback_site!(slot => c);
-        branch_named_own_inline_mode!(c, .try_proto);
+        branch_named_own_inline_mode!(c, .try_own_outline);
         load_named_handler_bits!(c => slot);
         load_named_epoch!(c => t0);
         load_named_inline_slot_index_or_branch!(slot => c, .slow);
@@ -2611,6 +2613,21 @@ llint_handler! {
         load_record_last_epoch!(b => t1);
         cmp_branch_ne!(t1, t0, .slow);
         load_record_inline_slot!(b, c => t0);
+        store_reg!(a, t0);
+        dispatch!();
+        .try_own_outline:
+        branch_named_own_outline_mode!(c, .try_proto);
+        load_named_handler_bits!(c => slot);
+        load_named_epoch!(c => t0);
+        load_named_outline_slot_index_or_branch!(slot => c, .slow);
+        load_object_record_from_state_or_branch!(b => b, .slow);
+        load_record_shape!(b => t1);
+        load_named_handler_shape!(slot => t2);
+        cmp_branch_ne!(t1, t2, .slow);
+        load_record_last_epoch!(b => t1);
+        cmp_branch_ne!(t1, t0, .slow);
+        load_record_outline_slots_from_state_or_branch!(b => t2, .slow);
+        load_outline_slot!(t2, c => t0);
         store_reg!(a, t0);
         dispatch!();
         .try_proto:
