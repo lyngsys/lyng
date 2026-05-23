@@ -71,6 +71,18 @@ impl FunctionCompiler<'_, '_> {
             Expr::SequenceExpression { expressions, .. } => {
                 self.lower_tail_sequence_expression(expressions)
             }
+            Expr::AssignmentExpression {
+                operator,
+                left,
+                right,
+                ..
+            } => {
+                if !self.lower_tail_assignment_return(operator, left, right)? {
+                    let value = self.lower_expr_to_temp(expr)?;
+                    self.builder.emit_ax(Opcode::Return, i32::from(value))?;
+                }
+                Ok(())
+            }
             _ => {
                 let value = self.lower_expr_to_source_or_temp(expr)?;
                 self.builder.emit_ax(Opcode::Return, i32::from(value))?;

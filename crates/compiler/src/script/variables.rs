@@ -1,6 +1,6 @@
 use super::{
     checked_u32_index, AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler,
-    FunctionId, LoweringError, LoweringResult, PreparedReferenceTarget, ReferenceUsage,
+    FunctionId, LoweringError, LoweringResult, Opcode, PreparedReferenceTarget, ReferenceUsage,
     ResolutionKind, SemanticBindingId, StorageClass,
 };
 
@@ -180,6 +180,16 @@ impl FunctionCompiler<'_, '_> {
             return Ok(());
         }
 
+        if operator == AssignOp::Assign
+            && let Some(register) = self.safe_frame_local_assignment_register(left, right)?
+        {
+            self.lower_expr_into(right, register)?;
+            if let Some(dest) = dest {
+                self.emit_move(dest, register)?;
+            }
+            return Ok(());
+        }
+
         match self.ast().get_expr(left).clone() {
             Expr::ArrayExpression { .. } | Expr::ObjectExpression { .. }
                 if operator == AssignOp::Assign =>
@@ -257,6 +267,38 @@ impl FunctionCompiler<'_, '_> {
                 }
             }
         }
+    }
+
+    pub(super) fn lower_tail_assignment_return(
+        &mut self,
+        operator: AssignOp,
+        left: ExprId,
+        right: ExprId,
+    ) -> LoweringResult<bool> {
+        if operator != AssignOp::Assign {
+            return Ok(false);
+        }
+        let left = self.assignment_target(left);
+        if self.lower_annex_b_call_assignment_target_reference_error(left)? {
+            return Ok(true);
+        }
+        let Some(register) = self.safe_frame_local_assignment_register(left, right)? else {
+            return Ok(false);
+        };
+        self.lower_expr_into(right, register)?;
+        self.builder.emit_ax(Opcode::Return, i32::from(register))?;
+        Ok(true)
+    }
+
+    fn safe_frame_local_assignment_register(
+        &mut self,
+        left: ExprId,
+        right: ExprId,
+    ) -> LoweringResult<Option<u16>> {
+        if !self.expr_preserves_frame_local_read(right)? {
+            return Ok(None);
+        }
+        self.frame_local_source_for_expr(left)
     }
 
     fn assignment_expression_inferred_name(

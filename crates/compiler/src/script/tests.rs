@@ -3043,3 +3043,122 @@ fn move_reduction_bumps_array_rest_assignment_index_in_place() {
         "array rest assignment should not copy a temporary Add result back into the index register:\n{disassembly}"
     );
 }
+
+#[test]
+fn move_reduction_assigns_safe_frame_local_from_source_directly() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_310),
+        "function set(a, b) { a = b; return a; } set(0, 1);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "set");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let copies = instructions
+        .iter()
+        .copied()
+        .filter_map(copy_register_pair)
+        .collect::<Vec<_>>();
+
+    assert!(
+        copies.contains(&(0, 1)),
+        "effect-only frame-local assignment should copy parameter r1 directly into r0:\n{disassembly}"
+    );
+    assert!(
+        !copies.iter().any(|&(dest, src)| src == 1 && dest != 0),
+        "effect-only frame-local assignment should not stage parameter r1 through a temporary:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_returns_safe_frame_local_assignment_directly() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_311),
+        "function set(a, b) { return a = b; } set(0, 1);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "set");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let copies = instructions
+        .iter()
+        .copied()
+        .filter_map(copy_register_pair)
+        .collect::<Vec<_>>();
+    let return_register = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Ax {
+                opcode: Opcode::Return,
+                ax,
+            } => Some(ax),
+            _ => None,
+        })
+        .expect("function should contain a Return instruction");
+
+    assert!(
+        copies.contains(&(0, 1)),
+        "tail frame-local assignment should copy parameter r1 directly into r0:\n{disassembly}"
+    );
+    assert_eq!(
+        return_register, 0,
+        "tail frame-local assignment should return the assigned local directly:\n{disassembly}"
+    );
+    assert!(
+        !copies.iter().any(|&(dest, src)| dest != 0 && src == 1),
+        "tail frame-local assignment should not stage parameter r1 through a temporary:\n{disassembly}"
+    );
+}
+
+#[test]
+fn move_reduction_does_not_clobber_frame_local_before_complex_assignment_rhs() {
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        lyng_common::SourceId::new(5_312),
+        "function wrap(a) { a = [a]; return a[0]; } wrap(1);",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+    let function = function_named(&unit, &mut atoms, "wrap");
+    let instructions = function.instructions().iter().collect::<Vec<_>>();
+    let disassembly = lyng_bytecode::disassemble(function);
+    let array_dest = instructions
+        .iter()
+        .copied()
+        .find_map(|instruction| match instruction {
+            lyng_bytecode::Instruction::Abx {
+                opcode: Opcode::CreateArray,
+                a,
+                ..
+            }
+            | lyng_bytecode::Instruction::AbxSlot {
+                opcode: Opcode::CreateArray,
+                a,
+                ..
+            } => Some(a),
+            _ => None,
+        })
+        .expect("function should contain a CreateArray instruction");
+
+    assert_ne!(
+        array_dest, 0,
+        "complex assignment RHS must not create the array in parameter r0 before reading r0:\n{disassembly}"
+    );
+}

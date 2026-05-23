@@ -30,7 +30,7 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Pass rate (selected files) | `93.73%` |
 | Selected variant executions | `101853` |
 | Runnable variant executions | `95205` |
-| Time | `71.3s` |
+| Time | `65.1s` |
 
 ## Delta From Previous Report
 
@@ -40,8 +40,8 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `141` | `141` | `+0` |
 | Selected files | `53053` | `53053` | `+0` |
 | Runnable files | `49729` | `49729` | `+0` |
-| Passed files | `49728` | `49729` | `+1` |
-| Failed files | `1` | `0` | `-1` |
+| Passed files | `49729` | `49729` | `+0` |
+| Failed files | `0` | `0` | `+0` |
 | Panicked files | `0` | `0` | `+0` |
 | Skipped files | `3324` | `3324` | `+0` |
 | Pass rate (selected files) | `93.73%` | `93.73%` | `+0.00pp` |
@@ -95,86 +95,86 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `staging/sm/Array/toSpliced-dense.js` | `2` | `16.583s` | `8.471s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `5.017s` | `2.526s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `4.760s` | `2.391s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `3.412s` | `1.714s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.680s` | `1.348s` |
-| `staging/sm/RegExp/unicode-braced.js` | `2` | `1.857s` | `0.932s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Wancho.js` | `2` | `1.734s` | `0.996s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.725s` | `0.875s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.719s` | `0.880s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.708s` | `0.867s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.701s` | `0.856s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.642s` | `0.827s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `1.633s` | `0.830s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Vai.js` | `2` | `1.626s` | `0.903s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.617s` | `0.817s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mahajani.js` | `2` | `1.537s` | `0.790s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Warang_Citi.js` | `2` | `1.534s` | `0.774s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Deseret.js` | `2` | `1.532s` | `0.774s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Kaithi.js` | `2` | `1.531s` | `0.767s` |
-| `staging/sm/RegExp/unicode-class-braced.js` | `2` | `1.529s` | `0.783s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Takri.js` | `2` | `1.527s` | `0.820s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Tai_Le.js` | `2` | `1.520s` | `0.781s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Tirhuta.js` | `2` | `1.503s` | `0.845s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Thai.js` | `2` | `1.488s` | `0.781s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Avestan.js` | `2` | `1.485s` | `0.750s` |
+| `staging/sm/Array/toSpliced-dense.js` | `2` | `13.520s` | `6.794s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `4.788s` | `2.421s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `4.563s` | `2.308s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `3.176s` | `1.605s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.414s` | `1.251s` |
+| `staging/sm/RegExp/unicode-braced.js` | `2` | `1.725s` | `0.864s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.666s` | `0.880s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.655s` | `0.877s` |
+| `staging/sm/RegExp/unicode-class-braced.js` | `2` | `1.607s` | `0.813s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.586s` | `0.811s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.574s` | `0.797s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.554s` | `0.792s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `1.540s` | `0.789s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.509s` | `0.796s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Medefaidrin.js` | `2` | `1.460s` | `0.794s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js` | `2` | `1.441s` | `0.750s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Javanese.js` | `2` | `1.418s` | `0.736s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Manichaean.js` | `2` | `1.398s` | `0.712s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Tai_Le.js` | `2` | `1.391s` | `0.736s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Saurashtra.js` | `2` | `1.389s` | `0.698s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js` | `2` | `1.385s` | `0.730s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Osage.js` | `2` | `1.376s` | `0.771s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Lepcha.js` | `2` | `1.372s` | `0.751s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mandaic.js` | `2` | `1.372s` | `0.709s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nabataean.js` | `2` | `1.368s` | `0.738s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `8.471s` |
-| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `8.112s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `2.526s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `2.491s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `2.391s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `2.369s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `1.714s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `1.698s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.348s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.332s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Wancho.js [non-strict]` | `pass` | `0.996s` |
-| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.932s` |
-| `staging/sm/RegExp/unicode-braced.js [strict]` | `pass` | `0.925s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Vai.js [strict]` | `pass` | `0.903s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.880s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.875s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.867s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.856s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.850s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.846s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Tirhuta.js [strict]` | `pass` | `0.845s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.841s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.840s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `0.830s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `0.827s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Takri.js [strict]` | `pass` | `0.820s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.817s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.814s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `0.803s` |
-| `built-ins/RegExp/property-escapes/generated/White_Space.js [strict]` | `pass` | `0.800s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.800s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mahajani.js [strict]` | `pass` | `0.790s` |
-| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `pass` | `0.783s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Thai.js [non-strict]` | `pass` | `0.781s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Tai_Le.js [strict]` | `pass` | `0.781s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Deseret.js [non-strict]` | `pass` | `0.774s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Warang_Citi.js [strict]` | `pass` | `0.774s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Kaithi.js [strict]` | `pass` | `0.767s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Canadian_Aboriginal.js [non-strict]` | `pass` | `0.765s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Kaithi.js [non-strict]` | `pass` | `0.764s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Zanabazar_Square.js [non-strict]` | `pass` | `0.763s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Javanese.js [strict]` | `pass` | `0.761s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Warang_Citi.js [non-strict]` | `pass` | `0.760s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Ol_Onal.js [non-strict]` | `pass` | `0.760s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Syloti_Nagri.js [non-strict]` | `pass` | `0.757s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Deseret.js [strict]` | `pass` | `0.757s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Elbasan.js [non-strict]` | `pass` | `0.756s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Cypro_Minoan.js [non-strict]` | `pass` | `0.756s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Khmer.js [non-strict]` | `pass` | `0.753s` |
-| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Thai.js [non-strict]` | `pass` | `0.752s` |
+| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.794s` |
+| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.725s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `2.421s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `2.366s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `2.308s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `2.255s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `1.605s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `1.571s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.251s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.164s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.880s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.877s` |
+| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.864s` |
+| `staging/sm/RegExp/unicode-braced.js [strict]` | `pass` | `0.861s` |
+| `staging/sm/RegExp/unicode-class-braced.js [strict]` | `pass` | `0.813s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.811s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.797s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.796s` |
+| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `pass` | `0.794s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Medefaidrin.js [strict]` | `pass` | `0.794s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.792s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `0.789s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.786s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.778s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.776s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `0.775s` |
+| `built-ins/RegExp/property-escapes/generated/ASCII_Hex_Digit.js [strict]` | `pass` | `0.771s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Osage.js [strict]` | `pass` | `0.771s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.762s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `0.751s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Lepcha.js [non-strict]` | `pass` | `0.751s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js [non-strict]` | `pass` | `0.750s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Kaithi.js [non-strict]` | `pass` | `0.744s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nabataean.js [non-strict]` | `pass` | `0.738s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Javanese.js [non-strict]` | `pass` | `0.736s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Tai_Le.js [non-strict]` | `pass` | `0.736s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Titlecase_Letter.js [non-strict]` | `pass` | `0.730s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Ol_Chiki.js [strict]` | `pass` | `0.730s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Nyiakeng_Puachue_Hmong.js [strict]` | `pass` | `0.720s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js [strict]` | `pass` | `0.716s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Sora_Sompeng.js [strict]` | `pass` | `0.715s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.714s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Manichaean.js [non-strict]` | `pass` | `0.712s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Khmer.js [non-strict]` | `pass` | `0.711s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Tirhuta.js [strict]` | `pass` | `0.711s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Mandaic.js [strict]` | `pass` | `0.709s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Syloti_Nagri.js [strict]` | `pass` | `0.706s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Nandinagari.js [strict]` | `pass` | `0.705s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Tifinagh.js [non-strict]` | `pass` | `0.702s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Thai.js [non-strict]` | `pass` | `0.701s` |
 
 ## Skip Breakdown
 
