@@ -403,7 +403,7 @@ execution fields above plus the rendered dominant phase.
 ## Dcat Handoff Evidence
 
 Before implementing a performance fix, the owning dcat issue should contain enough data
-for a fresh agent to reproduce the bottleneck:
+for a fresh contributor to reproduce the bottleneck:
 
 - Issue or parent epic id.
 - Exact command.

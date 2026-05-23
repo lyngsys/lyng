@@ -1,6 +1,6 @@
 # AGENTS
 
-This file is the repo-level operating guide for coding agents working in `lyng`.
+This file is the repo-level operating guide for working in `lyng`.
 
 ## What This Repo Is
 
@@ -167,8 +167,6 @@ Useful files when tracing behavior:
 - Do not hand-edit generated reports as if they were source.
 - Do not run the full Test262 corpus by default when a targeted slice is enough.
 - Do not change parser or VM control flow without reading the corresponding tests and docs first.
-
-# Agent Instructions
 
 ## Issue tracking
 

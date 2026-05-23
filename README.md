@@ -1,27 +1,23 @@
 # Lyng
 
-Lyng is a Rust JavaScript engine, distributed as a Cargo workspace of small,
+Lyng is a JavaScript engine in Rust, distributed as a Cargo workspace of small,
 single-responsibility crates (frontend, compiler, runtime substrate, builtins,
 CLI) plus the verification tooling around it.
 
 ## What this is
 
-An experiment in agentic coding.
+An interpreter-first ECMA-262 implementation, grounded in spec text and verified
+against the public Test262 conformance suite — tens of thousands of cases
+covering language and built-in semantics.
 
-JavaScript is a uniquely good target for an LLM-driven implementation: ECMA-262 is a
-precise, exhaustive spec, and Test262 is a large, public conformance suite with tens of
-thousands of cases. That combination lets an agent ground every behavioral decision in
-spec text and verify itself against a corpus it cannot bullshit its way through.
-
-The code is slop. The goal is **solid gold slop** — spec-faithful, well-tested, cleanly
-organized, and held to a real quality bar despite being agent-written. The `AGENTS.md` at
-the repo root and the one inside `crates/` encode the standards the agents are
-held to.
+Lyng has no JIT, no native code execution, and no browser or Node APIs. The core
+engine implements language semantics and the runtime substrate needed to host
+them.
 
 ## Current state
 
-As of May 2026, Lyng passes 100% of Test262 in every category except `intl402`, which
-has not been started. Current work is on runtime performance.
+As of May 2026, Lyng passes 100% of Test262 in every category except `intl402`,
+which has not been started. Current work is on runtime performance.
 
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -44,4 +40,4 @@ has not been started. Current work is on runtime performance.
 
 - [Engine overview](crates/README.md)
 - [Docs index](docs/lyng/README.md)
-- [Repo-level agent guide](AGENTS.md)
+- [Repo conventions](AGENTS.md)

@@ -124,5 +124,5 @@ true:
   QuickJS, and Boa.
 
 That child issue should include the candidate suite, license and dependency assessment,
-required harness work, expected report fields, and a smoke command that a fresh agent can
-run before implementation starts.
+required harness work, expected report fields, and a smoke command that a fresh contributor
+can run before implementation starts.

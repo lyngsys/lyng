@@ -1,6 +1,6 @@
 # AGENTS
 
-This file is the Lyng JS operating guide for coding agents. Read it before touching
+This file is the Lyng JS operating guide. Read it before touching
 `crates/*`, `docs/lyng/*`, `tools/lyng-test262`,
 `tools/lyng-bench`, `reports/lyng/*`, or Test262-related fixtures.
 

@@ -859,14 +859,14 @@ Orthogonal to the DSL work. Spec compliance is about *semantics* (does `Array.pr
 | Cold-stub authoring overhead during DSL-0b                             | medium     | low    | ~15-30 min per stub × 145 ≈ 1.5 weeks. Mechanical work. If the per-stub time blows out, the slow-path-bridge protocol is fundamentally wrong and we should know in DSL-0b week 2. |
 | Per-arch divergence in handler behavior                                | low        | high   | Behavioral tests cover both arches. Per-arch asm baselines acknowledge shape differences but behavior is one source of truth. |
 | Rust toolchain bugs in `#[unsafe(naked)]` / `core::arch::naked_asm!`   | low        | medium | Asm baselines catch codegen changes immediately. Can pin known-good rustc if needed. `naked_asm!` is stable as of Rust 1.88; mature enough for production use. |
-| AGENTS.md / engineering-standards.md current "no unsafe in lyng" policy contradicts the DSL | high (if not pre-fixed) | medium | Policy doc updates **must land in the same change as the DSL crate** to avoid contradictory instructions to future agents. See §12. |
+| AGENTS.md / engineering-standards.md current "no unsafe in lyng" policy contradicts the DSL | high (if not pre-fixed) | medium | Policy doc updates **must land in the same change as the DSL crate** to avoid contradictory instructions to future contributors. See §12. |
 | Recruiting / onboarding cost for DSL fluency                           | medium     | low    | DSL is small. Cold opcodes stay simple stubs. Documentation + JSC reference files lower the bar.      |
 | Data-layout refactors stall on GC integration (specifically pointer-identity cells) | medium | medium | Each refactor is its own ticket with own evidence requirement. Refactor only when DSL-0/1 surfaces hot need. |
 | Microbench / V8 v7 measurement noise on dev machine                    | high       | low    | `--require-isolation` enforces loadavg < 2.0. Document quiescing steps. Accept higher variance on multi-purpose machines. |
 
 ## 12. Policy and issue-tracker alignment (must land with the design)
 
-The current `crates/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future agents see consistent guidance.
+The current `crates/AGENTS.md` says **"Do not use `unsafe` code in Lyng JS crates"** verbatim. This contradicts the approved design. Documentation updates must land alongside the DSL crate's creation so future contributors see consistent guidance.
 
 **Required updates:**
 
