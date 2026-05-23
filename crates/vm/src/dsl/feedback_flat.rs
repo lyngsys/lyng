@@ -40,6 +40,7 @@ pub(crate) use crate::vm::FeedbackSiteState;
 
 pub const LLINT_IC_MODE_EMPTY: u8 = 0;
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
+pub const LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 
 #[repr(u8)]
@@ -47,6 +48,7 @@ pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 pub(crate) enum LlIntIcMode {
     Empty = LLINT_IC_MODE_EMPTY,
     NamedOwnInlineLoad = LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
+    NamedProtoInlineLoad = LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,8 +64,16 @@ pub(crate) struct ScalarFeedbackUpdate {
 pub struct FeedbackEntry {
     pub(crate) mode: u8,
     pub(crate) _pad: [u8; 7],
+    /// OwnData mode: `NamedPropertyHandler::bits()`.
+    /// PrototypeData mode: `NamedPropertyProtoHandler::proto_word()`.
     pub(crate) named_handler_bits: u64,
+    /// OwnData mode: receiver invalidation epoch.
+    /// PrototypeData mode: receiver invalidation epoch.
     pub(crate) named_epoch: u64,
+    /// PrototypeData mode: `NamedPropertyProtoHandler::receiver_word()`.
+    pub(crate) named_aux_bits: u64,
+    /// PrototypeData mode: prototype invalidation epoch.
+    pub(crate) named_aux_epoch: u64,
     pub(crate) scalar_observed_bits: u32,
     pub(crate) scalar_execution_count: u32,
     pub(crate) state: Option<FeedbackSiteState>,
@@ -74,6 +84,10 @@ pub const FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, named_handler_bits);
 pub const FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, named_epoch);
+pub const FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET: usize =
+    core::mem::offset_of!(FeedbackEntry, named_aux_bits);
+pub const FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET: usize =
+    core::mem::offset_of!(FeedbackEntry, named_aux_epoch);
 pub const FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, scalar_observed_bits);
 pub const FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET: usize =
@@ -87,6 +101,8 @@ impl Default for FeedbackEntry {
             _pad: [0; 7],
             named_handler_bits: 0,
             named_epoch: 0,
+            named_aux_bits: 0,
+            named_aux_epoch: 0,
             scalar_observed_bits: 0,
             scalar_execution_count: 0,
             state: None,
@@ -100,6 +116,8 @@ impl FeedbackEntry {
         self.mode = LlIntIcMode::Empty as u8;
         self.named_handler_bits = 0;
         self.named_epoch = 0;
+        self.named_aux_bits = 0;
+        self.named_aux_epoch = 0;
     }
 
     #[inline]
@@ -107,6 +125,23 @@ impl FeedbackEntry {
         self.mode = LlIntIcMode::NamedOwnInlineLoad as u8;
         self.named_handler_bits = handler_bits;
         self.named_epoch = epoch;
+        self.named_aux_bits = 0;
+        self.named_aux_epoch = 0;
+    }
+
+    #[inline]
+    pub(crate) const fn set_named_proto_inline_load(
+        &mut self,
+        receiver_word: u64,
+        proto_word: u64,
+        receiver_epoch: u64,
+        prototype_epoch: u64,
+    ) {
+        self.mode = LlIntIcMode::NamedProtoInlineLoad as u8;
+        self.named_handler_bits = proto_word;
+        self.named_epoch = receiver_epoch;
+        self.named_aux_bits = receiver_word;
+        self.named_aux_epoch = prototype_epoch;
     }
 
     #[inline]
@@ -122,6 +157,16 @@ impl FeedbackEntry {
     #[inline]
     pub(crate) const fn named_epoch(&self) -> u64 {
         self.named_epoch
+    }
+
+    #[inline]
+    pub(crate) const fn named_aux_bits(&self) -> u64 {
+        self.named_aux_bits
+    }
+
+    #[inline]
+    pub(crate) const fn named_aux_epoch(&self) -> u64 {
+        self.named_aux_epoch
     }
 
     #[inline]
@@ -161,7 +206,8 @@ impl FeedbackEntry {
 #[cfg(test)]
 mod tests {
     use super::{
-        FeedbackEntry, FEEDBACK_ENTRY_MODE_OFFSET, FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
+        FeedbackEntry, FEEDBACK_ENTRY_MODE_OFFSET, FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET,
+        FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET, FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
         FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET, FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
         FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, LLINT_FEEDBACK_OBSERVED_SMI,
     };
@@ -179,6 +225,14 @@ mod tests {
         assert_ne!(
             FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
             FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET
+        );
+        assert_ne!(
+            FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET,
+            FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET
+        );
+        assert_ne!(
+            FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
+            FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET
         );
     }
 
@@ -198,6 +252,8 @@ mod tests {
         assert_eq!(entry.mode(), super::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD);
         assert_eq!(entry.named_handler_bits(), 0x1234);
         assert_eq!(entry.named_epoch(), 9);
+        assert_eq!(entry.named_aux_bits(), 0);
+        assert_eq!(entry.named_aux_epoch(), 0);
         assert_eq!(entry.scalar_observed_bits(), 0);
         assert_eq!(entry.scalar_execution_count(), 0);
     }

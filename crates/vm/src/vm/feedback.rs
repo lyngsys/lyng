@@ -192,6 +192,20 @@ pub struct KeyedPropertyFeedbackSnapshot {
     dense_entries: Vec<DenseIndexCacheEntrySnapshot>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LlIntNamedPropertyHeader {
+    OwnInline {
+        handler_bits: u64,
+        epoch: u64,
+    },
+    ProtoInline {
+        receiver_word: u64,
+        proto_word: u64,
+        receiver_epoch: u64,
+        prototype_epoch: u64,
+    },
+}
+
 impl KeyedPropertyFeedbackSnapshot {
     #[inline]
     const fn uninitialized(execution_count: u32) -> Self {
@@ -2127,7 +2141,7 @@ impl Vm {
             .feedback_vectors
             .get(index)
             .and_then(|vector| vector.site(slot))
-            .and_then(Self::named_own_inline_load_header);
+            .and_then(Self::named_llint_load_header);
         let Some(slot_index) = Self::flat_feedback_slot_index(slot) else {
             return;
         };
@@ -2140,8 +2154,23 @@ impl Vm {
         };
         entry.clear_ic_header();
         entry.state = None;
-        if let Some((handler_bits, epoch)) = header {
-            entry.set_named_own_inline_load(handler_bits, epoch);
+        match header {
+            Some(LlIntNamedPropertyHeader::OwnInline {
+                handler_bits,
+                epoch,
+            }) => entry.set_named_own_inline_load(handler_bits, epoch),
+            Some(LlIntNamedPropertyHeader::ProtoInline {
+                receiver_word,
+                proto_word,
+                receiver_epoch,
+                prototype_epoch,
+            }) => entry.set_named_proto_inline_load(
+                receiver_word,
+                proto_word,
+                receiver_epoch,
+                prototype_epoch,
+            ),
+            None => {}
         }
     }
 
@@ -2160,6 +2189,41 @@ impl Vm {
             return None;
         }
         Some((handler.bits(), feedback.monomorphic_own_data_epoch))
+    }
+
+    #[inline]
+    fn named_proto_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64, u64, u64)> {
+        let FeedbackSiteState::NamedProperty(feedback) = site else {
+            return None;
+        };
+        let handler = feedback.monomorphic_proto_data_handler;
+        if !handler.is_valid() || !matches!(handler.slot_location(), SlotLocation::Inline(_)) {
+            return None;
+        }
+        Some((
+            handler.receiver_word(),
+            handler.proto_word(),
+            feedback.monomorphic_proto_data_receiver_epoch,
+            feedback.monomorphic_proto_data_prototype_epoch,
+        ))
+    }
+
+    #[inline]
+    fn named_llint_load_header(site: &FeedbackSiteState) -> Option<LlIntNamedPropertyHeader> {
+        if let Some((handler_bits, epoch)) = Self::named_own_inline_load_header(site) {
+            return Some(LlIntNamedPropertyHeader::OwnInline {
+                handler_bits,
+                epoch,
+            });
+        }
+        let (receiver_word, proto_word, receiver_epoch, prototype_epoch) =
+            Self::named_proto_inline_load_header(site)?;
+        Some(LlIntNamedPropertyHeader::ProtoInline {
+            receiver_word,
+            proto_word,
+            receiver_epoch,
+            prototype_epoch,
+        })
     }
 
     fn ensure_feedback_slot_execution(&mut self, code: CodeRef, slot: FeedbackSlotId) -> bool {
@@ -3001,16 +3065,20 @@ impl Vm {
                     || entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     || entry.named_handler_bits() != 0
                     || entry.named_epoch() != 0
+                    || entry.named_aux_bits() != 0
+                    || entry.named_aux_epoch() != 0
                     || entry.scalar_observed_bits() != 0
                     || entry.scalar_execution_count() != 0
                 {
                     return Err((
                         i,
                         format!(
-                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={} state={:?}",
+                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={} state={:?}",
                             entry.mode(),
                             entry.named_handler_bits(),
                             entry.named_epoch(),
+                            entry.named_aux_bits(),
+                            entry.named_aux_epoch(),
                             entry.scalar_observed_bits(),
                             entry.scalar_execution_count(),
                             entry.state
@@ -3041,42 +3109,55 @@ impl Vm {
                     ),
                 ));
             }
-            let expected = legacy.as_ref().and_then(Self::named_own_inline_load_header);
+            let expected = legacy.as_ref().and_then(Self::named_llint_load_header);
             match expected {
-                Some((handler_bits, epoch))
-                    if flat_entry.mode()
-                        == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
-                        && flat_entry.named_handler_bits() == handler_bits
-                        && flat_entry.named_epoch() == epoch
-                        && flat_entry.scalar_observed_bits() == 0
-                        && flat_entry.scalar_execution_count() == 0 => {}
-                Some((handler_bits, epoch)) => {
+                Some(LlIntNamedPropertyHeader::OwnInline {
+                    handler_bits,
+                    epoch,
+                }) if flat_entry.mode()
+                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
+                    && flat_entry.named_handler_bits() == handler_bits
+                    && flat_entry.named_epoch() == epoch
+                    && flat_entry.named_aux_bits() == 0
+                    && flat_entry.named_aux_epoch() == 0
+                    && flat_entry.scalar_observed_bits() == 0
+                    && flat_entry.scalar_execution_count() == 0 => {}
+                Some(LlIntNamedPropertyHeader::ProtoInline {
+                    receiver_word,
+                    proto_word,
+                    receiver_epoch,
+                    prototype_epoch,
+                }) if flat_entry.mode()
+                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD
+                    && flat_entry.named_handler_bits() == proto_word
+                    && flat_entry.named_epoch() == receiver_epoch
+                    && flat_entry.named_aux_bits() == receiver_word
+                    && flat_entry.named_aux_epoch() == prototype_epoch
+                    && flat_entry.scalar_observed_bits() == 0
+                    && flat_entry.scalar_execution_count() == 0 => {}
+                Some(expected) => {
                     return Err((
                         i,
-                        format!(
-                            "slot {i} header diverges: expected mode={} handler={handler_bits:#x} epoch={epoch}, flat mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={}",
-                            crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
-                            flat_entry.mode(),
-                            flat_entry.named_handler_bits(),
-                            flat_entry.named_epoch(),
-                            flat_entry.scalar_observed_bits(),
-                            flat_entry.scalar_execution_count()
-                        ),
+                        Self::format_flat_header_divergence(i, expected, flat_entry),
                     ));
                 }
                 None if flat_entry.mode() == crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     && flat_entry.named_handler_bits() == 0
                     && flat_entry.named_epoch() == 0
+                    && flat_entry.named_aux_bits() == 0
+                    && flat_entry.named_aux_epoch() == 0
                     && flat_entry.scalar_observed_bits() == 0
                     && flat_entry.scalar_execution_count() == 0 => {}
                 None => {
                     return Err((
                         i,
                         format!(
-                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} epoch={} scalar_observed={:#x} scalar_count={}",
+                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
                             flat_entry.mode(),
                             flat_entry.named_handler_bits(),
                             flat_entry.named_epoch(),
+                            flat_entry.named_aux_bits(),
+                            flat_entry.named_aux_epoch(),
                             flat_entry.scalar_observed_bits(),
                             flat_entry.scalar_execution_count()
                         ),
@@ -3085,6 +3166,41 @@ impl Vm {
             }
         }
         Ok(())
+    }
+
+    fn format_flat_header_divergence(
+        slot_index: usize,
+        expected: LlIntNamedPropertyHeader,
+        flat_entry: &crate::dsl::feedback_flat::FeedbackEntry,
+    ) -> String {
+        let expected_text = match expected {
+            LlIntNamedPropertyHeader::OwnInline {
+                handler_bits,
+                epoch,
+            } => format!(
+                "mode={} handler={handler_bits:#x} epoch={epoch} aux_bits=0x0 aux_epoch=0",
+                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
+            ),
+            LlIntNamedPropertyHeader::ProtoInline {
+                receiver_word,
+                proto_word,
+                receiver_epoch,
+                prototype_epoch,
+            } => format!(
+                "mode={} handler={proto_word:#x} epoch={receiver_epoch} aux_bits={receiver_word:#x} aux_epoch={prototype_epoch}",
+                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
+            ),
+        };
+        format!(
+            "slot {slot_index} header diverges: expected {expected_text}, flat mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
+            flat_entry.mode(),
+            flat_entry.named_handler_bits(),
+            flat_entry.named_epoch(),
+            flat_entry.named_aux_bits(),
+            flat_entry.named_aux_epoch(),
+            flat_entry.scalar_observed_bits(),
+            flat_entry.scalar_execution_count()
+        )
     }
 
     #[cfg(test)]

@@ -366,6 +366,8 @@ pub struct RuntimeObjectRecord {
 }
 
 pub const RUNTIME_OBJECT_SHAPE_OFFSET: usize = core::mem::offset_of!(RuntimeObjectRecord, shape);
+pub const RUNTIME_OBJECT_PROTOTYPE_OFFSET: usize =
+    core::mem::offset_of!(RuntimeObjectRecord, prototype);
 pub const RUNTIME_OBJECT_NAMED_SLOTS_OFFSET: usize =
     core::mem::offset_of!(RuntimeObjectRecord, named_slots);
 pub const RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET: usize =

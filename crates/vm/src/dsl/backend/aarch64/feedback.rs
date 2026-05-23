@@ -16,6 +16,10 @@
 //!   property handler word.
 //! - `{feedback_named_epoch}` — byte offset of the named-property
 //!   invalidation epoch snapshot.
+//! - `{feedback_named_aux_bits}` — byte offset of the auxiliary
+//!   named-property handler word.
+//! - `{feedback_named_aux_epoch}` — byte offset of the auxiliary
+//!   named-property invalidation epoch snapshot.
 //! - `{entry_observed}` — byte offset of the "observed types" word
 //!   inside `FeedbackEntry`.
 //! - `{feedback_scalar_execution_count}` — byte offset of the pending
@@ -59,6 +63,23 @@ macro_rules! branch_named_own_inline_mode {
     };
 }
 
+/// Branch to `$label` unless the flat feedback entry is a named
+/// monomorphic one-hop `PrototypeData` inline-slot load header.
+#[macro_export]
+macro_rules! branch_named_proto_inline_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #2\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 #[macro_export]
 macro_rules! load_named_handler_bits {
     ($entry:tt => $dst:tt) => {
@@ -73,6 +94,19 @@ macro_rules! load_named_handler_bits {
 }
 
 #[macro_export]
+macro_rules! load_named_aux_bits {
+    ($entry:tt => $dst:tt) => {
+        concat!(
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($entry),
+            ", {feedback_named_aux_bits}]\n",
+        )
+    };
+}
+
+#[macro_export]
 macro_rules! load_named_epoch {
     ($entry:tt => $dst:tt) => {
         concat!(
@@ -81,6 +115,19 @@ macro_rules! load_named_epoch {
             ", [x",
             stringify!($entry),
             ", {feedback_named_epoch}]\n",
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! load_named_aux_epoch {
+    ($entry:tt => $dst:tt) => {
+        concat!(
+            "ldr    x",
+            stringify!($dst),
+            ", [x",
+            stringify!($entry),
+            ", {feedback_named_aux_epoch}]\n",
         )
     };
 }

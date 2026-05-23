@@ -14,6 +14,8 @@
 //!   `LlIntState::object_records_base`.
 //! - `{object_shape}` — offset of the raw `Option<ShapeId>` word
 //!   inside `RuntimeObjectRecord`.
+//! - `{object_prototype}` — offset of the raw `Option<ObjectRef>` word
+//!   inside `RuntimeObjectRecord`.
 //! - `{object_last_epoch}` — offset of `last_invalidation_epoch`.
 //! - `{object_inline_slots}` — offset of the first inline named slot.
 //!
@@ -57,6 +59,28 @@ macro_rules! load_record_shape {
             ", [x",
             stringify!($rec),
             ", {object_shape}]\n",
+        )
+    };
+}
+
+/// Load the prototype ObjectRef handle from an ObjectRecord at `$rec`
+/// into `$dst`, branching to `$label` when the receiver has no
+/// prototype. The raw `Option<ObjectRef>` representation is a u32
+/// non-zero handle with zero as `None`.
+#[macro_export]
+macro_rules! load_record_prototype_or_branch {
+    ($rec:tt => $dst:tt, $label:tt) => {
+        concat!(
+            "ldr    w",
+            stringify!($dst),
+            ", [x",
+            stringify!($rec),
+            ", {object_prototype}]\n",
+            "cbz    x",
+            stringify!($dst),
+            ", ",
+            stringify!($label),
+            "\n",
         )
     };
 }

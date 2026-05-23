@@ -403,6 +403,20 @@ impl NamedPropertyProtoHandler {
         }
     }
 
+    /// Raw receiver-shape word used by `LLInt` feedback mirrors.
+    #[inline]
+    #[must_use]
+    pub const fn receiver_word(self) -> u64 {
+        self.receiver_word
+    }
+
+    /// Raw prototype-shape/slot word used by `LLInt` feedback mirrors.
+    #[inline]
+    #[must_use]
+    pub const fn proto_word(self) -> u64 {
+        self.proto_word
+    }
+
     /// Returns the cached receiver `ShapeId`, or `None` when this is the
     /// sentinel [`Self::NONE`] value.
     #[inline]
