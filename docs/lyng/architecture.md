@@ -16,6 +16,7 @@ Companion notes:
 - [Dynamic Scope and Eval](dynamic-scope-and-eval.md)
 - [Builtin Bootstrap](builtin-bootstrap.md)
 - [Engineering Standards](engineering-standards.md)
+- [asm-DSL LLInt-style Interpreter Design](2026-05-16-asm-dsl-llint-interpreter-design.md)
 
 ## Current Engine Shape
 
@@ -46,17 +47,18 @@ lyng-common
 ```
 
 The compiler consumes frontend metadata and emits bytecode. The VM installs bytecode and
-executes it. Runtime semantics that belong to objects, environments, abstract operations,
-or host hooks live outside the VM.
+dispatches it through the asm-DSL substrate described in the Dispatch Substrate section.
+Runtime semantics that belong to objects, environments, abstract operations, or host
+hooks live outside the VM.
 
 ## Architecture Constraints
 
-- The engine currently executes through an interpreter. A JSC-aligned threaded-dispatch
-  interpreter and a Sparkplug-style Baseline JIT are planned as the next phases —
+- The engine dispatches through the asm-DSL LLInt-style interpreter described in the
+  Dispatch Substrate section. A Sparkplug-style Baseline JIT remains a future phase —
   see [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md).
-  Today's substrate is interpreter-only; new code should not assume native-code
-  execution exists yet, but the data model (FeedbackVector, Structures, NaN-boxed
-  Value, 32-bit ShapeId) is being maintained as forward-compatible with the JIT.
+  New code should not assume native-code execution exists yet; the data model
+  (FeedbackVector, Structures, NaN-boxed Value, 32-bit ShapeId) is being maintained as
+  forward-compatible with that work.
 - `Value`, typed handles, atoms, object storage, environment storage, bytecode templates,
   and call frames are architecture-level contracts.
 - Normal local access uses frame registers or environment slots, not name lookup.
@@ -68,14 +70,20 @@ or host hooks live outside the VM.
 - Test262 harness extensions such as `$262` are embedding behavior, not default realm
   bootstrap behavior.
 
-## Upcoming substrate work
+## Dispatch Substrate
 
-The dispatch substrate is moving from today's α (extern "C" handlers
-returning `Step`) to an asm-DSL substrate documented in
-[docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md).
-R-0 (tooling and evidence reports) is the first milestone; see
-[reports/lyng/r0/status.md](../../reports/lyng/r0/status.md)
-for current progress.
+The VM dispatches bytecode through an asm-DSL LLInt-style substrate inspired by JSC's
+`LowLevelInterpreter*.asm`. Handlers are tail-jump-dispatched through a single dispatch
+table; engine state lives in pinned callee-saved registers across the entire handler
+chain. Hot opcodes carry inline `naked_asm!` bodies; cold opcodes are short stubs that
+bridge into shared Rust semantic bodies through `call_slow!`. AArch64 is the only
+supported target today.
+
+See [Bytecode and VM](bytecode-and-vm.md) for handler categories, register conventions,
+`LlIntState` layout, and the slow-path bridge protocol. The parent design is in
+[2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md);
+the freshest engine snapshot is
+[`reports/lyng/asm-dsl-engine-state-2026-05-22.md`](../../reports/lyng/asm-dsl-engine-state-2026-05-22.md).
 
 ## Runtime Pipeline
 
@@ -140,7 +148,8 @@ Read the live Lyng JS docs in this order:
 1. [README.md](README.md)
 2. this file
 3. [engineering-standards.md](engineering-standards.md)
-4. the relevant subsystem note for the code being changed
+4. [2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md) when touching the dispatch substrate
+5. the relevant subsystem note for the code being changed
 
 Design changes that touch architecture-level structures must update every affected note in
 the same change.

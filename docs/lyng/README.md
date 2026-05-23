@@ -11,7 +11,8 @@ top-level architecture note and the subsystem note for the area being changed.
 1. [Engine Overview](../../crates/README.md)
 2. [Architecture](architecture.md)
 3. [Engineering Standards](engineering-standards.md)
-4. [JSC-Aligned Engine Roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md) — the active strategic plan: phased work toward JSC LLInt-class interpreter and Baseline JIT performance.
+4. [asm-DSL LLInt-style Interpreter Design](2026-05-16-asm-dsl-llint-interpreter-design.md) — parent design for the current dispatch substrate.
+5. [JSC-Aligned Engine Roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md) — broader strategic plan toward JSC LLInt-class interpreter and Baseline JIT performance.
 
 ## Architecture Notes
 
@@ -22,6 +23,7 @@ top-level architecture note and the subsystem note for the area being changed.
 - [Garbage Collection](gc.md)
 - [Shared Memory And Backing Stores](shared-memory-and-backing-stores.md)
 - [Bytecode And VM](bytecode-and-vm.md)
+- [asm-DSL LLInt-style Interpreter Design](2026-05-16-asm-dsl-llint-interpreter-design.md)
 - [Builtin Bootstrap](builtin-bootstrap.md)
 - [Dynamic Scope And Eval](dynamic-scope-and-eval.md)
 - [Performance Workflow](performance-workflow.md)

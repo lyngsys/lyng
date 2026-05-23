@@ -46,11 +46,12 @@ into that stream. The builder may use logical instruction labels while emitting 
 optimizing, but finalization lowers every label to a byte offset before producing a
 `BytecodeFunction`.
 
-The VM dispatch loop decodes the current instruction from `instruction_bytes()` at the
-active frame PC. Installation validates operands and stores runtime metadata in sparse
-byte-offset keyed side tables; it does not keep a decoded instruction cache as an
-alternate runtime representation. `instructions()` remains a decoded iterator for audit,
-disassembly, validation, and tests.
+Dispatch reads instructions from `instruction_bytes()` at the active frame PC; see
+[Dispatch Substrate](#dispatch-substrate) below for how handlers consume that stream.
+Installation validates operands and stores runtime metadata in sparse byte-offset keyed
+side tables; it does not keep a decoded instruction cache as an alternate runtime
+representation. `instructions()` remains a decoded iterator for audit, disassembly,
+validation, and tests.
 
 ## Instruction Model
 
@@ -80,6 +81,90 @@ Each function owns a fixed register space. The compiler partitions it into:
 The VM executes with `FrameRecord` and `RegisterWindow` structures. Call and construct
 entrypoints seed arguments, `this`, new-target state, callee metadata, and realm/context
 state according to the installed function record.
+
+## Dispatch Substrate
+
+`lyng-vm` dispatches bytecode through an asm-DSL LLInt-style substrate inspired by
+JSC's `LowLevelInterpreter*.asm`. The runtime substrate is in
+[`crates/vm/src/dsl/`](../../crates/vm/src/dsl/); the proc-macro lowerer that parses
+handler bodies is in [`crates/vm-dsl/`](../../crates/vm-dsl/). The parent design is
+[`2026-05-16-asm-dsl-llint-interpreter-design.md`](2026-05-16-asm-dsl-llint-interpreter-design.md).
+
+There is no central dispatch loop and no `Step` enum. Entry to the interpreter sets up
+pinned registers and tail-jumps to the first handler; each handler tail-jumps to the
+next through a single dispatch table.
+
+### Pinned-register convention (AArch64)
+
+| Register | Role                              |
+|----------|-----------------------------------|
+| `x19`    | PC                                |
+| `x20`    | Register window base              |
+| `x21`    | Feedback-vector base              |
+| `x22`    | `Vm` pointer                      |
+| `x23`    | Dispatch-table base               |
+| `x24`    | `LlIntState` pointer              |
+
+AArch64 is the only supported target today. The x86_64 backend is deferred until there
+is a concrete user.
+
+### `LlIntState`
+
+The asm-visible per-frame state record is `#[repr(C)] struct LlIntState`, defined in
+[`crates/vm/src/dsl/llint_state.rs`](../../crates/vm/src/dsl/llint_state.rs). It holds:
+
+- frame PC offset and the instruction-bytes base pointer
+- register-window base
+- feedback-vector base
+- constants base and the `this`-value mirror (asm-visible frame context)
+- frame depth and the safepoint-check epoch
+- an opaque pointer to the Rust-side per-call context
+- the current prefix byte
+
+Field offsets are part of the ABI and locked by an offset-stability test
+(`ll_int_state_offsets_stable`).
+
+### Handler categories
+
+All handlers use one `llint_handler!` macro and share one dispatch table. They divide
+into three categories:
+
+- **Hot opcodes.** Full DSL bodies with the fast path expressed inline as `naked_asm!`.
+  Per-handler asm-shape budgets live in
+  [`tools/lyng-bench/hot-opcodes.toml`](../../tools/lyng-bench/hot-opcodes.toml);
+  per-handler asm baselines live under
+  [`reports/lyng/dsl-asm-baseline-aarch64/`](../../reports/lyng/dsl-asm-baseline-aarch64/).
+- **Warm opcodes** (`op_loop_header`, optionally `op_jump_loop`). Hot path includes a
+  mandatory safepoint poll for GC, debugger, and tier-up. The poll is a single byte
+  load + branch off the pinned `Vm` register; the slow call runs only on the rare arm.
+- **Cold opcodes.** Three-line DSL stubs that `call_slow!` into Rust semantic bodies,
+  then `dispatch_after_slow!`. Same dispatch shape as hot handlers, no inline asm
+  body.
+
+### Slow-path bridge
+
+`call_slow!` crosses from asm into Rust through a `#[no_mangle] extern "C"` shim that
+reconstructs a `LlIntDispatchState` wrapper from the `LlIntState` + opaque Rust context
+pair. The shim runs the Rust semantic body — the same semantic functions any in-Rust
+dispatcher would call — and returns one of:
+
+- `Continue` — advance PC by N bytes and resume dispatch.
+- `Refresh` — semantic body may have triggered GC or moved frame state; refresh
+  arena-pointer mirrors on `LlIntState` before resuming.
+- `ExitDone` — interpreter exits cleanly with a value.
+- `ExitError` — interpreter exits with a `VmError`.
+
+Mirror discipline: `LlIntState` fields that point into GC-or-arena storage are valid
+only between Refresh egress events. Any slow-path call may trigger GC; the Refresh arm
+restores the mirrors before the next handler reads them.
+
+### Inline-port progress
+
+25 opcodes are inline-ported as of HEAD (DSL-1 Phase 1.A + 1.B + 1.C); remaining
+opcodes are cold-stub `call_slow!` shims that delegate to Rust semantic bodies. Phase
+1.D and beyond will inline-port the rest of the top-30 hot set. Test262 has remained
+at 100% pass on runnable through every phase close. The freshest engine snapshot is
+[`reports/lyng/asm-dsl-engine-state-2026-05-22.md`](../../reports/lyng/asm-dsl-engine-state-2026-05-22.md).
 
 ## Scope And Environment Lowering
 
@@ -130,9 +215,11 @@ safepoint, step-over pauses when the observed frame depth is less than or equal 
 origin depth, and step-out pauses when the observed frame depth is less than the origin
 depth.
 
-The debugger path is disabled by default. The interpreter selects a dispatch variant with
-debug polling only when a hook is installed and a pause or step request is active, so the
-normal no-debugger path does not add an inspector check to every opcode.
+The debugger path is disabled by default. The asm-DSL warm handlers carry a single-byte
+poll check off the pinned `Vm` register; when no hook is active, the byte is zero and the
+check is a no-op. When a hook is installed and a pause or step request is active, the
+byte goes non-zero and the warm handler's slow arm runs `Vm::poll_debug_safepoint`, which
+invokes the host hook. Hot opcodes do not carry an inspector check.
 
 ## Exceptions And Abrupt Completion
 
