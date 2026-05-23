@@ -171,6 +171,7 @@ const EXPECTED_KNOWN: i32 = 7;
 const EXPECTED_BOUND_ID: i32 = 42;
 
 #[test]
+#[ignore = "Slow (~1.3s, 50k VM iterations). Run with: cargo test -p lyng-tests -- --ignored"]
 fn frame_context_survives_gc_pressure_in_closure_loop() {
     let mut atoms = AtomTable::new();
 

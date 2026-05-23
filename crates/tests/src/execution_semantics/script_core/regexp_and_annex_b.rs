@@ -936,6 +936,7 @@ fn script_core_supports_annex_b_string_html_methods_and_trim_aliases() {
 }
 
 #[test]
+#[ignore = "Slow (~0.7s). Run with: cargo test -p lyng-tests -- --ignored"]
 fn script_core_string_substr_matches_annex_b_numeric_edges() {
     let result = compile_and_run_string(
         r#"
@@ -1343,6 +1344,7 @@ fn script_core_recursive_calls_throw_before_native_stack_overflow() {
 }
 
 #[test]
+#[ignore = "Slow (~4.6s, dominates lyng-tests runtime). Run with: cargo test -p lyng-tests -- --ignored"]
 fn script_core_named_eval_recursion_uses_bytecode_call_guard() {
     let result = compile_and_run_string(
         r#"

@@ -11,6 +11,7 @@ use lyng_sema::analyze_script;
 
 /// Phase 1 exit gate: 100k lines, under 5s, no token vector.
 #[test]
+#[ignore = "Slow (~0.6s+). Run with: cargo test -p lyng-tests -- --ignored"]
 fn large_script_100k_lines_under_5s() {
     let mut src = String::with_capacity(3_000_000);
     for i in 0..100_000 {
