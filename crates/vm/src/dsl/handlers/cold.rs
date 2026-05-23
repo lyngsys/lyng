@@ -27,12 +27,13 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    bit_and_smi, call_slow, check_smi, cmp_branch_eq, dec_smi_overflow, decode_a, decode_ab,
-    decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
-    inc_smi_overflow, load_acc, load_constant, load_local_fixed, load_reg, load_state_value,
-    load_uninit_lex_sentinel, mul_smi_overflow, shift_left_smi, shift_right_smi, store_acc,
-    store_local_fixed, store_reg, sub_smi_overflow, tag_bool_const, tag_null, tag_smi,
-    tag_smi_const, tag_smi_from_signed_byte, tag_undefined, untag_smi,
+    bit_and_smi, branch_nonzero, call_fast, call_slow, check_smi, cmp_branch_eq, dec_smi_overflow,
+    decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch,
+    dispatch_after_slow, dispatch_from_payload, inc_smi_overflow, load_acc, load_constant,
+    load_local_fixed, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
+    shift_left_smi, shift_right_smi, store_acc, store_local_fixed, store_reg, sub_smi_overflow,
+    tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
+    untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -2654,9 +2655,59 @@ pub extern "C" fn op_load_dense_element_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_get_named_property_dsl, opcode_byte = 77, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        call_fast!(op_get_named_property_fast_rs, args = [a, b, c, slot]);
+        branch_nonzero!(0, .slow);
+        dispatch_from_payload!();
+        .slow:
+        // The Rust fast helper can clobber caller-saved operand registers.
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_get_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[allow(unused_variables)]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_get_named_property_fast_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    a: u32,
+    b: u32,
+    c: u32,
+    slot: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    // SAFETY: `state` is the live trampoline state pointer supplied by
+    // the asm bridge for the duration of this helper call.
+    let rust_context = unsafe {
+        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
+    };
+    let dispatch = &mut rust_context.dispatch;
+    // Keep the Rust frame snapshot aligned with the asm PC before
+    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
+    // without constructing the full slow-path wrapper.
+    let entry_pc = unsafe { (*state).frame_pc_offset };
+    dispatch.frame.set_instruction_offset(entry_pc);
+    let hit = dispatch.vm.try_get_named_property_fast_for_dsl(
+        dispatch.agent,
+        &mut dispatch.frame,
+        6,
+        lyng_types::FeedbackSlotId::from_raw(slot),
+        a as u16,
+        b as u16,
+    );
+    if hit {
+        let next_pc = dispatch.frame.instruction_offset();
+        // SAFETY: same live-state guarantee as above. Refresh the asm
+        // mirror so later slow paths observe the advanced frame PC.
+        unsafe {
+            (*state).frame_pc_offset = next_pc;
+        }
+        return crate::dsl::slow_path::SlowPathReturn {
+            tag: crate::dsl::slow_path::SlowPathTag::Continue as u64,
+            payload: u64::from(next_pc),
+        };
+    }
+    crate::dsl::slow_path::SlowPathReturn { tag: 1, payload: 0 }
 }
 
 #[cfg(target_arch = "aarch64")]

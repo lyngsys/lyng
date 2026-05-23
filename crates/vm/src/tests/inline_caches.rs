@@ -1743,6 +1743,75 @@ fn named_property_load_ic_polymorphic_fast_load_returns_value_for_two_shapes() {
     );
 }
 
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn named_property_load_ic_hit_avoids_semantic_slow_path() {
+    let unit = compile_test_unit(542, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(33));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(33)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .unwrap(),
+        Value::from_smi(33)
+    );
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::GetNamedProperty), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::GetNamedProperty),
+        0,
+        "cached named-property IC hit should avoid the semantic slow bridge"
+    );
+}
+
 #[test]
 fn named_property_load_ic_polymorphic_fast_load_falls_through_beyond_poly_limit() {
     // With POLY_LIMIT=4, six distinct shapes leave entries 4..6 reachable

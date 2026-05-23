@@ -226,6 +226,85 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        reason = "DSL fast helper keeps opcode operands explicit while reusing the existing named-load IC machinery"
+    )]
+    pub(crate) fn try_get_named_property_fast_for_dsl(
+        &mut self,
+        agent: &Agent,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+        target: u16,
+        receiver_register: u16,
+    ) -> bool {
+        let registers = frame.registers();
+        let receiver = self.read_register(registers, receiver_register);
+        let Some(object) = receiver.as_object_ref() else {
+            return false;
+        };
+
+        if let Some((handler, cached_epoch)) =
+            self.named_property_fast_handler(frame.code(), feedback_slot)
+        {
+            let heap_view = agent.heap().view();
+            if let Some(record) = heap_view.object_ref(object) {
+                if record.shape() == handler.receiver_shape()
+                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+                {
+                    let fast_value = match handler.slot_location() {
+                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                        SlotLocation::OutOfLine(offset) => record
+                            .named_slots()
+                            .and_then(|slots| heap_view.object_slots(slots))
+                            .and_then(|slots| slots.get(offset as usize).copied()),
+                    };
+                    if let Some(value) = fast_value {
+                        if let Some(slot) = feedback_slot {
+                            self.record_named_property_fast_hit(frame.code(), slot);
+                        }
+                        self.write_register(registers, target, value);
+                        advance_dispatch_frame(frame, instruction_len);
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if let Some(value) = self.try_named_property_polymorphic_fast_load(
+            agent,
+            frame.code(),
+            feedback_slot,
+            object,
+        ) {
+            self.write_register(registers, target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        if let Some(value) =
+            self.try_named_property_proto_fast_load(agent, frame.code(), feedback_slot, object)
+        {
+            self.write_register(registers, target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        if let Some(value) = self.try_named_property_load_inline_cache_hit(
+            agent,
+            frame.code(),
+            feedback_slot,
+            object,
+        ) {
+            self.write_register(registers, target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
+        false
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     pub(in crate::vm) fn execute_set_named_property_opcode(

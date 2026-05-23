@@ -348,6 +348,41 @@ macro_rules! call_slow {
     };
 }
 
+/// Call into a Rust fast-path helper without incrementing semantic
+/// slow-path counters. The helper returns `tag == 0` on hit with the
+/// next PC offset in `payload`; non-zero means the handler should fall
+/// through to its counted semantic slow path.
+///
+/// This mirrors `call_slow!`'s pre-call PC sync so the helper can inspect
+/// the current bytecode offset, but it deliberately does not bump the
+/// semantic slow-path counter.
+#[macro_export]
+macro_rules! call_fast {
+    ($shim:ident, args = [$a:tt, $b:tt, $c:tt, $d:tt]) => {
+        concat!(
+            "ldr    x16, [x24, {state_pb}]\n",
+            "sub    x17, x19, x16\n",
+            "str    w17, [x24, {state_pc}]\n",
+            "mov    x0, x24\n",
+            "mov    w1, w",
+            stringify!($a),
+            "\n",
+            "mov    w2, w",
+            stringify!($b),
+            "\n",
+            "mov    w3, w",
+            stringify!($c),
+            "\n",
+            "mov    w4, w",
+            stringify!($d),
+            "\n",
+            "bl     {",
+            stringify!($shim),
+            "}\n",
+        )
+    };
+}
+
 /// Post-`call_slow!` dispatch.
 ///
 /// The shim returns a tagged u64:
@@ -404,6 +439,25 @@ macro_rules! dispatch_after_slow {
             "br     x17\n",
             "2:\n", // exit:
             "b      {exit}\n",
+        )
+    };
+}
+
+/// Dispatch after a fast helper returned `tag == 0` with the next-PC
+/// offset in `x1`. This is the Continue arm of `dispatch_after_slow!`
+/// split out for handlers that branch non-zero fast-helper tags to a
+/// normal counted slow path.
+#[macro_export]
+macro_rules! dispatch_from_payload {
+    () => {
+        concat!(
+            "ldr    x16, [x24, {state_pb}]\n",
+            "add    x19, x16, x1\n",
+            "ldr    x20, [x24, {state_regs}]\n",
+            "ldr    x21, [x24, {state_fv}]\n",
+            "ldrb   w8, [x19]\n",
+            "ldr    x17, [x23, x8, lsl #3]\n",
+            "br     x17\n",
         )
     };
 }

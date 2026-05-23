@@ -53,7 +53,8 @@
 //! `LlIntState` field offsets, the VM polling flag, and the shim
 //! symbol. The lowerer always supplies the layout-stable bindings; the
 //! per-call-site `{shim}` binding is collected by scanning the body
-//! for `call_slow!(shim_name, ...)` invocations.
+//! for bridge invocations such as `call_slow!(shim_name, ...)` and
+//! `call_fast!(shim_name, ...)`.
 //!
 //! An "unused" comment fragment at the top of the asm template
 //! unconditionally references every named binding, keeping rustc
@@ -469,18 +470,20 @@ fn arg_group_has_opcode_byte(stream: TokenStream) -> bool {
     false
 }
 
-/// Scan `tokens` for `call_slow!(<shim_name>, args = [...])` invocations
-/// and collect the shim name. The shim name is a bare ident; we treat it
-/// as a linker symbol that must be supplied as `<name> = sym <name>` to
-/// `naked_asm!`.
+/// Scan `tokens` for bridge invocations of the shape
+/// `call_slow!(<shim_name>, args = [...])` or
+/// `call_fast!(<shim_name>, args = [...])` and collect the shim name.
+/// The shim name is a bare ident; we treat it as a linker symbol that
+/// must be supplied as `<name> = sym <name>` to `naked_asm!`.
 fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
-    // Heuristic: walk the stream looking for `call_slow ! ( IDENT , ...)`.
+    // Heuristic: walk the stream looking for
+    // `(call_slow|call_fast) ! ( IDENT , ...)`.
     let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
     for i in 0..trees.len() {
         let TokenTree::Ident(id) = &trees[i] else {
             continue;
         };
-        if id != "call_slow" {
+        if id != "call_slow" && id != "call_fast" {
             continue;
         }
         // Followed by `!`?
@@ -503,8 +506,8 @@ fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
             out.insert(name.to_string());
         }
     }
-    // Recurse into groups so call_slow! inside nested macro args is found
-    // too (rare but defensive).
+    // Recurse into groups so bridge calls inside nested macro args are
+    // found too (rare but defensive).
     for tt in tokens.clone() {
         if let TokenTree::Group(g) = tt {
             collect_shim_names(&g.stream(), out);
@@ -632,6 +635,19 @@ mod tests {
             "label-free cold stubs must receive opcode_byte injection so \
              slow-path counters count semantic entries. Got: {}",
             lowered,
+        );
+    }
+
+    #[test]
+    fn call_fast_shim_name_is_collected() {
+        let tokens: TokenStream =
+            syn::parse_str("call_fast!(op_get_named_property_fast_rs, args = [a, b, c, slot])")
+                .expect("parse call_fast!");
+        let mut names = BTreeSet::new();
+        collect_shim_names(&tokens, &mut names);
+        assert!(
+            names.contains("op_get_named_property_fast_rs"),
+            "call_fast! bridge shims must be emitted as naked_asm named symbols. Got: {names:?}",
         );
     }
 
