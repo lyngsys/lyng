@@ -494,36 +494,34 @@ pub extern "C" fn op_load_global_rust_probe_rs(
     a: u32,
     bx: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: `state` is the live trampoline state pointer supplied by
-    // the asm bridge for the duration of this helper call.
-    let rust_context = unsafe {
-        &mut *(*state)
-            .rust_context
-            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
-    };
-    let dispatch = rust_context.dispatch.ensure_built();
-    // Keep the Rust frame snapshot aligned with the asm PC before
-    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
-    // without constructing the full slow-path wrapper.
-    let entry_pc = unsafe { (*state).frame_pc_offset };
-    dispatch.frame.set_instruction_offset(entry_pc);
+    // Sync the cached Rust-side dispatch state with the asm-side
+    // frame depth before consulting `dispatch.frame`. The asm fast
+    // call path can push frames without invoking any slow shim, so
+    // by the time a probe runs `dispatch.frame_depth` may lag
+    // `(**state).frame_depth`. Without this sync the probe would
+    // write the resolved value into the stale caller-frame's
+    // register window instead of the current asm-side frame's.
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let inner = dispatch.dispatch_state();
+    let entry_pc = inner.frame.instruction_offset();
     let feedback_slot = {
-        let bytes = dispatch.installed.function().instruction_bytes();
+        let bytes = inner.installed.function().instruction_bytes();
         let offset = (entry_pc + 4) as usize;
         let lo = u32::from(bytes.get(offset).copied().unwrap_or(0));
         let hi = u32::from(bytes.get(offset + 1).copied().unwrap_or(0));
         lyng_types::FeedbackSlotId::from_raw(lo | (hi << 8))
     };
-    let hit = dispatch.vm.try_load_global_rust_probe_for_dsl(
-        dispatch.agent,
-        &mut dispatch.frame,
+    let hit = inner.vm.try_load_global_rust_probe_for_dsl(
+        inner.agent,
+        &mut inner.frame,
         6,
         a as u16,
         bx,
         feedback_slot,
     );
     if hit {
-        let next_pc = dispatch.frame.instruction_offset();
+        let next_pc = inner.frame.instruction_offset();
         // SAFETY: same live-state guarantee as above. Probe hits use
         // the no-refresh dispatch contract, so only the PC mirror is
         // updated for later slow paths; pinned REGS/FV stay live.
@@ -2772,29 +2770,25 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
     c: u32,
     slot: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: `state` is the live trampoline state pointer supplied by
-    // the asm bridge for the duration of this helper call.
-    let rust_context = unsafe {
-        &mut *(*state)
-            .rust_context
-            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
-    };
-    let dispatch = rust_context.dispatch.ensure_built();
-    // Keep the Rust frame snapshot aligned with the asm PC before
-    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
-    // without constructing the full slow-path wrapper.
-    let entry_pc = unsafe { (*state).frame_pc_offset };
-    dispatch.frame.set_instruction_offset(entry_pc);
-    let hit = dispatch.vm.try_assign_named_property_rust_probe_for_dsl(
-        dispatch.agent,
-        &mut dispatch.frame,
+    // See `op_load_global_rust_probe_rs` for the rationale: probes
+    // must synchronize `dispatch.frame` / `dispatch.frame_depth` with
+    // the asm-side state. The asm fast call path can push frames
+    // without invoking any slow shim, so without this sync the probe
+    // would observe a stale Rust-side frame snapshot and write to the
+    // wrong register window.
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    let inner = dispatch.dispatch_state();
+    let hit = inner.vm.try_assign_named_property_rust_probe_for_dsl(
+        inner.agent,
+        &mut inner.frame,
         6,
         lyng_types::FeedbackSlotId::from_raw(slot),
         a as u16,
         b as u16,
     );
     if hit {
-        let next_pc = dispatch.frame.instruction_offset();
+        let next_pc = inner.frame.instruction_offset();
         // SAFETY: same live-state guarantee as above. Probe hits use
         // the no-refresh dispatch contract, so only the PC mirror is
         // updated for later slow paths; pinned REGS/FV stay live.
