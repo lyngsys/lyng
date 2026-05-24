@@ -97,7 +97,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// normal `&mut DispatchState<'vm>`.
     pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
-            LlIntDispatchInner::Alpha(state) => *state,
+            LlIntDispatchInner::Alpha(state) => state,
             LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.ensure_built(),
         }
     }
