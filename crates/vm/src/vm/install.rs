@@ -4,7 +4,8 @@ use super::{
     RealmRef, TieringState, Value, Vm, VmError, VmResult,
 };
 use lyng_bytecode::{
-    decode_instruction_bytes, ArgumentsMode, CallRange, Instruction, Opcode, WideAbxOperands,
+    decode_instruction_bytes, ArgumentsMode, CallRange, FeedbackSiteKind, FeedbackSiteMetadata,
+    Instruction, Opcode, WideAbxOperands,
 };
 use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
@@ -828,10 +829,33 @@ impl Vm {
         }
         let slot_count =
             usize::try_from(installed.function.feedback_slot_count()).unwrap_or(usize::MAX);
-        let flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]> = (0..slot_count)
+        let mut flat: Box<[crate::dsl::feedback_flat::FeedbackEntry]> = (0..slot_count)
             .map(|_| crate::dsl::feedback_flat::FeedbackEntry::default())
             .collect::<Vec<_>>()
             .into_boxed_slice();
+        for descriptor in installed.feedback_slot_descriptors().iter().flatten() {
+            if descriptor.kind() != FeedbackSiteKind::Call {
+                continue;
+            }
+            let expected_arity = match descriptor.metadata() {
+                FeedbackSiteMetadata::ExpectedArity(arity) => Some(arity),
+                FeedbackSiteMetadata::CallArguments {
+                    spread_mask: 0,
+                    expected_arity,
+                } => Some(expected_arity),
+                _ => None,
+            };
+            let Some(expected_arity) = expected_arity else {
+                continue;
+            };
+            let Some(slot_index) = usize::try_from(descriptor.slot().get().saturating_sub(1)).ok()
+            else {
+                continue;
+            };
+            if let Some(entry) = flat.get_mut(slot_index) {
+                entry.set_call_no_spread(expected_arity);
+            }
+        }
         self.feedback_flat_storage[index] = flat;
         self.ensure_tiering_capacity(code);
         self.tiering[index] = Some(TieringState::default());

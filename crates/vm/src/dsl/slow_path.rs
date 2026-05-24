@@ -126,7 +126,14 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             // only read scalar fields here.
             unsafe {
                 let asm_depth = (**state).frame_depth as usize;
-                if asm_depth > rust.dispatch.frame_depth {
+                let same_depth_frame_replaced = asm_depth > 0
+                    && asm_depth == rust.dispatch.frame_depth
+                    && rust.frame_infos.get(asm_depth - 1).is_some_and(|info| {
+                        rust.dispatch.frame.code().get() != info.code_raw
+                            || rust.dispatch.frame.registers().base() != info.register_base
+                            || u32::from(rust.dispatch.frame.registers().len()) != info.register_len
+                    });
+                if asm_depth > rust.dispatch.frame_depth || same_depth_frame_replaced {
                     let register_stack_top = (**state).register_stack_top as usize;
                     if let Err(error) = rust.dispatch.vm.materialize_llint_frames(
                         rust.dispatch.agent,

@@ -473,6 +473,191 @@ fn simple_nested_return_avoids_semantic_slow_path() {
     );
 }
 
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn simple_tail_call_avoids_semantic_slow_path() {
+    let child_id = BytecodeFunctionId::from_raw(31).unwrap();
+    let parent_id = BytecodeFunctionId::from_raw(30).unwrap();
+    let script_id = BytecodeFunctionId::from_raw(29).unwrap();
+
+    let mut child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Function);
+    child
+        .alloc_registers(1)
+        .expect("test bytecode registers should allocate");
+    child
+        .emit_abx(Opcode::LoadSmi, 0, 42)
+        .expect("test bytecode should build");
+    child
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
+    let child = child.finish().expect("test bytecode should build");
+
+    let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
+    parent
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    let child_index = parent
+        .add_child_function(child_id)
+        .expect("test bytecode child should build");
+    parent
+        .emit_abx(Opcode::CreateClosure, 0, child_index)
+        .expect("test bytecode should build");
+    parent
+        .emit_abx(Opcode::LoadUndefined, 1, 0)
+        .expect("test bytecode should build");
+    parent
+        .emit_tail_call(0, 1, lyng_bytecode::CallRange::new(0, 0))
+        .expect("test bytecode should build");
+    let parent = parent.finish().expect("test bytecode should build");
+
+    let mut script = BytecodeBuilder::new(script_id, BytecodeFunctionKind::Script);
+    script
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    let parent_index = script
+        .add_child_function(parent_id)
+        .expect("test bytecode child should build");
+    script
+        .emit_abx(Opcode::CreateClosure, 0, parent_index)
+        .expect("test bytecode should build");
+    script
+        .emit_abx(Opcode::LoadUndefined, 1, 0)
+        .expect("test bytecode should build");
+    script
+        .emit_abc(Opcode::Call0, 2, 0, 1)
+        .expect("test bytecode should build");
+    script
+        .emit_ax(Opcode::Return, 2)
+        .expect("test bytecode should build");
+    let script = script.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(29), script.id(), vec![script, parent, child]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+    assert_eq!(vm.peak_frame_depth(), 2);
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::TailCall), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::TailCall),
+        0,
+        "eligible TailCall should recycle the caller frame through the LLInt frame-entry path"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn simple_tail_call_with_argument_avoids_semantic_slow_path() {
+    let child_id = BytecodeFunctionId::from_raw(34).unwrap();
+    let parent_id = BytecodeFunctionId::from_raw(33).unwrap();
+    let script_id = BytecodeFunctionId::from_raw(32).unwrap();
+
+    let mut child = BytecodeBuilder::new(child_id, BytecodeFunctionKind::Function);
+    child.set_parameter_counts(1, 1);
+    child
+        .alloc_registers(1)
+        .expect("test bytecode registers should allocate");
+    child
+        .emit_ax(Opcode::Return, 0)
+        .expect("test bytecode should build");
+    let child = child.finish().expect("test bytecode should build");
+
+    let mut parent = BytecodeBuilder::new(parent_id, BytecodeFunctionKind::Function);
+    parent
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    let child_index = parent
+        .add_child_function(child_id)
+        .expect("test bytecode child should build");
+    parent
+        .emit_abx(Opcode::CreateClosure, 0, child_index)
+        .expect("test bytecode should build");
+    parent
+        .emit_abx(Opcode::LoadUndefined, 1, 0)
+        .expect("test bytecode should build");
+    parent
+        .emit_abx(Opcode::LoadSmi, 2, 42)
+        .expect("test bytecode should build");
+    let tail_offset = parent
+        .emit_tail_call(0, 1, lyng_bytecode::CallRange::new(2, 1))
+        .expect("test bytecode should build");
+    parent
+        .add_feedback_site(
+            tail_offset,
+            FeedbackSiteKind::Call,
+            FeedbackSiteMetadata::ExpectedArity(1),
+        )
+        .expect("test feedback site should build");
+    let parent = parent.finish().expect("test bytecode should build");
+
+    let mut script = BytecodeBuilder::new(script_id, BytecodeFunctionKind::Script);
+    script
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    let parent_index = script
+        .add_child_function(parent_id)
+        .expect("test bytecode child should build");
+    script
+        .emit_abx(Opcode::CreateClosure, 0, parent_index)
+        .expect("test bytecode should build");
+    script
+        .emit_abx(Opcode::LoadUndefined, 1, 0)
+        .expect("test bytecode should build");
+    script
+        .emit_abc(Opcode::Call0, 2, 0, 1)
+        .expect("test bytecode should build");
+    script
+        .emit_ax(Opcode::Return, 2)
+        .expect("test bytecode should build");
+    let script = script.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(32), script.id(), vec![script, parent, child]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::TailCall), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::TailCall),
+        0,
+        "eligible no-spread TailCall should copy arguments and recycle the caller frame in LLInt"
+    );
+}
+
 #[test]
 fn nested_return_after_slow_continue_uses_current_caller_register_base() {
     let unit = compile_test_unit(

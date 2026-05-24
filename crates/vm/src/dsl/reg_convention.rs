@@ -76,8 +76,13 @@ pub const LLINT_FRAME_INFO_CALLEE_RAW: usize = offset_of!(LlIntFrameInfo, callee
 pub const LLINT_FRAME_INFO_PARAMETER_INITIALIZER_END_OFFSET: usize =
     offset_of!(LlIntFrameInfo, parameter_initializer_end_offset);
 pub const LLINT_FRAME_INFO_FRAME_FLAGS_RAW: usize = offset_of!(LlIntFrameInfo, frame_flags_raw);
+pub const LLINT_FRAME_INFO_TAIL_CALLER_RAW: usize = offset_of!(LlIntFrameInfo, tail_caller_raw);
+pub const LLINT_FRAME_INFO_TAIL_CALLER_STRICT: usize =
+    offset_of!(LlIntFrameInfo, tail_caller_strict);
 pub const LLINT_FRAME_INFO_STRIDE_SHIFT: u32 = 7;
 pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE_BIT: u32 = 0;
+pub const LLINT_FRAME_INFO_STRICT_BIT: u32 = 1;
+pub const LLINT_FRAME_INFO_TAIL_CALL_RECYCLE_SAFE_BIT: u32 = 2;
 
 pub const LLINT_CALL_TARGET_CALLEE_BITS: usize = offset_of!(LlIntCallTarget, callee_bits);
 pub const LLINT_CALL_TARGET_PB_BASE: usize = offset_of!(LlIntCallTarget, pb_base);
@@ -99,6 +104,8 @@ pub const LLINT_CALL_TARGET_STRIDE_SHIFT: u32 = 7;
 pub const LLINT_CALL_TARGET_ENABLED_BIT: u32 = 0;
 pub const LLINT_CALL_TARGET_FAST_RETURN_SAFE_BIT: u32 = 1;
 pub const LLINT_CALL_TARGET_THIS_GLOBAL_BIT: u32 = 2;
+pub const LLINT_CALL_TARGET_STRICT_BIT: u32 = 3;
+pub const LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE_BIT: u32 = 4;
 
 // VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
 // added in DSL-0c to give `poll_safepoint!` a known-zero byte to
@@ -121,6 +128,12 @@ pub const RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET: usize =
     lyng_gc::RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET;
 pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
     lyng_gc::RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET;
+
+pub const FEEDBACK_ENTRY_CALL_FLAGS_OFFSET: usize =
+    crate::dsl::feedback_flat::FEEDBACK_ENTRY_CALL_FLAGS_OFFSET;
+pub const FEEDBACK_ENTRY_CALL_EXPECTED_ARITY_OFFSET: usize =
+    crate::dsl::feedback_flat::FEEDBACK_ENTRY_CALL_EXPECTED_ARITY_OFFSET;
+pub const FEEDBACK_ENTRY_CALL_NO_SPREAD_BIT: u32 = 0;
 
 // =============================================================================
 // VM-relative offsets (read from pinned register x22 = VM).

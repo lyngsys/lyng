@@ -45,7 +45,8 @@ use crate::{
     load_record_shape, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
     record_smi, shift_left_smi, shift_right_smi, store_acc, store_local_fixed, store_reg,
     sub_smi_overflow, tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte,
-    tag_undefined, tagged_kind_or_branch, untag_object_ref, untag_smi,
+    tag_undefined, tagged_kind_or_branch, tail_call0_bytecode_or_branch, untag_object_ref,
+    untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -3119,6 +3120,7 @@ llint_handler! {
     op_call0_dsl, opcode_byte = 89, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call0_bytecode_or_branch!(a, b, c, .slow);
     .slow:
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_call0_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -3325,6 +3327,9 @@ pub extern "C" fn op_call_method_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_tail_call_dsl, opcode_byte = 95, layout = Abc, length = 10, |a, b, c| {
+        tail_call0_bytecode_or_branch!(a, b, .slow);
+        .slow:
+        decode_abc!(a, b, c);
         call_slow!(op_tail_call_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }

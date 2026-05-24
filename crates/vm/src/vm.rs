@@ -612,6 +612,14 @@ impl Vm {
         self.register_stack_top = top.min(self.register_stack.len());
     }
 
+    pub(crate) fn llint_frame_window_is_clear(&self, frame: &FrameRecord) -> bool {
+        self.for_in_states.window_is_empty(frame.registers())
+            && self.iterator_states.window_is_empty(frame.registers())
+            && self
+                .captured_name_references
+                .window_is_empty(frame.registers())
+    }
+
     pub(crate) fn materialize_llint_frames(
         &mut self,
         agent: &mut Agent,
@@ -619,17 +627,36 @@ impl Vm {
         frame_infos: &[crate::dsl::llint_state::LlIntFrameInfo],
         register_stack_top: usize,
     ) -> VmResult<()> {
-        if target_depth <= self.frames.len() {
+        if target_depth == 0 && self.frames.is_empty() {
             return Ok(());
         }
         if target_depth > frame_infos.len() || register_stack_top > self.register_stack.len() {
             return Err(VmError::MissingActiveFrame);
         }
 
-        for (index, frame) in self.frames.iter_mut().enumerate() {
+        let mut first_mismatch = target_depth.min(self.frames.len());
+        for (index, frame) in self.frames.iter_mut().enumerate().take(target_depth) {
             if let Some(info) = frame_infos.get(index) {
+                if frame.code().get() != info.code_raw
+                    || frame.registers().base() != info.register_base
+                    || u32::from(frame.registers().len()) != info.register_len
+                {
+                    first_mismatch = index;
+                    break;
+                }
                 frame.set_instruction_offset(info.pc_offset);
             }
+        }
+
+        while self.frames.len() > first_mismatch {
+            let Some(frame) = self.frames.pop() else {
+                break;
+            };
+            self.for_in_states.clear_window(frame.registers());
+            self.iterator_states.clear_window(frame.registers());
+            self.captured_name_references
+                .clear_window(frame.registers());
+            let _ = agent.pop_execution_context();
         }
 
         while self.frames.len() < target_depth {
@@ -681,7 +708,18 @@ impl Vm {
             .with_callee(callee)
             .with_flags(FrameFlags::from_raw(
                 u8::try_from(info.frame_flags_raw).map_err(|_| VmError::MissingActiveFrame)?,
-            ));
+            ))
+            .with_tail_caller(
+                if info.tail_caller_raw == 0 {
+                    None
+                } else {
+                    Some(
+                        ObjectRef::from_raw(info.tail_caller_raw)
+                            .ok_or(VmError::MissingActiveFrame)?,
+                    )
+                },
+                info.tail_caller_strict != 0,
+            );
             agent.push_execution_context(context);
             self.frames.push(frame);
         }

@@ -9,12 +9,16 @@ use crate::vm::dispatch_state::DispatchState;
 use lyng_env::ExecutableId;
 
 pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE: u32 = 1;
+pub const LLINT_FRAME_INFO_STRICT: u32 = 1 << 1;
+pub const LLINT_FRAME_INFO_TAIL_CALL_RECYCLE_SAFE: u32 = 1 << 2;
 pub const LLINT_RETURN_REGISTER_NONE: u32 = u32::MAX;
 pub const LLINT_MAX_BYTECODE_CALL_DEPTH: usize = 8_192;
 pub const LLINT_REGISTER_STACK_SCRATCH_VALUES: usize = 65_536;
 pub const LLINT_CALL_TARGET_ENABLED: u32 = 1;
 pub const LLINT_CALL_TARGET_FAST_RETURN_SAFE: u32 = 1 << 1;
 pub const LLINT_CALL_TARGET_THIS_GLOBAL: u32 = 1 << 2;
+pub const LLINT_CALL_TARGET_STRICT: u32 = 1 << 3;
+pub const LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE: u32 = 1 << 4;
 
 /// Compact asm-facing frame metadata for frame-return `LLInt` paths.
 ///
@@ -42,7 +46,9 @@ pub struct LlIntFrameInfo {
     pub callee_raw: u32,
     pub parameter_initializer_end_offset: u32,
     pub frame_flags_raw: u32,
-    pub pad: [u64; 4],
+    pub tail_caller_raw: u32,
+    pub tail_caller_strict: u32,
+    pub pad: [u64; 3],
 }
 
 impl Default for LlIntFrameInfo {
@@ -66,7 +72,9 @@ impl Default for LlIntFrameInfo {
             callee_raw: 0,
             parameter_initializer_end_offset: 0,
             frame_flags_raw: 0,
-            pad: [0; 4],
+            tail_caller_raw: 0,
+            tail_caller_strict: 0,
+            pad: [0; 3],
         }
     }
 }
@@ -314,11 +322,28 @@ pub(crate) fn refresh_frame_infos(
         let return_register = frame
             .return_register()
             .map_or(LLINT_RETURN_REGISTER_NONE, u32::from);
+        let function = installed.function();
         let simple_return_safe = installed.llint_simple_return_safe()
             && !frame.flags().contains(crate::FrameFlags::construct())
             && !frame
                 .flags()
                 .contains(crate::FrameFlags::derived_construct());
+        let mut flags = 0;
+        if simple_return_safe {
+            flags |= LLINT_FRAME_INFO_FAST_RETURN_SAFE;
+        }
+        if function.flags().strict() {
+            flags |= LLINT_FRAME_INFO_STRICT;
+        }
+        if llint_static_tail_recycle_safe(function)
+            && !frame.flags().contains(crate::FrameFlags::construct())
+            && !frame
+                .flags()
+                .contains(crate::FrameFlags::derived_construct())
+            && vm.llint_frame_window_is_clear(frame)
+        {
+            flags |= LLINT_FRAME_INFO_TAIL_CALL_RECYCLE_SAFE;
+        }
         frame_infos[index] = LlIntFrameInfo {
             pb_base,
             regs_base,
@@ -327,11 +352,7 @@ pub(crate) fn refresh_frame_infos(
             this_value: resolve_this_state_to_mirror(context_this_state, frame.this_value()),
             pc_offset: frame.instruction_offset(),
             return_register,
-            flags: if simple_return_safe {
-                LLINT_FRAME_INFO_FAST_RETURN_SAFE
-            } else {
-                0
-            },
+            flags,
             register_base: frame.registers().base(),
             register_len: u32::from(frame.registers().len()),
             code_raw: frame.code().get(),
@@ -342,7 +363,9 @@ pub(crate) fn refresh_frame_infos(
             callee_raw: frame.callee().map_or(0, ObjectRef::get),
             parameter_initializer_end_offset: frame.parameter_initializer_end_offset(),
             frame_flags_raw: u32::from(frame.flags().raw()),
-            pad: [0; 4],
+            tail_caller_raw: frame.tail_caller().map_or(0, ObjectRef::get),
+            tail_caller_strict: u32::from(frame.tail_caller_strict()),
+            pad: [0; 3],
         };
     }
     register_stack_base
@@ -368,6 +391,48 @@ pub(crate) fn refresh_call_targets(
         };
         call_targets[index] = target;
     }
+}
+
+fn llint_static_tail_recycle_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+    let flags = function.flags();
+    if flags.class_constructor()
+        || flags.derived_class_constructor()
+        || flags.generator()
+        || flags.async_function()
+        || function.arguments_mode() != lyng_bytecode::ArgumentsMode::None
+        || function.has_rest_parameter()
+        || function.needs_environment()
+        || !function.exception_handlers().is_empty()
+        || !function.direct_eval_lexical_sites().is_empty()
+        || !function.loop_iteration_environment_sites().is_empty()
+    {
+        return false;
+    }
+
+    !function.instructions().iter().any(|instruction| {
+        matches!(
+            instruction.opcode(),
+            lyng_bytecode::Opcode::CreateForIn
+                | lyng_bytecode::Opcode::AdvanceForIn
+                | lyng_bytecode::Opcode::CloseForIn
+                | lyng_bytecode::Opcode::CreateIterator
+                | lyng_bytecode::Opcode::AdvanceIterator
+                | lyng_bytecode::Opcode::CloseIterator
+                | lyng_bytecode::Opcode::PushClosureEnv
+                | lyng_bytecode::Opcode::PopClosureEnv
+                | lyng_bytecode::Opcode::EnterEnvScope
+                | lyng_bytecode::Opcode::LeaveEnvScope
+                | lyng_bytecode::Opcode::PushWithEnv
+                | lyng_bytecode::Opcode::PopWithEnv
+                | lyng_bytecode::Opcode::Throw
+                | lyng_bytecode::Opcode::EnterHandler
+                | lyng_bytecode::Opcode::LeaveHandler
+                | lyng_bytecode::Opcode::SuspendGeneratorStart
+                | lyng_bytecode::Opcode::Yield
+                | lyng_bytecode::Opcode::Await
+                | lyng_bytecode::Opcode::DelegateYield
+        )
+    })
 }
 
 fn llint_call_target_for_function(
@@ -425,6 +490,12 @@ fn llint_call_target_for_function(
     }
     if this_mode == FunctionThisMode::Global {
         target_flags |= LLINT_CALL_TARGET_THIS_GLOBAL;
+    }
+    if flags.strict() {
+        target_flags |= LLINT_CALL_TARGET_STRICT;
+    }
+    if llint_static_tail_recycle_safe(function) {
+        target_flags |= LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE;
     }
 
     Some(LlIntCallTarget {
