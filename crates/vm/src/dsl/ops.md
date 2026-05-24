@@ -177,6 +177,12 @@ sign-extended i64 ready for `tag_smi!`.
 | `branch_zero!`              | `cbz xR, label`                                                                              | 1 cbz |
 | `branch_nonzero!`           | `cbnz xR, label`                                                                             | 1 cbnz |
 | `branch!`                   | Unconditional `b label`                                                                      | 1 b |
+| `branch_i8_negative!`       | `tbnz wR, #7, label` — branch when zero-ext u8's i8 sign bit is set                          | 1 tbnz |
+| `branch_i16_negative!`      | `tbnz wR, #15, label` — branch when zero-ext u16's i16 sign bit is set                       | 1 tbnz |
+| `branch_i32_negative!`      | `tbnz wR, #31, label` — branch when w-reg's i32 sign bit is set                              | 1 tbnz |
+| `jump_relative_i8_and_dispatch!`  | sign-ext i8 → add to PC → dispatch (incl. fixed `advance`)                              | sxtb + add + add + ldrb + ldr + br (6 insns) |
+| `jump_relative_i16_and_dispatch!` | sign-ext i16 → add to PC → dispatch (incl. fixed `advance`)                             | sxth + add + add + ldrb + ldr + br (6 insns) |
+| `jump_relative_i32_and_dispatch!` | i32 sign-ext-add to PC → dispatch (incl. fixed `advance`)                               | add + add(sxtw) + ldrb + ldr + br (5 insns)  |
 | `label!`                    | Emit a local label                                                                           | 0 instructions |
 
 ## Feedback (IC sites)

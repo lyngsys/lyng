@@ -15,9 +15,10 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    branch_i8_negative, branch_nonzero, branch_zero, call_slow, check_bool, decode_a, decode_ab,
-    decode_abx, decode_ax, dispatch, dispatch_after_slow, jump_relative_i8_and_dispatch, load_reg,
-    poll_safepoint, untag_bool,
+    branch_i8_negative, branch_i16_negative, branch_nonzero, branch_zero, call_slow, check_bool,
+    decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    jump_relative_i16_and_dispatch, jump_relative_i8_and_dispatch, load_reg, poll_safepoint,
+    untag_bool,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -131,18 +132,31 @@ pub extern "C" fn op_jump8_slow_rs(
 // i16 delta), length = 4.
 // =====================================================================
 
-// `op_jump_if_true` uses an i16 delta (Abx layout: ldrh into the offset
-// scratch zero-extends the raw u16). The backend has no i16 jump macros
-// (only i8 / i32), and the issue forbids touching backend macros, so
-// the full inline path (with sxth-based delta application) is not
-// expressible here. Adding a partial inline (only the not-taken case)
-// would put a 10-insn bool check on the dominant taken-bool-true loop
-// hot path for no inline win, so this handler stays all-slow until the
-// backend gains an i16 jump primitive — at which point it can mirror
-// `op_jump_if_false8`'s shape on the `Abx` operand.
+// `op_jump_if_true` and `op_jump_if_false` use an i16 delta (Abx
+// layout: `ldrh` into the offset scratch zero-extends the raw u16).
+// The inline path mirrors `op_jump_if_true8` / `op_jump_if_false8`
+// (i8) shape on the Abx operand, sign-testing bit 15 instead of bit 7
+// and sign-extending with `sxth` instead of `sxtb`.
+//
+// op_jump_if_true: fallthrough is "take" when the bool is true, so the
+// not-taken branch fires on `t0 == 0` (mirrors `op_jump_if_true8`).
+// op_jump_if_false: fallthrough is "take" when the bool is false, so
+// the not-taken branch fires on `t0 != 0`.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_true, opcode_byte = 64, layout = Abx, length = 4, |condition, offset| {
+        load_reg!(condition => t0);
+        check_bool!(t0, .slow);
+        untag_bool!(t0);
+        branch_zero!(t0, .not_taken);
+        branch_i16_negative!(offset, .taken_backward);
+        jump_relative_i16_and_dispatch!(offset, advance = 4);
+        .taken_backward:
+        poll_safepoint!(.slow);
+        jump_relative_i16_and_dispatch!(offset, advance = 4);
+        .not_taken:
+        dispatch!(advance = 4);
+        .slow:
         call_slow!(op_jump_if_true_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
@@ -170,6 +184,18 @@ pub extern "C" fn op_jump_if_true_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_false, opcode_byte = 65, layout = Abx, length = 4, |condition, offset| {
+        load_reg!(condition => t0);
+        check_bool!(t0, .slow);
+        untag_bool!(t0);
+        branch_nonzero!(t0, .not_taken);
+        branch_i16_negative!(offset, .taken_backward);
+        jump_relative_i16_and_dispatch!(offset, advance = 4);
+        .taken_backward:
+        poll_safepoint!(.slow);
+        jump_relative_i16_and_dispatch!(offset, advance = 4);
+        .not_taken:
+        dispatch!(advance = 4);
+        .slow:
         call_slow!(op_jump_if_false_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }

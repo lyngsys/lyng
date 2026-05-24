@@ -927,6 +927,30 @@ macro_rules! branch_i8_negative {
     };
 }
 
+/// Branch to `$label` when `$reg` holds a zero-extended halfword whose
+/// signed i16 interpretation is negative.
+///
+/// `decode_abx!` loads the Abx layout's `bx` operand with `ldrh` (zero-
+/// extending the 16-bit field into the low half of the scratch w-reg),
+/// so the i16 sign bit is bit 15 of the operand register. Mirrors the
+/// `branch_i8_negative!` pattern (tbnz on the sign bit) without
+/// committing to a sign-extension, which the matching
+/// `jump_relative_i16_and_dispatch!` performs on its own.
+///
+/// Compiles to 1 instruction (`tbnz`). Uses no scratch registers.
+#[macro_export]
+macro_rules! branch_i16_negative {
+    ($reg:tt, $label:tt) => {
+        concat!(
+            "tbnz   w",
+            stringify!($reg),
+            ", #15, ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 #[macro_export]
 macro_rules! branch_i32_negative {
     ($reg:tt, $label:tt) => {
@@ -947,6 +971,41 @@ macro_rules! jump_relative_i8_and_dispatch {
     ($offset:tt, advance = $n:literal) => {
         concat!(
             "sxtb   x",
+            stringify!($offset),
+            ", w",
+            stringify!($offset),
+            "\n",
+            "add    x19, x19, #",
+            stringify!($n),
+            "\n",
+            "add    x19, x19, x",
+            stringify!($offset),
+            "\n",
+            "ldrb   w8, [x19]\n",
+            "ldr    x16, [x23, x8, lsl #3]\n",
+            "br     x16\n",
+        )
+    };
+}
+
+/// Apply a sign-extended i16 relative branch delta in `$offset` from
+/// the current instruction and dispatch from the resulting PC.
+///
+/// `decode_abx!` zero-extends the 16-bit operand into the low half of
+/// the scratch w-reg, so `sxth` widens it to i64 before adding to PC.
+/// Mirrors `jump_relative_i8_and_dispatch!` (which uses `sxtb`) and
+/// `jump_relative_i32_and_dispatch!` (which uses the `sxtw` extended
+/// add form). Both forms emit a 6-instruction tail: sign-extend +
+/// advance + delta-add + ldrb opcode + indexed table load + br.
+///
+/// Scratch use: `x8` (next opcode byte) and `x16` (next handler addr);
+/// both are AAPCS64 call-clobbered IP slots that the lowerer never
+/// assigns to live operands.
+#[macro_export]
+macro_rules! jump_relative_i16_and_dispatch {
+    ($offset:tt, advance = $n:literal) => {
+        concat!(
+            "sxth   x",
             stringify!($offset),
             ", w",
             stringify!($offset),
