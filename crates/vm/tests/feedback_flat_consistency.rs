@@ -1,7 +1,7 @@
-//! Flat LLInt feedback-header invariant tests.
+//! Flat `LLInt` feedback-header invariant tests.
 //!
 //! After the VM mutates legacy feedback, each flat `FeedbackEntry`
-//! must expose the compact LLInt header expected by asm readers. The
+//! must expose the compact `LLInt` header expected by asm readers. The
 //! legacy `FeedbackVector` remains the semantic source of truth; the
 //! flat array deliberately mirrors only small mode-specific header
 //! words, not the full `FeedbackSiteState` enum.
@@ -11,7 +11,7 @@
 //!
 //! - **Polymorphic property-access hot loop:** drives the
 //!   named-property IC through enough receiver shapes to enter the
-//!   polymorphic state and confirms the monomorphic LLInt header is
+//!   polymorphic state and confirms the monomorphic `LLInt` header is
 //!   cleared when the site is no longer eligible.
 
 use lyng_common::{AtomTable, SourceId};
@@ -69,10 +69,9 @@ fn flat_header_stays_empty_for_smi_add_feedback() {
 
     match vm.feedback_flat_matches_legacy(code) {
         Ok(()) => {}
-        Err((slot, diff)) => panic!(
-            "dual-write mismatch after SMI-add hot loop: slot {} -> {}",
-            slot, diff
-        ),
+        Err((slot, diff)) => {
+            panic!("dual-write mismatch after SMI-add hot loop: slot {slot} -> {diff}")
+        }
     }
 }
 
@@ -104,8 +103,7 @@ fn flat_header_clears_for_polymorphic_property_access() {
     match vm.feedback_flat_matches_legacy(code) {
         Ok(()) => {}
         Err((slot, diff)) => panic!(
-            "dual-write mismatch after polymorphic property-access loop: slot {} -> {}",
-            slot, diff
+            "dual-write mismatch after polymorphic property-access loop: slot {slot} -> {diff}"
         ),
     }
 }
@@ -135,9 +133,8 @@ fn flat_header_is_empty_on_cold_install_with_unallocated_legacy_vector() {
 
     match vm.feedback_flat_matches_legacy(installed.code()) {
         Ok(()) => {}
-        Err((slot, diff)) => panic!(
-            "cold install should leave flat fully-default: slot {} -> {}",
-            slot, diff
-        ),
+        Err((slot, diff)) => {
+            panic!("cold install should leave flat fully-default: slot {slot} -> {diff}")
+        }
     }
 }

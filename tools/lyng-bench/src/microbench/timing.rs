@@ -1,5 +1,10 @@
 //! Timing harness: high-resolution monotonic clock + sample aggregation.
 
+#![allow(
+    clippy::cast_precision_loss,
+    reason = "microbench timing converts Duration nanoseconds and dispatch counts to f64 ns/dispatch metrics"
+)]
+
 use std::time::{Duration, Instant};
 
 /// One sample: wall-clock duration plus the dispatch count it measures.
@@ -66,7 +71,7 @@ impl SampleStats {
 ///
 /// The `dispatches` value must be passed in by the caller — it's the
 /// opcode count × inner iteration count.
-pub fn time_once<F: FnOnce() -> ()>(dispatches: u64, f: F) -> Sample {
+pub fn time_once<F: FnOnce()>(dispatches: u64, f: F) -> Sample {
     let start = Instant::now();
     f();
     let elapsed = start.elapsed();
@@ -122,7 +127,7 @@ mod tests {
     #[test]
     fn time_once_returns_positive_elapsed() {
         let sample = time_once(1000, || {
-            std::hint::black_box((0..1000).fold(0_u64, |a, b| a.wrapping_add(b)));
+            std::hint::black_box((0..1000).fold(0_u64, u64::wrapping_add));
         });
         assert!(sample.elapsed.as_nanos() > 0);
         assert_eq!(sample.dispatches, 1000);

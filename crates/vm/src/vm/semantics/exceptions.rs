@@ -96,7 +96,7 @@ pub struct OpHandlerMarkerArgs {
 // to escape `Vm::run`.
 // =====================================================================
 
-pub(crate) fn op_throw_semantic(
+pub fn op_throw_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpExceptionsAxArgs,
 ) -> SemanticOutcome {
@@ -132,7 +132,7 @@ pub(crate) fn op_throw_semantic(
 // state of their own.
 // =====================================================================
 
-pub(crate) fn op_enter_handler_semantic(
+pub const fn op_enter_handler_semantic(
     _state: &mut LlIntDispatchState<'_, '_>,
     args: OpHandlerMarkerArgs,
 ) -> SemanticOutcome {
@@ -141,7 +141,7 @@ pub(crate) fn op_enter_handler_semantic(
     }
 }
 
-pub(crate) fn op_leave_handler_semantic(
+pub const fn op_leave_handler_semantic(
     _state: &mut LlIntDispatchState<'_, '_>,
     args: OpHandlerMarkerArgs,
 ) -> SemanticOutcome {
@@ -157,7 +157,7 @@ pub(crate) fn op_leave_handler_semantic(
 // emitter's explicit handler-leave sequence.
 // =====================================================================
 
-pub(crate) fn op_load_exception_semantic(
+pub fn op_load_exception_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpExceptionsAxArgs,
 ) -> SemanticOutcome {

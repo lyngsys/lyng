@@ -54,7 +54,7 @@
 //! and the interpreter's mutator path does not attach
 //! `ActiveVmRoots` to the heap mutator, so automatic minor GC does
 //! not fire from inside a tight allocation loop. (Major-GC mark
-//! slices DO get polled at LoopHeader safepoints.)
+//! slices DO get polled at `LoopHeader` safepoints.)
 //!
 //! What this test actually exercises:
 //!
@@ -173,6 +173,8 @@ const EXPECTED_BOUND_ID: i32 = 42;
 #[test]
 #[ignore = "Slow (~1.3s, 50k VM iterations). Run with: cargo test -p lyng-tests -- --ignored"]
 fn frame_context_survives_gc_pressure_in_closure_loop() {
+    const MIN_EXPECTED_ALLOCS: usize = 1000;
+
     let mut atoms = AtomTable::new();
 
     // Parse, sema, compile.
@@ -217,8 +219,7 @@ fn frame_context_survives_gc_pressure_in_closure_loop() {
     assert_eq!(
         result, expected,
         "closure loop sum mismatch — frame_const_base or frame_this_value may be stale; \
-         got {:?}, expected {:?} ({} iters * (KNOWN={} + this.id={}))",
-        result, expected, EXPECTED_ITERS, EXPECTED_KNOWN, EXPECTED_BOUND_ID,
+         got {result:?}, expected {expected:?} ({EXPECTED_ITERS} iters * (KNOWN={EXPECTED_KNOWN} + this.id={EXPECTED_BOUND_ID}))",
     );
 
     // Cross-check the workload actually exercised the heap. We
@@ -240,7 +241,6 @@ fn frame_context_survives_gc_pressure_in_closure_loop() {
     // conservative floor: 1000 allocations clearly indicates the
     // workload reached deep into the dispatch loop and the
     // Refresh-egress path ran many times.
-    const MIN_EXPECTED_ALLOCS: usize = 1000;
     assert!(
         alloc_delta >= MIN_EXPECTED_ALLOCS,
         "expected at least {} nursery allocations; got {} (before={}, after={}). \

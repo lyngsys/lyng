@@ -1,4 +1,4 @@
-//! Operand-decoding asm fragments for AArch64.
+//! Operand-decoding asm fragments for `AArch64`.
 //!
 //! These macros produce asm string fragments interpolated into the
 //! per-handler `naked_asm!` block by the proc-macro lowerer. The
@@ -14,7 +14,7 @@
 //! - `x20` = REGS    (register-file base, `*mut Value`)
 //! - `x21` = FV      (feedback-vector base, `*mut FeedbackEntry`)
 //!
-//! Narrow-form decoders only (Wide / ExtraWide land in Batch 7
+//! Narrow-form decoders only (Wide / `ExtraWide` land in Batch 7
 //! alongside `op_wide` / `op_extra_wide`).
 
 /// No-operand prologue (used by `op_wide` / `op_extra_wide` etc.).

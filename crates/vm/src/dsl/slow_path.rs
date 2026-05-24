@@ -60,7 +60,7 @@ pub(crate) enum LlIntDispatchInner<'vm, 'borrow> {
 impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// Construct from a live α `DispatchState`. The α handler in
     /// `dispatch_handlers/` calls this to forward into `op_xxx_semantic`.
-    pub fn from_alpha(state: &'borrow mut DispatchState<'vm>) -> Self {
+    pub const fn from_alpha(state: &'borrow mut DispatchState<'vm>) -> Self {
         Self {
             inner: LlIntDispatchInner::Alpha(state),
         }
@@ -79,7 +79,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// - No other live `&mut LlIntRustContext` aliases the same
     ///   pointer for the duration of the returned wrapper.
     pub unsafe fn from_raw(state: *mut LlIntState) -> Self {
-        let rust = unsafe { &mut *((*state).rust_context as *mut LlIntRustContext<'vm>) };
+        let rust = unsafe { &mut *(*state).rust_context.cast::<LlIntRustContext<'vm>>() };
         Self {
             inner: LlIntDispatchInner::Asm { state, rust },
         }
@@ -90,9 +90,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// `DispatchState`; asm-path shims unpack the same shape from
     /// `LlIntRustContext::dispatch`. Semantic bodies under
     /// `crate::vm::semantics::` consume this uniformly.
-    pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
+    pub const fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
-            LlIntDispatchInner::Alpha(state) => *state,
+            LlIntDispatchInner::Alpha(state) => state,
             LlIntDispatchInner::Asm { rust, .. } => &mut rust.dispatch,
         }
     }
@@ -108,7 +108,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// callers that need PC inspection without going through
     /// `dispatch_state()`.
     #[inline]
-    pub fn current_instruction_offset(&self) -> u32 {
+    pub const fn current_instruction_offset(&self) -> u32 {
         match &self.inner {
             LlIntDispatchInner::Alpha(state) => state.frame.instruction_offset(),
             LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.frame.instruction_offset(),
@@ -146,6 +146,10 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// `dispatch_handlers/` and never calls this translator. Hitting
     /// the no-op branch is not an error; callers may invoke it
     /// uniformly across both variants.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "outcome translation is one state machine over all egress modes; splitting would hide the shared refresh/exit invariants"
+    )]
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
@@ -209,8 +213,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     };
                     let fv_base = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
-                            as *mut crate::dsl::feedback_flat::FeedbackEntry
+                        rust.dispatch.vm.feedback_flat_storage[index]
+                            .as_ptr()
+                            .cast_mut()
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -295,8 +300,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .as_ptr();
                     let fv_base = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        rust.dispatch.vm.feedback_flat_storage[index].as_ptr()
-                            as *mut crate::dsl::feedback_flat::FeedbackEntry
+                        rust.dispatch.vm.feedback_flat_storage[index]
+                            .as_ptr()
+                            .cast_mut()
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -313,8 +319,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .code(active_frame.code())
                         .and_then(lyng_gc::RuntimeCodeRecord::constants)
                         .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
-                        .map(|s| s.as_ptr())
-                        .unwrap_or(std::ptr::null());
+                        .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
 
                     // Phase 1.B.1: refresh the `this` mirror. Captures
                     // super() mutations and any other slow-path
@@ -351,8 +356,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                             .code(active_frame.code())
                             .and_then(lyng_gc::RuntimeCodeRecord::constants)
                             .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
-                            .map(|s| s.as_ptr())
-                            .unwrap_or(std::ptr::null());
+                            .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
                         debug_assert_eq!(
                             const_base, recomputed,
                             "frame_const_base unstable across Refresh"
@@ -485,7 +489,7 @@ pub(crate) fn decode_no_decode_abc_slot_operands(
     })
 }
 
-impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
+impl LlIntDispatchState<'_, '_> {
     #[inline]
     pub(crate) fn decode_current_abx_operands(&mut self) -> VmResult<NoDecodeAbxOperands> {
         let inner = self.dispatch_state();

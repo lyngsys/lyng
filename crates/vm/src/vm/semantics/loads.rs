@@ -43,7 +43,7 @@ pub struct OpMoveArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_move_semantic(
+pub fn op_move_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpMoveArgs,
 ) -> SemanticOutcome {
@@ -79,42 +79,42 @@ fn op_lda_constant_semantic(
     }
 }
 
-pub(crate) fn op_lda_undefined_semantic(
+pub fn op_lda_undefined_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
     op_lda_constant_semantic(state, args, Value::undefined())
 }
 
-pub(crate) fn op_lda_null_semantic(
+pub fn op_lda_null_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
     op_lda_constant_semantic(state, args, Value::null())
 }
 
-pub(crate) fn op_lda_true_semantic(
+pub fn op_lda_true_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
     op_lda_constant_semantic(state, args, Value::from_bool(true))
 }
 
-pub(crate) fn op_lda_false_semantic(
+pub fn op_lda_false_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
     op_lda_constant_semantic(state, args, Value::from_bool(false))
 }
 
-pub(crate) fn op_lda_zero_semantic(
+pub fn op_lda_zero_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
     op_lda_constant_semantic(state, args, Value::from_smi(0))
 }
 
-pub(crate) fn op_lda_one_semantic(
+pub fn op_lda_one_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConstantArgs,
 ) -> SemanticOutcome {
@@ -143,49 +143,49 @@ fn op_load_constant_semantic(
     }
 }
 
-pub(crate) fn op_load_undefined_semantic(
+pub fn op_load_undefined_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::undefined())
 }
 
-pub(crate) fn op_load_null_semantic(
+pub fn op_load_null_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::null())
 }
 
-pub(crate) fn op_load_true_semantic(
+pub fn op_load_true_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::from_bool(true))
 }
 
-pub(crate) fn op_load_false_semantic(
+pub fn op_load_false_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::from_bool(false))
 }
 
-pub(crate) fn op_load_zero_semantic(
+pub fn op_load_zero_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::from_smi(0))
 }
 
-pub(crate) fn op_load_one_semantic(
+pub fn op_load_one_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
     op_load_constant_semantic(state, args, Value::from_smi(1))
 }
 
-pub(crate) fn op_load_uninitialized_lexical_semantic(
+pub fn op_load_uninitialized_lexical_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstantArgs,
 ) -> SemanticOutcome {
@@ -214,56 +214,56 @@ fn op_star_semantic(
     }
 }
 
-pub(crate) fn op_star_0_semantic(
+pub fn op_star_0_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 0)
 }
 
-pub(crate) fn op_star_1_semantic(
+pub fn op_star_1_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 1)
 }
 
-pub(crate) fn op_star_2_semantic(
+pub fn op_star_2_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 2)
 }
 
-pub(crate) fn op_star_3_semantic(
+pub fn op_star_3_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 3)
 }
 
-pub(crate) fn op_star_4_semantic(
+pub fn op_star_4_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 4)
 }
 
-pub(crate) fn op_star_5_semantic(
+pub fn op_star_5_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 5)
 }
 
-pub(crate) fn op_star_6_semantic(
+pub fn op_star_6_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
     op_star_semantic(state, args, 6)
 }
 
-pub(crate) fn op_star_7_semantic(
+pub fn op_star_7_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStarArgs,
 ) -> SemanticOutcome {
@@ -281,7 +281,7 @@ pub struct OpLdaSmi8Args {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_lda_smi8_semantic(
+pub fn op_lda_smi8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaSmi8Args,
 ) -> SemanticOutcome {
@@ -300,7 +300,7 @@ pub struct OpLdaConst8Args {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_lda_const8_semantic(
+pub fn op_lda_const8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdaConst8Args,
 ) -> SemanticOutcome {
@@ -321,7 +321,7 @@ pub struct OpLdarArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_ldar_semantic(
+pub fn op_ldar_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLdarArgs,
 ) -> SemanticOutcome {
@@ -345,7 +345,7 @@ pub struct OpLoadSmiArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_load_smi_semantic(
+pub fn op_load_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadSmiArgs,
 ) -> SemanticOutcome {
@@ -367,7 +367,7 @@ pub struct OpLoadSmi8Args {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_load_smi8_semantic(
+pub fn op_load_smi8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadSmi8Args,
 ) -> SemanticOutcome {
@@ -388,7 +388,7 @@ pub struct OpLoadConstArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_load_const_semantic(
+pub fn op_load_const_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConstArgs,
 ) -> SemanticOutcome {
@@ -410,7 +410,7 @@ pub struct OpLoadConst8Args {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_load_const8_semantic(
+pub fn op_load_const8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadConst8Args,
 ) -> SemanticOutcome {
@@ -449,28 +449,28 @@ fn op_load_local_semantic(
     }
 }
 
-pub(crate) fn op_load_local_0_semantic(
+pub fn op_load_local_0_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadLocalArgs,
 ) -> SemanticOutcome {
     op_load_local_semantic(state, args, 0)
 }
 
-pub(crate) fn op_load_local_1_semantic(
+pub fn op_load_local_1_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadLocalArgs,
 ) -> SemanticOutcome {
     op_load_local_semantic(state, args, 1)
 }
 
-pub(crate) fn op_load_local_2_semantic(
+pub fn op_load_local_2_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadLocalArgs,
 ) -> SemanticOutcome {
     op_load_local_semantic(state, args, 2)
 }
 
-pub(crate) fn op_load_local_3_semantic(
+pub fn op_load_local_3_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoadLocalArgs,
 ) -> SemanticOutcome {
@@ -496,28 +496,28 @@ fn op_store_local_semantic(
     }
 }
 
-pub(crate) fn op_store_local_0_semantic(
+pub fn op_store_local_0_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStoreLocalArgs,
 ) -> SemanticOutcome {
     op_store_local_semantic(state, args, 0)
 }
 
-pub(crate) fn op_store_local_1_semantic(
+pub fn op_store_local_1_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStoreLocalArgs,
 ) -> SemanticOutcome {
     op_store_local_semantic(state, args, 1)
 }
 
-pub(crate) fn op_store_local_2_semantic(
+pub fn op_store_local_2_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStoreLocalArgs,
 ) -> SemanticOutcome {
     op_store_local_semantic(state, args, 2)
 }
 
-pub(crate) fn op_store_local_3_semantic(
+pub fn op_store_local_3_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpStoreLocalArgs,
 ) -> SemanticOutcome {

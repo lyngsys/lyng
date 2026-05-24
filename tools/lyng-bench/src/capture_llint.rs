@@ -1,4 +1,4 @@
-//! `lyng-bench capture-llint` — extract JSC LLInt handler asm/source.
+//! `lyng-bench capture-llint` — extract JSC `LLInt` handler asm/source.
 //!
 //! Source-mode strategy:
 //! - `auto`: try system → local → excerpt in order; report which mode produced each opcode.
@@ -7,9 +7,10 @@
 //! - `excerpt`: parse JSC's offlineasm source files directly; produces
 //!   source-level reference instead of concrete asm.
 
+use std::fmt::Write as _;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CaptureLlintOptions {
     pub source: Source,
     pub jsc_binary: Option<PathBuf>,
@@ -50,7 +51,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
     // Write a summary report at output_dir/README.md.
     let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
     for (opcode, mode) in &produced {
-        summary.push_str(&format!("| `{opcode}` | {mode:?} |\n"));
+        writeln!(summary, "| `{opcode}` | {mode:?} |").expect("writing to a String cannot fail");
     }
     let summary_path = options.output_dir.join("README.md");
     std::fs::write(&summary_path, summary)
@@ -145,16 +146,11 @@ fn capture_from_binary(binary: &std::path::Path, opcode: &str) -> Result<String,
 }
 
 fn extract_llint_symbol(disasm: &str, symbol: &str) -> Result<String, String> {
-    let mut iter = disasm.lines();
+    let iter = disasm.lines();
     let mut body: Vec<String> = Vec::new();
     let mut found = false;
-    while let Some(line) = iter.next() {
-        if !found {
-            if line.contains(symbol) {
-                found = true;
-                body.push(line.to_string());
-            }
-        } else {
+    for line in iter {
+        if found {
             if line.contains("_llint_op_") && !line.contains(symbol) {
                 break;
             }
@@ -162,6 +158,9 @@ fn extract_llint_symbol(disasm: &str, symbol: &str) -> Result<String, String> {
             if body.len() > 200 {
                 break;
             }
+        } else if line.contains(symbol) {
+            found = true;
+            body.push(line.to_string());
         }
     }
     if !found {
@@ -255,14 +254,11 @@ fn capture_from_source(source_root: &std::path::Path, opcode: &str) -> Result<St
                 // preceding macro-callsite line so the captured excerpt
                 // includes the macro name (e.g. `compareJumpOp(`).
                 let start = if needle.starts_with('\n') {
-                    text[..start]
-                        .rfind('\n')
-                        .map(|i| {
-                            // Find the start of the line *before* the one we
-                            // just located: that's the macro-name line.
-                            text[..i].rfind('\n').map_or(0, |j| j + 1)
-                        })
-                        .unwrap_or(start)
+                    text[..start].rfind('\n').map_or(start, |i| {
+                        // Find the start of the line *before* the one we
+                        // just located: that's the macro-name line.
+                        text[..i].rfind('\n').map_or(0, |j| j + 1)
+                    })
                 } else {
                     start
                 };
@@ -285,7 +281,7 @@ fn parse_args(args: &[String]) -> Result<CaptureLlintOptions, String> {
     let mut opcodes: Vec<String> = Vec::new();
     let mut output_dir = PathBuf::from("reports/lyng/llint-reference");
 
-    let mut iter = args.iter().peekable();
+    let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--source" => match iter.next().map(String::as_str) {
@@ -297,10 +293,10 @@ fn parse_args(args: &[String]) -> Result<CaptureLlintOptions, String> {
                 None => return Err("--source requires a value".into()),
             },
             "--jsc-binary" => {
-                jsc_binary = Some(iter.next().ok_or("--jsc-binary requires a path")?.into())
+                jsc_binary = Some(iter.next().ok_or("--jsc-binary requires a path")?.into());
             }
             "--jsc-source" => {
-                jsc_source = Some(iter.next().ok_or("--jsc-source requires a path")?.into())
+                jsc_source = Some(iter.next().ok_or("--jsc-source requires a path")?.into());
             }
             "--opcodes" => {
                 let list = iter

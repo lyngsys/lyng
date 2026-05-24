@@ -548,23 +548,22 @@ impl Vm {
             self.named_property_own_data_handler(code, feedback_slot)
         {
             let view = agent.heap().view();
-            if let Some(record) = view.object_ref(global_object) {
-                if record.shape() == handler.receiver_shape()
-                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
-                {
-                    let cached_value = match handler.slot_location() {
-                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
-                        SlotLocation::OutOfLine(offset) => record
-                            .named_slots()
-                            .and_then(|slots| view.object_slots(slots))
-                            .and_then(|slots| slots.get(offset as usize).copied()),
-                    };
-                    if let Some(value) = cached_value {
-                        if let Some(slot) = feedback_slot {
-                            self.record_named_property_cache_hit(code, slot);
-                        }
-                        return Ok(value);
+            if let Some(record) = view.object_ref(global_object)
+                && record.shape() == handler.receiver_shape()
+                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+            {
+                let cached_value = match handler.slot_location() {
+                    SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                    SlotLocation::OutOfLine(offset) => record
+                        .named_slots()
+                        .and_then(|slots| view.object_slots(slots))
+                        .and_then(|slots| slots.get(offset as usize).copied()),
+                };
+                if let Some(value) = cached_value {
+                    if let Some(slot) = feedback_slot {
+                        self.record_named_property_cache_hit(code, slot);
                     }
+                    return Ok(value);
                 }
             }
         }
@@ -643,25 +642,24 @@ impl Vm {
             self.named_property_own_data_handler(frame.code(), feedback_slot)
         {
             let view = agent.heap().view();
-            if let Some(record) = view.object_ref(global_object) {
-                if record.shape() == handler.receiver_shape()
-                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
-                {
-                    let cached_value = match handler.slot_location() {
-                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
-                        SlotLocation::OutOfLine(offset) => record
-                            .named_slots()
-                            .and_then(|slots| view.object_slots(slots))
-                            .and_then(|slots| slots.get(offset as usize).copied()),
-                    };
-                    if let Some(value) = cached_value {
-                        if let Some(slot) = feedback_slot {
-                            self.record_named_property_cache_hit(frame.code(), slot);
-                        }
-                        self.write_register(frame.registers(), target, value);
-                        advance_dispatch_frame(frame, instruction_len);
-                        return true;
+            if let Some(record) = view.object_ref(global_object)
+                && record.shape() == handler.receiver_shape()
+                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+            {
+                let cached_value = match handler.slot_location() {
+                    SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                    SlotLocation::OutOfLine(offset) => record
+                        .named_slots()
+                        .and_then(|slots| view.object_slots(slots))
+                        .and_then(|slots| slots.get(offset as usize).copied()),
+                };
+                if let Some(value) = cached_value {
+                    if let Some(slot) = feedback_slot {
+                        self.record_named_property_cache_hit(frame.code(), slot);
                     }
+                    self.write_register(frame.registers(), target, value);
+                    advance_dispatch_frame(frame, instruction_len);
+                    return true;
                 }
             }
         }
@@ -814,6 +812,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        clippy::too_many_lines,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
     )]
     pub(in crate::vm) fn assign_global_with_feedback(
@@ -870,14 +869,12 @@ impl Vm {
                 Some(Some(target))
             })
         {
-            let stored = if let Some(target) = target_opt {
+            let stored = target_opt.is_some_and(|target| {
                 agent.with_heap_and_objects(|heap, _objects| {
                     let mut mutator = heap.mutator();
                     mutator.mut_store_value(target, value)
                 })
-            } else {
-                false
-            };
+            });
             if !stored && self.frame_is_strict(frame) {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }

@@ -18,8 +18,9 @@
 //!
 //! ### PC-advance convention
 //!
-//! The α handler `jump_dispatch_frame` sets `pc = current_pc + instruction_len
-//! + delta`. The `translate_outcome_to_step` `Continue` arm calls
+//! The α handler `jump_dispatch_frame` sets
+//! `pc = current_pc + instruction_len + delta`. The
+//! `translate_outcome_to_step` `Continue` arm calls
 //! `state.advance(pc_advance)`, which adds `pc_advance` to the *current* PC
 //! (the entry PC at the start of the handler). Therefore every jumping
 //! semantic body must return `Continue { pc_advance: instruction_len + delta }`
@@ -49,6 +50,12 @@
 //!     the new PC's opcode next (the epoch bump triggers a frame refresh on
 //!     the next iteration, mirroring the unary-arithmetic semantic bodies).
 //!  3. `Err(error)` — abrupt completion escapes; return `ExitError`.
+
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "Control-flow semantics intentionally wrap signed relative PC advances into the u32 advance representation after absolute-target validation"
+)]
 
 use lyng_ops::read;
 use lyng_types::Value;
@@ -114,14 +121,14 @@ fn op_jump_shared_semantic(
     SemanticOutcome::Continue { pc_advance }
 }
 
-pub(crate) fn op_jump_semantic(
+pub fn op_jump_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpArgs,
 ) -> SemanticOutcome {
     op_jump_shared_semantic(state, args)
 }
 
-pub(crate) fn op_jump8_semantic(
+pub fn op_jump8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpArgs,
 ) -> SemanticOutcome {
@@ -192,28 +199,28 @@ fn op_jump_if_shared_semantic(
     }
 }
 
-pub(crate) fn op_jump_if_true_semantic(
+pub fn op_jump_if_true_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpIfArgs,
 ) -> SemanticOutcome {
     op_jump_if_shared_semantic(state, args, true)
 }
 
-pub(crate) fn op_jump_if_true8_semantic(
+pub fn op_jump_if_true8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpIfArgs,
 ) -> SemanticOutcome {
     op_jump_if_shared_semantic(state, args, true)
 }
 
-pub(crate) fn op_jump_if_false_semantic(
+pub fn op_jump_if_false_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpIfArgs,
 ) -> SemanticOutcome {
     op_jump_if_shared_semantic(state, args, false)
 }
 
-pub(crate) fn op_jump_if_false8_semantic(
+pub fn op_jump_if_false8_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpIfArgs,
 ) -> SemanticOutcome {
@@ -228,7 +235,7 @@ pub struct OpLoopHeaderArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_loop_header_semantic(
+pub fn op_loop_header_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpLoopHeaderArgs,
 ) -> SemanticOutcome {
@@ -283,7 +290,7 @@ fn op_return_finish_semantic(
     }
 }
 
-pub(crate) fn op_return_semantic(
+pub fn op_return_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpReturnArgs,
 ) -> SemanticOutcome {
@@ -296,7 +303,7 @@ pub(crate) fn op_return_semantic(
     op_return_finish_semantic(state, value)
 }
 
-pub(crate) fn op_return_undefined_semantic(
+pub fn op_return_undefined_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpReturnUndefinedArgs,
 ) -> SemanticOutcome {
@@ -311,7 +318,7 @@ pub struct OpNopArgs {
     pub instruction_len: u32,
 }
 
-pub(crate) fn op_nop_semantic(
+pub const fn op_nop_semantic(
     _state: &mut LlIntDispatchState<'_, '_>,
     args: OpNopArgs,
 ) -> SemanticOutcome {

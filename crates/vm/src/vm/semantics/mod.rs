@@ -9,16 +9,21 @@
 //! Per-family submodules are added by family-extraction tasks A8–A18.
 //! `OpXxxArgs` structs live alongside their semantic body.
 
+#![allow(
+    clippy::needless_pass_by_value,
+    reason = "Semantic bodies share a uniform legacy-dispatch and LLInt-shim surface where small Copy operand structs are passed by value"
+)]
+
 // Family submodules are added by tasks A8–A18.
-pub(crate) mod arithmetic;
-pub(crate) mod calls;
-pub(crate) mod control_flow;
-pub(crate) mod exceptions;
-pub(crate) mod generators;
-pub(crate) mod iterators;
-pub(crate) mod loads;
-pub(crate) mod misc;
-pub(crate) mod names;
-pub(crate) mod prefix;
-pub(crate) mod property;
-pub(crate) mod scope;
+pub mod arithmetic;
+pub mod calls;
+pub mod control_flow;
+pub mod exceptions;
+pub mod generators;
+pub mod iterators;
+pub mod loads;
+pub mod misc;
+pub mod names;
+pub mod prefix;
+pub mod property;
+pub mod scope;

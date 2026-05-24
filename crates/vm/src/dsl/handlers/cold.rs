@@ -18,7 +18,7 @@
 //!    `crate::vm::semantics::<family>::op_xxx_semantic`, and
 //!    translates the outcome back to `SlowPathReturn`.
 //! 3. For inline-ported scalar opcodes: the hit path records pending
-//!    scalar feedback into the flat LLInt feedback sidecar with
+//!    scalar feedback into the flat `LLInt` feedback sidecar with
 //!    `record_smi!`; Rust drains that sidecar at explicit VM run
 //!    boundaries.
 //!
@@ -27,6 +27,15 @@
 //! Inline hit paths are hand-maintained; see
 //! `docs/superpowers/plans/2026-05-21-dsl-1-phase-1c-smi-arith-and-bitwise.md`
 //! and adjacent plans.
+
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::manual_let_else,
+    clippy::not_unsafe_ptr_arg_deref,
+    clippy::too_many_lines,
+    reason = "DSL cold shims are generated ABI glue: operands arrive as raw u32 slots from LLInt assembly, are narrowed back to manifest-checked bytecode widths, and stay in one opcode-table-shaped file"
+)]
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
@@ -79,8 +88,8 @@ impl ColdShimHelpers {
         // pub(crate) field reachable through the active frame's
         // installed function (held in `DispatchState.installed`).
         let bytes = inner.installed.function().instruction_bytes();
-        let lo = bytes.get((pc + offset) as usize).copied()? as u32;
-        let hi = bytes.get((pc + offset + 1) as usize).copied()? as u32;
+        let lo = u32::from(bytes.get((pc + offset) as usize).copied()?);
+        let hi = u32::from(bytes.get((pc + offset + 1) as usize).copied()?);
         let raw = lo | (hi << 8);
         lyng_types::FeedbackSlotId::from_raw(raw)
     }
@@ -89,8 +98,8 @@ impl ColdShimHelpers {
     /// current instruction at `[PC + offset]`. Used by the variable-arity
     /// `Call` / `TailCall` / `Construct` cold shims to mirror the α
     /// handler's `decode_call_range_operands` path. Layout per
-    /// `decode_call_range_operands`: bytes 4,5 = count_lo/hi; bytes 6,7 =
-    /// base_lo/hi. The slot operand follows at bytes 8,9.
+    /// `decode_call_range_operands`: bytes 4,5 = `count_lo/hi`; bytes 6,7 =
+    /// `base_lo/hi`. The slot operand follows at bytes 8,9.
     #[inline]
     fn call_range_from_pc(
         state: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
@@ -358,7 +367,7 @@ pub extern "C" fn op_load_const_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::loads::OpLoadConstArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::loads::op_load_const_semantic(&mut dispatch, args);
@@ -389,7 +398,7 @@ pub extern "C" fn op_load_env_slot_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::scope::op_load_env_slot_semantic(&mut dispatch, args);
@@ -420,7 +429,7 @@ pub extern "C" fn op_store_env_slot_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::scope::op_store_env_slot_semantic(&mut dispatch, args);
@@ -451,7 +460,7 @@ pub extern "C" fn op_assign_env_slot_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::scope::op_assign_env_slot_semantic(&mut dispatch, args);
@@ -487,7 +496,9 @@ pub extern "C" fn op_load_global_rust_probe_rs(
     // SAFETY: `state` is the live trampoline state pointer supplied by
     // the asm bridge for the duration of this helper call.
     let rust_context = unsafe {
-        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
+        &mut *(*state)
+            .rust_context
+            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
     };
     let dispatch = &mut rust_context.dispatch;
     // Keep the Rust frame snapshot aligned with the asm PC before
@@ -498,8 +509,8 @@ pub extern "C" fn op_load_global_rust_probe_rs(
     let feedback_slot = {
         let bytes = dispatch.installed.function().instruction_bytes();
         let offset = (entry_pc + 4) as usize;
-        let lo = bytes.get(offset).copied().unwrap_or(0) as u32;
-        let hi = bytes.get(offset + 1).copied().unwrap_or(0) as u32;
+        let lo = u32::from(bytes.get(offset).copied().unwrap_or(0));
+        let hi = u32::from(bytes.get(offset + 1).copied().unwrap_or(0));
         lyng_types::FeedbackSlotId::from_raw(lo | (hi << 8))
     };
     let hit = dispatch.vm.try_load_global_rust_probe_for_dsl(
@@ -538,7 +549,7 @@ pub extern "C" fn op_load_global_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 6u32,
         feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 4),
     };
@@ -570,7 +581,7 @@ pub extern "C" fn op_store_global_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 6u32,
         feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 4),
     };
@@ -602,7 +613,7 @@ pub extern "C" fn op_assign_global_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 6u32,
         feedback_slot: ColdShimHelpers::feedback_slot_from_pc(&mut dispatch, 4),
     };
@@ -634,7 +645,7 @@ pub extern "C" fn op_delete_global_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -666,7 +677,7 @@ pub extern "C" fn op_load_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -698,7 +709,7 @@ pub extern "C" fn op_resolve_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -730,7 +741,7 @@ pub extern "C" fn op_resolve_global_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -762,7 +773,7 @@ pub extern "C" fn op_assign_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -794,7 +805,7 @@ pub extern "C" fn op_assign_variable_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -827,7 +838,7 @@ pub extern "C" fn op_delete_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -859,7 +870,7 @@ pub extern "C" fn op_capture_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -891,7 +902,7 @@ pub extern "C" fn op_load_captured_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpCapturedNameArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::names::op_load_captured_name_semantic(&mut dispatch, args);
@@ -922,7 +933,7 @@ pub extern "C" fn op_load_captured_name_this_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpCapturedNameArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome =
@@ -954,7 +965,7 @@ pub extern "C" fn op_assign_captured_name_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpCapturedNameArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome =
@@ -1024,7 +1035,7 @@ pub extern "C" fn op_load_this_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -1056,7 +1067,7 @@ pub extern "C" fn op_load_callee_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -1088,7 +1099,7 @@ pub extern "C" fn op_load_new_target_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::names::OpAtomArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
         feedback_slot: None,
     };
@@ -2359,7 +2370,7 @@ pub extern "C" fn op_create_object_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::property::op_create_object_semantic(&mut dispatch, args);
@@ -2390,7 +2401,7 @@ pub extern "C" fn op_create_array_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::property::op_create_array_semantic(&mut dispatch, args);
@@ -2421,7 +2432,7 @@ pub extern "C" fn op_check_object_coercible_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome =
@@ -2453,7 +2464,7 @@ pub extern "C" fn op_throw_if_uninitialized_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome =
@@ -2763,7 +2774,9 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
     // SAFETY: `state` is the live trampoline state pointer supplied by
     // the asm bridge for the duration of this helper call.
     let rust_context = unsafe {
-        &mut *((*state).rust_context as *mut crate::dsl::llint_state::LlIntRustContext<'_>)
+        &mut *(*state)
+            .rust_context
+            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
     };
     let dispatch = &mut rust_context.dispatch;
     // Keep the Rust frame snapshot aligned with the asm PC before
@@ -3435,7 +3448,7 @@ pub extern "C" fn op_create_closure_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::calls::OpCreateClosureArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::calls::op_create_closure_semantic(&mut dispatch, args);
@@ -3532,7 +3545,7 @@ pub extern "C" fn op_close_for_in_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::iterators::op_close_for_in_semantic(&mut dispatch, args);
@@ -3630,7 +3643,7 @@ pub extern "C" fn op_close_iterator_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::iterators::op_close_iterator_semantic(&mut dispatch, args);
@@ -3899,7 +3912,7 @@ pub extern "C" fn op_enter_env_scope_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::scope::op_enter_env_scope_semantic(&mut dispatch, args);
@@ -3930,7 +3943,7 @@ pub extern "C" fn op_leave_env_scope_slow_rs(
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
         a: a as u16,
-        bx: bx,
+        bx,
         instruction_len: 4u32,
     };
     let outcome = crate::vm::semantics::scope::op_leave_env_scope_semantic(&mut dispatch, args);
@@ -4844,11 +4857,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_undefined_semantic(dispatch, args)
                 }
@@ -4863,11 +4876,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_uninitialized_lexical_semantic(
                         dispatch, args,
@@ -4884,11 +4897,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_null_semantic(dispatch, args)
                 }
@@ -4903,11 +4916,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_true_semantic(dispatch, args)
                 }
@@ -4922,11 +4935,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_false_semantic(dispatch, args)
                 }
@@ -4941,11 +4954,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_zero_semantic(dispatch, args)
                 }
@@ -4960,11 +4973,11 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstantArgs {
                         a: a as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_one_semantic(dispatch, args)
                 }
@@ -4979,12 +4992,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadSmiArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_smi_semantic(dispatch, args)
                 }
@@ -4999,12 +5012,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::loads::OpLoadConstArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_load_const_semantic(dispatch, args)
                 }
@@ -5019,12 +5032,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::scope::op_load_env_slot_semantic(dispatch, args)
                 }
@@ -5039,12 +5052,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::scope::op_store_env_slot_semantic(dispatch, args)
                 }
@@ -5059,12 +5072,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::scope::op_assign_env_slot_semantic(dispatch, args)
                 }
@@ -5079,14 +5092,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let feedback_slot = slot_opt;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
-                        feedback_slot: feedback_slot,
+                        bx,
+                        instruction_len,
+                        feedback_slot,
                     };
                     crate::vm::semantics::names::op_load_global_semantic(dispatch, args)
                 }
@@ -5101,14 +5114,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let feedback_slot = slot_opt;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
-                        feedback_slot: feedback_slot,
+                        bx,
+                        instruction_len,
+                        feedback_slot,
                     };
                     crate::vm::semantics::names::op_store_global_semantic(dispatch, args)
                 }
@@ -5123,14 +5136,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let feedback_slot = slot_opt;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
-                        feedback_slot: feedback_slot,
+                        bx,
+                        instruction_len,
+                        feedback_slot,
                     };
                     crate::vm::semantics::names::op_assign_global_semantic(dispatch, args)
                 }
@@ -5145,12 +5158,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_delete_global_semantic(dispatch, args)
@@ -5166,12 +5179,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_load_name_semantic(dispatch, args)
@@ -5187,12 +5200,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_resolve_name_semantic(dispatch, args)
@@ -5208,12 +5221,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_resolve_global_semantic(dispatch, args)
@@ -5229,12 +5242,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_assign_name_semantic(dispatch, args)
@@ -5250,12 +5263,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_assign_variable_name_semantic(dispatch, args)
@@ -5271,12 +5284,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_delete_name_semantic(dispatch, args)
@@ -5292,12 +5305,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_capture_name_semantic(dispatch, args)
@@ -5313,12 +5326,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpCapturedNameArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::names::op_load_captured_name_semantic(dispatch, args)
                 }
@@ -5333,12 +5346,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpCapturedNameArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::names::op_load_captured_name_this_semantic(dispatch, args)
                 }
@@ -5353,12 +5366,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpCapturedNameArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::names::op_assign_captured_name_semantic(dispatch, args)
                 }
@@ -5373,12 +5386,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_load_this_semantic(dispatch, args)
@@ -5394,12 +5407,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_load_callee_semantic(dispatch, args)
@@ -5415,12 +5428,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::names::OpAtomArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                         feedback_slot: None,
                     };
                     crate::vm::semantics::names::op_load_new_target_semantic(dispatch, args)
@@ -5436,16 +5449,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_add_smi_semantic(dispatch, args)
                 }
@@ -5460,16 +5473,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_sub_semantic(dispatch, args)
                 }
@@ -5484,16 +5497,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_sub_smi_semantic(dispatch, args)
                 }
@@ -5508,16 +5521,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_mul_semantic(dispatch, args)
                 }
@@ -5532,16 +5545,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_mul_smi_semantic(dispatch, args)
                 }
@@ -5556,16 +5569,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_div_semantic(dispatch, args)
                 }
@@ -5580,16 +5593,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_mod_semantic(dispatch, args)
                 }
@@ -5604,16 +5617,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_div_smi_semantic(dispatch, args)
                 }
@@ -5628,16 +5641,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_mod_smi_semantic(dispatch, args)
                 }
@@ -5652,16 +5665,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_exp_semantic(dispatch, args)
                 }
@@ -5676,16 +5689,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_bit_or_semantic(dispatch, args)
                 }
@@ -5700,16 +5713,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_bit_xor_semantic(dispatch, args)
                 }
@@ -5724,16 +5737,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_bit_and_semantic(dispatch, args)
                 }
@@ -5748,16 +5761,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinarySmiArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         imm_raw: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_bit_and_smi_semantic(dispatch, args)
                 }
@@ -5772,15 +5785,15 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpUnaryArgs {
                         dst: a as u16,
                         src: b as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_bit_not_semantic(dispatch, args)
                 }
@@ -5795,16 +5808,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_shift_left_semantic(dispatch, args)
                 }
@@ -5819,16 +5832,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_shift_right_semantic(dispatch, args)
                 }
@@ -5843,16 +5856,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_unsigned_shift_right_semantic(
                         dispatch, args,
@@ -5869,15 +5882,15 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpUnaryArgs {
                         dst: a as u16,
                         src: b as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_negate_semantic(dispatch, args)
                 }
@@ -5892,15 +5905,15 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpUpdateArgs {
                         dst: a as u16,
                         src: b as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_increment_semantic(dispatch, args)
                 }
@@ -5915,15 +5928,15 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpUpdateArgs {
                         dst: a as u16,
                         src: b as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_decrement_semantic(dispatch, args)
                 }
@@ -5938,16 +5951,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_equal_semantic(dispatch, args)
                 }
@@ -5962,16 +5975,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_strict_equal_semantic(dispatch, args)
                 }
@@ -5986,15 +5999,15 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpEqualZeroArgs {
                         dst: a as u16,
                         src: b as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_equal_zero_semantic(dispatch, args)
                 }
@@ -6009,16 +6022,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_less_than_semantic(dispatch, args)
                 }
@@ -6033,16 +6046,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_less_equal_semantic(dispatch, args)
                 }
@@ -6057,16 +6070,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_greater_than_semantic(dispatch, args)
                 }
@@ -6081,16 +6094,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_greater_equal_semantic(dispatch, args)
                 }
@@ -6105,14 +6118,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_in_semantic(dispatch, args)
                 }
@@ -6127,12 +6140,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_create_object_semantic(dispatch, args)
                 }
@@ -6147,12 +6160,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_create_array_semantic(dispatch, args)
                 }
@@ -6167,12 +6180,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_check_object_coercible_semantic(
                         dispatch, args,
@@ -6189,12 +6202,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::property::OpPropertyAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_throw_if_uninitialized_semantic(
                         dispatch, args,
@@ -6211,14 +6224,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_define_named_property_semantic(
                         dispatch, args,
@@ -6235,14 +6248,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_define_keyed_property_semantic(
                         dispatch, args,
@@ -6259,14 +6272,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_store_dense_element_semantic(dispatch, args)
                 }
@@ -6281,14 +6294,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_load_dense_element_semantic(dispatch, args)
                 }
@@ -6303,16 +6316,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_get_named_property_semantic(dispatch, args)
                 }
@@ -6327,16 +6340,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_set_named_property_semantic(dispatch, args)
                 }
@@ -6351,16 +6364,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_assign_named_property_semantic(
                         dispatch, args,
@@ -6377,16 +6390,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_strict_assign_named_property_semantic(
                         dispatch, args,
@@ -6403,16 +6416,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_get_keyed_property_semantic(dispatch, args)
                 }
@@ -6427,16 +6440,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_set_keyed_property_semantic(dispatch, args)
                 }
@@ -6451,16 +6464,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_assign_keyed_property_semantic(
                         dispatch, args,
@@ -6477,16 +6490,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_strict_assign_keyed_property_semantic(
                         dispatch, args,
@@ -6503,14 +6516,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_delete_property_semantic(dispatch, args)
                 }
@@ -6525,14 +6538,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_copy_data_properties_semantic(dispatch, args)
                 }
@@ -6547,13 +6560,13 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbArgs {
                         a: a as u16,
                         b: b as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_set_function_name_semantic(dispatch, args)
                 }
@@ -6568,13 +6581,13 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::property::OpPropertyAbArgs {
                         a: a as u16,
                         b: b as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::property::op_to_property_key_semantic(dispatch, args)
                 }
@@ -6589,9 +6602,9 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::calls::OpCallSmallArgs {
                         a: a as u16,
@@ -6599,7 +6612,7 @@ pub(crate) fn dispatch_wide_form(
                         c: c as u16,
                         arity: 0u8,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::calls::op_call0_semantic(dispatch, args)
                 }
@@ -6614,9 +6627,9 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::calls::OpCallSmallArgs {
                         a: a as u16,
@@ -6624,7 +6637,7 @@ pub(crate) fn dispatch_wide_form(
                         c: c as u16,
                         arity: 1u8,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::calls::op_call1_semantic(dispatch, args)
                 }
@@ -6639,9 +6652,9 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::calls::OpCallSmallArgs {
                         a: a as u16,
@@ -6649,7 +6662,7 @@ pub(crate) fn dispatch_wide_form(
                         c: c as u16,
                         arity: 2u8,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::calls::op_call2_semantic(dispatch, args)
                 }
@@ -6664,9 +6677,9 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::calls::OpCallSmallArgs {
                         a: a as u16,
@@ -6674,7 +6687,7 @@ pub(crate) fn dispatch_wide_form(
                         c: c as u16,
                         arity: 3u8,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::calls::op_call3_semantic(dispatch, args)
                 }
@@ -6689,12 +6702,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::calls::OpCreateClosureArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::calls::op_create_closure_semantic(dispatch, args)
                 }
@@ -6709,14 +6722,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_create_for_in_semantic(dispatch, args)
                 }
@@ -6731,14 +6744,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_advance_for_in_semantic(dispatch, args)
                 }
@@ -6753,12 +6766,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_close_for_in_semantic(dispatch, args)
                 }
@@ -6773,14 +6786,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_create_iterator_semantic(dispatch, args)
                 }
@@ -6795,14 +6808,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::iterators::OpIteratorAbcArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_advance_iterator_semantic(dispatch, args)
                 }
@@ -6817,12 +6830,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::iterators::OpIteratorAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::iterators::op_close_iterator_semantic(dispatch, args)
                 }
@@ -6837,14 +6850,14 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::generators::OpDelegateYieldArgs {
                         a: a as u16,
                         b: b as u16,
                         c: c as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::generators::op_delegate_yield_semantic(dispatch, args)
                 }
@@ -6859,12 +6872,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::scope::op_enter_env_scope_semantic(dispatch, args)
                 }
@@ -6879,12 +6892,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::scope::OpScopeAbxArgs {
                         a: a as u16,
-                        bx: bx,
-                        instruction_len: instruction_len,
+                        bx,
+                        instruction_len,
                     };
                     crate::vm::semantics::scope::op_leave_env_scope_semantic(dispatch, args)
                 }
@@ -6899,13 +6912,13 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let args = crate::vm::semantics::loads::OpMoveArgs {
                         dst: a as u16,
                         src: b as u16,
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::loads::op_move_semantic(dispatch, args)
                 }
@@ -6920,16 +6933,16 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, b16, c16, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
-                    let b: u32 = b16 as u32;
-                    let c: u32 = c16 as u32;
+                    let a: u32 = u32::from(a16);
+                    let b: u32 = u32::from(b16);
+                    let c: u32 = u32::from(c16);
                     let slot: u32 = slot_opt.map_or(0u32, |s| s.raw().get());
                     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
                         dst: a as u16,
                         lhs: b as u16,
                         rhs: c as u16,
                         feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-                        instruction_len: instruction_len,
+                        instruction_len,
                     };
                     crate::vm::semantics::arithmetic::op_add_semantic(dispatch, args)
                 }
@@ -6944,12 +6957,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
                         condition_register: a as u16,
-                        delta: (bx as i16) as i32,
-                        instruction_len: instruction_len,
+                        delta: i32::from(bx as i16),
+                        instruction_len,
                     };
                     crate::vm::semantics::control_flow::op_jump_if_true_semantic(dispatch, args)
                 }
@@ -6964,12 +6977,12 @@ pub(crate) fn dispatch_wide_form(
             };
             match decoded {
                 Ok((a16, bx_val, slot_opt, instruction_len)) => {
-                    let a: u32 = a16 as u32;
+                    let a: u32 = u32::from(a16);
                     let bx: u32 = bx_val;
                     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
                         condition_register: a as u16,
-                        delta: (bx as i16) as i32,
-                        instruction_len: instruction_len,
+                        delta: i32::from(bx as i16),
+                        instruction_len,
                     };
                     crate::vm::semantics::control_flow::op_jump_if_false_semantic(dispatch, args)
                 }

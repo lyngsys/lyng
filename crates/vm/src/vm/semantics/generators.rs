@@ -136,7 +136,7 @@ pub struct OpDelegateYieldArgs {
 // resume at the post-`SuspendGeneratorStart` PC.
 // =====================================================================
 
-pub(crate) fn op_suspend_generator_start_semantic(
+pub fn op_suspend_generator_start_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpSuspendGeneratorStartArgs,
 ) -> SemanticOutcome {
@@ -165,7 +165,7 @@ pub(crate) fn op_suspend_generator_start_semantic(
 // surfaces the yielded value to the generator consumer.
 // =====================================================================
 
-pub(crate) fn op_yield_semantic(
+pub fn op_yield_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpGeneratorsAxArgs,
 ) -> SemanticOutcome {
@@ -200,7 +200,7 @@ pub(crate) fn op_yield_semantic(
 // `Ok(None)`; we then return `Continue { pc_advance: 0 }`.
 // =====================================================================
 
-pub(crate) fn op_delegate_yield_semantic(
+pub fn op_delegate_yield_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpDelegateYieldArgs,
 ) -> SemanticOutcome {
@@ -248,7 +248,7 @@ pub(crate) fn op_delegate_yield_semantic(
 // `try_step!(vm.await_value(...))`).
 // =====================================================================
 
-pub(crate) fn op_await_semantic(
+pub fn op_await_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpGeneratorsAxArgs,
 ) -> SemanticOutcome {
@@ -288,7 +288,7 @@ pub(crate) fn op_await_semantic(
 // that is the job of `LoadResumeValue`.
 // =====================================================================
 
-pub(crate) fn op_load_resume_kind_semantic(
+pub fn op_load_resume_kind_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpGeneratorsAxArgs,
 ) -> SemanticOutcome {
@@ -309,7 +309,7 @@ pub(crate) fn op_load_resume_kind_semantic(
 // suspension.
 // =====================================================================
 
-pub(crate) fn op_load_resume_value_semantic(
+pub fn op_load_resume_value_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpGeneratorsAxArgs,
 ) -> SemanticOutcome {

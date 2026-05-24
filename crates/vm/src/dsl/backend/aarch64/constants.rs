@@ -25,7 +25,7 @@
 //! `vm_counter_base` which does live on `Vm`); the offset itself was
 //! always LlIntState-relative. Phase 1.B.2 promotes the macro from
 //! "compiles only" (structural validation tests, opcode 210 never
-//! dispatches) to "runs in op_load_const8", which exposes the bug.
+//! dispatches) to "runs in `op_load_const8`", which exposes the bug.
 //! Fixed here.
 //!
 //! ## Scratch-register convention

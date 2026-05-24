@@ -47,7 +47,7 @@ fn no_op_functions_outside_semantics_and_handlers() {
                 || trimmed.starts_with("pub(crate) fn op_")
                 || trimmed.starts_with("pub(super) fn op_")
                 || trimmed.starts_with("fn op_"))
-                && trimmed.contains("(")
+                && trimmed.contains('(')
                 // Skip `op_xxx_slow` helper functions — they're allowed in
                 // dispatch_handlers/ today and will move to dsl/handlers/
                 // in DSL-0b.

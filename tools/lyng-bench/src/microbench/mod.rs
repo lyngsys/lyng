@@ -21,7 +21,7 @@ mod snippets;
 mod timing;
 pub use snippets::{all_snippets, for_opcode, Snippet};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MicrobenchOptions {
     pub opcodes_config: PathBuf,
     pub baseline: Option<PathBuf>,
@@ -260,29 +260,29 @@ fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
     let mut require_isolation = false;
     let mut output: Option<PathBuf> = None;
 
-    let mut iter = args.iter().peekable();
+    let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--opcodes-config" => {
                 opcodes_config = iter
                     .next()
                     .ok_or("--opcodes-config requires a path")?
-                    .into()
+                    .into();
             }
             "--baseline" => {
-                baseline = Some(iter.next().ok_or("--baseline requires a path")?.into())
+                baseline = Some(iter.next().ok_or("--baseline requires a path")?.into());
             }
             "--samples" => {
                 samples = iter
                     .next()
                     .and_then(|s| s.parse().ok())
-                    .ok_or("--samples requires a number")?
+                    .ok_or("--samples requires a number")?;
             }
             "--iters" => {
                 iters = iter
                     .next()
                     .and_then(|s| s.parse().ok())
-                    .ok_or("--iters requires a number")?
+                    .ok_or("--iters requires a number")?;
             }
             "--require-isolation" => require_isolation = true,
             "--output" => output = Some(iter.next().ok_or("--output requires a path")?.into()),

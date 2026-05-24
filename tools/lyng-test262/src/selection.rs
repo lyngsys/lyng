@@ -937,11 +937,11 @@ mod tests {
     #[test]
     fn skip_decision_keeps_staging_typedarray_sort_negative_nan_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/sm/TypedArray/sort-negative-nan.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -959,11 +959,11 @@ mod tests {
     #[test]
     fn skip_decision_keeps_staging_typedarray_counting_sort_stress_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/sm/TypedArray/sort_large_countingsort.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -981,11 +981,11 @@ mod tests {
     #[test]
     fn skip_decision_keeps_staging_typedarray_to_string_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/sm/TypedArray/toString.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -1003,11 +1003,11 @@ mod tests {
     #[test]
     fn skip_decision_keeps_staging_extension_recursion_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/sm/extensions/recursion.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -1025,11 +1025,11 @@ mod tests {
     #[test]
     fn skip_decision_keeps_staging_deep_empty_block_eval_stress_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/sm/regress/regress-610026.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -1071,11 +1071,11 @@ mod tests {
     #[test]
     fn checked_in_manifest_runs_is_htmldda_tests() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("annexB/language/expressions/typeof/emulates-undefined.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
         let manifest = load_manifest(&root, "reports/lyng/test262-exclusions.txt")
             .expect("checked-in manifest should load");
 
@@ -1095,11 +1095,11 @@ mod tests {
     #[test]
     fn selected_builtin_bootstrap_regressions_are_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("built-ins/Object/getPrototypeOf/15.2.3.2-1.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -1143,8 +1143,8 @@ mod tests {
     #[test]
     fn selected_arraybuffer_safety_regressions_are_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
         let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         for relative_path in [
             "built-ins/ArrayBuffer/allocation-limit.js",
             "built-ins/ArrayBuffer/length-is-too-large-throws.js",
@@ -1196,11 +1196,11 @@ mod tests {
     #[test]
     fn selected_iterator_helper_path_regressions_are_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("built-ins/Iterator/concat/proto.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,
@@ -1244,11 +1244,11 @@ mod tests {
     #[test]
     fn selected_staging_duplicate_named_group_tests_are_runnable() {
         let root = workspace_root();
-        let test_dir = root.join("testdata/test262/test");
+        let helpers = HelperCatalog::load(&root).expect("helper catalog");
+        let test_dir = helpers.test_dir();
         let path = test_dir.join("staging/built-ins/RegExp/named-groups/duplicate-named-groups.js");
         let source = std::fs::read_to_string(&path).expect("test fixture should be readable");
         let metadata = parse_metadata(&source);
-        let helpers = HelperCatalog::load(&root).expect("helper catalog");
 
         let decision = skip_decision(
             &path,

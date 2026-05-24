@@ -1,17 +1,17 @@
-//! AArch64 backend for the DSL substrate.
+//! `AArch64` backend for the DSL substrate.
 //!
 //! Module layout mirrors the operation taxonomy in `dsl/ops.md`:
 //!
 //! - [`operands`] — operand-byte decode + register-file access.
 //! - [`values`]   — NaN-tag checks and tag manipulation.
-//! - [`objects`]  — ObjectRecord access via `ObjectRef` handles.
+//! - [`objects`]  — `ObjectRecord` access via `ObjectRef` handles.
 //! - [`arithmetic`] — SMI arithmetic + bitwise.
 //! - [`constants`] — Phase 1.B.1 indexed load from `frame_const_base`.
 //! - [`control`]  — dispatch, branches, slow-path bridge, prefix.
 //! - [`feedback`] — IC-site lookups + observed-type recording.
 //! - [`frame`]    — Phase 1.B.1 fixed-offset `LlIntState` Value loads.
 //! - [`locals`]   — Phase 1.B.3 fixed-immediate-index register-window
-//!                  load/store (`load_local_fixed!` / `store_local_fixed!`).
+//!   load/store (`load_local_fixed!` / `store_local_fixed!`).
 //! - [`safepoint`] — interrupt-poll macro.
 //! - [`memory`]   — raw load/store fragments referenced by other macros.
 //! - [`counters`] — feature-gated opcode counters.

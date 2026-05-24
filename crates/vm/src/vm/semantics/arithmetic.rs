@@ -70,7 +70,7 @@ pub struct OpBinaryArgs {
 
 /// Operands for register + i16-immediate binary opcodes (Abc layout, the
 /// `c` field is an `i16` immediate decoded via `decode_smi_immediate`).
-/// Used by AddSmi / SubSmi / MulSmi / ModSmi / BitAndSmi. `imm_raw` is the
+/// Used by `AddSmi` / `SubSmi` / `MulSmi` / `ModSmi` / `BitAndSmi`. `imm_raw` is the
 /// raw `u16` operand value; the slow helper re-decodes it for symmetry
 /// with the α handler signature.
 pub struct OpBinarySmiArgs {
@@ -82,7 +82,7 @@ pub struct OpBinarySmiArgs {
 }
 
 /// Operands for unary opcodes that delegate to a Vm helper returning
-/// `VmResult<Value>` (Negate, BitNot). The α path takes the Abc form with
+/// `VmResult<Value>` (Negate, `BitNot`). The α path takes the Abc form with
 /// an unused `c` operand; only `dst`, `src`, and the feedback slot matter.
 pub struct OpUnaryArgs {
     pub dst: u16,
@@ -110,12 +110,12 @@ pub struct OpEqualZeroArgs {
 // =====================================================================
 
 /// Slow-path tail shared by every binary opcode that delegates to a Vm
-/// `execute_*` helper. Returns the SemanticOutcome to forward to the α
+/// `execute_*` helper. Returns the `SemanticOutcome` to forward to the α
 /// handler.
 ///
 /// `finish_abc_value_result` already advances PC + writes register +
 /// records feedback on success, and leaves PC at the new handler PC on
-/// catch — so the success/catch SemanticOutcome carries `pc_advance: 0`.
+/// catch — so the success/catch `SemanticOutcome` carries `pc_advance: 0`.
 #[inline]
 fn route_binary_result(
     state: &mut DispatchState<'_>,
@@ -177,21 +177,23 @@ fn route_binary_smi_result(
 
 /// Shared body for binary opcodes that delegate to a Vm helper with the
 /// `(agent, host, registry, frame, lhs, rhs) -> VmResult<Value>`
-/// signature: Div / Exp / BitOr / BitXor / Shift* / Equal / Less* /
-/// Greater* / DivSmi. Mirrors `op_binary_general` in the α file.
+/// signature: Div / Exp / `BitOr` / `BitXor` / Shift* / Equal / Less* /
+/// Greater* / `DivSmi`. Mirrors `op_binary_general` in the α file.
+type BinaryVmOp = fn(
+    &mut Vm,
+    &mut Agent,
+    &dyn HostHooks,
+    &mut dyn NativeFunctionRegistry,
+    &FrameRecord,
+    u16,
+    u16,
+) -> VmResult<Value>;
+
 #[inline]
 fn op_binary_general(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
-    op: fn(
-        &mut Vm,
-        &mut Agent,
-        &dyn HostHooks,
-        &mut dyn NativeFunctionRegistry,
-        &FrameRecord,
-        u16,
-        u16,
-    ) -> VmResult<Value>,
+    op: BinaryVmOp,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let result = {
@@ -212,7 +214,7 @@ fn op_binary_general(
 // Add / Sub / Mul — two-register Abc with SMI cache hit path and feedback slot
 // =====================================================================
 
-pub(crate) fn op_add_semantic(
+pub fn op_add_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -246,7 +248,7 @@ pub(crate) fn op_add_semantic(
     route_binary_result(inner, &args, result)
 }
 
-pub(crate) fn op_sub_semantic(
+pub fn op_sub_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -280,7 +282,7 @@ pub(crate) fn op_sub_semantic(
     route_binary_result(inner, &args, result)
 }
 
-pub(crate) fn op_mul_semantic(
+pub fn op_mul_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -316,7 +318,7 @@ pub(crate) fn op_mul_semantic(
 // AddSmi / SubSmi / MulSmi — register + i16 immediate (Abc-encoded)
 // =====================================================================
 
-pub(crate) fn op_add_smi_semantic(
+pub fn op_add_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -352,7 +354,7 @@ pub(crate) fn op_add_smi_semantic(
     route_binary_smi_result(inner, &args, result)
 }
 
-pub(crate) fn op_sub_smi_semantic(
+pub fn op_sub_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -388,7 +390,7 @@ pub(crate) fn op_sub_smi_semantic(
     route_binary_smi_result(inner, &args, result)
 }
 
-pub(crate) fn op_mul_smi_semantic(
+pub fn op_mul_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -426,14 +428,14 @@ pub(crate) fn op_mul_smi_semantic(
 // Div / DivSmi / Exp — always delegate, no inline SMI cache hit path
 // =====================================================================
 
-pub(crate) fn op_div_semantic(
+pub fn op_div_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_div_opcode)
 }
 
-pub(crate) fn op_div_smi_semantic(
+pub fn op_div_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -452,7 +454,7 @@ pub(crate) fn op_div_smi_semantic(
     route_binary_smi_result(inner, &args, result)
 }
 
-pub(crate) fn op_exp_semantic(
+pub fn op_exp_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -463,7 +465,7 @@ pub(crate) fn op_exp_semantic(
 // Mod / ModSmi — SMI cache hit path via smi_mod_result, then delegate
 // =====================================================================
 
-pub(crate) fn op_mod_semantic(
+pub fn op_mod_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -495,7 +497,7 @@ pub(crate) fn op_mod_semantic(
     route_binary_result(inner, &args, result)
 }
 
-pub(crate) fn op_mod_smi_semantic(
+pub fn op_mod_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -534,7 +536,7 @@ pub(crate) fn op_mod_smi_semantic(
 // delegate.
 // =====================================================================
 
-pub(crate) fn op_bit_and_semantic(
+pub fn op_bit_and_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -566,7 +568,7 @@ pub(crate) fn op_bit_and_semantic(
     route_binary_result(inner, &args, result)
 }
 
-pub(crate) fn op_bit_and_smi_semantic(
+pub fn op_bit_and_smi_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
@@ -600,35 +602,35 @@ pub(crate) fn op_bit_and_smi_semantic(
     route_binary_smi_result(inner, &args, result)
 }
 
-pub(crate) fn op_bit_or_semantic(
+pub fn op_bit_or_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_bitor_opcode)
 }
 
-pub(crate) fn op_bit_xor_semantic(
+pub fn op_bit_xor_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_bitxor_opcode)
 }
 
-pub(crate) fn op_shift_left_semantic(
+pub fn op_shift_left_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_shift_left_opcode)
 }
 
-pub(crate) fn op_shift_right_semantic(
+pub fn op_shift_right_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_shift_right_opcode)
 }
 
-pub(crate) fn op_unsigned_shift_right_semantic(
+pub fn op_unsigned_shift_right_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -639,14 +641,14 @@ pub(crate) fn op_unsigned_shift_right_semantic(
 // Comparisons — Equal / StrictEqual / EqualZero / Less* / Greater*
 // =====================================================================
 
-pub(crate) fn op_equal_semantic(
+pub fn op_equal_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_equal_opcode)
 }
 
-pub(crate) fn op_strict_equal_semantic(
+pub fn op_strict_equal_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -660,28 +662,28 @@ pub(crate) fn op_strict_equal_semantic(
     route_binary_result(inner, &args, result)
 }
 
-pub(crate) fn op_less_than_semantic(
+pub fn op_less_than_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_less_than_opcode)
 }
 
-pub(crate) fn op_less_equal_semantic(
+pub fn op_less_equal_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_less_equal_opcode)
 }
 
-pub(crate) fn op_greater_than_semantic(
+pub fn op_greater_than_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     op_binary_general(state, args, Vm::execute_greater_than_opcode)
 }
 
-pub(crate) fn op_greater_equal_semantic(
+pub fn op_greater_equal_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
@@ -690,7 +692,7 @@ pub(crate) fn op_greater_equal_semantic(
 
 /// `EqualZero` cannot raise — it returns a Boolean directly from a single
 /// register read.
-pub(crate) fn op_equal_zero_semantic(
+pub fn op_equal_zero_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpEqualZeroArgs,
 ) -> SemanticOutcome {
@@ -718,7 +720,7 @@ pub(crate) fn op_equal_zero_semantic(
 // iteration).
 // =====================================================================
 
-pub(crate) fn op_negate_semantic(
+pub fn op_negate_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpUnaryArgs,
 ) -> SemanticOutcome {
@@ -753,7 +755,7 @@ pub(crate) fn op_negate_semantic(
     }
 }
 
-pub(crate) fn op_bit_not_semantic(
+pub fn op_bit_not_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpUnaryArgs,
 ) -> SemanticOutcome {
@@ -832,14 +834,14 @@ fn op_update_register_semantic(
     }
 }
 
-pub(crate) fn op_increment_semantic(
+pub fn op_increment_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpUpdateArgs,
 ) -> SemanticOutcome {
     op_update_register_semantic(state, args, true)
 }
 
-pub(crate) fn op_decrement_semantic(
+pub fn op_decrement_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpUpdateArgs,
 ) -> SemanticOutcome {

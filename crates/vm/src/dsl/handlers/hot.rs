@@ -1,7 +1,7 @@
 //! Hot DSL handlers. Populated by tasks B39–B42.
 //!
 //! Per the design (§10), hot handlers are the highest-frequency opcodes
-//! and ship with inline LLInt bodies. The `llint_handler!` proc-macro lowers each handler
+//! and ship with inline `LLInt` bodies. The `llint_handler!` proc-macro lowers each handler
 //! body into a single `naked_asm!` block; the backend `macro_rules!`
 //! macros (under `crates/vm/src/dsl/backend/aarch64/`) supply the
 //! asm fragments for individual DSL ops (`decode_ab!`, `load_reg!`,
@@ -11,6 +11,14 @@
 //! they are not yet wired into `DSL_DISPATCH_TABLE` — the alpha path
 //! continues to dispatch through the legacy handlers. Phase C of the
 //! plan flips the table over.
+
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    clippy::not_unsafe_ptr_arg_deref,
+    reason = "DSL hot shims receive decoded raw operand slots from LLInt assembly; explicit narrowing/sign casts reconstruct the bytecode operand widths before semantic dispatch"
+)]
 
 // Bring the AArch64 backend macros into scope so the proc-macro-emitted
 // `decode_ab!`, `load_reg!`, `store_reg!`, `dispatch!`, ... calls
@@ -69,8 +77,8 @@ llint_handler! {
 /// with 4 u32 operand slots after the state pointer; we adapt them to
 /// the `OpBinaryArgs` shape that `op_add_semantic` expects.
 ///
-/// The `instruction_len` is hardcoded to `6` (op_add's encoded length
-/// for the narrow form). When Wide / ExtraWide prefix decoding lands,
+/// The `instruction_len` is hardcoded to `6` (`op_add`'s encoded length
+/// for the narrow form). When Wide / `ExtraWide` prefix decoding lands,
 /// the lowerer will need to pass the effective length too.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]

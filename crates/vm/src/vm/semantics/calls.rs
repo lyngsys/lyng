@@ -49,7 +49,7 @@
 //! register. No frame transition; returns
 //! `Continue { pc_advance: instruction_len }`.
 //!
-//! ### Feedback-slot recording (TailCall)
+//! ### Feedback-slot recording (`TailCall`)
 //!
 //! The α handler for `TailCall` calls `vm.record_feedback_slot` *after*
 //! `handle_dispatch_result` returns `Some(_)` (success) and *not* on the
@@ -100,8 +100,8 @@ pub struct OpCallRangeArgs {
 }
 
 /// Operands for `TailCall`. Same shape as `OpCallRangeArgs` but without
-/// `c` (TailCall uses register `b` as the this register directly per the
-/// α handler) and without `instruction_len` (TailCall replaces or unwinds
+/// `c` (`TailCall` uses register `b` as the this register directly per the
+/// α handler) and without `instruction_len` (`TailCall` replaces or unwinds
 /// the active frame, so no PC advance applies in the caller).
 pub struct OpTailCallArgs {
     pub a: u16,
@@ -177,28 +177,28 @@ fn op_call_small_semantic(
     }
 }
 
-pub(crate) fn op_call0_semantic(
+pub fn op_call0_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallSmallArgs,
 ) -> SemanticOutcome {
     op_call_small_semantic(state, args)
 }
 
-pub(crate) fn op_call1_semantic(
+pub fn op_call1_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallSmallArgs,
 ) -> SemanticOutcome {
     op_call_small_semantic(state, args)
 }
 
-pub(crate) fn op_call2_semantic(
+pub fn op_call2_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallSmallArgs,
 ) -> SemanticOutcome {
     op_call_small_semantic(state, args)
 }
 
-pub(crate) fn op_call3_semantic(
+pub fn op_call3_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallSmallArgs,
 ) -> SemanticOutcome {
@@ -209,7 +209,7 @@ pub(crate) fn op_call3_semantic(
 // Call — variable-arity call via call_value
 // =====================================================================
 
-pub(crate) fn op_call_semantic(
+pub fn op_call_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallRangeArgs,
 ) -> SemanticOutcome {
@@ -266,7 +266,7 @@ pub(crate) fn op_call_semantic(
 // The α handler ordering — record feedback only after success, not on
 // the caught-abrupt path — is preserved here.
 
-pub(crate) fn op_tail_call_semantic(
+pub fn op_tail_call_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpTailCallArgs,
 ) -> SemanticOutcome {
@@ -302,17 +302,16 @@ pub(crate) fn op_tail_call_semantic(
         Err(error) => return SemanticOutcome::ExitError { error },
     };
     inner.vm.record_feedback_slot(code, args.feedback_slot);
-    match inner_result {
-        Some(value) => SemanticOutcome::ExitDone { value },
-        None => SemanticOutcome::Refresh,
-    }
+    inner_result.map_or(SemanticOutcome::Refresh, |value| {
+        SemanticOutcome::ExitDone { value }
+    })
 }
 
 // =====================================================================
 // Construct — variable-arity construct via construct_value
 // =====================================================================
 
-pub(crate) fn op_construct_semantic(
+pub fn op_construct_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCallRangeArgs,
 ) -> SemanticOutcome {
@@ -352,7 +351,7 @@ pub(crate) fn op_construct_semantic(
 // CreateClosure — allocates a function object; no frame transition.
 // =====================================================================
 
-pub(crate) fn op_create_closure_semantic(
+pub fn op_create_closure_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCreateClosureArgs,
 ) -> SemanticOutcome {

@@ -9,6 +9,11 @@
 //! transitional `LlIntDispatchState` wrapper in `slow_path`. DSL-0b adds
 //! every other module.
 
+#![allow(
+    clippy::too_long_first_doc_paragraph,
+    reason = "DSL docs intentionally preserve design-note paragraphs that describe ABI and asm invariants in one place"
+)]
+
 pub mod backend;
 pub mod entry;
 pub mod feedback_flat;

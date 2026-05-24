@@ -1,5 +1,10 @@
 //! asm-visible state record + Rust-only context per design §5.
 
+#![allow(
+    clippy::pub_underscore_fields,
+    reason = "LlIntState is a repr(C) asm ABI record with explicit public padding fields for stable offsets"
+)]
+
 use lyng_types::Value;
 
 use crate::dsl::feedback_flat::FeedbackEntry;
@@ -7,6 +12,7 @@ use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
 
 /// Opaque marker for the Rust-side context pointer in [`LlIntState`].
+///
 /// The asm layer never reads through this pointer — it round-trips
 /// the value through `state.rust_context` so the slow-path bridge can
 /// reconstruct `&mut LlIntRustContext<'vm>`.
@@ -114,13 +120,13 @@ impl Default for LlIntExitSlot {
 /// in Phase 1.B.2); on match the handler bails to the slow path,
 /// which handles the throw / lex-env walk as appropriate.
 #[inline]
-pub(crate) fn resolve_this_state_to_mirror(
+pub(crate) const fn resolve_this_state_to_mirror(
     this_state: Option<lyng_env::ThisState>,
     fallback_frame_this: Value,
 ) -> Value {
     match this_state {
         Some(lyng_env::ThisState::Value(v)) => v,
-        Some(lyng_env::ThisState::Uninitialized) | Some(lyng_env::ThisState::Lexical) => {
+        Some(lyng_env::ThisState::Uninitialized | lyng_env::ThisState::Lexical) => {
             Value::uninitialized_lexical()
         }
         None => fallback_frame_this,
@@ -141,7 +147,9 @@ pub(crate) fn resolve_initial_this_value(
     agent: &lyng_env::Agent,
     frame: &crate::FrameRecord,
 ) -> Value {
-    let this_state = agent.current_execution_context().map(|ec| ec.this_state());
+    let this_state = agent
+        .current_execution_context()
+        .map(lyng_env::ExecutionContext::this_state);
     let fallback = frame.this_value();
     resolve_this_state_to_mirror(this_state, fallback)
 }

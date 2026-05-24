@@ -17,7 +17,7 @@
 //! `x20` is the REGS pin (register-window base per
 //! [`crate::dsl::reg_convention`]). `N * 8` is the byte offset because
 //! each register-window slot is a 64-bit [`lyng_types::Value`]. The
-//! AArch64 `ldr/str (immediate)` post-indexed form accepts a
+//! `AArch64` `ldr/str (immediate)` post-indexed form accepts a
 //! `#imm12 * 8` byte offset directly when the destination is an x-reg;
 //! N in 0..=3 fits trivially.
 //!
@@ -28,7 +28,7 @@
 //! constant slot, we'd have to materialize the literal into a scratch
 //! first (`movz xN, #idx`) and then issue the indexed load — 2
 //! instructions vs the 1-instruction fixed-offset form below. Across
-//! the 7 LoadLocalN / StoreLocalN handlers that use this shape (1.B.3
+//! the 7 `LoadLocalN` / `StoreLocalN` handlers that use this shape (1.B.3
 //! Tasks 2 + 3), the saving is 7 fewer instructions per dispatch on the
 //! hot path.
 //!
@@ -47,7 +47,7 @@
 /// fixed index `$n` into `$dst_reg`.
 ///
 /// `$n` is a numeric literal (typically 0..=3 from Phase 1.B.3 ports;
-/// the AArch64 immediate-offset range for an `ldr (unsigned offset)`
+/// the `AArch64` immediate-offset range for an `ldr (unsigned offset)`
 /// with an `xN` destination is wider — up to `#32760` — but bytecode
 /// slot indices won't approach that). `$dst_reg` is a scratch register
 /// number produced by the lowerer's ident substitution.

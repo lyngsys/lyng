@@ -14,7 +14,7 @@ const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 /// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
 /// space for the full byte range even though Lyng uses ~157 opcodes,
 /// to keep offset math cheap (compile-time bank offsets are 0, 2048,
-/// 4096 — all encodable as AArch64 LDR/STR immediates).
+/// 4096 — all encodable as `AArch64` LDR/STR immediates).
 ///
 /// Box-allocated so the Vm pointer stays stable across struct moves
 /// (Vm itself isn't pinned; the asm-side `[VM, #offset]` access reads
@@ -40,8 +40,8 @@ impl DispatchCounters {
         // contiguous 6144-byte allocations with 8-byte alignment.
         // We verify size + offsets in
         // `tests/dispatch_counters_layout.rs`.
-        let raw: *mut u64 = Box::into_raw(boxed_slice) as *mut u64;
-        unsafe { Box::from_raw(raw as *mut Self) }
+        let raw: *mut u64 = Box::into_raw(boxed_slice).cast::<u64>();
+        unsafe { Box::from_raw(raw.cast::<Self>()) }
     }
 
     pub fn reset(&mut self) {
@@ -55,11 +55,11 @@ impl DispatchCounters {
         OpcodeDispatchCounts::from_dispatch_array(&self.dispatch)
     }
 
-    pub fn slow_semantic_count(&self, opcode: Opcode) -> u64 {
+    pub const fn slow_semantic_count(&self, opcode: Opcode) -> u64 {
         self.slow_semantic[opcode as u8 as usize]
     }
 
-    pub fn slow_safepoint_count(&self, opcode: Opcode) -> u64 {
+    pub const fn slow_safepoint_count(&self, opcode: Opcode) -> u64 {
         self.slow_safepoint[opcode as u8 as usize]
     }
 }
@@ -98,7 +98,7 @@ impl OpcodeDispatchCounterStore {
     /// get the `OpcodeDispatchCounterStore` pointer (or its inner Box —
     /// depending on the chosen offset binding strategy).
     pub fn counters_ptr(&self) -> *const DispatchCounters {
-        &*self.counters as *const _
+        &raw const *self.counters
     }
 
     #[inline]
@@ -107,7 +107,7 @@ impl OpcodeDispatchCounterStore {
         // aligned u64. The asm path uses non-atomic `add x10, x10, #1`
         // with the same single-threaded guarantee.
         unsafe {
-            let counters = &mut *(self.counters_ptr() as *mut DispatchCounters);
+            let counters = &mut *self.counters_ptr().cast_mut();
             counters.dispatch[opcode as u8 as usize] =
                 counters.dispatch[opcode as u8 as usize].saturating_add(1);
         }
@@ -116,7 +116,7 @@ impl OpcodeDispatchCounterStore {
     pub fn reset(&self) {
         // SAFETY: same as `increment` — single-threaded VM.
         unsafe {
-            let counters = &mut *(self.counters_ptr() as *mut DispatchCounters);
+            let counters = &mut *self.counters_ptr().cast_mut();
             counters.reset();
         }
     }
@@ -246,7 +246,7 @@ pub struct CallArgumentCopyCounterStore {
 }
 
 impl CallArgumentCopyCounterStore {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             scratch_pushes: Cell::new(0),
             frame_copies: Cell::new(0),
@@ -270,7 +270,7 @@ impl CallArgumentCopyCounterStore {
         self.frame_copies.set(0);
     }
 
-    pub fn snapshot(&self) -> CallArgumentCopyCounts {
+    pub const fn snapshot(&self) -> CallArgumentCopyCounts {
         CallArgumentCopyCounts {
             scratch_pushes: self.scratch_pushes.get(),
             frame_copies: self.frame_copies.get(),

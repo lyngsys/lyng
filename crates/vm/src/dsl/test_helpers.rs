@@ -31,7 +31,11 @@
 //! harness via the `#[doc(hidden)] pub` re-export in
 //! [`crate::dsl::test_helpers`].
 
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    clippy::missing_const_for_fn,
+    reason = "test harness wrappers intentionally stay ordinary functions so integration tests can call semantic bodies uniformly"
+)]
 
 use std::sync::Arc;
 
@@ -117,7 +121,7 @@ pub struct DslHarness {
 impl DslHarness {
     /// Build a fresh harness. Sets up a `Runtime` + `Vm`, installs a
     /// trivial script, and captures the resulting installed function
-    /// and a synthesized FrameRecord pointing at offset 0.
+    /// and a synthesized `FrameRecord` pointing at offset 0.
     pub fn new() -> Self {
         let mut runtime = Runtime::new(NoopHostHooks);
         let mut vm = Vm::new();
@@ -259,8 +263,7 @@ impl DslHarness {
             frame_this_value: Value::undefined(),
             frame_depth: 0,
             frame_check_epoch: 0,
-            rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_>
-                as *mut LlIntRustContextOpaque,
+            rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
             prefix: 0,
             _pad2: [0; 7],
         };
@@ -270,7 +273,7 @@ impl DslHarness {
         // `rust_ctx` local above, also pinned on this stack frame.
         // `from_raw`'s contract requires both — satisfied.
         let return_value = unsafe {
-            let mut dispatch = LlIntDispatchState::from_raw(&mut state as *mut LlIntState);
+            let mut dispatch = LlIntDispatchState::from_raw(&raw mut state);
             dispatch.sync_from_asm();
             let outcome = semantic(&mut dispatch);
             dispatch.translate_outcome(outcome)

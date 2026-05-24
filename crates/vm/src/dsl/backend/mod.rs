@@ -1,4 +1,4 @@
-//! Per-arch DSL backend dispatch. Today: AArch64 only.
+//! Per-arch DSL backend dispatch. Today: `AArch64` only.
 //!
 //! Each `backend::*` module exports a vocabulary of `macro_rules!` macros
 //! that emit `&'static str` asm fragments (via `concat!`). The DSL

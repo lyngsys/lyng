@@ -1,4 +1,4 @@
-//! Value-tag check and tag-manipulation asm fragments for AArch64.
+//! Value-tag check and tag-manipulation asm fragments for `AArch64`.
 //!
 //! Per [`reports/lyng/llint-dsl-value-layout.md`], `Value` is a
 //! NaN-tag-space `u64` with a 16-bit `TagKind` field in bits 32-47 and
@@ -7,7 +7,7 @@
 //!
 //! Predicate shapes:
 //!
-//! - **SMI / ObjectRef / StringRef / etc.**: `(bits & MASK_KIND_HDR) == PATTERN_KIND`
+//! - **SMI / `ObjectRef` / `StringRef` / etc.**: `(bits & MASK_KIND_HDR) == PATTERN_KIND`
 //!   where `MASK_KIND_HDR = 0x7fff_ffff_0000_0000` and
 //!   `PATTERN_KIND = 0x7ff8_<kind>_0000_0000` — 4 instructions
 //!   (MOVZ/MOVK/AND/MOVZ/MOVK/CMP/B.NE).
@@ -24,12 +24,12 @@
 //! slots `t0..t6` map to `x9..x15`. This keeps the live-operand
 //! budget at 7 slots without colliding with macro-internal scratch.
 //!
-//! AArch64 mov-immediate-with-shift syntax: the canonical 16-bit
+//! `AArch64` mov-immediate-with-shift syntax: the canonical 16-bit
 //! immediate forms are `movz` (zero rest), `movn` (invert and zero
 //! rest), and `movk` (keep rest). `mov xR, #imm, lsl #shift` is *not*
 //! a separate form — the assembler accepts it as an alias for `movz`
 //! / `movn` in narrow cases, but rejects mid-range shifts on Apple
-//! Silicon's AArch64 assembler (`lsl #32`/`lsl #48` are exactly the
+//! Silicon's `AArch64` assembler (`lsl #32`/`lsl #48` are exactly the
 //! cases we hit). We therefore emit `movz` / `movk` explicitly.
 
 // ===========================================================================
@@ -58,7 +58,7 @@ macro_rules! check_smi {
     };
 }
 
-/// Check `reg` holds an ObjectRef; branch to `label` on miss.
+/// Check `reg` holds an `ObjectRef`; branch to `label` on miss.
 #[macro_export]
 macro_rules! check_object_ref {
     ($reg:tt, $label:tt) => {
@@ -78,7 +78,7 @@ macro_rules! check_object_ref {
     };
 }
 
-/// Check `reg` holds a StringRef; branch to `label` on miss.
+/// Check `reg` holds a `StringRef`; branch to `label` on miss.
 #[macro_export]
 macro_rules! check_string_ref {
     ($reg:tt, $label:tt) => {
@@ -276,7 +276,7 @@ macro_rules! branch_if_nullish_kind {
     };
 }
 
-/// Branch when a tag kind is an ObjectRef.
+/// Branch when a tag kind is an `ObjectRef`.
 #[macro_export]
 macro_rules! branch_if_object_kind {
     ($kind:tt, $label:tt) => {
@@ -430,7 +430,7 @@ macro_rules! tag_bool_const {
 
 /// Tag a Boolean payload already materialized as 0/1 in `$reg`.
 ///
-/// AArch64 W-register writes zero-extend into the paired X-register, so
+/// `AArch64` W-register writes zero-extend into the paired X-register, so
 /// callers can feed this directly from `cset w{reg}, cond`. The macro
 /// masks the payload to keep the value representation tight, then ORs
 /// in the Boolean tag/header bits.
@@ -530,10 +530,10 @@ macro_rules! tag_smi_from_signed_byte {
 /// into the destination register. Used by `op_load_this` to compare
 /// against the pre-resolved `frame_this_value` mirror; on match,
 /// the handler bails to the slow path which resolves the actual
-/// ThisState (Uninitialized → throw ReferenceError; Lexical → walk
+/// `ThisState` (Uninitialized → throw `ReferenceError`; Lexical → walk
 /// lex-env).
 ///
-/// The Apple Silicon AArch64 assembler (clang's integrated assembler
+/// The Apple Silicon `AArch64` assembler (clang's integrated assembler
 /// driven by rustc's `naked_asm!`) rejects the `ldr {dst}, =literal`
 /// literal-pool form inside a `naked_asm!` block — there's no enclosing
 /// function for the assembler to attach the literal pool to, and the

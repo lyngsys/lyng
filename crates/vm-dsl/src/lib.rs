@@ -6,7 +6,7 @@
 //!
 //! Submodules:
 //! - `parse`: syn-based AST for handler signatures + bodies.
-//! - `layouts`: operand-layout descriptors (Abc, AbcSlot, Abx, Ax, ...).
+//! - `layouts`: operand-layout descriptors (Abc, `AbcSlot`, Abx, Ax, ...).
 //! - `scratch`: compile-time scratch-register allocator.
 //! - `lower`: AST → `naked_asm!` string assembly.
 
@@ -41,7 +41,7 @@ mod scratch;
 /// ```
 #[proc_macro]
 pub fn llint_handler(input: TokenStream) -> TokenStream {
-    match parse::parse_handler(input.into()).and_then(lower::lower_handler) {
+    match parse::parse_handler(input.into()).and_then(|ast| lower::lower_handler(&ast)) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
     }

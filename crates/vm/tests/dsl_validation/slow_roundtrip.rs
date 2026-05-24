@@ -93,6 +93,6 @@ fn exit_error_outcome_round_trips() {
 // Touch the import explicitly so an unused-import warning doesn't
 // fire on toolchains that infer harder. The signature also documents
 // the closure shape `invoke_semantic_directly` expects.
-fn _semantic_signature_witness(_state: &mut LlIntDispatchState<'_, '_>) -> SemanticOutcome {
+const fn _semantic_signature_witness(_state: &mut LlIntDispatchState<'_, '_>) -> SemanticOutcome {
     SemanticOutcome::Continue { pc_advance: 0 }
 }

@@ -23,6 +23,12 @@
 //! dispatch over; this batch just makes the table well-formed so the
 //! flip is a one-line change.
 
+#![allow(
+    clippy::empty_loop,
+    clippy::too_many_lines,
+    reason = "The DSL dispatch table is intentionally a long const opcode map, and the placeholder handler is a non-returning invalid-bytecode sink"
+)]
+
 pub mod cold;
 pub mod hot;
 pub mod warm;
@@ -38,7 +44,7 @@ pub type DslHandler = unsafe extern "C" fn() -> !;
 /// out at byte 152. The asm trampoline never reaches this on a
 /// well-formed bytecode stream; hitting it is a corrupted-bytecode
 /// bug.
-unsafe extern "C" fn unimplemented_dsl_handler() -> ! {
+const unsafe extern "C" fn unimplemented_dsl_handler() -> ! {
     loop {} // SAFETY: never reachable on valid bytecode.
 }
 

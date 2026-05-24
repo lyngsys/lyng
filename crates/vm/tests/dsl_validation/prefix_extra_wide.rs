@@ -7,7 +7,7 @@
 //! deferral reasoning is identical:
 //!
 //! 1. [`crate::dsl::entry::run_dsl_trampoline`] is still a stub.
-//! 2. ExtraWide operand decoders aren't in
+//! 2. `ExtraWide` operand decoders aren't in
 //!    [`crate::dsl::backend::aarch64::operands`] yet (per the module
 //!    docstring, line 15).
 //! 3. The `DSL_DISPATCH_TABLE` still routes `ExtraWide` and `Move`

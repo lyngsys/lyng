@@ -64,15 +64,15 @@ pub(crate) struct ScalarFeedbackUpdate {
 pub struct FeedbackEntry {
     pub(crate) mode: u8,
     pub(crate) _pad: [u8; 7],
-    /// OwnData mode: `NamedPropertyHandler::bits()`.
-    /// PrototypeData mode: `NamedPropertyProtoHandler::proto_word()`.
+    /// `OwnData` mode: `NamedPropertyHandler::bits()`.
+    /// `PrototypeData` mode: `NamedPropertyProtoHandler::proto_word()`.
     pub(crate) named_handler_bits: u64,
-    /// OwnData mode: receiver invalidation epoch.
-    /// PrototypeData mode: receiver invalidation epoch.
+    /// `OwnData` mode: receiver invalidation epoch.
+    /// `PrototypeData` mode: receiver invalidation epoch.
     pub(crate) named_epoch: u64,
-    /// PrototypeData mode: `NamedPropertyProtoHandler::receiver_word()`.
+    /// `PrototypeData` mode: `NamedPropertyProtoHandler::receiver_word()`.
     pub(crate) named_aux_bits: u64,
-    /// PrototypeData mode: prototype invalidation epoch.
+    /// `PrototypeData` mode: prototype invalidation epoch.
     pub(crate) named_aux_epoch: u64,
     pub(crate) scalar_observed_bits: u32,
     pub(crate) scalar_execution_count: u32,

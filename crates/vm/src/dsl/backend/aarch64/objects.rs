@@ -1,6 +1,6 @@
 //! Object-record access via `ObjectRef` handles.
 //!
-//! Per the value-layout report §"Irreducible deltas vs LLInt", every
+//! Per the value-layout report §"Irreducible deltas vs `LLInt`", every
 //! object load is a **two-load indirection**: the `ObjectRef` (u32) is
 //! a side-table index into `LlIntState.object_records_base`, which
 //! yields a `*const RuntimeObjectRecord`; the record then carries the
@@ -48,7 +48,7 @@ macro_rules! load_object_record_from_state_or_branch {
     };
 }
 
-/// Load the shape pointer from an ObjectRecord at `$rec` into `$dst`.
+/// Load the shape pointer from an `ObjectRecord` at `$rec` into `$dst`.
 ///
 /// The shape word is a 32-bit Shape ID; we load it as `w` and let the
 /// caller widen if needed.
@@ -65,7 +65,7 @@ macro_rules! load_record_shape {
     };
 }
 
-/// Load the prototype ObjectRef handle from an ObjectRecord at `$rec`
+/// Load the prototype `ObjectRef` handle from an `ObjectRecord` at `$rec`
 /// into `$dst`, branching to `$label` when the receiver has no
 /// prototype. The raw `Option<ObjectRef>` representation is a u32
 /// non-zero handle with zero as `None`.
@@ -100,7 +100,7 @@ macro_rules! load_record_last_epoch {
     };
 }
 
-/// Load inline slot `$idx` from an ObjectRecord at `$rec` into `$dst`
+/// Load inline slot `$idx` from an `ObjectRecord` at `$rec` into `$dst`
 /// as a `Value` (full 64 bits).
 #[macro_export]
 macro_rules! load_record_inline_slot {
@@ -118,7 +118,7 @@ macro_rules! load_record_inline_slot {
     };
 }
 
-/// Store `$src` into inline slot `$idx` of an ObjectRecord at `$rec`.
+/// Store `$src` into inline slot `$idx` of an `ObjectRecord` at `$rec`.
 #[macro_export]
 macro_rules! store_record_inline_slot {
     ($rec:tt, $idx:tt, $src:tt) => {
@@ -135,7 +135,7 @@ macro_rules! store_record_inline_slot {
     };
 }
 
-/// Resolve an ObjectRecord's named-slot handle to an outline-slots
+/// Resolve an `ObjectRecord`'s named-slot handle to an outline-slots
 /// base pointer in `$dst`. Branches to `$label` when the object has no
 /// named-slot storage or the pointer table has no live entry.
 #[macro_export]

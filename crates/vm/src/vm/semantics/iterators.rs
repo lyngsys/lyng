@@ -92,7 +92,7 @@ pub struct OpIteratorAbxArgs {
 // the for-in side table at register `a`.
 // =====================================================================
 
-pub(crate) fn op_create_for_in_semantic(
+pub fn op_create_for_in_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbcArgs,
 ) -> SemanticOutcome {
@@ -130,7 +130,7 @@ pub(crate) fn op_create_for_in_semantic(
 // `b` and the done flag to `c`.
 // =====================================================================
 
-pub(crate) fn op_advance_for_in_semantic(
+pub fn op_advance_for_in_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbcArgs,
 ) -> SemanticOutcome {
@@ -147,13 +147,10 @@ pub(crate) fn op_advance_for_in_semantic(
         Err(error) => return SemanticOutcome::ExitError { error },
     };
     let done = next.is_none();
-    let value = match next {
-        Some(key) => {
-            let DispatchState { vm, agent, .. } = &mut *inner;
-            vm.property_key_to_enumeration_value(agent, key)
-        }
-        None => Value::undefined(),
-    };
+    let value = next.map_or_else(Value::undefined, |key| {
+        let DispatchState { vm, agent, .. } = &mut *inner;
+        vm.property_key_to_enumeration_value(agent, key)
+    });
     let registers = inner.frame.registers();
     inner.vm.write_register_unchecked(registers, args.b, value);
     inner
@@ -170,7 +167,7 @@ pub(crate) fn op_advance_for_in_semantic(
 // caught-completion case here.
 // =====================================================================
 
-pub(crate) fn op_close_for_in_semantic(
+pub fn op_close_for_in_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbxArgs,
 ) -> SemanticOutcome {
@@ -188,7 +185,7 @@ pub(crate) fn op_close_for_in_semantic(
 // iterator side table at register `a`.
 // =====================================================================
 
-pub(crate) fn op_create_iterator_semantic(
+pub fn op_create_iterator_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbcArgs,
 ) -> SemanticOutcome {
@@ -228,7 +225,7 @@ pub(crate) fn op_create_iterator_semantic(
 // the callee can read the live frame stack via `Vm::call_value`.
 // =====================================================================
 
-pub(crate) fn op_advance_iterator_semantic(
+pub fn op_advance_iterator_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbcArgs,
 ) -> SemanticOutcome {
@@ -273,7 +270,7 @@ pub(crate) fn op_advance_iterator_semantic(
 // `handle_dispatch_result` to honor the catch-target rewrite.
 // =====================================================================
 
-pub(crate) fn op_close_iterator_semantic(
+pub fn op_close_iterator_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpIteratorAbxArgs,
 ) -> SemanticOutcome {

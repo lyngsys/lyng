@@ -5,10 +5,10 @@
 //! returned by `Opcode::encoded_len()`. A mismatch advances PC by the wrong
 //! number of bytes per instruction, misaligning subsequent dispatch and
 //! eventually tripping `debug_assert!`s on garbage operand values (cf. the
-//! op_move length=3 bug fixed in commit "DSL-0c: fix op_move length 3 → 4").
+//! `op_move` `length = 3` bug fixed by the DSL-0c length correction.
 //!
-//! The `llint_handler!` proc-macro emits a sibling `pub const
-//! OP_XXX_LENGTH: u32` next to each generated `op_xxx` function so this
+//! The `llint_handler!` proc-macro emits a sibling
+//! `pub const OP_XXX_LENGTH: u32` next to each generated `op_xxx` function so this
 //! test can read the declared length without going through the asm
 //! body. The cold-stub family is guarded separately at codegen time —
 //! see `tools/lyng-dsl-codegen/src/main.rs`'s `main()` validator.
@@ -24,7 +24,7 @@
 //!
 //! ## What this does NOT catch
 //!
-//! - Wide / ExtraWide effective lengths (the DSL handlers handle narrow
+//! - `Wide` / `ExtraWide` effective lengths (the DSL handlers handle narrow
 //!   form only — wide-form dispatch is delegated to the α path; see
 //!   `op_wide_via_alpha_rs` in `warm.rs`).
 //! - Operand-decoding correctness (use `dsl_validation_*` for that).
@@ -44,63 +44,63 @@ fn handler_length_pairs() -> [(&'static str, u32, u32); 12] {
         (
             "op_move",
             hot::OP_MOVE_LENGTH,
-            Opcode::Move.encoded_len() as u32,
+            u32::from(Opcode::Move.encoded_len()),
         ),
         (
             "op_add",
             hot::OP_ADD_LENGTH,
-            Opcode::Add.encoded_len() as u32,
+            u32::from(Opcode::Add.encoded_len()),
         ),
         (
             "op_jump",
             hot::OP_JUMP_LENGTH,
-            Opcode::Jump.encoded_len() as u32,
+            u32::from(Opcode::Jump.encoded_len()),
         ),
         (
             "op_return",
             hot::OP_RETURN_LENGTH,
-            Opcode::Return.encoded_len() as u32,
+            u32::from(Opcode::Return.encoded_len()),
         ),
         // warm.rs (8 handlers)
         (
             "op_loop_header",
             warm::OP_LOOP_HEADER_LENGTH,
-            Opcode::LoopHeader.encoded_len() as u32,
+            u32::from(Opcode::LoopHeader.encoded_len()),
         ),
         (
             "op_jump8",
             warm::OP_JUMP8_LENGTH,
-            Opcode::Jump8.encoded_len() as u32,
+            u32::from(Opcode::Jump8.encoded_len()),
         ),
         (
             "op_jump_if_true",
             warm::OP_JUMP_IF_TRUE_LENGTH,
-            Opcode::JumpIfTrue.encoded_len() as u32,
+            u32::from(Opcode::JumpIfTrue.encoded_len()),
         ),
         (
             "op_jump_if_false",
             warm::OP_JUMP_IF_FALSE_LENGTH,
-            Opcode::JumpIfFalse.encoded_len() as u32,
+            u32::from(Opcode::JumpIfFalse.encoded_len()),
         ),
         (
             "op_jump_if_true8",
             warm::OP_JUMP_IF_TRUE8_LENGTH,
-            Opcode::JumpIfTrue8.encoded_len() as u32,
+            u32::from(Opcode::JumpIfTrue8.encoded_len()),
         ),
         (
             "op_jump_if_false8",
             warm::OP_JUMP_IF_FALSE8_LENGTH,
-            Opcode::JumpIfFalse8.encoded_len() as u32,
+            u32::from(Opcode::JumpIfFalse8.encoded_len()),
         ),
         (
             "op_wide",
             warm::OP_WIDE_LENGTH,
-            Opcode::Wide.encoded_len() as u32,
+            u32::from(Opcode::Wide.encoded_len()),
         ),
         (
             "op_extra_wide",
             warm::OP_EXTRA_WIDE_LENGTH,
-            Opcode::ExtraWide.encoded_len() as u32,
+            u32::from(Opcode::ExtraWide.encoded_len()),
         ),
     ]
 }

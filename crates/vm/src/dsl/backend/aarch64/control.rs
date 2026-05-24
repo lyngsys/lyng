@@ -1,6 +1,6 @@
-//! Dispatch, branches, and slow-path bridge fragments for AArch64.
+//! Dispatch, branches, and slow-path bridge fragments for `AArch64`.
 //!
-//! This module is the most-used backend file: every inline LLInt handler
+//! This module is the most-used backend file: every inline `LLInt` handler
 //! ends in [`dispatch!`], every slow-path handler ends in
 //! [`dispatch_after_slow!`], and the prefix opcodes (`op_wide` /
 //! `op_extra_wide`) use [`dispatch_prefixed!`].
@@ -404,13 +404,13 @@ macro_rules! call_rust_probe {
 ///
 /// The shim returns a tagged u64:
 ///
-/// - `0x0` (Continue, low 32 = new pc_offset) → reload `PC` and
+/// - `0x0` (Continue, low 32 = new `pc_offset`) → reload `PC` and
 ///   tail-jump to the next handler.
-/// - `0x1` (Refresh, low 32 = new pc_offset) → reload PC, REGS, FV
+/// - `0x1` (Refresh, low 32 = new `pc_offset`) → reload PC, REGS, FV
 ///   from `state.frame_*` (a frame switch happened) and tail-jump.
 /// - `0x2` (Exit) → branch to `{exit}` symbol.
 ///
-/// Uses AArch64 numeric local labels (`1:` / `1f` / `2:` / `2f`)
+/// Uses `AArch64` numeric local labels (`1:` / `1f` / `2:` / `2f`)
 /// rather than named `L*` labels. Numeric locals are per-block-of-asm
 /// scoped on Apple's assembler, so multiple handlers in the same
 /// translation unit don't collide on label names. Named labels

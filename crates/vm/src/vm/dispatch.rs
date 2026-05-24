@@ -8,89 +8,6 @@ use lyng_types::{AbruptCompletion, FeedbackSlotId};
 pub(in crate::vm) mod arithmetic;
 pub(in crate::vm) mod property;
 
-#[cfg(test)]
-mod tests {
-    /// Phase 1 sub-8 (`lyng-9gyk`) exit invariant: dispatch.rs must contain
-    /// **no** `match` expression with more than 10 arms.
-    ///
-    /// The roadmap (`reports/lyng/jsc-aligned-engine-roadmap.md`) chose
-    /// Option α — per-handler `extern "C" fn` table with a central trampoline
-    /// — over the legacy single-`match` interpreter. If a regression
-    /// reintroduces a wide opcode-match in this file, it would re-grow the
-    /// dispatch jump table that Track H + Phase 1 spent two epics deleting.
-    /// Catch it at the source level.
-    ///
-    /// "Wide" here means more than 10 arms in a single `match`. Small matches
-    /// (e.g., on `prefix == Opcode::ExtraWide` in wide-decode helpers,
-    /// short `match` over `AbruptCompletion`, etc.) are fine.
-    ///
-    /// DSL-0c C2 update: the only large opcode-match in the workspace now
-    /// lives in `crate::dsl::handlers::cold::dispatch_wide_form`, which the
-    /// codegen tool emits and which `dsl::handlers::warm` consults for
-    /// `Wide` / `ExtraWide` dispatch — it deliberately replaces the deleted
-    /// α `DISPATCH_TABLE` indirection with a single, code-generated match.
-    /// This file (dispatch.rs) only holds shared decoders + helpers.
-    #[test]
-    fn dispatch_rs_contains_no_match_over_10_arms() {
-        let source = include_str!("dispatch.rs");
-        let mut arms_per_match: Vec<usize> = Vec::new();
-        let mut depth: usize = 0;
-        let mut stack: Vec<(usize, usize)> = Vec::new(); // (open_depth, arm_count)
-        let mut chars = source.chars().peekable();
-        while let Some(c) = chars.next() {
-            match c {
-                '{' => {
-                    depth += 1;
-                }
-                '}' => {
-                    if let Some(&(open_depth, count)) = stack.last() {
-                        if open_depth == depth {
-                            arms_per_match.push(count);
-                            stack.pop();
-                        }
-                    }
-                    depth = depth.saturating_sub(1);
-                }
-                '=' if chars.peek() == Some(&'>') => {
-                    chars.next();
-                    if let Some(top) = stack.last_mut() {
-                        top.1 += 1;
-                    }
-                }
-                'm' => {
-                    let mut buf = String::from("m");
-                    for _ in 0..4 {
-                        if let Some(&p) = chars.peek() {
-                            buf.push(p);
-                            chars.next();
-                        }
-                    }
-                    if buf == "match" {
-                        // Consume until the '{' that opens the match body.
-                        while let Some(c) = chars.next() {
-                            if c == '{' {
-                                depth += 1;
-                                stack.push((depth, 0));
-                                break;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        let max_arms = arms_per_match.iter().copied().max().unwrap_or(0);
-        assert!(
-            max_arms <= 10,
-            "dispatch.rs contains a match with {max_arms} arms; Phase 1 sub-8 invariant is ≤ 10. \
-             A wide opcode match here would re-grow the dispatch jump table that Track H + \
-             trampoline cutover (`lyng-33i2`) eliminated. The wide-form opcode match lives in \
-             `crate::dsl::handlers::cold::dispatch_wide_form` (codegen-emitted); add new opcodes \
-             via the codegen tool, not by hand-rolling a match here.",
-        );
-    }
-}
-
 #[inline]
 pub(in crate::vm) const fn advance_dispatch_frame(frame: &mut FrameRecord, encoded_len: u32) {
     let next = frame
@@ -155,7 +72,7 @@ pub(in crate::vm) fn decode_feedback_slot_operand(
 }
 
 #[inline]
-pub(crate) fn decode_abc_operands(
+pub fn decode_abc_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,
@@ -214,7 +131,7 @@ fn decode_abc_operands_wide(
 }
 
 #[inline]
-pub(crate) fn decode_abx_operands(
+pub fn decode_abx_operands(
     bytes: &[u8],
     prefix: Option<Opcode>,
     is_profiled: bool,
@@ -368,5 +285,88 @@ impl Vm {
         let result = self.run_via_dsl(agent, host, registry);
         self.drain_llint_scalar_feedback();
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Phase 1 sub-8 (`lyng-9gyk`) exit invariant: dispatch.rs must contain
+    /// **no** `match` expression with more than 10 arms.
+    ///
+    /// The roadmap (`reports/lyng/jsc-aligned-engine-roadmap.md`) chose
+    /// Option α — per-handler `extern "C" fn` table with a central trampoline
+    /// — over the legacy single-`match` interpreter. If a regression
+    /// reintroduces a wide opcode-match in this file, it would re-grow the
+    /// dispatch jump table that Track H + Phase 1 spent two epics deleting.
+    /// Catch it at the source level.
+    ///
+    /// "Wide" here means more than 10 arms in a single `match`. Small matches
+    /// (e.g., on `prefix == Opcode::ExtraWide` in wide-decode helpers,
+    /// short `match` over `AbruptCompletion`, etc.) are fine.
+    ///
+    /// DSL-0c C2 update: the only large opcode-match in the workspace now
+    /// lives in `crate::dsl::handlers::cold::dispatch_wide_form`, which the
+    /// codegen tool emits and which `dsl::handlers::warm` consults for
+    /// `Wide` / `ExtraWide` dispatch — it deliberately replaces the deleted
+    /// α `DISPATCH_TABLE` indirection with a single, code-generated match.
+    /// This file (dispatch.rs) only holds shared decoders + helpers.
+    #[test]
+    fn dispatch_rs_contains_no_match_over_10_arms() {
+        let source = include_str!("dispatch.rs");
+        let mut arms_per_match: Vec<usize> = Vec::new();
+        let mut depth: usize = 0;
+        let mut stack: Vec<(usize, usize)> = Vec::new(); // (open_depth, arm_count)
+        let mut chars = source.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '{' => {
+                    depth += 1;
+                }
+                '}' => {
+                    if let Some(&(open_depth, count)) = stack.last()
+                        && open_depth == depth
+                    {
+                        arms_per_match.push(count);
+                        stack.pop();
+                    }
+                    depth = depth.saturating_sub(1);
+                }
+                '=' if chars.peek() == Some(&'>') => {
+                    chars.next();
+                    if let Some(top) = stack.last_mut() {
+                        top.1 += 1;
+                    }
+                }
+                'm' => {
+                    let mut buf = String::from("m");
+                    for _ in 0..4 {
+                        if let Some(&p) = chars.peek() {
+                            buf.push(p);
+                            chars.next();
+                        }
+                    }
+                    if buf == "match" {
+                        // Consume until the '{' that opens the match body.
+                        for c in chars.by_ref() {
+                            if c == '{' {
+                                depth += 1;
+                                stack.push((depth, 0));
+                                break;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let max_arms = arms_per_match.iter().copied().max().unwrap_or(0);
+        assert!(
+            max_arms <= 10,
+            "dispatch.rs contains a match with {max_arms} arms; Phase 1 sub-8 invariant is ≤ 10. \
+             A wide opcode match here would re-grow the dispatch jump table that Track H + \
+             trampoline cutover (`lyng-33i2`) eliminated. The wide-form opcode match lives in \
+             `crate::dsl::handlers::cold::dispatch_wide_form` (codegen-emitted); add new opcodes \
+             via the codegen tool, not by hand-rolling a match here.",
+        );
     }
 }

@@ -30,7 +30,7 @@ impl Vm {
 
     /// Frame-register read with the slice bounds check elided.
     ///
-    /// Matches JSC LLInt's `loadq [cfr, index, 8], value` pattern: the
+    /// Matches JSC `LLInt`'s `loadq [cfr, index, 8], value` pattern: the
     /// bytecode validator guarantees `register < window.len()` at
     /// compile time, and `reserve_register_window` reserves
     /// `register_stack.len() >= absolute` before the frame executes. With

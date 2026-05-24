@@ -1,3 +1,8 @@
+#![allow(
+    clippy::cast_precision_loss,
+    reason = "benchmark reports intentionally convert integer counters to f64 percentages and ratios"
+)]
+
 use lyng_builtins::BootstrapMode;
 use lyng_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
 use lyng_bytecode::{Opcode, OPCODE_COUNT};

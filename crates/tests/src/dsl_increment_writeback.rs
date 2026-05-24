@@ -24,7 +24,7 @@
 //! `numeric = ToNumeric(src)` back to `args.src` BEFORE storing the
 //! updated `value` to `args.dst`. The inline SMI hit path ELIDES that
 //! writeback because for SMI src, `ToNumeric(SMI) == SMI` — the
-//! writeback would be a no-op. Non-SMI src (string, BigInt, Object
+//! writeback would be a no-op. Non-SMI src (string, `BigInt`, Object
 //! with valueOf) takes the `.slow` branch which calls
 //! `op_*_slow_rs → op_*_semantic`, which DOES perform the writeback.
 //!

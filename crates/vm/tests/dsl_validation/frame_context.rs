@@ -43,24 +43,24 @@
 //! Four synthetic `llint_handler!` invocations exercise the macros in
 //! the shapes Phase 1.B.2 actually uses:
 //!
-//! - `op_test_load_constant_dsl` (opcode_byte = 210): use an internal
+//! - `op_test_load_constant_dsl` (`opcode_byte` = 210): use an internal
 //!   scratch slot as a fake index and read
 //!   `frame_const_base[fake_idx]` into another scratch via
 //!   `load_constant!`. Exercises the 2-instruction indexed-load shape
 //!   that Phase 1.B.2's `op_load_const8` adopts.
-//! - `op_test_load_this_value_dsl` (opcode_byte = 211): read
+//! - `op_test_load_this_value_dsl` (`opcode_byte` = 211): read
 //!   `frame_this_value` into a scratch via
 //!   `load_state_value!(... vm_state_offset = state_this_value)`.
 //!   Exercises the 1-instruction fixed-offset load shape that Phase
 //!   1.B.2's `op_load_this` adopts.
-//! - `op_test_load_this_sentinel_dsl` (opcode_byte = 212): same call
+//! - `op_test_load_this_sentinel_dsl` (`opcode_byte` = 212): same call
 //!   shape as the previous handler. The sentinel-vs-real-value
 //!   distinction is decided at trampoline-entry / Refresh time by the
 //!   `resolve_initial_this_value` helper, not by the macro itself.
 //!   Kept distinct so the asm-DSL pipeline is exercised twice with the
 //!   same body — catches any register-allocation or label-prefix drift
 //!   between identical bodies in the same translation unit.
-//! - `op_test_load_uninit_lex_sentinel_dsl` (opcode_byte = 213):
+//! - `op_test_load_uninit_lex_sentinel_dsl` (`opcode_byte` = 213):
 //!   materialize `Value::uninitialized_lexical()` into a scratch via
 //!   `load_uninit_lex_sentinel!`. Exercises the 4-instruction
 //!   movz/movk sentinel-materialization shape that Phase 1.B.2's

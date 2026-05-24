@@ -45,7 +45,7 @@ pub struct OpPrefixArgs;
 /// `Wide; ExtraWide; ...`, so encountering one indicates a corrupted
 /// instruction stream rather than a valid program.
 #[inline]
-fn double_prefix_error(state: &mut LlIntDispatchState<'_, '_>) -> VmError {
+const fn double_prefix_error(state: &mut LlIntDispatchState<'_, '_>) -> VmError {
     let inner = state.dispatch_state();
     VmError::DoublePrefix {
         code: inner.frame.code(),
@@ -61,7 +61,7 @@ fn double_prefix_error(state: &mut LlIntDispatchState<'_, '_>) -> VmError {
 // + double-prefix guard.
 // =====================================================================
 
-pub(crate) fn op_wide_semantic(
+pub const fn op_wide_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpPrefixArgs,
 ) -> SemanticOutcome {
@@ -80,7 +80,7 @@ pub(crate) fn op_wide_semantic(
 // `decode_abx_operands_wide` for the encoding split.
 // =====================================================================
 
-pub(crate) fn op_extra_wide_semantic(
+pub const fn op_extra_wide_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpPrefixArgs,
 ) -> SemanticOutcome {

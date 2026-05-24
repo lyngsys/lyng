@@ -1,6 +1,6 @@
 //! DSL-0b B48 — spot-check 10 representative cold stubs.
 //!
-//! After B46 (codegen tool) and B47 (cold.rs + DSL_DISPATCH_TABLE),
+//! After B46 (codegen tool) and B47 (cold.rs + `DSL_DISPATCH_TABLE`),
 //! 140 cold opcodes have a generated `op_xxx_dsl` handler symbol and a
 //! matching `op_xxx_slow_rs` Rust shim. This file asserts at link time
 //! that 10 representative stubs (one per family / cross-cut) exist

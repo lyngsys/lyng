@@ -43,14 +43,14 @@ mod bytecode_calls;
 mod call;
 mod debugger;
 mod direct_eval_env;
-pub(crate) mod dispatch;
-pub(crate) mod dispatch_state;
+pub mod dispatch;
+pub mod dispatch_state;
 mod dynamic_compilation;
 mod exceptions;
 mod feedback;
 mod generators;
 mod global_script;
-pub(crate) mod install;
+pub mod install;
 mod internal_calls;
 mod jobs;
 mod loop_iteration;
@@ -59,7 +59,7 @@ mod names;
 mod property_access;
 mod registers;
 mod runtime_objects;
-pub(crate) mod semantics;
+pub mod semantics;
 mod state;
 mod tiering;
 mod values;
@@ -80,7 +80,7 @@ use values::{bytecode_index, code_index, decode_env_operand, string_text_array_i
 // Re-export `code_index` for the DSL-0b entry shim so it can resolve
 // the `feedback_flat_storage` slot for a frame's `CodeRef` without
 // re-implementing the (id - 1) → usize indexing.
-pub(crate) use values::code_index as code_index_for_dsl;
+pub use values::code_index as code_index_for_dsl;
 
 pub use modules::LoadedModuleRoot;
 
@@ -298,7 +298,7 @@ impl Vm {
     }
 
     #[cfg(feature = "opcode-counters")]
-    pub fn enable_opcode_dispatch_counts(&mut self) {
+    pub const fn enable_opcode_dispatch_counts(&mut self) {
         // No-op when counters are always allocated. Kept for backward
         // compatibility with tests that called this method.
     }
@@ -322,7 +322,7 @@ impl Vm {
     }
 
     #[cfg(feature = "opcode-counters")]
-    pub fn dispatch_counters(&self) -> &OpcodeDispatchCounterStore {
+    pub const fn dispatch_counters(&self) -> &OpcodeDispatchCounterStore {
         &self.dispatch_counters
     }
 
@@ -331,14 +331,14 @@ impl Vm {
     /// enable for tests/benches that want to verify the no-Vec hot path
     /// for ordinary bytecode-to-bytecode calls.
     #[cfg(feature = "opcode-counters")]
-    pub fn enable_call_argument_copy_counts(&mut self) {
+    pub const fn enable_call_argument_copy_counts(&mut self) {
         if self.call_argument_copy_counts.is_none() {
             self.call_argument_copy_counts = Some(CallArgumentCopyCounterStore::new());
         }
     }
 
     #[cfg(feature = "opcode-counters")]
-    pub fn disable_call_argument_copy_counts(&mut self) {
+    pub const fn disable_call_argument_copy_counts(&mut self) {
         self.call_argument_copy_counts = None;
     }
 
@@ -376,7 +376,7 @@ impl Vm {
     /// Records `count` argument values copied into a callee bytecode frame.
     /// Symmetric with `record_argument_scratch_pushes` — together they let
     /// tests verify that ordinary calls copy each argument exactly once
-    /// (frame_copies == n, scratch_pushes == 0) instead of twice.
+    /// (`frame_copies` == n, `scratch_pushes` == 0) instead of twice.
     #[cfg(feature = "opcode-counters")]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, count: u64) {
@@ -430,9 +430,7 @@ impl Vm {
     /// disabled via `disable_slow_path_counts`.
     #[cfg(feature = "opcode-counters")]
     pub fn slow_path_counts(&self) -> Option<crate::slow_path_counts::SlowPathCounts> {
-        if self.slow_path_counts.is_none() {
-            return None;
-        }
+        self.slow_path_counts.as_ref()?;
         let counters = self.dispatch_counters.counters();
         Some(
             crate::slow_path_counts::SlowPathCounts::from_dispatch_arrays(
@@ -443,7 +441,7 @@ impl Vm {
     }
 
     #[cfg(feature = "opcode-counters")]
-    pub fn slow_path_counts_enabled(&self) -> bool {
+    pub const fn slow_path_counts_enabled(&self) -> bool {
         self.slow_path_counts.is_some()
     }
 
@@ -586,7 +584,7 @@ impl Vm {
     /// during a single trampoline invocation (window reservation
     /// happens before entry, release happens after return).
     #[inline]
-    pub(crate) fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
+    pub(crate) const fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
         self.register_stack.as_mut_ptr()
     }
 

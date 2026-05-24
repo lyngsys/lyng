@@ -26,7 +26,7 @@
 //! `Vm::execute_*_opcode` helpers in `vm/dispatch/property.rs`. Those
 //! helpers carry the Phase 3a/3e/3f inline-cache cache hit paths (monomorphic
 //! handler load, polymorphic shape probe, megamorphic table), the
-//! ToObject coercion, the prototype-chain walk, and the feedback-slot
+//! `ToObject` coercion, the prototype-chain walk, and the feedback-slot
 //! recording. DSL-0a's job is only to lift the call site out of the α
 //! handler — DSL-1 lands the IC mode-byte refactor and DSL-0b the
 //! flat-array refactor (per design §10). No IC layout changes here.
@@ -121,7 +121,7 @@ pub struct OpPropertyAbxArgs {
 /// The helper internally advances `frame.instruction_offset()` on success
 /// and rewrites it to the catch target on a caught abrupt completion. In
 /// both cases the next opcode byte is at the current PC, so the
-/// SemanticOutcome carries `pc_advance: 0`.
+/// `SemanticOutcome` carries `pc_advance: 0`.
 ///
 /// This mirrors the α-side pattern `try_step!(result); dispatch_next!(state);`
 /// — option (b) from the plan (keep helpers as `Vm`-side methods, route
@@ -138,7 +138,7 @@ fn route_execute_result(result: crate::error::VmResult<()>) -> SemanticOutcome {
 // Named property reads — `GetNamedProperty`.
 // =====================================================================
 
-pub(crate) fn op_get_named_property_semantic(
+pub fn op_get_named_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
@@ -213,21 +213,21 @@ fn op_set_named_property_shared(
     route_execute_result(result)
 }
 
-pub(crate) fn op_set_named_property_semantic(
+pub fn op_set_named_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     op_set_named_property_shared(state, args, Opcode::SetNamedProperty)
 }
 
-pub(crate) fn op_assign_named_property_semantic(
+pub fn op_assign_named_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     op_set_named_property_shared(state, args, Opcode::AssignNamedProperty)
 }
 
-pub(crate) fn op_strict_assign_named_property_semantic(
+pub fn op_strict_assign_named_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
@@ -238,7 +238,7 @@ pub(crate) fn op_strict_assign_named_property_semantic(
 // Keyed property reads — `GetKeyedProperty`.
 // =====================================================================
 
-pub(crate) fn op_get_keyed_property_semantic(
+pub fn op_get_keyed_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
@@ -308,21 +308,21 @@ fn op_set_keyed_property_shared(
     route_execute_result(result)
 }
 
-pub(crate) fn op_set_keyed_property_semantic(
+pub fn op_set_keyed_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     op_set_keyed_property_shared(state, args, Opcode::SetKeyedProperty)
 }
 
-pub(crate) fn op_assign_keyed_property_semantic(
+pub fn op_assign_keyed_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     op_set_keyed_property_shared(state, args, Opcode::AssignKeyedProperty)
 }
 
-pub(crate) fn op_strict_assign_keyed_property_semantic(
+pub fn op_strict_assign_keyed_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
@@ -337,7 +337,7 @@ pub(crate) fn op_strict_assign_keyed_property_semantic(
 // non-profiled `OpPropertyAbcArgs` shape.
 // =====================================================================
 
-pub(crate) fn op_define_named_property_semantic(
+pub fn op_define_named_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -367,7 +367,7 @@ pub(crate) fn op_define_named_property_semantic(
     route_execute_result(result)
 }
 
-pub(crate) fn op_define_keyed_property_semantic(
+pub fn op_define_keyed_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -407,7 +407,7 @@ pub(crate) fn op_define_keyed_property_semantic(
 // handler precisely).
 // =====================================================================
 
-pub(crate) fn op_create_object_semantic(
+pub fn op_create_object_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
@@ -429,7 +429,7 @@ pub(crate) fn op_create_object_semantic(
     }
 }
 
-pub(crate) fn op_create_array_semantic(
+pub fn op_create_array_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
@@ -463,7 +463,7 @@ pub(crate) fn op_create_array_semantic(
 // Dense element access — `StoreDenseElement`, `LoadDenseElement`.
 // =====================================================================
 
-pub(crate) fn op_store_dense_element_semantic(
+pub fn op_store_dense_element_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -493,7 +493,7 @@ pub(crate) fn op_store_dense_element_semantic(
     route_execute_result(result)
 }
 
-pub(crate) fn op_load_dense_element_semantic(
+pub fn op_load_dense_element_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -529,7 +529,7 @@ pub(crate) fn op_load_dense_element_semantic(
 // `ThrowIfUninitialized`.
 // =====================================================================
 
-pub(crate) fn op_delete_property_semantic(
+pub fn op_delete_property_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -559,7 +559,7 @@ pub(crate) fn op_delete_property_semantic(
     route_execute_result(result)
 }
 
-pub(crate) fn op_in_semantic(
+pub fn op_in_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -589,7 +589,7 @@ pub(crate) fn op_in_semantic(
     route_execute_result(result)
 }
 
-pub(crate) fn op_to_property_key_semantic(
+pub fn op_to_property_key_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbArgs,
 ) -> SemanticOutcome {
@@ -618,7 +618,7 @@ pub(crate) fn op_to_property_key_semantic(
     route_execute_result(result)
 }
 
-pub(crate) fn op_copy_data_properties_semantic(
+pub fn op_copy_data_properties_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
@@ -652,7 +652,7 @@ pub(crate) fn op_copy_data_properties_semantic(
 /// the α handler routes a `Vm::set_function_name` call through
 /// `handle_dispatch_result` and advances PC explicitly. The semantic
 /// body mirrors that exactly.
-pub(crate) fn op_set_function_name_semantic(
+pub fn op_set_function_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbArgs,
 ) -> SemanticOutcome {
@@ -681,7 +681,7 @@ pub(crate) fn op_set_function_name_semantic(
 /// `CheckObjectCoercible` — Abx-decoded; only `a` (the register holding
 /// the candidate value) is used. The α handler reads the register, calls
 /// `Vm::check_object_coercible`, and routes through `handle_dispatch_result`.
-pub(crate) fn op_check_object_coercible_semantic(
+pub fn op_check_object_coercible_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
@@ -703,12 +703,12 @@ pub(crate) fn op_check_object_coercible_semantic(
     }
 }
 
-/// `ThrowIfUninitialized` — Abx-decoded; raises a ReferenceError when the
+/// `ThrowIfUninitialized` — Abx-decoded; raises a `ReferenceError` when the
 /// register holds the TDZ sentinel. The α handler reads, compares against
 /// `Value::uninitialized_lexical()`, constructs the abrupt completion
 /// inline, and routes through `handle_dispatch_result`. Non-TDZ values
 /// fall through to the bare advance.
-pub(crate) fn op_throw_if_uninitialized_semantic(
+pub fn op_throw_if_uninitialized_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {

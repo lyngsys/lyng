@@ -1,8 +1,8 @@
 //! Phase 1.B.3 Tasks 2 + 3: integration tests for the inline
 //! `op_load_local_N` + `op_store_local_N` ports.
 //!
-//! Each test exercises one or more of the 4 LoadLocal opcodes (slots
-//! 0..3, via parameter access) and the 4 StoreLocal opcodes (slots
+//! Each test exercises one or more of the 4 `LoadLocal` opcodes (slots
+//! 0..3, via parameter access) and the 4 `StoreLocal` opcodes (slots
 //! 0..3, via parameter or local-variable update in a loop or
 //! assignment). The lyng bytecode compiler decides which JS-level
 //! binding lands in which register slot — function parameters occupy
@@ -103,12 +103,12 @@ fn store_local_3_updates_param_via_assignment() {
     // assignment dispatches StoreLocal3 (the peephole rewrites
     // `Move dst=3, src=...` to `StoreLocal3`).
     let value = run_script(
-        r#"
+        r"
         (function(a, b, c, d) {
             d = a + b + c + d;
             return d;
         })(1, 2, 3, 100);
-        "#,
+        ",
     );
     // a=1, b=2, c=3, d=100 → d := 106
     assert_eq!(value, Value::from_smi(106));
@@ -120,14 +120,14 @@ fn store_local_0_1_2_via_assignments() {
     // dispatches StoreLocal0 / StoreLocal1 / StoreLocal2 respectively.
     // a=10*2=20, b=20*3=60, c=30*4=120 → sum 200.
     let value = run_script(
-        r#"
+        r"
         (function(a, b, c) {
             a = a * 2;
             b = b * 3;
             c = c * 4;
             return a + b + c;
         })(10, 20, 30);
-        "#,
+        ",
     );
     assert_eq!(value, Value::from_smi(200));
 }
@@ -145,7 +145,7 @@ fn locals_in_tight_loop_sum() {
     //
     // Sum 0+1+...+99 = 4950.
     let value = run_script(
-        r#"
+        r"
         (function(iters, p1, p2, p3) {
             var s = 0;
             for (var i = 0; i < iters; i++) {
@@ -153,7 +153,7 @@ fn locals_in_tight_loop_sum() {
             }
             return s;
         })(100, 1, 2, 3);
-        "#,
+        ",
     );
     assert_eq!(value, Value::from_smi(4950));
 }

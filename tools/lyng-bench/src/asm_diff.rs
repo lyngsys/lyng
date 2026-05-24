@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AsmDiffOptions {
     pub opcodes_config: PathBuf,
     pub baseline_dir: PathBuf,
@@ -113,9 +113,6 @@ fn handler_submodule_and_fn(opcode_name: &str, snake: &str) -> (&'static str, St
     // table falls back to the naive `op_<snake>` in the `arithmetic`
     // submodule; those mostly fail capture and get reported.
     match opcode_name {
-        // arithmetic
-        "Add" | "Sub" | "Mul" | "Increment" | "Decrement" | "BitAnd" | "ShiftLeft"
-        | "ShiftRight" | "GreaterEqual" | "LessEqual" => ("arithmetic", format!("op_{snake}")),
         // loads
         "Move" => ("loads", "op_move".to_string()),
         "Ldar" => ("loads", "op_ldar".to_string()),
@@ -169,7 +166,7 @@ fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
     let mut mode = Mode::Check;
     let mut capture_mode = CaptureMode::Auto;
 
-    let mut iter = args.iter().peekable();
+    let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--opcodes-config" => {
@@ -327,7 +324,11 @@ fn capture_via_rustc_emit(crate_name: &str, symbol: &str) -> Result<String, Stri
         .filter_map(Result::ok)
         .find_map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with(&crate_stem) && name.ends_with(".s") {
+            if name.starts_with(&crate_stem)
+                && std::path::Path::new(&name)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("s"))
+            {
                 Some(entry.path())
             } else {
                 None
@@ -360,16 +361,11 @@ fn extract_symbol_body(asm: &str, symbol: &str) -> Result<String, String> {
         candidates.push(mangled_suffix);
     }
 
-    let mut iter = asm.lines();
+    let iter = asm.lines();
     let mut found = false;
     let mut body = Vec::new();
-    while let Some(line) = iter.next() {
-        if !found {
-            if candidates.iter().any(|p| line.contains(p)) {
-                found = true;
-                body.push(line.to_string());
-            }
-        } else {
+    for line in iter {
+        if found {
             // Stop at the next top-level symbol or end of file.
             if line.starts_with(|c: char| c.is_ascii_alphabetic())
                 && line.ends_with(':')
@@ -378,6 +374,9 @@ fn extract_symbol_body(asm: &str, symbol: &str) -> Result<String, String> {
             {
                 break;
             }
+            body.push(line.to_string());
+        } else if candidates.iter().any(|p| line.contains(p)) {
+            found = true;
             body.push(line.to_string());
         }
     }
@@ -497,7 +496,7 @@ fn label_token_length(s: &str) -> usize {
 use std::path::Path;
 
 /// Per-symbol outcome from a `--mode check` pass.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CheckOutcome {
     Match,
     Differs {
@@ -533,12 +532,13 @@ pub fn check_one_symbol(
     let normalized_baseline = normalize(&baseline);
 
     let current_instr_count = count_instructions(&normalized_current);
-    if let Some(budget) = max_instructions {
-        if budget > 0 && current_instr_count > budget as usize {
-            return Err(format!(
-                "{symbol}: {current_instr_count} instructions exceeds budget of {budget}"
-            ));
-        }
+    if let Some(budget) = max_instructions
+        && budget > 0
+        && current_instr_count > budget as usize
+    {
+        return Err(format!(
+            "{symbol}: {current_instr_count} instructions exceeds budget of {budget}"
+        ));
     }
 
     if normalized_current == normalized_baseline {
@@ -713,6 +713,6 @@ mod tests {
         let baseline_path = tmp.path().join("fake_op.asm");
         std::fs::write(&baseline_path, "fake_op:\n\tret\n").unwrap();
         let result = check_one_symbol("fake_op", "fake_op:\n\tret\n", tmp.path(), Some(100));
-        assert!(result.is_ok(), "{:?}", result);
+        assert!(result.is_ok(), "{result:?}");
     }
 }

@@ -13,6 +13,11 @@
 //! `dispatch_after_slow!` does `b {exit}`, we land here, restore the
 //! saved callee-saved regs, and return to `run_via_dsl`.
 
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "LlIntState mirrors frame depth as a u32 ABI field; the VM frame stack cannot practically approach that limit in one invocation"
+)]
+
 use std::sync::Arc;
 
 use lyng_env::Agent;
@@ -66,7 +71,7 @@ pub(crate) fn run_via_dsl(
         // boxed slice's `as_ptr()` is still a valid (non-dangling)
         // pointer; the asm trampoline never dereferences past the
         // slot count anyway.
-        vm.feedback_flat_storage[index].as_ptr() as *mut crate::dsl::feedback_flat::FeedbackEntry
+        vm.feedback_flat_storage[index].as_ptr().cast_mut()
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -103,8 +108,7 @@ pub(crate) fn run_via_dsl(
         .code(frame.code())
         .and_then(lyng_gc::RuntimeCodeRecord::constants)
         .and_then(|slots| agent.heap().view().code_slots(slots))
-        .map(|s| s.as_ptr())
-        .unwrap_or(std::ptr::null());
+        .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
 
     // Phase 1.B.1: derive `frame_this_value`. Pre-resolves the
     // active execution context's ThisState into either the real
@@ -152,7 +156,7 @@ pub(crate) fn run_via_dsl(
         frame_this_value: this_value,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
-        rust_context: (&mut rust_ctx) as *mut LlIntRustContext<'_> as *mut LlIntRustContextOpaque,
+        rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
         prefix: 0,
         _pad2: [0; 7],
     };
@@ -166,11 +170,7 @@ pub(crate) fn run_via_dsl(
     // static [DslHandler; 256]` with stable storage for the entire
     // program lifetime.
     unsafe {
-        run_dsl_trampoline(
-            &mut state as *mut LlIntState,
-            vm_ptr,
-            DSL_DISPATCH_TABLE.as_ptr(),
-        )
+        run_dsl_trampoline(&raw mut state, vm_ptr, DSL_DISPATCH_TABLE.as_ptr());
     };
 
     match rust_ctx.exit.kind {
@@ -220,6 +220,13 @@ pub(crate) fn run_via_dsl(
 /// | VM | x22 | `*mut Vm` |
 /// | TABLE | x23 | `*const DslHandler` |
 /// | STATE | x24 | `*mut LlIntState` |
+///
+/// # Safety
+///
+/// `state` must point to a live [`LlIntState`] for the full trampoline
+/// invocation, `vm` must be the `VM` pinned in that state, and `table`
+/// must point to a 256-entry DSL dispatch table whose handlers obey the
+/// `LLInt` calling convention.
 #[unsafe(naked)]
 pub unsafe extern "C" fn run_dsl_trampoline(
     _state: *mut LlIntState,
@@ -271,6 +278,11 @@ pub unsafe extern "C" fn run_dsl_trampoline(
 /// into, and rustc-generated prologues/epilogues would corrupt the
 /// trampoline's frame. The asm here mirrors `run_dsl_trampoline`'s
 /// entry sequence in reverse.
+///
+/// # Safety
+///
+/// This symbol may only be reached by a branch from a DSL handler that
+/// is currently running inside [`run_dsl_trampoline`]'s stack frame.
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
 pub unsafe extern "C" fn _interpreter_exit() {

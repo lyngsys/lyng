@@ -1,7 +1,7 @@
 //! V8 v7 benchmark suite driver (lyng-5xdt).
 //!
-//! Wires the six V8 v7 workloads — Richards, DeltaBlue, Crypto, RayTrace,
-//! NavierStokes, Splay — into `lyng-bench` as a `v8suite` subcommand.
+//! Wires the six V8 v7 workloads — Richards, `DeltaBlue`, Crypto, `RayTrace`,
+//! `NavierStokes`, Splay — into `lyng-bench` as a `v8suite` subcommand.
 //! Each benchmark is executed inside `target/release/lyng --shell` as
 //! an isolated subprocess per sample so warmup state, JIT tier transitions,
 //! GC heaps, and feedback caches don't leak between samples. The driver
@@ -16,6 +16,13 @@
 //! files. Higher score is better. Each benchmark's `NotifyResult(name,
 //! formatted)` callback prints `SCORE\t<name>\t<value>` lines to stdout
 //! that the parent driver parses.
+
+#![allow(
+    clippy::cast_precision_loss,
+    reason = "benchmark score and counter reports intentionally convert integer timings/counters to f64 ratios"
+)]
+
+use std::fmt::Write as _;
 
 use lyng_builtins::BootstrapMode;
 use lyng_bytecode::{Opcode, OPCODE_COUNT};
@@ -140,9 +147,11 @@ pub fn run(args: &[String]) -> Result<(), String> {
 
     let workloads: Vec<&V8Workload> = V8_WORKLOADS
         .iter()
-        .filter(|w| match &options.filter {
-            Some(needle) => w.name.eq_ignore_ascii_case(needle),
-            None => true,
+        .filter(|w| {
+            options
+                .filter
+                .as_ref()
+                .is_none_or(|needle| w.name.eq_ignore_ascii_case(needle))
         })
         .collect();
     if workloads.is_empty() {
@@ -232,9 +241,11 @@ fn run_opcode_counts(options: &Options) -> Result<(), String> {
 
     let workloads: Vec<&V8Workload> = V8_WORKLOADS
         .iter()
-        .filter(|w| match &options.filter {
-            Some(needle) => w.name.eq_ignore_ascii_case(needle),
-            None => true,
+        .filter(|w| {
+            options
+                .filter
+                .as_ref()
+                .is_none_or(|needle| w.name.eq_ignore_ascii_case(needle))
         })
         .collect();
     if workloads.is_empty() {
@@ -597,8 +608,8 @@ fn median(values: &[f64]) -> Option<f64> {
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let mid = sorted.len() / 2;
-    Some(if sorted.len() % 2 == 0 {
-        (sorted[mid - 1] + sorted[mid]) / 2.0
+    Some(if sorted.len().is_multiple_of(2) {
+        f64::midpoint(sorted[mid - 1], sorted[mid])
     } else {
         sorted[mid]
     })
@@ -614,13 +625,18 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
         "Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is better.\n\n",
     );
     out.push_str("## Configuration\n\n");
-    out.push_str(&format!("- Samples per benchmark: `{}`\n", options.samples));
-    out.push_str(&format!(
-        "- Per-sample timeout: `{}s`\n",
+    writeln!(out, "- Samples per benchmark: `{}`", options.samples)
+        .expect("writing to a String cannot fail");
+    writeln!(
+        out,
+        "- Per-sample timeout: `{}s`",
         options.per_sample_timeout.as_secs()
-    ));
-    out.push_str(&format!("- lyng binary: `{}`\n", options.lyng_bin));
-    out.push_str(&format!("- V8 v7 sources: `{}`\n\n", options.v8_root));
+    )
+    .expect("writing to a String cannot fail");
+    writeln!(out, "- lyng binary: `{}`", options.lyng_bin)
+        .expect("writing to a String cannot fail");
+    writeln!(out, "- V8 v7 sources: `{}`\n", options.v8_root)
+        .expect("writing to a String cannot fail");
     out.push_str("## Scores\n\n");
     out.push_str("| Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |\n");
     out.push_str("| --- | ---: | ---: | ---: | ---: | :---: | ---: | --- |\n");
@@ -630,8 +646,9 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
             .map_or_else(|| "—".to_string(), |s| format!("`{s:.0}`"));
         let baseline = report.workload.phase1_baseline;
         let target = report.workload.phase1_target;
-        let (delta_cell, gate_cell) = match report.median_score {
-            Some(score) => {
+        let (delta_cell, gate_cell) = report.median_score.map_or_else(
+            || ("—".to_string(), "—".to_string()),
+            |score| {
                 let delta = ((score - f64::from(baseline)) / f64::from(baseline)) * 100.0;
                 let delta_str = format!("`{delta:+.1}%`");
                 let gate_str = if score >= f64::from(target) {
@@ -640,9 +657,8 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
                     "✗"
                 };
                 (delta_str, gate_str.to_string())
-            }
-            None => ("—".to_string(), "—".to_string()),
-        };
+            },
+        );
         let us_cell = report
             .median_us_per_iter
             .map_or_else(|| "—".to_string(), |u| format!("`{u:.1}`"));
@@ -656,8 +672,9 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        out.push_str(&format!(
-            "| `{name}` | {score} | `{baseline}` | `{target}` | {delta} | {gate} | {us} | {samples} |\n",
+        writeln!(
+            out,
+            "| `{name}` | {score} | `{baseline}` | `{target}` | {delta} | {gate} | {us} | {samples} |",
             name = report.workload.name,
             score = score_cell,
             baseline = baseline,
@@ -666,7 +683,8 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
             gate = gate_cell,
             us = us_cell,
             samples = samples_cell,
-        ));
+        )
+        .expect("writing to a String cannot fail");
     }
     out.push_str(
         "\nBaseline / target columns come from the Phase 1 exit-gate table in \
@@ -680,10 +698,8 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
         out.push_str("\n## Errors\n\n");
         for report in reports {
             if let Some(error) = &report.error {
-                out.push_str(&format!(
-                    "- `{name}`: {error}\n",
-                    name = report.workload.name
-                ));
+                writeln!(out, "- `{name}`: {error}", name = report.workload.name)
+                    .expect("writing to a String cannot fail");
             }
         }
     }
@@ -725,12 +741,8 @@ fn write_output(path: &str, contents: &str) -> Result<(), String> {
     if let Some(parent) = Path::new(path).parent()
         && !parent.as_os_str().is_empty()
     {
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "failed to create directory for {path}: {error}",
-                path = path
-            )
-        })?;
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("failed to create directory for {path}: {error}"))?;
     }
     fs::write(path, contents).map_err(|error| format!("failed to write {path}: {error}"))
 }
@@ -956,10 +968,9 @@ fn render_opcode_counts_json(
                 .iter()
                 .map(|(name, count)| ((*name).to_string(), json!(*count)))
                 .collect();
-            let slow_path_share = slow_path
-                .as_ref()
-                .map(|totals| slow_path_workload_json(counts, totals))
-                .unwrap_or(Value::Null);
+            let slow_path_share = slow_path.as_ref().map_or(Value::Null, |totals| {
+                slow_path_workload_json(counts, totals)
+            });
             json!({
                 "name": workload.name,
                 "file": workload.file,

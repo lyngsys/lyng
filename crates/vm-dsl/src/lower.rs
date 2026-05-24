@@ -34,9 +34,9 @@
 //! The DSL body references operand idents (`a`, `b`, `c`, `slot`,
 //! `src`, `dst`, ...) and internal scratch idents (`t0..t6`). The
 //! backend macros uniformly `stringify!` their arguments to build
-//! AArch64 register operands like `w9, x10`. If the proc-macro spliced
+//! `AArch64` register operands like `w9, x10`. If the proc-macro spliced
 //! the raw idents into `naked_asm!`, the assembler would see `w<a>` —
-//! invalid asm. The lowerer therefore walks the body TokenStream and
+//! invalid asm. The lowerer therefore walks the body `TokenStream` and
 //! rewrites every recognized scratch-name ident into its allocated
 //! register number literal *before* splicing into `naked_asm!`.
 //!
@@ -107,10 +107,10 @@ fn handler_decode_prologue(
     }
 }
 
-pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
+pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
     let layout = Layout::from_ident(&ast.layout)?;
     let operands: Vec<_> = ast.operand_idents.iter().cloned().collect();
-    validate_operand_arity(&ast, layout, operands.len())?;
+    validate_operand_arity(ast, layout, operands.len())?;
 
     // Pre-assign operand identifiers to scratch registers. Internal
     // scratch names `t0..t6` are allocated lazily inside
@@ -415,15 +415,14 @@ fn inject_opcode_byte(
     while i < trees.len() {
         // Detect `<name> ! (...)` where <name> is one of the slow-path
         // bridge macros that we want to enrich.
-        let name = match &trees[i] {
-            TokenTree::Ident(id) => id.to_string(),
-            _ => {
-                // Recurse into groups (e.g. macro args that themselves
-                // contain nested invocations — rare but defensive).
-                out.push(rewrite_group(trees[i].clone(), opcode_byte, gate_call_slow));
-                i += 1;
-                continue;
-            }
+        let name = if let TokenTree::Ident(id) = &trees[i] {
+            id.to_string()
+        } else {
+            // Recurse into groups (e.g. macro args that themselves
+            // contain nested invocations — rare but defensive).
+            out.push(rewrite_group(trees[i].clone(), opcode_byte, gate_call_slow));
+            i += 1;
+            continue;
         };
         // `call_slow!` is suppressed when `gate_call_slow` (hit-side
         // tail). Poll shims are counted by the paired `poll_safepoint!`
@@ -499,7 +498,7 @@ fn is_poll_shim_call(trees: &[TokenTree], ident_index: usize) -> bool {
     )
 }
 
-/// Recurse into a TokenTree::Group, applying `inject_opcode_byte` to
+/// Recurse into a `TokenTree::Group`, applying `inject_opcode_byte` to
 /// the inner stream. Non-group trees pass through unchanged. The
 /// `gate_call_slow` flag is propagated so the label-scope discipline is
 /// preserved inside nested groups (a `call_slow!` nested inside another
@@ -639,7 +638,7 @@ mod tests {
     fn lower_handler_tokens(source: &str) -> TokenStream {
         let input: TokenStream = syn::parse_str(source).expect("parse handler tokens");
         let ast = crate::parse::parse_handler(input).expect("parse handler ast");
-        lower_handler(ast).expect("lower handler")
+        lower_handler(&ast).expect("lower handler")
     }
 
     fn lit31() -> LitInt {
@@ -751,7 +750,7 @@ mod tests {
         )
         .expect("parse handler tokens");
         let ast = crate::parse::parse_handler(input).expect("parse handler ast");
-        let error = lower_handler(ast).expect_err("decode = Rust should reject operand bindings");
+        let error = lower_handler(&ast).expect_err("decode = Rust should reject operand bindings");
 
         assert!(
             error
@@ -773,8 +772,7 @@ mod tests {
             !output_has_opcode_byte_for("call_slow", &rewritten),
             "hit-side `call_slow!` must NOT receive `opcode_byte = N` \
              when gate_call_slow is true (would over-count slow-path \
-             semantic entries). Got: {}",
-            rewritten,
+             semantic entries). Got: {rewritten}",
         );
     }
 
@@ -791,8 +789,7 @@ mod tests {
             output_has_opcode_byte_for("call_slow", &rewritten),
             "slow-path `call_slow!` MUST receive `opcode_byte = N` \
              when gate_call_slow is false (correctly counts a slow \
-             entry). Got: {}",
-            rewritten,
+             entry). Got: {rewritten}",
         );
     }
 
@@ -819,8 +816,7 @@ mod tests {
         assert!(
             output_has_opcode_byte_for_recursive("call_slow", &lowered),
             "label-free cold stubs must receive opcode_byte injection so \
-             slow-path counters count semantic entries. Got: {}",
-            lowered,
+             slow-path counters count semantic entries. Got: {lowered}",
         );
     }
 
@@ -850,14 +846,12 @@ mod tests {
         assert!(
             output_has_opcode_byte_for("poll_safepoint", &gated),
             "`poll_safepoint!` should be rewritten even when \
-             gate_call_slow is true. Got: {}",
-            gated,
+             gate_call_slow is true. Got: {gated}",
         );
         assert!(
             output_has_opcode_byte_for("poll_safepoint", &ungated),
             "`poll_safepoint!` should be rewritten when \
-             gate_call_slow is false. Got: {}",
-            ungated,
+             gate_call_slow is false. Got: {ungated}",
         );
     }
 
@@ -869,7 +863,7 @@ mod tests {
         let tokens: TokenStream =
             syn::parse_str("call_slow!(op_add_slow_rs, args = [a, b, c, slot], opcode_byte = 99)")
                 .expect("parse call_slow! with explicit opcode_byte");
-        let rewritten = inject_opcode_byte(tokens.clone(), &lit31(), false);
+        let rewritten = inject_opcode_byte(tokens, &lit31(), false);
         // The output stream should still contain exactly one
         // `opcode_byte = 99` (no duplicate `opcode_byte = 31` appended).
         let s = rewritten.to_string();
@@ -878,14 +872,12 @@ mod tests {
         assert_eq!(
             count_99, 1,
             "explicit opcode_byte = 99 should pass through unchanged. \
-             Got: {}",
-            s,
+             Got: {s}",
         );
         assert_eq!(
             count_31, 0,
             "lowerer must not inject a second opcode_byte when the \
-             user already spelled one. Got: {}",
-            s,
+             user already spelled one. Got: {s}",
         );
     }
 
@@ -900,14 +892,12 @@ mod tests {
         assert!(
             !output_has_opcode_byte_for("check_smi", &gated),
             "`check_smi!` should never receive opcode_byte injection. \
-             Got: {}",
-            gated,
+             Got: {gated}",
         );
         assert!(
             !output_has_opcode_byte_for("check_smi", &ungated),
             "`check_smi!` should never receive opcode_byte injection. \
-             Got: {}",
-            ungated,
+             Got: {ungated}",
         );
     }
 }

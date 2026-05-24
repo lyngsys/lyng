@@ -78,7 +78,7 @@ pub struct OpScopeAxArgs {
 // (depth, slot).
 // =====================================================================
 
-pub(crate) fn op_load_env_slot_semantic(
+pub fn op_load_env_slot_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAbxArgs,
 ) -> SemanticOutcome {
@@ -109,7 +109,7 @@ pub(crate) fn op_load_env_slot_semantic(
     }
 }
 
-pub(crate) fn op_store_env_slot_semantic(
+pub fn op_store_env_slot_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAbxArgs,
 ) -> SemanticOutcome {
@@ -140,7 +140,7 @@ pub(crate) fn op_store_env_slot_semantic(
     }
 }
 
-pub(crate) fn op_assign_env_slot_semantic(
+pub fn op_assign_env_slot_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAbxArgs,
 ) -> SemanticOutcome {
@@ -180,7 +180,7 @@ pub(crate) fn op_assign_env_slot_semantic(
 // `instruction_len` after the mutation, matching the α handler ordering.
 // =====================================================================
 
-pub(crate) fn op_enter_env_scope_semantic(
+pub fn op_enter_env_scope_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAbxArgs,
 ) -> SemanticOutcome {
@@ -199,7 +199,7 @@ pub(crate) fn op_enter_env_scope_semantic(
     }
 }
 
-pub(crate) fn op_leave_env_scope_semantic(
+pub fn op_leave_env_scope_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAbxArgs,
 ) -> SemanticOutcome {
@@ -218,7 +218,7 @@ pub(crate) fn op_leave_env_scope_semantic(
 // pops the topmost loop-iteration environment without operands.
 // =====================================================================
 
-pub(crate) fn op_push_closure_env_semantic(
+pub fn op_push_closure_env_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAxArgs,
 ) -> SemanticOutcome {
@@ -257,7 +257,7 @@ pub(crate) fn op_push_closure_env_semantic(
     }
 }
 
-pub(crate) fn op_pop_closure_env_semantic(
+pub fn op_pop_closure_env_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAxArgs,
 ) -> SemanticOutcome {
@@ -277,21 +277,18 @@ pub(crate) fn op_pop_closure_env_semantic(
 // topmost with-environment without operands.
 // =====================================================================
 
-pub(crate) fn op_push_with_env_semantic(
+pub fn op_push_with_env_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let register = match u16::try_from(args.ax) {
-        Ok(r) => r,
-        Err(_) => {
-            return SemanticOutcome::ExitError {
-                error: VmError::RegisterOutOfBounds {
-                    code: inner.frame.code(),
-                    register: 0,
-                },
-            };
-        }
+    let Ok(register) = u16::try_from(args.ax) else {
+        return SemanticOutcome::ExitError {
+            error: VmError::RegisterOutOfBounds {
+                code: inner.frame.code(),
+                register: 0,
+            },
+        };
     };
     let value = inner
         .vm
@@ -312,7 +309,7 @@ pub(crate) fn op_push_with_env_semantic(
     }
 }
 
-pub(crate) fn op_pop_with_env_semantic(
+pub fn op_pop_with_env_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAxArgs,
 ) -> SemanticOutcome {
@@ -328,21 +325,18 @@ pub(crate) fn op_pop_with_env_semantic(
 // string, writes the result back to the same register.
 // =====================================================================
 
-pub(crate) fn op_type_of_semantic(
+pub fn op_type_of_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpScopeAxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let register = match u16::try_from(args.ax) {
-        Ok(r) => r,
-        Err(_) => {
-            return SemanticOutcome::ExitError {
-                error: VmError::RegisterOutOfBounds {
-                    code: inner.frame.code(),
-                    register: 0,
-                },
-            };
-        }
+    let Ok(register) = u16::try_from(args.ax) else {
+        return SemanticOutcome::ExitError {
+            error: VmError::RegisterOutOfBounds {
+                code: inner.frame.code(),
+                register: 0,
+            },
+        };
     };
     let registers = inner.frame.registers();
     let value = inner.vm.read_register_unchecked(registers, register);

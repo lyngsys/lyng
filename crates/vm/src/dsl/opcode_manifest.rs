@@ -998,7 +998,7 @@ impl SemanticFnPtr {
     /// linker-resolution test asserts this is always `false` for every
     /// entry in `SEMANTIC_FN_PTRS`.
     #[inline]
-    pub fn is_null(self) -> bool {
+    pub const fn is_null(self) -> bool {
         self.0.is_null()
     }
 }
@@ -2089,7 +2089,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
     ),
 ];
 
-/// Subset filter for the DSL_DISPATCH_TABLE assembly in DSL-0b.
+/// Subset filter for the `DSL_DISPATCH_TABLE` assembly in DSL-0b.
 pub fn by_category(category: OpcodeCategory) -> impl Iterator<Item = &'static OpcodeEntry> {
     OPCODES
         .iter()

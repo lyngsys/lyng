@@ -397,9 +397,11 @@ mod tests {
 
     #[test]
     fn load_module_source_applies_import_attributes_to_entry_self_imports() {
-        let helpers = Arc::new(HelperCatalog::load(&workspace_root()).expect("helper catalog"));
-        let entry_path = workspace_root()
-            .join("testdata/test262/test/language/import/import-attributes/text-self.js");
+        let root = workspace_root();
+        let helpers = Arc::new(HelperCatalog::load(&root).expect("helper catalog"));
+        let entry_path = helpers
+            .test_dir()
+            .join("language/import/import-attributes/text-self.js");
         let host = Test262Host::new(&entry_path, "entry source", helpers);
 
         let loaded = host

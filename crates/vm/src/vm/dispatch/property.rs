@@ -1,3 +1,8 @@
+#![allow(
+    clippy::inline_always,
+    reason = "Property dispatch helpers sit on named/keyed access hot paths and are intentionally forced through small inline probes"
+)]
+
 use super::advance_dispatch_frame;
 use crate::error::VmResult;
 use crate::vm::property_access::VmProxyBridge;
@@ -67,6 +72,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     #[inline]
@@ -103,25 +109,24 @@ impl Vm {
                 self.named_property_own_data_handler(frame.code(), feedback_slot)
             {
                 let heap_view = agent.heap().view();
-                if let Some(record) = heap_view.object_ref(object) {
-                    if record.shape() == handler.receiver_shape()
-                        && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
-                    {
-                        let cached_value = match handler.slot_location() {
-                            SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
-                            SlotLocation::OutOfLine(offset) => record
-                                .named_slots()
-                                .and_then(|slots| heap_view.object_slots(slots))
-                                .and_then(|slots| slots.get(offset as usize).copied()),
-                        };
-                        if let Some(value) = cached_value {
-                            if let Some(slot) = feedback_slot {
-                                self.record_named_property_cache_hit(frame.code(), slot);
-                            }
-                            self.register_stack[target_index] = value;
-                            advance_dispatch_frame(frame, instruction_len);
-                            return Ok(());
+                if let Some(record) = heap_view.object_ref(object)
+                    && record.shape() == handler.receiver_shape()
+                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
+                {
+                    let cached_value = match handler.slot_location() {
+                        SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
+                        SlotLocation::OutOfLine(offset) => record
+                            .named_slots()
+                            .and_then(|slots| heap_view.object_slots(slots))
+                            .and_then(|slots| slots.get(offset as usize).copied()),
+                    };
+                    if let Some(value) = cached_value {
+                        if let Some(slot) = feedback_slot {
+                            self.record_named_property_cache_hit(frame.code(), slot);
                         }
+                        self.register_stack[target_index] = value;
+                        advance_dispatch_frame(frame, instruction_len);
+                        return Ok(());
                     }
                 }
             }
@@ -274,13 +279,14 @@ impl Vm {
             return false;
         }
 
-        if let Some(Some(true)) = self.try_named_property_polymorphic_own_data_store(
+        if self.try_named_property_polymorphic_own_data_store(
             agent,
             frame.code(),
             feedback_slot,
             object,
             value,
-        ) {
+        ) == Some(Some(true))
+        {
             self.record_feedback_slot(frame.code(), feedback_slot);
             advance_dispatch_frame(frame, instruction_len);
             return true;
@@ -291,6 +297,7 @@ impl Vm {
 
     #[expect(
         clippy::too_many_arguments,
+        clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     pub(in crate::vm) fn execute_set_named_property_opcode(
@@ -356,16 +363,12 @@ impl Vm {
                     Some(Some(target))
                 });
             if let Some(target_opt) = cached_target {
-                let stored = if let Some(target) = target_opt {
+                let stored = target_opt.is_some_and(|target| {
                     agent.with_heap_and_objects(|heap, _objects| {
                         let mut mutator = heap.mutator();
                         mutator.mut_store_value(target, value)
                     })
-                } else {
-                    // Non-writable own-data property: stored = false, no heap write.
-                    // Matches store_to_named_property_cache → Ok(Some(false)).
-                    false
-                };
+                });
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
                         agent,
@@ -1821,9 +1824,9 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3e named-property (non-keyed) one-hop PrototypeData cache
+    /// Phase 3e named-property (non-keyed) one-hop `PrototypeData` cache
     /// path. Returns the cached slot value from the prototype holder on a
-    /// monomorphic + one-hop PrototypeData hit, `None` on any miss
+    /// monomorphic + one-hop `PrototypeData` hit, `None` on any miss
     /// (shape/epoch mismatch on receiver or prototype, missing prototype,
     /// etc.). Bypasses the slow chain on the dominant class-method-
     /// dispatch / `Object.prototype` lookup pattern.
@@ -1864,12 +1867,12 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3e named-keyed (atom) one-hop PrototypeData cache hit path.
+    /// Phase 3e named-keyed (atom) one-hop `PrototypeData` cache hit path.
     /// Returns the cached slot value from the prototype holder on a
-    /// monomorphic + NamedAtom + one-hop PrototypeData hit, `None` on
+    /// monomorphic + `NamedAtom` + one-hop `PrototypeData` hit, `None` on
     /// miss (shape/epoch mismatch on receiver or prototype, missing
     /// prototype, etc.). Records the slot via `record_feedback_slot`
-    /// matching the OwnData sibling.
+    /// matching the `OwnData` sibling.
     #[inline(always)]
     fn try_keyed_named_proto_data_load(
         &mut self,
@@ -1909,7 +1912,7 @@ impl Vm {
     /// Phase 3d named-keyed (atom) store cache hit path. Returns `Some(stored)`
     /// on a monomorphic-NamedAtom hit, `None` on miss. Non-writable
     /// hits return `Some(false)` (matching slow-chain semantics — the
-    /// caller's `assignment` logic converts this to a TypeError in
+    /// caller's `assignment` logic converts this to a `TypeError` in
     /// strict mode).
     #[inline(always)]
     fn try_keyed_named_own_data_store(
@@ -1949,7 +1952,7 @@ impl Vm {
         Some(stored)
     }
 
-    /// Phase 3f named-property (non-keyed) polymorphic OwnData cache hit path.
+    /// Phase 3f named-property (non-keyed) polymorphic `OwnData` cache hit path.
     /// Walks the receiver shape through the inline polymorphic sidecar
     /// (up to `POLY_LIMIT` cached shapes), returning the slot value on
     /// hit. Returns `None` on any miss — shape not in the sidecar,
@@ -1985,9 +1988,9 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3f named-property (non-keyed) polymorphic OwnData store cache
+    /// Phase 3f named-property (non-keyed) polymorphic `OwnData` store cache
     /// path. Mirrors [`Self::try_named_property_polymorphic_own_data_load`]
-    /// for the Set / Assign / StrictAssign / StoreGlobal / AssignGlobal
+    /// for the Set / Assign / `StrictAssign` / `StoreGlobal` / `AssignGlobal`
     /// opcode family.
     ///
     /// Encodes the hit decision into `Option<Option<bool>>` to match the
@@ -1999,6 +2002,10 @@ impl Vm {
     /// - `Some(None)` — non-writable hit; slow-chain analog returns
     ///   `Ok(Some(false))` and the caller handles the strict-mode error.
     #[inline(always)]
+    #[allow(
+        clippy::option_option,
+        reason = "store cache probes need three states: miss, non-writable hit, and writable hit with barrier result"
+    )]
     pub(in crate::vm) fn try_named_property_polymorphic_own_data_store(
         &self,
         agent: &mut Agent,
@@ -2032,7 +2039,7 @@ impl Vm {
         Some(Some(stored))
     }
 
-    /// Phase 3f named-keyed (atom) polymorphic OwnData load cache hit path.
+    /// Phase 3f named-keyed (atom) polymorphic `OwnData` load cache hit path.
     /// Walks the keyed-atom polymorphic sidecar matching both the atom
     /// and the receiver shape. Mirrors
     /// [`Self::try_named_property_polymorphic_own_data_load`] for the keyed
@@ -2072,7 +2079,7 @@ impl Vm {
     /// Phase 3f dense-keyed polymorphic cache load. Walks the inline
     /// `[KeyedDenseIndexHandler; POLY_LIMIT]` sidecar for a shape+flags
     /// match before falling to the slow chain. Mirrors
-    /// [`Self::try_keyed_dense_index_cache_load`] for shapes 2..POLY_LIMIT.
+    /// [`Self::try_keyed_dense_index_cache_load`] for shapes `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_dense_polymorphic_cache_load(
         &mut self,
@@ -2110,7 +2117,7 @@ impl Vm {
     }
 
     /// Phase 3f dense-keyed polymorphic cache store. Mirrors
-    /// [`Self::try_keyed_dense_index_cache_store`] for shapes 2..POLY_LIMIT.
+    /// [`Self::try_keyed_dense_index_cache_store`] for shapes `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_dense_polymorphic_cache_store(
         &mut self,
@@ -2162,9 +2169,9 @@ impl Vm {
         Some(true)
     }
 
-    /// Phase 3f named-keyed (atom) polymorphic OwnData store cache hit path.
+    /// Phase 3f named-keyed (atom) polymorphic `OwnData` store cache hit path.
     /// Mirrors [`Self::try_keyed_named_own_data_store`] for shapes
-    /// 2..POLY_LIMIT.
+    /// `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_named_polymorphic_own_data_store(
         &mut self,

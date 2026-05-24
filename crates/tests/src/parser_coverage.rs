@@ -40,7 +40,12 @@ fn run_script_rows(rows: &[(&str, &str)]) {
         .iter()
         .filter_map(|(label, src)| parse_script_ok(label, src).err())
         .collect();
-    assert!(failures.is_empty(), "{} failures:\n{}", failures.len(), failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} failures:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 fn run_module_rows(rows: &[(&str, &str)]) {
@@ -48,7 +53,12 @@ fn run_module_rows(rows: &[(&str, &str)]) {
         .iter()
         .filter_map(|(label, src)| parse_module_ok(label, src).err())
         .collect();
-    assert!(failures.is_empty(), "{} failures:\n{}", failures.len(), failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} failures:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 #[test]
@@ -174,7 +184,10 @@ fn statements_parse_cleanly() {
         ("with", "with (obj) x;"),
         ("try_catch", "try { x; } catch (e) { y; }"),
         ("try_finally", "try { x; } finally { y; }"),
-        ("try_catch_finally", "try { x; } catch (e) { y; } finally { z; }"),
+        (
+            "try_catch_finally",
+            "try { x; } catch (e) { y; } finally { z; }",
+        ),
         ("try_catch_no_param", "try { x; } catch { y; }"),
         ("throw", "throw new Error();"),
         ("return", "function f() { return; }"),

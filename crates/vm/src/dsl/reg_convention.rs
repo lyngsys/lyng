@@ -4,16 +4,16 @@
 //! docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md
 //! and reports/lyng/llint-dsl-abi.md.
 //!
-//! AArch64 mapping:
+//! `AArch64` mapping:
 //!
 //! | Pin           | Reg     | Type                            |
 //! | ------------- | ------- | ------------------------------- |
 //! | PC            | x19     | *const u8                       |
 //! | REGS          | x20     | *mut Value                      |
-//! | FV            | x21     | *mut FeedbackEntry              |
+//! | FV            | x21     | *mut `FeedbackEntry`              |
 //! | VM            | x22     | *mut Vm                         |
-//! | TABLE         | x23     | *const DslHandler               |
-//! | STATE         | x24     | *mut LlIntState                 |
+//! | TABLE         | x23     | *const `DslHandler`               |
+//! | STATE         | x24     | *mut `LlIntState`                 |
 //! | t0..t6        | x9..x15 | scratch (caller-saved) — live operand slots |
 //! | macro scratch | x16/x17 | AAPCS64 IP0/IP1 — macro-internal only       |
 //!
@@ -26,7 +26,7 @@
 //! `x15` without losing operand `a` in `x9`.
 //!
 //! Refresh discipline (slow-path call):
-//!   PRE:   state.frame_pc_offset <- PC - pb_base
+//!   PRE:   `state.frame_pc_offset` <- PC - `pb_base`
 //!   POST:  if Refresh: PC/REGS/FV reloaded from state.frame_*
 //!
 //! Rust probe hits may use `dispatch_probe_hit_no_refresh!` only when
@@ -90,7 +90,7 @@ pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
 /// wrapper around `Box<DispatchCounters>`; its single field is the Box at
 /// offset 0. So the asm path needs TWO loads:
 ///   1. `ldr x9, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` — gets the Box's
-///      raw pointer (the first u64 of OpcodeDispatchCounterStore is the Box).
+///      raw pointer (the first u64 of `OpcodeDispatchCounterStore` is the Box).
 ///   2. `ldr x9, [x9]` (or equivalent indexed load) — dereferences the Box
 ///      pointer to reach `DispatchCounters`.
 ///
@@ -163,7 +163,7 @@ mod counter_offset_tests {
         // unlikely to be at the very start).
         // Just verifies the const is reachable; the exact value depends
         // on Vm's struct layout which may change.
-        let _offset: usize = VM_DISPATCH_COUNTERS_PTR_OFFSET;
+        std::hint::black_box(VM_DISPATCH_COUNTERS_PTR_OFFSET);
         // No specific assertion — the import resolving is the test.
     }
 }

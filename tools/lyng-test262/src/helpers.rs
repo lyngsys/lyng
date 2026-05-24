@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -698,17 +699,84 @@ impl HelperCatalog {
 }
 
 pub fn resolve_test262_root(workspace_root: &Path) -> Result<PathBuf, String> {
-    for candidate in workspace_root.ancestors() {
-        let test262_root = candidate.join("testdata/test262");
-        if test262_root.join("harness/assert.js").is_file() && test262_root.join("test").is_dir() {
-            return Ok(test262_root);
-        }
+    if let Some(test262_root) = test262_root_in_ancestors(workspace_root) {
+        return Ok(test262_root);
+    }
+
+    if let Some(test262_root) = test262_root_in_primary_checkout(workspace_root) {
+        return Ok(test262_root);
     }
 
     Err(format!(
         "test262 fixture root not found from workspace {}",
         workspace_root.display()
     ))
+}
+
+fn test262_root_in_ancestors(workspace_root: &Path) -> Option<PathBuf> {
+    workspace_root
+        .ancestors()
+        .map(|candidate| candidate.join("testdata/test262"))
+        .find(|test262_root| is_test262_root(test262_root))
+}
+
+fn test262_root_in_primary_checkout(workspace_root: &Path) -> Option<PathBuf> {
+    let git_dir = read_git_dir(workspace_root)?;
+    let common_dir = read_git_common_dir(&git_dir)?;
+    let checkout_root = checkout_root_from_common_dir(&common_dir)?;
+    let test262_root = checkout_root.join("testdata/test262");
+    is_test262_root(&test262_root).then_some(test262_root)
+}
+
+fn is_test262_root(test262_root: &Path) -> bool {
+    test262_root.join("harness/assert.js").is_file() && test262_root.join("test").is_dir()
+}
+
+fn read_git_dir(workspace_root: &Path) -> Option<PathBuf> {
+    let git_path = workspace_root.join(".git");
+    if git_path.is_dir() {
+        return Some(git_path);
+    }
+
+    let contents = fs::read_to_string(&git_path).ok()?;
+    let raw_path = contents.strip_prefix("gitdir:")?.trim();
+    if raw_path.is_empty() {
+        return None;
+    }
+
+    let git_dir = PathBuf::from(raw_path);
+    Some(if git_dir.is_absolute() {
+        git_dir
+    } else {
+        workspace_root.join(git_dir)
+    })
+}
+
+fn read_git_common_dir(git_dir: &Path) -> Option<PathBuf> {
+    let common_dir = match fs::read_to_string(git_dir.join("commondir")) {
+        Ok(contents) => {
+            let raw_path = contents.trim();
+            if raw_path.is_empty() {
+                return None;
+            }
+            let path = PathBuf::from(raw_path);
+            if path.is_absolute() {
+                path
+            } else {
+                git_dir.join(path)
+            }
+        }
+        Err(_) => git_dir.to_path_buf(),
+    };
+
+    Some(common_dir.canonicalize().unwrap_or(common_dir))
+}
+
+fn checkout_root_from_common_dir(common_dir: &Path) -> Option<PathBuf> {
+    if common_dir.file_name()? != OsStr::new(".git") {
+        return None;
+    }
+    common_dir.parent().map(Path::to_path_buf)
 }
 
 fn read_helper_file(harness_root: &Path, name: &str) -> Result<String, String> {
@@ -769,7 +837,9 @@ fn adapt_regexp_helper_source(source: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::metadata::parse_metadata;
 
@@ -782,11 +852,57 @@ mod tests {
             .expect("workspace root should exist")
     }
 
+    fn make_temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "lyng-test262-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).expect("temp dir should be created");
+        path
+    }
+
     #[test]
     fn resolves_test262_root_from_worktree_or_checkout() {
         let test262_root = resolve_test262_root(&workspace_root()).expect("test262 root");
         assert!(test262_root.join("harness/assert.js").is_file());
         assert!(test262_root.join("test").is_dir());
+    }
+
+    #[test]
+    fn resolves_test262_root_from_primary_checkout_for_linked_worktree() {
+        let root = make_temp_dir("linked-worktree");
+        let primary = root.join("primary");
+        let worktree = root.join("worktree");
+        let worktree_git_dir = primary.join(".git/worktrees/codex");
+        let test262_root = primary.join("testdata/test262");
+
+        fs::create_dir_all(test262_root.join("harness")).expect("harness dir should be created");
+        fs::create_dir_all(test262_root.join("test")).expect("test dir should be created");
+        fs::write(test262_root.join("harness/assert.js"), "")
+            .expect("assert helper should be written");
+        fs::create_dir_all(&worktree_git_dir).expect("worktree git dir should be created");
+        fs::create_dir_all(&worktree).expect("worktree dir should be created");
+        fs::write(
+            worktree.join(".git"),
+            format!("gitdir: {}\n", worktree_git_dir.display()),
+        )
+        .expect("gitdir file should be written");
+        fs::write(worktree_git_dir.join("commondir"), "../..\n")
+            .expect("commondir should be written");
+
+        let resolved = resolve_test262_root(&worktree).expect("test262 root");
+        assert_eq!(
+            resolved,
+            test262_root
+                .canonicalize()
+                .expect("expected fixture root should exist")
+        );
+
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

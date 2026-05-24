@@ -75,7 +75,7 @@ fn trampoline_executes_sequence_of_null_literals() {
     assert_eq!(result, Value::null());
 }
 
-/// `42` exercises LdaSmi8 (8-bit signed-integer load to the accumulator) on
+/// `42` exercises `LdaSmi8` (8-bit signed-integer load to the accumulator) on
 /// top of the existing Lda*-style return path.
 #[test]
 fn trampoline_executes_smi8_literal() {
@@ -93,7 +93,7 @@ fn trampoline_executes_smi8_literal() {
 }
 
 /// A SMI outside the i8 range exercises the wider Load/Lda forms that fall
-/// back to LoadSmi or LoadConst, depending on what the compiler picks.
+/// back to `LoadSmi` or `LoadConst`, depending on what the compiler picks.
 #[test]
 fn trampoline_executes_smi_larger_than_byte() {
     let unit = compile_test_unit(5, "1000");
@@ -127,7 +127,7 @@ fn trampoline_executes_smi_sequence_returns_last_value() {
     assert_eq!(result, Value::from_smi(3));
 }
 
-/// `if (true) 1; else 2;` exercises a JumpIfFalse over the consequent.
+/// `if (true) 1; else 2;` exercises a `JumpIfFalse` over the consequent.
 #[test]
 fn trampoline_executes_if_true_consequent() {
     let unit = compile_test_unit(7, "if (true) { 1 } else { 2 }");
@@ -143,7 +143,7 @@ fn trampoline_executes_if_true_consequent() {
     assert_eq!(result, Value::from_smi(1));
 }
 
-/// `if (false) 1; else 2;` takes the else branch via JumpIfFalse.
+/// `if (false) 1; else 2;` takes the else branch via `JumpIfFalse`.
 #[test]
 fn trampoline_executes_if_false_alternate() {
     let unit = compile_test_unit(8, "if (false) { 1 } else { 2 }");

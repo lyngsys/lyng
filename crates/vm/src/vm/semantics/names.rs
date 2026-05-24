@@ -92,7 +92,7 @@ pub struct OpCapturedNameArgs {
 // Globals with feedback — LoadGlobal / StoreGlobal / AssignGlobal
 // =====================================================================
 
-pub(crate) fn op_load_global_semantic(
+pub fn op_load_global_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -192,21 +192,21 @@ fn op_store_or_assign_global_semantic(
     }
 }
 
-pub(crate) fn op_store_global_semantic(
+pub fn op_store_global_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
     op_store_or_assign_global_semantic(state, args, false)
 }
 
-pub(crate) fn op_assign_global_semantic(
+pub fn op_assign_global_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
     op_store_or_assign_global_semantic(state, args, true)
 }
 
-pub(crate) fn op_delete_global_semantic(
+pub fn op_delete_global_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -240,7 +240,7 @@ pub(crate) fn op_delete_global_semantic(
 // AssignName / AssignVariableName / DeleteName
 // =====================================================================
 
-pub(crate) fn op_load_name_semantic(
+pub fn op_load_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -274,7 +274,7 @@ pub(crate) fn op_load_name_semantic(
     }
 }
 
-pub(crate) fn op_resolve_name_semantic(
+pub fn op_resolve_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -308,7 +308,7 @@ pub(crate) fn op_resolve_name_semantic(
     }
 }
 
-pub(crate) fn op_resolve_global_semantic(
+pub fn op_resolve_global_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -382,21 +382,21 @@ fn op_assign_name_common_semantic(
     }
 }
 
-pub(crate) fn op_assign_name_semantic(
+pub fn op_assign_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
     op_assign_name_common_semantic(state, args, false)
 }
 
-pub(crate) fn op_assign_variable_name_semantic(
+pub fn op_assign_variable_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
     op_assign_name_common_semantic(state, args, true)
 }
 
-pub(crate) fn op_delete_name_semantic(
+pub fn op_delete_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -443,7 +443,7 @@ pub(crate) fn op_delete_name_semantic(
 // `captured_name_register` helper.
 // =====================================================================
 
-pub(crate) fn op_capture_name_semantic(
+pub fn op_capture_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -486,7 +486,7 @@ fn captured_name_register(inner: &DispatchState<'_>, bx: u32) -> Result<u16, Sem
     })
 }
 
-pub(crate) fn op_load_captured_name_semantic(
+pub fn op_load_captured_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCapturedNameArgs,
 ) -> SemanticOutcome {
@@ -519,7 +519,7 @@ pub(crate) fn op_load_captured_name_semantic(
     }
 }
 
-pub(crate) fn op_load_captured_name_this_semantic(
+pub fn op_load_captured_name_this_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCapturedNameArgs,
 ) -> SemanticOutcome {
@@ -544,7 +544,7 @@ pub(crate) fn op_load_captured_name_this_semantic(
     }
 }
 
-pub(crate) fn op_assign_captured_name_semantic(
+pub fn op_assign_captured_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpCapturedNameArgs,
 ) -> SemanticOutcome {
@@ -594,7 +594,7 @@ pub(crate) fn op_assign_captured_name_semantic(
 // exception path.
 // =====================================================================
 
-pub(crate) fn op_load_this_semantic(
+pub fn op_load_this_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -603,7 +603,7 @@ pub(crate) fn op_load_this_semantic(
         let DispatchState { agent, frame, .. } = &mut *inner;
         let this_state = agent.current_execution_context().map_or_else(
             || ThisState::Value(frame.this_value()),
-            |ec| ec.this_state(),
+            lyng_env::ExecutionContext::this_state,
         );
         match this_state {
             ThisState::Value(value) => Ok(value),
@@ -624,7 +624,7 @@ pub(crate) fn op_load_this_semantic(
     }
 }
 
-pub(crate) fn op_load_callee_semantic(
+pub fn op_load_callee_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {
@@ -640,7 +640,7 @@ pub(crate) fn op_load_callee_semantic(
     }
 }
 
-pub(crate) fn op_load_new_target_semantic(
+pub fn op_load_new_target_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpAtomArgs,
 ) -> SemanticOutcome {

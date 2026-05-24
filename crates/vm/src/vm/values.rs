@@ -2075,6 +2075,6 @@ pub(super) fn bytecode_index(id: BytecodeFunctionId) -> usize {
 }
 
 #[inline]
-pub(crate) fn code_index(id: CodeRef) -> usize {
+pub fn code_index(id: CodeRef) -> usize {
     usize::try_from(id.get() - 1).expect("code ref should fit in usize")
 }

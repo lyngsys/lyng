@@ -11,7 +11,7 @@ use lyng_gc::{CodeHandleStoreTarget, RuntimeCodeRecord, ValueStoreTarget};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct InstalledFunction {
+pub struct InstalledFunction {
     pub(super) function: BytecodeFunction,
     pub(super) child_codes: Vec<CodeRef>,
     canonical_atoms: Arc<[Option<AtomId>]>,
@@ -58,7 +58,7 @@ impl InstalledFunction {
     /// trampoline's `frame_pb_base` pointer and to expose feedback /
     /// constant tables to semantic bodies.
     #[inline]
-    pub(crate) fn function(&self) -> &BytecodeFunction {
+    pub(crate) const fn function(&self) -> &BytecodeFunction {
         &self.function
     }
 
@@ -562,6 +562,10 @@ fn validate_instruction_jump_target(
     Ok(())
 }
 
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "jump operands are read from encoded bytecode fields and sign-extended back to their declared i16/i8 forms"
+)]
 const fn jump_delta(instruction: Instruction) -> Option<i32> {
     match instruction {
         Instruction::Ax {

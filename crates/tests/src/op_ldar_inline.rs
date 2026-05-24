@@ -96,13 +96,13 @@ fn ldar_with_function_call_result() {
     // destination accumulator-bound add operand triggers the Ldar
     // peephole rewrite).
     let value = run_script(
-        r#"
+        r"
         (function() {
             function add(x, y) { return x + y; }
             var r = add(3, 4);
             return r + 1;
         })();
-        "#,
+        ",
     );
     assert_eq!(value, Value::from_smi(8));
 }

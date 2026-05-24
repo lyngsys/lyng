@@ -88,8 +88,7 @@ fn op_wide_alone_records_prefix_and_continues() {
     // PC past the full wide instruction itself — the semantic body's
     // role here is the prefix bit-flip plus double-prefix guard.
     let mut harness = DslHarness::new();
-    let outcome =
-        harness.with_alpha_dispatch(None, |state| invoke_wide_semantic_via_dsl_harness(state));
+    let outcome = harness.with_alpha_dispatch(None, invoke_wide_semantic_via_dsl_harness);
     match outcome {
         SemanticOutcome::Continue { pc_advance } => {
             assert_eq!(pc_advance, 0, "prefix should not advance PC");

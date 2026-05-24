@@ -1,6 +1,6 @@
-//! Phase 1.B.2 Task 2: integration tests for the inline op_load_const8 port.
+//! Phase 1.B.2 Task 2: integration tests for the inline `op_load_const8` port.
 //!
-//! Exercises each ConstantValue variant that the pre-resolution
+//! Exercises each `ConstantValue` variant that the pre-resolution
 //! pipeline produces in the active code's flat constants array.
 //!
 //! These tests guard the SEMANTIC INVARIANT — they pass equally with
@@ -71,10 +71,10 @@ fn op_load_const8_float_constant() {
     // A float literal compiles to a Float64 constant in the pool.
     // The inline op_load_const8 path reads it via
     // `frame_const_base[idx]` — the same indexed-load as a Smi.
-    let value = run_script("3.14;");
+    let value = run_script("2.5;");
     // Value is a NaN-tag-space Float64; compare by raw bits to avoid
-    // f64 equality pitfalls. 3.14 has a fixed bit pattern.
-    assert_eq!(value, Value::from_f64(3.14));
+    // f64 equality pitfalls. 2.5 has a fixed bit pattern.
+    assert_eq!(value, Value::from_f64(2.5));
 }
 
 #[test]

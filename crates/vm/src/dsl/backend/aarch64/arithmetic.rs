@@ -1,4 +1,4 @@
-//! SMI arithmetic asm fragments for AArch64.
+//! SMI arithmetic asm fragments for `AArch64`.
 //!
 //! Each macro operates on **already-untagged** SMI payloads (32-bit
 //! signed integers in the low half of an X-register, sign-extended).
@@ -73,7 +73,7 @@ macro_rules! sub_smi_overflow {
 /// 32-bit signed multiply with overflow detection AND negative-zero
 /// deferral.
 ///
-/// AArch64 has no W-form `muls`; we compute the full 64-bit product
+/// `AArch64` has no W-form `muls`; we compute the full 64-bit product
 /// via `smull` (sign-extend lhs/rhs to 64 bits, multiply), then check
 /// that the 64-bit result equals its sign-extended 32-bit form.
 ///

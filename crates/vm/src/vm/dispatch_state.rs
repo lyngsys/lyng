@@ -118,7 +118,7 @@ impl<'vm> DispatchState<'vm> {
     }
 
     #[inline]
-    pub(crate) fn code(&self) -> CodeRef {
+    pub(crate) const fn code(&self) -> CodeRef {
         self.frame.code()
     }
 

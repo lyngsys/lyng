@@ -40,7 +40,7 @@ use syn::{
 };
 
 /// A single statement of a handler body.
-pub(crate) enum BodyStmt {
+pub enum BodyStmt {
     /// `dispatch!(...)`, `check_smi!(...)`, etc. The tokens are
     /// re-emitted verbatim; the backend `macro_rules!` macro expands at
     /// the `naked_asm!` call site.
@@ -73,7 +73,7 @@ impl DecodeMode {
     }
 }
 
-pub(crate) struct HandlerAst {
+pub struct HandlerAst {
     /// Function name (e.g. `op_add`).
     pub(crate) name: Ident,
     /// `u8` discriminant of the matching `Opcode` variant. Threaded
@@ -197,7 +197,7 @@ impl Parse for HandlerAst {
         braced!(body_content in input);
         let body = parse_body(&body_content)?;
 
-        Ok(HandlerAst {
+        Ok(Self {
             name,
             opcode_byte,
             layout,
@@ -244,7 +244,7 @@ fn parse_body(input: ParseStream) -> Result<Vec<BodyStmt>> {
     Ok(stmts)
 }
 
-pub(crate) fn parse_handler(input: TokenStream) -> Result<HandlerAst> {
+pub fn parse_handler(input: TokenStream) -> Result<HandlerAst> {
     syn::parse2(input)
 }
 

@@ -333,10 +333,6 @@ impl Vm {
         )
     }
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "spec-shaped VM routine stays contiguous to preserve completion ordering and cleanup invariants"
-    )]
     pub(crate) fn evaluate_indirect_eval_source(
         &mut self,
         agent: &mut Agent,

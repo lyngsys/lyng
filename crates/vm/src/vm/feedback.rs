@@ -1,3 +1,8 @@
+#![allow(
+    clippy::inline_always,
+    reason = "Feedback helpers are dispatch hot-path probes where the call boundary shows up in tight opcode loops"
+)]
+
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
@@ -630,23 +635,23 @@ impl From<KeyedPropertyFamily> for FeedbackKeyedPropertyFamily {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ArithmeticFeedback {
+pub struct ArithmeticFeedback {
     execution_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ComparisonFeedback {
+pub struct ComparisonFeedback {
     execution_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct NamedPropertyFeedback {
+pub struct NamedPropertyFeedback {
     execution_count: u32,
     cache_state: InlineCacheState,
     entry_count: u8,
     entries: [Option<NamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
     /// Bit-packed handler derived from `entries[0]` whenever the cache is
-    /// monomorphic and the entry is OwnData. `NamedPropertyHandler::NONE` in
+    /// monomorphic and the entry is `OwnData`. `NamedPropertyHandler::NONE` in
     /// every other state. Lets the IC cache hit path skip the four-deep call chain
     /// on the common case. Sidecar — `entries` remains the system of record.
     monomorphic_own_data_handler: NamedPropertyHandler,
@@ -660,9 +665,9 @@ pub(crate) struct NamedPropertyFeedback {
     /// and prototype slot offset derived from `entries[0]` whenever the
     /// cache is monomorphic and the entry is a one-hop `PrototypeData`
     /// chain (`dependency_count == 2`). `NamedPropertyProtoHandler::NONE`
-    /// in every other state, including multi-hop PrototypeData. Mutually
+    /// in every other state, including multi-hop `PrototypeData`. Mutually
     /// exclusive with `monomorphic_own_data_handler` in practice — a cache entry is
-    /// either OwnData or PrototypeData.
+    /// either `OwnData` or `PrototypeData`.
     monomorphic_proto_data_handler: NamedPropertyProtoHandler,
     /// Raw `last_invalidation_epoch` u64 captured from the receiver at
     /// proto-cache install time. Catches receiver-side invalidations,
@@ -680,7 +685,7 @@ pub(crate) struct NamedPropertyFeedback {
     /// matching entry is absent, is a `PrototypeData` path, or fails any
     /// other packing eligibility check. The inline cache hit path walks
     /// `polymorphic_own_data_handlers` after the monomorphic word miss and before the
-    /// proto-cache hit path, skipping the slow chain on shapes 2..POLY_LIMIT.
+    /// proto-cache hit path, skipping the slow chain on shapes `2..POLY_LIMIT`.
     /// Mega-poly transition leaves this array zeroed. Sidecar — `entries`
     /// remains the system of record.
     polymorphic_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
@@ -723,7 +728,7 @@ impl DenseIndexCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct KeyedPropertyFeedback {
+pub struct KeyedPropertyFeedback {
     execution_count: u32,
     family: Option<KeyedPropertyFamily>,
     cache_state: InlineCacheState,
@@ -731,11 +736,11 @@ pub(crate) struct KeyedPropertyFeedback {
     named_entries: [Option<KeyedNamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
     dense_entry_count: u8,
     dense_entries: [Option<DenseIndexCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
-    /// Phase 3d named-atom cache handler — packed shape + slot_offset +
+    /// Phase 3d named-atom cache handler — packed shape + `slot_offset` +
     /// writable derived from `named_entries[0].entry` when the cache is
     /// monomorphic and the family is `NamedAtom`. NONE otherwise.
     monomorphic_named_own_data_handler: NamedPropertyHandler,
-    /// Raw `AtomId` (NonZeroU32) of `named_entries[0]` when cache-hit
+    /// Raw `AtomId` (`NonZeroU32`) of `named_entries[0]` when cache-hit
     /// eligible; `0` otherwise. The cache hit path compares against the runtime
     /// atom of the keyed access.
     monomorphic_named_atom: u32,
@@ -746,7 +751,7 @@ pub(crate) struct KeyedPropertyFeedback {
     /// Phase 3e named-atom proto cache handler — packed receiver shape,
     /// prototype shape, and slot offset derived from
     /// `named_entries[0].entry` when monomorphic, family is `NamedAtom`,
-    /// and the entry is one-hop PrototypeData. NONE otherwise; mutually
+    /// and the entry is one-hop `PrototypeData`. NONE otherwise; mutually
     /// exclusive with `monomorphic_named_own_data_handler` for any given keyed-atom
     /// site.
     monomorphic_named_proto_data_handler: NamedPropertyProtoHandler,
@@ -760,14 +765,14 @@ pub(crate) struct KeyedPropertyFeedback {
     /// from `dense_entries[0]` when the cache is monomorphic and the
     /// family is `DenseIndex`. NONE otherwise.
     monomorphic_dense_index_handler: KeyedDenseIndexHandler,
-    /// Phase 3f polymorphic named-atom OwnData sidecar — mirrors the first
+    /// Phase 3f polymorphic named-atom `OwnData` sidecar — mirrors the first
     /// `POLY_LIMIT` `named_entries` whenever the cache is polymorphic, the
     /// family is `NamedAtom`, and the underlying entry packs into a valid
     /// `NamedPropertyHandler`. Each slot is `NamedPropertyHandler::NONE`
-    /// for the corresponding miss conditions (absent entry, PrototypeData
+    /// for the corresponding miss conditions (absent entry, `PrototypeData`
     /// path, or unpackable handler).
     polymorphic_named_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
-    /// Raw `AtomId` (NonZeroU32) paired with each `polymorphic_named_own_data_handlers[i]`.
+    /// Raw `AtomId` (`NonZeroU32`) paired with each `polymorphic_named_own_data_handlers[i]`.
     /// Zero when the slot is empty. The inline cache hit path matches both the
     /// receiver shape (carried in the handler) and the atom against the
     /// runtime keyed access.
@@ -815,7 +820,7 @@ impl CallCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct CallFeedback {
+pub struct CallFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
     cache_state: InlineCacheState,
@@ -867,7 +872,7 @@ impl ConstructCacheEntry {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ConstructFeedback {
+pub struct ConstructFeedback {
     execution_count: u32,
     expected_arity: Option<u16>,
     cache_state: InlineCacheState,
@@ -880,7 +885,7 @@ pub(crate) struct ConstructFeedback {
 // `FeedbackEntry`. The enum variants are still constructed only through
 // the methods on this file; outside this module the type is opaque.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FeedbackSiteState {
+pub enum FeedbackSiteState {
     Arithmetic(ArithmeticFeedback),
     Comparison(ComparisonFeedback),
     NamedProperty(NamedPropertyFeedback),
@@ -911,12 +916,12 @@ impl NamedPropertyFeedback {
     /// `monomorphic_proto_data_handler`, `polymorphic_own_data_handlers`, and their paired
     /// invalidation-epoch snapshots) from the current cache state. Called
     /// after any mutation that may have changed an active entry, the
-    /// cache_state, or the entry_count.
+    /// `cache_state`, or the `entry_count`.
     ///
     /// State semantics:
     /// - `Uninitialized` / `Megamorphic` — all sidecars cleared.
-    /// - `Monomorphic` — populate `monomorphic_own_data_handler` (OwnData) or
-    ///   `monomorphic_proto_data_handler` (one-hop PrototypeData) from `entries[0]`.
+    /// - `Monomorphic` — populate `monomorphic_own_data_handler` (`OwnData`) or
+    ///   `monomorphic_proto_data_handler` (one-hop `PrototypeData`) from `entries[0]`.
     /// - `Polymorphic` (Phase 3f) — pack the first `POLY_LIMIT` `entries`
     ///   into `polymorphic_own_data_handlers` via `NamedPropertyHandler::from_entry`;
     ///   non-OwnData entries and unpackable handlers leave a `NONE` slot
@@ -1162,7 +1167,7 @@ impl KeyedPropertyFeedback {
     /// `monomorphic_named_proto_data_handler`, `monomorphic_dense_index_handler`,
     /// `polymorphic_named_own_data_handlers`, `polymorphic_dense_index_handlers`, plus paired
     /// atom / epoch snapshots) from the current cache state. Called from
-    /// every mutation that may change an active entry, the cache_state,
+    /// every mutation that may change an active entry, the `cache_state`,
     /// or the family. Mirrors
     /// [`NamedPropertyFeedback::refresh_monomorphic_own_data_handler`] but covers both
     /// the named-atom and dense-index families.
@@ -1217,7 +1222,7 @@ impl KeyedPropertyFeedback {
                         self.polymorphic_named_own_data_epochs[slot] = keyed_entry
                             .entry
                             .dependency(0)
-                            .and_then(|d| d.invalidation_epoch())
+                            .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
                             .unwrap_or(0);
                     }
                 }
@@ -1259,7 +1264,7 @@ impl KeyedPropertyFeedback {
                     *mono_epoch = keyed_entry
                         .entry
                         .dependency(0)
-                        .and_then(|d| d.invalidation_epoch())
+                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
                         .unwrap_or(0);
                 }
             }
@@ -1272,12 +1277,12 @@ impl KeyedPropertyFeedback {
                     *proto_receiver_epoch = keyed_entry
                         .entry
                         .dependency(0)
-                        .and_then(|d| d.invalidation_epoch())
+                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
                         .unwrap_or(0);
                     *proto_prototype_epoch = keyed_entry
                         .entry
                         .dependency(1)
-                        .and_then(|d| d.invalidation_epoch())
+                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
                         .unwrap_or(0);
                 }
             }
@@ -2187,7 +2192,7 @@ impl Vm {
     }
 
     #[inline]
-    fn named_own_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
+    const fn named_own_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2199,7 +2204,7 @@ impl Vm {
     }
 
     #[inline]
-    fn named_own_outline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
+    const fn named_own_outline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2211,7 +2216,9 @@ impl Vm {
     }
 
     #[inline]
-    fn named_proto_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64, u64, u64)> {
+    const fn named_proto_inline_load_header(
+        site: &FeedbackSiteState,
+    ) -> Option<(u64, u64, u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2278,11 +2285,12 @@ impl Vm {
             }
         }
 
-        let mut mirrored = false;
-        if let Some(site) = self.feedback_vectors[index].site_mut(slot) {
-            site.record_execution();
-            mirrored = true;
-        }
+        let mirrored = self.feedback_vectors[index]
+            .site_mut(slot)
+            .is_some_and(|site| {
+                site.record_execution();
+                true
+            });
         if mirrored {
             self.mirror_flat_slot(code, slot);
         }
@@ -2500,7 +2508,7 @@ impl Vm {
         });
     }
 
-    /// Read the bit-packed monomorphic OwnData IC handler plus its paired
+    /// Read the bit-packed monomorphic `OwnData` IC handler plus its paired
     /// dependency-invalidation epoch for one feedback slot. Returns `None`
     /// when the slot is absent, the site isn't a named-property site, or the
     /// cache is in any state other than monomorphic-OwnData. The caller
@@ -2528,11 +2536,11 @@ impl Vm {
         }
     }
 
-    /// Read the bit-packed one-hop PrototypeData IC handler plus its paired
+    /// Read the bit-packed one-hop `PrototypeData` IC handler plus its paired
     /// receiver and prototype invalidation epochs for one feedback slot.
     /// Returns `None` when the slot is absent, the site isn't a named-
     /// property site, or the cache is in any state other than monomorphic
-    /// one-hop PrototypeData (`dependency_count == 2`). Phase 3e IC cache
+    /// one-hop `PrototypeData` (`dependency_count == 2`). Phase 3e IC cache
     /// path entry point — mirrors [`Self::named_property_own_data_handler`]
     /// but for the prototype-method-dispatch hot path.
     #[inline(always)]
@@ -2562,13 +2570,14 @@ impl Vm {
     /// so the inline cache hit path stays semantically identical.
     #[inline(always)]
     pub(super) fn record_named_property_cache_hit(&mut self, code: CodeRef, slot: FeedbackSlotId) {
-        let mut wrote = false;
-        if let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) {
-            if let Some(site) = vector.site_mut(slot) {
-                site.record_execution();
-                wrote = true;
-            }
-        }
+        let wrote = if let Some(vector) = self.feedback_vectors.get_mut(code_index(code))
+            && let Some(site) = vector.site_mut(slot)
+        {
+            site.record_execution();
+            true
+        } else {
+            false
+        };
         if wrote {
             self.mirror_flat_slot(code, slot);
         }
@@ -2608,7 +2617,7 @@ impl Vm {
     ///   - the site is a `KeyedProperty` site,
     ///   - cache state is monomorphic + family is `NamedAtom`,
     ///   - the cached atom equals the runtime `atom`,
-    ///   - the cached entry is one-hop PrototypeData.
+    ///   - the cached entry is one-hop `PrototypeData`.
     #[inline(always)]
     pub(super) fn keyed_property_named_proto_data_handler(
         &self,
@@ -2658,7 +2667,7 @@ impl Vm {
     /// hit. Returns `None` when the slot is absent, the site isn't a
     /// named-property site, the cache isn't polymorphic, or no cached
     /// shape matches. Sibling to [`Self::named_property_own_data_handler`]
-    /// for shapes 2..POLY_LIMIT; the inline call site checks the
+    /// for shapes `2..POLY_LIMIT`; the inline call site checks the
     /// monomorphic word first, then walks here on miss.
     #[inline(always)]
     pub(super) fn named_property_polymorphic_own_data_handler(
@@ -2684,7 +2693,7 @@ impl Vm {
     /// Phase 3f polymorphic-OwnData keyed-named IC cache-hit lookup.
     /// Walks the named-atom polymorphic sidecar matching both the runtime
     /// `atom` and the receiver shape. Sibling to
-    /// [`Self::keyed_property_named_own_data_handler`] for shapes 2..POLY_LIMIT
+    /// [`Self::keyed_property_named_own_data_handler`] for shapes `2..POLY_LIMIT`
     /// of a keyed-atom site.
     #[inline(always)]
     pub(super) fn keyed_property_named_polymorphic_own_data_handler(
@@ -2718,7 +2727,7 @@ impl Vm {
     /// Phase 3f polymorphic dense-index keyed IC cache-hit lookup. Walks
     /// the `[KeyedDenseIndexHandler; POLY_LIMIT]` sidecar for a shape+flags
     /// match. Mirrors `keyed_property_dense_index_handler` for shapes
-    /// 2..POLY_LIMIT.
+    /// `2..POLY_LIMIT`.
     #[inline(always)]
     pub(super) fn keyed_property_dense_polymorphic_handlers(
         &self,
@@ -3068,19 +3077,21 @@ impl Vm {
     /// slot it summarizes. Returns `Ok(())` on full match, or
     /// `Err((slot_index, diff_string))` describing the first divergence.
     #[doc(hidden)]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "debug assertion walks every flat feedback shape in one ordered comparison for readable mismatch reports"
+    )]
     pub fn feedback_flat_matches_legacy(&self, code: CodeRef) -> Result<(), (usize, String)> {
         let index = code_index(code);
         let legacy_sites: &[Option<FeedbackSiteState>] = self
             .feedback_vectors
             .get(index)
-            .map(|vector| vector.sites.as_slice())
-            .unwrap_or(&[]);
+            .map_or(&[], |vector| vector.sites.as_slice());
         let empty_flat: &[crate::dsl::feedback_flat::FeedbackEntry] = &[];
         let flat: &[crate::dsl::feedback_flat::FeedbackEntry] = self
             .feedback_flat_storage
             .get(index)
-            .map(std::ops::Deref::deref)
-            .unwrap_or(empty_flat);
+            .map_or(empty_flat, std::ops::Deref::deref);
         // Both storages may differ in length only when the legacy vector
         // is still unallocated and the flat array carries install-time
         // capacity. In that case every flat entry must be empty.

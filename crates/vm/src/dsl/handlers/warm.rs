@@ -7,6 +7,12 @@
 //! categorical (used to determine inlining heuristics in the DSL
 //! optimizer + dispatch table organization later in DSL-1).
 
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::not_unsafe_ptr_arg_deref,
+    reason = "DSL warm shims receive decoded raw operand slots from LLInt assembly; explicit narrowing reconstructs the bytecode operand widths before semantic dispatch"
+)]
+
 #[cfg(target_arch = "aarch64")]
 use crate::{
     branch_i8_negative, branch_nonzero, call_slow, check_bool, decode_a, decode_ab, decode_abx,
@@ -70,7 +76,7 @@ pub extern "C" fn op_jump8_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let delta = (offset_raw as i8) as i32;
+    let delta = i32::from(offset_raw as i8);
     let args = crate::vm::semantics::control_flow::OpJumpArgs {
         delta,
         instruction_len: 2,
@@ -101,7 +107,7 @@ pub extern "C" fn op_jump_if_true_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let delta = (offset_raw as i16) as i32;
+    let delta = i32::from(offset_raw as i16);
     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
         condition_register: condition as u16,
         delta,
@@ -128,7 +134,7 @@ pub extern "C" fn op_jump_if_false_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let delta = (offset_raw as i16) as i32;
+    let delta = i32::from(offset_raw as i16);
     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
         condition_register: condition as u16,
         delta,
@@ -161,7 +167,7 @@ pub extern "C" fn op_jump_if_true8_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let delta = (offset_raw as i8) as i32;
+    let delta = i32::from(offset_raw as i8);
     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
         condition_register: condition as u16,
         delta,
@@ -201,7 +207,7 @@ pub extern "C" fn op_jump_if_false8_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    let delta = (offset_raw as i8) as i32;
+    let delta = i32::from(offset_raw as i8);
     let args = crate::vm::semantics::control_flow::OpJumpIfArgs {
         condition_register: condition as u16,
         delta,

@@ -17,7 +17,7 @@
 //!
 //! From there, bank offsets (0, 2048, 4096) index into the three
 //! `[u64; 256]` banks. All bank offsets are 8-byte-aligned and within
-//! the AArch64 LDR/STR `#imm` range.
+//! the `AArch64` LDR/STR `#imm` range.
 //!
 //! Emitted shape (4 instructions per increment):
 //!
@@ -33,7 +33,7 @@
 //! - **Dispatch bank** (`inc_dispatch_counter!`) uses `x9, x10`. Emitted
 //!   as the FIRST body fragment, BEFORE the operand-decode prologue —
 //!   no live operand values to clobber.
-//! - **Slow_semantic / Slow_safepoint banks** use `x16, x17` (AAPCS64
+//! - **`Slow_semantic` / `Slow_safepoint` banks** use `x16, x17` (AAPCS64
 //!   IP0/IP1 scratch). Emitted INSIDE `call_slow!` / `poll_safepoint!`
 //!   AFTER the operand-decode prologue, so any live operands in x9..x15
 //!   are preserved. The `call_slow!` bridge subsequently reloads x16/x17
@@ -47,10 +47,10 @@
 //! ## Bank-offset encoding
 //!
 //! - Dispatch bank: literal `<op>*8`. For op < 256, max offset = 2040 (≤ 32760 scaled-immediate range).
-//! - Slow_semantic bank: literal `<op>*8 + 2048`. Max = 4088.
-//! - Slow_safepoint bank: literal `<op>*8 + 4096`. Max = 6136.
+//! - `Slow_semantic` bank: literal `<op>*8 + 2048`. Max = 4088.
+//! - `Slow_safepoint` bank: literal `<op>*8 + 4096`. Max = 6136.
 //!
-//! All within AArch64's `LDR Xt, [Xn, #imm]` scaled-u64 immediate range (#0..#32760).
+//! All within `AArch64`'s `LDR Xt, [Xn, #imm]` scaled-u64 immediate range (#0..#32760).
 
 // =============================================================================
 // Opcode-counters feature ON: emit real counter increments.

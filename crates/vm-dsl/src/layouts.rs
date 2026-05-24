@@ -6,7 +6,7 @@
 //! the layout to (a) validate the operand binding count and (b) emit the
 //! per-handler decode prologue.
 //!
-//! The decode prologue is emitted as a TokenStream that the consumer
+//! The decode prologue is emitted as a `TokenStream` that the consumer
 //! crate's backend macros (`decode_abc!`, `decode_ab!`, `decode_ax!`,
 //! etc., under `crates/vm/src/dsl/backend/aarch64/operands.rs`)
 //! expand into a `concat!(...)`-produced asm fragment. The operand
@@ -19,7 +19,7 @@ use quote::quote;
 use syn::{Error, Ident, Result};
 
 #[derive(Clone, Copy)]
-pub(crate) enum Layout {
+pub enum Layout {
     /// Single register operand (e.g. `op_ldar a`).
     A,
     /// Two register operands.

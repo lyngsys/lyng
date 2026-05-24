@@ -1,9 +1,9 @@
-//! Phase 1.B.2 Task 3: integration tests for the inline op_load_this port.
+//! Phase 1.B.2 Task 3: integration tests for the inline `op_load_this` port.
 //!
 //! Exercises the inline read of `LlIntState::frame_this_value` plus the
 //! sentinel-bail comparison against `Value::uninitialized_lexical()`.
 //!
-//! ThisState arms covered:
+//! `ThisState` arms covered:
 //! - `ThisState::Value(v)`: inline fast path reads the mirror and returns `v`.
 //! - `ThisState::Lexical`: arrow function captures the enclosing frame's
 //!   `this`; the inline path observes the sentinel-or-resolved value
@@ -118,12 +118,12 @@ fn op_load_this_in_nested_call_preserves_outer_this() {
     // returns the OUTER's `this.kind` to catch any cross-frame
     // contamination.
     let value = run_script(
-        r#"
+        r"
             (function() {
                 (function() { return this.kind; }).call({kind: 'inner'});
                 return this.kind;
             }).call({kind: 'outer'});
-        "#,
+        ",
     );
     // The outer's `this.kind` is 'outer'; assert the value is a
     // string and (looser, since we can't directly inspect string
@@ -145,7 +145,7 @@ fn op_load_this_in_arrow_inside_loop_remains_stable() {
     // The script returns the sum 100 * this.unit. With this.unit = 1
     // that's 100.
     let value = run_script(
-        r#"
+        r"
             (function() {
                 var total = 0;
                 var read_this = () => this.unit;
@@ -154,7 +154,7 @@ fn op_load_this_in_arrow_inside_loop_remains_stable() {
                 }
                 return total;
             }).call({unit: 1});
-        "#,
+        ",
     );
     assert_eq!(value, Value::from_smi(100));
 }

@@ -2,8 +2,13 @@
 //!
 //! Each entry is a JS function that exercises the named opcode in a hot
 //! `for` loop. The harness compiles the function, calls it with the
-//! iteration count, and measures wall time. ns/dispatch = wall_time_ns /
-//! (iters * opcodes_per_iter).
+//! iteration count, and measures wall time. ns/dispatch = `wall_time_ns` /
+//! (iters * `opcodes_per_iter`).
+
+#![allow(
+    clippy::cast_precision_loss,
+    reason = "microbench verification intentionally reports integer counter ratios as f64 diagnostics"
+)]
 
 use std::collections::HashMap;
 
@@ -22,6 +27,10 @@ pub struct Snippet {
 /// Snippets that need accurate per-iter counts can be verified by running
 /// the snippet under `lyng-bench runtime --count-opcodes`.
 #[must_use]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the microbench suite is a single opcode-to-snippet manifest kept in bytecode-family order for auditability"
+)]
 pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     let mut map = HashMap::new();
 
@@ -495,9 +504,11 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // =====================================================================
     // Phase-1.B anchor opcodes (DSL-1 Phase 1.B.0 Task 8).
     //
-    // The slot-specialised local loaders (`LoadLocalN`) and the captured-
-    // environment loader (`LoadEnvSlot`) are exercised by reading the
-    // target slot four times per iteration.
+    // The slot-specialised local loaders (`LoadLocalN`) are exercised by
+    // copying a target parameter into a `var` local four times per
+    // iteration. Arithmetic expressions can read frame-local operands
+    // directly, bypassing the `Move` emission that the bytecode builder
+    // compacts into `LoadLocalN`.
     //
     // Slot placement: function parameters are the only reliable way to
     // land a binding in register slots 1..3. `let` bindings in the lyng
@@ -512,26 +523,28 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // =====================================================================
 
     // LoadLocal0: bench(iters)'s `iters` parameter sits at register 0 in
-    // the lyng calling convention. Reading `iters` four times per iter
-    // emits `LoadLocal0 dst, r0` because the peephole prefers the slot-0
-    // specialized form over a generic `Move dst, r0`. Plus the loop's
-    // `i < iters` test loads `iters` once more per iteration, yielding
-    // 5 LoadLocal0 dispatches per iter total (verified empirically:
-    // 5001 dispatches for ITERS=1000 in the verify_opcodes_per_iter test).
+    // the lyng calling convention. `s` is deliberately placed above the
+    // `Star0..7` range so assigning `iters` into `s` emits `Move dst=s,
+    // src=0`, which the bytecode-builder peephole rewrites to
+    // `LoadLocal0`.
     map.insert(
         "LoadLocal0",
         Snippet {
             opcode: "LoadLocal0",
             source: r"
             function bench(iters) {
-                let s = 0;
+                var d0 = 0, d1 = 0, d2 = 0, d3 = 0;
+                var s = 0;
                 for (let i = 0; i < iters; i++) {
-                    s = iters + iters + iters + iters;
+                    s = iters;
+                    s = iters;
+                    s = iters;
+                    s = iters;
                 }
                 return s;
             }
         ",
-            opcodes_per_iter: 5,
+            opcodes_per_iter: 4,
         },
     );
 
@@ -547,9 +560,12 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
             opcode: "LoadLocal1",
             source: r"
             function bench(iters, p1) {
-                let s = 0;
+                var s = 0;
                 for (let i = 0; i < iters; i++) {
-                    s = p1 + p1 + p1 + p1;
+                    s = p1;
+                    s = p1;
+                    s = p1;
+                    s = p1;
                 }
                 return s;
             }
@@ -565,9 +581,12 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
             opcode: "LoadLocal2",
             source: r"
             function bench(iters, p1, p2) {
-                let s = 0;
+                var s = 0;
                 for (let i = 0; i < iters; i++) {
-                    s = p2 + p2 + p2 + p2;
+                    s = p2;
+                    s = p2;
+                    s = p2;
+                    s = p2;
                 }
                 return s + p1;
             }
@@ -583,9 +602,12 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
             opcode: "LoadLocal3",
             source: r"
             function bench(iters, p1, p2, p3) {
-                let s = 0;
+                var s = 0;
                 for (let i = 0; i < iters; i++) {
-                    s = p3 + p3 + p3 + p3;
+                    s = p3;
+                    s = p3;
+                    s = p3;
+                    s = p3;
                 }
                 return s + p1 + p2;
             }
@@ -770,6 +792,7 @@ mod verify_counts {
     use lyng_parser::parse_script;
     use lyng_sema::analyze_script;
     use lyng_vm::Vm;
+    use std::fmt::Write as _;
 
     fn run_one(snippet: &Snippet, iters: u64) -> Vec<(String, u64)> {
         let src = format!("{}\nbench({});\n", snippet.source, iters);
@@ -935,10 +958,12 @@ mod verify_counts {
             } else {
                 actual as f64 / expected as f64
             };
-            report.push_str(&format!(
+            writeln!(
+                report,
                 "[{name:>14}] declared per-iter={declared_per_iter} expected={expected} \
-                 actual_for_op={actual} ratio={ratio:.3}\n  top: {top:?}\n",
-            ));
+                 actual_for_op={actual} ratio={ratio:.3}\n  top: {top:?}"
+            )
+            .expect("writing to a String cannot fail");
             // Require actual count to be within ±5% of declared expected,
             // and at least one dispatch of the named opcode.
             if actual == 0 {
@@ -946,7 +971,7 @@ mod verify_counts {
                     "{name}: expected at least {expected} dispatches of `{name}`, got 0 \
                      (top: {top:?})"
                 ));
-            } else if ratio < 0.95 || ratio > 1.05 {
+            } else if !(0.95..=1.05).contains(&ratio) {
                 bad.push(format!(
                     "{name}: expected {expected} dispatches of `{name}` (within 5%), got {actual} \
                      (ratio={ratio:.3}, top: {top:?})"
