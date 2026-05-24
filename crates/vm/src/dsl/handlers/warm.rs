@@ -15,8 +15,8 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    branch_i8_negative, branch_nonzero, call_slow, check_bool, decode_a, decode_ab, decode_abx,
-    decode_ax, dispatch, dispatch_after_slow, jump_relative_i8_and_dispatch, load_reg,
+    branch_i8_negative, branch_nonzero, branch_zero, call_slow, check_bool, decode_a, decode_ab,
+    decode_abx, decode_ax, dispatch, dispatch_after_slow, jump_relative_i8_and_dispatch, load_reg,
     poll_safepoint, untag_bool,
 };
 
@@ -57,15 +57,56 @@ pub extern "C" fn op_loop_header_poll_rs(
 
 // =====================================================================
 // op_jump8 (B44) — 1-byte i8 delta variant. Layout A in the DSL
-// (single byte at PC+1), length = 2.
+// (single byte at PC+1), length = 2. Mirrors `op_jump`'s inline shape:
+// forward and backward (no pending poll) paths apply the signed i8
+// delta inline; pending-poll hands off to `op_jump8_poll_rs`.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump8, opcode_byte = 141, layout = A, length = 2, |offset| {
-        call_slow!(op_jump8_slow_rs, args = [offset]);
+        branch_i8_negative!(offset, .taken_backward);
+        jump_relative_i8_and_dispatch!(offset, advance = 2);
+        .taken_backward:
+        poll_safepoint!(.poll_pending);
+        jump_relative_i8_and_dispatch!(offset, advance = 2);
+        .poll_pending:
+        call_slow!(op_jump8_poll_rs, args = [offset]);
         dispatch_after_slow!();
     }
+}
+
+/// Pending-poll shim for backward `op_jump8`. Mirrors `op_jump_poll_rs`:
+/// runs `run_poll` to consume `vm.poll_pending`, then applies the
+/// sign-extended i8 delta and returns `Continue { pc_advance }` so the
+/// asm bridge advances PC past the whole jump.
+#[cfg(target_arch = "aarch64")]
+#[unsafe(no_mangle)]
+pub extern "C" fn op_jump8_poll_rs(
+    state: *mut crate::dsl::llint_state::LlIntState,
+    offset_raw: u32,
+) -> crate::dsl::slow_path::SlowPathReturn {
+    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
+    dispatch.sync_from_asm();
+    match crate::dsl::poll::run_poll(&mut dispatch, crate::dsl::poll::PollArgs) {
+        crate::dsl::slow_path::SemanticOutcome::Continue { .. } => {}
+        outcome => return dispatch.translate_outcome(outcome),
+    }
+    let delta = i32::from(offset_raw as i8);
+    let instruction_offset = dispatch.current_instruction_offset();
+    let target = i64::from(instruction_offset) + 2 + i64::from(delta);
+    if target < 0 || target > i64::from(u32::MAX) {
+        let code = dispatch.dispatch_state().frame.code();
+        return dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError {
+            error: crate::error::VmError::InvalidJumpTarget {
+                code,
+                instruction_offset,
+                target_offset: target,
+            },
+        });
+    }
+    let pc_advance = (2_i64 + i64::from(delta)) as u32;
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance })
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -90,6 +131,15 @@ pub extern "C" fn op_jump8_slow_rs(
 // i16 delta), length = 4.
 // =====================================================================
 
+// `op_jump_if_true` uses an i16 delta (Abx layout: ldrh into the offset
+// scratch zero-extends the raw u16). The backend has no i16 jump macros
+// (only i8 / i32), and the issue forbids touching backend macros, so
+// the full inline path (with sxth-based delta application) is not
+// expressible here. Adding a partial inline (only the not-taken case)
+// would put a 10-insn bool check on the dominant taken-bool-true loop
+// hot path for no inline win, so this handler stays all-slow until the
+// backend gains an i16 jump primitive — at which point it can mirror
+// `op_jump_if_false8`'s shape on the `Abx` operand.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_true, opcode_byte = 64, layout = Abx, length = 4, |condition, offset| {
@@ -153,6 +203,18 @@ pub extern "C" fn op_jump_if_false_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_true8, opcode_byte = 142, layout = Ab, length = 3, |condition, offset| {
+        load_reg!(condition => t0);
+        check_bool!(t0, .slow);
+        untag_bool!(t0);
+        branch_zero!(t0, .not_taken);
+        branch_i8_negative!(offset, .taken_backward);
+        jump_relative_i8_and_dispatch!(offset, advance = 3);
+        .taken_backward:
+        poll_safepoint!(.slow);
+        jump_relative_i8_and_dispatch!(offset, advance = 3);
+        .not_taken:
+        dispatch!(advance = 3);
+        .slow:
         call_slow!(op_jump_if_true8_slow_rs, args = [condition, offset]);
         dispatch_after_slow!();
     }
