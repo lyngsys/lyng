@@ -106,12 +106,12 @@ Per
 
 | Macro                 | Effect                                              | Fast-path cost (AArch64)     |
 | --------------------- | --------------------------------------------------- | ---------------------------- |
-| `check_smi!`          | Branch to label if `reg` is not an SMI              | mov + movk + and + mov + movk + cmp + b.ne (constants hoisted: AND + CMP + B.NE) |
+| `check_smi!`          | Branch to label if `reg` is not an SMI              | lsr + movz + movk + cmp + b.ne (5 insns, kind = 4) |
 | `check_object_ref!`   | Branch to label if `reg` is not an ObjectRef        | same shape, kind = 5         |
 | `check_string_ref!`   | Branch to label if `reg` is not a StringRef         | same shape, kind = 6         |
-| `check_undefined!`    | Branch to label if `reg` is not `undefined`         | mov + movk + cmp + b.ne (CMP + B.NE) |
+| `check_undefined!`    | Branch to label if `reg` is not `undefined`         | movz + movk + cmp + b.ne (4 insns) |
 | `check_null!`         | Branch to label if `reg` is not `null`              | same shape                   |
-| `check_bool!`         | Branch to label if `reg` is not a Boolean           | AND + CMP + B.NE             |
+| `check_bool!`         | Branch to label if `reg` is not a Boolean           | lsr + movz + movk + cmp + b.ne (5 insns, kind = 3) |
 | `check_double!`       | Branch to label if `reg` *is* tagged (i.e. not double) | LSR + CMP + B.EQ          |
 | `untag_smi!`          | Sign-extend low 32 bits in-place                    | 1 sxtw                       |
 | `untag_object_ref!`   | Zero-extend low 32 bits in-place                    | 1 uxtw                       |

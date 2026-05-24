@@ -7,16 +7,29 @@
 //!
 //! Predicate shapes:
 //!
-//! - **SMI / `ObjectRef` / `StringRef` / etc.**: `(bits & MASK_KIND_HDR) == PATTERN_KIND`
-//!   where `MASK_KIND_HDR = 0x7fff_ffff_0000_0000` and
-//!   `PATTERN_KIND = 0x7ff8_<kind>_0000_0000` — 4 instructions
-//!   (MOVZ/MOVK/AND/MOVZ/MOVK/CMP/B.NE).
+//! - **SMI / `ObjectRef` / `StringRef` / `Bool`**: the high 32 bits of any
+//!   tagged value are exactly `0x7ff8_000K` where `K` is the
+//!   `TagKind`. We `lsr xN, #32` into a scratch (extracting only the
+//!   tag-bearing word and zeroing the payload simultaneously), build
+//!   `0x7ff8_000K` in a second scratch via `MOVZ`+`MOVK`, then `CMP w`
+//!   (32-bit form) and `B.NE`. 5 instructions total
+//!   (`LSR`/`MOVZ`/`MOVK`/`CMP`/`B.NE`), down from the previous
+//!   `AND`-`MOVZ`-`MOVK`-`CMP` 7-insn shape.
 //! - **Undefined / Null**: full 64-bit `CMP` against the canonical
-//!   pattern (payload is always 0) — 2 instructions (CMP/B.NE).
-//! - **Bool**: same shape as SMI; payload is 0/1.
+//!   pattern (payload is always 0) — 4 instructions
+//!   (MOVZ/MOVK/CMP/B.NE). The 32-bit lsr trick saves nothing here
+//!   because the comparand `0x7ff8_0001` (etc.) doesn't fit a 12-bit
+//!   `CMP` immediate, so we'd still need 2 insns to materialize it.
 //! - **Double**: negation of `is_tagged_bits`. The fast path branches
 //!   to slow only when the value *is* tagged — `CMP/B.EQ` against
-//!   `0x7ff8_0000_0000_0000` masked.
+//!   `0x7ff8` after an LSR by 48 (3 insns total).
+//!
+//! Note: a single-bit `TBZ`/`TBNZ` predicate is **not** viable for any
+//! of these macros — the 16-bit `TagKind` field carries
+//! non-bit-disjoint values (Bool=3=0b0011, SMI=4=0b0100, ObjectRef=5
+//! =0b0101, etc.), so no single bit distinguishes one kind from
+//! another. The 5-insn LSR/MOVZ/MOVK/CMP/B.NE shape is the shortest
+//! correct sequence for these checks under the current encoding.
 //!
 //! All internal scratch use is on `x16` / `x17` (AAPCS64 "IP0/IP1"
 //! intra-procedure-call temporaries — caller-saved, no agreed-upon
@@ -37,20 +50,22 @@
 // ===========================================================================
 
 /// Check `reg` holds an SMI; branch to `label` on miss.
+///
+/// 5 instructions: `LSR` the value down by 32 to drop the payload and
+/// land the `0x7ff8_<kind>` half-word in `w16`, materialize the
+/// expected `0x7ff8_0004` (SMI kind) in `w17` via `MOVZ`+`MOVK`, then
+/// 32-bit `CMP` and `B.NE`.
 #[macro_export]
 macro_rules! check_smi {
     ($reg:tt, $label:tt) => {
         concat!(
-            // x16 := TAG_HEADER | TAG_KIND_MASK == 0x7fff_ffff_0000_0000
-            "movz   x16, #0xffff, lsl #32\n",
-            "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x",
+            "lsr    x16, x",
             stringify!($reg),
-            ", x16\n",
-            // x17 := TAG_HEADER | (4 << 32) == 0x7ff8_0004_0000_0000
-            "movz   x17, #0x4, lsl #32\n",
-            "movk   x17, #0x7ff8, lsl #48\n",
-            "cmp    x16, x17\n",
+            ", #32\n",
+            // w17 := 0x7ff8_0004 == TAG_HEADER>>32 | SMI kind (4)
+            "movz   w17, #0x4\n",
+            "movk   w17, #0x7ff8, lsl #16\n",
+            "cmp    w16, w17\n",
             "b.ne   ",
             stringify!($label),
             "\n",
@@ -59,18 +74,19 @@ macro_rules! check_smi {
 }
 
 /// Check `reg` holds an `ObjectRef`; branch to `label` on miss.
+///
+/// 5 instructions; see `check_smi!` for the `LSR`/`MOVZ`/`MOVK`/`CMP`/`B.NE`
+/// shape rationale. Comparand is `0x7ff8_0005` (`ObjectRef` kind = 5).
 #[macro_export]
 macro_rules! check_object_ref {
     ($reg:tt, $label:tt) => {
         concat!(
-            "movz   x16, #0xffff, lsl #32\n",
-            "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x",
+            "lsr    x16, x",
             stringify!($reg),
-            ", x16\n",
-            "movz   x17, #0x5, lsl #32\n",
-            "movk   x17, #0x7ff8, lsl #48\n",
-            "cmp    x16, x17\n",
+            ", #32\n",
+            "movz   w17, #0x5\n",
+            "movk   w17, #0x7ff8, lsl #16\n",
+            "cmp    w16, w17\n",
             "b.ne   ",
             stringify!($label),
             "\n",
@@ -79,18 +95,19 @@ macro_rules! check_object_ref {
 }
 
 /// Check `reg` holds a `StringRef`; branch to `label` on miss.
+///
+/// 5 instructions; see `check_smi!` for the `LSR`/`MOVZ`/`MOVK`/`CMP`/`B.NE`
+/// shape rationale. Comparand is `0x7ff8_0006` (`StringRef` kind = 6).
 #[macro_export]
 macro_rules! check_string_ref {
     ($reg:tt, $label:tt) => {
         concat!(
-            "movz   x16, #0xffff, lsl #32\n",
-            "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x",
+            "lsr    x16, x",
             stringify!($reg),
-            ", x16\n",
-            "movz   x17, #0x6, lsl #32\n",
-            "movk   x17, #0x7ff8, lsl #48\n",
-            "cmp    x16, x17\n",
+            ", #32\n",
+            "movz   w17, #0x6\n",
+            "movk   w17, #0x7ff8, lsl #16\n",
+            "cmp    w16, w17\n",
             "b.ne   ",
             stringify!($label),
             "\n",
@@ -133,18 +150,19 @@ macro_rules! check_null {
 }
 
 /// Check `reg` is a Boolean (true or false); branch to `label` on miss.
+///
+/// 5 instructions; see `check_smi!` for the LSR/MOVZ/MOVK/CMP/B.NE
+/// shape rationale. Comparand is `0x7ff8_0003` (Boolean kind = 3).
 #[macro_export]
 macro_rules! check_bool {
     ($reg:tt, $label:tt) => {
         concat!(
-            "movz   x16, #0xffff, lsl #32\n",
-            "movk   x16, #0x7ff8, lsl #48\n",
-            "and    x16, x",
+            "lsr    x16, x",
             stringify!($reg),
-            ", x16\n",
-            "movz   x17, #0x3, lsl #32\n",
-            "movk   x17, #0x7ff8, lsl #48\n",
-            "cmp    x16, x17\n",
+            ", #32\n",
+            "movz   w17, #0x3\n",
+            "movk   w17, #0x7ff8, lsl #16\n",
+            "cmp    w16, w17\n",
             "b.ne   ",
             stringify!($label),
             "\n",
