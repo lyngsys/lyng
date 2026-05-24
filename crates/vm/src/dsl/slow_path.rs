@@ -5,9 +5,9 @@
 //! transitional `LlIntDispatchState` alias are populated. The asm-facing
 //! shim layer and `SlowPathReturn`/`SlowPathTag` lands in DSL-0b.
 
-use lyng_types::Value;
+use lyng_types::{CodeRef, FeedbackSlotId, Value};
 
-use crate::error::VmError;
+use crate::error::{VmError, VmResult};
 
 /// Logical outcome of a semantic-body invocation. The α handler maps
 /// this to `Step`; the DSL cold-stub shim maps it to `SlowPathReturn`.
@@ -406,6 +406,136 @@ pub enum SlowPathTag {
     Exit = 2,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NoDecodeAbxOperands {
+    pub a: u16,
+    pub bx: u32,
+    pub instruction_len: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NoDecodeAbcOperands {
+    pub a: u16,
+    pub b: u16,
+    pub c: u16,
+    pub instruction_len: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct NoDecodeAbcSlotOperands {
+    pub a: u16,
+    pub b: u16,
+    pub c: u16,
+    pub feedback_slot: FeedbackSlotId,
+    pub instruction_len: u32,
+}
+
+#[inline]
+pub(crate) fn decode_no_decode_abx_operands(
+    bytes: &[u8],
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<NoDecodeAbxOperands> {
+    let (a, bx, _feedback_slot, instruction_len) =
+        crate::vm::dispatch::decode_abx_operands(bytes, None, false, code, instruction_offset)?;
+    Ok(NoDecodeAbxOperands {
+        a,
+        bx,
+        instruction_len,
+    })
+}
+
+#[inline]
+pub(crate) fn decode_no_decode_abc_operands(
+    bytes: &[u8],
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<NoDecodeAbcOperands> {
+    let (a, b, c, feedback_slot, instruction_len) =
+        crate::vm::dispatch::decode_abc_operands(bytes, None, false, code, instruction_offset)?;
+    debug_assert_eq!(feedback_slot, None);
+    Ok(NoDecodeAbcOperands {
+        a,
+        b,
+        c,
+        instruction_len,
+    })
+}
+
+#[inline]
+pub(crate) fn decode_no_decode_abc_slot_operands(
+    bytes: &[u8],
+    code: CodeRef,
+    instruction_offset: u32,
+) -> VmResult<NoDecodeAbcSlotOperands> {
+    let (a, b, c, feedback_slot, instruction_len) =
+        crate::vm::dispatch::decode_abc_operands(bytes, None, true, code, instruction_offset)?;
+    let feedback_slot = feedback_slot.ok_or(VmError::InstructionOutOfBounds {
+        code,
+        instruction_offset,
+    })?;
+    Ok(NoDecodeAbcSlotOperands {
+        a,
+        b,
+        c,
+        feedback_slot,
+        instruction_len,
+    })
+}
+
+impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
+    #[inline]
+    pub(crate) fn decode_current_abx_operands(&mut self) -> VmResult<NoDecodeAbxOperands> {
+        let inner = self.dispatch_state();
+        let pc = inner.frame.instruction_offset();
+        let code = inner.code();
+        let bytes = inner
+            .installed
+            .function()
+            .instruction_bytes()
+            .get(pc as usize..)
+            .ok_or(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset: pc,
+            })?;
+        decode_no_decode_abx_operands(bytes, code, pc)
+    }
+
+    #[inline]
+    pub(crate) fn decode_current_abc_operands(&mut self) -> VmResult<NoDecodeAbcOperands> {
+        let inner = self.dispatch_state();
+        let pc = inner.frame.instruction_offset();
+        let code = inner.code();
+        let bytes = inner
+            .installed
+            .function()
+            .instruction_bytes()
+            .get(pc as usize..)
+            .ok_or(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset: pc,
+            })?;
+        decode_no_decode_abc_operands(bytes, code, pc)
+    }
+
+    #[inline]
+    pub(crate) fn decode_current_abc_slot_operands(&mut self) -> VmResult<NoDecodeAbcSlotOperands> {
+        let inner = self.dispatch_state();
+        let pc = inner.frame.instruction_offset();
+        let code = inner.code();
+        let bytes = inner
+            .installed
+            .function()
+            .instruction_bytes()
+            .get(pc as usize..)
+            .ok_or(VmError::InstructionOutOfBounds {
+                code,
+                instruction_offset: pc,
+            })?;
+        decode_no_decode_abc_slot_operands(bytes, code, pc)
+    }
+}
+
 /// Generate an asm-facing cold-stub shim from a semantic body. Keeps
 /// every cold stub's wrapper to one declaration site. Emits a
 /// `#[no_mangle] pub extern "C" fn` that reconstructs an
@@ -447,4 +577,66 @@ macro_rules! dsl_cold_shim {
             dispatch.translate_outcome(outcome)
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lyng_bytecode::Opcode;
+    use lyng_types::{CodeRef, FeedbackSlotId};
+
+    fn code_ref() -> CodeRef {
+        CodeRef::from_raw(1).expect("non-zero code ref")
+    }
+
+    #[test]
+    fn no_decode_abx_operands_decode_from_instruction_bytes() {
+        let bytes = [Opcode::LoadSmi as u8, 7, 0x34, 0x12];
+
+        let decoded = decode_no_decode_abx_operands(&bytes, code_ref(), 0)
+            .expect("Abx no-decode operands should decode");
+
+        assert_eq!(decoded.a, 7);
+        assert_eq!(decoded.bx, 0x1234);
+        assert_eq!(decoded.instruction_len, 4);
+    }
+
+    #[test]
+    fn no_decode_abc_operands_decode_from_instruction_bytes() {
+        let bytes = [Opcode::DefineNamedProperty as u8, 1, 2, 3];
+
+        let decoded = decode_no_decode_abc_operands(&bytes, code_ref(), 0)
+            .expect("Abc no-decode operands should decode");
+
+        assert_eq!(decoded.a, 1);
+        assert_eq!(decoded.b, 2);
+        assert_eq!(decoded.c, 3);
+        assert_eq!(decoded.instruction_len, 4);
+    }
+
+    #[test]
+    fn no_decode_abc_slot_operands_decode_feedback_slot_from_instruction_bytes() {
+        let slot = 11u16;
+        let slot_bytes = slot.to_le_bytes();
+        let bytes = [
+            Opcode::SetNamedProperty as u8,
+            4,
+            5,
+            6,
+            slot_bytes[0],
+            slot_bytes[1],
+        ];
+
+        let decoded = decode_no_decode_abc_slot_operands(&bytes, code_ref(), 0)
+            .expect("AbcSlot no-decode operands should decode");
+
+        assert_eq!(decoded.a, 4);
+        assert_eq!(decoded.b, 5);
+        assert_eq!(decoded.c, 6);
+        assert_eq!(
+            decoded.feedback_slot,
+            FeedbackSlotId::from_raw(u32::from(slot)).unwrap()
+        );
+        assert_eq!(decoded.instruction_len, 6);
+    }
 }

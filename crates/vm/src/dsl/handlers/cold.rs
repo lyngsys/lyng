@@ -304,8 +304,8 @@ llint_handler! {
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, |a, bx| {
-        call_slow!(op_load_smi_slow_rs, args = [a, bx]);
+    op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, decode = Rust, || {
+        call_slow!(op_load_smi_slow_rs, args = []);
         dispatch_after_slow!();
     }
 }
@@ -315,15 +315,20 @@ llint_handler! {
 #[unsafe(no_mangle)]
 pub extern "C" fn op_load_smi_slow_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    let operands = match dispatch.decode_current_abx_operands() {
+        Ok(operands) => operands,
+        Err(error) => {
+            return dispatch
+                .translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError { error });
+        }
+    };
     let args = crate::vm::semantics::loads::OpLoadSmiArgs {
-        a: a as u16,
-        bx: bx,
-        instruction_len: 4u32,
+        a: operands.a,
+        bx: operands.bx,
+        instruction_len: operands.instruction_len,
     };
     let outcome = crate::vm::semantics::loads::op_load_smi_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
@@ -2462,8 +2467,8 @@ pub extern "C" fn op_throw_if_uninitialized_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_define_named_property_dsl, opcode_byte = 73, layout = Abc, length = 4, |a, b, c| {
-        call_slow!(op_define_named_property_slow_rs, args = [a, b, c]);
+    op_define_named_property_dsl, opcode_byte = 73, layout = Abc, length = 4, decode = Rust, || {
+        call_slow!(op_define_named_property_slow_rs, args = []);
         dispatch_after_slow!();
     }
 }
@@ -2473,17 +2478,21 @@ llint_handler! {
 #[unsafe(no_mangle)]
 pub extern "C" fn op_define_named_property_slow_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    b: u32,
-    c: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    let operands = match dispatch.decode_current_abc_operands() {
+        Ok(operands) => operands,
+        Err(error) => {
+            return dispatch
+                .translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError { error });
+        }
+    };
     let args = crate::vm::semantics::property::OpPropertyAbcArgs {
-        a: a as u16,
-        b: b as u16,
-        c: c as u16,
-        instruction_len: 4u32,
+        a: operands.a,
+        b: operands.b,
+        c: operands.c,
+        instruction_len: operands.instruction_len,
     };
     let outcome =
         crate::vm::semantics::property::op_define_named_property_semantic(&mut dispatch, args);
@@ -2690,8 +2699,8 @@ pub extern "C" fn op_get_named_property_slow_rs(
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_set_named_property_dsl, opcode_byte = 78, layout = AbcSlot, length = 6, |a, b, c, slot| {
-        call_slow!(op_set_named_property_slow_rs, args = [a, b, c, slot]);
+    op_set_named_property_dsl, opcode_byte = 78, layout = AbcSlot, length = 6, decode = Rust, || {
+        call_slow!(op_set_named_property_slow_rs, args = []);
         dispatch_after_slow!();
     }
 }
@@ -2701,19 +2710,22 @@ llint_handler! {
 #[unsafe(no_mangle)]
 pub extern "C" fn op_set_named_property_slow_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    b: u32,
-    c: u32,
-    slot: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    let operands = match dispatch.decode_current_abc_slot_operands() {
+        Ok(operands) => operands,
+        Err(error) => {
+            return dispatch
+                .translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError { error });
+        }
+    };
     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
-        a: a as u16,
-        b: b as u16,
-        c: c as u16,
-        feedback_slot: lyng_types::FeedbackSlotId::from_raw(slot),
-        instruction_len: 6u32,
+        a: operands.a,
+        b: operands.b,
+        c: operands.c,
+        feedback_slot: Some(operands.feedback_slot),
+        instruction_len: operands.instruction_len,
     };
     let outcome =
         crate::vm::semantics::property::op_set_named_property_semantic(&mut dispatch, args);

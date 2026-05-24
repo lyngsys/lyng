@@ -7,6 +7,16 @@
 //! }
 //! ```
 //!
+//! Cold handlers that want Rust-side operand decoding add
+//! `decode = Rust` after `length = N` and use an empty operand binding
+//! list:
+//!
+//! ```ignore
+//! llint_handler! {
+//!     name, opcode_byte = N, layout = LayoutIdent, length = N, decode = Rust, || { <body> }
+//! }
+//! ```
+//!
 //! The `opcode_byte = N` arg is the `u8` discriminant of the matching
 //! `Opcode` enum variant. The lowerer threads it into
 //! `inc_dispatch_counter!(N)` — the leading body fragment in the asm
@@ -48,6 +58,21 @@ pub(crate) enum BodyStmt {
     Label(String),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum DecodeMode {
+    Asm,
+    Rust,
+}
+
+impl DecodeMode {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Asm => "Asm",
+            Self::Rust => "Rust",
+        }
+    }
+}
+
 pub(crate) struct HandlerAst {
     /// Function name (e.g. `op_add`).
     pub(crate) name: Ident,
@@ -61,6 +86,10 @@ pub(crate) struct HandlerAst {
     /// Encoded instruction length, used as the `length = const N as u32`
     /// option of `naked_asm!` for tooling/debug purposes.
     pub(crate) length: LitInt,
+    /// Where operands are decoded. `Asm` emits the direct backend
+    /// prologue; `Rust` suppresses it for all-slow cold stubs whose shim
+    /// decodes from bytecode.
+    pub(crate) decode_mode: DecodeMode,
     /// Named operand bindings (e.g. `a, b, c, slot`). May be empty for
     /// `layout = None` handlers (the input then looks like `|| { ... }`).
     pub(crate) operand_idents: Punctuated<Ident, Token![,]>,
@@ -113,6 +142,32 @@ impl Parse for HandlerAst {
         let length: LitInt = input.parse()?;
         input.parse::<Token![,]>()?;
 
+        let decode_mode = if input.peek(Ident) {
+            let decode_ident: Ident = input.parse()?;
+            if decode_ident != "decode" {
+                return Err(syn::Error::new(
+                    decode_ident.span(),
+                    "expected `decode = Rust` or `|...|`",
+                ));
+            }
+            input.parse::<Token![=]>()?;
+            let mode: Ident = input.parse()?;
+            let decode_mode = match mode.to_string().as_str() {
+                "Asm" => DecodeMode::Asm,
+                "Rust" => DecodeMode::Rust,
+                _ => {
+                    return Err(syn::Error::new(
+                        mode.span(),
+                        "expected decode mode `Asm` or `Rust`",
+                    ));
+                }
+            };
+            input.parse::<Token![,]>()?;
+            decode_mode
+        } else {
+            DecodeMode::Asm
+        };
+
         // `|<idents>?| { <body> }`. The operand list may be empty for
         // `layout = None` handlers, so `parse_separated_nonempty` is
         // unsuitable — parse manually instead.
@@ -147,6 +202,7 @@ impl Parse for HandlerAst {
             opcode_byte,
             layout,
             length,
+            decode_mode,
             operand_idents,
             body,
         })

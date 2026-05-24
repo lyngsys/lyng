@@ -68,23 +68,49 @@ use std::collections::BTreeSet;
 use syn::{LitInt, Result};
 
 use crate::layouts::Layout;
-use crate::parse::{BodyStmt, HandlerAst};
+use crate::parse::{BodyStmt, DecodeMode, HandlerAst};
 use crate::scratch::ScratchAllocator;
+
+fn expected_operand_arity(layout: Layout, decode_mode: DecodeMode) -> usize {
+    match decode_mode {
+        DecodeMode::Asm => layout.operand_arity(),
+        DecodeMode::Rust => 0,
+    }
+}
+
+fn validate_operand_arity(ast: &HandlerAst, layout: Layout, operand_count: usize) -> Result<()> {
+    let expected_arity = expected_operand_arity(layout, ast.decode_mode);
+    if operand_count == expected_arity {
+        return Ok(());
+    }
+
+    Err(syn::Error::new(
+        ast.layout.span(),
+        format!(
+            "layout {} with {} decoding has arity {}, got {} operand bindings",
+            ast.layout,
+            ast.decode_mode.name(),
+            expected_arity,
+            operand_count,
+        ),
+    ))
+}
+
+fn handler_decode_prologue(
+    layout: Layout,
+    decode_mode: DecodeMode,
+    operands: &[Ident],
+) -> TokenStream {
+    match decode_mode {
+        DecodeMode::Asm => layout.decode_prologue_tokens(operands),
+        DecodeMode::Rust => quote! { "" },
+    }
+}
 
 pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let layout = Layout::from_ident(&ast.layout)?;
     let operands: Vec<_> = ast.operand_idents.iter().cloned().collect();
-    if operands.len() != layout.operand_arity() {
-        return Err(syn::Error::new(
-            ast.layout.span(),
-            format!(
-                "layout {} has arity {}, got {} operand bindings",
-                ast.layout,
-                layout.operand_arity(),
-                operands.len(),
-            ),
-        ));
-    }
+    validate_operand_arity(&ast, layout, operands.len())?;
 
     // Pre-assign operand identifiers to scratch registers. Internal
     // scratch names `t0..t6` are allocated lazily inside
@@ -108,7 +134,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
     let counter_increment = quote! {
         ::lyng_vm::inc_dispatch_counter!(#opcode_byte)
     };
-    let prologue_raw = layout.decode_prologue_tokens(&operands);
+    let prologue_raw = handler_decode_prologue(layout, ast.decode_mode, &operands);
     // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
     // macros stringify their args verbatim — feeding them `dst, src`
     // yields invalid asm like `wdst, wsrc`. Substitute the operand idents
@@ -598,6 +624,102 @@ mod tests {
 
     fn lit31() -> LitInt {
         syn::parse_str("31").expect("parse u8 literal")
+    }
+
+    #[test]
+    fn no_decode_abx_handler_omits_asm_decode_prologue() {
+        let lowered = lower_handler_tokens(
+            "op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, decode = Rust, || {
+                call_slow!(op_load_smi_slow_rs, args = []);
+                dispatch_after_slow!();
+            }",
+        );
+        let output = lowered.to_string();
+
+        assert!(
+            !output.contains("decode_abx"),
+            "decode = Rust must not emit the Abx asm decode prologue. Got: {output}",
+        );
+        assert!(
+            output_has_opcode_byte_for_recursive("call_slow", &lowered),
+            "no-decode cold stubs must still receive slow-path counter injection. Got: {output}",
+        );
+    }
+
+    #[test]
+    fn no_decode_abc_handler_omits_asm_decode_prologue() {
+        let lowered = lower_handler_tokens(
+            "op_define_named_property_dsl, opcode_byte = 73, layout = Abc, length = 4, decode = Rust, || {
+                call_slow!(op_define_named_property_slow_rs, args = []);
+                dispatch_after_slow!();
+            }",
+        );
+        let output = lowered.to_string();
+
+        assert!(
+            !output.contains("decode_abc"),
+            "decode = Rust must not emit the Abc asm decode prologue. Got: {output}",
+        );
+        assert!(
+            output_has_opcode_byte_for_recursive("call_slow", &lowered),
+            "no-decode cold stubs must still receive slow-path counter injection. Got: {output}",
+        );
+    }
+
+    #[test]
+    fn no_decode_abc_slot_handler_omits_asm_decode_prologue() {
+        let lowered = lower_handler_tokens(
+            "op_set_named_property_dsl, opcode_byte = 78, layout = AbcSlot, length = 6, decode = Rust, || {
+                call_slow!(op_set_named_property_slow_rs, args = []);
+                dispatch_after_slow!();
+            }",
+        );
+        let output = lowered.to_string();
+
+        assert!(
+            !output.contains("decode_abc_slot"),
+            "decode = Rust must not emit the AbcSlot asm decode prologue. Got: {output}",
+        );
+        assert!(
+            output_has_opcode_byte_for_recursive("call_slow", &lowered),
+            "no-decode cold stubs must still receive slow-path counter injection. Got: {output}",
+        );
+    }
+
+    #[test]
+    fn default_fast_handler_keeps_direct_asm_decode() {
+        let lowered = lower_handler_tokens(
+            "op_add_dsl, opcode_byte = 31, layout = AbcSlot, length = 6, |a, b, c, slot| {
+                load_reg!(b => t0);
+                dispatch!();
+            }",
+        );
+        let output = lowered.to_string();
+
+        assert!(
+            output.contains("decode_abc_slot"),
+            "normal handlers must keep the direct asm decode prologue. Got: {output}",
+        );
+    }
+
+    #[test]
+    fn rust_decode_mode_rejects_operand_bindings() {
+        let input: TokenStream = syn::parse_str(
+            "op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, decode = Rust, |a, bx| {
+                call_slow!(op_load_smi_slow_rs, args = []);
+                dispatch_after_slow!();
+            }",
+        )
+        .expect("parse handler tokens");
+        let ast = crate::parse::parse_handler(input).expect("parse handler ast");
+        let error = lower_handler(ast).expect_err("decode = Rust should reject operand bindings");
+
+        assert!(
+            error
+                .to_string()
+                .contains("layout Abx with Rust decoding has arity 0, got 2 operand bindings"),
+            "unexpected error for decode = Rust operands: {error}",
+        );
     }
 
     #[test]
