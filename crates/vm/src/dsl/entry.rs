@@ -27,7 +27,8 @@ use lyng_types::Value;
 
 use crate::dsl::handlers::{DslHandler, DSL_DISPATCH_TABLE};
 use crate::dsl::llint_state::{
-    ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
+    DeferredDispatch, ExitKind, LazyDispatchState, LlIntExitSlot, LlIntRustContext,
+    LlIntRustContextOpaque, LlIntState,
 };
 use crate::error::{VmError, VmResult};
 use crate::vm::install::InstalledFunction;
@@ -132,24 +133,25 @@ pub(crate) fn run_via_dsl(
     let register_stack_base = vm.register_stack_storage_mut_ptr();
     let (call_targets_base, call_targets_len) = vm.llint_call_targets_for_entry();
 
-    // Build a DispatchState directly so the asm-path slow-path bridge
-    // can call `LlIntDispatchState::dispatch_state()` and get the same
-    // shape the α handlers use. Semantic bodies under
-    // `crate::vm::semantics::` all consume `DispatchState`; threading
-    // it through both dispatch paths keeps the single-implementation
-    // invariant.
-    let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
-        vm,
-        agent,
-        host,
-        registry,
-        installed,
-        frame,
-        frame_depth,
-        frame_check_epoch,
-    );
+    // lyng-rmho: defer DispatchState construction past the
+    // fast/slow gateway. The constituent references are stashed in
+    // a `DeferredDispatch` and only materialized into a
+    // `DispatchState` on the first slow-shim invocation. Pure-fast-
+    // path runs (no slow shim hits) pay nothing for the construction
+    // beyond a single enum discriminant write. Subsequent slow shims
+    // within the same `run_via_dsl` invocation reuse the cached
+    // `DispatchState`.
     let mut rust_ctx = LlIntRustContext {
-        dispatch,
+        dispatch: LazyDispatchState::Pending(DeferredDispatch {
+            vm,
+            agent,
+            host,
+            registry,
+            installed,
+            frame,
+            frame_depth,
+            frame_check_epoch,
+        }),
         exit: LlIntExitSlot::default(),
         frame_infos,
         frame_info_register_stack_base,

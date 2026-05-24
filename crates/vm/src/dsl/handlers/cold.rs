@@ -501,7 +501,7 @@ pub extern "C" fn op_load_global_rust_probe_rs(
             .rust_context
             .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
     };
-    let dispatch = &mut rust_context.dispatch;
+    let dispatch = rust_context.dispatch.ensure_built();
     // Keep the Rust frame snapshot aligned with the asm PC before
     // invoking the VM-side IC helper. This mirrors `sync_from_asm`
     // without constructing the full slow-path wrapper.
@@ -2779,7 +2779,7 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
             .rust_context
             .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
     };
-    let dispatch = &mut rust_context.dispatch;
+    let dispatch = rust_context.dispatch.ensure_built();
     // Keep the Rust frame snapshot aligned with the asm PC before
     // invoking the VM-side IC helper. This mirrors `sync_from_asm`
     // without constructing the full slow-path wrapper.

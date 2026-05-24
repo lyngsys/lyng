@@ -5,13 +5,20 @@
     reason = "LlIntState is a repr(C) asm ABI record with explicit public padding fields for stable offsets"
 )]
 
-use lyng_env::ExecutableId;
-use lyng_objects::{FunctionEntryIdentity, FunctionObjectData, FunctionThisMode};
+use std::sync::Arc;
+
+use lyng_env::{Agent, ExecutableId};
+use lyng_host::HostHooks;
+use lyng_objects::{
+    FunctionEntryIdentity, FunctionObjectData, FunctionThisMode, NativeFunctionRegistry,
+};
 use lyng_types::{ObjectRef, Value};
 
 use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
+use crate::vm::install::InstalledFunction;
+use crate::{FrameRecord, Vm};
 
 pub const LLINT_FRAME_INFO_HEADROOM: usize = 64;
 pub const LLINT_REGISTER_STACK_HEADROOM: usize = 1024;
@@ -202,14 +209,140 @@ pub struct LlIntState {
 /// so threading the same type through both dispatch paths keeps the
 /// single-implementation invariant intact.
 ///
+/// lyng-rmho restructure: the `dispatch` field is now lazy. At
+/// trampoline entry the context stashes the constituent references
+/// ([`DeferredDispatch`]) without building a `DispatchState`. The
+/// first slow-shim that needs the dispatch state materializes it via
+/// [`LazyDispatchState::ensure_built`]; subsequent slow shims within
+/// the same `run_via_dsl` invocation reuse the cached
+/// `DispatchState`. Pure-fast-path runs (no slow shim invocations)
+/// pay nothing for the construction.
+///
 /// The lifetime `'vm` is the borrow on `Vm`/`Agent`/`HostHooks`/`Registry`
 /// taken by `crate::dsl::entry::run_via_dsl` for the duration of one
 /// trampoline invocation.
 pub struct LlIntRustContext<'vm> {
-    pub(crate) dispatch: DispatchState<'vm>,
+    pub(crate) dispatch: LazyDispatchState<'vm>,
     pub(crate) exit: LlIntExitSlot,
     pub(crate) frame_infos: Vec<LlIntFrameInfo>,
     pub(crate) frame_info_register_stack_base: *mut Value,
+}
+
+/// Constituent references stashed at entry, used to construct a
+/// [`DispatchState`] on the first slow-shim invocation. Mirrors
+/// `DispatchState`'s public field set 1:1; only the lifetime of
+/// construction differs.
+///
+/// This is a `pub(crate)` helper — the asm trampoline never observes
+/// this type; it is reachable only through
+/// [`LazyDispatchState::ensure_built`] inside slow-shim preamble.
+pub(crate) struct DeferredDispatch<'vm> {
+    pub(crate) vm: &'vm mut Vm,
+    pub(crate) agent: &'vm mut Agent,
+    pub(crate) host: &'vm dyn HostHooks,
+    pub(crate) registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
+    pub(crate) installed: Arc<InstalledFunction>,
+    pub(crate) frame: FrameRecord,
+    pub(crate) frame_depth: usize,
+    pub(crate) frame_check_epoch: u32,
+}
+
+impl<'vm> DeferredDispatch<'vm> {
+    /// Materialize the `DispatchState`. Consumes the deferred
+    /// references — the `&mut`s move into the `DispatchState`'s
+    /// fields, preventing aliasing.
+    #[inline]
+    pub(crate) fn into_dispatch_state(self) -> DispatchState<'vm> {
+        DispatchState::new_for_dsl_entry(
+            self.vm,
+            self.agent,
+            self.host,
+            self.registry,
+            self.installed,
+            self.frame,
+            self.frame_depth,
+            self.frame_check_epoch,
+        )
+    }
+}
+
+/// Lazy `DispatchState` holder. Constructed in the `Pending` variant
+/// by `dsl::entry::run_via_dsl`; transitions to `Built` on the first
+/// slow-shim invocation that calls
+/// [`crate::dsl::slow_path::LlIntDispatchState::dispatch_state`] (or
+/// any other accessor that needs the built form). The `Poisoned`
+/// variant is a transient sentinel used by [`Self::ensure_built`] to
+/// move the deferred references out of `self` without violating the
+/// borrow checker; it should never be externally observable.
+pub(crate) enum LazyDispatchState<'vm> {
+    Pending(DeferredDispatch<'vm>),
+    Built(DispatchState<'vm>),
+    /// Transient sentinel during `ensure_built` — only the move
+    /// between the call to `mem::replace` and the assignment back to
+    /// `Built(...)` can observe this variant. External accessors
+    /// treat it as a bug.
+    Poisoned,
+}
+
+impl<'vm> LazyDispatchState<'vm> {
+    /// Lazily build the `DispatchState` and return a mutable reference
+    /// to it. Subsequent calls return the cached state without
+    /// rebuilding.
+    #[inline]
+    pub(crate) fn ensure_built(&mut self) -> &mut DispatchState<'vm> {
+        if matches!(self, LazyDispatchState::Pending(_)) {
+            let prev = core::mem::replace(self, LazyDispatchState::Poisoned);
+            match prev {
+                LazyDispatchState::Pending(components) => {
+                    *self = LazyDispatchState::Built(components.into_dispatch_state());
+                }
+                // Unreachable: outer `matches!` confirmed `Pending`.
+                _ => unreachable!(),
+            }
+        }
+        match self {
+            LazyDispatchState::Built(state) => state,
+            LazyDispatchState::Pending(_) => {
+                // The block above just transitioned out of Pending.
+                unreachable!("ensure_built post-condition: state must be Built")
+            }
+            LazyDispatchState::Poisoned => {
+                unreachable!(
+                    "LazyDispatchState::Poisoned observed — ensure_built lost its components"
+                )
+            }
+        }
+    }
+
+    /// Read the active frame's instruction offset without forcing the
+    /// `DispatchState` to be built. Used by
+    /// [`crate::dsl::slow_path::LlIntDispatchState::current_instruction_offset`]
+    /// when callers want PC inspection without paying for full
+    /// `DispatchState` construction.
+    #[inline]
+    pub(crate) fn frame_instruction_offset(&self) -> u32 {
+        match self {
+            LazyDispatchState::Pending(c) => c.frame.instruction_offset(),
+            LazyDispatchState::Built(s) => s.frame.instruction_offset(),
+            LazyDispatchState::Poisoned => unreachable!(
+                "LazyDispatchState::Poisoned observed outside ensure_built transition"
+            ),
+        }
+    }
+
+    /// Update the active frame's instruction offset without forcing
+    /// the `DispatchState` to be built. Used by
+    /// [`crate::dsl::slow_path::LlIntDispatchState::sync_from_asm`]
+    /// to mirror the asm-side `frame_pc_offset` into the Rust-side
+    /// snapshot before any semantic body observes it.
+    #[inline]
+    pub(crate) fn set_frame_instruction_offset(&mut self, offset: u32) {
+        match self {
+            LazyDispatchState::Pending(c) => c.frame.set_instruction_offset(offset),
+            LazyDispatchState::Built(s) => s.frame.set_instruction_offset(offset),
+            LazyDispatchState::Poisoned => unreachable!(),
+        }
+    }
 }
 
 /// Slot the slow-path bridge writes when a semantic body chooses to

@@ -52,7 +52,8 @@ use lyng_sema::analyze_script;
 use lyng_types::Value;
 
 use crate::dsl::llint_state::{
-    ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
+    DeferredDispatch, ExitKind, LazyDispatchState, LlIntExitSlot, LlIntRustContext,
+    LlIntRustContextOpaque, LlIntState,
 };
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome, SlowPathTag};
 use crate::error::VmError;
@@ -229,18 +230,20 @@ impl DslHarness {
         let installed = Arc::clone(&self.installed);
         let frame = self.frame;
         let frame_depth = 0usize;
-        let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
-            &mut self.vm,
-            agent,
-            host,
-            &mut self.registry,
-            installed,
-            frame,
-            frame_depth,
-            0,
-        );
+        // lyng-rmho: stash the constituents in the Pending variant so
+        // the harness exercises the same lazy materialization path the
+        // production `run_via_dsl` entry uses.
         let mut rust_ctx = LlIntRustContext {
-            dispatch,
+            dispatch: LazyDispatchState::Pending(DeferredDispatch {
+                vm: &mut self.vm,
+                agent,
+                host,
+                registry: &mut self.registry,
+                installed,
+                frame,
+                frame_depth,
+                frame_check_epoch: 0,
+            }),
             exit: LlIntExitSlot::default(),
             frame_infos: Vec::new(),
             frame_info_register_stack_base: core::ptr::null_mut(),
