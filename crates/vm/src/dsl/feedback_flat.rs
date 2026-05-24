@@ -43,7 +43,6 @@ pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
 pub const LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
 pub const LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
-pub const LLINT_FEEDBACK_CALL_NO_SPREAD: u8 = 1;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,9 +65,7 @@ pub(crate) struct ScalarFeedbackUpdate {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedbackEntry {
     pub(crate) mode: u8,
-    pub(crate) call_flags: u8,
-    pub(crate) call_expected_arity: u16,
-    pub(crate) _pad: [u8; 4],
+    pub(crate) _pad: [u8; 7],
     /// OwnData mode: `NamedPropertyHandler::bits()`.
     /// PrototypeData mode: `NamedPropertyProtoHandler::proto_word()`.
     pub(crate) named_handler_bits: u64,
@@ -85,10 +82,6 @@ pub struct FeedbackEntry {
 }
 
 pub const FEEDBACK_ENTRY_MODE_OFFSET: usize = core::mem::offset_of!(FeedbackEntry, mode);
-pub const FEEDBACK_ENTRY_CALL_FLAGS_OFFSET: usize =
-    core::mem::offset_of!(FeedbackEntry, call_flags);
-pub const FEEDBACK_ENTRY_CALL_EXPECTED_ARITY_OFFSET: usize =
-    core::mem::offset_of!(FeedbackEntry, call_expected_arity);
 pub const FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, named_handler_bits);
 pub const FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET: usize =
@@ -107,9 +100,7 @@ impl Default for FeedbackEntry {
     fn default() -> Self {
         Self {
             mode: LlIntIcMode::Empty as u8,
-            call_flags: 0,
-            call_expected_arity: 0,
-            _pad: [0; 4],
+            _pad: [0; 7],
             named_handler_bits: 0,
             named_epoch: 0,
             named_aux_bits: 0,
@@ -162,12 +153,6 @@ impl FeedbackEntry {
         self.named_epoch = receiver_epoch;
         self.named_aux_bits = receiver_word;
         self.named_aux_epoch = prototype_epoch;
-    }
-
-    #[inline]
-    pub(crate) const fn set_call_no_spread(&mut self, expected_arity: u16) {
-        self.call_flags |= LLINT_FEEDBACK_CALL_NO_SPREAD;
-        self.call_expected_arity = expected_arity;
     }
 
     #[inline]

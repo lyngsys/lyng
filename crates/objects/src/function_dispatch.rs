@@ -12,20 +12,6 @@ impl ObjectRuntime {
         }
     }
 
-    pub fn function_data_entries(&self) -> impl Iterator<Item = (ObjectRef, &FunctionObjectData)> {
-        self.object_metadata
-            .iter()
-            .enumerate()
-            .filter_map(|(index, metadata)| {
-                let raw = u32::try_from(index + 1).ok()?;
-                let object = ObjectRef::from_raw(raw)?;
-                match &metadata.as_ref()?.cold {
-                    ObjectColdData::Function(data) => Some((object, data)),
-                    ObjectColdData::Ordinary(_) | ObjectColdData::Proxy(_) => None,
-                }
-            })
-    }
-
     pub fn set_function_home_object(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
