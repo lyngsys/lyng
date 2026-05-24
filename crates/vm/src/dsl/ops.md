@@ -181,15 +181,16 @@ sign-extended i64 ready for `tag_smi!`.
 `backend/aarch64/feedback.rs`
 
 `FV` (`x21`) holds the `Box<[FeedbackEntry]>` base for the current
-function. Each `FeedbackEntry` carries `Option<FeedbackSiteState>` with
-all Phase 3f packed sidecars.
+function. Each `FeedbackEntry` is a compact 64-byte asm-visible header;
+the legacy `FeedbackVector` remains the semantic source of truth for
+rich `FeedbackSiteState` data.
 
 | Macro                  | Effect                                                          | Cost |
 | ---------------------- | --------------------------------------------------------------- | ---- |
-| `load_feedback_site!`  | Compute pointer to FeedbackEntry at slot N                      | lsl + add |
-| `record_smi!`          | OR observed-types bit 0 (SMI) in place                          | lsl + add + ldr + orr + str |
-| `record_object!`       | OR observed-types bit 1 (Object) in place                       | same shape |
-| `record_double!`       | OR observed-types bit 2 (Double) in place                       | same shape |
+| `load_feedback_site!`  | Compute pointer to FeedbackEntry at slot N                      | shifted-register add |
+| `record_smi!`          | OR observed-types bit 0 (SMI) and saturating-increment count    | shifted-register add + 2 ldr + orr + 2 str + adds + csinv |
+| `record_object!`       | OR observed-types bit 1 (Object) and saturating-increment count | same shape |
+| `record_double!`       | OR observed-types bit 2 (Double) and saturating-increment count | same shape |
 
 ## Safepoint
 

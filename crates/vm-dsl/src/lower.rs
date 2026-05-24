@@ -248,7 +248,7 @@ pub(crate) fn lower_handler(ast: HandlerAst) -> Result<TokenStream> {
                 state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
-                entry_stride_shift = const 6_u32,
+                entry_stride_shift = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_STRIDE_SHIFT,
                 feedback_entry_stride = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_STRIDE,
                 feedback_mode = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_MODE_OFFSET,
                 feedback_named_handler_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET,

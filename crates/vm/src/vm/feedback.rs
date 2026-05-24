@@ -2129,9 +2129,9 @@ impl Vm {
             .map(f);
         // DSL-0b (B17): dual-write — after every legacy mutation,
         // mirror the slot into the flat-array storage so the asm
-        // `FV` pin sees identical IC state. The mirror is a single
-        // clone of the Option<FeedbackSiteState> and runs only when
-        // the legacy write actually happened (Some(R) path).
+        // `FV` pin sees the compact IC header projected from the
+        // semantic source of truth. The projection runs only when the
+        // legacy write actually happened (Some(R) path).
         if result.is_some() {
             self.mirror_flat_slot(code, slot);
         }
@@ -2157,7 +2157,6 @@ impl Vm {
             return;
         };
         entry.clear_ic_header();
-        entry.state = None;
         match header {
             Some(LlIntNamedPropertyHeader::OwnInline {
                 handler_bits,
@@ -3087,8 +3086,7 @@ impl Vm {
         // capacity. In that case every flat entry must be empty.
         if legacy_sites.is_empty() {
             for (i, entry) in flat.iter().enumerate() {
-                if entry.state.is_some()
-                    || entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
+                if entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     || entry.named_handler_bits() != 0
                     || entry.named_epoch() != 0
                     || entry.named_aux_bits() != 0
@@ -3099,7 +3097,7 @@ impl Vm {
                     return Err((
                         i,
                         format!(
-                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={} state={:?}",
+                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
                             entry.mode(),
                             entry.named_handler_bits(),
                             entry.named_epoch(),
@@ -3107,7 +3105,6 @@ impl Vm {
                             entry.named_aux_epoch(),
                             entry.scalar_observed_bits(),
                             entry.scalar_execution_count(),
-                            entry.state
                         ),
                     ));
                 }
@@ -3126,15 +3123,6 @@ impl Vm {
             ));
         }
         for (i, (legacy, flat_entry)) in legacy_sites.iter().zip(flat.iter()).enumerate() {
-            if flat_entry.state.is_some() {
-                return Err((
-                    i,
-                    format!(
-                        "slot {i} copied the legacy feedback enum into the flat LLInt header: {:?}",
-                        flat_entry.state
-                    ),
-                ));
-            }
             let expected = legacy.as_ref().and_then(Self::named_llint_load_header);
             match expected {
                 Some(LlIntNamedPropertyHeader::OwnInline {

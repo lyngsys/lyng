@@ -2,7 +2,7 @@
 //!
 //! The `FV` pin (`x21`) holds the base of the current
 //! `Box<[FeedbackEntry]>` for this function's feedback vector. A slot
-//! index multiplied by the entry stride yields a `*mut FeedbackEntry`
+//! index shifted by the compact entry stride yields a `*mut FeedbackEntry`
 //! the macros can read / write.
 //!
 //! All internal scratch use is on `x16` / `x17` (see
@@ -10,7 +10,7 @@
 //!
 //! Bindings expected from the proc-macro lowerer:
 //!
-//! - `{feedback_entry_stride}` — `size_of::<FeedbackEntry>()`.
+//! - `{entry_stride_shift}` — `log2(size_of::<FeedbackEntry>())`.
 //! - `{feedback_mode}` — byte offset of the `LLInt` IC mode byte.
 //! - `{feedback_named_handler_bits}` — byte offset of the packed named
 //!   property handler word.
@@ -35,13 +35,9 @@ macro_rules! load_feedback_site {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
-            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
-            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
-            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
-            "madd   x",
+            "add    x",
             stringify!($dst),
-            ", x17, x16, x21\n",
+            ", x21, x17, lsl #{entry_stride_shift}\n",
         )
     };
 }
@@ -221,11 +217,7 @@ macro_rules! record_smi {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
-            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
-            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
-            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
-            "madd   x16, x17, x16, x21\n",
+            "add    x16, x21, x17, lsl #{entry_stride_shift}\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x1\n",
             "str    w17, [x16, {entry_observed}]\n",
@@ -245,11 +237,7 @@ macro_rules! record_object {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
-            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
-            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
-            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
-            "madd   x16, x17, x16, x21\n",
+            "add    x16, x21, x17, lsl #{entry_stride_shift}\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x2\n",
             "str    w17, [x16, {entry_observed}]\n",
@@ -269,11 +257,7 @@ macro_rules! record_double {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            "movz   x16, #({feedback_entry_stride} & 0xffff)\n",
-            "movk   x16, #(({feedback_entry_stride} >> 16) & 0xffff), lsl #16\n",
-            "movk   x16, #(({feedback_entry_stride} >> 32) & 0xffff), lsl #32\n",
-            "movk   x16, #(({feedback_entry_stride} >> 48) & 0xffff), lsl #48\n",
-            "madd   x16, x17, x16, x21\n",
+            "add    x16, x21, x17, lsl #{entry_stride_shift}\n",
             "ldr    w17, [x16, {entry_observed}]\n",
             "orr    w17, w17, #0x4\n",
             "str    w17, [x16, {entry_observed}]\n",

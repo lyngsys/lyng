@@ -60,6 +60,24 @@ fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
 }
 
 #[test]
+fn llint_feedback_addressing_uses_compact_stride_shift() {
+    let feedback_backend = include_str!("../dsl/backend/aarch64/feedback.rs");
+
+    assert!(
+        feedback_backend.contains("lsl #{entry_stride_shift}"),
+        "LLInt feedback slot addressing should use the compact FeedbackEntry stride shift"
+    );
+    assert!(
+        !feedback_backend.contains("feedback_entry_stride} & 0xffff"),
+        "LLInt feedback hot paths must not materialize the FeedbackEntry stride with movz/movk"
+    );
+    assert!(
+        !feedback_backend.contains("madd   x16, x17, x16, x21"),
+        "LLInt feedback hot paths should not multiply by a materialized FeedbackEntry stride"
+    );
+}
+
+#[test]
 fn rust_vm_hot_paths_do_not_use_llint_fast_path_terminology() {
     let files = [
         ("vm/feedback.rs", include_str!("../vm/feedback.rs")),

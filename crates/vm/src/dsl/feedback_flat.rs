@@ -1,8 +1,8 @@
 //! Flat-array feedback storage for the DSL `FV` pin per design §9.
 //!
 //! Each [`FeedbackEntry`] is a fixed-size, pointer-stable IC slot. The
-//! asm-visible prefix is intentionally small and layout-pinned; the
-//! legacy [`FeedbackSiteState`] remains the semantic source of truth.
+//! entry is intentionally a compact asm-visible header; the legacy VM
+//! feedback state remains the semantic source of truth.
 //!
 //! Storage placement decision (Task B17):
 //!
@@ -31,12 +31,10 @@
 //!   reallocate, but that only moves the `Box` smart pointer, not
 //!   the heap buffer it owns).
 //!
-//! Per-entry layout: the first 32 bytes are the `LLInt` scalar/IC header.
-//! The trailing `state` field is kept only for the older flat-storage
-//! consistency harness; production mirroring no longer clones the
-//! large legacy enum into this field.
-
-pub(crate) use crate::vm::FeedbackSiteState;
+//! Per-entry layout: the first 48 bytes are the `LLInt` scalar/IC
+//! header. The remaining bytes are explicit padding so the entry is
+//! exactly 64 bytes; asm slot addressing can therefore use a single
+//! shifted add instead of materializing a large Rust enum stride.
 
 pub const LLINT_IC_MODE_EMPTY: u8 = 0;
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
@@ -78,7 +76,7 @@ pub struct FeedbackEntry {
     pub(crate) named_aux_epoch: u64,
     pub(crate) scalar_observed_bits: u32,
     pub(crate) scalar_execution_count: u32,
-    pub(crate) state: Option<FeedbackSiteState>,
+    pub(crate) _tail_pad: [u8; 16],
 }
 
 pub const FEEDBACK_ENTRY_MODE_OFFSET: usize = core::mem::offset_of!(FeedbackEntry, mode);
@@ -95,6 +93,7 @@ pub const FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET: usize =
 pub const FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, scalar_execution_count);
 pub const FEEDBACK_ENTRY_STRIDE: usize = core::mem::size_of::<FeedbackEntry>();
+pub const FEEDBACK_ENTRY_STRIDE_SHIFT: u32 = 6;
 
 impl Default for FeedbackEntry {
     fn default() -> Self {
@@ -107,7 +106,7 @@ impl Default for FeedbackEntry {
             named_aux_epoch: 0,
             scalar_observed_bits: 0,
             scalar_execution_count: 0,
-            state: None,
+            _tail_pad: [0; 16],
         }
     }
 }
@@ -203,15 +202,6 @@ impl FeedbackEntry {
         self.scalar_execution_count = 0;
         Some(update)
     }
-
-    /// Returns the inner [`FeedbackSiteState`] when the slot is
-    /// populated. Used by the dual-write invariant test to compare
-    /// against the legacy vector slot.
-    #[inline]
-    #[allow(dead_code)] // exercised by `feedback_flat_consistency` test.
-    pub(crate) const fn state(&self) -> Option<&FeedbackSiteState> {
-        self.state.as_ref()
-    }
 }
 
 #[cfg(test)]
@@ -220,8 +210,25 @@ mod tests {
         FeedbackEntry, FEEDBACK_ENTRY_MODE_OFFSET, FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET,
         FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET, FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
         FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET, FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
-        FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, LLINT_FEEDBACK_OBSERVED_SMI,
+        FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, FEEDBACK_ENTRY_STRIDE,
+        FEEDBACK_ENTRY_STRIDE_SHIFT, LLINT_FEEDBACK_OBSERVED_SMI,
     };
+
+    #[test]
+    fn asm_visible_feedback_entry_layout_is_compact_and_stable() {
+        assert_eq!(FEEDBACK_ENTRY_MODE_OFFSET, 0);
+        assert_eq!(FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET, 8);
+        assert_eq!(FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET, 16);
+        assert_eq!(FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET, 24);
+        assert_eq!(FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET, 32);
+        assert_eq!(FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, 40);
+        assert_eq!(FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET, 44);
+        assert_eq!(FEEDBACK_ENTRY_STRIDE, 64);
+        assert_eq!(
+            FEEDBACK_ENTRY_STRIDE,
+            1_usize << FEEDBACK_ENTRY_STRIDE_SHIFT
+        );
+    }
 
     #[test]
     fn scalar_feedback_fields_do_not_overlap_ic_header_fields() {

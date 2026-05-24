@@ -115,8 +115,8 @@ fn flat_header_is_empty_on_cold_install_with_unallocated_legacy_vector() {
     // Compile + install but execute zero times: the legacy vector
     // stays in its unallocated sentinel (sites.len() == 0) while
     // the flat array carries `function.feedback_slot_count()`
-    // default `None`-state entries. The invariant matcher accepts
-    // this asymmetry and confirms every flat slot is `None`.
+    // default compact headers. The invariant matcher accepts this
+    // asymmetry and confirms every flat slot is empty.
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,

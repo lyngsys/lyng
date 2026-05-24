@@ -767,10 +767,11 @@ impl Vm {
         }
         // DSL-0b (B15): eagerly allocate the flat-array feedback
         // storage to `function.feedback_slot_count()` entries. Every
-        // slot starts as `FeedbackEntry::default()` (state == None);
-        // dual-write from `record_*` paths (B17) populates entries to
-        // mirror the legacy `Vec<Option<FeedbackSiteState>>`. Storage
-        // is pointer-stable thereafter — the slow path never grows it.
+        // slot starts as `FeedbackEntry::default()`; dual-write from
+        // `record_*` paths (B17) projects the legacy
+        // `Vec<Option<FeedbackSiteState>>` into compact LLInt headers.
+        // Storage is pointer-stable thereafter — the slow path never
+        // grows it.
         if self.feedback_flat_storage.len() <= index {
             self.feedback_flat_storage.resize_with(index + 1, || {
                 Vec::<crate::dsl::feedback_flat::FeedbackEntry>::new().into_boxed_slice()
