@@ -651,12 +651,9 @@ pub fn all_snippets() -> HashMap<&'static str, Snippet> {
     // rewriting `Move dst=0, src=B` to `Ldar B` (load accumulator
     // from register B). Slot 0 is the accumulator by the calling
     // convention; emitting an explicit `StoreLocal0` would be
-    // redundant with `Ldar`. The handler exists (and is inline-ported
-    // in DSL-1 Phase 1.B.3 Task 3 for symmetry with the
-    // `store_local_fixed!` macro), but is unreachable via the standard
-    // emit pipeline — see the per-handler report at
-    // `reports/lyng/dsl-handlers/op_store_local_0.md` for the
-    // detailed finding.
+    // redundant with `Ldar`. The handler exists for symmetry with the
+    // `store_local_fixed!` macro, but is unreachable via the standard
+    // emit pipeline.
     map.insert(
         "StoreLocal1",
         Snippet {
@@ -906,14 +903,11 @@ mod verify_counts {
             "LoadLocal1",
             "LoadLocal2",
             "LoadLocal3",
-            // Phase 1.B.3 Task 4: StoreLocal1/2 backfilled to close the
-            // snippets-coverage gap (StoreLocal3 was the only one
-            // present in Phase 1.B.0). **StoreLocal0 is intentionally
-            // omitted** — the bytecode-builder peephole rewrites
+            // StoreLocal1/2 backfill the snippets-coverage gap. StoreLocal0
+            // is intentionally omitted — the bytecode-builder peephole rewrites
             // `Move dst=0, src=B` to `Ldar B` before the
             // `store_local_opcode` branch fires, so StoreLocal0 cannot
-            // be emitted via the standard pipeline. See the per-handler
-            // report at `reports/lyng/dsl-handlers/op_store_local_0.md`.
+            // be emitted via the standard pipeline.
             "StoreLocal1",
             "StoreLocal2",
             "StoreLocal3",

@@ -54,8 +54,8 @@ hooks live outside the VM.
 ## Architecture Constraints
 
 - The engine dispatches through the asm-DSL LLInt-style interpreter described in the
-  Dispatch Substrate section. A Sparkplug-style Baseline JIT remains a future phase —
-  see [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md).
+  Dispatch Substrate section. JSC LLInt parity is the active target; see
+  [`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md).
   New code should not assume native-code execution exists yet; the data model
   (FeedbackVector, Structures, NaN-boxed Value, 32-bit ShapeId) is being maintained as
   forward-compatible with that work.
@@ -82,8 +82,8 @@ supported target today.
 See [Bytecode and VM](bytecode-and-vm.md) for handler categories, register conventions,
 `LlIntState` layout, and the slow-path bridge protocol. The parent design is in
 [2026-05-16-asm-dsl-llint-interpreter-design.md](2026-05-16-asm-dsl-llint-interpreter-design.md);
-the freshest engine snapshot is
-[`reports/lyng/asm-dsl-engine-state-2026-05-22.md`](../../reports/lyng/asm-dsl-engine-state-2026-05-22.md).
+the live performance snapshot is
+[`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md).
 
 ## Runtime Pipeline
 

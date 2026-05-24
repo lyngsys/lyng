@@ -5,12 +5,12 @@ it is semantically meaningful and visible in checked-in reports. The external-en
 comparison loop also has a local V8 v7 benchmark corpus for cross-engine measurement
 once a bottleneck has been isolated.
 
-> **Strategic goal update (2026-05-14).** The earlier "match QuickJS" target was
-> scoped too low. The current strategic plan is the
-> [JSC-aligned engine roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md):
-> aim for JSC LLInt-class interpreter performance (~2.5–4× past QuickJS) and JSC
-> Baseline-class JIT performance (~8–12× past QuickJS). The measurement workflow
-> below is unchanged; the framing of *what counts as a good result* shifted.
+> **Strategic goal update (2026-05-24).** The active performance target is
+> JSC LLInt parity. Use
+> [LLInt-Parity State Of The Engine](../../reports/lyng/llint-parity-state-of-engine.md)
+> and [external-engine-compare.md](../../reports/lyng/external-engine-compare.md)
+> as the live reference evidence. Historical staged gate numbers are not
+> acceptance criteria.
 
 Run commands from the workspace root. Use release builds for measurements. Write
 exploratory reports under `/tmp`; refresh checked-in reports only when intentionally
@@ -28,8 +28,9 @@ a broader engine strategy.
 Use benchmarks to find and verify bottlenecks, not as targets to game. If a proposed fix
 only helps because it special-cases a benchmark artifact, stop and either redesign it as a
 general optimization or record the profiling finding for follow-up. Optimizations should
-be defensible against the JSC-aligned roadmap's structural goals (threaded dispatch,
-inline IC fast path, JIT readiness), not just benchmark deltas.
+be defensible against the LLInt-parity structural goals (threaded dispatch,
+asm-visible IC metadata, and JIT-ready bytecode/feedback layout), not just benchmark
+deltas.
 
 ## Loop Shape
 

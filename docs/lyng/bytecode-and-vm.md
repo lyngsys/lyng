@@ -166,11 +166,13 @@ normal counted semantic slow path.
 
 ### Inline-port progress
 
-25 opcodes are inline-ported as of HEAD (DSL-1 Phase 1.A + 1.B + 1.C); remaining
-opcodes are cold-stub `call_slow!` shims that delegate to Rust semantic bodies. Phase
-1.D and beyond will inline-port the rest of the top-30 hot set. Test262 has remained
-at 100% pass on runnable through every phase close. The freshest engine snapshot is
-[`reports/lyng/asm-dsl-engine-state-2026-05-22.md`](../../reports/lyng/asm-dsl-engine-state-2026-05-22.md).
+25 opcodes are inline-ported as of HEAD; remaining opcodes are cold-stub
+`call_slow!` shims that delegate to Rust semantic bodies. The next ports should
+be selected from current opcode counts and LLInt-parity profiling evidence, not
+from historical staged rollout lists. Test262 has remained at 100% pass on
+runnable through the recent LLInt-substrate work. The freshest strategic
+snapshot is
+[`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md).
 
 ## Scope And Environment Lowering
 
@@ -248,6 +250,6 @@ compiler owns lowering. The host crate owns host-provided module and dynamic imp
 - Every IC-shaped opcode carries a mandatory trailing feedback slot operand
   (Track H, landed). The bytecode encoding is JIT-ready: a future Baseline JIT
   consumes the same bytes and `FeedbackVector` without reshape.
-  See [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md).
-- Native-code execution is absent from the current engine; the JSC-aligned
-  roadmap above plans to add a Sparkplug-style Baseline JIT as Phase 6.
+  See [`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md).
+- Native-code execution is absent from the current engine; interpreter work is
+  measured against JSC LLInt parity before any Baseline JIT work resumes.

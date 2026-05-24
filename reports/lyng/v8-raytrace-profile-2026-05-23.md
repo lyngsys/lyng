@@ -4,11 +4,12 @@ Date: 2026-05-23
 
 ## Target
 
-Profiled the V8 v7 `RayTrace` workload because it is still below the
-Phase 1 V8-suite target in the checked-in report:
+Profiled the V8 v7 `RayTrace` workload because it is one of the largest
+JSC LLInt-parity gaps in the checked-in external-engine comparison and its
+opcode mix is property-heavy:
 
-- Checked-in median: score `413`, target `430`
-- Fresh one-sample score run: score `399`, target `430`
+- Checked-in V8-suite median: score `413`
+- Fresh one-sample score run: score `399`
 - Direct profiled run score: `414`
 
 Commands:

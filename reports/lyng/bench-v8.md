@@ -8,20 +8,18 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 ## Configuration
 
-- Samples per benchmark: `5`
+- Samples per benchmark: `3`
 - Per-sample timeout: `120s`
 - lyng binary: `target/release/lyng`
 - V8 v7 sources: `testdata/js-benchmarks/v8-v7`
 
 ## Scores
 
-| Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |
-| --- | ---: | ---: | ---: | ---: | :---: | ---: | --- |
-| `Richards` | `477` | `234` | `260` | `+103.8%` | ✓ | `7400.8` | 466, 478, 477, 468, 477 |
-| `DeltaBlue` | `417` | `277` | `310` | `+50.5%` | ✓ | `15855.6` | 417, 417, 416, 414, 418 |
-| `Crypto` | `382` | `236` | `265` | `+61.9%` | ✓ | `69680.9` | 383, 384, 382, 381, 378 |
-| `RayTrace` | `278` | `387` | `430` | `-28.2%` | ✗ | `266183.1` | 278, 277, 277, 280, 281 |
-| `NavierStokes` | `529` | `424` | `470` | `+24.8%` | ✓ | `280529.3` | 528, 529, 529, 528, 530 |
-| `Splay` | `1411` | `1198` | `1330` | `+17.8%` | ✓ | `5775.4` | 1399, 1423, 1420, 1395, 1411 |
-
-Baseline / target columns come from the Phase 1 exit-gate table in [jsc-aligned-engine-roadmap.md](jsc-aligned-engine-roadmap.md). Baseline = pre-Phase-1 score on the legacy match dispatcher; target = Phase 1 trampoline-cutover score gate (sub-9, `lyng-2wji`). `Δ vs baseline` is `(score − baseline) / baseline × 100%`; negative values are regressions.
+| Benchmark | Median score | Median µs/iter | Samples |
+| --- | ---: | ---: | --- |
+| `Richards` | `484` | `7293.8` | 484, 477, 484 |
+| `DeltaBlue` | `421` | `15705.0` | 421, 421, 420 |
+| `Crypto` | `393` | `67730.5` | 393, 392, 393 |
+| `RayTrace` | `291` | `254291.8` | 291, 294, 291 |
+| `NavierStokes` | `541` | `274306.8` | 540, 541, 541 |
+| `Splay` | `1440` | `5659.1` | 1426, 1440, 1448 |

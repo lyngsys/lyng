@@ -102,9 +102,8 @@ pub fn decode_abc_operands(
 /// Wide / ExtraWide-prefixed Abc operand decoding. Extracted to a `#[cold]`
 /// `#[inline(never)]` helper so the narrow path inlines into each handler
 /// without dragging the wide decoder bytes along — the wide path is
-/// "essentially zero share on real workloads" (Phase 1 spec), and per-handler
-/// asm should fit the < 200 byte budget without inline wide code competing
-/// for L1i.
+/// essentially zero share on real workloads, and per-handler asm should stay
+/// compact without inline wide code competing for L1i.
 #[cold]
 #[inline(never)]
 fn decode_abc_operands_wide(
@@ -290,15 +289,14 @@ impl Vm {
 
 #[cfg(test)]
 mod tests {
-    /// Phase 1 sub-8 (`lyng-9gyk`) exit invariant: dispatch.rs must contain
-    /// **no** `match` expression with more than 10 arms.
+    /// Dispatch invariant: this file must contain **no** `match` expression
+    /// with more than 10 arms.
     ///
-    /// The roadmap (`reports/lyng/jsc-aligned-engine-roadmap.md`) chose
-    /// Option α — per-handler `extern "C" fn` table with a central trampoline
-    /// — over the legacy single-`match` interpreter. If a regression
-    /// reintroduces a wide opcode-match in this file, it would re-grow the
-    /// dispatch jump table that Track H + Phase 1 spent two epics deleting.
-    /// Catch it at the source level.
+    /// The asm-DSL LLInt-style interpreter uses a handler table plus tail
+    /// dispatch instead of a legacy single-`match` interpreter. If a
+    /// regression reintroduces a wide opcode-match in this file, it would
+    /// re-grow the dispatch jump table this substrate replaced. Catch it at
+    /// the source level.
     ///
     /// "Wide" here means more than 10 arms in a single `match`. Small matches
     /// (e.g., on `prefix == Opcode::ExtraWide` in wide-decode helpers,
@@ -362,9 +360,9 @@ mod tests {
         let max_arms = arms_per_match.iter().copied().max().unwrap_or(0);
         assert!(
             max_arms <= 10,
-            "dispatch.rs contains a match with {max_arms} arms; Phase 1 sub-8 invariant is ≤ 10. \
-             A wide opcode match here would re-grow the dispatch jump table that Track H + \
-             trampoline cutover (`lyng-33i2`) eliminated. The wide-form opcode match lives in \
+            "dispatch.rs contains a match with {max_arms} arms; dispatch invariant is <= 10. \
+             A wide opcode match here would re-grow the dispatch jump table that the asm-DSL \
+             substrate eliminated. The wide-form opcode match lives in \
              `crate::dsl::handlers::cold::dispatch_wide_form` (codegen-emitted); add new opcodes \
              via the codegen tool, not by hand-rolling a match here.",
         );

@@ -2,14 +2,14 @@
 
 **Date:** 2026-05-16
 **Status:** Design approved; ready for implementation planning.
-**Supersedes (in spirit):** parts of [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md) — specifically its Option α substrate commitment and Phase 1/Phase 3 acceptance criteria.
+**Supersedes:** the previous Option α dispatch-substrate roadmap.
 **Companion document:** [`reports/lyng/llint-parity-state-of-engine.md`](../../reports/lyng/llint-parity-state-of-engine.md) — the measurement-driven retrospective that motivated this design.
 
 ---
 
 ## 1. Context
 
-The previous JSC-aligned roadmap (`lyng-49qk`) committed to Option α — a Rust `extern "C" fn` per-handler dispatch table with a central trampoline returning a `Step` enum. After landing Phase 1 through Phase 3f + Phase 4a-b, isolated bench numbers (`reports/lyng/external-engine-compare.md`) show lyng at:
+The previous staged roadmap (`lyng-49qk`) committed to Option α — a Rust `extern "C" fn` per-handler dispatch table with a central trampoline returning a `Step` enum. After landing that interpreter-track package, isolated bench numbers (`reports/lyng/external-engine-compare.md`) show lyng at:
 
 - **5-12× slower than JSC LLInt** across V8 v7 (Richards 318 vs LLInt 1871).
 - **1.6-3.7× slower than QuickJS** — the engine the original roadmap called "ceiling too low."
@@ -568,18 +568,10 @@ Three source modes for resilience:
 
 Reference material; re-captured only when JSC ships a major version or when our capture tooling improves. Not gated on every dev run.
 
-### Per-handler ported reports
+### Per-handler notes
 
-For each DSL handler we author:
-
-```
-reports/lyng/dsl-handlers/
-├── op_add.md
-├── op_get_named_property.md
-└── ...
-```
-
-Each contains:
+For each DSL handler we author, keep the durable evidence in the asm baseline,
+the relevant source comments, and the current benchmark reports. Capture:
 
 - DSL source (excerpt with link).
 - Current asm output (both arches when applicable).
@@ -778,10 +770,9 @@ Port the remaining ~25 hot opcodes (top-30 minus the 5 from DSL-0) from cold stu
 2. Identify any data-layout refactor surfaced. If yes, that's its own ticket, done first.
 3. Replace the cold-stub body with a full DSL fast path. Add new DSL operations to `backend/aarch64/` if needed (with `ops.md` entry).
 4. Run `cargo asm` on the handler; inspect; iterate until shape is right.
-5. Run microbench; capture into ported report.
-6. Run isolated V8 v7 sweep; capture into ported report.
-7. Write `reports/lyng/dsl-handlers/op_xxx.md` with side-by-side LLInt diff + data.
-8. Commit asm baseline + ported report + handler source as one cohesive change.
+5. Run microbench; capture current evidence.
+6. Run isolated V8 v7 sweep; capture current evidence.
+7. Commit asm baseline + handler source as one cohesive change.
 
 **Port order (priority by dispatch share + risk):**
 
@@ -905,7 +896,6 @@ These don't block the design but should be answered with data, not speculation:
 - **Design review feedback (Codex, first pass, 2026-05-16):** the review that triggered the first revision. P0/P1 findings (`naked_asm!` vs `asm!`, slow-path ABI insufficient for `VmError`, `DispatchState` not C-ABI, safepoint coverage gap, Value-layout vocabulary mismatch, DSL-0 V8-v7 gate not executable, FV lifecycle underspecified) are addressed in §3, §4, §5, §6, §7, §9, and §10.
 - **Design review feedback (Codex, second pass, 2026-05-16):** the review that triggered the second revision. P0/P1 findings (trait-object fat pointers can't erase to `c_void`, `LlIntState` missing full frame/install context, cold stubs need semantic-extraction subphase, `op_loop_header` is a marker not a jump, backward-jump poll coverage, `FV` mutability, `LlIntExitSlot` should be Rust-side, `poll_pending` producer model, `sym` operand specification, no-unwind policy) are addressed by introducing `LlIntRustContext` (§5), the DSL-0a semantic-extraction subphase (§10), the warm backward-jump handler category (§3, §6), and the slow-path-share invariant in DSL-1 (§10).
 - **Design review feedback (Codex, third pass, 2026-05-16):** the review that triggered the third revision. Verdict: no P0 blockers; P1/P2 findings to fold in before R-0. Findings (`'static` lifetime stand-in is misleading, `AtomicU8` over-specifies cross-thread debugger, tier-up counter has circular producer problem, pre-slow-path PC sync underspecified, prefix dispatch needs explicit DSL design, slow-path-share instrumentation must be R-0 deliverable, source-grep too weak for invariant, opcode-counter mode under naked dispatch unspecified) are addressed by the `LlIntRustContextOpaque` erasure (§5), the same-thread `Vm.poll_pending: u8` design (§6), the deliberate deferral of tier accounting from DSL-0 (§6, §10), the pre-slow-path sync protocol (§6), the `dispatch_prefixed!` DSL operation and three prefix validation cases (§6, §10), slow-path-share counters as an R-0 deliverable (§10), the opcode manifest with seven structural invariant tests (§10), and feature-flagged `inc_counter!` for opcode-counter mode (§10).
-- **Original roadmap (superseded in scope):** [`reports/lyng/jsc-aligned-engine-roadmap.md`](../../reports/lyng/jsc-aligned-engine-roadmap.md) — Phase 1-6 plan. The interpreter-track substrate decision (Option α) is reversed by this design; the Baseline JIT track (Phases 5-6) remains valid in shape, deferred behind this work.
 - **JSC LLInt source (reference, not vendored):** `/Users/sondre/dev/WebKit/Source/JavaScriptCore/llint/`
   - `LowLevelInterpreter.asm` — dispatch macros, wrapper macros (`llintOp*`).
   - `LowLevelInterpreter64.asm` — 64-bit handler bodies including `performGetByIDHelper`.

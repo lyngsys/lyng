@@ -12,7 +12,7 @@ top-level architecture note and the subsystem note for the area being changed.
 2. [Architecture](architecture.md)
 3. [Engineering Standards](engineering-standards.md)
 4. [asm-DSL LLInt-style Interpreter Design](2026-05-16-asm-dsl-llint-interpreter-design.md) — parent design for the current dispatch substrate.
-5. [JSC-Aligned Engine Roadmap](../../reports/lyng/jsc-aligned-engine-roadmap.md) — broader strategic plan toward JSC LLInt-class interpreter and Baseline JIT performance.
+5. [LLInt-Parity State Of The Engine](../../reports/lyng/llint-parity-state-of-engine.md) — live performance target, evidence, and optimization direction.
 
 ## Architecture Notes
 

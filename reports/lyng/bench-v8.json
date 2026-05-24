@@ -3,115 +3,85 @@
     {
       "error": null,
       "file": "richards.js",
-      "median_score": 477.0,
-      "median_us_per_iter": 7400.83857442348,
+      "median_score": 484.0,
+      "median_us_per_iter": 7293.801652892562,
       "name": "Richards",
-      "phase1_baseline": 234,
-      "phase1_gate_met": true,
-      "phase1_target": 260,
       "reference_us": 35302,
       "samples": [
-        466.0,
-        478.0,
+        484.0,
         477.0,
-        468.0,
-        477.0
+        484.0
       ]
     },
     {
       "error": null,
       "file": "deltablue.js",
-      "median_score": 417.0,
-      "median_us_per_iter": 15855.635491606714,
+      "median_score": 421.0,
+      "median_us_per_iter": 15704.988123515439,
       "name": "DeltaBlue",
-      "phase1_baseline": 277,
-      "phase1_gate_met": true,
-      "phase1_target": 310,
       "reference_us": 66118,
       "samples": [
-        417.0,
-        417.0,
-        416.0,
-        414.0,
-        418.0
+        421.0,
+        421.0,
+        420.0
       ]
     },
     {
       "error": null,
       "file": "crypto.js",
-      "median_score": 382.0,
-      "median_us_per_iter": 69680.89005235602,
+      "median_score": 393.0,
+      "median_us_per_iter": 67730.53435114503,
       "name": "Crypto",
-      "phase1_baseline": 236,
-      "phase1_gate_met": true,
-      "phase1_target": 265,
       "reference_us": 266181,
       "samples": [
-        383.0,
-        384.0,
-        382.0,
-        381.0,
-        378.0
+        393.0,
+        392.0,
+        393.0
       ]
     },
     {
       "error": null,
       "file": "raytrace.js",
-      "median_score": 278.0,
-      "median_us_per_iter": 266183.09352517984,
+      "median_score": 291.0,
+      "median_us_per_iter": 254291.7525773196,
       "name": "RayTrace",
-      "phase1_baseline": 387,
-      "phase1_gate_met": false,
-      "phase1_target": 430,
       "reference_us": 739989,
       "samples": [
-        278.0,
-        277.0,
-        277.0,
-        280.0,
-        281.0
+        291.0,
+        294.0,
+        291.0
       ]
     },
     {
       "error": null,
       "file": "navier-stokes.js",
-      "median_score": 529.0,
-      "median_us_per_iter": 280529.30056710774,
+      "median_score": 541.0,
+      "median_us_per_iter": 274306.83918669133,
       "name": "NavierStokes",
-      "phase1_baseline": 424,
-      "phase1_gate_met": true,
-      "phase1_target": 470,
       "reference_us": 1484000,
       "samples": [
-        528.0,
-        529.0,
-        529.0,
-        528.0,
-        530.0
+        540.0,
+        541.0,
+        541.0
       ]
     },
     {
       "error": null,
       "file": "splay.js",
-      "median_score": 1411.0,
-      "median_us_per_iter": 5775.407512402551,
+      "median_score": 1440.0,
+      "median_us_per_iter": 5659.097222222223,
       "name": "Splay",
-      "phase1_baseline": 1198,
-      "phase1_gate_met": true,
-      "phase1_target": 1330,
       "reference_us": 81491,
       "samples": [
-        1399.0,
-        1423.0,
-        1420.0,
-        1395.0,
-        1411.0
+        1426.0,
+        1440.0,
+        1448.0
       ]
     }
   ],
   "lyng_bin": "target/release/lyng",
   "per_sample_timeout_secs": 120,
-  "samples_per_benchmark": 5,
-  "schema": "lyng-bench/v8suite/v1",
+  "samples_per_benchmark": 3,
+  "schema": "lyng-bench/v8suite/v2",
   "v8_root": "testdata/js-benchmarks/v8-v7"
 }

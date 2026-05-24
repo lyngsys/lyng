@@ -46,7 +46,7 @@ pub fn help_text() -> String {
         "  test262       Test262 performance diagnostics for agents",
         "  compare       External QuickJS and JSC (LLInt) comparison report",
         "  v8suite       V8 v7 benchmarks (Richards, DeltaBlue, Crypto, RayTrace,",
-        "                NavierStokes, Splay) — Phase 1 exit-gate scoring",
+        "                NavierStokes, Splay) — standalone throughput scoring",
         "  asm-diff      Capture, normalize, and diff handler asm against baselines",
         "  microbench    Per-opcode ns/dispatch with confidence interval (R-0 Phase 4)",
         "  capture-llint Extract JSC LLInt handler asm or offlineasm source (R-0 Phase 5)",

@@ -7,8 +7,7 @@
 //! GC heaps, and feedback caches don't leak between samples. The driver
 //! collects `--samples` runs per benchmark (default 5), computes the
 //! per-benchmark median score, and emits a markdown report alongside a
-//! stable-keyed JSON document for downstream gate comparisons (Phase 1
-//! sub-9 / `lyng-2wji`).
+//! stable-keyed JSON document for tracking progress toward JSC LLInt parity.
 //!
 //! The score model is V8's standard reciprocal-time formula:
 //! `score = 100 × reference_µs / mean_µs`, where the reference comes
@@ -51,19 +50,11 @@ const DEFAULT_LYNG_BIN: &str = "target/release/lyng";
 /// ...)` — keeping it here mirrors what the JS sees, so the scores we report
 /// match what running V8's d8 on the same files would report.
 ///
-/// `phase1_baseline` / `phase1_target` come from the JSC-aligned engine
-/// roadmap (Phase 1 benchmark gates table in
-/// `reports/lyng/jsc-aligned-engine-roadmap.md`). The baseline is the
-/// pre-Phase-1 score on the legacy match dispatcher; the target is the
-/// Phase 1 exit-gate score that the trampoline + per-handler ABI was
-/// expected to achieve.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct V8Workload {
     pub name: &'static str,
     pub file: &'static str,
     pub reference_us: u64,
-    pub phase1_baseline: u32,
-    pub phase1_target: u32,
 }
 
 pub(crate) const V8_WORKLOADS: &[V8Workload] = &[
@@ -71,43 +62,31 @@ pub(crate) const V8_WORKLOADS: &[V8Workload] = &[
         name: "Richards",
         file: "richards.js",
         reference_us: 35_302,
-        phase1_baseline: 234,
-        phase1_target: 260,
     },
     V8Workload {
         name: "DeltaBlue",
         file: "deltablue.js",
         reference_us: 66_118,
-        phase1_baseline: 277,
-        phase1_target: 310,
     },
     V8Workload {
         name: "Crypto",
         file: "crypto.js",
         reference_us: 266_181,
-        phase1_baseline: 236,
-        phase1_target: 265,
     },
     V8Workload {
         name: "RayTrace",
         file: "raytrace.js",
         reference_us: 739_989,
-        phase1_baseline: 387,
-        phase1_target: 430,
     },
     V8Workload {
         name: "NavierStokes",
         file: "navier-stokes.js",
         reference_us: 1_484_000,
-        phase1_baseline: 424,
-        phase1_target: 470,
     },
     V8Workload {
         name: "Splay",
         file: "splay.js",
         reference_us: 81_491,
-        phase1_baseline: 1198,
-        phase1_target: 1330,
     },
 ];
 
@@ -638,27 +617,12 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
     writeln!(out, "- V8 v7 sources: `{}`\n", options.v8_root)
         .expect("writing to a String cannot fail");
     out.push_str("## Scores\n\n");
-    out.push_str("| Benchmark | Median score | Baseline | Target | Δ vs baseline | Gate | Median µs/iter | Samples |\n");
-    out.push_str("| --- | ---: | ---: | ---: | ---: | :---: | ---: | --- |\n");
+    out.push_str("| Benchmark | Median score | Median µs/iter | Samples |\n");
+    out.push_str("| --- | ---: | ---: | --- |\n");
     for report in reports {
         let score_cell = report
             .median_score
             .map_or_else(|| "—".to_string(), |s| format!("`{s:.0}`"));
-        let baseline = report.workload.phase1_baseline;
-        let target = report.workload.phase1_target;
-        let (delta_cell, gate_cell) = report.median_score.map_or_else(
-            || ("—".to_string(), "—".to_string()),
-            |score| {
-                let delta = ((score - f64::from(baseline)) / f64::from(baseline)) * 100.0;
-                let delta_str = format!("`{delta:+.1}%`");
-                let gate_str = if score >= f64::from(target) {
-                    "✓"
-                } else {
-                    "✗"
-                };
-                (delta_str, gate_str.to_string())
-            },
-        );
         let us_cell = report
             .median_us_per_iter
             .map_or_else(|| "—".to_string(), |u| format!("`{u:.1}`"));
@@ -674,25 +638,14 @@ fn render_markdown(options: &Options, reports: &[WorkloadReport]) -> String {
         };
         writeln!(
             out,
-            "| `{name}` | {score} | `{baseline}` | `{target}` | {delta} | {gate} | {us} | {samples} |",
+            "| `{name}` | {score} | {us} | {samples} |",
             name = report.workload.name,
             score = score_cell,
-            baseline = baseline,
-            target = target,
-            delta = delta_cell,
-            gate = gate_cell,
             us = us_cell,
             samples = samples_cell,
         )
         .expect("writing to a String cannot fail");
     }
-    out.push_str(
-        "\nBaseline / target columns come from the Phase 1 exit-gate table in \
-         [jsc-aligned-engine-roadmap.md](jsc-aligned-engine-roadmap.md). Baseline = \
-         pre-Phase-1 score on the legacy match dispatcher; target = Phase 1 \
-         trampoline-cutover score gate (sub-9, `lyng-2wji`). `Δ vs baseline` is \
-         `(score − baseline) / baseline × 100%`; negative values are regressions.\n",
-    );
     let any_error = reports.iter().any(|r| r.error.is_some());
     if any_error {
         out.push_str("\n## Errors\n\n");
@@ -710,25 +663,19 @@ fn render_json(options: &Options, reports: &[WorkloadReport]) -> Value {
     let benchmarks: Vec<Value> = reports
         .iter()
         .map(|r| {
-            let gate_met = r
-                .median_score
-                .map(|score| score >= f64::from(r.workload.phase1_target));
             json!({
                 "name": r.workload.name,
                 "file": r.workload.file,
                 "reference_us": r.workload.reference_us,
-                "phase1_baseline": r.workload.phase1_baseline,
-                "phase1_target": r.workload.phase1_target,
                 "samples": r.samples,
                 "median_score": r.median_score,
                 "median_us_per_iter": r.median_us_per_iter,
-                "phase1_gate_met": gate_met,
                 "error": r.error,
             })
         })
         .collect();
     json!({
-        "schema": "lyng-bench/v8suite/v1",
+        "schema": "lyng-bench/v8suite/v2",
         "samples_per_benchmark": options.samples,
         "per_sample_timeout_secs": options.per_sample_timeout.as_secs(),
         "lyng_bin": options.lyng_bin,
@@ -751,21 +698,13 @@ fn print_summary(reports: &[WorkloadReport]) {
     println!("\n========== V8 v7 Suite ==========");
     for report in reports {
         match (report.median_score, &report.error) {
-            (Some(score), None) => {
-                let target = report.workload.phase1_target;
-                let baseline = report.workload.phase1_baseline;
-                let delta = ((score - f64::from(baseline)) / f64::from(baseline)) * 100.0;
-                let gate = if score >= f64::from(target) {
-                    "✓"
-                } else {
-                    "✗"
-                };
-                println!(
-                    "{name:<14} score={score:>5.0} baseline={baseline:>4} target={target:>4} \
-                     Δ={delta:+5.1}% gate={gate}",
+            (Some(score), None) => match report.median_us_per_iter {
+                Some(us) => println!(
+                    "{name:<14} score={score:>5.0} median_us={us:>8.1}",
                     name = report.workload.name,
-                );
-            }
+                ),
+                None => println!("{name:<14} score={score:>5.0}", name = report.workload.name,),
+            },
             (_, Some(error)) => {
                 println!(
                     "{name:<14} ERROR: {error}",
@@ -1185,7 +1124,52 @@ mod tests {
     }
 
     #[test]
-    fn v8_workloads_cover_phase_1_suite() {
+    fn markdown_report_omits_stale_gate_columns() {
+        let options = parse_options(&[]).expect("default v8suite options should parse");
+        let reports = vec![WorkloadReport {
+            workload: V8_WORKLOADS[0],
+            samples: vec![463.0],
+            median_score: Some(463.0),
+            median_us_per_iter: Some(7624.6),
+            error: None,
+        }];
+
+        let markdown = render_markdown(&options, &reports);
+
+        assert!(markdown.contains("| Benchmark | Median score | Median µs/iter | Samples |"));
+        assert!(!markdown.contains("Baseline"));
+        assert!(!markdown.contains("Target"));
+        assert!(!markdown.contains("Gate"));
+        assert!(!markdown.contains(&format!("phase{}", 1)));
+    }
+
+    #[test]
+    fn json_report_omits_stale_gate_fields() {
+        let options = parse_options(&[]).expect("default v8suite options should parse");
+        let reports = vec![WorkloadReport {
+            workload: V8_WORKLOADS[0],
+            samples: vec![463.0],
+            median_score: Some(463.0),
+            median_us_per_iter: Some(7624.6),
+            error: None,
+        }];
+
+        let report = render_json(&options, &reports);
+        let benchmark = &report["benchmarks"][0];
+
+        assert_eq!(report["schema"], "lyng-bench/v8suite/v2");
+        assert!(benchmark.get("reference_us").is_some());
+        assert!(benchmark.get("samples").is_some());
+        assert!(benchmark.get("median_score").is_some());
+        assert!(benchmark.get("median_us_per_iter").is_some());
+        for suffix in ["baseline", "target", "gate_met"] {
+            let field = format!("phase{}_{suffix}", 1);
+            assert!(benchmark.get(&field).is_none(), "{field} should be absent");
+        }
+    }
+
+    #[test]
+    fn v8_workloads_cover_local_v8_v7_suite() {
         let names: Vec<&str> = V8_WORKLOADS.iter().map(|w| w.name).collect();
         assert_eq!(
             names,

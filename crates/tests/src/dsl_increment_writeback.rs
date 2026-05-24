@@ -66,9 +66,8 @@
 //! would hold the original string and `typeof r === "number"` would
 //! be `false`, returning 0 and failing the assertion.
 //!
-//! See `reports/lyng/dsl-handlers/op_increment.md` and
-//! `op_decrement.md` § SMI-elision-of-src-writeback for the structural
-//! claim this test backstops.
+//! This backstops the unary SMI writeback invariant documented by the
+//! increment/decrement DSL handlers.
 
 use lyng_common::{AtomTable, SourceId};
 use lyng_compiler::compile_script;

@@ -443,7 +443,7 @@ not "byte-identical asm".
 | `untag_double!`                                          | 1 (subtract offset)| 0              | Lyng-js wins here — no `DoubleEncodeOffset` to subtract.                                     |
 | `check_cell!` / `check_object_ref!`                      | 2 (AND + CBZ)      | 3 (AND + CMP + B.NE) | Same predicate cost asymmetry as `check_smi!`. Single-operand fast path is still ≤4 cycles. |
 | `untag_cell!` / `untag_object_ref!`                      | 0 (cell ptr is the value, modulo low bits) | 0 (W-register read) | Both zero work, but see `load_record_shape!` below. |
-| `load_cell_shape!` / `load_record_shape!`                | 1 load (`ldr w, [cell, #structureID_offset]`) | **2 loads** (`ldr xRec, [heap_base, refId, lsl #3]` then `ldr wShape, [xRec, #shape_off]`) | **Side-table indirection.** `ObjectRef = u32` resolves through the object pool, then the `ObjectRecord` is dereferenced. Documented in [`jsc-aligned-engine-roadmap.md` §2](./jsc-aligned-engine-roadmap.md). |
+| `load_cell_shape!` / `load_record_shape!`                | 1 load (`ldr w, [cell, #structureID_offset]`) | **2 loads** (`ldr xRec, [heap_base, refId, lsl #3]` then `ldr wShape, [xRec, #shape_off]`) | **Side-table indirection.** `ObjectRef = u32` resolves through the object pool, then the `ObjectRecord` is dereferenced. Tracked in the live LLInt-parity state report. |
 | `load_inline_slot!(record, slot)` / `load_record_inline_slot!` | 1 load          | **2 loads**    | Same indirection: must reach the record first.                                              |
 | `check_undefined!`                                       | 2 (CMP + B)        | 1 (CMP + B) — single 64-bit compare against pattern | Lyng-js wins here: undefined is one canonical 64-bit value, no AND needed.        |
 | `check_null!`                                            | 2 (CMP + B)        | 1 (CMP + B)    | Same reason.                                                                                |
@@ -464,9 +464,7 @@ only):
 
 The `GetById` row is the irreducible structural delta — eliminating
 it requires moving from `ObjectRef = u32` + side table to
-`*mut ObjectHeader` packed into the NaN-tag space, which is
-roadmapped separately ([`jsc-aligned-engine-roadmap.md` §"Pointer-identity
-cells"](./jsc-aligned-engine-roadmap.md)). DSL-0 accepts the
+`*mut ObjectHeader` packed into the NaN-tag space. DSL-0 accepts the
 2-load record-shape sequence and exposes it as a single macro
 (`load_record_shape!`) so the substrate can be reused after the
 encoding refactor lands.
