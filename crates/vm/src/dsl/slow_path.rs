@@ -231,6 +231,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
                     }
+                    rust.dispatch.refresh_dsl_poll_pending();
                 }
                 // The asm bridge's `dispatch_after_slow!` Continue
                 // arm reads the new pc_offset from `x1` (`payload`)
@@ -357,6 +358,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                             "frame_const_base unstable across Refresh"
                         );
                     }
+                    rust.dispatch.refresh_dsl_poll_pending();
                 }
                 SlowPathReturn {
                     tag: SlowPathTag::Refresh as u64,

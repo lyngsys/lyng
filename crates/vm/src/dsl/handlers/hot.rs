@@ -17,8 +17,9 @@
 // resolve. They are `#[macro_export]`-ed at the crate root.
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    add_smi_overflow, call_slow, check_smi, decode_ab, decode_abc_slot, dispatch,
-    dispatch_after_slow, load_reg, record_smi, store_reg, tag_smi, untag_smi,
+    add_smi_overflow, branch_i32_negative, call_slow, check_smi, decode_ab, decode_abc_slot,
+    decode_ax_i24, dispatch, dispatch_after_slow, jump_relative_i32_and_dispatch, load_reg,
+    poll_safepoint, record_smi, store_reg, tag_smi, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -96,45 +97,58 @@ pub extern "C" fn op_add_slow_rs(
 }
 
 // =====================================================================
-// op_jump (B41) — Ax layout, length = 5. The semantic body in
-// op_jump_semantic handles backward-edge polling and PC arithmetic; the
-// DSL handler delegates to it via call_slow.
+// op_jump (B41) — AxI24 layout, length = 4. Both forward and backward
+// non-pending paths apply the signed i24 delta inline; backward jumps
+// first run the cheap warm-opcode safepoint flag check.
 // =====================================================================
 
-// `Jump` uses the Ax instruction form: 1 byte opcode + 3 bytes
-// sign-extended i24 delta. Encoded length is 4 bytes. The DSL's
-// `decode_ax!` reads a 4-byte word at PC+1 — that pulls in the
-// adjacent opcode byte, but the slow-path shim masks and sign-extends
-// the low 24 bits before computing the actual delta, so the extra
-// byte is harmless.
+// `Jump` uses the AxI24 instruction form: 1 byte opcode + 3 bytes
+// sign-extended i24 delta. Backward jumps poll the VM safepoint byte
+// before jumping; when the poll is pending, the slow shim consumes the
+// poll and then applies the already-sign-extended delta.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
-    op_jump, opcode_byte = 63, layout = Ax, length = 4, |offset| {
-        call_slow!(op_jump_slow_rs, args = [offset]);
+    op_jump, opcode_byte = 63, layout = AxI24, length = 4, |offset| {
+        branch_i32_negative!(offset, .taken_backward);
+        jump_relative_i32_and_dispatch!(offset, advance = 4);
+        .taken_backward:
+        poll_safepoint!(.poll_pending);
+        jump_relative_i32_and_dispatch!(offset, advance = 4);
+        .poll_pending:
+        call_slow!(op_jump_poll_rs, args = [offset]);
         dispatch_after_slow!();
     }
 }
 
-/// Slow-path shim for `op_jump`. The 4-byte `decode_ax!` load reads
-/// 3 bytes of i24 delta + 1 byte of the next opcode (or padding).
-/// We mask off the top byte and sign-extend the low 24 bits to
-/// recover the i24 delta semantic_body expects.
+/// Pending-poll shim for backward `op_jump`. The `AxI24` decode prologue
+/// has already sign-extended the 24-bit delta into the low argument word.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
-pub extern "C" fn op_jump_slow_rs(
+pub extern "C" fn op_jump_poll_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
     offset_raw: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
-    // sign-extend the low 24 bits of offset_raw
-    let delta = (((offset_raw & 0x00ff_ffff) as i32) << 8) >> 8;
-    let args = crate::vm::semantics::control_flow::OpJumpArgs {
-        delta,
-        instruction_len: 4,
-    };
-    let outcome = crate::vm::semantics::control_flow::op_jump_semantic(&mut dispatch, args);
-    dispatch.translate_outcome(outcome)
+    match crate::dsl::poll::run_poll(&mut dispatch, crate::dsl::poll::PollArgs) {
+        crate::dsl::slow_path::SemanticOutcome::Continue { .. } => {}
+        outcome => return dispatch.translate_outcome(outcome),
+    }
+    let delta = offset_raw as i32;
+    let instruction_offset = dispatch.current_instruction_offset();
+    let target = i64::from(instruction_offset) + 4 + i64::from(delta);
+    if target < 0 || target > i64::from(u32::MAX) {
+        let code = dispatch.dispatch_state().frame.code();
+        return dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError {
+            error: crate::error::VmError::InvalidJumpTarget {
+                code,
+                instruction_offset,
+                target_offset: target,
+            },
+        });
+    }
+    let pc_advance = (4_i64 + i64::from(delta)) as u32;
+    dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance })
 }
 
 // =====================================================================

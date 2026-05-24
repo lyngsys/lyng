@@ -326,6 +326,163 @@ fn add_smi_hit_avoids_semantic_slow_path() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
+fn jump_i24_forward_hit_avoids_semantic_slow_path() {
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(18).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::Jump, 4),
+        Instruction::abx(Opcode::LoadSmi, 0, 1),
+        Instruction::abx(Opcode::LoadSmi, 0, 42),
+        Instruction::ax(Opcode::Return, 0),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(18), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::Jump), 1);
+    assert_eq!(
+        slow_path.semantic(Opcode::Jump),
+        0,
+        "Jump i24 forward hit should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(21).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::Jump, 8),
+        Instruction::abx(Opcode::LoadSmi, 0, 42),
+        Instruction::ax(Opcode::Return, 0),
+        Instruction::ax(Opcode::Jump, -12),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(21), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let dispatch = vm
+        .opcode_dispatch_counts()
+        .expect("opcode counters should be enabled");
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::Jump), 2);
+    assert_eq!(
+        slow_path.semantic(Opcode::Jump),
+        0,
+        "Jump i24 backward hit without a pending poll should avoid the semantic slow bridge"
+    );
+    assert_eq!(
+        slow_path.safepoint(Opcode::Jump),
+        0,
+        "Jump i24 backward hit should poll without taking the safepoint slow path when clear"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+struct ResumeDebugHook;
+
+#[cfg(feature = "opcode-counters")]
+impl VmDebugHook for ResumeDebugHook {
+    fn on_pause(&mut self, _context: VmDebugPauseContext<'_>) -> VmDebugCommand {
+        VmDebugCommand::Resume
+    }
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(24).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::Jump, 8),
+        Instruction::abx(Opcode::LoadSmi, 0, 7),
+        Instruction::ax(Opcode::Return, 0),
+        Instruction::ax(Opcode::Jump, -12),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(24), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    vm.set_debug_hook(ResumeDebugHook);
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.request_debug_pause_at(installed.code(), 12);
+
+    vm.enable_opcode_dispatch_counts();
+    vm.enable_slow_path_counts();
+    vm.reset_opcode_dispatch_counts();
+    vm.reset_slow_path_counts();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+    assert_eq!(result, Value::from_smi(7));
+
+    let slow_path = vm
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(
+        slow_path.safepoint(Opcode::Jump),
+        1,
+        "pending debugger work should enter the Jump safepoint slow path"
+    );
+    assert_eq!(
+        slow_path.semantic(Opcode::Jump),
+        0,
+        "pending debugger work should not force the Jump semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
 fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
     let mut builder = BytecodeBuilder::new(
         BytecodeFunctionId::from_raw(19).unwrap(),
@@ -933,6 +1090,82 @@ fn vm_loop_backedges_poll_active_incremental_major_mark() {
 }
 
 #[test]
+fn vm_full_jump_backedges_poll_active_incremental_major_mark() {
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(23).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_kind(BytecodeFunctionKind::Script)
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::Jump, 8),
+        Instruction::abx(Opcode::LoadSmi, 0, 7),
+        Instruction::ax(Opcode::Return, 0),
+        Instruction::ax(Opcode::Jump, -12),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(23), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let roots = PrimitiveRoots::new();
+    let live = agent.heap_mut().mutator().alloc_string(
+        StringEncoding::Latin1,
+        4,
+        b"live",
+        None,
+        AllocationLifetime::Default,
+    );
+    let _rooted = roots.root_string(live);
+    agent.heap_mut().set_major_mark_slice_budget(1);
+    assert!(agent.heap_mut().begin_incremental_mark(&roots));
+    assert_eq!(
+        agent.heap().active_incremental_mark_pending_work_items(),
+        Some(1)
+    );
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(7));
+    assert_eq!(
+        agent.heap().active_incremental_mark_pending_work_items(),
+        Some(0)
+    );
+}
+
+#[test]
+fn vm_dsl_poll_pending_tracks_active_incremental_major_mark() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let mut vm = Vm::new();
+
+    let roots = PrimitiveRoots::new();
+    let live = agent.heap_mut().mutator().alloc_string(
+        StringEncoding::Latin1,
+        4,
+        b"live",
+        None,
+        AllocationLifetime::Default,
+    );
+    let _rooted = roots.root_string(live);
+    agent.heap_mut().set_major_mark_slice_budget(1);
+    assert!(agent.heap_mut().begin_incremental_mark(&roots));
+
+    vm.refresh_dsl_poll_pending_for_agent(agent);
+    assert_eq!(vm.dsl_poll_pending, 1);
+
+    Vm::poll_incremental_mark_safepoint(agent);
+    vm.refresh_dsl_poll_pending_for_agent(agent);
+    assert_eq!(vm.dsl_poll_pending, 0);
+}
+
+#[test]
 fn vm_executes_specialized_smi_opcodes_and_fallback_paths() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -1037,6 +1270,40 @@ fn vm_rejects_register_operands_outside_installed_frame() {
         VmError::RegisterOutOfBounds {
             code,
             register: 1
+        } if code == CodeRef::from_raw(1).unwrap()
+    ));
+}
+
+#[test]
+fn vm_rejects_jump_targets_outside_instruction_stream() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let function = BytecodeFunction::new(
+        BytecodeFunctionId::from_raw(1).unwrap(),
+        None,
+        ArgumentsMode::None,
+    )
+    .with_kind(BytecodeFunctionKind::Script)
+    .with_register_counts(1, 0)
+    .with_instructions(vec![
+        Instruction::ax(Opcode::Jump, 4),
+        Instruction::ax(Opcode::ReturnUndefined, 0),
+    ]);
+    let unit = CompiledScriptUnit::new(SourceId::new(20), function.id(), vec![function]);
+
+    let mut vm = Vm::new();
+    let error = vm
+        .install_script(agent, realm.id(), &unit)
+        .expect_err("invalid jump targets should be rejected at install");
+
+    assert!(matches!(
+        error,
+        VmError::InvalidJumpTarget {
+            code,
+            instruction_offset: 0,
+            target_offset: 8
         } if code == CodeRef::from_raw(1).unwrap()
     ));
 }

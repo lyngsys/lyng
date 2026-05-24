@@ -238,7 +238,7 @@ fn canonical_atom(canonical_atoms: &[Option<AtomId>], atom: AtomId) -> AtomId {
         .unwrap_or(atom)
 }
 
-fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmResult<()> {
+fn validate_instruction_operands(code: CodeRef, function: &BytecodeFunction) -> VmResult<()> {
     let register_len = function
         .register_count()
         .checked_add(function.hidden_register_count())
@@ -246,8 +246,20 @@ fn validate_register_operands(code: CodeRef, function: &BytecodeFunction) -> VmR
             code,
             register: u16::MAX,
         })?;
-    for instruction in function.instructions() {
+    let instruction_offsets = function.instructions().byte_offsets().collect::<Vec<_>>();
+    for (instruction_offset, instruction) in instruction_offsets
+        .iter()
+        .copied()
+        .zip(function.instructions())
+    {
         validate_instruction_registers(code, register_len, instruction)?;
+        validate_instruction_jump_target(
+            code,
+            function.instruction_bytes().len(),
+            &instruction_offsets,
+            instruction_offset,
+            instruction,
+        )?;
     }
     Ok(())
 }
@@ -518,6 +530,58 @@ fn validate_registers<const N: usize>(
     Ok(())
 }
 
+fn validate_instruction_jump_target(
+    code: CodeRef,
+    byte_len: usize,
+    instruction_offsets: &[usize],
+    instruction_offset: usize,
+    instruction: Instruction,
+) -> VmResult<()> {
+    let Some(delta) = jump_delta(instruction) else {
+        return Ok(());
+    };
+    let instruction_offset_u32 =
+        u32::try_from(instruction_offset).map_err(|_| VmError::InvalidJumpTarget {
+            code,
+            instruction_offset: u32::MAX,
+            target_offset: i64::MAX,
+        })?;
+    let target = i64::from(instruction_offset_u32)
+        + i64::try_from(instruction.encoded_len()).expect("instruction length should fit i64")
+        + i64::from(delta);
+    let target_offset = usize::try_from(target).ok();
+    if !target_offset
+        .is_some_and(|offset| offset < byte_len && instruction_offsets.contains(&offset))
+    {
+        return Err(VmError::InvalidJumpTarget {
+            code,
+            instruction_offset: instruction_offset_u32,
+            target_offset: target,
+        });
+    }
+    Ok(())
+}
+
+const fn jump_delta(instruction: Instruction) -> Option<i32> {
+    match instruction {
+        Instruction::Ax {
+            opcode: Opcode::Jump | Opcode::Jump8,
+            ax,
+        } => Some(ax),
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue | Opcode::JumpIfFalse,
+            bx,
+            ..
+        } => Some((bx as i16) as i32),
+        Instruction::Abx {
+            opcode: Opcode::JumpIfTrue8 | Opcode::JumpIfFalse8,
+            bx,
+            ..
+        } => Some((bx as i8) as i32),
+        _ => None,
+    }
+}
+
 fn register_from_u32(code: CodeRef, register: u32) -> VmResult<u16> {
     u16::try_from(register).map_err(|_| VmError::RegisterOutOfBounds {
         code,
@@ -665,7 +729,7 @@ impl Vm {
                 RuntimeCodeRecord::new(None, Some(realm), constants),
                 AllocationLifetime::Default,
             );
-            validate_register_operands(code, &installed_function)?;
+            validate_instruction_operands(code, &installed_function)?;
             codes_by_function[bytecode_index(function_id)] = Some(code);
             installed_templates[bytecode_index(function_id)] = Some(installed_function);
         }

@@ -65,6 +65,7 @@ inside its `naked_asm!`.
 | `decode_abc_slot!`| AbcSlot   | a, b, c, slot (3 byte + u16) | 3 ldrb + ldrh |
 | `decode_abx!`     | Abx       | a, bx (1 byte + 1 u16)       | ldrb + ldrh   |
 | `decode_ax!`      | Ax        | ax (1 u32)                   | 1 ldr w       |
+| `decode_ax_i24!`  | AxI24     | ax (signed i24)              | ldrh + ldrsb + orr |
 | `load_reg!`       | n/a       | Value at `[REGS + idx*8]`    | 1 ldr x       |
 | `store_reg!`      | n/a       | `[REGS + idx*8] := Value`    | 1 str x       |
 | `load_acc!`       | n/a       | Value at `[REGS]`            | 1 ldr x       |

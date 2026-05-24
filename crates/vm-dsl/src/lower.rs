@@ -71,7 +71,7 @@ use crate::layouts::Layout;
 use crate::parse::{BodyStmt, DecodeMode, HandlerAst};
 use crate::scratch::ScratchAllocator;
 
-fn expected_operand_arity(layout: Layout, decode_mode: DecodeMode) -> usize {
+const fn expected_operand_arity(layout: Layout, decode_mode: DecodeMode) -> usize {
     match decode_mode {
         DecodeMode::Asm => layout.operand_arity(),
         DecodeMode::Rust => 0,
@@ -426,9 +426,11 @@ fn inject_opcode_byte(
             }
         };
         // `call_slow!` is suppressed when `gate_call_slow` (hit-side
-        // tail); `poll_safepoint!` is always a candidate.
+        // tail). Poll shims are counted by the paired `poll_safepoint!`
+        // branch, so they must not also increment the semantic bank.
+        // `poll_safepoint!` itself is always a candidate.
         let is_target = match name.as_str() {
-            "call_slow" => !gate_call_slow,
+            "call_slow" => !gate_call_slow && !is_poll_shim_call(&trees, i),
             "poll_safepoint" => true,
             _ => false,
         };
@@ -477,6 +479,24 @@ fn inject_opcode_byte(
         i += 3;
     }
     out.into_iter().collect()
+}
+
+fn is_poll_shim_call(trees: &[TokenTree], ident_index: usize) -> bool {
+    let Some(TokenTree::Punct(bang)) = trees.get(ident_index + 1) else {
+        return false;
+    };
+    if bang.as_char() != '!' {
+        return false;
+    }
+    let Some(TokenTree::Group(group)) = trees.get(ident_index + 2) else {
+        return false;
+    };
+    if group.delimiter() != Delimiter::Parenthesis {
+        return false;
+    }
+    group.stream().into_iter().next().is_some_and(
+        |tree| matches!(tree, TokenTree::Ident(name) if name.to_string().ends_with("_poll_rs")),
+    )
 }
 
 /// Recurse into a TokenTree::Group, applying `inject_opcode_byte` to
@@ -703,6 +723,25 @@ mod tests {
     }
 
     #[test]
+    fn jump_i24_handler_uses_exact_i24_decode_prologue() {
+        let lowered = lower_handler_tokens(
+            "op_jump, opcode_byte = 63, layout = AxI24, length = 4, |offset| {
+                dispatch!();
+            }",
+        );
+        let output = lowered.to_string();
+
+        assert!(
+            output.contains("decode_ax_i24"),
+            "signed i24 control-flow handlers must use the exact i24 decode prologue. Got: {output}",
+        );
+        assert!(
+            !output.contains("decode_ax !"),
+            "signed i24 control-flow handlers must not use the 32-bit Ax overread prologue. Got: {output}",
+        );
+    }
+
+    #[test]
     fn rust_decode_mode_rejects_operand_bindings() {
         let input: TokenStream = syn::parse_str(
             "op_load_smi_dsl, opcode_byte = 9, layout = Abx, length = 4, decode = Rust, |a, bx| {
@@ -754,6 +793,17 @@ mod tests {
              when gate_call_slow is false (correctly counts a slow \
              entry). Got: {}",
             rewritten,
+        );
+    }
+
+    #[test]
+    fn poll_shim_call_slow_is_not_counted_as_semantic_slow_path() {
+        let tokens: TokenStream = syn::parse_str("call_slow!(op_jump_poll_rs, args = [offset])")
+            .expect("parse poll call_slow!");
+        let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ false);
+        assert!(
+            !output_has_opcode_byte_for("call_slow", &rewritten),
+            "poll shims are counted by `poll_safepoint!`, not the semantic slow-path bank. Got: {rewritten}",
         );
     }
 

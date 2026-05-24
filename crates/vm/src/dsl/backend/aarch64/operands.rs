@@ -118,6 +118,28 @@ macro_rules! decode_ax {
     };
 }
 
+/// Decode a signed i24 operand from `[PC + 1]..[PC + 3]`.
+///
+/// The low 16 bits are loaded with `ldrh`; the high byte is loaded
+/// with `ldrsb`, shifted into place, and `orr`ed into the destination.
+/// This avoids the `decode_ax!` 32-bit overread into `[PC + 4]`.
+#[macro_export]
+macro_rules! decode_ax_i24 {
+    ($ax:tt) => {
+        concat!(
+            "ldrh   w",
+            stringify!($ax),
+            ", [x19, #1]\n",
+            "ldrsb  w16, [x19, #3]\n",
+            "orr    w",
+            stringify!($ax),
+            ", w",
+            stringify!($ax),
+            ", w16, lsl #16\n",
+        )
+    };
+}
+
 /// Load a Value from the register file at index in `$idx` into `$dst`.
 /// Compiles to `ldr xDst, [x20, xIdx, lsl #3]` — single instruction.
 #[macro_export]
@@ -161,4 +183,24 @@ macro_rules! store_acc {
     ($src:tt) => {
         concat!("str    x", stringify!($src), ", [x20]\n",)
     };
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn decode_ax_i24_uses_only_encoded_delta_bytes() {
+        let asm = decode_ax_i24!(9);
+
+        assert!(asm.contains("ldrh   w9, [x19, #1]"));
+        assert!(asm.contains("ldrsb  w16, [x19, #3]"));
+        assert!(asm.contains("orr    w9, w9, w16, lsl #16"));
+        assert!(
+            !asm.contains("[x19, #4]"),
+            "signed i24 decode must not read the following opcode byte: {asm}",
+        );
+        assert!(
+            !asm.contains("ldr    w9, [x19, #1]"),
+            "signed i24 decode must not use the 32-bit Ax overread form: {asm}",
+        );
+    }
 }

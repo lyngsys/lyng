@@ -46,8 +46,10 @@ pub fn run_poll(state: &mut LlIntDispatchState<'_, '_>, _args: PollArgs) -> Sema
     inner.sync_active_frame();
     {
         let crate::vm::dispatch_state::DispatchState { vm, agent, .. } = &mut *inner;
+        crate::vm::Vm::poll_incremental_mark_safepoint(agent);
         vm.poll_debug_safepoint(agent, crate::vm::VmDebugSafepointKind::LoopHeader);
     }
+    inner.refresh_dsl_poll_pending();
     // op_loop_header is encoded as 4 bytes (`length = 4` in the warm
     // handler). After the hook resumes — whether via Resume / StepIn /
     // StepOver / StepOut — execution advances past the loop-header to

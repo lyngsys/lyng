@@ -183,13 +183,12 @@ pub struct Vm {
     /// reallocates the flat array, only mutates per-entry content.
     /// See `crate::dsl::feedback_flat` for the storage rationale.
     pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
-    /// DSL-0c placeholder for the safepoint poll-pending byte read by
-    /// `poll_safepoint!` (warm `op_loop_header` / conditional backward
-    /// jumps). The asm reads `[x22, VM_POLL_PENDING_OFFSET]` where
-    /// `x22 = *mut Vm`; the offset is derived from
-    /// `offset_of!(Vm, dsl_poll_pending)` in
-    /// `crate::dsl::reg_convention`. Always 0 during DSL-0; B41 will
-    /// give it real semantics (GC step / debugger pause bits).
+    /// Safepoint poll-pending byte read by `poll_safepoint!` (warm
+    /// `op_loop_header` / backward jumps). The asm reads
+    /// `[x22, VM_POLL_PENDING_OFFSET]` where `x22 = *mut Vm`; the offset
+    /// is derived from `offset_of!(Vm, dsl_poll_pending)` in
+    /// `crate::dsl::reg_convention`. Non-zero means a same-thread
+    /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
     tiering: Vec<Option<TieringState>>,
     activation_tables: ActivationSideTables,
@@ -475,15 +474,27 @@ impl Vm {
         self.refresh_dsl_poll_pending();
     }
 
-    /// Sync `dsl_poll_pending` with the current debug state. The DSL
-    /// warm `op_loop_header` handler checks this byte on every backedge
-    /// and branches to the slow path when non-zero; the slow path then
-    /// invokes `run_poll`, which dispatches to `poll_debug_safepoint`.
-    /// Keeping the byte mirrored to `debug_poll_enabled()` is the
-    /// substrate's only signal that a pause/step is pending.
+    /// Sync `dsl_poll_pending` with the current debug state only. Public
+    /// debugger APIs do not have an `Agent`, so GC pending work is folded
+    /// in at DSL entry and slow-path egress via
+    /// [`Self::refresh_dsl_poll_pending_for_agent`].
     #[inline]
     pub(crate) fn refresh_dsl_poll_pending(&mut self) {
         self.dsl_poll_pending = u8::from(self.debug_poll_enabled());
+    }
+
+    #[inline]
+    pub(crate) fn refresh_dsl_poll_pending_for_agent(&mut self, agent: &Agent) {
+        self.dsl_poll_pending = u8::from(self.dsl_poll_pending_for_agent(agent));
+    }
+
+    #[inline]
+    pub(crate) fn dsl_poll_pending_for_agent(&self, agent: &Agent) -> bool {
+        self.debug_poll_enabled()
+            || agent
+                .heap()
+                .active_incremental_mark_pending_work_items()
+                .is_some_and(|pending| pending > 0)
     }
 
     #[inline]
@@ -669,7 +680,7 @@ impl Vm {
     }
 
     #[inline]
-    pub(super) fn poll_incremental_mark_safepoint(agent: &mut Agent) {
+    pub(crate) fn poll_incremental_mark_safepoint(agent: &mut Agent) {
         let _ = agent.heap_mut().poll_incremental_mark_step();
     }
 
@@ -1672,6 +1683,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
+        self.refresh_dsl_poll_pending_for_agent(agent);
         let frame = self
             .frames
             .last()

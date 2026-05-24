@@ -31,8 +31,10 @@ pub(crate) enum Layout {
     AbcSlot,
     /// `a` register + extended `bx` operand.
     Abx,
-    /// Extended `ax` operand (used by jump targets).
+    /// Extended unsigned `ax` operand.
     Ax,
+    /// Signed 24-bit `ax` operand used by full-width control-flow deltas.
+    AxI24,
     /// No operands (only the opcode byte and feedback-slot trailer).
     None,
 }
@@ -44,6 +46,7 @@ impl Layout {
             "AbcSlot" => Ok(Self::AbcSlot),
             "Abx" => Ok(Self::Abx),
             "Ax" => Ok(Self::Ax),
+            "AxI24" => Ok(Self::AxI24),
             "Ab" => Ok(Self::Ab),
             "A" => Ok(Self::A),
             "None" => Ok(Self::None),
@@ -54,12 +57,10 @@ impl Layout {
         }
     }
 
-    pub(crate) fn operand_arity(self) -> usize {
+    pub(crate) const fn operand_arity(self) -> usize {
         match self {
             Self::None => 0,
-            // `Ax` is the extended (u32-immediate) jump-target form —
-            // a single operand binding mapped to a 4-byte read at PC+1.
-            Self::A | Self::Ax => 1,
+            Self::A | Self::Ax | Self::AxI24 => 1,
             Self::Ab | Self::Abx => 2,
             Self::Abc => 3,
             Self::AbcSlot => 4,
@@ -82,6 +83,7 @@ impl Layout {
             }
             (Self::Abx, [a, bx]) => quote! { decode_abx!(#a, #bx) },
             (Self::Ax, [ax]) => quote! { decode_ax!(#ax) },
+            (Self::AxI24, [ax]) => quote! { decode_ax_i24!(#ax) },
             _ => {
                 // Arity is enforced upstream by `lower_handler`; this
                 // arm is unreachable in practice.

@@ -530,6 +530,19 @@ macro_rules! branch_i8_negative {
     };
 }
 
+#[macro_export]
+macro_rules! branch_i32_negative {
+    ($reg:tt, $label:tt) => {
+        concat!(
+            "tbnz   w",
+            stringify!($reg),
+            ", #31, ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 /// Apply a sign-extended i8 relative branch delta in `$offset` from the
 /// current instruction and dispatch from the resulting PC.
 #[macro_export]
@@ -547,6 +560,25 @@ macro_rules! jump_relative_i8_and_dispatch {
             "add    x19, x19, x",
             stringify!($offset),
             "\n",
+            "ldrb   w8, [x19]\n",
+            "ldr    x16, [x23, x8, lsl #3]\n",
+            "br     x16\n",
+        )
+    };
+}
+
+/// Apply a sign-extended i32 relative branch delta in `$offset` from
+/// the current instruction and dispatch from the resulting PC.
+#[macro_export]
+macro_rules! jump_relative_i32_and_dispatch {
+    ($offset:tt, advance = $n:literal) => {
+        concat!(
+            "add    x19, x19, #",
+            stringify!($n),
+            "\n",
+            "add    x19, x19, w",
+            stringify!($offset),
+            ", sxtw\n",
             "ldrb   w8, [x19]\n",
             "ldr    x16, [x23, x8, lsl #3]\n",
             "br     x16\n",

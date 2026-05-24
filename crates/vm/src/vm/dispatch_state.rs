@@ -132,6 +132,11 @@ impl<'vm> DispatchState<'vm> {
         self.vm.sync_dispatch_frame(frame_depth, frame);
     }
 
+    #[inline]
+    pub(crate) fn refresh_dsl_poll_pending(&mut self) {
+        self.vm.refresh_dsl_poll_pending_for_agent(self.agent);
+    }
+
     /// Pop the agent's top execution context. Mirror of the
     /// `let _ = agent.pop_execution_context();` line in the legacy match.
     #[inline]
