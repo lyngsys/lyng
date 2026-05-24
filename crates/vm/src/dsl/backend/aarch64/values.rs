@@ -73,6 +73,87 @@ macro_rules! check_smi {
     };
 }
 
+/// Check two registers both hold SMIs; branch to `label` on either miss.
+///
+/// Paired counterpart to `check_smi!`. Binary-op handlers (`op_add`,
+/// `op_sub`, ...) emit two consecutive SMI guards that share a single
+/// slow label; the comparand `0x7ff8_0004` is identical between them
+/// and so can be hoisted out of the per-operand body.
+///
+/// ## Emitted shape (8 instructions total)
+///
+/// ```text
+///     ; hoisted comparand — w17 := 0x7ff8_0004 (high 32 bits of an SMI Value)
+///     movz  w17, #0x4
+///     movk  w17, #0x7ff8, lsl #16
+///     ; per-operand SMI check (reg_a)
+///     lsr   x16, x{reg_a}, #32
+///     cmp   w16, w17
+///     b.ne  {label}
+///     ; per-operand SMI check (reg_b)
+///     lsr   x16, x{reg_b}, #32
+///     cmp   w16, w17
+///     b.ne  {label}
+/// ```
+///
+/// Two separate `check_smi!` invocations emit 5 instructions each
+/// (`LSR`/`MOVZ`/`MOVK`/`CMP`/`B.NE`) — 10 instructions for two
+/// operands. The paired form is **8**, saving 2 instructions per
+/// binary-op fast path by hoisting the duplicated `MOVZ`+`MOVK`
+/// comparand setup.
+///
+/// ## Why pairing works
+///
+/// The comparand `0x7ff8_0004` is a per-kind constant: it depends
+/// only on `TagKind::Smi` (= 4) and the canonical-NaN header — never
+/// on the operand value. Building it once in `w17` and reusing it
+/// across both compares is a textbook scalar-CSE move; the
+/// proc-macro lowerer cannot perform this CSE itself because each
+/// `check_smi!` is an opaque `concat!` blob to the assembler.
+///
+/// ## Scratch register usage
+///
+/// `x16` and `x17` are AAPCS64 IP0/IP1 — caller-saved intra-procedure
+/// scratch with no semantic role in the DSL pinned-register
+/// convention. `x17` carries the hoisted comparand across both per-
+/// operand bodies; `x16` is rewritten by each `lsr`. Neither `reg_a`
+/// nor `reg_b` is mutated, so they remain available for subsequent
+/// `untag_smi!` / arithmetic.
+///
+/// ## When to use
+///
+/// Use whenever a handler emits two adjacent `check_smi!` calls that
+/// share a slow label. Out-of-scope for non-paired sites (single SMI
+/// guards keep `check_smi!`), and for paired guards with diverging
+/// labels (rare; pair the labels first or keep the singles).
+#[macro_export]
+macro_rules! check_smi_pair {
+    ($reg_a:tt, $reg_b:tt, $label:tt) => {
+        concat!(
+            // w17 := 0x7ff8_0004 — high 32 bits of an SMI Value, built
+            // once and reused across both per-operand compares.
+            "movz   w17, #0x4\n",
+            "movk   w17, #0x7ff8, lsl #16\n",
+            // per-operand: shift high half of the Value into w16, then
+            // 32-bit compare against the SMI tag pattern.
+            "lsr    x16, x",
+            stringify!($reg_a),
+            ", #32\n",
+            "cmp    w16, w17\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+            "lsr    x16, x",
+            stringify!($reg_b),
+            ", #32\n",
+            "cmp    w16, w17\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 /// Check `reg` holds an `ObjectRef`; branch to `label` on miss.
 ///
 /// 5 instructions; see `check_smi!` for the `LSR`/`MOVZ`/`MOVK`/`CMP`/`B.NE`

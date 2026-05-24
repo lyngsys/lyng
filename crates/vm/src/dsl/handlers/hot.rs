@@ -25,7 +25,7 @@
 // resolve. They are `#[macro_export]`-ed at the crate root.
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    add_smi_overflow, branch_i32_negative, call_slow, check_smi, decode_ab, decode_abc_slot,
+    add_smi_overflow, branch_i32_negative, call_slow, check_smi_pair, decode_ab, decode_abc_slot,
     decode_ax_i24, dispatch, dispatch_after_slow, jump_relative_i32_and_dispatch, load_reg,
     mask_u24, poll_safepoint, record_smi, return_to_caller_or_branch, store_reg, tag_smi,
     untag_smi,
@@ -47,20 +47,24 @@ llint_handler! {
 // op_add (B40) — Abc layout with feedback slot, SMI inline hit path.
 // =====================================================================
 //
-// Hit path: 2x check_smi + 2x untag + add + tag + store_reg +
-// record_smi! + dispatch. `record_smi!` writes pending scalar feedback
-// into the LLInt flat feedback sidecar; Rust drains that sidecar at
-// explicit VM run boundaries and reconciles the legacy feedback vector
-// and tiering counters. Semantic slow path: call_slow into the op_add
-// semantic body, which performs feedback recording itself.
+// Hit path: check_smi_pair + 2x untag + add + tag + store_reg +
+// record_smi! + dispatch. The paired SMI guard hoists the
+// `0x7ff8_0004` comparand out of the per-operand body, emitting one
+// movz/movk pair plus two lsr/cmp/b.ne triples (8 insns total)
+// instead of two independent 5-insn `check_smi!` invocations
+// (10 insns) — a 2-insn save on every SMI add. `record_smi!` writes
+// pending scalar feedback into the LLInt flat feedback sidecar; Rust
+// drains that sidecar at explicit VM run boundaries and reconciles
+// the legacy feedback vector and tiering counters. Semantic slow
+// path: call_slow into the op_add semantic body, which performs
+// feedback recording itself.
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_add, opcode_byte = 31, layout = AbcSlot, length = 6, |a, b, c, slot| {
         load_reg!(b => t0);
-        check_smi!(t0, .slow);
         load_reg!(c => t1);
-        check_smi!(t1, .slow);
+        check_smi_pair!(t0, t1, .slow);
         untag_smi!(t0);
         untag_smi!(t1);
         add_smi_overflow!(t0, t1 => t2, .slow);

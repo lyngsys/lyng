@@ -107,6 +107,7 @@ Per
 | Macro                 | Effect                                              | Fast-path cost (AArch64)     |
 | --------------------- | --------------------------------------------------- | ---------------------------- |
 | `check_smi!`          | Branch to label if `reg` is not an SMI              | lsr + movz + movk + cmp + b.ne (5 insns, kind = 4) |
+| `check_smi_pair!`     | Branch to label if either of two regs is not an SMI | movz + movk (hoisted comparand) + (lsr + cmp + b.ne) × 2 — 8 insns total, saves 2 vs two `check_smi!` |
 | `check_object_ref!`   | Branch to label if `reg` is not an ObjectRef        | same shape, kind = 5         |
 | `check_string_ref!`   | Branch to label if `reg` is not a StringRef         | same shape, kind = 6         |
 | `check_undefined!`    | Branch to label if `reg` is not `undefined`         | movz + movk + cmp + b.ne (4 insns) |
