@@ -66,7 +66,8 @@ fn llint_rust_probe_no_refresh_dispatch_does_not_reload_frame_pins() {
         .expect("backend must define the no-refresh Rust probe hit dispatch macro");
     let rest = &backend[start..];
     let end = rest
-        .find("// ===========================================================================\n// Branches.")
+        .find("\n}\n\n/// Complete a simple nested function return")
+        .or_else(|| rest.find("// ===========================================================================\n// Branches."))
         .expect("dispatch macro section should end before branch helpers");
     let dispatch_macro = &rest[..end];
 

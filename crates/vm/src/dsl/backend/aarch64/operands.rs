@@ -118,6 +118,19 @@ macro_rules! decode_ax {
     };
 }
 
+#[macro_export]
+macro_rules! mask_u24 {
+    ($reg:tt) => {
+        concat!(
+            "ubfx   x",
+            stringify!($reg),
+            ", x",
+            stringify!($reg),
+            ", #0, #24\n",
+        )
+    };
+}
+
 /// Decode a signed i24 operand from `[PC + 1]..[PC + 3]`.
 ///
 /// The low 16 bits are loaded with `ldrh`; the high byte is loaded

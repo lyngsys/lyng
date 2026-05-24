@@ -242,6 +242,8 @@ impl DslHarness {
         let mut rust_ctx = LlIntRustContext {
             dispatch,
             exit: LlIntExitSlot::default(),
+            frame_infos: Vec::new(),
+            frame_info_register_stack_base: core::ptr::null_mut(),
         };
 
         // Build the asm-visible state record. `frame_regs_base` /
@@ -263,6 +265,14 @@ impl DslHarness {
             frame_this_value: Value::undefined(),
             frame_depth: 0,
             frame_check_epoch: 0,
+            frame_info_base: core::ptr::null_mut(),
+            frame_info_len: 0,
+            register_stack_top: 0,
+            register_stack_len: 0,
+            register_stack_base: core::ptr::null_mut(),
+            call_targets_base: core::ptr::null(),
+            call_targets_len: 0,
+            _pad3: 0,
             rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
             prefix: 0,
             _pad2: [0; 7],

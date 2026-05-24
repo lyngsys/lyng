@@ -125,6 +125,63 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             // SAFETY: `state` is valid by `from_raw`'s contract; we
             // only read scalar fields here.
             unsafe {
+                let asm_depth = (**state).frame_depth as usize;
+                let same_depth_frame_replaced = asm_depth > 0
+                    && asm_depth == rust.dispatch.frame_depth
+                    && rust.frame_infos.get(asm_depth - 1).is_some_and(|info| {
+                        rust.dispatch.frame.code().get() != info.code_raw
+                            || rust.dispatch.frame.registers().base() != info.register_base
+                            || u32::from(rust.dispatch.frame.registers().len()) != info.register_len
+                    });
+                if asm_depth > rust.dispatch.frame_depth || same_depth_frame_replaced {
+                    let register_stack_top = (**state).register_stack_top as usize;
+                    if let Err(error) = rust.dispatch.vm.materialize_llint_frames(
+                        rust.dispatch.agent,
+                        asm_depth,
+                        &rust.frame_infos,
+                        register_stack_top,
+                    ) {
+                        rust.exit.kind = crate::dsl::llint_state::ExitKind::Error;
+                        rust.exit.error = Some(Box::new(error));
+                        return;
+                    }
+                    if let Some(active) = rust.dispatch.vm.frames().last().copied() {
+                        rust.dispatch.frame = active;
+                    }
+                    rust.dispatch.frame_depth = asm_depth;
+                    rust.dispatch.installed = rust
+                        .dispatch
+                        .vm
+                        .installed_for_dsl_runtime(rust.dispatch.frame.code())
+                        .unwrap_or_else(|| rust.dispatch.installed.clone());
+                    rust.dispatch.frame_check_epoch =
+                        rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                }
+                if asm_depth > 0 && asm_depth < rust.dispatch.frame_depth {
+                    rust.dispatch
+                        .vm
+                        .reconcile_llint_fast_return_depth(rust.dispatch.agent, asm_depth);
+                    if let Some(active) = rust.dispatch.vm.frames().last().copied() {
+                        rust.dispatch.frame = active;
+                    }
+                    rust.dispatch.frame_depth = asm_depth;
+                    rust.dispatch.installed = rust
+                        .dispatch
+                        .vm
+                        .installed_for_dsl_runtime(rust.dispatch.frame.code())
+                        .unwrap_or_else(|| rust.dispatch.installed.clone());
+                    rust.dispatch.frame_check_epoch =
+                        rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                    rust.frame_info_register_stack_base =
+                        crate::dsl::llint_state::refresh_frame_infos(
+                            &mut rust.frame_infos,
+                            rust.dispatch.vm,
+                            rust.dispatch.agent,
+                        );
+                    (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
+                    (**state).frame_info_len =
+                        u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
+                }
                 rust.dispatch
                     .frame
                     .set_instruction_offset((**state).frame_pc_offset);
@@ -235,6 +292,39 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_fv_base = fv_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
+                        (**state).frame_depth =
+                            u32::try_from(rust.dispatch.frame_depth).unwrap_or(u32::MAX);
+                        (**state).register_stack_top =
+                            u32::try_from(rust.dispatch.vm.register_stack_top())
+                                .unwrap_or(u32::MAX);
+                        (**state).register_stack_len =
+                            u32::try_from(rust.dispatch.vm.register_stack_storage_len_for_dsl())
+                                .unwrap_or(u32::MAX);
+                    }
+                    let register_stack_base = rust.dispatch.vm.register_stack_storage_mut_ptr();
+                    if register_stack_base != rust.frame_info_register_stack_base {
+                        rust.frame_info_register_stack_base =
+                            crate::dsl::llint_state::refresh_frame_infos(
+                                &mut rust.frame_infos,
+                                rust.dispatch.vm,
+                                rust.dispatch.agent,
+                            );
+                    }
+                    if let Some(info) = rust
+                        .frame_infos
+                        .get_mut(rust.dispatch.frame_depth.saturating_sub(1))
+                    {
+                        info.pc_offset = new_offset;
+                    }
+                    let (call_targets_base, call_targets_len) =
+                        rust.dispatch.vm.llint_call_targets_for_entry();
+                    unsafe {
+                        (**state).register_stack_base = register_stack_base;
+                        (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
+                        (**state).frame_info_len =
+                            u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
+                        (**state).call_targets_base = call_targets_base;
+                        (**state).call_targets_len = call_targets_len;
                     }
                     rust.dispatch.refresh_dsl_poll_pending();
                 }
@@ -339,6 +429,30 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         // Phase 1.B.1: refresh the new fields.
                         (**state).frame_const_base = const_base;
                         (**state).frame_this_value = this_value;
+                        (**state).frame_depth = u32::try_from(current_depth).unwrap_or(u32::MAX);
+                        (**state).register_stack_top =
+                            u32::try_from(rust.dispatch.vm.register_stack_top())
+                                .unwrap_or(u32::MAX);
+                        (**state).register_stack_len =
+                            u32::try_from(rust.dispatch.vm.register_stack_storage_len_for_dsl())
+                                .unwrap_or(u32::MAX);
+                    }
+                    rust.frame_info_register_stack_base =
+                        crate::dsl::llint_state::refresh_frame_infos(
+                            &mut rust.frame_infos,
+                            rust.dispatch.vm,
+                            rust.dispatch.agent,
+                        );
+                    let (call_targets_base, call_targets_len) =
+                        rust.dispatch.vm.llint_call_targets_for_entry();
+                    unsafe {
+                        (**state).register_stack_base =
+                            rust.dispatch.vm.register_stack_storage_mut_ptr();
+                        (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
+                        (**state).frame_info_len =
+                            u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
+                        (**state).call_targets_base = call_targets_base;
+                        (**state).call_targets_len = call_targets_len;
                     }
                     // Phase 1.B.1: debug-only stability assertion.
                     // The arena slot's data pointer must be stable

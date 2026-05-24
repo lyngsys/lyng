@@ -5,11 +5,134 @@
     reason = "LlIntState is a repr(C) asm ABI record with explicit public padding fields for stable offsets"
 )]
 
-use lyng_types::Value;
+use lyng_env::ExecutableId;
+use lyng_objects::{FunctionEntryIdentity, FunctionObjectData, FunctionThisMode};
+use lyng_types::{ObjectRef, Value};
 
 use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
+
+pub const LLINT_FRAME_INFO_HEADROOM: usize = 64;
+pub const LLINT_REGISTER_STACK_HEADROOM: usize = 1024;
+pub const LLINT_MAX_BYTECODE_CALL_DEPTH: usize = 8_192;
+pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE: u32 = 1;
+pub const LLINT_FRAME_INFO_STRICT: u32 = 1 << 1;
+pub const LLINT_FRAME_INFO_TAIL_CALL_RECYCLE_SAFE: u32 = 1 << 2;
+pub const LLINT_RETURN_REGISTER_NONE: u32 = u32::MAX;
+pub const LLINT_CALL_TARGET_ENABLED: u32 = 1;
+pub const LLINT_CALL_TARGET_FAST_RETURN_SAFE: u32 = 1 << 1;
+pub const LLINT_CALL_TARGET_THIS_GLOBAL: u32 = 1 << 2;
+pub const LLINT_CALL_TARGET_STRICT: u32 = 1 << 3;
+pub const LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE: u32 = 1 << 4;
+
+/// Compact asm-facing frame metadata for no-cleanup call/return paths.
+///
+/// The canonical `FrameRecord` stays Rust-owned. This mirror contains
+/// only the fields the `LLInt` hit paths need while they defer
+/// materializing pushed/popped frames back into `Vm::frames` until the
+/// next Rust slow-path boundary.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LlIntFrameInfo {
+    pub pb_base: *const u8,
+    pub regs_base: *mut Value,
+    pub fv_base: *mut FeedbackEntry,
+    pub const_base: *const Value,
+    pub this_value: Value,
+    pub pc_offset: u32,
+    pub return_register: u32,
+    pub flags: u32,
+    pub register_base: u32,
+    pub register_len: u32,
+    pub code_raw: u32,
+    pub realm_raw: u32,
+    pub lexical_env_raw: u32,
+    pub variable_env_raw: u32,
+    pub private_env_raw: u32,
+    pub callee_raw: u32,
+    pub parameter_initializer_end_offset: u32,
+    pub frame_flags_raw: u32,
+    pub tail_caller_raw: u32,
+    pub tail_caller_strict: u32,
+    pub pad: [u64; 3],
+}
+
+impl Default for LlIntFrameInfo {
+    fn default() -> Self {
+        Self {
+            pb_base: std::ptr::null(),
+            regs_base: std::ptr::null_mut(),
+            fv_base: std::ptr::null_mut(),
+            const_base: std::ptr::null(),
+            this_value: Value::undefined(),
+            pc_offset: 0,
+            return_register: LLINT_RETURN_REGISTER_NONE,
+            flags: 0,
+            register_base: 0,
+            register_len: 0,
+            code_raw: 0,
+            realm_raw: 0,
+            lexical_env_raw: 0,
+            variable_env_raw: 0,
+            private_env_raw: 0,
+            callee_raw: 0,
+            parameter_initializer_end_offset: 0,
+            frame_flags_raw: 0,
+            tail_caller_raw: 0,
+            tail_caller_strict: 0,
+            pad: [0; 3],
+        }
+    }
+}
+
+/// Compact asm-facing metadata for bytecode function objects eligible
+/// for direct `LLInt` frame entry.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LlIntCallTarget {
+    pub callee_bits: u64,
+    pub pb_base: *const u8,
+    pub fv_base: *mut FeedbackEntry,
+    pub const_base: *const Value,
+    pub global_this: Value,
+    pub code_raw: u32,
+    pub register_len: u32,
+    pub parameter_count: u32,
+    pub flags: u32,
+    pub realm_raw: u32,
+    pub lexical_env_raw: u32,
+    pub variable_env_raw: u32,
+    pub private_env_raw: u32,
+    pub callee_raw: u32,
+    pub parameter_initializer_end_offset: u32,
+    pub _pad1: u32,
+    pub _pad: [u64; 5],
+}
+
+impl Default for LlIntCallTarget {
+    fn default() -> Self {
+        Self {
+            callee_bits: 0,
+            pb_base: std::ptr::null(),
+            fv_base: std::ptr::null_mut(),
+            const_base: std::ptr::null(),
+            global_this: Value::undefined(),
+            code_raw: 0,
+            register_len: 0,
+            parameter_count: 0,
+            flags: 0,
+            realm_raw: 0,
+            lexical_env_raw: 0,
+            variable_env_raw: 0,
+            private_env_raw: 0,
+            callee_raw: 0,
+            parameter_initializer_end_offset: 0,
+            _pad1: 0,
+            _pad: [0; 5],
+        }
+    }
+}
 
 /// Opaque marker for the Rust-side context pointer in [`LlIntState`].
 ///
@@ -52,6 +175,14 @@ pub struct LlIntState {
     pub frame_this_value: Value,
     pub frame_depth: u32,
     pub frame_check_epoch: u32,
+    pub frame_info_base: *mut LlIntFrameInfo,
+    pub frame_info_len: u32,
+    pub register_stack_top: u32,
+    pub register_stack_len: u32,
+    pub register_stack_base: *mut Value,
+    pub call_targets_base: *const LlIntCallTarget,
+    pub call_targets_len: u32,
+    pub _pad3: u32,
     pub rust_context: *mut LlIntRustContextOpaque,
     pub prefix: u8,
     pub _pad2: [u8; 7],
@@ -77,6 +208,8 @@ pub struct LlIntState {
 pub struct LlIntRustContext<'vm> {
     pub(crate) dispatch: DispatchState<'vm>,
     pub(crate) exit: LlIntExitSlot,
+    pub(crate) frame_infos: Vec<LlIntFrameInfo>,
+    pub(crate) frame_info_register_stack_base: *mut Value,
 }
 
 /// Slot the slow-path bridge writes when a semantic body chooses to
@@ -154,6 +287,254 @@ pub(crate) fn resolve_initial_this_value(
     resolve_this_state_to_mirror(this_state, fallback)
 }
 
+pub(crate) fn refresh_frame_infos(
+    frame_infos: &mut Vec<LlIntFrameInfo>,
+    vm: &mut crate::Vm,
+    agent: &lyng_env::Agent,
+) -> *mut Value {
+    let register_stack_base = vm.register_stack_storage_mut_ptr();
+    let target_len = vm
+        .frames()
+        .len()
+        .saturating_add(LLINT_FRAME_INFO_HEADROOM)
+        .min(LLINT_MAX_BYTECODE_CALL_DEPTH);
+    frame_infos.clear();
+    frame_infos.resize(target_len, LlIntFrameInfo::default());
+
+    let mut bytecode_contexts = agent
+        .execution_contexts()
+        .iter()
+        .copied()
+        .filter(|context| matches!(context.executable(), ExecutableId::Bytecode(_)));
+    for (index, frame) in vm.frames().iter().enumerate() {
+        let context_this_state = bytecode_contexts
+            .next()
+            .filter(|context| context.executable() == ExecutableId::Bytecode(frame.code()))
+            .map(lyng_env::ExecutionContext::this_state);
+        let Some(installed) = vm.installed_for_dsl_runtime(frame.code()) else {
+            continue;
+        };
+        let function = installed.function();
+        let pb_base = function.instruction_bytes().as_ptr();
+        let fv_base = {
+            let index = crate::vm::code_index_for_dsl(frame.code());
+            vm.feedback_flat_storage[index].as_ptr().cast_mut()
+        };
+        let const_base = agent
+            .heap()
+            .view()
+            .code(frame.code())
+            .and_then(lyng_gc::RuntimeCodeRecord::constants)
+            .and_then(|slots| agent.heap().view().code_slots(slots))
+            .map_or(std::ptr::null(), <[_]>::as_ptr);
+        let regs_base = {
+            let base = frame.registers().base() as usize;
+            // SAFETY: the register window belongs to a live frame and
+            // is within the reserved register-stack backing storage.
+            unsafe { register_stack_base.add(base) }
+        };
+        let return_register = frame
+            .return_register()
+            .map_or(LLINT_RETURN_REGISTER_NONE, u32::from);
+        let mut flags = 0;
+        if llint_simple_return_safe(function)
+            && !frame.flags().contains(crate::FrameFlags::construct())
+            && !frame
+                .flags()
+                .contains(crate::FrameFlags::derived_construct())
+        {
+            flags |= LLINT_FRAME_INFO_FAST_RETURN_SAFE;
+        }
+        if function.flags().strict() {
+            flags |= LLINT_FRAME_INFO_STRICT;
+        }
+        if llint_static_tail_recycle_safe(function)
+            && !frame.flags().contains(crate::FrameFlags::construct())
+            && !frame
+                .flags()
+                .contains(crate::FrameFlags::derived_construct())
+            && vm.llint_frame_window_is_clear(frame)
+        {
+            flags |= LLINT_FRAME_INFO_TAIL_CALL_RECYCLE_SAFE;
+        }
+        if let Some(info) = frame_infos.get_mut(index) {
+            *info = LlIntFrameInfo {
+                pb_base,
+                regs_base,
+                fv_base,
+                const_base,
+                this_value: resolve_this_state_to_mirror(context_this_state, frame.this_value()),
+                pc_offset: frame.instruction_offset(),
+                return_register,
+                flags,
+                register_base: frame.registers().base(),
+                register_len: u32::from(frame.registers().len()),
+                code_raw: frame.code().get(),
+                realm_raw: frame.realm().get(),
+                lexical_env_raw: frame.lexical_env().get(),
+                variable_env_raw: frame.variable_env().get(),
+                private_env_raw: 0,
+                callee_raw: frame.callee().map_or(0, ObjectRef::get),
+                parameter_initializer_end_offset: frame.parameter_initializer_end_offset(),
+                frame_flags_raw: u32::from(frame.flags().raw()),
+                tail_caller_raw: frame.tail_caller().map_or(0, ObjectRef::get),
+                tail_caller_strict: u32::from(frame.tail_caller_strict()),
+                pad: [0; 3],
+            };
+        }
+    }
+    register_stack_base
+}
+
+pub(crate) fn llint_call_target_for_function(
+    vm: &mut crate::Vm,
+    agent: &lyng_env::Agent,
+    object: ObjectRef,
+    data: &FunctionObjectData,
+) -> Option<LlIntCallTarget> {
+    let FunctionEntryIdentity::Bytecode(code) = data.entry()? else {
+        return None;
+    };
+    let installed = vm.installed_for_dsl_runtime(code)?;
+    let function = installed.function();
+    let flags = function.flags();
+    if flags.generator()
+        || flags.async_function()
+        || flags.class_constructor()
+        || flags.derived_class_constructor()
+        || function.needs_environment()
+        || function.arguments_mode() != lyng_bytecode::ArgumentsMode::None
+        || function.has_rest_parameter()
+        || !function.direct_eval_lexical_sites().is_empty()
+    {
+        return None;
+    }
+
+    let this_mode = data.this_mode();
+    if matches!(this_mode, FunctionThisMode::Lexical) {
+        return None;
+    }
+
+    let realm = data.realm()?;
+    let environment = data.environment()?;
+    let register_len = function
+        .register_count()
+        .checked_add(function.hidden_register_count())?;
+    let fv_base = {
+        let index = crate::vm::code_index_for_dsl(code);
+        vm.feedback_flat_storage[index].as_mut_ptr()
+    };
+    let const_base = agent
+        .heap()
+        .view()
+        .code(code)
+        .and_then(lyng_gc::RuntimeCodeRecord::constants)
+        .and_then(|slots| agent.heap().view().code_slots(slots))
+        .map_or(std::ptr::null(), <[_]>::as_ptr);
+    let global_this = agent
+        .realm(realm)
+        .map(|record| record.global_object())
+        .map_or_else(Value::undefined, Value::from_object_ref);
+    let mut target_flags = LLINT_CALL_TARGET_ENABLED;
+    if llint_simple_return_safe(function) {
+        target_flags |= LLINT_CALL_TARGET_FAST_RETURN_SAFE;
+    }
+    if this_mode == FunctionThisMode::Global {
+        target_flags |= LLINT_CALL_TARGET_THIS_GLOBAL;
+    }
+    if flags.strict() {
+        target_flags |= LLINT_CALL_TARGET_STRICT;
+    }
+    if llint_static_tail_recycle_safe(function) {
+        target_flags |= LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE;
+    }
+
+    Some(LlIntCallTarget {
+        callee_bits: Value::from_object_ref(object).bits(),
+        pb_base: function.instruction_bytes().as_ptr(),
+        fv_base,
+        const_base,
+        global_this,
+        code_raw: code.get(),
+        register_len: u32::from(register_len),
+        parameter_count: u32::from(function.parameter_count()),
+        flags: target_flags,
+        realm_raw: realm.get(),
+        lexical_env_raw: environment.get(),
+        variable_env_raw: environment.get(),
+        private_env_raw: data
+            .private_env()
+            .map_or(0, lyng_types::EnvironmentRef::get),
+        callee_raw: object.get(),
+        parameter_initializer_end_offset: function.parameter_initializer_end_offset(),
+        _pad1: 0,
+        _pad: [0; 5],
+    })
+}
+
+fn llint_simple_return_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+    let flags = function.flags();
+    if flags.class_constructor()
+        || flags.derived_class_constructor()
+        || flags.generator()
+        || flags.async_function()
+        || function.arguments_mode() != lyng_bytecode::ArgumentsMode::None
+        || function.has_rest_parameter()
+        || function.needs_environment()
+        || !function.exception_handlers().is_empty()
+    {
+        return false;
+    }
+
+    no_dynamic_cleanup_opcodes(function)
+}
+
+fn llint_static_tail_recycle_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+    let flags = function.flags();
+    if flags.class_constructor()
+        || flags.derived_class_constructor()
+        || flags.generator()
+        || flags.async_function()
+        || function.arguments_mode() != lyng_bytecode::ArgumentsMode::None
+        || function.has_rest_parameter()
+        || function.needs_environment()
+        || !function.exception_handlers().is_empty()
+        || !function.direct_eval_lexical_sites().is_empty()
+        || !function.loop_iteration_environment_sites().is_empty()
+    {
+        return false;
+    }
+
+    no_dynamic_cleanup_opcodes(function)
+}
+
+fn no_dynamic_cleanup_opcodes(function: &lyng_bytecode::BytecodeFunction) -> bool {
+    !function.instructions().iter().any(|instruction| {
+        matches!(
+            instruction.opcode(),
+            lyng_bytecode::Opcode::CreateForIn
+                | lyng_bytecode::Opcode::AdvanceForIn
+                | lyng_bytecode::Opcode::CloseForIn
+                | lyng_bytecode::Opcode::CreateIterator
+                | lyng_bytecode::Opcode::AdvanceIterator
+                | lyng_bytecode::Opcode::CloseIterator
+                | lyng_bytecode::Opcode::PushClosureEnv
+                | lyng_bytecode::Opcode::PopClosureEnv
+                | lyng_bytecode::Opcode::EnterEnvScope
+                | lyng_bytecode::Opcode::LeaveEnvScope
+                | lyng_bytecode::Opcode::PushWithEnv
+                | lyng_bytecode::Opcode::PopWithEnv
+                | lyng_bytecode::Opcode::Throw
+                | lyng_bytecode::Opcode::EnterHandler
+                | lyng_bytecode::Opcode::LeaveHandler
+                | lyng_bytecode::Opcode::SuspendGeneratorStart
+                | lyng_bytecode::Opcode::Yield
+                | lyng_bytecode::Opcode::Await
+                | lyng_bytecode::Opcode::DelegateYield
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,8 +558,18 @@ mod tests {
         // slots before the scalar block.
         assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
         assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
-        assert_eq!(r::LLINT_STATE_PREFIX, 80);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 88);
+        assert_eq!(r::LLINT_STATE_FRAME_DEPTH, 64);
+        assert_eq!(r::LLINT_STATE_FRAME_INFO_BASE, 72);
+        assert_eq!(r::LLINT_STATE_FRAME_INFO_LEN, 80);
+        assert_eq!(r::LLINT_STATE_REGISTER_STACK_TOP, 84);
+        assert_eq!(r::LLINT_STATE_REGISTER_STACK_LEN, 88);
+        assert_eq!(r::LLINT_STATE_REGISTER_STACK_BASE, 96);
+        assert_eq!(r::LLINT_STATE_CALL_TARGETS_BASE, 104);
+        assert_eq!(r::LLINT_STATE_CALL_TARGETS_LEN, 112);
+        assert_eq!(r::LLINT_STATE_PREFIX, 128);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 136);
+        assert_eq!(core::mem::size_of::<LlIntFrameInfo>(), 128);
+        assert_eq!(core::mem::size_of::<LlIntCallTarget>(), 128);
     }
 
     #[test]

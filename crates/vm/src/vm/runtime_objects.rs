@@ -131,8 +131,12 @@ impl Vm {
         Ok(object)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "closure allocation threads function metadata, prototype setup, and observable property definitions in order"
+    )]
     pub(in crate::vm) fn create_closure(
-        &self,
+        &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
         child_index: u32,
@@ -192,7 +196,7 @@ impl Vm {
                 &mut mutator,
                 ObjectAllocation::function(root_shape)
                     .with_prototype(function_prototype)
-                    .with_cold_data(ObjectColdData::Function(function_data)),
+                    .with_cold_data(ObjectColdData::Function(function_data.clone())),
                 AllocationLifetime::Default,
             )
         });
@@ -241,6 +245,7 @@ impl Vm {
             )?;
         }
 
+        self.update_llint_call_target(agent, function, &function_data);
         Ok(function)
     }
 

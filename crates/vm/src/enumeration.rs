@@ -58,6 +58,14 @@ impl ForInStateTable {
             .retain(|register, _| *register < start || *register >= end);
     }
 
+    pub(crate) fn window_is_empty(&self, window: RegisterWindow) -> bool {
+        let start = window.base();
+        let end = window.end();
+        self.states
+            .keys()
+            .all(|register| *register < start || *register >= end)
+    }
+
     pub(crate) fn drain_window(&mut self, window: RegisterWindow) -> Vec<(u16, ForInEnumerator)> {
         let start = window.base();
         let end = window.end();
@@ -130,6 +138,14 @@ impl IteratorStateTable {
         let end = window.end();
         self.states
             .retain(|register, _| *register < start || *register >= end);
+    }
+
+    pub(crate) fn window_is_empty(&self, window: RegisterWindow) -> bool {
+        let start = window.base();
+        let end = window.end();
+        self.states
+            .keys()
+            .all(|register| *register < start || *register >= end)
     }
 
     pub(crate) fn drain_window(&mut self, window: RegisterWindow) -> Vec<(u16, IteratorRecord)> {
