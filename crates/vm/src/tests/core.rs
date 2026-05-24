@@ -463,8 +463,8 @@ fn simple_nested_return_avoids_semantic_slow_path() {
     assert_eq!(dispatch.count(Opcode::Return), 2);
     assert_eq!(
         slow_path.semantic(Opcode::Call0),
-        1,
-        "Call0 is still semantic until the frame-entry LLInt slice lands"
+        0,
+        "eligible Call0 should enter the callee through the LLInt frame-entry path"
     );
     assert_eq!(
         slow_path.semantic(Opcode::Return),

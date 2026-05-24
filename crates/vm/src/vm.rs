@@ -595,6 +595,103 @@ impl Vm {
         self.request_dispatch_frame_check();
     }
 
+    pub(crate) fn ensure_llint_register_stack_scratch(&mut self) {
+        let target_len = self
+            .register_stack_top
+            .saturating_add(crate::dsl::llint_state::LLINT_REGISTER_STACK_SCRATCH_VALUES);
+        if self.register_stack.len() < target_len {
+            self.register_stack.resize(target_len, Value::undefined());
+        }
+    }
+
+    pub(crate) fn set_llint_materialized_register_stack_top(&mut self, top: usize) {
+        debug_assert!(
+            top <= self.register_stack.len(),
+            "LLInt materialized register top must stay inside backing storage"
+        );
+        self.register_stack_top = top.min(self.register_stack.len());
+    }
+
+    pub(crate) fn materialize_llint_frames(
+        &mut self,
+        agent: &mut Agent,
+        target_depth: usize,
+        frame_infos: &[crate::dsl::llint_state::LlIntFrameInfo],
+        register_stack_top: usize,
+    ) -> VmResult<()> {
+        if target_depth <= self.frames.len() {
+            return Ok(());
+        }
+        if target_depth > frame_infos.len() || register_stack_top > self.register_stack.len() {
+            return Err(VmError::MissingActiveFrame);
+        }
+
+        for (index, frame) in self.frames.iter_mut().enumerate() {
+            if let Some(info) = frame_infos.get(index) {
+                frame.set_instruction_offset(info.pc_offset);
+            }
+        }
+
+        while self.frames.len() < target_depth {
+            let index = self.frames.len();
+            let info = *frame_infos.get(index).ok_or(VmError::MissingActiveFrame)?;
+            let code = CodeRef::from_raw(info.code_raw).ok_or(VmError::MissingActiveFrame)?;
+            let realm = RealmRef::from_raw(info.realm_raw).ok_or(VmError::MissingActiveFrame)?;
+            let lexical_env = EnvironmentRef::from_raw(info.lexical_env_raw)
+                .ok_or(VmError::MissingActiveFrame)?;
+            let variable_env = EnvironmentRef::from_raw(info.variable_env_raw)
+                .ok_or(VmError::MissingActiveFrame)?;
+            let private_env = if info.private_env_raw == 0 {
+                None
+            } else {
+                Some(
+                    EnvironmentRef::from_raw(info.private_env_raw)
+                        .ok_or(VmError::MissingActiveFrame)?,
+                )
+            };
+            let callee = if info.callee_raw == 0 {
+                None
+            } else {
+                Some(ObjectRef::from_raw(info.callee_raw).ok_or(VmError::MissingActiveFrame)?)
+            };
+            let return_register = if info.return_register
+                == crate::dsl::llint_state::LLINT_RETURN_REGISTER_NONE
+            {
+                None
+            } else {
+                Some(u16::try_from(info.return_register).map_err(|_| VmError::MissingActiveFrame)?)
+            };
+            let register_len =
+                u16::try_from(info.register_len).map_err(|_| VmError::MissingActiveFrame)?;
+            let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
+                .with_private_env(private_env)
+                .with_this_state(ThisState::Value(info.this_value));
+            let frame = FrameRecord::new(
+                code,
+                info.pc_offset,
+                RegisterWindow::new(info.register_base, register_len),
+                return_register,
+                realm,
+                lexical_env,
+                variable_env,
+                lyng_env::ExecutionContextKind::Function,
+            )
+            .with_this_value(info.this_value)
+            .with_parameter_initializer_end_offset(info.parameter_initializer_end_offset)
+            .with_callee(callee)
+            .with_flags(FrameFlags::from_raw(
+                u8::try_from(info.frame_flags_raw).map_err(|_| VmError::MissingActiveFrame)?,
+            ));
+            agent.push_execution_context(context);
+            self.frames.push(frame);
+        }
+
+        self.set_llint_materialized_register_stack_top(register_stack_top);
+        self.note_frame_depth();
+        self.request_dispatch_frame_check();
+        Ok(())
+    }
+
     #[cfg(test)]
     #[inline]
     pub(crate) const fn register_stack_storage_len_for_tests(&self) -> usize {
@@ -616,6 +713,11 @@ impl Vm {
     #[inline]
     pub(crate) fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
         self.register_stack.as_mut_ptr()
+    }
+
+    #[inline]
+    pub(crate) const fn register_stack_storage_len_for_dsl(&self) -> usize {
+        self.register_stack.len()
     }
 
     /// DSL-0c: crate-visible accessor for the dispatch frame-check

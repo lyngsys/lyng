@@ -44,6 +44,7 @@ pub(crate) fn run_via_dsl(
     frame: FrameRecord,
 ) -> VmResult<Value> {
     let frame_depth = vm.frames().len();
+    vm.ensure_llint_register_stack_scratch();
     let pb_base = installed.function().instruction_bytes().as_ptr();
     let frame_pc_offset = frame.instruction_offset();
     // DSL-0b (B16): wire the `FV` pin to the eagerly-allocated flat
@@ -119,6 +120,16 @@ pub(crate) fn run_via_dsl(
     let mut frame_infos = Vec::new();
     let frame_info_register_stack_base =
         crate::dsl::llint_state::refresh_frame_infos(&mut frame_infos, vm, agent);
+    let mut call_targets = Vec::new();
+    crate::dsl::llint_state::refresh_call_targets(&mut call_targets, vm, agent);
+    let frame_info_base = frame_infos.as_mut_ptr();
+    let frame_info_len = u32::try_from(frame_infos.len()).unwrap_or(u32::MAX);
+    let register_stack_top = u32::try_from(vm.register_stack().len()).unwrap_or(u32::MAX);
+    let register_stack_len =
+        u32::try_from(vm.register_stack_storage_len_for_dsl()).unwrap_or(u32::MAX);
+    let register_stack_base = vm.register_stack_storage_mut_ptr();
+    let call_targets_base = call_targets.as_ptr();
+    let call_targets_len = u32::try_from(call_targets.len()).unwrap_or(u32::MAX);
 
     // Build a DispatchState directly so the asm-path slow-path bridge
     // can call `LlIntDispatchState::dispatch_state()` and get the same
@@ -140,6 +151,7 @@ pub(crate) fn run_via_dsl(
         dispatch,
         exit: LlIntExitSlot::default(),
         frame_infos,
+        call_targets,
         frame_info_register_stack_base,
     };
 
@@ -157,7 +169,14 @@ pub(crate) fn run_via_dsl(
         frame_this_value: this_value,
         frame_depth: u32::try_from(frame_depth).unwrap_or(u32::MAX),
         frame_check_epoch: 0,
-        frame_info_base: rust_ctx.frame_infos.as_mut_ptr(),
+        frame_info_base,
+        frame_info_len,
+        register_stack_top,
+        register_stack_len,
+        register_stack_base,
+        call_targets_base,
+        call_targets_len,
+        pad3: 0,
         rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
         prefix: 0,
         pad2: [0; 7],

@@ -33,12 +33,12 @@ use crate::{
     add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
     branch_named_own_outline_mode, branch_named_proto_inline_mode, branch_nonzero,
-    branch_raw_equal_strict_result, call_rust_probe, call_slow, check_object_ref, check_smi,
-    cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a, decode_ab, decode_abc,
-    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow, dispatch_from_payload,
-    inc_smi_overflow, load_acc, load_constant, load_feedback_site, load_local_fixed,
-    load_named_aux_bits, load_named_aux_epoch, load_named_epoch, load_named_handler_bits,
-    load_named_handler_shape, load_named_inline_slot_index_or_branch,
+    branch_raw_equal_strict_result, call0_bytecode_or_branch, call_rust_probe, call_slow,
+    check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a,
+    decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    dispatch_from_payload, inc_smi_overflow, load_acc, load_constant, load_feedback_site,
+    load_local_fixed, load_named_aux_bits, load_named_aux_epoch, load_named_epoch,
+    load_named_handler_bits, load_named_handler_shape, load_named_inline_slot_index_or_branch,
     load_named_outline_slot_index_or_branch, load_object_record_from_state_or_branch,
     load_outline_slot, load_record_inline_slot, load_record_last_epoch,
     load_record_outline_slots_from_state_or_branch, load_record_prototype_or_branch,
@@ -3117,6 +3117,8 @@ pub extern "C" fn op_to_property_key_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_call0_dsl, opcode_byte = 89, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        call0_bytecode_or_branch!(a, b, c, .slow);
+    .slow:
         call_slow!(op_call0_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }

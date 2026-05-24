@@ -34,7 +34,7 @@
 
 use core::mem::offset_of;
 
-use crate::dsl::llint_state::{LlIntFrameInfo, LlIntState};
+use crate::dsl::llint_state::{LlIntCallTarget, LlIntFrameInfo, LlIntState};
 
 pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_offset);
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
@@ -49,6 +49,12 @@ pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_con
 pub const LLINT_STATE_FRAME_THIS_VALUE: usize = offset_of!(LlIntState, frame_this_value);
 pub const LLINT_STATE_FRAME_DEPTH: usize = offset_of!(LlIntState, frame_depth);
 pub const LLINT_STATE_FRAME_INFO_BASE: usize = offset_of!(LlIntState, frame_info_base);
+pub const LLINT_STATE_FRAME_INFO_LEN: usize = offset_of!(LlIntState, frame_info_len);
+pub const LLINT_STATE_REGISTER_STACK_TOP: usize = offset_of!(LlIntState, register_stack_top);
+pub const LLINT_STATE_REGISTER_STACK_LEN: usize = offset_of!(LlIntState, register_stack_len);
+pub const LLINT_STATE_REGISTER_STACK_BASE: usize = offset_of!(LlIntState, register_stack_base);
+pub const LLINT_STATE_CALL_TARGETS_BASE: usize = offset_of!(LlIntState, call_targets_base);
+pub const LLINT_STATE_CALL_TARGETS_LEN: usize = offset_of!(LlIntState, call_targets_len);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 
 pub const LLINT_FRAME_INFO_PB_BASE: usize = offset_of!(LlIntFrameInfo, pb_base);
@@ -59,8 +65,40 @@ pub const LLINT_FRAME_INFO_THIS_VALUE: usize = offset_of!(LlIntFrameInfo, this_v
 pub const LLINT_FRAME_INFO_PC_OFFSET: usize = offset_of!(LlIntFrameInfo, pc_offset);
 pub const LLINT_FRAME_INFO_RETURN_REGISTER: usize = offset_of!(LlIntFrameInfo, return_register);
 pub const LLINT_FRAME_INFO_FLAGS: usize = offset_of!(LlIntFrameInfo, flags);
-pub const LLINT_FRAME_INFO_STRIDE_SHIFT: u32 = 6;
+pub const LLINT_FRAME_INFO_REGISTER_BASE: usize = offset_of!(LlIntFrameInfo, register_base);
+pub const LLINT_FRAME_INFO_REGISTER_LEN: usize = offset_of!(LlIntFrameInfo, register_len);
+pub const LLINT_FRAME_INFO_CODE_RAW: usize = offset_of!(LlIntFrameInfo, code_raw);
+pub const LLINT_FRAME_INFO_REALM_RAW: usize = offset_of!(LlIntFrameInfo, realm_raw);
+pub const LLINT_FRAME_INFO_LEXICAL_ENV_RAW: usize = offset_of!(LlIntFrameInfo, lexical_env_raw);
+pub const LLINT_FRAME_INFO_VARIABLE_ENV_RAW: usize = offset_of!(LlIntFrameInfo, variable_env_raw);
+pub const LLINT_FRAME_INFO_PRIVATE_ENV_RAW: usize = offset_of!(LlIntFrameInfo, private_env_raw);
+pub const LLINT_FRAME_INFO_CALLEE_RAW: usize = offset_of!(LlIntFrameInfo, callee_raw);
+pub const LLINT_FRAME_INFO_PARAMETER_INITIALIZER_END_OFFSET: usize =
+    offset_of!(LlIntFrameInfo, parameter_initializer_end_offset);
+pub const LLINT_FRAME_INFO_FRAME_FLAGS_RAW: usize = offset_of!(LlIntFrameInfo, frame_flags_raw);
+pub const LLINT_FRAME_INFO_STRIDE_SHIFT: u32 = 7;
 pub const LLINT_FRAME_INFO_FAST_RETURN_SAFE_BIT: u32 = 0;
+
+pub const LLINT_CALL_TARGET_CALLEE_BITS: usize = offset_of!(LlIntCallTarget, callee_bits);
+pub const LLINT_CALL_TARGET_PB_BASE: usize = offset_of!(LlIntCallTarget, pb_base);
+pub const LLINT_CALL_TARGET_FV_BASE: usize = offset_of!(LlIntCallTarget, fv_base);
+pub const LLINT_CALL_TARGET_CONST_BASE: usize = offset_of!(LlIntCallTarget, const_base);
+pub const LLINT_CALL_TARGET_GLOBAL_THIS: usize = offset_of!(LlIntCallTarget, global_this);
+pub const LLINT_CALL_TARGET_CODE_RAW: usize = offset_of!(LlIntCallTarget, code_raw);
+pub const LLINT_CALL_TARGET_REGISTER_LEN: usize = offset_of!(LlIntCallTarget, register_len);
+pub const LLINT_CALL_TARGET_PARAMETER_COUNT: usize = offset_of!(LlIntCallTarget, parameter_count);
+pub const LLINT_CALL_TARGET_FLAGS: usize = offset_of!(LlIntCallTarget, flags);
+pub const LLINT_CALL_TARGET_REALM_RAW: usize = offset_of!(LlIntCallTarget, realm_raw);
+pub const LLINT_CALL_TARGET_LEXICAL_ENV_RAW: usize = offset_of!(LlIntCallTarget, lexical_env_raw);
+pub const LLINT_CALL_TARGET_VARIABLE_ENV_RAW: usize = offset_of!(LlIntCallTarget, variable_env_raw);
+pub const LLINT_CALL_TARGET_PRIVATE_ENV_RAW: usize = offset_of!(LlIntCallTarget, private_env_raw);
+pub const LLINT_CALL_TARGET_CALLEE_RAW: usize = offset_of!(LlIntCallTarget, callee_raw);
+pub const LLINT_CALL_TARGET_PARAMETER_INITIALIZER_END_OFFSET: usize =
+    offset_of!(LlIntCallTarget, parameter_initializer_end_offset);
+pub const LLINT_CALL_TARGET_STRIDE_SHIFT: u32 = 7;
+pub const LLINT_CALL_TARGET_ENABLED_BIT: u32 = 0;
+pub const LLINT_CALL_TARGET_FAST_RETURN_SAFE_BIT: u32 = 1;
+pub const LLINT_CALL_TARGET_THIS_GLOBAL_BIT: u32 = 2;
 
 // VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
 // added in DSL-0c to give `poll_safepoint!` a known-zero byte to
