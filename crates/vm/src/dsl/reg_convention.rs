@@ -29,6 +29,11 @@
 //!   PRE:   state.frame_pc_offset <- PC - pb_base
 //!   POST:  if Refresh: PC/REGS/FV reloaded from state.frame_*
 //!
+//! Rust probe hits may use `dispatch_probe_hit_no_refresh!` only when
+//! the probe contract guarantees no frame switch, no register-stack
+//! relocation, and no feedback-vector relocation. That dispatch form
+//! updates PC from the returned payload and leaves pinned REGS/FV intact.
+//!
 //! Const offsets below are derived from [`LlIntState`] via `offset_of!`
 //! and locked in by `tests::ll_int_state_offsets_stable`.
 

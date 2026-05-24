@@ -35,10 +35,10 @@ use crate::{
     branch_named_own_outline_mode, branch_named_proto_inline_mode, branch_nonzero,
     branch_raw_equal_strict_result, call_rust_probe, call_slow, check_object_ref, check_smi,
     cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a, decode_ab, decode_abc,
-    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow, dispatch_from_payload,
-    inc_smi_overflow, load_acc, load_constant, load_feedback_site, load_local_fixed,
-    load_named_aux_bits, load_named_aux_epoch, load_named_epoch, load_named_handler_bits,
-    load_named_handler_shape, load_named_inline_slot_index_or_branch,
+    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc, load_constant, load_feedback_site,
+    load_local_fixed, load_named_aux_bits, load_named_aux_epoch, load_named_epoch,
+    load_named_handler_bits, load_named_handler_shape, load_named_inline_slot_index_or_branch,
     load_named_outline_slot_index_or_branch, load_object_record_from_state_or_branch,
     load_outline_slot, load_record_inline_slot, load_record_last_epoch,
     load_record_outline_slots_from_state_or_branch, load_record_prototype_or_branch,
@@ -462,7 +462,7 @@ llint_handler! {
     op_load_global_dsl, opcode_byte = 14, layout = Abx, length = 6, |a, bx| {
         call_rust_probe!(op_load_global_rust_probe_rs, args = [a, bx]);
         branch_nonzero!(0, .slow);
-        dispatch_from_payload!();
+        dispatch_probe_hit_no_refresh!();
         .slow:
         // The Rust probe can clobber caller-saved operand registers.
         decode_abx!(a, bx);
@@ -507,8 +507,9 @@ pub extern "C" fn op_load_global_rust_probe_rs(
     );
     if hit {
         let next_pc = dispatch.frame.instruction_offset();
-        // SAFETY: same live-state guarantee as above. Refresh the asm
-        // mirror so later slow paths observe the advanced frame PC.
+        // SAFETY: same live-state guarantee as above. Probe hits use
+        // the no-refresh dispatch contract, so only the PC mirror is
+        // updated for later slow paths; pinned REGS/FV stay live.
         unsafe {
             (*state).frame_pc_offset = next_pc;
         }
@@ -2728,7 +2729,7 @@ llint_handler! {
     op_assign_named_property_dsl, opcode_byte = 79, layout = AbcSlot, length = 6, |a, b, c, slot| {
         call_rust_probe!(op_assign_named_property_rust_probe_rs, args = [a, b, c, slot]);
         branch_nonzero!(0, .slow);
-        dispatch_from_payload!();
+        dispatch_probe_hit_no_refresh!();
         .slow:
         // The Rust probe can clobber caller-saved operand registers.
         decode_abc_slot!(a, b, c, slot);
@@ -2768,8 +2769,9 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
     );
     if hit {
         let next_pc = dispatch.frame.instruction_offset();
-        // SAFETY: same live-state guarantee as above. Refresh the asm
-        // mirror so later slow paths observe the advanced frame PC.
+        // SAFETY: same live-state guarantee as above. Probe hits use
+        // the no-refresh dispatch contract, so only the PC mirror is
+        // updated for later slow paths; pinned REGS/FV stay live.
         unsafe {
             (*state).frame_pc_offset = next_pc;
         }

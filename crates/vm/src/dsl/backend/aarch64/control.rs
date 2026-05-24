@@ -460,18 +460,26 @@ macro_rules! dispatch_after_slow {
     };
 }
 
-/// Dispatch after a Rust probe returned `tag == 0` with the next-PC
-/// offset in `x1`. This is the Continue arm of `dispatch_after_slow!`
-/// split out for handlers that branch non-zero probe tags to a
-/// normal counted slow path.
+/// Dispatch after a Rust probe hit returned `tag == 0` with the next-PC
+/// offset in `x1`.
+///
+/// This is a no-refresh dispatch form. It is valid only for probe-hit
+/// helpers whose hit contract guarantees no frame switch, no
+/// register-stack relocation, and no feedback-vector relocation. Those
+/// probes may inspect or mutate the active frame's current registers and
+/// feedback data, then advance the PC, but they must not enter guest
+/// bytecode, call host code, or take an allocation/GC path that can move
+/// the register stack or feedback vector. Misses branch to the normal
+/// counted semantic slow path, where `dispatch_after_slow!` handles
+/// Continue/Refresh/Exit.
 #[macro_export]
-macro_rules! dispatch_from_payload {
+macro_rules! dispatch_probe_hit_no_refresh {
+    // No-refresh contract: no frame switch, no register-stack relocation,
+    // and no feedback-vector relocation while the Rust probe hit helper runs.
     () => {
         concat!(
             "ldr    x16, [x24, {state_pb}]\n",
             "add    x19, x16, x1\n",
-            "ldr    x20, [x24, {state_regs}]\n",
-            "ldr    x21, [x24, {state_fv}]\n",
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",

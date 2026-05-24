@@ -44,6 +44,49 @@ fn llint_rust_probes_are_explicitly_enumerated() {
 }
 
 #[test]
+fn llint_rust_probe_hits_use_no_refresh_dispatch() {
+    let cold_handlers = include_str!("../dsl/handlers/cold.rs");
+
+    assert_eq!(
+        cold_handlers.matches("dispatch_probe_hit_no_refresh!();").count(),
+        2,
+        "LoadGlobal and AssignNamedProperty probe hits must use the documented no-refresh dispatch form"
+    );
+    assert!(
+        !cold_handlers.contains("dispatch_from_payload!();"),
+        "probe-hit dispatch should use a name that carries the no-refresh contract"
+    );
+}
+
+#[test]
+fn llint_rust_probe_no_refresh_dispatch_does_not_reload_frame_pins() {
+    let backend = include_str!("../dsl/backend/aarch64/control.rs");
+    let start = backend
+        .find("macro_rules! dispatch_probe_hit_no_refresh")
+        .expect("backend must define the no-refresh Rust probe hit dispatch macro");
+    let rest = &backend[start..];
+    let end = rest
+        .find("// ===========================================================================\n// Branches.")
+        .expect("dispatch macro section should end before branch helpers");
+    let dispatch_macro = &rest[..end];
+
+    assert!(
+        dispatch_macro.contains("no frame switch")
+            && dispatch_macro.contains("no register-stack relocation")
+            && dispatch_macro.contains("no feedback-vector relocation"),
+        "no-refresh probe-hit dispatch must document the contract that makes skipping REGS/FV reloads valid"
+    );
+    assert!(
+        !dispatch_macro.contains("{state_regs}") && !dispatch_macro.contains("{state_fv}"),
+        "probe-hit no-refresh dispatch must not reload REGS/FV from LlIntState"
+    );
+    assert!(
+        !dispatch_macro.contains("x20") && !dispatch_macro.contains("x21"),
+        "probe-hit no-refresh dispatch must leave pinned REGS/FV untouched"
+    );
+}
+
+#[test]
 fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
     let cold_handlers = include_str!("../dsl/handlers/cold.rs");
     let hot_handlers = include_str!("../dsl/handlers/hot.rs");

@@ -158,6 +158,12 @@ Mirror discipline: `LlIntState` fields that point into GC-or-arena storage are v
 only between Refresh egress events. Any slow-path call may trigger GC; the Refresh arm
 restores the mirrors before the next handler reads them.
 
+Temporary Rust probes are separate from counted semantic slow paths. A probe-hit
+dispatch may use the no-refresh form only when the helper guarantees no frame switch, no
+register-stack relocation, and no feedback-vector relocation; that path updates `PC` from
+the returned payload and leaves pinned `REGS`/`FV` live. Probe misses fall through to the
+normal counted semantic slow path.
+
 ### Inline-port progress
 
 25 opcodes are inline-ported as of HEAD (DSL-1 Phase 1.A + 1.B + 1.C); remaining

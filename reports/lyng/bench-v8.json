@@ -3,109 +3,109 @@
     {
       "error": null,
       "file": "richards.js",
-      "median_score": 295.0,
-      "median_us_per_iter": 11966.77966101695,
+      "median_score": 477.0,
+      "median_us_per_iter": 7400.83857442348,
       "name": "Richards",
       "phase1_baseline": 234,
       "phase1_gate_met": true,
       "phase1_target": 260,
       "reference_us": 35302,
       "samples": [
-        292.0,
-        295.0,
-        296.0,
-        297.0,
-        294.0
+        466.0,
+        478.0,
+        477.0,
+        468.0,
+        477.0
       ]
     },
     {
       "error": null,
       "file": "deltablue.js",
-      "median_score": 323.0,
-      "median_us_per_iter": 20469.969040247677,
+      "median_score": 417.0,
+      "median_us_per_iter": 15855.635491606714,
       "name": "DeltaBlue",
       "phase1_baseline": 277,
       "phase1_gate_met": true,
       "phase1_target": 310,
       "reference_us": 66118,
       "samples": [
-        324.0,
-        326.0,
-        323.0,
-        323.0,
-        321.0
+        417.0,
+        417.0,
+        416.0,
+        414.0,
+        418.0
       ]
     },
     {
       "error": null,
       "file": "crypto.js",
-      "median_score": 311.0,
-      "median_us_per_iter": 85588.74598070739,
+      "median_score": 382.0,
+      "median_us_per_iter": 69680.89005235602,
       "name": "Crypto",
       "phase1_baseline": 236,
       "phase1_gate_met": true,
       "phase1_target": 265,
       "reference_us": 266181,
       "samples": [
-        311.0,
-        312.0,
-        311.0,
-        311.0,
-        311.0
+        383.0,
+        384.0,
+        382.0,
+        381.0,
+        378.0
       ]
     },
     {
       "error": null,
       "file": "raytrace.js",
-      "median_score": 413.0,
-      "median_us_per_iter": 179174.09200968524,
+      "median_score": 278.0,
+      "median_us_per_iter": 266183.09352517984,
       "name": "RayTrace",
       "phase1_baseline": 387,
       "phase1_gate_met": false,
       "phase1_target": 430,
       "reference_us": 739989,
       "samples": [
-        415.0,
-        413.0,
-        415.0,
-        410.0,
-        413.0
+        278.0,
+        277.0,
+        277.0,
+        280.0,
+        281.0
       ]
     },
     {
       "error": null,
       "file": "navier-stokes.js",
-      "median_score": 505.0,
-      "median_us_per_iter": 293861.38613861386,
+      "median_score": 529.0,
+      "median_us_per_iter": 280529.30056710774,
       "name": "NavierStokes",
       "phase1_baseline": 424,
       "phase1_gate_met": true,
       "phase1_target": 470,
       "reference_us": 1484000,
       "samples": [
-        506.0,
-        501.0,
-        505.0,
-        505.0,
-        506.0
+        528.0,
+        529.0,
+        529.0,
+        528.0,
+        530.0
       ]
     },
     {
       "error": null,
       "file": "splay.js",
-      "median_score": 1312.0,
-      "median_us_per_iter": 6211.204268292683,
+      "median_score": 1411.0,
+      "median_us_per_iter": 5775.407512402551,
       "name": "Splay",
       "phase1_baseline": 1198,
-      "phase1_gate_met": false,
+      "phase1_gate_met": true,
       "phase1_target": 1330,
       "reference_us": 81491,
       "samples": [
-        1308.0,
-        1316.0,
-        1263.0,
-        1312.0,
-        1314.0
+        1399.0,
+        1423.0,
+        1420.0,
+        1395.0,
+        1411.0
       ]
     }
   ],

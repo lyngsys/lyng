@@ -170,6 +170,7 @@ sign-extended i64 ready for `tag_smi!`.
 | `dispatch!(advance = N)`    | Tail-jump with explicit advance                                                              | same          |
 | `call_slow!(shim, args)`    | Bridge to Rust slow-path; sync `state.frame_pc_offset`, mov a0..aN, `bl`                     | ldr + sub + str + mov*N + bl |
 | `dispatch_after_slow!()`    | Branch on shim's return tag (Continue / Refresh / Exit)                                      | cbnz + ldr + add + ldrb + ldr + br (Continue path); refresh adds 2 ldr |
+| `dispatch_probe_hit_no_refresh!()` | Rust probe-hit dispatch under the explicit no frame switch / no register-stack relocation / no feedback-vector relocation contract | ldr + add + ldrb + ldr + br |
 | `dispatch_prefixed!(kind=)` | Prefix-byte handler: stash kind, advance 1, dispatch next opcode                             | ldrb + cbnz + mov + strb + add + ldrb + ldr + br |
 | `branch_zero!`              | `cbz xR, label`                                                                              | 1 cbz |
 | `branch_nonzero!`           | `cbnz xR, label`                                                                             | 1 cbnz |
