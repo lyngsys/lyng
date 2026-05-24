@@ -23,14 +23,14 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `141` |
 | Selected files | `53053` |
 | Runnable files | `49729` |
-| Passed files | `49669` |
-| Failed files | `60` |
+| Passed files | `49727` |
+| Failed files | `2` |
 | Panicked files | `0` |
 | Skipped files | `3324` |
-| Pass rate (selected files) | `93.62%` |
+| Pass rate (selected files) | `93.73%` |
 | Selected variant executions | `101853` |
 | Runnable variant executions | `95205` |
-| Time | `125.3s` |
+| Time | `61.0s` |
 
 ## Delta From Previous Report
 
@@ -40,11 +40,11 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `141` | `141` | `+0` |
 | Selected files | `53053` | `53053` | `+0` |
 | Runnable files | `49729` | `49729` | `+0` |
-| Passed files | `49727` | `49669` | `-58` |
-| Failed files | `2` | `60` | `+58` |
+| Passed files | `49669` | `49727` | `+58` |
+| Failed files | `60` | `2` | `-58` |
 | Panicked files | `0` | `0` | `+0` |
 | Skipped files | `3324` | `3324` | `+0` |
-| Pass rate (selected files) | `93.73%` | `93.62%` | `-0.11pp` |
+| Pass rate (selected files) | `93.62%` | `93.73%` | `+0.11pp` |
 | Selected variant executions | `101853` | `101853` | `+0` |
 | Runnable variant executions | `95205` | `95205` | `+0` |
 
@@ -60,12 +60,12 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1086` | `1086` | `1084` | `2` | `0` | `0` | `99.82%` |
-| `built-ins` | `23402` | `23402` | `23393` | `9` | `0` | `0` | `99.96%` |
-| `harness` | `116` | `116` | `113` | `3` | `0` | `0` | `97.41%` |
+| `annexB` | `1086` | `1086` | `1086` | `0` | `0` | `0` | `100.00%` |
+| `built-ins` | `23402` | `23402` | `23402` | `0` | `0` | `0` | `100.00%` |
+| `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3324` | `0` | `0` | `0` | `3324` | `0` | `0.00%` |
-| `language` | `23640` | `23640` | `23605` | `35` | `0` | `0` | `99.85%` |
-| `staging` | `1485` | `1485` | `1474` | `11` | `0` | `0` | `99.26%` |
+| `language` | `23640` | `23640` | `23638` | `2` | `0` | `0` | `99.99%` |
+| `staging` | `1485` | `1485` | `1485` | `0` | `0` | `0` | `100.00%` |
 
 ## Variant Execution Breakdown
 
@@ -73,19 +73,19 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | --- | ---: |
 | Selected variant executions | `101853` |
 | Runnable variant executions | `95205` |
-| Passed variants | `95086` |
-| Failed variants | `119` |
+| Passed variants | `95201` |
+| Failed variants | `4` |
 | Panicked variants | `0` |
 | Skipped variants | `6648` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `annexB` | `1377` | `1377` | `1373` | `4` | `0` | `0` | `99.71%` |
-| `built-ins` | `46503` | `46503` | `46485` | `18` | `0` | `0` | `99.96%` |
-| `harness` | `232` | `232` | `226` | `6` | `0` | `0` | `97.41%` |
+| `annexB` | `1377` | `1377` | `1377` | `0` | `0` | `0` | `100.00%` |
+| `built-ins` | `46503` | `46503` | `46503` | `0` | `0` | `0` | `100.00%` |
+| `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6648` | `0` | `0` | `0` | `6648` | `0` | `0.00%` |
-| `language` | `44347` | `44347` | `44278` | `69` | `0` | `0` | `99.84%` |
-| `staging` | `2746` | `2746` | `2724` | `22` | `0` | `0` | `99.20%` |
+| `language` | `44347` | `44347` | `44343` | `4` | `0` | `0` | `99.99%` |
+| `staging` | `2746` | `2746` | `2746` | `0` | `0` | `0` | `100.00%` |
 
 ## Slowest Test Timings
 
@@ -95,86 +95,86 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `staging/sm/String/string-upper-lower-mapping.js` | `2` | `60.014s` | `30.009s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `54.957s` | `27.569s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `54.623s` | `27.323s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `27.037s` | `13.612s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `27.007s` | `13.546s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `26.946s` | `13.508s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `26.918s` | `13.555s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `26.635s` | `13.405s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `26.521s` | `13.273s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `26.107s` | `13.077s` |
-| `staging/sm/Date/dst-offset-caching-1-of-8.js` | `2` | `21.644s` | `10.834s` |
-| `staging/sm/Array/toSpliced-dense.js` | `2` | `15.090s` | `7.550s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `15.060s` | `7.610s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `7.275s` | `3.657s` |
-| `built-ins/encodeURI/S15.1.3.3_A2.3_T1.js` | `2` | `5.706s` | `2.915s` |
-| `language/literals/regexp/S7.8.5_A2.1_T2.js` | `2` | `5.448s` | `2.755s` |
-| `built-ins/encodeURIComponent/S15.1.3.4_A2.3_T1.js` | `2` | `5.397s` | `2.745s` |
-| `language/literals/regexp/S7.8.5_A1.1_T2.js` | `2` | `5.341s` | `2.674s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js` | `2` | `3.694s` | `1.850s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js` | `2` | `2.402s` | `1.206s` |
-| `staging/sm/String/string-code-point-upper-lower-mapping.js` | `2` | `2.052s` | `1.030s` |
-| `staging/sm/String/fromCodePoint.js` | `2` | `2.040s` | `1.021s` |
-| `staging/sm/TypedArray/sort_snans.js` | `2` | `2.027s` | `1.016s` |
-| `staging/sm/TypedArray/fill.js` | `2` | `2.024s` | `1.015s` |
-| `staging/sm/TypedArray/set-same-buffer-different-source-target-types.js` | `2` | `2.021s` | `1.014s` |
+| `staging/sm/Array/toSpliced-dense.js` | `2` | `12.984s` | `6.541s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `4.027s` | `2.029s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `3.935s` | `1.985s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `2.989s` | `1.519s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.962s` | `1.519s` |
+| `language/comments/S7.4_A5.js` | `2` | `2.014s` | `1.007s` |
+| `language/comments/S7.4_A6.js` | `2` | `2.010s` | `1.006s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `2.001s` | `1.047s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.974s` | `0.999s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.940s` | `0.971s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js` | `2` | `1.925s` | `1.000s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.925s` | `0.969s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js` | `2` | `1.922s` | `0.968s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js` | `2` | `1.894s` | `0.973s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.888s` | `0.956s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js` | `2` | `1.884s` | `0.992s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sundanese.js` | `2` | `1.862s` | `0.981s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js` | `2` | `1.859s` | `0.940s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js` | `2` | `1.850s` | `0.927s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.849s` | `0.952s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.839s` | `0.920s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js` | `2` | `1.831s` | `0.948s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sogdian.js` | `2` | `1.830s` | `0.991s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js` | `2` | `1.812s` | `0.953s` |
+| `staging/sm/RegExp/unicode-braced.js` | `2` | `1.792s` | `0.904s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `staging/sm/String/string-upper-lower-mapping.js [strict]` | `fail` | `30.009s` |
-| `staging/sm/String/string-upper-lower-mapping.js [non-strict]` | `fail` | `30.005s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `27.569s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `27.388s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `27.323s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `27.299s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `13.612s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `13.555s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `13.546s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `13.508s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `13.461s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `13.438s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `13.425s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `13.405s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `13.362s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `13.273s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `13.248s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `13.230s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `13.077s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `13.029s` |
-| `staging/sm/Date/dst-offset-caching-1-of-8.js [strict]` | `pass` | `10.834s` |
-| `staging/sm/Date/dst-offset-caching-1-of-8.js [non-strict]` | `pass` | `10.810s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `7.610s` |
-| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `7.550s` |
-| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `7.539s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `7.450s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `3.657s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `3.617s` |
-| `built-ins/encodeURI/S15.1.3.3_A2.3_T1.js [non-strict]` | `pass` | `2.915s` |
-| `built-ins/encodeURI/S15.1.3.3_A2.3_T1.js [strict]` | `pass` | `2.791s` |
-| `language/literals/regexp/S7.8.5_A2.1_T2.js [non-strict]` | `pass` | `2.755s` |
-| `built-ins/encodeURIComponent/S15.1.3.4_A2.3_T1.js [non-strict]` | `pass` | `2.745s` |
-| `language/literals/regexp/S7.8.5_A2.1_T2.js [strict]` | `pass` | `2.693s` |
-| `language/literals/regexp/S7.8.5_A1.1_T2.js [strict]` | `pass` | `2.674s` |
-| `language/literals/regexp/S7.8.5_A1.1_T2.js [non-strict]` | `pass` | `2.667s` |
-| `built-ins/encodeURIComponent/S15.1.3.4_A2.3_T1.js [strict]` | `pass` | `2.651s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js [non-strict]` | `pass` | `1.850s` |
-| `built-ins/RegExp/character-class-escape-non-whitespace.js [strict]` | `pass` | `1.844s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js [non-strict]` | `pass` | `1.206s` |
-| `staging/sm/regress/regress-1507322-deep-weakmap.js [strict]` | `pass` | `1.196s` |
-| `staging/sm/String/string-code-point-upper-lower-mapping.js [non-strict]` | `fail` | `1.030s` |
-| `staging/sm/String/string-code-point-upper-lower-mapping.js [strict]` | `fail` | `1.022s` |
-| `staging/sm/String/fromCodePoint.js [strict]` | `fail` | `1.021s` |
-| `staging/sm/String/fromCodePoint.js [non-strict]` | `fail` | `1.019s` |
-| `staging/sm/TypedArray/sort_snans.js [non-strict]` | `fail` | `1.016s` |
-| `staging/sm/expressions/nullish-coalescing.js [strict]` | `fail` | `1.016s` |
-| `staging/sm/TypedArray/fill.js [strict]` | `fail` | `1.015s` |
-| `staging/sm/TypedArray/set-same-buffer-different-source-target-types.js [strict]` | `fail` | `1.014s` |
-| `staging/sm/RegExp/unicode-ignoreCase.js [non-strict]` | `fail` | `1.012s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.4_T1.js [strict]` | `fail` | `1.011s` |
+| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.541s` |
+| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.443s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `2.029s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `1.998s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `1.985s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `1.950s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.519s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `1.519s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `1.469s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.443s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `1.047s` |
+| `language/comments/S7.4_A5.js [non-strict]` | `fail` | `1.007s` |
+| `language/comments/S7.4_A5.js [strict]` | `fail` | `1.007s` |
+| `language/comments/S7.4_A6.js [strict]` | `fail` | `1.006s` |
+| `language/comments/S7.4_A6.js [non-strict]` | `fail` | `1.004s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js [strict]` | `pass` | `1.000s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.999s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js [strict]` | `pass` | `0.992s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sogdian.js [strict]` | `pass` | `0.991s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sundanese.js [non-strict]` | `pass` | `0.981s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.975s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js [strict]` | `pass` | `0.973s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.971s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.969s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.969s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [non-strict]` | `pass` | `0.968s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.956s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.956s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `0.954s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [strict]` | `pass` | `0.953s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js [strict]` | `pass` | `0.953s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.952s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js [strict]` | `pass` | `0.948s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Psalter_Pahlavi.js [strict]` | `pass` | `0.942s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js [strict]` | `pass` | `0.940s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.932s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js [non-strict]` | `pass` | `0.927s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js [non-strict]` | `pass` | `0.925s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js [strict]` | `pass` | `0.924s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js [non-strict]` | `pass` | `0.922s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.920s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `0.919s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js [non-strict]` | `pass` | `0.919s` |
+| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `pass` | `0.910s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sora_Sompeng.js [non-strict]` | `pass` | `0.907s` |
+| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.904s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.897s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js [non-strict]` | `pass` | `0.892s` |
+| `staging/sm/RegExp/unicode-braced.js [strict]` | `pass` | `0.888s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js [non-strict]` | `pass` | `0.884s` |
 
 ## Skip Breakdown
 
@@ -192,40 +192,7 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Cluster | Outcome | Count | Examples |
 | --- | --- | ---: | --- |
-| `language/statements/for-await-of` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«function TypeError() { [native code] }», «function Test262Error(message) {
-  this.message = message \|\| "";
-}») to be true` | `48` | `language/statements/for-await-of/async-func-dstr-const-obj-ptrn-id-init-throws.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«function TypeError() { [native code] }», «function Test262Error(message) {
-  this.message = message \|\| "";
-}») to be true`<br>`language/statements/for-await-of/async-func-dstr-const-obj-ptrn-id-init-throws.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«function TypeError() { [native code] }», «function Test262Error(message) {
-  this.message = message \|\| "";
-}») to be true`<br>`language/statements/for-await-of/async-func-dstr-const-obj-ptrn-list-err.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Expected SameValue(«function TypeError() { [native code] }», «function Test262Error(message) {
-  this.message = message \|\| "";
-}») to be true` |
-| `staging/sm/TypedArray` | `timeout after 1.0s` | `8` | `staging/sm/TypedArray/fill.js [non-strict]: timeout after 1.0s`<br>`staging/sm/TypedArray/fill.js [strict]: timeout after 1.0s`<br>`staging/sm/TypedArray/set-same-buffer-different-source-target-types.js [non-strict]: timeout after 1.0s` |
-| `language/statements/class/elements` | `runtime error: TypeError` | `6` | `language/statements/class/elements/private-method-shadowed-on-nested-class.js [non-strict]: runtime error: TypeError`<br>`language/statements/class/elements/private-method-shadowed-on-nested-class.js [strict]: runtime error: TypeError`<br>`language/statements/class/elements/privatefieldget-typeerror-3.js [non-strict]: runtime error: TypeError` |
-| `annexB/built-ins/RegExp` | `timeout after 1.0s` | `4` | `annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [non-strict]: timeout after 1.0s`<br>`annexB/built-ins/RegExp/RegExp-leading-escape-BMP.js [strict]: timeout after 1.0s`<br>`annexB/built-ins/RegExp/RegExp-trailing-escape-BMP.js [non-strict]: timeout after 1.0s` |
-| `built-ins/Iterator/zip` | `timeout after 1.0s` | `4` | `built-ins/Iterator/zip/basic-longest.js [non-strict]: timeout after 1.0s`<br>`built-ins/Iterator/zip/basic-shortest.js [non-strict]: timeout after 1.0s`<br>`built-ins/Iterator/zip/basic-shortest.js [strict]: timeout after 1.0s` |
-| `built-ins/Iterator/zipKeyed` | `timeout after 1.0s` | `4` | `built-ins/Iterator/zipKeyed/basic-longest.js [non-strict]: timeout after 1.0s`<br>`built-ins/Iterator/zipKeyed/basic-longest.js [strict]: timeout after 1.0s`<br>`built-ins/Iterator/zipKeyed/basic-shortest.js [non-strict]: timeout after 1.0s` |
-| `language/comments` | `timeout after 1.0s` | `4` | `language/comments/S7.4_A5.js [non-strict]: timeout after 1.0s`<br>`language/comments/S7.4_A5.js [strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [non-strict]: timeout after 1.0s` |
-| `language/statements/class/elements` | `runtime error: Test262Error` | `4` | `language/statements/class/elements/privatefieldget-typeerror-5.js [non-strict]: runtime error: Test262Error`<br>`language/statements/class/elements/privatefieldget-typeerror-5.js [strict]: runtime error: Test262Error`<br>`language/statements/class/elements/privatefieldset-typeerror-5.js [non-strict]: runtime error: Test262Error` |
-| `staging/sm/String` | `timeout after 1.0s` | `4` | `staging/sm/String/fromCodePoint.js [non-strict]: timeout after 1.0s`<br>`staging/sm/String/fromCodePoint.js [strict]: timeout after 1.0s`<br>`staging/sm/String/string-code-point-upper-lower-mapping.js [non-strict]: timeout after 1.0s` |
-| `built-ins/Array/prototype/concat` | `timeout after 1.0s` | `2` | `built-ins/Array/prototype/concat/Array.prototype.concat_large-typed-array.js [non-strict]: timeout after 1.0s`<br>`built-ins/Array/prototype/concat/Array.prototype.concat_large-typed-array.js [strict]: timeout after 1.0s` |
-| `built-ins/Iterator/zip` | `runtime error: Test262Error` | `2` | `built-ins/Iterator/zip/result-is-iterator.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Iterator/zip/result-is-iterator.js [strict]: runtime error: Test262Error` |
-| `built-ins/Iterator/zipKeyed` | `runtime error: Test262Error` | `2` | `built-ins/Iterator/zipKeyed/result-is-iterator.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Iterator/zipKeyed/result-is-iterator.js [strict]: runtime error: Test262Error` |
-| `built-ins/decodeURI` | `timeout after 1.0s` | `2` | `built-ins/decodeURI/S15.1.3.1_A2.4_T1.js [non-strict]: timeout after 1.0s`<br>`built-ins/decodeURI/S15.1.3.1_A2.4_T1.js [strict]: timeout after 1.0s` |
-| `built-ins/decodeURIComponent` | `timeout after 1.0s` | `2` | `built-ins/decodeURIComponent/S15.1.3.2_A2.4_T1.js [non-strict]: timeout after 1.0s`<br>`built-ins/decodeURIComponent/S15.1.3.2_A2.4_T1.js [strict]: timeout after 1.0s` |
-| `harness` | `Test262:AsyncTestFailure:Test262Error: Test262Error: Actual [null, TypeError, TypeError, TypeError, true] and expected [null, [object Object], hi, 10, true] should have the same contents. ` | `2` | `harness/asyncHelpers-asyncTest-then-rejects.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Actual [null, TypeError, TypeError, TypeError, true] and expected [null, [object Object], hi, 10, true] should have the same contents. `<br>`harness/asyncHelpers-asyncTest-then-rejects.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: Actual [null, TypeError, TypeError, TypeError, true] and expected [null, [object Object], hi, 10, true] should have the same contents. ` |
-| `harness` | `Test262:AsyncTestFailure:Test262Error: Test262Error: asyncTest should discard promise's resolved value Expected SameValue(«TypeError», «undefined») to be true` | `2` | `harness/asyncHelpers-asyncTest-then-resolves.js [non-strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: asyncTest should discard promise's resolved value Expected SameValue(«TypeError», «undefined») to be true`<br>`harness/asyncHelpers-asyncTest-then-resolves.js [strict]: Test262:AsyncTestFailure:Test262Error: Test262Error: asyncTest should discard promise's resolved value Expected SameValue(«TypeError», «undefined») to be true` |
-| `harness` | `runtime error: Test262Error` | `2` | `harness/wellKnownIntrinsicObjects.js [non-strict]: runtime error: Test262Error`<br>`harness/wellKnownIntrinsicObjects.js [strict]: runtime error: Test262Error` |
-| `language/expressions/assignment/destructuring` | `runtime error: Test262Error` | `2` | `language/expressions/assignment/destructuring/default-expr-throws-iterator-return-is-not-callable.js [non-strict]: runtime error: Test262Error`<br>`language/expressions/assignment/destructuring/default-expr-throws-iterator-return-is-not-callable.js [strict]: runtime error: Test262Error` |
-| `language/expressions/class/elements` | `runtime error: TypeError` | `2` | `language/expressions/class/elements/private-method-shadowed-on-nested-class.js [non-strict]: runtime error: TypeError`<br>`language/expressions/class/elements/private-method-shadowed-on-nested-class.js [strict]: runtime error: TypeError` |
-| `language/expressions/dynamic-import` | `Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./update-to-dynamic-import-other_FIXTURE.js` was not found` | `2` | `language/expressions/dynamic-import/update-to-dynamic-import.js [non-strict]: Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./update-to-dynamic-import-other_FIXTURE.js` was not found`<br>`language/expressions/dynamic-import/update-to-dynamic-import.js [strict]: Test262:AsyncTestFailure:Test262Error: load_module_source failed: module file `/Users/sondre/dev/lyng/./update-to-dynamic-import-other_FIXTURE.js` was not found` |
-| `staging/sm/RegExp` | `timeout after 1.0s` | `2` | `staging/sm/RegExp/unicode-ignoreCase.js [non-strict]: timeout after 1.0s`<br>`staging/sm/RegExp/unicode-ignoreCase.js [strict]: timeout after 1.0s` |
-| `staging/sm/String` | `timeout after 30.0s` | `2` | `staging/sm/String/string-upper-lower-mapping.js [non-strict]: timeout after 30.0s`<br>`staging/sm/String/string-upper-lower-mapping.js [strict]: timeout after 30.0s` |
-| `staging/sm/class` | `runtime error: Test262Error` | `2` | `staging/sm/class/superPropChains.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/class/superPropChains.js [strict]: runtime error: Test262Error` |
-| `staging/sm/expressions` | `timeout after 1.0s` | `2` | `staging/sm/expressions/nullish-coalescing.js [non-strict]: timeout after 1.0s`<br>`staging/sm/expressions/nullish-coalescing.js [strict]: timeout after 1.0s` |
-| `staging/sm/generators` | `runtime error: TypeError` | `2` | `staging/sm/generators/delegating-yield-3.js [non-strict]: runtime error: TypeError`<br>`staging/sm/generators/delegating-yield-3.js [strict]: runtime error: TypeError` |
-| `language/expressions/call` | `runtime error: ReferenceError` | `1` | `language/expressions/call/with-base-obj.js [non-strict]: runtime error: ReferenceError` |
+| `language/comments` | `timeout after 1.0s` | `4` | `language/comments/S7.4_A5.js [strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [non-strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [strict]: timeout after 1.0s` |
 
 ## Notes
 
