@@ -23,6 +23,15 @@ impl Vm {
             previous_lexical_env,
         });
         frame.set_lexical_env(with_environment);
+        // Mirror the new lexical environment into `Vm::frames`. Without
+        // this, an LLInt fast-return that pops the callee can reload
+        // `dispatch.frame` from a stale `vm.frames` entry whose
+        // `lexical_env` still points at `previous_lexical_env`, losing
+        // the with-binding scope visible to subsequent identifier
+        // references inside the same `with` block.
+        if let Some(slot) = self.frames.last_mut() {
+            *slot = *frame;
+        }
         Ok(())
     }
 
@@ -37,6 +46,11 @@ impl Vm {
         };
         let state = self.with_environment_states.remove(index);
         frame.set_lexical_env(state.previous_lexical_env);
+        // See `push_with_environment` for the rationale: keep `vm.frames`
+        // in sync so a later LLInt fast-return reloads the correct env.
+        if let Some(slot) = self.frames.last_mut() {
+            *slot = *frame;
+        }
     }
 
     pub(super) fn close_with_environment_frames(&mut self, frame_depth: usize) {
