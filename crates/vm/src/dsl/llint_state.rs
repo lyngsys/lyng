@@ -298,8 +298,9 @@ pub(crate) fn refresh_frame_infos(
         .len()
         .saturating_add(LLINT_FRAME_INFO_HEADROOM)
         .min(LLINT_MAX_BYTECODE_CALL_DEPTH);
-    frame_infos.clear();
-    frame_infos.resize(target_len, LlIntFrameInfo::default());
+    if frame_infos.len() < target_len {
+        frame_infos.resize(target_len, LlIntFrameInfo::default());
+    }
 
     let mut bytecode_contexts = agent
         .execution_contexts()
@@ -337,7 +338,7 @@ pub(crate) fn refresh_frame_infos(
             .return_register()
             .map_or(LLINT_RETURN_REGISTER_NONE, u32::from);
         let mut flags = 0;
-        if llint_simple_return_safe(function)
+        if installed.llint_simple_return_safe()
             && !frame.flags().contains(crate::FrameFlags::construct())
             && !frame
                 .flags()
@@ -348,7 +349,7 @@ pub(crate) fn refresh_frame_infos(
         if function.flags().strict() {
             flags |= LLINT_FRAME_INFO_STRICT;
         }
-        if llint_static_tail_recycle_safe(function)
+        if installed.llint_static_tail_recycle_safe()
             && !frame.flags().contains(crate::FrameFlags::construct())
             && !frame
                 .flags()
@@ -406,6 +407,7 @@ pub(crate) fn llint_call_target_for_function(
         || function.arguments_mode() != lyng_bytecode::ArgumentsMode::None
         || function.has_rest_parameter()
         || !function.direct_eval_lexical_sites().is_empty()
+        || !installed.llint_direct_entry_safe()
     {
         return None;
     }
@@ -436,7 +438,7 @@ pub(crate) fn llint_call_target_for_function(
         .map(|record| record.global_object())
         .map_or_else(Value::undefined, Value::from_object_ref);
     let mut target_flags = LLINT_CALL_TARGET_ENABLED;
-    if llint_simple_return_safe(function) {
+    if installed.llint_simple_return_safe() {
         target_flags |= LLINT_CALL_TARGET_FAST_RETURN_SAFE;
     }
     if this_mode == FunctionThisMode::Global {
@@ -445,7 +447,7 @@ pub(crate) fn llint_call_target_for_function(
     if flags.strict() {
         target_flags |= LLINT_CALL_TARGET_STRICT;
     }
-    if llint_static_tail_recycle_safe(function) {
+    if installed.llint_static_tail_recycle_safe() {
         target_flags |= LLINT_CALL_TARGET_TAIL_CALL_RECYCLE_SAFE;
     }
 
@@ -472,7 +474,7 @@ pub(crate) fn llint_call_target_for_function(
     })
 }
 
-fn llint_simple_return_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+pub(crate) fn llint_simple_return_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
     let flags = function.flags();
     if flags.class_constructor()
         || flags.derived_class_constructor()
@@ -489,7 +491,7 @@ fn llint_simple_return_safe(function: &lyng_bytecode::BytecodeFunction) -> bool 
     no_dynamic_cleanup_opcodes(function)
 }
 
-fn llint_static_tail_recycle_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+pub(crate) fn llint_static_tail_recycle_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
     let flags = function.flags();
     if flags.class_constructor()
         || flags.derived_class_constructor()
@@ -506,6 +508,42 @@ fn llint_static_tail_recycle_safe(function: &lyng_bytecode::BytecodeFunction) ->
     }
 
     no_dynamic_cleanup_opcodes(function)
+}
+
+pub(crate) fn llint_direct_entry_safe(function: &lyng_bytecode::BytecodeFunction) -> bool {
+    function.instructions().iter().all(|instruction| {
+        matches!(
+            instruction.opcode(),
+            lyng_bytecode::Opcode::Nop
+                | lyng_bytecode::Opcode::LoadUndefined
+                | lyng_bytecode::Opcode::LoadNull
+                | lyng_bytecode::Opcode::LoadTrue
+                | lyng_bytecode::Opcode::LoadFalse
+                | lyng_bytecode::Opcode::LoadZero
+                | lyng_bytecode::Opcode::LoadOne
+                | lyng_bytecode::Opcode::LoadSmi
+                | lyng_bytecode::Opcode::LoadConst
+                | lyng_bytecode::Opcode::LdaUndefined
+                | lyng_bytecode::Opcode::LdaNull
+                | lyng_bytecode::Opcode::LdaTrue
+                | lyng_bytecode::Opcode::LdaFalse
+                | lyng_bytecode::Opcode::LdaZero
+                | lyng_bytecode::Opcode::LdaOne
+                | lyng_bytecode::Opcode::LdaSmi8
+                | lyng_bytecode::Opcode::LdaConst8
+                | lyng_bytecode::Opcode::Star0
+                | lyng_bytecode::Opcode::Star1
+                | lyng_bytecode::Opcode::Star2
+                | lyng_bytecode::Opcode::Star3
+                | lyng_bytecode::Opcode::Star4
+                | lyng_bytecode::Opcode::Star5
+                | lyng_bytecode::Opcode::Star6
+                | lyng_bytecode::Opcode::Star7
+                | lyng_bytecode::Opcode::Move
+                | lyng_bytecode::Opcode::Return
+                | lyng_bytecode::Opcode::ReturnUndefined
+        )
+    })
 }
 
 fn no_dynamic_cleanup_opcodes(function: &lyng_bytecode::BytecodeFunction) -> bool {
