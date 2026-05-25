@@ -342,9 +342,8 @@ impl Agent {
     pub fn delete(&mut self, id: ObjectRef, key: PropertyKey) -> InternalMethodResult<bool> {
         let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
 
-        let result = self.with_heap_and_objects(|heap, objects| {
-            objects.delete(&mut heap.mutator(), id, key)
-        });
+        let result = self
+            .with_heap_and_objects(|heap, objects| objects.delete(&mut heap.mutator(), id, key));
 
         if let Some(old) = old_shape {
             self.fire_watchpoints_for_shape(old);
@@ -403,7 +402,12 @@ impl Agent {
         // 5. Resolve (or allocate) the post-mutation shape.
         let key = PrototypeKey::from_optional(prototype);
         let new_shape = self.with_heap_and_objects(|heap, objects| {
-            objects.resolve_prototype_transition(&mut heap.mutator(), old_shape, key, AllocationLifetime::Default)
+            objects.resolve_prototype_transition(
+                &mut heap.mutator(),
+                old_shape,
+                key,
+                AllocationLifetime::Default,
+            )
         });
 
         // 6. Commit: update the object's shape pointer and prototype handle.
@@ -417,10 +421,10 @@ impl Agent {
         // guarantees `id` exists in the heap, so the prototype store cannot fail
         // here.  The error branch is kept for completeness but documented as
         // unreachable in practice.
-        let proto_ok = self.heap.mutator().mut_store_object_handle(
-            ObjectHandleStoreTarget::ObjectPrototype(id),
-            prototype,
-        );
+        let proto_ok = self
+            .heap
+            .mutator()
+            .mut_store_object_handle(ObjectHandleStoreTarget::ObjectPrototype(id), prototype);
         debug_assert!(
             proto_ok,
             "prototype store after successful retarget_shape must succeed: id={id:?}"

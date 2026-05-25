@@ -77,4 +77,3 @@ impl SlowPathCounts {
             .unwrap_or(0)
     }
 }
-

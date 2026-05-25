@@ -1575,7 +1575,11 @@ fn alloc_object_with_named_x(agent: &mut Agent) -> lyng_types::ObjectRef {
     let key = PropertyKey::from_atom(AtomId::from_raw(1));
     let obj = agent.with_heap_and_objects(|heap, objects| {
         let root = objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::LongLived);
-        objects.alloc_object(&mut heap.mutator(), lyng_objects::ObjectAllocation::ordinary(root), AllocationLifetime::LongLived)
+        objects.alloc_object(
+            &mut heap.mutator(),
+            lyng_objects::ObjectAllocation::ordinary(root),
+            AllocationLifetime::LongLived,
+        )
     });
     // Add property "x" through the Agent wrapper so the shape advances.
     let mut desc = PropertyDescriptor::new();
@@ -1600,13 +1604,7 @@ fn dictionary_transition_via_redefine_fires_watchpoint() {
     let agent = runtime.root_agent_mut();
 
     let obj = alloc_object_with_named_x(agent);
-    let original_shape = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let original_shape = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     agent
         .objects_mut()
@@ -1651,13 +1649,7 @@ fn dictionary_transition_via_delete_fires_watchpoint() {
     let agent = runtime.root_agent_mut();
 
     let obj = alloc_object_with_named_x(agent);
-    let original_shape = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let original_shape = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     agent
         .objects_mut()
@@ -1716,7 +1708,13 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
         desc.set_configurable(true);
         agent
             .with_heap_and_objects(|heap, objects| {
-                objects.define_own_property(&mut heap.mutator(), obj, key, desc, AllocationLifetime::LongLived)
+                objects.define_own_property(
+                    &mut heap.mutator(),
+                    obj,
+                    key,
+                    desc,
+                    AllocationLifetime::LongLived,
+                )
             })
             .expect("property addition during setup should succeed");
     }
@@ -1729,13 +1727,7 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
     );
 
     // Read the brink shape — the one with LIMIT properties on it.
-    let brink_shape = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let brink_shape = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     // Register watchpoint on the brink shape.
     agent
@@ -1857,23 +1849,11 @@ fn set_prototype_of_allocates_fresh_shape() {
     let obj = alloc_plain_object(agent);
     let proto = alloc_plain_object(agent);
 
-    let shape_before = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_before = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     agent.set_prototype_of(obj, Some(proto)).unwrap();
 
-    let shape_after = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_after = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     assert_ne!(
         shape_before, shape_after,
@@ -1898,39 +1878,15 @@ fn prototype_transition_table_dedups() {
     let obj_b = alloc_plain_object(agent);
 
     // Both objects share the same source root shape.
-    let s_a_before = agent
-        .heap()
-        .view()
-        .object(obj_a)
-        .unwrap()
-        .shape()
-        .unwrap();
-    let s_b_before = agent
-        .heap()
-        .view()
-        .object(obj_b)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let s_a_before = agent.heap().view().object(obj_a).unwrap().shape().unwrap();
+    let s_b_before = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
     assert_eq!(s_a_before, s_b_before, "precondition: same source shape");
 
     agent.set_prototype_of(obj_a, Some(proto)).unwrap();
     agent.set_prototype_of(obj_b, Some(proto)).unwrap();
 
-    let shape_a = agent
-        .heap()
-        .view()
-        .object(obj_a)
-        .unwrap()
-        .shape()
-        .unwrap();
-    let shape_b = agent
-        .heap()
-        .view()
-        .object(obj_b)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_a = agent.heap().view().object(obj_a).unwrap().shape().unwrap();
+    let shape_b = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
 
     assert_eq!(
         shape_a, shape_b,
@@ -1952,20 +1908,8 @@ fn null_and_object_prototype_produce_distinct_shapes() {
     agent.set_prototype_of(obj_a, None).unwrap();
     agent.set_prototype_of(obj_b, Some(proto)).unwrap();
 
-    let shape_a = agent
-        .heap()
-        .view()
-        .object(obj_a)
-        .unwrap()
-        .shape()
-        .unwrap();
-    let shape_b = agent
-        .heap()
-        .view()
-        .object(obj_b)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_a = agent.heap().view().object(obj_a).unwrap().shape().unwrap();
+    let shape_b = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
 
     assert_ne!(
         shape_a, shape_b,
@@ -2001,13 +1945,7 @@ fn dead_prototype_transition_entry_pruned_on_gc() {
     let proto1 = alloc_plain_object(agent);
     let proto2 = alloc_plain_object(agent);
 
-    let s_source: ShapeId = agent
-        .heap()
-        .view()
-        .object(anchor)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let s_source: ShapeId = agent.heap().view().object(anchor).unwrap().shape().unwrap();
 
     // Establish two entries in s_source.prototype_transitions:
     //   s_source --proto1--> shape_a   (obj1 transitions to proto1)
@@ -2068,13 +2006,7 @@ fn live_prototype_transition_entry_retained_on_gc() {
     let obj = alloc_plain_object(agent);
     let proto = alloc_plain_object(agent);
 
-    let s_source: ShapeId = agent
-        .heap()
-        .view()
-        .object(anchor)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let s_source: ShapeId = agent.heap().view().object(anchor).unwrap().shape().unwrap();
 
     agent.set_prototype_of(obj, Some(proto)).unwrap();
 

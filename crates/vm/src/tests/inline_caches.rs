@@ -305,22 +305,18 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
     );
 
     // Capture shape before prototype swap.
-    let shape_before = agent.with_heap_and_objects(|heap, _objects| {
-        heap.view().object(object).unwrap().shape()
-    });
+    let shape_before =
+        agent.with_heap_and_objects(|heap, _objects| heap.view().object(object).unwrap().shape());
 
     // Swap the prototype to one with a different value at the same shape.
     // The receiver epoch bump (cause = PrototypeMutation) must invalidate
     // the proto shortcut so the next access observes the new value.
     // Use Agent::set_prototype_of to trigger shape transition (PR 3).
-    agent
-        .set_prototype_of(object, Some(prototype_b))
-        .unwrap();
+    agent.set_prototype_of(object, Some(prototype_b)).unwrap();
 
     // PR 3: Verify that the shape transitioned on prototype swap.
-    let shape_after = agent.with_heap_and_objects(|heap, _objects| {
-        heap.view().object(object).unwrap().shape()
-    });
+    let shape_after =
+        agent.with_heap_and_objects(|heap, _objects| heap.view().object(object).unwrap().shape());
     assert_ne!(
         shape_before, shape_after,
         "PR 3: proto swap should transition the shape"

@@ -4239,7 +4239,7 @@ fn watchpoint_set_mut_is_lazy() {
 // T8 — sweep drops only Invalidated entries
 #[test]
 fn sweep_invalidated_watchpoint_sets_keeps_watched_and_cleared() {
-    use crate::watchpoint::{Watchpoint, ShapeInvalidationObserver};
+    use crate::watchpoint::{ShapeInvalidationObserver, Watchpoint};
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();

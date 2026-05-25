@@ -83,8 +83,12 @@ pub fn create_error_object(
         descriptor.set_writable(true);
         descriptor.set_enumerable(false);
         descriptor.set_configurable(true);
-        let defined =
-            agent.define_own_property(object, PropertyKey::from_atom(message_atom), descriptor, AllocationLifetime::Default);
+        let defined = agent.define_own_property(
+            object,
+            PropertyKey::from_atom(message_atom),
+            descriptor,
+            AllocationLifetime::Default,
+        );
         if !matches!(defined, Ok(true)) {
             return Err(fallback_throw_completion());
         }

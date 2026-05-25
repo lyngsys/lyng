@@ -15,7 +15,7 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    branch_i8_negative, branch_i16_negative, branch_nonzero, branch_zero, call_slow, check_bool,
+    branch_i16_negative, branch_i8_negative, branch_nonzero, branch_zero, call_slow, check_bool,
     decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
     jump_relative_i16_and_dispatch, jump_relative_i8_and_dispatch, load_reg, poll_safepoint,
     untag_bool,

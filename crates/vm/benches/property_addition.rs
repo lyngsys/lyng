@@ -21,7 +21,7 @@
 //! transition + watchpoint-probe overhead without any dictionary-transition
 //! branch.
 
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use lyng_common::AtomId;
 use lyng_env::Runtime;
 use lyng_gc::AllocationLifetime;
@@ -57,7 +57,6 @@ fn bench_property_addition(c: &mut Criterion) {
                 // pressure becomes a variable, but criterion's SmallInput
                 // batching keeps the setup cost amortised.
                 || Runtime::new(NoopHostHooks),
-
                 // ── Measured body ────────────────────────────────────────────
                 |mut runtime| {
                     let agent = runtime.root_agent_mut();
@@ -88,12 +87,7 @@ fn bench_property_addition(c: &mut Criterion) {
                             desc.set_enumerable(true);
                             desc.set_configurable(true);
                             agent
-                                .define_own_property(
-                                    obj,
-                                    key,
-                                    desc,
-                                    AllocationLifetime::LongLived,
-                                )
+                                .define_own_property(obj, key, desc, AllocationLifetime::LongLived)
                                 .expect("property addition should not fail in bench");
                         }
                     }

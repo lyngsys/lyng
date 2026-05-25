@@ -1222,7 +1222,9 @@ impl ObjectRuntime {
     /// Returns a mutable reference to the `WatchpointSet` for a shape, lazily
     /// creating an empty set on the first access.
     pub fn watchpoint_set_mut(&mut self, shape: ShapeId) -> &mut WatchpointSet {
-        self.watchpoint_sets.entry(shape).or_insert_with(WatchpointSet::new)
+        self.watchpoint_sets
+            .entry(shape)
+            .or_insert_with(WatchpointSet::new)
     }
 
     /// Drains the watchpoint list for `shape`, marks its set `Invalidated`,
@@ -1233,7 +1235,10 @@ impl ObjectRuntime {
     /// the `Agent` wrapper re-borrows `self` afterwards for any observer types
     /// (e.g. Spec 2's `AdaptiveProtoLoad`) that need `&mut Agent`.
     pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
-        let Some(fired) = self.watchpoint_sets.get_mut(&shape).and_then(|s| s.drain_for_fire())
+        let Some(fired) = self
+            .watchpoint_sets
+            .get_mut(&shape)
+            .and_then(|s| s.drain_for_fire())
         else {
             return;
         };

@@ -38,9 +38,7 @@ impl ShapeInvalidationObserver {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Watchpoint {
-    ShapeInvalidation {
-        observer: ShapeInvalidationObserver,
-    },
+    ShapeInvalidation { observer: ShapeInvalidationObserver },
 }
 
 pub struct WatchpointSet {
@@ -130,7 +128,8 @@ mod tests {
 
         set.register(Watchpoint::ShapeInvalidation {
             observer: ShapeInvalidationObserver::Recording { token: 1 },
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(set.state(), WatchpointState::Watched);
 
         let mut sink = Vec::new();
@@ -145,13 +144,16 @@ mod tests {
         let mut set = WatchpointSet::new();
         set.register(Watchpoint::ShapeInvalidation {
             observer: ShapeInvalidationObserver::Recording { token: 1 },
-        }).unwrap();
+        })
+        .unwrap();
         let mut sink = Vec::new();
         set.fire_all_into(&mut sink);
 
-        let err = set.register(Watchpoint::ShapeInvalidation {
-            observer: ShapeInvalidationObserver::Recording { token: 2 },
-        }).unwrap_err();
+        let err = set
+            .register(Watchpoint::ShapeInvalidation {
+                observer: ShapeInvalidationObserver::Recording { token: 2 },
+            })
+            .unwrap_err();
         assert_eq!(err, Invalidated);
     }
 
@@ -172,7 +174,8 @@ mod tests {
         for token in [10, 20, 30] {
             set.register(Watchpoint::ShapeInvalidation {
                 observer: ShapeInvalidationObserver::Recording { token },
-            }).unwrap();
+            })
+            .unwrap();
         }
         let mut sink = Vec::new();
         set.fire_all_into(&mut sink);

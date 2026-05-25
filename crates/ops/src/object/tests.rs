@@ -1028,13 +1028,7 @@ fn ordinary_set_prototype_of_transitions_shape_and_fires_watchpoint() {
     let proto = alloc_plain_object_ops(agent);
 
     // Record the shape before mutation.
-    let shape_before = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_before = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     // Register a watchpoint on the current shape so we can detect it firing.
     agent
@@ -1051,13 +1045,7 @@ fn ordinary_set_prototype_of_transitions_shape_and_fires_watchpoint() {
     ordinary_set_prototype_of(agent, obj, Some(proto))
         .expect("ordinary_set_prototype_of should succeed");
 
-    let shape_after = agent
-        .heap()
-        .view()
-        .object(obj)
-        .unwrap()
-        .shape()
-        .unwrap();
+    let shape_after = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
     // 1. Shape must have changed.
     assert_ne!(

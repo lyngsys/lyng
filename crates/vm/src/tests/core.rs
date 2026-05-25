@@ -321,7 +321,9 @@ fn evaluate_builder_with_opcode_counters_redirects_asm_writes_to_external_store(
     function_builder
         .emit_ax(Opcode::Return, 1)
         .expect("test bytecode should build");
-    let function = function_builder.finish().expect("test bytecode should build");
+    let function = function_builder
+        .finish()
+        .expect("test bytecode should build");
     let unit = CompiledScriptUnit::new(SourceId::new(91), function.id(), vec![function]);
 
     let mut runtime = Runtime::new(NoopHostHooks);
