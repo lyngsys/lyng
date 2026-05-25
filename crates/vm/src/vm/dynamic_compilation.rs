@@ -1,7 +1,7 @@
 use super::values::alloc_string;
 use super::{
-    Agent, AllocationLifetime, FrameRecord, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError,
-    VmResult, WellKnownAtom,
+    Agent, AllocationLifetime, EntryExecutionOverride, FrameRecord, NativeFunctionRegistry,
+    ObjectRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
 use lyng_builtins::DynamicFunctionKind as BuiltinDynamicFunctionKind;
 use lyng_common::{AtomId, SourceId, Span};
@@ -1652,21 +1652,24 @@ impl Vm {
             self.push_direct_eval_environment(self.frames.len(), environment);
         }
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
-        let result = self.evaluate_installed_with_registry_and_host_with_entry_override(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_referrer,
-            entry_this_value,
-            entry_new_target,
-            entry_home_object,
-            entry_active_function,
-            entry_private_env,
-            entry_lexical_this,
-            host,
-            registry,
-        );
+        let result = {
+            let mut builder = self
+                .installed_eval(agent, installed, lexical_env, variable_env)
+                .with_host(host)
+                .with_registry(registry)
+                .with_entry_override(EntryExecutionOverride {
+                    this_value: entry_this_value,
+                    new_target: entry_new_target,
+                    home_object: entry_home_object,
+                    active_function: entry_active_function,
+                    private_env: entry_private_env,
+                    lexical_this: entry_lexical_this,
+                });
+            if let Some(referrer) = script_referrer {
+                builder = builder.with_referrer(referrer);
+            }
+            builder.run()
+        };
         if let Some(environment) = persistent_direct_eval_env {
             Self::sync_direct_eval_annex_b_catch_var_bindings(
                 agent,

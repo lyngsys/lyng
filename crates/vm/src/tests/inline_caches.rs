@@ -35,7 +35,9 @@ fn load_env_slot_throws_for_uninitialized_lexicals() {
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    let result = vm.evaluate_installed(agent, installed, lexical_env, lexical_env);
+    let result = vm
+        .installed_eval(agent, installed, lexical_env, lexical_env)
+        .run();
 
     assert!(matches!(result, Err(VmError::Abrupt(_))));
     assert_eq!(
@@ -86,7 +88,9 @@ fn store_env_slot_rejects_reassigning_initialized_const_bindings() {
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    let result = vm.evaluate_installed(agent, installed, lexical_env, lexical_env);
+    let result = vm
+        .installed_eval(agent, installed, lexical_env, lexical_env)
+        .run();
 
     assert!(matches!(result, Err(VmError::Abrupt(_))));
     assert_eq!(
@@ -135,12 +139,14 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(7)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(7)
     );
@@ -207,12 +213,14 @@ fn named_property_load_ic_caches_prototype_data_one_hop() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(42)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(42)
     );
@@ -284,12 +292,14 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
@@ -304,7 +314,8 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
             .unwrap()
     });
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(22)
     );
@@ -359,12 +370,14 @@ fn keyed_named_property_load_ic_caches_prototype_data_one_hop() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
@@ -436,12 +449,14 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(77)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(77)
     );
@@ -478,12 +493,14 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
@@ -518,12 +535,14 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
@@ -542,7 +561,8 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(11)
     );
@@ -584,12 +604,14 @@ fn global_property_store_ic_caches_global_object_data_property() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(1)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(2)
     );
@@ -663,7 +685,8 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
     for (index, object) in sources.into_iter().enumerate() {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -746,7 +769,8 @@ fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
     for (_, object, index) in sources {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -836,7 +860,8 @@ fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() 
     for (index, object) in sources.into_iter().enumerate() {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -888,12 +913,14 @@ fn named_property_store_ic_caches_own_data_paths() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
@@ -948,7 +975,8 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
@@ -967,7 +995,8 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
@@ -1029,7 +1058,8 @@ fn named_property_store_ic_caches_absent_own_data_transitions() {
         .expect("Box constructor should have installed code");
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(3)
     );
@@ -1079,7 +1109,8 @@ fn absent_named_property_load_records_without_megamorphic_feedback() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for _ in 0..2 {
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::undefined()
         );
@@ -1132,12 +1163,14 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(4)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(4)
     );
@@ -1203,7 +1236,8 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
     for (index, object) in sources.into_iter().enumerate() {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -1278,7 +1312,8 @@ fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
     for (_, object, index) in sources {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -1348,17 +1383,20 @@ fn keyed_dense_index_load_site_caches_dense_shape() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(12)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(12)
     );
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(12)
     );
@@ -1438,7 +1476,8 @@ fn keyed_dense_index_load_cache_tracks_shape_changes_polymorphically() {
     ] {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             expected
         );
@@ -1490,7 +1529,8 @@ fn keyed_dense_index_cache_falls_back_after_sparse_transition() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for _ in 0..3 {
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(12)
         );
@@ -1511,7 +1551,8 @@ fn keyed_dense_index_cache_falls_back_after_sparse_transition() {
         ));
     });
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(12)
     );
@@ -1572,7 +1613,8 @@ fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for _ in 0..3 {
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(12)
         );
@@ -1585,7 +1627,8 @@ fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
     let key_string = agent.alloc_runtime_string("value", None, AllocationLifetime::Default);
     install_global_value(agent, &realm, key_name, Value::from_string_ref(key_string));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(44)
     );
@@ -1627,7 +1670,8 @@ fn ordinary_object_dense_index_store_uses_specialized_path_without_feedback_slow
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     for _ in 0..2 {
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(9)
         );
@@ -1670,7 +1714,8 @@ fn ordinary_object_index_store_observes_inherited_index_setter() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
@@ -1713,7 +1758,8 @@ fn engine_array_existing_index_store_skips_prototype_setter_scan() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(9)
     );
@@ -1754,7 +1800,8 @@ fn engine_array_sparse_index_store_uses_specialized_path_without_feedback_slow_p
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(33)
     );
@@ -1837,7 +1884,8 @@ fn flat_named_property_header_tracks_monomorphic_inline_load() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(33)
     );
@@ -1897,7 +1945,8 @@ fn flat_named_property_header_tracks_monomorphic_outline_load() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(34)
     );
@@ -1964,13 +2013,15 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_t
     // Prime: install A then B to bring the IC to Polymorphic-2.
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(10)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(20)
     );
@@ -1979,13 +2030,15 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_t
     // other shape's value.
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(10)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(20)
     );
@@ -2031,7 +2084,8 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(33)
     );
@@ -2050,7 +2104,8 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(33)
     );
@@ -2106,7 +2161,8 @@ fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(34)
     );
@@ -2125,7 +2181,8 @@ fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(34)
     );
@@ -2199,7 +2256,8 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(42)
     );
@@ -2218,7 +2276,8 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(42)
     );
@@ -2286,7 +2345,8 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_falls_through_beyon
     for (object, index) in &sources {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(*index).expect("test index fits i32") + 100)
         );
@@ -2297,7 +2357,8 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_falls_through_beyon
     for (object, index) in &sources {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(*index).expect("test index fits i32") + 100)
         );
@@ -2348,13 +2409,15 @@ fn named_property_store_ic_polymorphic_own_data_handlers_store_writes_correct_sl
     // Prime polymorphic-2.
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
@@ -2373,13 +2436,15 @@ fn named_property_store_ic_polymorphic_own_data_handlers_store_writes_correct_sl
     // store performed against that shape.
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(99)
     );
@@ -2437,13 +2502,15 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_invalidates_on_prot
 
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(10)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(20)
     );
@@ -2460,14 +2527,16 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_invalidates_on_prot
 
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(10),
         "own-data slot still resolves correctly through slow chain after epoch bump"
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(20),
         "shape_b's polymorphic_own_data_handlers hit is unaffected by shape_a's epoch bump"
@@ -2521,25 +2590,29 @@ fn keyed_named_property_load_ic_polymorphic_own_data_handlers_load_returns_value
 
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(70)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(80)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(70)
     );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(80)
     );
