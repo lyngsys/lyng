@@ -33,3 +33,10 @@ lyng-parser = { workspace = true }
 lyng-sema = { workspace = true }
 lyng-compiler = { workspace = true }
 lyng-vm-dsl = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "property_addition"
+harness = false
