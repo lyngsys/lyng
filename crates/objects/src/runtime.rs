@@ -10,7 +10,8 @@ use super::{
     ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
     TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
 };
-use std::collections::HashMap;
+use crate::watchpoint::WatchpointSet;
+use std::collections::{HashMap, HashSet};
 
 /// Checked-in threshold before stable shapes switch from inline descriptor scan
 /// to a flattened lookup table.
@@ -56,6 +57,10 @@ pub struct ObjectRuntime {
     pub(crate) root_shapes: HashMap<RootShapeKey, ShapeId>,
     pub(crate) next_private_brand_raw: u32,
     pub(crate) next_invalidation_epoch: u64,
+    pub(crate) watchpoint_sets: HashMap<ShapeId, WatchpointSet>,
+    pub(crate) shapes_with_proto_transitions: HashSet<ShapeId>,
+    #[cfg(test)]
+    pub(crate) recording_watchpoint_fires: Vec<u64>,
 }
 
 impl ObjectRuntime {
@@ -1134,6 +1139,30 @@ impl ObjectRuntime {
     #[inline]
     pub const fn current_invalidation_epoch(&self) -> u64 {
         self.next_invalidation_epoch
+    }
+
+    /// Returns a mutable reference to the `WatchpointSet` for a shape, lazily
+    /// creating an empty set on the first access.
+    pub fn watchpoint_set_mut(&mut self, shape: ShapeId) -> &mut WatchpointSet {
+        self.watchpoint_sets.entry(shape).or_insert_with(WatchpointSet::new)
+    }
+
+    /// Drops all `WatchpointSet` entries that have reached the `Invalidated`
+    /// state. Called post-GC or after a shape invalidation sweep.
+    pub fn sweep_invalidated_watchpoint_sets(&mut self) {
+        self.watchpoint_sets.retain(|_, set| !set.is_invalidated());
+    }
+
+    /// Test-only read-only accessor for a shape's `WatchpointSet`.
+    #[cfg(test)]
+    pub fn watchpoint_sets_inspect(&self, shape: ShapeId) -> Option<&WatchpointSet> {
+        self.watchpoint_sets.get(&shape)
+    }
+
+    /// Test-only drain of all tokens accumulated into `recording_watchpoint_fires`.
+    #[cfg(test)]
+    pub fn take_recording_fires(&mut self) -> Vec<u64> {
+        std::mem::take(&mut self.recording_watchpoint_fires)
     }
 
     #[inline]

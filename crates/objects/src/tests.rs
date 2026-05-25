@@ -4222,3 +4222,71 @@ fn freeing_objects_removes_runtime_metadata_and_releases_object_records() {
     assert!(matches!(freed.cold(), ObjectColdData::Function(_)));
     assert_eq!(runtime.object(mutator.view(), object), None);
 }
+
+// T7 — watchpoint_set_mut creates a lazy entry on first access
+#[test]
+fn watchpoint_set_mut_is_lazy() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+
+    assert!(runtime.watchpoint_sets_inspect(shape).is_none());
+    let _ = runtime.watchpoint_set_mut(shape);
+    assert!(runtime.watchpoint_sets_inspect(shape).is_some());
+}
+
+// T8 — sweep drops only Invalidated entries
+#[test]
+fn sweep_invalidated_watchpoint_sets_keeps_watched_and_cleared() {
+    use crate::watchpoint::{Watchpoint, ShapeInvalidationObserver};
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+
+    // Allocate three distinct shapes via the transition chain.
+    let s_cleared = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key_a = PropertyKey::from_atom(AtomId::from_raw(1001));
+    let key_b = PropertyKey::from_atom(AtomId::from_raw(1002));
+    let s_watched = runtime
+        .transition_shape(
+            &mut mutator,
+            s_cleared,
+            ShapeTransitionKey::new(key_a, ShapePropertyKind::Data, attrs(true, true, true)),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+    let s_invalidated = runtime
+        .transition_shape(
+            &mut mutator,
+            s_watched,
+            ShapeTransitionKey::new(key_b, ShapePropertyKind::Data, attrs(true, true, true)),
+            AllocationLifetime::Default,
+        )
+        .unwrap();
+
+    // s_cleared — allocate, leave in Cleared state
+    let _ = runtime.watchpoint_set_mut(s_cleared);
+    // s_watched — register a watchpoint so state becomes Watched
+    runtime
+        .watchpoint_set_mut(s_watched)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 1 },
+        })
+        .unwrap();
+    // s_invalidated — register then drain so state becomes Invalidated
+    {
+        let set = runtime.watchpoint_set_mut(s_invalidated);
+        set.register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 2 },
+        })
+        .unwrap();
+        let _ = set.drain_for_fire();
+    }
+
+    runtime.sweep_invalidated_watchpoint_sets();
+
+    assert!(runtime.watchpoint_sets_inspect(s_cleared).is_some());
+    assert!(runtime.watchpoint_sets_inspect(s_watched).is_some());
+    assert!(runtime.watchpoint_sets_inspect(s_invalidated).is_none());
+}
