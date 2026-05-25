@@ -532,9 +532,9 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.set_debug_hook(ResumeDebugHook);
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.request_debug_pause_at(installed.code(), 12);
+    let mut debugger = VmDebugger::new(ResumeDebugHook);
+    debugger.request_pause_at(installed.code(), 12);
 
     let counters = vm.opcode_counters_mut();
     counters.enable_slow_path();
@@ -542,6 +542,7 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_debugger(&mut debugger)
         .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(7));

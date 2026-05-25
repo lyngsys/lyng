@@ -199,6 +199,91 @@ impl<'a> VmDebugPauseContext<'a> {
     }
 }
 
+/// Caller-owned bundle of `(hook, state)` that drives the VM debug poll.
+///
+/// Constructed externally, then passed by mutable reference to
+/// [`EvaluateScript::with_debugger`] / [`EvaluateInstalled::with_debugger`]
+/// for a single `.run()`. The builder swaps it into the VM's internal slot
+/// at run entry and swaps it back at run exit — so pause-control mutations
+/// the caller makes between runs persist on the externally-owned struct.
+///
+/// Mirrors [`OpcodeCounters`] for the debug side of the VM extension surface.
+#[derive(Default)]
+pub struct VmDebugger {
+    hook: Option<Box<dyn VmDebugHook>>,
+    state: VmDebugState,
+}
+
+impl VmDebugger {
+    #[must_use]
+    pub fn new(hook: impl VmDebugHook + 'static) -> Self {
+        Self {
+            hook: Some(Box::new(hook)),
+            state: VmDebugState::default(),
+        }
+    }
+
+    /// Drop the installed hook and clear all pause/step state.
+    pub fn clear(&mut self) {
+        self.hook = None;
+        self.state.clear();
+    }
+
+    /// Request a pause at the next safepoint of any kind.
+    pub const fn request_pause(&mut self) {
+        self.state.request_pause(VmDebugPauseRequest::any());
+    }
+
+    /// Request a pause at the next safepoint matching `code` and `instruction_offset`.
+    pub const fn request_pause_at(&mut self, code: CodeRef, instruction_offset: u32) {
+        self.state
+            .request_pause(VmDebugPauseRequest::at(code, instruction_offset));
+    }
+
+    /// Drop any pending pause request without affecting the active step.
+    pub const fn clear_pause_request(&mut self) {
+        self.state.clear_pause_request();
+    }
+
+    /// True when the swapped-in debugger should drive the asm fast-path
+    /// safepoint byte. Empty debugger (no hook, no requests, no step)
+    /// returns false — fast path stays at 2 instructions.
+    #[inline]
+    pub(super) const fn poll_enabled(&self) -> bool {
+        self.hook.is_some() && self.state.should_poll()
+    }
+
+    #[inline]
+    pub(super) fn consume_pause(
+        &mut self,
+        safepoint: VmDebugSafepoint,
+    ) -> Option<VmDebugPauseReason> {
+        self.state.consume_pause(safepoint)
+    }
+
+    #[inline]
+    pub(super) const fn apply_command(
+        &mut self,
+        command: VmDebugCommand,
+        origin_frame_depth: usize,
+    ) {
+        self.state.apply_command(command, origin_frame_depth);
+    }
+
+    /// Temporarily detach the hook so the VM can invoke it while holding
+    /// `&mut Vm` (the hook callback receives a `VmDebugPauseContext` that
+    /// borrows the VM). Caller MUST follow with [`Self::restore_hook`].
+    #[inline]
+    pub(super) fn take_hook(&mut self) -> Option<Box<dyn VmDebugHook>> {
+        self.hook.take()
+    }
+
+    #[inline]
+    pub(super) fn restore_hook(&mut self, hook: Box<dyn VmDebugHook>) {
+        self.hook = Some(hook);
+    }
+}
+
 #[derive(Default)]
 pub(super) struct VmDebugState {
     pause_request: Option<VmDebugPauseRequest>,

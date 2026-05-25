@@ -48,15 +48,16 @@ fn debugger_pauses_at_requested_loop_header_and_reads_frame_state() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.set_debug_hook(RecordingDebugHook {
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut debugger = VmDebugger::new(RecordingDebugHook {
         pauses: Rc::clone(&pauses),
         commands: Rc::new(RefCell::new(VecDeque::new())),
     });
-    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.request_debug_pause_at(installed.code(), loop_offset);
+    debugger.request_pause_at(installed.code(), loop_offset);
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_debugger(&mut debugger)
         .run()
         .unwrap();
 
@@ -107,10 +108,6 @@ fn assert_step_command(
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.set_debug_hook(RecordingDebugHook {
-        pauses: Rc::clone(&pauses),
-        commands,
-    });
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let script_code = installed.code();
     let outer_code = vm
@@ -119,10 +116,15 @@ fn assert_step_command(
     let inner_code = vm
         .installed_child_code(outer_code, 0)
         .expect("outer should install inner child code");
-    vm.request_debug_pause_at(outer_code, offsets.outer_entry);
+    let mut debugger = VmDebugger::new(RecordingDebugHook {
+        pauses: Rc::clone(&pauses),
+        commands,
+    });
+    debugger.request_pause_at(outer_code, offsets.outer_entry);
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_debugger(&mut debugger)
         .run()
         .unwrap();
 

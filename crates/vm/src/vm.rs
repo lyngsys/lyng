@@ -63,7 +63,6 @@ mod values;
 mod with_env;
 
 use call::RejectingNativeRegistry;
-use debugger::{VmDebugPauseRequest, VmDebugState};
 use feedback::FeedbackVector;
 use install::InstalledFunction;
 use state::{
@@ -83,7 +82,7 @@ pub use modules::LoadedModuleRoot;
 
 pub use debugger::{
     VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
-    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode,
+    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
 };
 pub use feedback::{
     CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
@@ -156,8 +155,7 @@ pub struct Vm {
     current_exception: Option<Value>,
     #[cfg(feature = "opcode-counters")]
     pub(crate) counters: OpcodeCounters,
-    debug_hook: Option<Box<dyn VmDebugHook>>,
-    debug_state: VmDebugState,
+    debugger: VmDebugger,
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
@@ -244,6 +242,7 @@ pub struct EvaluateScript<'b> {
     extensions: Option<&'b SharedRealmExtensionProvider>,
     #[cfg(feature = "opcode-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
+    installed_debugger: Option<&'b mut VmDebugger>,
 }
 
 impl<'b> EvaluateScript<'b> {
@@ -280,6 +279,15 @@ impl<'b> EvaluateScript<'b> {
         self
     }
 
+    /// Install a caller-owned [`VmDebugger`] for the duration of `.run()` /
+    /// `.run_retaining_installed()`. The debugger is swapped into the VM at
+    /// run entry and swapped back at run exit, so pause-control mutations
+    /// (and step state the hook installed) persist on the caller's struct.
+    pub fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
+        self.installed_debugger = Some(debugger);
+        self
+    }
+
     /// # Errors
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
@@ -290,12 +298,9 @@ impl<'b> EvaluateScript<'b> {
     /// # Errors
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
-    #[cfg_attr(
-        feature = "opcode-counters",
-        allow(
-            clippy::needless_option_as_deref,
-            reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
-        )
+    #[allow(
+        clippy::needless_option_as_deref,
+        reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
     )]
     pub fn run_retaining_installed(self) -> VmResult<(Value, InstalledCode)> {
         let EvaluateScript {
@@ -309,6 +314,7 @@ impl<'b> EvaluateScript<'b> {
             extensions,
             #[cfg(feature = "opcode-counters")]
             mut installed_counters,
+            mut installed_debugger,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -321,12 +327,20 @@ impl<'b> EvaluateScript<'b> {
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
+        if let Some(external) = installed_debugger.as_deref_mut() {
+            std::mem::swap(&mut vm.debugger, external);
+            vm.refresh_dsl_poll_pending();
+        }
         let result = match extensions {
             Some(provider) => vm.with_extension_provider(provider, |vm| {
                 Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
             }),
             None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
         };
+        if let Some(external) = installed_debugger.as_deref_mut() {
+            std::mem::swap(&mut vm.debugger, external);
+            vm.refresh_dsl_poll_pending();
+        }
         #[cfg(feature = "opcode-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
@@ -381,6 +395,7 @@ pub struct EvaluateInstalled<'b> {
     entry_override: Option<EntryExecutionOverride>,
     #[cfg(feature = "opcode-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
+    installed_debugger: Option<&'b mut VmDebugger>,
 }
 
 impl<'b> EvaluateInstalled<'b> {
@@ -419,14 +434,18 @@ impl<'b> EvaluateInstalled<'b> {
         self
     }
 
+    /// Install a caller-owned [`VmDebugger`] for the duration of `.run()`.
+    /// See [`EvaluateScript::with_debugger`] for the full description.
+    pub fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
+        self.installed_debugger = Some(debugger);
+        self
+    }
+
     /// # Errors
     /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    #[cfg_attr(
-        feature = "opcode-counters",
-        allow(
-            clippy::needless_option_as_deref,
-            reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
-        )
+    #[allow(
+        clippy::needless_option_as_deref,
+        reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
     )]
     pub fn run(self) -> VmResult<Value> {
         let EvaluateInstalled {
@@ -442,6 +461,7 @@ impl<'b> EvaluateInstalled<'b> {
             entry_override,
             #[cfg(feature = "opcode-counters")]
             mut installed_counters,
+            mut installed_debugger,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -459,6 +479,10 @@ impl<'b> EvaluateInstalled<'b> {
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
+        if let Some(external) = installed_debugger.as_deref_mut() {
+            std::mem::swap(&mut vm.debugger, external);
+            vm.refresh_dsl_poll_pending();
+        }
         let result = vm.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -471,6 +495,10 @@ impl<'b> EvaluateInstalled<'b> {
             entry_override,
             observer,
         );
+        if let Some(external) = installed_debugger.as_deref_mut() {
+            std::mem::swap(&mut vm.debugger, external);
+            vm.refresh_dsl_poll_pending();
+        }
         #[cfg(feature = "opcode-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
@@ -491,8 +519,7 @@ impl Vm {
             current_exception: None,
             #[cfg(feature = "opcode-counters")]
             counters: OpcodeCounters::new(),
-            debug_hook: None,
-            debug_state: VmDebugState::default(),
+            debugger: VmDebugger::default(),
             atom_texts: HashMap::new(),
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
@@ -588,37 +615,10 @@ impl Vm {
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, _count: u64) {}
 
-    pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
-        self.debug_hook = Some(Box::new(hook));
-        self.refresh_dsl_poll_pending();
-    }
-
-    pub fn clear_debug_hook(&mut self) {
-        self.debug_hook = None;
-        self.debug_state.clear();
-        self.refresh_dsl_poll_pending();
-    }
-
-    pub fn request_debug_pause(&mut self) {
-        self.debug_state.request_pause(VmDebugPauseRequest::any());
-        self.refresh_dsl_poll_pending();
-    }
-
-    pub fn request_debug_pause_at(&mut self, code: CodeRef, instruction_offset: u32) {
-        self.debug_state
-            .request_pause(VmDebugPauseRequest::at(code, instruction_offset));
-        self.refresh_dsl_poll_pending();
-    }
-
-    pub fn clear_debug_pause_request(&mut self) {
-        self.debug_state.clear_pause_request();
-        self.refresh_dsl_poll_pending();
-    }
-
-    /// Sync `dsl_poll_pending` with the current debug state only. Public
-    /// debugger APIs do not have an `Agent`, so GC pending work is folded
-    /// in at DSL entry and slow-path egress via
-    /// [`Self::refresh_dsl_poll_pending_for_agent`].
+    /// Sync `dsl_poll_pending` with the swapped-in debugger only. The
+    /// builder calls this after each `mem::swap` of [`VmDebugger`]; GC
+    /// pending work is folded in separately at DSL entry / slow-path
+    /// egress via [`Self::refresh_dsl_poll_pending_for_agent`].
     #[inline]
     pub(crate) fn refresh_dsl_poll_pending(&mut self) {
         self.dsl_poll_pending = u8::from(self.debug_poll_enabled());
@@ -640,7 +640,7 @@ impl Vm {
 
     #[inline]
     pub(crate) const fn debug_poll_enabled(&self) -> bool {
-        self.debug_hook.is_some() && self.debug_state.should_poll()
+        self.debugger.poll_enabled()
     }
 
     #[inline]
@@ -652,16 +652,16 @@ impl Vm {
             return;
         };
         let safepoint = VmDebugSafepoint::new(kind, &frame, self.frames.len());
-        let Some(reason) = self.debug_state.consume_pause(safepoint) else {
+        let Some(reason) = self.debugger.consume_pause(safepoint) else {
             return;
         };
         let mut hook = self
-            .debug_hook
-            .take()
+            .debugger
+            .take_hook()
             .expect("debug polling requires an installed hook");
         let command = hook.on_pause(VmDebugPauseContext::new(self, agent, safepoint, reason));
-        self.debug_hook = Some(hook);
-        self.debug_state
+        self.debugger.restore_hook(hook);
+        self.debugger
             .apply_command(command, safepoint.frame_depth());
         self.refresh_dsl_poll_pending();
     }
@@ -1254,6 +1254,7 @@ impl Vm {
             extensions: None,
             #[cfg(feature = "opcode-counters")]
             installed_counters: None,
+            installed_debugger: None,
         }
     }
 
@@ -1278,6 +1279,7 @@ impl Vm {
             entry_override: None,
             #[cfg(feature = "opcode-counters")]
             installed_counters: None,
+            installed_debugger: None,
         }
     }
 
