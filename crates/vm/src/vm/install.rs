@@ -1,7 +1,7 @@
 use super::{
     bytecode_index, code_index, feedback::FeedbackVector, Agent, AllocationLifetime, AtomId,
     BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
-    RealmRef, TieringState, Value, Vm, VmError, VmResult,
+    RealmRef, Value, Vm, VmError, VmResult,
 };
 use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
 use lyng_env::{
@@ -877,8 +877,7 @@ impl Vm {
             .collect::<Vec<_>>()
             .into_boxed_slice();
         self.feedback_flat_storage[index] = flat;
-        self.ensure_tiering_capacity(code);
-        self.tiering[index] = Some(TieringState::default());
+        self.tiering.ensure_slot(code);
         self.installed[index] = Some(Arc::new(installed));
     }
 }

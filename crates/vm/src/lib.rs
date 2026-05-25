@@ -59,7 +59,8 @@ pub use vm::{
     ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
     FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
-    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, TieringSnapshot,
-    Vm, VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
-    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger, VmEvaluationObserver,
+    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, Tiering,
+    TieringSnapshot, Vm, VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext,
+    VmDebugPauseReason, VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
+    VmEvaluationObserver,
 };

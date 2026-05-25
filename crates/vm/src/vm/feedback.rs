@@ -2294,7 +2294,7 @@ impl Vm {
         if mirrored {
             self.mirror_flat_slot(code, slot);
         }
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
         true
     }
 
@@ -2311,7 +2311,7 @@ impl Vm {
         };
         site.record_execution();
         self.mirror_flat_slot(code, slot);
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
         true
     }
 
@@ -2423,7 +2423,7 @@ impl Vm {
         if wrote {
             self.mirror_flat_slot(code, slot);
         }
-        self.observe_tier_feedback_events(code, count);
+        self.tiering.observe_feedback_events(code, count);
     }
 
     #[inline]
@@ -2446,7 +2446,7 @@ impl Vm {
             site.record_call_target(agent, callee);
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
-            self.observe_tier_feedback_event(code);
+            self.tiering.observe_feedback_event(code);
             return;
         }
 
@@ -2494,7 +2494,7 @@ impl Vm {
             site.record_construct_target(agent, constructor, created);
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
-            self.observe_tier_feedback_event(code);
+            self.tiering.observe_feedback_event(code);
             return;
         }
 
@@ -2581,7 +2581,7 @@ impl Vm {
         if wrote {
             self.mirror_flat_slot(code, slot);
         }
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
     }
 
     /// Phase 3d named-keyed cache handler lookup. Returns the packed
@@ -2763,7 +2763,7 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
         Some(value)
     }
 
@@ -2892,7 +2892,7 @@ impl Vm {
         // DSL-0b (B17) dual-write — borrow on `site` is dropped after
         // `record_execution()` so `mirror_flat_slot` can re-borrow.
         self.mirror_flat_slot(code, slot);
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
         Some(value)
     }
 
@@ -2919,7 +2919,7 @@ impl Vm {
         site.record_execution();
         // DSL-0b (B17) dual-write — see paired load helper.
         self.mirror_flat_slot(code, slot);
-        self.observe_tier_feedback_event(code);
+        self.tiering.observe_feedback_event(code);
         Some(stored)
     }
 

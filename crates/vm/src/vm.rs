@@ -71,7 +71,6 @@ use state::{
     EntryExecutionOverride, LoopIterationEnvironment, PendingDynamicImport,
     SuspendedExecutionSideState, TemplateCacheKey, WithEnvironmentState,
 };
-use tiering::TieringState;
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
 // Re-export `code_index` for the DSL-0b entry shim so it can resolve
 // the `feedback_flat_storage` slot for a frame's `CodeRef` without
@@ -91,7 +90,7 @@ pub use feedback::{
     KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot,
     NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
 };
-pub use tiering::{TierStatus, TieringSnapshot};
+pub use tiering::{TierStatus, Tiering, TieringSnapshot};
 
 /// Observer for coarse VM evaluation phases around one installed entry execution.
 ///
@@ -187,7 +186,7 @@ pub struct Vm {
     /// `crate::dsl::reg_convention`. Non-zero means a same-thread
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
-    tiering: Vec<Option<TieringState>>,
+    pub(crate) tiering: Tiering,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
     iterator_states: IteratorStateTable,
@@ -243,6 +242,7 @@ pub struct EvaluateScript<'b> {
     #[cfg(feature = "opcode-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
     installed_debugger: Option<&'b mut VmDebugger>,
+    installed_tiering: Option<&'b mut Tiering>,
 }
 
 impl<'b> EvaluateScript<'b> {
@@ -288,6 +288,18 @@ impl<'b> EvaluateScript<'b> {
         self
     }
 
+    /// Install a caller-owned [`Tiering`] for the duration of `.run()` /
+    /// `.run_retaining_installed()`. The tiering store is swapped into the
+    /// VM at run entry and swapped back at run exit, so per-`CodeRef` tier
+    /// state accumulated during the run persists on the caller's struct.
+    /// The default `Vm::new()` holds an empty `Tiering`, so without this
+    /// hook the VM allocates no per-install tier slots and `observe_*`
+    /// calls short-circuit before any `Vec` indexing.
+    pub fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
+        self.installed_tiering = Some(tiering);
+        self
+    }
+
     /// # Errors
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
@@ -315,6 +327,7 @@ impl<'b> EvaluateScript<'b> {
             #[cfg(feature = "opcode-counters")]
             mut installed_counters,
             mut installed_debugger,
+            mut installed_tiering,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -331,12 +344,18 @@ impl<'b> EvaluateScript<'b> {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
         }
+        if let Some(external) = installed_tiering.as_deref_mut() {
+            std::mem::swap(&mut vm.tiering, external);
+        }
         let result = match extensions {
             Some(provider) => vm.with_extension_provider(provider, |vm| {
                 Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
             }),
             None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
         };
+        if let Some(external) = installed_tiering.as_deref_mut() {
+            std::mem::swap(&mut vm.tiering, external);
+        }
         if let Some(external) = installed_debugger.as_deref_mut() {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
@@ -396,6 +415,7 @@ pub struct EvaluateInstalled<'b> {
     #[cfg(feature = "opcode-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
     installed_debugger: Option<&'b mut VmDebugger>,
+    installed_tiering: Option<&'b mut Tiering>,
 }
 
 impl<'b> EvaluateInstalled<'b> {
@@ -441,6 +461,13 @@ impl<'b> EvaluateInstalled<'b> {
         self
     }
 
+    /// Install a caller-owned [`Tiering`] for the duration of `.run()`. See
+    /// [`EvaluateScript::with_tiering`] for the full description.
+    pub fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
+        self.installed_tiering = Some(tiering);
+        self
+    }
+
     /// # Errors
     /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
     #[allow(
@@ -462,6 +489,7 @@ impl<'b> EvaluateInstalled<'b> {
             #[cfg(feature = "opcode-counters")]
             mut installed_counters,
             mut installed_debugger,
+            mut installed_tiering,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -483,6 +511,9 @@ impl<'b> EvaluateInstalled<'b> {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
         }
+        if let Some(external) = installed_tiering.as_deref_mut() {
+            std::mem::swap(&mut vm.tiering, external);
+        }
         let result = vm.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
@@ -495,6 +526,9 @@ impl<'b> EvaluateInstalled<'b> {
             entry_override,
             observer,
         );
+        if let Some(external) = installed_tiering.as_deref_mut() {
+            std::mem::swap(&mut vm.tiering, external);
+        }
         if let Some(external) = installed_debugger.as_deref_mut() {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
@@ -527,7 +561,7 @@ impl Vm {
             feedback_flat_storage: Vec::new(),
             llint_call_targets: vec![crate::dsl::llint_state::LlIntCallTarget::default()],
             dsl_poll_pending: 0,
-            tiering: Vec::new(),
+            tiering: Tiering::disabled(),
             activation_tables: ActivationSideTables::default(),
             for_in_states: ForInStateTable::default(),
             iterator_states: IteratorStateTable::default(),
@@ -1255,6 +1289,7 @@ impl Vm {
             #[cfg(feature = "opcode-counters")]
             installed_counters: None,
             installed_debugger: None,
+            installed_tiering: None,
         }
     }
 
@@ -1280,6 +1315,7 @@ impl Vm {
             #[cfg(feature = "opcode-counters")]
             installed_counters: None,
             installed_debugger: None,
+            installed_tiering: None,
         }
     }
 

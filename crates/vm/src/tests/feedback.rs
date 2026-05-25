@@ -921,9 +921,11 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut tiering = Tiering::new();
+    tiering.ensure_slot(installed.code());
 
-    let initial = vm
-        .tiering_snapshot(installed.code())
+    let initial = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     assert!(!initial.is_eligible());
     assert_eq!(initial.status(), TierStatus::InterpreterOnly);
@@ -931,27 +933,30 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
 
     let first = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_tiering(&mut tiering)
         .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(3));
     assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(1));
     assert!(!vm.has_feedback_vector(installed.code()));
     assert_eq!(
-        vm.tiering_snapshot(installed.code())
+        tiering
+            .snapshot(installed.code())
             .expect("installed code should expose tiering state")
             .hotness(),
         0
     );
 
-    assert!(vm.set_tier_eligible(installed.code(), true));
-    let eligible = vm
-        .tiering_snapshot(installed.code())
+    assert!(tiering.set_eligible(installed.code(), true));
+    let eligible = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     assert!(eligible.is_eligible());
     assert_eq!(eligible.status(), TierStatus::Collecting);
 
     let second = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_tiering(&mut tiering)
         .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(3));
@@ -961,8 +966,8 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
         vm.feedback_execution_count(installed.code(), call_slot),
         Some(1)
     );
-    let warmed = vm
-        .tiering_snapshot(installed.code())
+    let warmed = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     assert_eq!(warmed.status(), TierStatus::Collecting);
     assert_eq!(warmed.hotness(), 1);
@@ -1091,16 +1096,19 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
         .installed_child_code(outer_code, 0)
         .expect("inner closure template should install under the outer function");
 
-    assert!(vm.set_tier_eligible(inner_code, true));
+    let mut tiering = Tiering::new();
+    tiering.ensure_slot(inner_code);
+    assert!(tiering.set_eligible(inner_code, true));
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_tiering(&mut tiering)
         .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
     assert!(vm.has_feedback_vector(inner_code));
-    let snapshot = vm
-        .tiering_snapshot(inner_code)
+    let snapshot = tiering
+        .snapshot(inner_code)
         .expect("inner code should expose tiering state");
     assert_eq!(snapshot.status(), TierStatus::Collecting);
     assert_eq!(snapshot.hotness(), 2);
@@ -1134,16 +1142,19 @@ fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut tiering = Tiering::new();
+    tiering.ensure_slot(installed.code());
 
-    assert!(vm.set_tier_eligible(installed.code(), true));
+    assert!(tiering.set_eligible(installed.code(), true));
     let first = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_tiering(&mut tiering)
         .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(120));
 
-    let after_first = vm
-        .tiering_snapshot(installed.code())
+    let after_first = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     // Without backedge accounting the loop alone never reaches
     // ReadyForNative — feedback-site events are the only hotness source.
@@ -1151,9 +1162,9 @@ fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
     assert_eq!(after_first.invalidation_epoch(), 0);
     assert_eq!(after_first.native_generation(), None);
 
-    assert!(vm.invalidate_tier_state(installed.code()));
-    let invalidated = vm
-        .tiering_snapshot(installed.code())
+    assert!(tiering.invalidate(installed.code()));
+    let invalidated = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     assert_eq!(invalidated.status(), TierStatus::Invalidated);
     assert_eq!(invalidated.hotness(), 0);
@@ -1162,11 +1173,12 @@ fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
 
     let second = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_tiering(&mut tiering)
         .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(120));
-    let rewarmed = vm
-        .tiering_snapshot(installed.code())
+    let rewarmed = tiering
+        .snapshot(installed.code())
         .expect("installed code should expose tiering state");
     assert_eq!(rewarmed.invalidation_epoch(), 1);
     assert_eq!(rewarmed.backedge_events(), 0);

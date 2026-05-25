@@ -154,26 +154,90 @@ impl TieringState {
     }
 }
 
-impl Vm {
+/// Caller-ownable container for per-`CodeRef` tier-up state.
+///
+/// The default `Vm::new()` holds a *disabled* `Tiering` (`Tiering::disabled()`)
+/// — `ensure_slot` is a no-op and `observe_feedback_events` short-circuits
+/// before any `Vec` work. Callers that want to collect tier state construct
+/// an active `Tiering::new()`, swap it in via
+/// `EvaluateScript::with_tiering` / `EvaluateInstalled::with_tiering`, then
+/// read snapshots off the caller-owned struct afterwards.
+///
+/// The current shape is scaffolding for an eventual JSC-style tier ladder
+/// (LLInt → Baseline → DFG → FTL). DSL-0c (§2, §6, §10) deliberately defers
+/// the JIT and tier accounting; this struct exists so the bookkeeping can
+/// be opt-in at near-zero cost until that work lands.
+pub struct Tiering {
+    states: Vec<Option<TieringState>>,
+    enabled: bool,
+}
+
+impl Default for Tiering {
     #[inline]
-    pub(super) fn ensure_tiering_capacity(&mut self, code: CodeRef) {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Tiering {
+    /// Construct an *active* tiering store. Slots are allocated on
+    /// `ensure_slot`, and IC feedback observations accumulate hotness.
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            states: Vec::new(),
+            enabled: true,
+        }
+    }
+
+    /// Construct a *disabled* tiering store. `ensure_slot` is a no-op,
+    /// `observe_feedback_event(s)` short-circuit immediately, and
+    /// `snapshot` always returns `None`. Used as the always-present
+    /// internal store on `Vm::new()` so the default VM pays nothing for
+    /// the tiering scaffold until a caller opts in via `with_tiering`.
+    #[inline]
+    pub(super) fn disabled() -> Self {
+        Self {
+            states: Vec::new(),
+            enabled: false,
+        }
+    }
+
+    /// Register `code` for tier tracking, creating a default-state slot if
+    /// one isn't present yet. Idempotent: existing slot state is preserved.
+    /// No-op on a disabled tiering store.
+    ///
+    /// Call this on a caller-owned `Tiering` for every `CodeRef` you want
+    /// to track *before* swapping it into the VM via `with_tiering`. The
+    /// VM's internal install path also calls `ensure_slot` on whatever
+    /// `Tiering` is currently swapped in, so codes installed during an
+    /// `evaluate_script` run are auto-registered on the caller-owned
+    /// `Tiering` for that run.
+    #[inline]
+    pub fn ensure_slot(&mut self, code: CodeRef) {
+        if !self.enabled {
+            return;
+        }
         let index = code_index(code);
-        if self.tiering.len() <= index {
-            self.tiering.resize_with(index + 1, || None);
+        if self.states.len() <= index {
+            self.states.resize_with(index + 1, || None);
+        }
+        if self.states[index].is_none() {
+            self.states[index] = Some(TieringState::default());
         }
     }
 
     #[inline]
-    pub fn tiering_snapshot(&self, code: CodeRef) -> Option<TieringSnapshot> {
-        self.tiering
+    pub fn snapshot(&self, code: CodeRef) -> Option<TieringSnapshot> {
+        self.states
             .get(code_index(code))
             .and_then(|state| state.map(TieringState::snapshot))
     }
 
     #[inline]
-    pub fn set_tier_eligible(&mut self, code: CodeRef, eligible: bool) -> bool {
+    pub fn set_eligible(&mut self, code: CodeRef, eligible: bool) -> bool {
         let index = code_index(code);
-        let Some(state) = self.tiering.get_mut(index).and_then(Option::as_mut) else {
+        let Some(state) = self.states.get_mut(index).and_then(Option::as_mut) else {
             return false;
         };
         state.set_eligible(eligible);
@@ -181,9 +245,9 @@ impl Vm {
     }
 
     #[inline]
-    pub fn invalidate_tier_state(&mut self, code: CodeRef) -> bool {
+    pub fn invalidate(&mut self, code: CodeRef) -> bool {
         let index = code_index(code);
-        let Some(state) = self.tiering.get_mut(index).and_then(Option::as_mut) else {
+        let Some(state) = self.states.get_mut(index).and_then(Option::as_mut) else {
             return false;
         };
         state.invalidate();
@@ -191,14 +255,17 @@ impl Vm {
     }
 
     #[inline]
-    pub(super) fn observe_tier_feedback_event(&mut self, code: CodeRef) {
-        self.observe_tier_feedback_events(code, 1);
+    pub(super) fn observe_feedback_event(&mut self, code: CodeRef) {
+        self.observe_feedback_events(code, 1);
     }
 
     #[inline]
-    pub(super) fn observe_tier_feedback_events(&mut self, code: CodeRef, count: u32) {
+    pub(super) fn observe_feedback_events(&mut self, code: CodeRef, count: u32) {
+        if !self.enabled || self.states.is_empty() {
+            return;
+        }
         if let Some(state) = self
-            .tiering
+            .states
             .get_mut(code_index(code))
             .and_then(Option::as_mut)
         {
@@ -206,7 +273,21 @@ impl Vm {
         }
     }
 
-    // DSL-0c C6: observe_tier_backedge_event deleted with α path's
+    // DSL-0c C6: observe_backedge_event deleted with α path's
     // backedge accounting. The interpreter has no tier-up accounting
     // post-DSL-0c (design §6 + §10).
+}
+
+impl Vm {
+    /// Read a tiering snapshot from the VM's *internal* `Tiering`.
+    ///
+    /// In the default configuration this is the always-empty `Tiering` that
+    /// `Vm::new()` constructs, so the snapshot is `None`. To collect tier
+    /// state, swap in a caller-owned `Tiering` via
+    /// `EvaluateScript::with_tiering` / `EvaluateInstalled::with_tiering`
+    /// and read the snapshot off the caller-owned struct after `.run()`.
+    #[inline]
+    pub fn tiering_snapshot(&self, code: CodeRef) -> Option<TieringSnapshot> {
+        self.tiering.snapshot(code)
+    }
 }
