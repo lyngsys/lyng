@@ -6,7 +6,9 @@ use super::{
 };
 use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
-use lyng_objects::{InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload};
+use lyng_objects::{
+    InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload, ShapeTransitionKey,
+};
 use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -446,5 +448,35 @@ impl Agent {
     /// with `&mut self` available for full re-entry if needed.
     pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
         self.objects.fire_watchpoints_for_shape(shape);
+    }
+
+    /// Records a property-addition transition on `obj`'s current shape (which
+    /// becomes the parent of the new child shape), always firing watchpoints
+    /// registered on the parent shape after the transition is recorded.
+    ///
+    /// May fire spuriously when the child already existed in the parent's
+    /// transition table (Spec 1's `Recording` observers tolerate this).
+    ///
+    /// This is the production entry point for property-addition shape
+    /// transitions. Callers must use this rather than calling
+    /// `objects.transition_shape` through `with_heap_and_objects` directly so
+    /// that shape-invalidation watchpoints are fired correctly.
+    pub fn transition_shape(
+        &mut self,
+        obj: ObjectRef,
+        transition: ShapeTransitionKey,
+        lifetime: AllocationLifetime,
+    ) -> Option<ShapeId> {
+        let parent_shape = self.heap.view().object(obj).and_then(|r| r.shape());
+
+        let result = self.with_heap_and_objects(|heap, objects| {
+            let parent = parent_shape?;
+            objects.transition_shape(&mut heap.mutator(), parent, transition, lifetime)
+        });
+
+        if let Some(parent) = parent_shape {
+            self.fire_watchpoints_for_shape(parent);
+        }
+        result
     }
 }

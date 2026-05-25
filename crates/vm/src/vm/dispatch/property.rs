@@ -1688,7 +1688,7 @@ impl Vm {
         value: Value,
         lifetime: AllocationLifetime,
     ) -> Result<Option<(bool, NamedPropertyCacheEntry)>, InternalMethodError> {
-        agent.with_heap_and_objects(|heap, objects| {
+        let result = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             let Some(plan) = objects.plan_named_property_transition_store_entry(
                 &mut mutator,
@@ -1702,7 +1702,14 @@ impl Vm {
             let stored =
                 objects.store_to_named_property_cache(&mut mutator, object, key, plan, value)?;
             Ok(stored.map(|stored| (stored, plan)))
-        })
+        });
+        // Fire watchpoints on the parent (pre-transition) shape whenever a
+        // transition was planned — receiver_shape() is the parent shape that
+        // was passed to ObjectRuntime::transition_shape inside the plan call.
+        if let Ok(Some((_, plan))) = result {
+            agent.fire_watchpoints_for_shape(plan.receiver_shape());
+        }
+        result
     }
 
     /// Phase 3d dense-keyed load cache hit path. Returns the cached element
