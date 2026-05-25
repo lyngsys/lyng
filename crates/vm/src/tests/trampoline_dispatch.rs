@@ -17,7 +17,8 @@ fn trampoline_executes_null_literal_script() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `null` cleanly");
 
     assert_eq!(
@@ -36,7 +37,8 @@ fn trampoline_executes_true_literal_script() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `true` cleanly");
 
     assert_eq!(result, Value::from_bool(true));
@@ -51,7 +53,8 @@ fn trampoline_executes_false_literal_script() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `false` cleanly");
 
     assert_eq!(result, Value::from_bool(false));
@@ -69,7 +72,8 @@ fn trampoline_executes_sequence_of_null_literals() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `null; null` cleanly");
 
     assert_eq!(result, Value::null());
@@ -86,7 +90,8 @@ fn trampoline_executes_smi8_literal() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `42` cleanly");
 
     assert_eq!(result, Value::from_smi(42));
@@ -103,7 +108,8 @@ fn trampoline_executes_smi_larger_than_byte() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `1000` cleanly");
 
     assert_eq!(result, Value::from_smi(1000));
@@ -121,7 +127,8 @@ fn trampoline_executes_smi_sequence_returns_last_value() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `1; 2; 3` cleanly");
 
     assert_eq!(result, Value::from_smi(3));
@@ -137,7 +144,8 @@ fn trampoline_executes_if_true_consequent() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute if/else cleanly");
 
     assert_eq!(result, Value::from_smi(1));
@@ -153,7 +161,8 @@ fn trampoline_executes_if_false_alternate() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute if/else cleanly");
 
     assert_eq!(result, Value::from_smi(2));
@@ -172,7 +181,8 @@ fn trampoline_executes_smi_add() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `5 + 7` cleanly");
 
     assert_eq!(result, Value::from_smi(12));
@@ -187,7 +197,8 @@ fn trampoline_executes_chained_smi_add() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute chained add cleanly");
 
     assert_eq!(result, Value::from_smi(15));
@@ -202,7 +213,8 @@ fn trampoline_executes_negate_literal() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `-7` cleanly");
 
     assert_eq!(result, Value::from_smi(-7));
@@ -217,7 +229,8 @@ fn trampoline_executes_smi_mul_and_sub() {
     let mut vm = Vm::new();
 
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("trampoline-dispatch should execute `10 * 3 - 4` cleanly");
 
     assert_eq!(result, Value::from_smi(26));
@@ -230,7 +243,7 @@ fn trampoline_executes_strict_equal_true() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_bool(true));
 }
 
@@ -241,7 +254,7 @@ fn trampoline_executes_strict_equal_false() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_bool(false));
 }
 
@@ -252,7 +265,7 @@ fn trampoline_executes_less_than() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_bool(true));
 }
 
@@ -263,7 +276,7 @@ fn trampoline_executes_if_with_comparison_chooses_consequent() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(1));
 }
 
@@ -275,7 +288,7 @@ fn trampoline_executes_bitwise_ops() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     // (5 & 3) = 1; (5 | 3) = 7; (5 ^ 3) = 6 → 14
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(14));
 }
 
@@ -287,7 +300,7 @@ fn trampoline_executes_shifts() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     // (1 << 4) = 16; (32 >> 2) = 8 → 24
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(24));
 }
 
@@ -298,7 +311,7 @@ fn trampoline_executes_smi_mod() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(2));
 }
 
@@ -309,7 +322,7 @@ fn trampoline_executes_exp_smi() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(1024));
 }
 
@@ -324,7 +337,7 @@ fn trampoline_executes_object_literal_and_property_load() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(42));
 }
 
@@ -335,7 +348,7 @@ fn trampoline_executes_multi_property_load() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(4));
 }
 
@@ -346,7 +359,7 @@ fn trampoline_executes_array_literal_and_indexed_load() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(20));
 }
 
@@ -357,7 +370,7 @@ fn trampoline_executes_undefined_via_load_global() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::undefined());
 }
 
@@ -368,7 +381,7 @@ fn trampoline_executes_nan_via_load_global() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert!(result.is_nan(), "NaN global should resolve to a NaN Value");
 }
 
@@ -379,7 +392,7 @@ fn trampoline_executes_in_operator() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_bool(true));
 }
 
@@ -390,7 +403,7 @@ fn trampoline_executes_delete_property() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_bool(true));
 }
 
@@ -405,7 +418,7 @@ fn trampoline_executes_arrow_call_zero_args() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(7));
 }
 
@@ -416,7 +429,7 @@ fn trampoline_executes_arrow_call_one_arg() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(42));
 }
 
@@ -427,7 +440,7 @@ fn trampoline_executes_arrow_call_three_args() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(6));
 }
 
@@ -442,7 +455,7 @@ fn trampoline_executes_let_binding() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(42));
 }
 
@@ -453,7 +466,7 @@ fn trampoline_executes_let_reassignment() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(3));
 }
 
@@ -464,7 +477,7 @@ fn trampoline_executes_block_scoped_let() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(1));
 }
 
@@ -475,7 +488,7 @@ fn trampoline_executes_typeof() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     // typeof 42 returns the string "number"; just assert no error + non-undefined
     assert!(
         !result.is_undefined(),
@@ -493,7 +506,7 @@ fn trampoline_executes_for_of_loop() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(15));
 }
 
@@ -507,7 +520,7 @@ fn trampoline_executes_for_in_loop() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(3));
 }
 
@@ -518,7 +531,7 @@ fn trampoline_executes_try_catch_with_thrown_value() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(42));
 }
 
@@ -529,6 +542,6 @@ fn trampoline_executes_while_loop() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     assert_eq!(result, Value::from_smi(10));
 }

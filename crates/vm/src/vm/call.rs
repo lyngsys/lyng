@@ -1024,7 +1024,8 @@ mod tests {
         let mut vm = Vm::new();
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
         let _ = vm
-            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap();
 
         let object_atom = unit_atom(&unit, "object");
@@ -1076,12 +1077,13 @@ mod tests {
         let mut registry = RejectingNativeRegistry;
 
         let direct = vm
-            .evaluate_installed(
+            .installed_eval(
                 agent,
                 InstalledCode::new(getter_code, getter_entry),
                 getter_environment,
                 getter_environment,
             )
+            .run()
             .expect("getter should execute directly");
         assert_eq!(direct, Value::from_smi(10));
 

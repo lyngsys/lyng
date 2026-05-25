@@ -14,7 +14,7 @@ fn evaluate_script_string_literal_strict_equality_with_identifier() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -32,7 +32,7 @@ fn evaluate_script_string_from_char_code_uses_uint16_code_units() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -55,7 +55,7 @@ fn evaluate_script_string_add_preserves_mixed_encodings() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -80,7 +80,7 @@ fn evaluate_script_string_concat_preserves_utf16_code_units() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -104,7 +104,7 @@ fn evaluate_script_array_join_preserves_utf16_code_units() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -127,7 +127,7 @@ fn evaluate_script_typed_array_join_preserves_utf16_separator() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -153,7 +153,7 @@ fn evaluate_script_string_html_methods_preserve_utf16_code_units() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -172,7 +172,7 @@ fn evaluate_script_regexp_legacy_input_preserves_utf16_code_units() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -198,7 +198,7 @@ fn evaluate_script_regexp_exec_reuses_string_code_unit_scratch() {
     let mut vm = Vm::new();
 
     assert_eq!(vm.string_code_units_scratch_capacity(), 0);
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(64));
     assert!(vm.string_code_units_scratch_capacity() >= 64);
@@ -222,10 +222,10 @@ fn evaluate_script_string_index_reads_do_not_allocate_primitive_wrappers() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.evaluate_script(agent, realm, &warmup).unwrap();
+    let _ = vm.script_eval(agent, realm, &warmup).run().unwrap();
     let before_objects = agent.heap().view().object_stats().occupied_slots;
     let before_strings = agent.heap().view().string_stats().occupied_slots;
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let after_objects = agent.heap().view().object_stats().occupied_slots;
     let after_strings = agent.heap().view().string_stats().occupied_slots;
 
@@ -260,9 +260,9 @@ fn evaluate_script_repeated_short_latin1_concat_reuses_strings() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.evaluate_script(agent, realm, &warmup).unwrap();
+    let _ = vm.script_eval(agent, realm, &warmup).run().unwrap();
     let before_strings = agent.heap().view().string_stats().occupied_slots;
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let after_strings = agent.heap().view().string_stats().occupied_slots;
 
     assert_eq!(result, Value::from_smi(192));
@@ -286,7 +286,7 @@ fn evaluate_script_string_search_uses_regexp_payloads() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }

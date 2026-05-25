@@ -323,14 +323,14 @@ impl Vm {
         })?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         let script_referrer = Self::active_script_or_module_referrer(agent);
-        self.evaluate_script_with_registry_and_host_referrer(
-            agent,
-            realm_record,
-            compilation.unit(),
-            script_referrer.as_ref(),
-            host,
-            registry,
-        )
+        let mut builder = self
+            .script_eval(agent, realm_record, compilation.unit())
+            .with_host(host)
+            .with_registry(registry);
+        if let Some(referrer) = script_referrer.as_ref() {
+            builder = builder.with_referrer(referrer);
+        }
+        builder.run()
     }
 
     pub(crate) fn evaluate_indirect_eval_source(
@@ -439,15 +439,14 @@ impl Vm {
         let script_referrer = Self::active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
-        self.evaluate_installed_with_registry_and_host(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_referrer,
-            host,
-            registry,
-        )
+        let mut builder = self
+            .installed_eval(agent, installed, lexical_env, variable_env)
+            .with_host(host)
+            .with_registry(registry);
+        if let Some(referrer) = script_referrer {
+            builder = builder.with_referrer(referrer);
+        }
+        builder.run()
     }
 
     fn rewrite_direct_eval_use_sites(sema: &mut ScriptSema) {

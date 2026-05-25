@@ -19,7 +19,7 @@ fn generator_call_returns_a_generator_without_running_the_body() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let iter = global_value(agent, &realm, "iter")
         .as_object_ref()
         .expect("generator call should return an object");
@@ -44,7 +44,7 @@ fn async_function_call_returns_a_promise_and_fulfills_after_await() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async function call should return a promise object");
@@ -72,7 +72,7 @@ fn async_function_call_rejects_the_returned_promise_on_await_rejection() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async function call should return a promise object");
@@ -102,7 +102,7 @@ fn async_functions_use_the_async_function_prototype_chain() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -122,7 +122,7 @@ fn async_function_constructor_compiles_dynamic_async_bodies() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("dynamic AsyncFunction call should return a promise object");
@@ -168,7 +168,7 @@ fn for_await_of_consumes_async_iterators() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -200,7 +200,7 @@ fn for_await_of_wraps_sync_iterators_and_awaits_each_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -250,7 +250,7 @@ fn for_await_of_sync_iterator_preserves_async_from_sync_tick_order() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -304,7 +304,7 @@ fn for_await_of_break_rejects_when_async_close_rejects() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -371,7 +371,7 @@ fn for_await_of_return_closes_wrapped_sync_iterators_and_awaits_return_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -414,7 +414,7 @@ fn for_await_of_return_preserves_value_with_async_iterator_close() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -462,7 +462,7 @@ fn for_await_of_return_preserves_value_with_sync_wrapper_close_without_await() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("for await should return a promise");
@@ -501,7 +501,7 @@ fn async_generator_next_returns_a_promise_for_iterator_results() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator test should return a promise");
@@ -533,7 +533,7 @@ fn async_generator_yield_unwraps_promises_before_resolving_next() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator promise-yield test should return a promise");
@@ -569,7 +569,7 @@ fn async_generator_awaits_within_the_body_before_settling_next_requests() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator await test should return a promise");
@@ -613,7 +613,7 @@ fn async_generator_yield_star_uses_async_iterator_hint() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator yield-star test should return a promise");
@@ -678,7 +678,7 @@ fn async_generator_private_yield_star_awaits_async_iterator_next_results() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator delegated yield-star test should return a promise");
@@ -734,7 +734,7 @@ fn async_generator_yield_star_missing_return_method_awaits_return_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator return-value await test should return a promise");
@@ -782,7 +782,7 @@ fn async_generator_explicit_return_undefined_awaits_before_settling() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator explicit-return timing test should return a promise");
@@ -842,7 +842,7 @@ fn async_generator_yield_return_resumption_awaits_return_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator yield-return timing test should return a promise");
@@ -901,7 +901,7 @@ fn async_generator_return_promise_resolve_abrupt_resumes_suspended_yield_as_thro
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator abrupt return test should return a promise");
@@ -976,7 +976,7 @@ fn async_generator_yield_star_return_resumption_awaits_before_delegate_return_lo
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("async generator yield-star return timing test should return a promise");
@@ -1029,7 +1029,7 @@ fn async_generator_functions_use_the_async_generator_prototype_chain() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1057,7 +1057,7 @@ fn async_iterator_prototype_async_iterator_method_has_spec_name() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1089,7 +1089,7 @@ fn async_iterator_prototype_async_dispose_method_has_spec_descriptor() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1129,7 +1129,10 @@ fn async_iterator_prototype_async_dispose_rejects_when_return_throws() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
     let promise = result
         .as_object_ref()
@@ -1171,7 +1174,7 @@ fn async_generator_function_constructor_compiles_dynamic_async_generator_bodies(
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let promise = result
         .as_object_ref()
         .expect("dynamic async generator constructor test should return a promise");
@@ -1202,7 +1205,7 @@ fn generator_call_runs_parameter_instantiation_before_suspending_start() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
     let iter = global_value(agent, &realm, "iter")
         .as_object_ref()
         .expect("generator call should return an object");
@@ -1235,7 +1238,7 @@ fn generator_call_throws_parameter_instantiation_errors_before_returning() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(21));
 }
@@ -1256,7 +1259,7 @@ fn generator_call_creates_instances_after_parameter_side_effects() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(false));
 }
@@ -1279,7 +1282,7 @@ fn generator_instances_use_the_function_prototype_chain() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let _ = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(
         global_value(agent, &realm, "directProtoMatches"),
@@ -1324,7 +1327,7 @@ fn generator_function_constructor_rejections_throw_syntax_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -1358,7 +1361,7 @@ fn subclassed_generator_function_constructors_preserve_generator_descriptors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }

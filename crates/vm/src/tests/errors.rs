@@ -27,7 +27,7 @@ fn evaluate_script_promise_finally_invokes_then_on_thenables() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -57,7 +57,7 @@ fn evaluate_script_promise_finally_wraps_callable_handlers_before_invoking_then(
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -99,7 +99,10 @@ fn evaluate_script_promise_finally_invokes_result_then_observably() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .evaluate_script_with_registry_and_host(agent, realm, &unit, &host, &mut registry)
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
     let promise = result
         .as_object_ref()
@@ -132,7 +135,7 @@ fn evaluate_script_promise_then_throws_when_constructor_is_null() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -181,7 +184,7 @@ fn evaluate_script_promise_all_settled_shares_already_called_between_element_fun
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -213,7 +216,7 @@ fn evaluate_script_object_define_properties_applies_multiple_descriptors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -235,7 +238,7 @@ fn evaluate_script_object_define_properties_normalizes_array_length() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -259,7 +262,7 @@ fn aggregate_error_constructor_materializes_message_and_errors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -279,7 +282,7 @@ fn aggregate_error_constructor_installs_cause_property() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -319,7 +322,7 @@ fn aggregate_error_evaluates_message_before_iterating_errors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -344,7 +347,7 @@ fn suppressed_error_constructor_materializes_message_and_fields() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.evaluate_script(agent, realm, &unit).unwrap();
+    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }

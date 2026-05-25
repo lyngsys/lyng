@@ -31,14 +31,16 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     let first = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(3));
     assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(1));
     assert!(!vm.has_feedback_vector(installed.code()));
 
     let second = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(3));
     assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(2));
@@ -94,7 +96,8 @@ fn evaluated_entry_snapshot(
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, expected);
 
@@ -119,7 +122,8 @@ fn evaluated_construct_entry_snapshot(
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, expected);
 
@@ -435,7 +439,8 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
 
     for _ in 0..2 {
         assert!(vm
-            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap()
             .is_object());
     }
@@ -526,7 +531,8 @@ fn llint_scalar_feedback_batch_drain_preserves_warmup_execution_counts() {
         .expect("four function should have installed code");
 
     let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(4));
@@ -602,7 +608,8 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
     for (index, object) in sources.into_iter().enumerate() {
         install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
@@ -678,12 +685,13 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
     let named_installed = vm.install_script(agent, realm.id(), &named_unit).unwrap();
     for _ in 0..2 {
         assert_eq!(
-            vm.evaluate_installed(
+            vm.installed_eval(
                 agent,
                 named_installed,
                 realm.global_env(),
                 realm.global_env()
             )
+            .run()
             .unwrap(),
             Value::from_smi(4)
         );
@@ -737,12 +745,13 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
     let dense_installed = vm.install_script(agent, realm.id(), &dense_unit).unwrap();
     for _ in 0..2 {
         assert_eq!(
-            vm.evaluate_installed(
+            vm.installed_eval(
                 agent,
                 dense_installed,
                 realm.global_env(),
                 realm.global_env()
             )
+            .run()
             .unwrap(),
             Value::from_smi(12)
         );
@@ -836,7 +845,8 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
 
     for _ in 0..2 {
         assert_eq!(
-            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                .run()
                 .unwrap(),
             Value::from_smi(7)
         );
@@ -862,7 +872,8 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
             .unwrap()
     }));
     assert_eq!(
-        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_smi(13)
     );
@@ -919,7 +930,8 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
     assert_eq!(initial.hotness(), 0);
 
     let first = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(3));
     assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(1));
@@ -939,7 +951,8 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
     assert_eq!(eligible.status(), TierStatus::Collecting);
 
     let second = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(3));
     assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(2));
@@ -1017,7 +1030,8 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
         .expect("inner closure template should install under the outer function");
 
     let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
@@ -1079,7 +1093,8 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
 
     assert!(vm.set_tier_eligible(inner_code, true));
     let result = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
@@ -1122,7 +1137,8 @@ fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
 
     assert!(vm.set_tier_eligible(installed.code(), true));
     let first = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(120));
 
@@ -1145,7 +1161,8 @@ fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
     assert_eq!(invalidated.native_generation(), None);
 
     let second = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(120));
     let rewarmed = vm
@@ -1198,14 +1215,16 @@ fn internal_bytecode_callbacks_share_feedback_state_with_the_parent_vm() {
         .expect("callback function should have installed code");
 
     let first = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(0));
     assert_eq!(vm.feedback_warmup_counter(callback_code), Some(1));
     assert!(!vm.has_feedback_vector(callback_code));
 
     let second = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(0));
     assert_eq!(vm.feedback_warmup_counter(callback_code), Some(2));
