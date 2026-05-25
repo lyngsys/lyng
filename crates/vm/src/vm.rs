@@ -346,6 +346,93 @@ impl<'b> EvaluateScript<'b> {
     }
 }
 
+/// Scoped builder for evaluating an already-installed code record. Holds borrows of the VM,
+/// agent, and required inputs; consumed by `.run()`.
+pub struct EvaluateInstalled<'b> {
+    vm: &'b mut Vm,
+    agent: &'b mut Agent,
+    installed: InstalledCode,
+    lexical_env: EnvironmentRef,
+    variable_env: EnvironmentRef,
+    host: Option<&'b dyn HostHooks>,
+    registry: Option<&'b mut dyn NativeFunctionRegistry>,
+    referrer: Option<AtomId>,
+    observer: Option<&'b mut dyn VmEvaluationObserver>,
+    entry_override: Option<EntryExecutionOverride>,
+}
+
+impl<'b> EvaluateInstalled<'b> {
+    #[must_use]
+    pub fn with_host(mut self, host: &'b dyn HostHooks) -> Self {
+        self.host = Some(host);
+        self
+    }
+
+    #[must_use]
+    pub fn with_registry(mut self, registry: &'b mut dyn NativeFunctionRegistry) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
+    #[must_use]
+    pub fn with_referrer(mut self, atom: AtomId) -> Self {
+        self.referrer = Some(atom);
+        self
+    }
+
+    #[must_use]
+    pub fn with_observer(mut self, observer: &'b mut dyn VmEvaluationObserver) -> Self {
+        self.observer = Some(observer);
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_entry_override(mut self, override_: EntryExecutionOverride) -> Self {
+        self.entry_override = Some(override_);
+        self
+    }
+
+    /// # Errors
+    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
+    pub fn run(self) -> VmResult<Value> {
+        let EvaluateInstalled {
+            vm,
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            host,
+            registry,
+            referrer,
+            observer,
+            entry_override,
+        } = self;
+        let host = host.unwrap_or(&NoopHostHooks);
+        let mut fallback_registry = RejectingNativeRegistry;
+        let registry: &mut dyn NativeFunctionRegistry = match registry {
+            Some(r) => r,
+            None => &mut fallback_registry,
+        };
+        let mut fallback_observer = NoopVmEvaluationObserver;
+        let observer: &mut dyn VmEvaluationObserver = match observer {
+            Some(o) => o,
+            None => &mut fallback_observer,
+        };
+        vm.evaluate_entry_with_registry_and_checkpoint(
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            referrer,
+            host,
+            registry,
+            None,
+            entry_override,
+            observer,
+        )
+    }
+}
+
 impl Vm {
     #[inline]
     pub fn new() -> Self {
@@ -1324,6 +1411,29 @@ impl Vm {
                 script_referrer,
                 host,
             ),
+        }
+    }
+
+    /// Begin evaluating an already-installed code record. Returns a builder; call `.run()` to execute.
+    #[must_use]
+    pub fn installed_eval<'b>(
+        &'b mut self,
+        agent: &'b mut Agent,
+        installed: InstalledCode,
+        lexical_env: EnvironmentRef,
+        variable_env: EnvironmentRef,
+    ) -> EvaluateInstalled<'b> {
+        EvaluateInstalled {
+            vm: self,
+            agent,
+            installed,
+            lexical_env,
+            variable_env,
+            host: None,
+            registry: None,
+            referrer: None,
+            observer: None,
+            entry_override: None,
         }
     }
 

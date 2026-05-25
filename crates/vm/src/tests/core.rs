@@ -156,6 +156,23 @@ fn script_eval_builder_runs_default_case() {
 }
 
 #[test]
+fn installed_eval_builder_runs_default_case() {
+    let unit = compile_test_unit(162, "7 * 6;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(42));
+}
+
+#[test]
 fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
