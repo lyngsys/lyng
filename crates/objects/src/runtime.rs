@@ -1156,13 +1156,10 @@ impl ObjectRuntime {
     /// Running the dispatch here keeps the `pub(crate)` fields encapsulated;
     /// the `Agent` wrapper re-borrows `self` afterwards for any observer types
     /// (e.g. Spec 2's `AdaptiveProtoLoad`) that need `&mut Agent`.
-    ///
-    /// Returns `true` if any watchpoints were fired, `false` if the set was
-    /// absent or already `Invalidated`.
-    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) -> bool {
+    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
         let Some(fired) = self.watchpoint_sets.get_mut(&shape).and_then(|s| s.drain_for_fire())
         else {
-            return false;
+            return;
         };
         for wp in fired {
             match wp {
@@ -1173,7 +1170,6 @@ impl ObjectRuntime {
                 },
             }
         }
-        true
     }
 
     /// Drops all `WatchpointSet` entries that have reached the `Invalidated`

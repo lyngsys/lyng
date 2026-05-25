@@ -16,9 +16,11 @@ pub struct Invalidated;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ShapeInvalidationObserver {
-    /// Test-only: records the fire event into a `Vec<u64>` so unit tests can
+    /// Records the fire event into a `Vec<u64>` so unit tests can
     /// assert "this transition fired exactly the watchpoints I registered."
-    /// Carries no heap roots; production builds skip this branch via `cfg(test)`.
+    /// Carries no heap roots. Always present in production builds; production code
+    /// never constructs this variant, so `ObjectRuntime::recording_watchpoint_fires`
+    /// stays empty at runtime (24-byte overhead).
     Recording { token: u64 },
 }
 
