@@ -411,9 +411,17 @@ impl Agent {
         if !shape_ok {
             return Err(InternalMethodError::CorruptObjectState);
         }
+        // Both stores act on the same live object — `retarget_shape` succeeding
+        // guarantees `id` exists in the heap, so the prototype store cannot fail
+        // here.  The error branch is kept for completeness but documented as
+        // unreachable in practice.
         let proto_ok = self.heap.mutator().mut_store_object_handle(
             ObjectHandleStoreTarget::ObjectPrototype(id),
             prototype,
+        );
+        debug_assert!(
+            proto_ok,
+            "prototype store after successful retarget_shape must succeed: id={id:?}"
         );
         if !proto_ok {
             return Err(InternalMethodError::CorruptObjectState);

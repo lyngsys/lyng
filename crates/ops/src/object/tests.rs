@@ -8,8 +8,8 @@ use lyng_objects::{
     ArrayBufferObjectData, FunctionConstructorFlags, FunctionObjectData, FunctionThisMode,
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
     ObjectAllocation, ObjectColdData, ObjectRuntime, OrdinaryObjectData, PrimitiveWrapperKind,
-    TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind, TypedArrayElementKind,
-    TypedArrayObjectData,
+    ShapeInvalidationObserver, TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind,
+    TypedArrayElementKind, TypedArrayObjectData, Watchpoint, WatchpointState,
 };
 use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, EnvironmentRef, PropertyKey, RealmRef, WellKnownSymbolId,
@@ -993,4 +993,100 @@ fn require_temporal_object_rejects_plain_objects_and_wrong_temporal_kind() {
         TemporalObjectKind::ZonedDateTime,
     )
     .is_err());
+}
+
+// ── Regression: ordinary_set_prototype_of routes through Agent (PR 3 wiring) ──
+
+/// Helper: allocate a plain ordinary object with no prototype, using the
+/// long-lived lifetime so heap references stay stable across the test.
+fn alloc_plain_object_ops(agent: &mut Agent) -> lyng_types::ObjectRef {
+    agent.with_heap_and_objects(|heap, objects| {
+        let root = objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::LongLived);
+        objects.alloc_object(
+            &mut heap.mutator(),
+            ObjectAllocation::ordinary(root),
+            AllocationLifetime::LongLived,
+        )
+    })
+}
+
+/// T16 — The JS-observable prototype-mutation path (`ordinary_set_prototype_of`
+/// in `ops/object/ordinary.rs`, reached from both the proxy dispatch non-proxy
+/// branch and the object-literal `__proto__` lowering) must:
+///   1. transition the object to a new shape;
+///   2. fire watchpoints registered on the old shape; and
+///   3. leave the old shape's WatchpointSet in the `Invalidated` state.
+///
+/// This test exercises the actual entry point that `Object.setPrototypeOf` and
+/// `{ __proto__: v }` land on after PR 3's wiring fix.
+#[test]
+fn ordinary_set_prototype_of_transitions_shape_and_fires_watchpoint() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    let obj = alloc_plain_object_ops(agent);
+    let proto = alloc_plain_object_ops(agent);
+
+    // Record the shape before mutation.
+    let shape_before = agent
+        .heap()
+        .view()
+        .object(obj)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    // Register a watchpoint on the current shape so we can detect it firing.
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(shape_before)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 16 },
+        })
+        .unwrap();
+
+    // Exercise the JS-observable path: this is exactly the function that
+    // `proxy::set_prototype_of` (non-proxy branch) and `class_helpers.rs`
+    // (object-literal `__proto__`) call.
+    ordinary_set_prototype_of(agent, obj, Some(proto))
+        .expect("ordinary_set_prototype_of should succeed");
+
+    let shape_after = agent
+        .heap()
+        .view()
+        .object(obj)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    // 1. Shape must have changed.
+    assert_ne!(
+        shape_before, shape_after,
+        "prototype mutation via the JS-observable path must produce a distinct shape"
+    );
+
+    // 2. The prototype store must be reflected in the heap record.
+    assert_eq!(
+        agent.heap().view().object(obj).unwrap().prototype(),
+        Some(proto),
+        "prototype pointer must be updated in the heap record"
+    );
+
+    // 3. The watchpoint registered on the old shape must have fired.
+    assert_eq!(
+        agent.objects_mut().take_recording_fires(),
+        vec![16],
+        "watchpoint on the old shape must fire when ordinary_set_prototype_of is called"
+    );
+
+    // 4. The old shape's WatchpointSet must be in the Invalidated state.
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(shape_before)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated,
+        "old shape's WatchpointSet must be Invalidated after prototype mutation"
+    );
 }

@@ -123,10 +123,14 @@ pub fn ordinary_get_prototype_of(
 
 /// Ordinary-only `[[SetPrototypeOf]]` over the object substrate.
 ///
-/// This helper bypasses proxy traps by going directly through `ObjectRuntime`
-/// internal methods. Guest-observable code should use
-/// [`super::set_prototype_of_in_context`] unless the algorithm is explicitly
-/// operating on an ordinary/bootstrap object.
+/// This helper bypasses proxy traps but routes through [`Agent::set_prototype_of`],
+/// which validates the operation, transitions the object's shape, fires watchpoints
+/// on the old shape, and bumps the invalidation epoch.  All JS-observable callers
+/// (proxy dispatch, object-literal `__proto__` lowering) land here and therefore
+/// automatically get the IC-invalidation semantics introduced in PR 3.
+///
+/// Bootstrap / initialization code that sets prototypes before IC shapes are live
+/// should call `objects.set_prototype(...)` directly and skip this entry point.
 ///
 /// # Errors
 /// Returns an abrupt completion if the underlying object internal methods fail.
@@ -135,10 +139,9 @@ pub fn ordinary_set_prototype_of(
     object: ObjectRef,
     prototype: Option<ObjectRef>,
 ) -> Completion<bool> {
-    let result = agent.with_heap_and_objects(|heap, objects| {
-        objects.set_prototype_of(&mut heap.mutator(), object, prototype)
-    });
-    result.map_err(|error| internal_method_error(agent, error))
+    agent
+        .set_prototype_of(object, prototype)
+        .map_err(|error| internal_method_error(agent, error))
 }
 
 /// Ordinary-only `[[GetOwnProperty]]` over the object substrate.
