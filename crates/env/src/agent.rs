@@ -282,8 +282,9 @@ impl Agent {
         f(&mut self.heap, &mut self.objects)
     }
 
-    /// Ensures `id` is in dictionary mode, firing watchpoints on the
-    /// pre-transition shape if a transition actually occurred.
+    /// Ensures `id` is in dictionary mode, always firing watchpoints on the
+    /// pre-call shape. (May fire spuriously even when no shape change occurred —
+    /// Spec 1's `Recording` observers tolerate this.)
     ///
     /// This is the production entry point for dictionary transitions.
     /// Callers must use this rather than `objects.ensure_named_property_dictionary`
@@ -295,16 +296,15 @@ impl Agent {
             objects.ensure_named_property_dictionary(&mut heap.mutator(), id)
         });
 
-        if ok {
-            if let Some(old) = old_shape {
-                self.fire_watchpoints_for_shape(old);
-            }
+        if let Some(old) = old_shape {
+            self.fire_watchpoints_for_shape(old);
         }
         ok
     }
 
-    /// Defines or updates one own property on `id`, firing watchpoints on the
-    /// pre-transition shape when a shape change occurs.
+    /// Defines or updates one own property on `id`, always firing watchpoints on the
+    /// pre-call shape. (May fire spuriously even when no shape change occurred —
+    /// Spec 1's `Recording` observers tolerate this.)
     ///
     /// This is the production entry point for property definition.
     /// Callers must use this rather than calling `objects.define_own_property`
@@ -329,8 +329,9 @@ impl Agent {
         result
     }
 
-    /// Deletes one property from `id`, firing watchpoints on the pre-transition
-    /// shape when a shape change occurs.
+    /// Deletes one property from `id`, always firing watchpoints on the
+    /// pre-call shape. (May fire spuriously even when no shape change occurred —
+    /// Spec 1's `Recording` observers tolerate this.)
     ///
     /// This is the production entry point for property deletion.
     /// Callers must use this rather than calling `objects.delete` through
