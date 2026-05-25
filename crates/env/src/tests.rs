@@ -1774,6 +1774,65 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
     );
 }
 
+// T17 — Adding a NEW property to a shape-stable object fires the watchpoint
+//         registered on the parent (pre-transition) shape and advances the
+//         object to a fresh child shape.
+#[test]
+fn property_addition_fires_watchpoint_on_parent_shape() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    // Allocate an object with one existing property "x" (atom 1) so we have a
+    // non-root shape to register the watchpoint on.
+    let obj = alloc_object_with_named_x(agent);
+    // alloc_object_with_named_x already drains setup fires internally.
+
+    // Capture the current shape — this is the PARENT shape we register on.
+    let s_parent = agent.heap().view().object(obj).unwrap().shape().unwrap();
+
+    // Register a Recording watchpoint on s_parent.
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(s_parent)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 17 },
+        })
+        .unwrap();
+
+    // Add a NEW property "b" (atom 2) — triggers a shape transition from
+    // s_parent to a child shape. Agent::define_own_property fires watchpoints
+    // on the pre-call shape (s_parent) unconditionally.
+    let key_b = PropertyKey::from_atom(AtomId::from_raw(2));
+    let mut desc = PropertyDescriptor::new();
+    desc.set_value(Value::from_smi(99));
+    desc.set_writable(true);
+    desc.set_enumerable(true);
+    desc.set_configurable(true);
+    agent
+        .define_own_property(obj, key_b, desc, AllocationLifetime::LongLived)
+        .expect("property addition should succeed");
+
+    // Watchpoint on s_parent must have fired with token 17.
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![17]);
+
+    // The object must have advanced to a new child shape.
+    assert_ne!(
+        agent.heap().view().object(obj).unwrap().shape().unwrap(),
+        s_parent,
+        "object should be on a child shape after property addition"
+    );
+
+    // The parent's WatchpointSet must be Invalidated.
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(s_parent)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated
+    );
+}
+
 // ── Prototype-transition shape tests (Task 3.2 / 3.3) ────────────────────────
 
 /// Allocates a plain ordinary object with no prototype and no properties.
