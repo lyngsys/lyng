@@ -204,7 +204,8 @@ fn frame_context_survives_gc_pressure_in_closure_loop() {
 
     let mut vm = Vm::new();
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("gc-stress script should execute without VM error");
 
     let after_acct = agent.heap().view().accounting();

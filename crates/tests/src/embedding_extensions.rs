@@ -177,15 +177,13 @@ fn compile_and_run(source: &str, provider: Option<&SharedRealmExtensionProvider>
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.evaluate_script_with_host_referrer_and_extensions(
-        agent,
-        realm,
-        &unit,
-        None,
-        &NoopHostHooks,
-        provider,
-    )
-    .expect("script should execute")
+    let mut builder = vm
+        .script_eval(agent, realm, &unit)
+        .with_host(&NoopHostHooks);
+    if let Some(provider) = provider {
+        builder = builder.with_extensions(provider);
+    }
+    builder.run().expect("script should execute")
 }
 
 fn compile_and_run_string(source: &str, provider: Option<&SharedRealmExtensionProvider>) -> String {
@@ -195,16 +193,13 @@ fn compile_and_run_string(source: &str, provider: Option<&SharedRealmExtensionPr
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let value = vm
-        .evaluate_script_with_host_referrer_and_extensions(
-            agent,
-            realm,
-            &unit,
-            None,
-            &NoopHostHooks,
-            provider,
-        )
-        .expect("script should execute");
+    let mut builder = vm
+        .script_eval(agent, realm, &unit)
+        .with_host(&NoopHostHooks);
+    if let Some(provider) = provider {
+        builder = builder.with_extensions(provider);
+    }
+    let value = builder.run().expect("script should execute");
     let string = value
         .as_string_ref()
         .expect("script should return a string value");

@@ -55,7 +55,8 @@ fn run_script(src: &str) -> Value {
     let realm = agent.default_realm().expect("default realm should exist");
 
     let mut vm = Vm::new();
-    vm.evaluate_script(agent, realm, &unit)
+    vm.script_eval(agent, realm, &unit)
+        .run()
         .expect("script should execute without VM error")
 }
 

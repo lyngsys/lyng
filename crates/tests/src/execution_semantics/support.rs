@@ -45,7 +45,8 @@ pub(super) fn compile_and_run(source: &str) -> Value {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.evaluate_script(agent, realm, &unit)
+    vm.script_eval(agent, realm, &unit)
+        .run()
         .expect("compiled script should execute")
 }
 
@@ -58,7 +59,8 @@ pub(super) fn compile_and_run_string(source: &str) -> String {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let result = vm
-        .evaluate_script(agent, realm, &unit)
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("compiled script should execute");
     let string = result
         .as_string_ref()
@@ -115,7 +117,9 @@ pub(super) fn evaluate_with_registry(
     install_globals(agent, realm);
 
     let mut vm = Vm::new();
-    vm.evaluate_script_with_registry(agent, realm, unit, registry)
+    vm.script_eval(agent, realm, unit)
+        .with_registry(registry)
+        .run()
         .expect("compiled script should execute")
 }
 
