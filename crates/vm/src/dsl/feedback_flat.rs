@@ -40,6 +40,11 @@ pub const LLINT_IC_MODE_EMPTY: u8 = 0;
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
 pub const LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
 pub const LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
+/// Polymorphic OwnData (`POLY_LIMIT` = 2) inline-slot walk. Reuses the four
+/// 8-byte slots in [`FeedbackEntry`] to pack both handlers and epochs:
+/// `named_handler_bits` / `named_epoch` carry sidecar slot 0;
+/// `named_aux_bits` / `named_aux_epoch` carry sidecar slot 1.
+pub const LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC: u8 = 4;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 
 #[repr(u8)]
@@ -49,6 +54,7 @@ pub(crate) enum LlIntIcMode {
     NamedOwnInlineLoad = LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
     NamedProtoInlineLoad = LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
     NamedOwnOutlineLoad = LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD,
+    NamedOwnPolymorphic = LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -154,6 +160,25 @@ impl FeedbackEntry {
         self.named_aux_epoch = prototype_epoch;
     }
 
+    /// Install a polymorphic OwnData inline-slot handler pair. Slot 0 is
+    /// stored in the primary handler/epoch fields, slot 1 in the auxiliary
+    /// fields — matches the asm walk in
+    /// `op_get_named_property_dsl`'s `.try_poly` label.
+    #[inline]
+    pub(crate) const fn set_named_own_polymorphic(
+        &mut self,
+        slot0_handler_bits: u64,
+        slot0_epoch: u64,
+        slot1_handler_bits: u64,
+        slot1_epoch: u64,
+    ) {
+        self.mode = LlIntIcMode::NamedOwnPolymorphic as u8;
+        self.named_handler_bits = slot0_handler_bits;
+        self.named_epoch = slot0_epoch;
+        self.named_aux_bits = slot1_handler_bits;
+        self.named_aux_epoch = slot1_epoch;
+    }
+
     #[inline]
     pub(crate) const fn mode(&self) -> u8 {
         self.mode
@@ -252,6 +277,17 @@ mod tests {
             FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
             FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET
         );
+    }
+
+    #[test]
+    fn named_own_polymorphic_install_round_trips_through_aux_slots() {
+        let mut entry = FeedbackEntry::default();
+        entry.set_named_own_polymorphic(0xAAAA_AAAA_BBBB_BBBB, 7, 0xCCCC_CCCC_DDDD_DDDD, 9);
+        assert_eq!(entry.mode(), super::LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC);
+        assert_eq!(entry.named_handler_bits(), 0xAAAA_AAAA_BBBB_BBBB);
+        assert_eq!(entry.named_epoch(), 7);
+        assert_eq!(entry.named_aux_bits(), 0xCCCC_CCCC_DDDD_DDDD);
+        assert_eq!(entry.named_aux_epoch(), 9);
     }
 
     #[test]

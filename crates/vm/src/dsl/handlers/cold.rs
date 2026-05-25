@@ -41,7 +41,8 @@
 use crate::{
     add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
-    branch_named_own_outline_mode, branch_named_proto_inline_mode, branch_nonzero,
+    branch_named_own_outline_mode, branch_named_own_polymorphic_mode,
+    branch_named_proto_inline_mode, branch_nonzero,
     branch_raw_equal_strict_result, call_rust_probe, call_slow, check_object_ref, check_smi,
     cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a, decode_ab, decode_abc,
     decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
@@ -2637,7 +2638,7 @@ llint_handler! {
         store_reg!(a, t0);
         dispatch!();
         .try_own_outline:
-        branch_named_own_outline_mode!(c, .try_proto);
+        branch_named_own_outline_mode!(c, .try_poly);
         load_named_handler_bits!(c => slot);
         load_named_epoch!(c => t0);
         load_named_outline_slot_index_or_branch!(slot => c, .slow);
@@ -2649,6 +2650,31 @@ llint_handler! {
         cmp_branch_ne!(t1, t0, .slow);
         load_record_outline_slots_from_state_or_branch!(b => t2, .slow);
         load_outline_slot!(t2, c => t0);
+        store_reg!(a, t0);
+        dispatch!();
+        .try_poly:
+        branch_named_own_polymorphic_mode!(c, .try_proto);
+        load_object_record_from_state_or_branch!(b => b, .slow);
+        load_record_shape!(b => t1);
+        load_named_handler_bits!(c => slot);
+        load_named_handler_shape!(slot => t2);
+        cmp_branch_ne!(t1, t2, .poly_slot_1);
+        load_named_epoch!(c => t0);
+        load_record_last_epoch!(b => t2);
+        cmp_branch_ne!(t0, t2, .poly_slot_1);
+        load_named_inline_slot_index_or_branch!(slot => c, .slow);
+        load_record_inline_slot!(b, c => t0);
+        store_reg!(a, t0);
+        dispatch!();
+        .poly_slot_1:
+        load_named_aux_bits!(c => slot);
+        load_named_handler_shape!(slot => t2);
+        cmp_branch_ne!(t1, t2, .slow);
+        load_named_aux_epoch!(c => t0);
+        load_record_last_epoch!(b => t2);
+        cmp_branch_ne!(t0, t2, .slow);
+        load_named_inline_slot_index_or_branch!(slot => c, .slow);
+        load_record_inline_slot!(b, c => t0);
         store_reg!(a, t0);
         dispatch!();
         .try_proto:

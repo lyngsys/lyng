@@ -2120,6 +2120,104 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
 
 #[cfg(feature = "opcode-counters")]
 #[test]
+fn named_property_load_polymorphic_ic_hits_avoid_semantic_slow_path() {
+    // Polymorphic OwnData inline-slot two-shape walk. After priming the IC
+    // with two distinct receiver shapes, both should resolve through the
+    // asm-DSL `.try_poly` label (FeedbackEntry mode = 4) and avoid the
+    // semantic slow bridge.
+    let unit = compile_test_unit(549, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let shape_a = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(10));
+    let shape_b = make_object_with_value(
+        agent,
+        root_shape,
+        &[26_000],
+        value_name,
+        Value::from_smi(20),
+    );
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Prime the IC: shape A then shape B → Polymorphic-2.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(10)
+    );
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(20)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            2,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
+
+    // Slot 0 path: receiver shape matches the first cached entry.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_a));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(10)
+    );
+    // Slot 1 path: receiver shape matches the second cached entry.
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(shape_b));
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(20)
+    );
+
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(dispatch.count(Opcode::GetNamedProperty), 2);
+    assert_eq!(
+        slow_path.semantic(Opcode::GetNamedProperty),
+        0,
+        "cached polymorphic named-property IC hits should avoid the semantic slow bridge"
+    );
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
 fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(548, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();

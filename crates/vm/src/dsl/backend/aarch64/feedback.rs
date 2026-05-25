@@ -93,6 +93,25 @@ macro_rules! branch_named_own_outline_mode {
     };
 }
 
+/// Branch to `$label` unless the flat feedback entry is a polymorphic
+/// `OwnData` inline-slot load header. The pair of cached handlers / epochs
+/// is packed into the existing primary (slot 0) and auxiliary (slot 1)
+/// fields by [`FeedbackEntry::set_named_own_polymorphic`].
+#[macro_export]
+macro_rules! branch_named_own_polymorphic_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #4\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 #[macro_export]
 macro_rules! load_named_handler_bits {
     ($entry:tt => $dst:tt) => {

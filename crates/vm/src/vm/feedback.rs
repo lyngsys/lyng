@@ -213,6 +213,12 @@ enum LlIntNamedPropertyHeader {
         receiver_epoch: u64,
         prototype_epoch: u64,
     },
+    OwnPolymorphic {
+        slot0_handler_bits: u64,
+        slot0_epoch: u64,
+        slot1_handler_bits: u64,
+        slot1_epoch: u64,
+    },
 }
 
 impl KeyedPropertyFeedbackSnapshot {
@@ -2182,6 +2188,17 @@ impl Vm {
                 receiver_epoch,
                 prototype_epoch,
             ),
+            Some(LlIntNamedPropertyHeader::OwnPolymorphic {
+                slot0_handler_bits,
+                slot0_epoch,
+                slot1_handler_bits,
+                slot1_epoch,
+            }) => entry.set_named_own_polymorphic(
+                slot0_handler_bits,
+                slot0_epoch,
+                slot1_handler_bits,
+                slot1_epoch,
+            ),
             None => {}
         }
     }
@@ -2234,6 +2251,39 @@ impl Vm {
         ))
     }
 
+    /// Phase 3f polymorphic-OwnData header projection. Reports the two
+    /// entries of `polymorphic_own_data_handlers` packed into the asm IC
+    /// header. Returns `Some` only when both sidecar slots hold valid
+    /// `OwnData` handlers *and* both are inline-slot — the first-cut
+    /// asm walk in `op_get_named_property_dsl`'s `.try_poly` label
+    /// doesn't handle outline polymorphic. Outline / mixed / partially-
+    /// filled poly state stays on the slow path until that walk is
+    /// extended.
+    #[inline]
+    const fn named_own_polymorphic_load_header(
+        site: &FeedbackSiteState,
+    ) -> Option<(u64, u64, u64, u64)> {
+        let FeedbackSiteState::NamedProperty(feedback) = site else {
+            return None;
+        };
+        let handler0 = feedback.polymorphic_own_data_handlers[0];
+        let handler1 = feedback.polymorphic_own_data_handlers[1];
+        if !handler0.is_valid() || !handler1.is_valid() {
+            return None;
+        }
+        if !matches!(handler0.slot_location(), SlotLocation::Inline(_))
+            || !matches!(handler1.slot_location(), SlotLocation::Inline(_))
+        {
+            return None;
+        }
+        Some((
+            handler0.bits(),
+            feedback.polymorphic_own_data_epochs[0],
+            handler1.bits(),
+            feedback.polymorphic_own_data_epochs[1],
+        ))
+    }
+
     #[inline]
     fn named_llint_load_header(site: &FeedbackSiteState) -> Option<LlIntNamedPropertyHeader> {
         if let Some((handler_bits, epoch)) = Self::named_own_inline_load_header(site) {
@@ -2246,6 +2296,20 @@ impl Vm {
             return Some(LlIntNamedPropertyHeader::OwnOutline {
                 handler_bits,
                 epoch,
+            });
+        }
+        // Polymorphic OwnData takes precedence over ProtoInline — when the
+        // IC has transitioned to polymorphic, the monomorphic-proto handler
+        // word is NONE, so the order here is monomorphic-Own → polymorphic-
+        // Own → monomorphic-Proto for clarity.
+        if let Some((slot0_handler_bits, slot0_epoch, slot1_handler_bits, slot1_epoch)) =
+            Self::named_own_polymorphic_load_header(site)
+        {
+            return Some(LlIntNamedPropertyHeader::OwnPolymorphic {
+                slot0_handler_bits,
+                slot0_epoch,
+                slot1_handler_bits,
+                slot1_epoch,
             });
         }
         let (receiver_word, proto_word, receiver_epoch, prototype_epoch) =
@@ -3232,6 +3296,15 @@ impl Vm {
             } => format!(
                 "mode={} handler={proto_word:#x} epoch={receiver_epoch} aux_bits={receiver_word:#x} aux_epoch={prototype_epoch}",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
+            ),
+            LlIntNamedPropertyHeader::OwnPolymorphic {
+                slot0_handler_bits,
+                slot0_epoch,
+                slot1_handler_bits,
+                slot1_epoch,
+            } => format!(
+                "mode={} handler={slot0_handler_bits:#x} epoch={slot0_epoch} aux_bits={slot1_handler_bits:#x} aux_epoch={slot1_epoch}",
+                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
             ),
         };
         format!(
