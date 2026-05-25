@@ -1672,6 +1672,10 @@ fn dictionary_transition_via_delete_fires_watchpoint() {
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![8]);
     assert_eq!(
+        agent.objects().named_property_storage_mode(obj),
+        Some(NamedPropertyStorageMode::Dictionary),
+    );
+    assert_eq!(
         agent
             .objects()
             .watchpoint_sets_inspect(original_shape)
