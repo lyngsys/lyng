@@ -59,7 +59,9 @@ pub struct ObjectRuntime {
     pub(crate) next_invalidation_epoch: u64,
     pub(crate) watchpoint_sets: HashMap<ShapeId, WatchpointSet>,
     pub(crate) shapes_with_proto_transitions: HashSet<ShapeId>,
-    #[cfg(test)]
+    /// Side-buffer for the test-only `Recording` watchpoint observer. Always
+    /// present (cross-crate test visibility); production code never constructs
+    /// `Recording` so this stays empty (24 bytes overhead).
     pub(crate) recording_watchpoint_fires: Vec<u64>,
 }
 
@@ -1147,20 +1149,48 @@ impl ObjectRuntime {
         self.watchpoint_sets.entry(shape).or_insert_with(WatchpointSet::new)
     }
 
+    /// Drains the watchpoint list for `shape`, marks its set `Invalidated`,
+    /// and dispatches `Recording` observers into `recording_watchpoint_fires`.
+    ///
+    /// This is the objects-layer half of `Agent::fire_watchpoints_for_shape`.
+    /// Running the dispatch here keeps the `pub(crate)` fields encapsulated;
+    /// the `Agent` wrapper re-borrows `self` afterwards for any observer types
+    /// (e.g. Spec 2's `AdaptiveProtoLoad`) that need `&mut Agent`.
+    ///
+    /// Returns `true` if any watchpoints were fired, `false` if the set was
+    /// absent or already `Invalidated`.
+    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) -> bool {
+        let Some(fired) = self.watchpoint_sets.get_mut(&shape).and_then(|s| s.drain_for_fire())
+        else {
+            return false;
+        };
+        for wp in fired {
+            match wp {
+                crate::watchpoint::Watchpoint::ShapeInvalidation { observer } => match observer {
+                    crate::watchpoint::ShapeInvalidationObserver::Recording { token } => {
+                        self.recording_watchpoint_fires.push(token);
+                    }
+                },
+            }
+        }
+        true
+    }
+
     /// Drops all `WatchpointSet` entries that have reached the `Invalidated`
     /// state. Called post-GC or after a shape invalidation sweep.
     pub fn sweep_invalidated_watchpoint_sets(&mut self) {
         self.watchpoint_sets.retain(|_, set| !set.is_invalidated());
     }
 
-    /// Test-only read-only accessor for a shape's `WatchpointSet`.
-    #[cfg(test)]
+    /// Read-only accessor for a shape's `WatchpointSet`. Used by tests (including
+    /// cross-crate tests in `lyng-env`) to assert post-fire state.
     pub fn watchpoint_sets_inspect(&self, shape: ShapeId) -> Option<&WatchpointSet> {
         self.watchpoint_sets.get(&shape)
     }
 
-    /// Test-only drain of all tokens accumulated into `recording_watchpoint_fires`.
-    #[cfg(test)]
+    /// Drain all tokens accumulated into `recording_watchpoint_fires`. Primarily
+    /// used by tests; production code never constructs `Recording` watchpoints so
+    /// this returns an empty `Vec` in normal operation.
     pub fn take_recording_fires(&mut self) -> Vec<u64> {
         std::mem::take(&mut self.recording_watchpoint_fires)
     }

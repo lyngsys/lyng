@@ -1460,3 +1460,105 @@ fn shared_wait_queue_wakes_waiters_across_os_threads() {
         0
     );
 }
+
+// ── Watchpoint dispatch tests (Task 1.5) ─────────────────────────────────────
+
+use lyng_objects::{
+    ShapeInvalidationObserver, ShapePropertyKind, ShapeTransitionKey, Watchpoint, WatchpointState,
+};
+use lyng_types::{DescriptorAttributes, ShapeId};
+
+/// Returns the root shape (no prototype guard, `LongLived`).
+fn alloc_root_shape(agent: &mut Agent) -> ShapeId {
+    agent.with_heap_and_objects(|heap, objects| {
+        objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::LongLived)
+    })
+}
+
+/// Returns a transition child of `parent` so we have a second distinct `ShapeId`.
+fn alloc_child_shape(agent: &mut Agent, parent: ShapeId, atom_raw: u32) -> ShapeId {
+    agent.with_heap_and_objects(|heap, objects| {
+        let key = PropertyKey::from_atom(AtomId::from_raw(atom_raw));
+        let mut da = DescriptorAttributes::empty();
+        da.set_writable(true);
+        da.set_enumerable(true);
+        da.set_configurable(true);
+        objects
+            .transition_shape(
+                &mut heap.mutator(),
+                parent,
+                ShapeTransitionKey::new(key, ShapePropertyKind::Data, da),
+                AllocationLifetime::LongLived,
+            )
+            .expect("transition from root should succeed")
+    })
+}
+
+// T9 — fire on a shape with no registered watchpoints is a no-op
+#[test]
+fn fire_watchpoints_unknown_shape_is_noop() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let shape = alloc_root_shape(agent);
+
+    agent.fire_watchpoints_for_shape(shape);
+
+    assert!(agent.objects_mut().take_recording_fires().is_empty());
+}
+
+// Recording dispatch end-to-end via Agent
+#[test]
+fn fire_watchpoints_dispatches_recording() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let shape = alloc_root_shape(agent);
+
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 99 },
+        })
+        .unwrap();
+
+    agent.fire_watchpoints_for_shape(shape);
+
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![99]);
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(shape)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated
+    );
+}
+
+// T4 — registering on a *different* shape's set succeeds after a fire on another shape
+#[test]
+fn registering_on_different_shape_succeeds_after_fire() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let s1 = alloc_root_shape(agent);
+    let s2 = alloc_child_shape(agent, s1, 9001);
+
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(s1)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 1 },
+        })
+        .unwrap();
+    agent.fire_watchpoints_for_shape(s1);
+
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(s2)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 2 },
+        })
+        .unwrap();
+    agent.fire_watchpoints_for_shape(s2);
+
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![1, 2]);
+}

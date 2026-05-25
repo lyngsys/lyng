@@ -7,7 +7,7 @@ use super::{
 use lyng_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
 use lyng_objects::RegExpPayload;
-use lyng_types::{CodeRef, StringRef};
+use lyng_types::{CodeRef, ShapeId, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -280,5 +280,14 @@ impl Agent {
         f: impl FnOnce(&mut PrimitiveHeap, &mut ObjectRuntime) -> R,
     ) -> R {
         f(&mut self.heap, &mut self.objects)
+    }
+
+    /// Drains watchpoints registered against `shape` and dispatches each one.
+    /// Split-borrow pattern: objects-layer dispatch runs first (handling
+    /// `Recording` observers into the side-buffer), then Spec 2's
+    /// `AdaptiveProtoLoad` and other `Agent`-level observers will follow here
+    /// with `&mut self` available for full re-entry if needed.
+    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
+        self.objects.fire_watchpoints_for_shape(shape);
     }
 }
