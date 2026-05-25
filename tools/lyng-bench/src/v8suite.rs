@@ -865,12 +865,13 @@ fn run_workload_opcode_counts_once(
     }
 
     let value = vm
-        .evaluate_installed(
+        .installed_eval(
             agent,
             installed,
             realm_record.global_env(),
             realm_record.global_env(),
         )
+        .run()
         .map_err(|error| {
             format!(
                 "execution failed for {name}: {error:?}",

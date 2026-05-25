@@ -87,17 +87,15 @@ fn execute_script(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
             .into_boxed_str(),
     );
     let provider = shell_extension_provider(invocation);
-    let execution_result = if let Some(provider) = provider.as_ref() {
-        vm.evaluate_script_with_host_referrer_and_extensions(
-            agent,
-            realm,
-            &unit,
-            Some(&script_referrer),
-            host,
-            Some(provider),
-        )
-    } else {
-        vm.evaluate_script_with_host_referrer(agent, realm, &unit, Some(&script_referrer), host)
+    let execution_result = {
+        let mut builder = vm
+            .script_eval(agent, realm, &unit)
+            .with_host(host)
+            .with_referrer(&script_referrer);
+        if let Some(provider) = provider.as_ref() {
+            builder = builder.with_extensions(provider);
+        }
+        builder.run()
     };
     let exit_code = match execution_result {
         Ok(_) => 0,

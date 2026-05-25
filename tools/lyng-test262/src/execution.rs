@@ -734,15 +734,14 @@ fn run_compiled_script_with_diagnostics(
     );
     let result = {
         let mut observer = DiagnosticVmTimingObserver::new(timings);
-        vm.evaluate_installed_with_host_observed(
-            agent,
-            installed,
-            realm.global_env(),
-            realm.global_env(),
-            script_referrer,
-            host,
-            &mut observer,
-        )
+        let mut builder = vm
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .with_host(host)
+            .with_observer(&mut observer);
+        if let Some(referrer) = script_referrer {
+            builder = builder.with_referrer(referrer);
+        }
+        builder.run()
     };
     finish_runtime_timing(timings, runtime_start);
     match result {
@@ -1349,14 +1348,13 @@ fn run_script(
         let realm = agent.default_realm().expect("default realm should exist");
         let global_object = realm.global_object();
         let mut vm = Vm::new();
-        match vm.evaluate_script_with_host_referrer_and_extensions(
-            agent,
-            realm,
-            &unit,
-            Some(&script_referrer),
-            &host,
-            Some(provider),
-        ) {
+        match vm
+            .script_eval(agent, realm, &unit)
+            .with_host(&host)
+            .with_referrer(&script_referrer)
+            .with_extensions(provider)
+            .run()
+        {
             Ok(_) => Ok(()),
             Err(VmError::Abrupt(completion)) => Err(ScriptExecutionError::Abrupt {
                 actual_type: thrown_error_type(agent, global_object, completion),

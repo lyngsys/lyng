@@ -162,7 +162,8 @@ fn run_snippet(
     // Warm-up sample: discard timing so we measure steady-state dispatch
     // cost, not the first-eval install + initial-jit overhead.
     let value = vm
-        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .map_err(|err| format!("warmup eval failed for {}: {err:?}", snippet.opcode))?;
     black_box(value.bits());
 
@@ -174,12 +175,10 @@ fn run_snippet(
     for sample_index in 0..samples {
         let mut eval_result: Option<Result<Value, VmError>> = None;
         let sample = timing::time_once(dispatches_per_sample, || {
-            eval_result = Some(vm.evaluate_installed(
-                agent,
-                installed,
-                realm.global_env(),
-                realm.global_env(),
-            ));
+            eval_result = Some(
+                vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                    .run(),
+            );
         });
         let value = eval_result
             .expect("time_once closure always assigns eval_result")
