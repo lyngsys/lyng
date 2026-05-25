@@ -88,11 +88,7 @@ impl Vm {
 }
 
 fn ensure_global_object_dictionary(agent: &mut Agent, global_object: ObjectRef) -> VmResult<()> {
-    let converted = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.ensure_named_property_dictionary(&mut mutator, global_object)
-    });
-    if converted {
+    if agent.ensure_named_property_dictionary(global_object) {
         Ok(())
     } else {
         Err(VmError::Abrupt(errors::throw_type_error(agent)))

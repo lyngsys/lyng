@@ -7,7 +7,7 @@ use super::{
 use lyng_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
 use lyng_objects::RegExpPayload;
-use lyng_types::{CodeRef, ShapeId, StringRef};
+use lyng_types::{CodeRef, ObjectRef, ShapeId, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -280,6 +280,27 @@ impl Agent {
         f: impl FnOnce(&mut PrimitiveHeap, &mut ObjectRuntime) -> R,
     ) -> R {
         f(&mut self.heap, &mut self.objects)
+    }
+
+    /// Ensures `id` is in dictionary mode, firing watchpoints on the
+    /// pre-transition shape if a transition actually occurred.
+    ///
+    /// This is the production entry point for dictionary transitions.
+    /// Callers must use this rather than `objects.ensure_named_property_dictionary`
+    /// directly so that shape-invalidation watchpoints are fired correctly.
+    pub fn ensure_named_property_dictionary(&mut self, id: ObjectRef) -> bool {
+        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+
+        let ok = self.with_heap_and_objects(|heap, objects| {
+            objects.ensure_named_property_dictionary(&mut heap.mutator(), id)
+        });
+
+        if ok {
+            if let Some(old) = old_shape {
+                self.fire_watchpoints_for_shape(old);
+            }
+        }
+        ok
     }
 
     /// Drains watchpoints registered against `shape` and dispatches each one.
