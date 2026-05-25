@@ -237,6 +237,144 @@ pub struct Vm {
     peak_frame_depth: usize,
 }
 
+/// Scoped builder for evaluating a `CompiledScriptUnit`. Holds borrows of the VM, agent,
+/// and required inputs; consumed by `.run()` or `.run_retaining_installed()`.
+pub struct EvaluateScript<'b> {
+    vm: &'b mut Vm,
+    agent: &'b mut Agent,
+    realm: RealmRecord,
+    unit: &'b CompiledScriptUnit,
+    host: Option<&'b dyn HostHooks>,
+    registry: Option<&'b mut dyn NativeFunctionRegistry>,
+    referrer: Option<&'b ModuleKey>,
+    extensions: Option<&'b SharedRealmExtensionProvider>,
+}
+
+impl<'b> EvaluateScript<'b> {
+    #[must_use]
+    pub fn with_host(mut self, host: &'b dyn HostHooks) -> Self {
+        self.host = Some(host);
+        self
+    }
+
+    #[must_use]
+    pub fn with_registry(mut self, registry: &'b mut dyn NativeFunctionRegistry) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
+    #[must_use]
+    pub fn with_referrer(mut self, key: &'b ModuleKey) -> Self {
+        self.referrer = Some(key);
+        self
+    }
+
+    #[must_use]
+    pub fn with_extensions(mut self, provider: &'b SharedRealmExtensionProvider) -> Self {
+        self.extensions = Some(provider);
+        self
+    }
+
+    /// # Errors
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
+    pub fn run(self) -> VmResult<Value> {
+        let EvaluateScript { vm, agent, realm, unit, host, registry, referrer, extensions } = self;
+        let host = host.unwrap_or(&NoopHostHooks);
+        let mut fallback_registry = RejectingNativeRegistry;
+        let registry: &mut dyn NativeFunctionRegistry = match registry {
+            Some(r) => r,
+            None => &mut fallback_registry,
+        };
+        match extensions {
+            Some(provider) => vm.with_extension_provider(provider, |vm| {
+                Self::run_inner(vm, agent, realm, unit, referrer, host, registry)
+            }),
+            None => Self::run_inner(vm, agent, realm, unit, referrer, host, registry),
+        }
+    }
+
+    fn run_inner(
+        vm: &mut Vm,
+        agent: &mut Agent,
+        realm: RealmRecord,
+        unit: &CompiledScriptUnit,
+        referrer: Option<&ModuleKey>,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<Value> {
+        let installed = vm.install_script(agent, realm.id(), unit)?;
+        let _ = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
+        vm.install_active_realm_extensions(agent, realm.id())?;
+        Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
+        let referrer_atom =
+            referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let mut observer = NoopVmEvaluationObserver;
+        vm.evaluate_entry_with_registry_and_checkpoint(
+            agent,
+            installed,
+            realm.global_env(),
+            realm.global_env(),
+            referrer_atom,
+            host,
+            registry,
+            Some(unit.instantiation_plan()),
+            None,
+            &mut observer,
+        )
+    }
+
+    /// # Errors
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
+    pub fn run_retaining_installed(self) -> VmResult<(Value, InstalledCode)> {
+        let EvaluateScript { vm, agent, realm, unit, host, registry, referrer, extensions } = self;
+        let host = host.unwrap_or(&NoopHostHooks);
+        let mut fallback_registry = RejectingNativeRegistry;
+        let registry: &mut dyn NativeFunctionRegistry = match registry {
+            Some(r) => r,
+            None => &mut fallback_registry,
+        };
+        match extensions {
+            Some(provider) => vm.with_extension_provider(provider, |vm| {
+                Self::run_retaining_inner(vm, agent, &realm, unit, referrer, host, registry)
+            }),
+            None => Self::run_retaining_inner(vm, agent, &realm, unit, referrer, host, registry),
+        }
+    }
+
+    fn run_retaining_inner(
+        vm: &mut Vm,
+        agent: &mut Agent,
+        realm: &RealmRecord,
+        unit: &CompiledScriptUnit,
+        referrer: Option<&ModuleKey>,
+        host: &dyn HostHooks,
+        registry: &mut dyn NativeFunctionRegistry,
+    ) -> VmResult<(Value, InstalledCode)> {
+        let installed = vm.install_script(agent, realm.id(), unit)?;
+        let _ = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
+        vm.install_active_realm_extensions(agent, realm.id())?;
+        Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        let referrer_atom =
+            referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let mut observer = NoopVmEvaluationObserver;
+        let value = vm.evaluate_entry_with_registry_and_checkpoint(
+            agent,
+            installed,
+            realm.global_env(),
+            realm.global_env(),
+            referrer_atom,
+            host,
+            registry,
+            Some(unit.instantiation_plan()),
+            None,
+            &mut observer,
+        )?;
+        Ok((value, installed))
+    }
+}
+
 impl Vm {
     #[inline]
     pub fn new() -> Self {
@@ -1098,6 +1236,26 @@ impl Vm {
     ) -> VmResult<InstalledCode> {
         self.record_source_text(unit.source(), unit.source_text());
         self.install_functions(agent, realm, unit.entry(), unit.functions(), unit.atoms())
+    }
+
+    /// Begin evaluating a compiled script unit. Returns a builder; call `.run()` to execute.
+    #[must_use]
+    pub fn script_eval<'b>(
+        &'b mut self,
+        agent: &'b mut Agent,
+        realm: RealmRecord,
+        unit: &'b CompiledScriptUnit,
+    ) -> EvaluateScript<'b> {
+        EvaluateScript {
+            vm: self,
+            agent,
+            realm,
+            unit,
+            host: None,
+            registry: None,
+            referrer: None,
+            extensions: None,
+        }
     }
 
     /// # Errors
