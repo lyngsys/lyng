@@ -286,42 +286,13 @@ impl<'b> EvaluateScript<'b> {
             Some(r) => r,
             None => &mut fallback_registry,
         };
-        match extensions {
+        let result = match extensions {
             Some(provider) => vm.with_extension_provider(provider, |vm| {
-                Self::run_inner(vm, agent, realm, unit, referrer, host, registry)
+                Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
             }),
-            None => Self::run_inner(vm, agent, realm, unit, referrer, host, registry),
-        }
-    }
-
-    fn run_inner(
-        vm: &mut Vm,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        let installed = vm.install_script(agent, realm.id(), unit)?;
-        let _ = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
-        vm.install_active_realm_extensions(agent, realm.id())?;
-        Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
-        let referrer_atom =
-            referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-        let mut observer = NoopVmEvaluationObserver;
-        vm.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            realm.global_env(),
-            realm.global_env(),
-            referrer_atom,
-            host,
-            registry,
-            Some(unit.instantiation_plan()),
-            None,
-            &mut observer,
-        )
+            None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
+        };
+        result.map(|(value, _)| value)
     }
 
     /// # Errors
@@ -337,13 +308,13 @@ impl<'b> EvaluateScript<'b> {
         };
         match extensions {
             Some(provider) => vm.with_extension_provider(provider, |vm| {
-                Self::run_retaining_inner(vm, agent, &realm, unit, referrer, host, registry)
+                Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
             }),
-            None => Self::run_retaining_inner(vm, agent, &realm, unit, referrer, host, registry),
+            None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
         }
     }
 
-    fn run_retaining_inner(
+    fn run_inner(
         vm: &mut Vm,
         agent: &mut Agent,
         realm: &RealmRecord,

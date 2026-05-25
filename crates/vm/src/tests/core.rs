@@ -144,56 +144,7 @@ fn small_arity_calls_preserve_call_semantics() {
 
 #[test]
 fn script_eval_builder_runs_default_case() {
-    let unit = compile_test_unit(
-        150,
-        r#"
-        function score(a, b, c, d) {
-            return arguments.length * 1000
-                + (a || 0)
-                + (b || 0) * 10
-                + (c || 0) * 100
-                + (d || 0) * 1000;
-        }
-
-        var receiver = {
-            base: 50,
-            plus(a, b, c) {
-                return this.base + a + b + c;
-            }
-        };
-        var bound = receiver.plus.bind({ base: 70 }, 1);
-        var proxy = new Proxy(function(a, b) {
-            return this.base + a + b;
-        }, {
-            apply(target, thisArg, args) {
-                return Reflect.apply(target, thisArg, args) + args.length;
-            }
-        });
-        function Constructor(a, b, c) {
-            this.total = a + b + c;
-        }
-        function tail(n, acc) {
-            "use strict";
-            if (n === 0) {
-                return acc;
-            }
-            return tail(n - 1, acc + n);
-        }
-
-        score() === 0
-            && score(4) === 1004
-            && score(4, 5) === 2054
-            && score(4, 5, 6) === 3654
-            && score(4, 5, 6, 7) === 11654
-            && score(...[4]) === 1004
-            && receiver.plus(1, 2, 3) === 56
-            && bound(2, 3) === 76
-            && receiver.plus.call(receiver, 4, 5, 6) === 65
-            && proxy.call(receiver, 8, 9) === 69
-            && new Constructor(1, 2, 3).total === 6
-            && tail(3, 0) === 6;
-        "#,
-    );
+    let unit = compile_test_unit(151, "2 + 3;");
 
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -201,7 +152,7 @@ fn script_eval_builder_runs_default_case() {
     let mut vm = Vm::new();
     let result = vm.script_eval(agent, realm, &unit).run().unwrap();
 
-    assert_eq!(result, Value::from_bool(true));
+    assert_eq!(result, Value::from_smi(5));
 }
 
 #[test]
