@@ -36,6 +36,7 @@ mod runtime;
 mod runtime_storage;
 mod shapes;
 mod temporal;
+mod watchpoint;
 
 pub use self::core::{
     ElementStorageRef, InternalMethodError, InternalMethodResult, NamedSlotStorageRef, ObjectFlags,
