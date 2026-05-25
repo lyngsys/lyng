@@ -348,6 +348,7 @@ pub struct ShapeMetadata {
     /// array; the remainder live in the heap-allocated `NamedSlotStorage` and are indexed by
     /// `slot_count - inline_slot_count` consecutive positions starting at 0.
     pub(crate) inline_slot_count: u32,
+    pub(crate) prototype_transitions: Option<Box<HashMap<PrototypeKey, ShapeId>>>,
 }
 
 impl ShapeMetadata {
@@ -359,6 +360,7 @@ impl ShapeMetadata {
             property_lookup: None,
             transitions: ShapeTransitionStorage::new(),
             inline_slot_count: 0,
+            prototype_transitions: None,
         }
     }
 
@@ -375,6 +377,7 @@ impl ShapeMetadata {
             property_lookup,
             transitions: ShapeTransitionStorage::new(),
             inline_slot_count,
+            prototype_transitions: None,
         }
     }
 
@@ -506,6 +509,21 @@ impl ShapeTransitionStorage {
         }
         self.inline_len -= 1;
         self.inline[self.inline_len] = None;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum PrototypeKey {
+    Object(ObjectRef),
+    Null,
+}
+
+impl PrototypeKey {
+    pub fn from_optional(proto: Option<ObjectRef>) -> Self {
+        match proto {
+            Some(obj) => Self::Object(obj),
+            None => Self::Null,
+        }
     }
 }
 
