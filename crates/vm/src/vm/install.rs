@@ -18,9 +18,6 @@ pub struct InstalledFunction {
     direct_eval_lexical_sites: Vec<lyng_bytecode::DirectEvalLexicalSite>,
     loop_iteration_sites: Vec<lyng_bytecode::LoopIterationEnvironmentSite>,
     feedback_sites_by_slot: Vec<Option<lyng_bytecode::FeedbackSiteDescriptor>>,
-    llint_simple_return_safe: bool,
-    llint_static_tail_recycle_safe: bool,
-    llint_direct_entry_safe: bool,
 }
 
 impl InstalledFunction {
@@ -30,10 +27,6 @@ impl InstalledFunction {
         child_codes: Vec<CodeRef>,
         canonical_atoms: Arc<[Option<AtomId>]>,
     ) -> Self {
-        let llint_simple_return_safe = crate::dsl::llint_state::llint_simple_return_safe(&function);
-        let llint_static_tail_recycle_safe =
-            crate::dsl::llint_state::llint_static_tail_recycle_safe(&function);
-        let llint_direct_entry_safe = crate::dsl::llint_state::llint_direct_entry_safe(&function);
         let direct_eval_lexical_sites = function
             .direct_eval_lexical_sites()
             .iter()
@@ -57,9 +50,6 @@ impl InstalledFunction {
             direct_eval_lexical_sites,
             loop_iteration_sites,
             feedback_sites_by_slot,
-            llint_simple_return_safe,
-            llint_static_tail_recycle_safe,
-            llint_direct_entry_safe,
         }
     }
 
@@ -70,21 +60,6 @@ impl InstalledFunction {
     #[inline]
     pub(crate) const fn function(&self) -> &BytecodeFunction {
         &self.function
-    }
-
-    #[inline]
-    pub(crate) const fn llint_simple_return_safe(&self) -> bool {
-        self.llint_simple_return_safe
-    }
-
-    #[inline]
-    pub(crate) const fn llint_static_tail_recycle_safe(&self) -> bool {
-        self.llint_static_tail_recycle_safe
-    }
-
-    #[inline]
-    pub(crate) const fn llint_direct_entry_safe(&self) -> bool {
-        self.llint_direct_entry_safe
     }
 
     #[inline]

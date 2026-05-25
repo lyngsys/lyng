@@ -515,7 +515,7 @@ impl Vm {
     }
 
     fn initialize_module_hoisted_functions(
-        &mut self,
+        &self,
         agent: &mut Agent,
         realm: &RealmRecord,
         code: CodeRef,

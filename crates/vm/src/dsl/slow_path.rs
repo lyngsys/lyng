@@ -90,15 +90,10 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// `DispatchState`; asm-path shims unpack the same shape from
     /// `LlIntRustContext::dispatch`. Semantic bodies under
     /// `crate::vm::semantics::` consume this uniformly.
-    ///
-    /// On the Asm variant the dispatch state is built lazily on first
-    /// call within a `run_via_dsl` invocation. The transition from
-    /// `Pending` to `Built` happens here transparently; callers see a
-    /// normal `&mut DispatchState<'vm>`.
-    pub fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
+    pub const fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
             LlIntDispatchInner::Alpha(state) => state,
-            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.ensure_built(),
+            LlIntDispatchInner::Asm { rust, .. } => &mut rust.dispatch,
         }
     }
 
@@ -113,13 +108,10 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     /// callers that need PC inspection without going through
     /// `dispatch_state()`.
     #[inline]
-    pub fn current_instruction_offset(&self) -> u32 {
+    pub const fn current_instruction_offset(&self) -> u32 {
         match &self.inner {
             LlIntDispatchInner::Alpha(state) => state.frame.instruction_offset(),
-            // lyng-rmho: read through the lazy accessor so we don't
-            // force the DispatchState to be materialized just to look
-            // at the frame's PC.
-            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.frame_instruction_offset(),
+            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.frame.instruction_offset(),
         }
     }
 
@@ -133,64 +125,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             // SAFETY: `state` is valid by `from_raw`'s contract; we
             // only read scalar fields here.
             unsafe {
-                let asm_depth = (**state).frame_depth as usize;
-                let dispatch = rust.dispatch.ensure_built();
-                let same_depth_frame_replaced = asm_depth > 0
-                    && asm_depth == dispatch.frame_depth
-                    && rust.frame_infos.get(asm_depth - 1).is_some_and(|info| {
-                        dispatch.frame.code().get() != info.code_raw
-                            || dispatch.frame.registers().base() != info.register_base
-                            || u32::from(dispatch.frame.registers().len()) != info.register_len
-                    });
-                if asm_depth > dispatch.frame_depth || same_depth_frame_replaced {
-                    let register_stack_top = (**state).register_stack_top as usize;
-                    if let Err(error) = dispatch.vm.materialize_llint_frames(
-                        dispatch.agent,
-                        asm_depth,
-                        &rust.frame_infos,
-                        register_stack_top,
-                    ) {
-                        rust.exit.kind = crate::dsl::llint_state::ExitKind::Error;
-                        rust.exit.error = Some(Box::new(error));
-                        return;
-                    }
-                    if let Some(active) = dispatch.vm.frames().last().copied() {
-                        dispatch.frame = active;
-                    }
-                    dispatch.frame_depth = asm_depth;
-                    dispatch.installed = dispatch
-                        .vm
-                        .installed_for_dsl_runtime(dispatch.frame.code())
-                        .unwrap_or_else(|| dispatch.installed.clone());
-                    dispatch.frame_check_epoch =
-                        dispatch.vm.dispatch_frame_check_epoch_for_dsl();
-                }
-                if asm_depth > 0 && asm_depth < dispatch.frame_depth {
-                    dispatch
-                        .vm
-                        .reconcile_llint_fast_return_depth(dispatch.agent, asm_depth);
-                    if let Some(active) = dispatch.vm.frames().last().copied() {
-                        dispatch.frame = active;
-                    }
-                    dispatch.frame_depth = asm_depth;
-                    dispatch.installed = dispatch
-                        .vm
-                        .installed_for_dsl_runtime(dispatch.frame.code())
-                        .unwrap_or_else(|| dispatch.installed.clone());
-                    dispatch.frame_check_epoch =
-                        dispatch.vm.dispatch_frame_check_epoch_for_dsl();
-                    rust.frame_info_register_stack_base =
-                        crate::dsl::llint_state::refresh_frame_infos(
-                            &mut rust.frame_infos,
-                            dispatch.vm,
-                            dispatch.agent,
-                        );
-                    (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
-                    (**state).frame_info_len =
-                        u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
-                }
                 rust.dispatch
-                    .set_frame_instruction_offset((**state).frame_pc_offset);
+                    .frame
+                    .set_instruction_offset((**state).frame_pc_offset);
             }
             // registers_base / fv_base are mirrored back via the
             // `Refresh` path in `translate_outcome`; semantic bodies
@@ -233,22 +170,16 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                 // Under α, the trampoline loop does this check between
                 // every handler call. Under DSL, the asm bridge does
                 // NOT — so we do it here in the slow-path egress.
-                // lyng-rmho: every slow shim ends here. Materialize the
-                // `DispatchState` now if it wasn't built earlier — the
-                // epoch check + REGS refresh below read/write through
-                // `vm`, `frame_check_epoch`, `frame_depth`, and `frame`,
-                // all of which live on `DispatchState`.
                 if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
-                    let dispatch = rust.dispatch.ensure_built();
-                    let vm_epoch = dispatch.vm.dispatch_frame_check_epoch_for_dsl();
-                    if dispatch.frame_check_epoch != vm_epoch
-                        && dispatch.vm.frames().len() != dispatch.frame_depth
+                    let vm_epoch = rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                    if rust.dispatch.frame_check_epoch != vm_epoch
+                        && rust.dispatch.vm.frames().len() != rust.dispatch.frame_depth
                     {
                         // Cross-frame catch — recurse into the Refresh
                         // arm so we share the frame-reload logic.
                         return self.translate_outcome(SemanticOutcome::Refresh);
                     }
-                    dispatch.frame_check_epoch = vm_epoch;
+                    rust.dispatch.frame_check_epoch = vm_epoch;
                 }
                 // REGS-pin refresh — the asm-side `x20` register pins
                 // the active frame's register-stack base. When a slow
@@ -261,35 +192,35 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                 // FV) from the live `Vm::register_stack_storage_mut_ptr`
                 // on every Continue egress so the asm bridge picks up
                 // the post-reallocation base. PC stays sourced from
-                // `dispatch.frame` so handler-local PC advances
+                // `rust.dispatch.frame` so handler-local PC advances
                 // (which haven't been synced to `vm.frames`) are
                 // preserved — matching α's `still_active` policy that
                 // never clobbers PC on a same-frame epoch bump.
                 let mut new_offset_u64: u64 = 0;
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-                    let dispatch = rust.dispatch.ensure_built();
-                    let new_offset = dispatch
+                    let new_offset = rust
+                        .dispatch
                         .frame
                         .instruction_offset()
                         .wrapping_add(pc_advance);
                     new_offset_u64 = u64::from(new_offset);
-                    let active_frame = dispatch.frame;
+                    let active_frame = rust.dispatch.frame;
                     let regs_base_ptr = {
                         let base = active_frame.registers().base() as usize;
                         // SAFETY: register window is reserved on the
                         // active frame; one-past-the-end is well-defined.
-                        unsafe { dispatch.vm.register_stack_storage_mut_ptr().add(base) }
+                        unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
                     let fv_base = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        dispatch.vm.feedback_flat_storage[index]
+                        rust.dispatch.vm.feedback_flat_storage[index]
                             .as_ptr()
                             .cast_mut()
                     };
                     let object_records_base =
-                        dispatch.agent.heap().view().object_record_ptr_table();
+                        rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
-                        dispatch.agent.heap().view().object_slots_ptr_table();
+                        rust.dispatch.agent.heap().view().object_slots_ptr_table();
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
@@ -304,39 +235,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_fv_base = fv_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
-                        (**state).frame_depth =
-                            u32::try_from(dispatch.frame_depth).unwrap_or(u32::MAX);
-                        (**state).register_stack_top =
-                            u32::try_from(dispatch.vm.register_stack_top()).unwrap_or(u32::MAX);
-                        (**state).register_stack_len =
-                            u32::try_from(dispatch.vm.register_stack_storage_len_for_dsl())
-                                .unwrap_or(u32::MAX);
                     }
-                    let register_stack_base = dispatch.vm.register_stack_storage_mut_ptr();
-                    if register_stack_base != rust.frame_info_register_stack_base {
-                        rust.frame_info_register_stack_base =
-                            crate::dsl::llint_state::refresh_frame_infos(
-                                &mut rust.frame_infos,
-                                dispatch.vm,
-                                dispatch.agent,
-                            );
-                    }
-                    let dispatch_frame_depth = dispatch.frame_depth;
-                    if let Some(info) = rust.frame_infos.get_mut(dispatch_frame_depth.saturating_sub(1))
-                    {
-                        info.pc_offset = new_offset;
-                    }
-                    let (call_targets_base, call_targets_len) =
-                        dispatch.vm.llint_call_targets_for_entry();
-                    unsafe {
-                        (**state).register_stack_base = register_stack_base;
-                        (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
-                        (**state).frame_info_len =
-                            u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
-                        (**state).call_targets_base = call_targets_base;
-                        (**state).call_targets_len = call_targets_len;
-                    }
-                    dispatch.refresh_dsl_poll_pending();
+                    rust.dispatch.refresh_dsl_poll_pending();
                 }
                 // The asm bridge's `dispatch_after_slow!` Continue
                 // arm reads the new pc_offset from `x1` (`payload`)
@@ -350,11 +250,6 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             }
             SemanticOutcome::Refresh => {
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-                    // lyng-rmho: the Refresh path mutates `dispatch.{vm,
-                    // frame, frame_depth, installed, frame_check_epoch,
-                    // agent}`. All routes need the built form; materialize
-                    // before reading.
-                    let dispatch = rust.dispatch.ensure_built();
                     // Always pull the active frame from `vm.frames().last()`
                     // — mirrors α's `refresh_from_active_frame()`. This
                     // covers all three Refresh callers uniformly:
@@ -365,69 +260,72 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     //   - same-frame catch: depth unchanged, but
                     //     `transfer_to_exception_handler` rewrote
                     //     `vm.frames.last_mut().instruction_offset` to the
-                    //     handler target. `dispatch.frame` is a
+                    //     handler target. `rust.dispatch.frame` is a
                     //     `Copy` snapshot of the pre-throw frame and is
                     //     stale; only `vm.frames().last()` has the
                     //     authoritative post-catch PC.
-                    let current_depth = dispatch.vm.frames().len();
-                    if let Some(active) = dispatch.vm.frames().last().copied() {
-                        dispatch.frame = active;
+                    let current_depth = rust.dispatch.vm.frames().len();
+                    if let Some(active) = rust.dispatch.vm.frames().last().copied() {
+                        rust.dispatch.frame = active;
                     }
-                    dispatch.frame_depth = current_depth;
+                    rust.dispatch.frame_depth = current_depth;
                     // Refresh `installed` unconditionally as well — even
                     // for same-frame catch the code identity is the same,
                     // but `installed_for_dsl_runtime` is a cheap lookup
                     // and matches α's `refresh_from_active_frame()`
                     // unconditional reinstall.
-                    let installed = dispatch
+                    let installed = rust
+                        .dispatch
                         .vm
-                        .installed_for_dsl_runtime(dispatch.frame.code())
-                        .unwrap_or_else(|| dispatch.installed.clone());
-                    dispatch.installed = installed;
+                        .installed_for_dsl_runtime(rust.dispatch.frame.code())
+                        .unwrap_or_else(|| rust.dispatch.installed.clone());
+                    rust.dispatch.installed = installed;
                     // Sync the frame-check epoch — α does this in
                     // `refresh_from_active_frame`. Keeps the DSL Refresh
                     // path observationally identical to α.
-                    dispatch.frame_check_epoch =
-                        dispatch.vm.dispatch_frame_check_epoch_for_dsl();
-                    let active_frame = dispatch.frame;
+                    rust.dispatch.frame_check_epoch =
+                        rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                    let active_frame = rust.dispatch.frame;
                     let regs_base_ptr = {
                         let base = active_frame.registers().base() as usize;
                         // SAFETY: register window is reserved on the
                         // active frame; one-past-the-end is well-defined.
-                        unsafe { dispatch.vm.register_stack_storage_mut_ptr().add(base) }
+                        unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
-                    let pb_base = dispatch
+                    let pb_base = rust
+                        .dispatch
                         .installed
                         .function()
                         .instruction_bytes()
                         .as_ptr();
                     let fv_base = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        dispatch.vm.feedback_flat_storage[index]
+                        rust.dispatch.vm.feedback_flat_storage[index]
                             .as_ptr()
                             .cast_mut()
                     };
                     let object_records_base =
-                        dispatch.agent.heap().view().object_record_ptr_table();
+                        rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
-                        dispatch.agent.heap().view().object_slots_ptr_table();
+                        rust.dispatch.agent.heap().view().object_slots_ptr_table();
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
-                    let const_base: *const lyng_types::Value = dispatch
+                    let const_base: *const lyng_types::Value = rust
+                        .dispatch
                         .agent
                         .heap()
                         .view()
                         .code(active_frame.code())
                         .and_then(lyng_gc::RuntimeCodeRecord::constants)
-                        .and_then(|slots| dispatch.agent.heap().view().code_slots(slots))
+                        .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
                         .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
 
                     // Phase 1.B.1: refresh the `this` mirror. Captures
                     // super() mutations and any other slow-path
                     // changes to frame.this_value().
                     let this_value = crate::dsl::llint_state::resolve_initial_this_value(
-                        dispatch.agent,
+                        rust.dispatch.agent,
                         &active_frame,
                     );
                     // SAFETY: state is valid by from_raw's contract.
@@ -441,28 +339,6 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         // Phase 1.B.1: refresh the new fields.
                         (**state).frame_const_base = const_base;
                         (**state).frame_this_value = this_value;
-                        (**state).frame_depth = u32::try_from(current_depth).unwrap_or(u32::MAX);
-                        (**state).register_stack_top =
-                            u32::try_from(dispatch.vm.register_stack_top()).unwrap_or(u32::MAX);
-                        (**state).register_stack_len =
-                            u32::try_from(dispatch.vm.register_stack_storage_len_for_dsl())
-                                .unwrap_or(u32::MAX);
-                    }
-                    rust.frame_info_register_stack_base =
-                        crate::dsl::llint_state::refresh_frame_infos(
-                            &mut rust.frame_infos,
-                            dispatch.vm,
-                            dispatch.agent,
-                        );
-                    let (call_targets_base, call_targets_len) =
-                        dispatch.vm.llint_call_targets_for_entry();
-                    unsafe {
-                        (**state).register_stack_base = dispatch.vm.register_stack_storage_mut_ptr();
-                        (**state).frame_info_base = rust.frame_infos.as_mut_ptr();
-                        (**state).frame_info_len =
-                            u32::try_from(rust.frame_infos.len()).unwrap_or(u32::MAX);
-                        (**state).call_targets_base = call_targets_base;
-                        (**state).call_targets_len = call_targets_len;
                     }
                     // Phase 1.B.1: debug-only stability assertion.
                     // The arena slot's data pointer must be stable
@@ -472,20 +348,21 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     // `frame_pb_base` already relies on. See spec §3.6.
                     #[cfg(debug_assertions)]
                     {
-                        let recomputed: *const lyng_types::Value = dispatch
+                        let recomputed: *const lyng_types::Value = rust
+                            .dispatch
                             .agent
                             .heap()
                             .view()
                             .code(active_frame.code())
                             .and_then(lyng_gc::RuntimeCodeRecord::constants)
-                            .and_then(|slots| dispatch.agent.heap().view().code_slots(slots))
+                            .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
                             .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
                         debug_assert_eq!(
                             const_base, recomputed,
                             "frame_const_base unstable across Refresh"
                         );
                     }
-                    dispatch.refresh_dsl_poll_pending();
+                    rust.dispatch.refresh_dsl_poll_pending();
                 }
                 SlowPathReturn {
                     tag: SlowPathTag::Refresh as u64,

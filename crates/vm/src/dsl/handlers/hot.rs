@@ -27,8 +27,7 @@
 use crate::{
     add_smi_overflow, branch_i32_negative, call_slow, check_smi_pair, decode_ab, decode_abc_slot,
     decode_ax_i24, dispatch, dispatch_after_slow, jump_relative_i32_and_dispatch, load_reg,
-    mask_u24, poll_safepoint, record_smi, return_to_caller_or_branch, store_reg, tag_smi,
-    untag_smi,
+    poll_safepoint, record_smi, store_reg, tag_smi, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -173,10 +172,6 @@ pub extern "C" fn op_jump_poll_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_return, opcode_byte = 67, layout = Ax, length = 4, |src| {
-        mask_u24!(src);
-        load_reg!(src => t0);
-        return_to_caller_or_branch!(t0, .slow);
-    .slow:
         call_slow!(op_return_slow_rs, args = [src]);
         dispatch_after_slow!();
     }

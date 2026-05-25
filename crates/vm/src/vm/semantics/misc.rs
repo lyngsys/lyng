@@ -33,7 +33,7 @@ pub struct OpMiscStubArgs;
 /// `op_unimplemented` in the dispatch table; the semantic stub returns
 /// `ExitError { UnsupportedOpcode { ..., opcode: InstanceOf } }`,
 /// matching the α path exactly.
-pub fn op_instance_of_semantic(
+pub const fn op_instance_of_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpMiscStubArgs,
 ) -> SemanticOutcome {
@@ -51,7 +51,7 @@ pub fn op_instance_of_semantic(
 /// `Call`). A14 deferred this opcode because the bytecode emitter does
 /// not yet target it; today it routes through `op_unimplemented`. The
 /// semantic stub mirrors the α path by returning `UnsupportedOpcode`.
-pub fn op_call_method_semantic(
+pub const fn op_call_method_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     _args: OpMiscStubArgs,
 ) -> SemanticOutcome {

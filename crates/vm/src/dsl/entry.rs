@@ -27,8 +27,7 @@ use lyng_types::Value;
 
 use crate::dsl::handlers::{DslHandler, DSL_DISPATCH_TABLE};
 use crate::dsl::llint_state::{
-    DeferredDispatch, ExitKind, LazyDispatchState, LlIntExitSlot, LlIntRustContext,
-    LlIntRustContextOpaque, LlIntState,
+    ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
 };
 use crate::error::{VmError, VmResult};
 use crate::vm::install::InstalledFunction;
@@ -52,7 +51,6 @@ pub(crate) fn run_via_dsl(
     let frame_depth = vm.frames().len();
     let pb_base = installed.function().instruction_bytes().as_ptr();
     let frame_pc_offset = frame.instruction_offset();
-    vm.ensure_llint_register_stack_headroom();
     // DSL-0b (B16): wire the `FV` pin to the eagerly-allocated flat
     // feedback storage on `Vm::feedback_flat_storage`. The slot is
     // keyed by `code_index(frame.code())` and was populated to
@@ -122,39 +120,26 @@ pub(crate) fn run_via_dsl(
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
-    let mut frame_infos = Vec::new();
-    let frame_info_register_stack_base =
-        crate::dsl::llint_state::refresh_frame_infos(&mut frame_infos, vm, agent);
-    let frame_info_base = frame_infos.as_mut_ptr();
-    let frame_info_len = u32::try_from(frame_infos.len()).unwrap_or(u32::MAX);
-    let register_stack_top = u32::try_from(vm.register_stack_top()).unwrap_or(u32::MAX);
-    let register_stack_len =
-        u32::try_from(vm.register_stack_storage_len_for_dsl()).unwrap_or(u32::MAX);
-    let register_stack_base = vm.register_stack_storage_mut_ptr();
-    let (call_targets_base, call_targets_len) = vm.llint_call_targets_for_entry();
 
-    // lyng-rmho: defer DispatchState construction past the
-    // fast/slow gateway. The constituent references are stashed in
-    // a `DeferredDispatch` and only materialized into a
-    // `DispatchState` on the first slow-shim invocation. Pure-fast-
-    // path runs (no slow shim hits) pay nothing for the construction
-    // beyond a single enum discriminant write. Subsequent slow shims
-    // within the same `run_via_dsl` invocation reuse the cached
-    // `DispatchState`.
+    // Build a DispatchState directly so the asm-path slow-path bridge
+    // can call `LlIntDispatchState::dispatch_state()` and get the same
+    // shape the α handlers use. Semantic bodies under
+    // `crate::vm::semantics::` all consume `DispatchState`; threading
+    // it through both dispatch paths keeps the single-implementation
+    // invariant.
+    let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
+        vm,
+        agent,
+        host,
+        registry,
+        installed,
+        frame,
+        frame_depth,
+        frame_check_epoch,
+    );
     let mut rust_ctx = LlIntRustContext {
-        dispatch: LazyDispatchState::Pending(DeferredDispatch {
-            vm,
-            agent,
-            host,
-            registry,
-            installed,
-            frame,
-            frame_depth,
-            frame_check_epoch,
-        }),
+        dispatch,
         exit: LlIntExitSlot::default(),
-        frame_infos,
-        frame_info_register_stack_base,
     };
 
     let mut state = LlIntState {
@@ -171,14 +156,6 @@ pub(crate) fn run_via_dsl(
         frame_this_value: this_value,
         frame_depth: frame_depth as u32,
         frame_check_epoch: 0,
-        frame_info_base,
-        frame_info_len,
-        register_stack_top,
-        register_stack_len,
-        register_stack_base,
-        call_targets_base,
-        call_targets_len,
-        _pad3: 0,
         rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
         prefix: 0,
         _pad2: [0; 7],

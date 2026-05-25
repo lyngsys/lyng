@@ -42,9 +42,9 @@ use crate::{
     add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
     branch_named_own_outline_mode, branch_named_proto_inline_mode, branch_nonzero,
-    branch_raw_equal_strict_result, call0_bytecode_or_branch, call_rust_probe, call_slow,
-    check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a,
-    decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    branch_raw_equal_strict_result, call_rust_probe, call_slow, check_object_ref, check_smi,
+    cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a, decode_ab, decode_abc,
+    decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
     dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc, load_constant, load_feedback_site,
     load_local_fixed, load_named_aux_bits, load_named_aux_epoch, load_named_epoch,
     load_named_handler_bits, load_named_handler_shape, load_named_inline_slot_index_or_branch,
@@ -54,8 +54,7 @@ use crate::{
     load_record_shape, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
     record_smi, shift_left_smi, shift_right_smi, store_acc, store_local_fixed, store_reg,
     sub_smi_overflow, tag_bool_const, tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte,
-    tag_undefined, tagged_kind_or_branch, tail_call0_bytecode_or_branch, untag_object_ref,
-    untag_smi,
+    tag_undefined, tagged_kind_or_branch, untag_object_ref, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -494,34 +493,36 @@ pub extern "C" fn op_load_global_rust_probe_rs(
     a: u32,
     bx: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // Sync the cached Rust-side dispatch state with the asm-side
-    // frame depth before consulting `dispatch.frame`. The asm fast
-    // call path can push frames without invoking any slow shim, so
-    // by the time a probe runs `dispatch.frame_depth` may lag
-    // `(**state).frame_depth`. Without this sync the probe would
-    // write the resolved value into the stale caller-frame's
-    // register window instead of the current asm-side frame's.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let inner = dispatch.dispatch_state();
-    let entry_pc = inner.frame.instruction_offset();
+    // SAFETY: `state` is the live trampoline state pointer supplied by
+    // the asm bridge for the duration of this helper call.
+    let rust_context = unsafe {
+        &mut *(*state)
+            .rust_context
+            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
+    };
+    let dispatch = &mut rust_context.dispatch;
+    // Keep the Rust frame snapshot aligned with the asm PC before
+    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
+    // without constructing the full slow-path wrapper.
+    let entry_pc = unsafe { (*state).frame_pc_offset };
+    dispatch.frame.set_instruction_offset(entry_pc);
     let feedback_slot = {
-        let bytes = inner.installed.function().instruction_bytes();
+        let bytes = dispatch.installed.function().instruction_bytes();
         let offset = (entry_pc + 4) as usize;
         let lo = u32::from(bytes.get(offset).copied().unwrap_or(0));
         let hi = u32::from(bytes.get(offset + 1).copied().unwrap_or(0));
         lyng_types::FeedbackSlotId::from_raw(lo | (hi << 8))
     };
-    let hit = inner.vm.try_load_global_rust_probe_for_dsl(
-        inner.agent,
-        &mut inner.frame,
+    let hit = dispatch.vm.try_load_global_rust_probe_for_dsl(
+        dispatch.agent,
+        &mut dispatch.frame,
         6,
         a as u16,
         bx,
         feedback_slot,
     );
     if hit {
-        let next_pc = inner.frame.instruction_offset();
+        let next_pc = dispatch.frame.instruction_offset();
         // SAFETY: same live-state guarantee as above. Probe hits use
         // the no-refresh dispatch contract, so only the PC mirror is
         // updated for later slow paths; pinned REGS/FV stay live.
@@ -2770,25 +2771,29 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
     c: u32,
     slot: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // See `op_load_global_rust_probe_rs` for the rationale: probes
-    // must synchronize `dispatch.frame` / `dispatch.frame_depth` with
-    // the asm-side state. The asm fast call path can push frames
-    // without invoking any slow shim, so without this sync the probe
-    // would observe a stale Rust-side frame snapshot and write to the
-    // wrong register window.
-    let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
-    dispatch.sync_from_asm();
-    let inner = dispatch.dispatch_state();
-    let hit = inner.vm.try_assign_named_property_rust_probe_for_dsl(
-        inner.agent,
-        &mut inner.frame,
+    // SAFETY: `state` is the live trampoline state pointer supplied by
+    // the asm bridge for the duration of this helper call.
+    let rust_context = unsafe {
+        &mut *(*state)
+            .rust_context
+            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
+    };
+    let dispatch = &mut rust_context.dispatch;
+    // Keep the Rust frame snapshot aligned with the asm PC before
+    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
+    // without constructing the full slow-path wrapper.
+    let entry_pc = unsafe { (*state).frame_pc_offset };
+    dispatch.frame.set_instruction_offset(entry_pc);
+    let hit = dispatch.vm.try_assign_named_property_rust_probe_for_dsl(
+        dispatch.agent,
+        &mut dispatch.frame,
         6,
         lyng_types::FeedbackSlotId::from_raw(slot),
         a as u16,
         b as u16,
     );
     if hit {
-        let next_pc = inner.frame.instruction_offset();
+        let next_pc = dispatch.frame.instruction_offset();
         // SAFETY: same live-state guarantee as above. Probe hits use
         // the no-refresh dispatch contract, so only the PC mirror is
         // updated for later slow paths; pinned REGS/FV stay live.
@@ -3150,9 +3155,6 @@ pub extern "C" fn op_to_property_key_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_call0_dsl, opcode_byte = 89, layout = AbcSlot, length = 6, |a, b, c, slot| {
-        call0_bytecode_or_branch!(a, b, c, .slow);
-    .slow:
-        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_call0_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }
@@ -3359,9 +3361,6 @@ pub extern "C" fn op_call_method_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_tail_call_dsl, opcode_byte = 95, layout = Abc, length = 10, |a, b, c| {
-        tail_call0_bytecode_or_branch!(a, b, .slow);
-    .slow:
-        decode_abc!(a, b, c);
         call_slow!(op_tail_call_slow_rs, args = [a, b, c]);
         dispatch_after_slow!();
     }

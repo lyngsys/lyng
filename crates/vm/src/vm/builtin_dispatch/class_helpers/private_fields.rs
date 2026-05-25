@@ -57,19 +57,6 @@ impl Vm {
         if !updated {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        // Refresh the LLInt call-target table so the asm fast-call path
-        // installs the new `[[PrivateEnvironment]]` on the callee's
-        // execution context. Without this refresh, the call-target was
-        // captured by `update_llint_call_target` at function-allocation
-        // time (before this builtin ran), so its `private_env_raw` is
-        // still 0 and `materialize_llint_frames` would see `None` —
-        // making the bytecode body unable to resolve outer private
-        // names (ECMA-262 §15.7.10 ClassDefinitionEvaluation requires
-        // each method's `[[PrivateEnvironment]]` to be the class's
-        // PrivateEnvironment after this point).
-        if let Some(data) = agent.objects().function_data(function).cloned() {
-            self.update_llint_call_target(agent, function, &data);
-        }
         Ok(Value::from_object_ref(function))
     }
 

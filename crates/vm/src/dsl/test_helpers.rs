@@ -52,8 +52,7 @@ use lyng_sema::analyze_script;
 use lyng_types::Value;
 
 use crate::dsl::llint_state::{
-    DeferredDispatch, ExitKind, LazyDispatchState, LlIntExitSlot, LlIntRustContext,
-    LlIntRustContextOpaque, LlIntState,
+    ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
 };
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome, SlowPathTag};
 use crate::error::VmError;
@@ -230,23 +229,19 @@ impl DslHarness {
         let installed = Arc::clone(&self.installed);
         let frame = self.frame;
         let frame_depth = 0usize;
-        // lyng-rmho: stash the constituents in the Pending variant so
-        // the harness exercises the same lazy materialization path the
-        // production `run_via_dsl` entry uses.
+        let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
+            &mut self.vm,
+            agent,
+            host,
+            &mut self.registry,
+            installed,
+            frame,
+            frame_depth,
+            0,
+        );
         let mut rust_ctx = LlIntRustContext {
-            dispatch: LazyDispatchState::Pending(DeferredDispatch {
-                vm: &mut self.vm,
-                agent,
-                host,
-                registry: &mut self.registry,
-                installed,
-                frame,
-                frame_depth,
-                frame_check_epoch: 0,
-            }),
+            dispatch,
             exit: LlIntExitSlot::default(),
-            frame_infos: Vec::new(),
-            frame_info_register_stack_base: core::ptr::null_mut(),
         };
 
         // Build the asm-visible state record. `frame_regs_base` /
@@ -268,14 +263,6 @@ impl DslHarness {
             frame_this_value: Value::undefined(),
             frame_depth: 0,
             frame_check_epoch: 0,
-            frame_info_base: core::ptr::null_mut(),
-            frame_info_len: 0,
-            register_stack_top: 0,
-            register_stack_len: 0,
-            register_stack_base: core::ptr::null_mut(),
-            call_targets_base: core::ptr::null(),
-            call_targets_len: 0,
-            _pad3: 0,
             rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
             prefix: 0,
             _pad2: [0; 7],
