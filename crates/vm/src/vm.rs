@@ -276,7 +276,16 @@ impl<'b> EvaluateScript<'b> {
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
     pub fn run(self) -> VmResult<Value> {
-        let EvaluateScript { vm, agent, realm, unit, host, registry, referrer, extensions } = self;
+        let EvaluateScript {
+            vm,
+            agent,
+            realm,
+            unit,
+            host,
+            registry,
+            referrer,
+            extensions,
+        } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
         let registry: &mut dyn NativeFunctionRegistry = match registry {
@@ -296,7 +305,16 @@ impl<'b> EvaluateScript<'b> {
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
     pub fn run_retaining_installed(self) -> VmResult<(Value, InstalledCode)> {
-        let EvaluateScript { vm, agent, realm, unit, host, registry, referrer, extensions } = self;
+        let EvaluateScript {
+            vm,
+            agent,
+            realm,
+            unit,
+            host,
+            registry,
+            referrer,
+            extensions,
+        } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
         let registry: &mut dyn NativeFunctionRegistry = match registry {
@@ -324,8 +342,7 @@ impl<'b> EvaluateScript<'b> {
         let _ = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         vm.install_active_realm_extensions(agent, realm.id())?;
         Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
-        let referrer_atom =
-            referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+        let referrer_atom = referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let mut observer = NoopVmEvaluationObserver;
         let value = vm.evaluate_entry_with_registry_and_checkpoint(
             agent,
@@ -1308,104 +1325,6 @@ impl Vm {
         }
     }
 
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
-    /// checkpointing fails.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
-    pub fn evaluate_script_with_registry_and_host_referrer_and_extensions(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-        provider: Option<&SharedRealmExtensionProvider>,
-    ) -> VmResult<Value> {
-        match provider {
-            Some(provider) => self.with_extension_provider(provider, |vm| {
-                vm.evaluate_script_with_registry_and_host_referrer(
-                    agent,
-                    realm,
-                    unit,
-                    script_referrer,
-                    host,
-                    registry,
-                )
-            }),
-            None => self.evaluate_script_with_registry_and_host_referrer(
-                agent,
-                realm,
-                unit,
-                script_referrer,
-                host,
-                registry,
-            ),
-        }
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_host_referrer_and_extensions(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-        provider: Option<&SharedRealmExtensionProvider>,
-    ) -> VmResult<Value> {
-        let mut registry = RejectingNativeRegistry;
-        self.evaluate_script_with_registry_and_host_referrer_and_extensions(
-            agent,
-            realm,
-            unit,
-            script_referrer,
-            host,
-            &mut registry,
-            provider,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, instantiation, extension setup, evaluation, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_host_referrer_and_extensions_retaining_installed(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-        provider: Option<&SharedRealmExtensionProvider>,
-    ) -> VmResult<(Value, InstalledCode)> {
-        match provider {
-            Some(provider) => self.with_extension_provider(provider, |vm| {
-                vm.evaluate_script_with_host_referrer_retaining_installed(
-                    agent,
-                    &realm,
-                    unit,
-                    script_referrer,
-                    host,
-                )
-            }),
-            None => self.evaluate_script_with_host_referrer_retaining_installed(
-                agent,
-                &realm,
-                unit,
-                script_referrer,
-                host,
-            ),
-        }
-    }
-
     /// Begin evaluating an already-installed code record. Returns a builder; call `.run()` to execute.
     pub fn installed_eval<'b>(
         &'b mut self,
@@ -1426,348 +1345,6 @@ impl Vm {
             observer: None,
             entry_override: None,
         }
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    pub fn evaluate_installed(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> VmResult<Value> {
-        let mut registry = RejectingNativeRegistry;
-        self.evaluate_installed_with_registry_and_host(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            None,
-            &NoopHostHooks,
-            &mut registry,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-    ) -> VmResult<Value> {
-        let installed = self.install_script(agent, realm.id(), unit)?;
-        let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
-        self.install_active_realm_extensions(agent, realm.id())?;
-        Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
-        let mut registry = RejectingNativeRegistry;
-        let mut observer = NoopVmEvaluationObserver;
-        self.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            realm.global_env(),
-            realm.global_env(),
-            None,
-            &NoopHostHooks,
-            &mut registry,
-            Some(unit.instantiation_plan()),
-            None,
-            &mut observer,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_host(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        host: &dyn HostHooks,
-    ) -> VmResult<Value> {
-        let mut registry = RejectingNativeRegistry;
-        self.evaluate_script_with_registry_and_host(agent, realm, unit, host, &mut registry)
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_host_referrer(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-    ) -> VmResult<Value> {
-        let mut registry = RejectingNativeRegistry;
-        self.evaluate_script_with_registry_and_host_referrer(
-            agent,
-            realm,
-            unit,
-            script_referrer,
-            host,
-            &mut registry,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_registry(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        self.evaluate_script_with_registry_and_host(agent, realm, unit, &NoopHostHooks, registry)
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_registry_and_host(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        self.evaluate_script_with_registry_and_host_referrer(
-            agent, realm, unit, None, host, registry,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn evaluate_script_with_registry_and_host_referrer(
-        &mut self,
-        agent: &mut Agent,
-        realm: RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        let installed = self.install_script(agent, realm.id(), unit)?;
-        let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
-        self.install_active_realm_extensions(agent, realm.id())?;
-        Self::instantiate_global_script(agent, &realm, unit.instantiation_plan())?;
-        let script_referrer =
-            script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-        let mut observer = NoopVmEvaluationObserver;
-        self.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            realm.global_env(),
-            realm.global_env(),
-            script_referrer,
-            host,
-            registry,
-            Some(unit.instantiation_plan()),
-            None,
-            &mut observer,
-        )
-    }
-
-    fn evaluate_script_with_host_referrer_retaining_installed(
-        &mut self,
-        agent: &mut Agent,
-        realm: &RealmRecord,
-        unit: &CompiledScriptUnit,
-        script_referrer: Option<&ModuleKey>,
-        host: &dyn HostHooks,
-    ) -> VmResult<(Value, InstalledCode)> {
-        let installed = self.install_script(agent, realm.id(), unit)?;
-        let _ = self.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
-        self.install_active_realm_extensions(agent, realm.id())?;
-        Self::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
-        let script_referrer =
-            script_referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-        let mut registry = RejectingNativeRegistry;
-        let mut observer = NoopVmEvaluationObserver;
-        let value = self.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            realm.global_env(),
-            realm.global_env(),
-            script_referrer,
-            host,
-            &mut registry,
-            Some(unit.instantiation_plan()),
-            None,
-            &mut observer,
-        )?;
-        Ok((value, installed))
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    pub fn evaluate_installed_with_registry(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        self.evaluate_installed_with_registry_and_host(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            None,
-            &NoopHostHooks,
-            registry,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
-    pub fn evaluate_installed_with_registry_and_host(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-        script_or_module_referrer: Option<AtomId>,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        let mut observer = NoopVmEvaluationObserver;
-        self.evaluate_installed_with_registry_and_host_observed(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_or_module_referrer,
-            host,
-            registry,
-            &mut observer,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, observer, and spec state explicitly at call sites"
-    )]
-    pub fn evaluate_installed_with_host_observed(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-        script_or_module_referrer: Option<AtomId>,
-        host: &dyn HostHooks,
-        observer: &mut dyn VmEvaluationObserver,
-    ) -> VmResult<Value> {
-        let mut registry = RejectingNativeRegistry;
-        self.evaluate_installed_with_registry_and_host_observed(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_or_module_referrer,
-            host,
-            &mut registry,
-            observer,
-        )
-    }
-
-    /// # Errors
-    ///
-    /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, observer, and spec state explicitly at call sites"
-    )]
-    pub fn evaluate_installed_with_registry_and_host_observed(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-        script_or_module_referrer: Option<AtomId>,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-        observer: &mut dyn VmEvaluationObserver,
-    ) -> VmResult<Value> {
-        self.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_or_module_referrer,
-            host,
-            registry,
-            None,
-            None,
-            observer,
-        )
-    }
-
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
-    pub(crate) fn evaluate_installed_with_registry_and_host_with_entry_override(
-        &mut self,
-        agent: &mut Agent,
-        installed: InstalledCode,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-        script_or_module_referrer: Option<AtomId>,
-        entry_this_value: Value,
-        entry_new_target: Option<ObjectRef>,
-        entry_home_object: Option<ObjectRef>,
-        entry_active_function: Option<ObjectRef>,
-        entry_private_env: Option<EnvironmentRef>,
-        entry_lexical_this: bool,
-        host: &dyn HostHooks,
-        registry: &mut dyn NativeFunctionRegistry,
-    ) -> VmResult<Value> {
-        let mut observer = NoopVmEvaluationObserver;
-        self.evaluate_entry_with_registry_and_checkpoint(
-            agent,
-            installed,
-            lexical_env,
-            variable_env,
-            script_or_module_referrer,
-            host,
-            registry,
-            None,
-            Some(EntryExecutionOverride {
-                this_value: entry_this_value,
-                new_target: entry_new_target,
-                home_object: entry_home_object,
-                active_function: entry_active_function,
-                private_env: entry_private_env,
-                lexical_this: entry_lexical_this,
-            }),
-            &mut observer,
-        )
     }
 
     #[expect(
