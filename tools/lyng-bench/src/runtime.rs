@@ -533,13 +533,12 @@ fn measure_script_runtime_sample(
             .map_err(|error| format!("warmup execution failed for {}: {error:?}", workload.name))?;
         black_box(value.bits());
     }
-    if options.count_opcodes {
-        vm.enable_opcode_dispatch_counts();
-        vm.reset_opcode_dispatch_counts();
-    }
-    if options.count_slow_path_share {
-        vm.enable_slow_path_counts();
-        vm.reset_slow_path_counts();
+    if options.count_opcodes || options.count_slow_path_share {
+        let counters = vm.opcode_counters_mut();
+        if options.count_slow_path_share {
+            counters.enable_slow_path();
+        }
+        counters.reset();
     }
 
     let start = Instant::now();
@@ -555,14 +554,13 @@ fn measure_script_runtime_sample(
         checksum = checksum.wrapping_add(black_box(value.bits()));
     }
     black_box(checksum);
+    let counters = vm.opcode_counters();
     Ok(SampleResult {
         elapsed: start.elapsed(),
-        opcode_dispatch_counts: options
-            .count_opcodes
-            .then(|| vm.opcode_dispatch_counts().unwrap_or_default()),
+        opcode_dispatch_counts: options.count_opcodes.then(|| counters.dispatch_counts()),
         slow_path_counts: options
             .count_slow_path_share
-            .then(|| vm.slow_path_counts().unwrap_or_default()),
+            .then(|| counters.slow_path_counts().unwrap_or_default()),
     })
 }
 

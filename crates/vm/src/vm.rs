@@ -30,10 +30,7 @@ use crate::error::VmResult;
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
 use crate::name_refs::CapturedNameReferenceTable;
 #[cfg(feature = "opcode-counters")]
-use crate::opcode_counts::{
-    CallArgumentCopyCounterStore, CallArgumentCopyCounts, OpcodeDispatchCounterStore,
-    OpcodeDispatchCounts,
-};
+use crate::opcode_counts::OpcodeCounters;
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
 mod activation_objects;
@@ -158,11 +155,7 @@ pub struct Vm {
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
     #[cfg(feature = "opcode-counters")]
-    pub(crate) dispatch_counters: OpcodeDispatchCounterStore,
-    #[cfg(feature = "opcode-counters")]
-    call_argument_copy_counts: Option<CallArgumentCopyCounterStore>,
-    #[cfg(feature = "opcode-counters")]
-    slow_path_counts: Option<crate::slow_path_counts::SlowPathCounterStore>,
+    pub(crate) counters: OpcodeCounters,
     debug_hook: Option<Box<dyn VmDebugHook>>,
     debug_state: VmDebugState,
     atom_texts: HashMap<AtomId, Box<str>>,
@@ -249,6 +242,8 @@ pub struct EvaluateScript<'b> {
     registry: Option<&'b mut dyn NativeFunctionRegistry>,
     referrer: Option<&'b ModuleKey>,
     extensions: Option<&'b SharedRealmExtensionProvider>,
+    #[cfg(feature = "opcode-counters")]
+    installed_counters: Option<&'b mut OpcodeCounters>,
 }
 
 impl<'b> EvaluateScript<'b> {
@@ -272,38 +267,36 @@ impl<'b> EvaluateScript<'b> {
         self
     }
 
-    /// # Errors
-    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
-    /// checkpointing fails.
-    pub fn run(self) -> VmResult<Value> {
-        let EvaluateScript {
-            vm,
-            agent,
-            realm,
-            unit,
-            host,
-            registry,
-            referrer,
-            extensions,
-        } = self;
-        let host = host.unwrap_or(&NoopHostHooks);
-        let mut fallback_registry = RejectingNativeRegistry;
-        let registry: &mut dyn NativeFunctionRegistry = match registry {
-            Some(r) => r,
-            None => &mut fallback_registry,
-        };
-        let result = match extensions {
-            Some(provider) => vm.with_extension_provider(provider, |vm| {
-                Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
-            }),
-            None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
-        };
-        result.map(|(value, _)| value)
+    /// Redirect opcode-counter writes to an externally-owned
+    /// `OpcodeCounters` for the duration of `.run()` /
+    /// `.run_retaining_installed()`. The borrow's contents are swapped
+    /// with the VM's internal counters at the start of the run, then
+    /// swapped back when the run returns — so the caller can read
+    /// dispatch / slow-path / call-argument-copy snapshots off their
+    /// own `OpcodeCounters` afterwards.
+    #[cfg(feature = "opcode-counters")]
+    pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
+        self.installed_counters = Some(counters);
+        self
     }
 
     /// # Errors
     /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
     /// checkpointing fails.
+    pub fn run(self) -> VmResult<Value> {
+        self.run_retaining_installed().map(|(value, _)| value)
+    }
+
+    /// # Errors
+    /// Returns a VM error if script installation, bootstrap, instantiation, execution, or job
+    /// checkpointing fails.
+    #[cfg_attr(
+        feature = "opcode-counters",
+        allow(
+            clippy::needless_option_as_deref,
+            reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
+        )
+    )]
     pub fn run_retaining_installed(self) -> VmResult<(Value, InstalledCode)> {
         let EvaluateScript {
             vm,
@@ -314,6 +307,8 @@ impl<'b> EvaluateScript<'b> {
             registry,
             referrer,
             extensions,
+            #[cfg(feature = "opcode-counters")]
+            mut installed_counters,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -321,12 +316,22 @@ impl<'b> EvaluateScript<'b> {
             Some(r) => r,
             None => &mut fallback_registry,
         };
-        match extensions {
+
+        #[cfg(feature = "opcode-counters")]
+        if let Some(external) = installed_counters.as_deref_mut() {
+            std::mem::swap(&mut vm.counters, external);
+        }
+        let result = match extensions {
             Some(provider) => vm.with_extension_provider(provider, |vm| {
                 Self::run_inner(vm, agent, &realm, unit, referrer, host, registry)
             }),
             None => Self::run_inner(vm, agent, &realm, unit, referrer, host, registry),
+        };
+        #[cfg(feature = "opcode-counters")]
+        if let Some(external) = installed_counters.as_deref_mut() {
+            std::mem::swap(&mut vm.counters, external);
         }
+        result
     }
 
     fn run_inner(
@@ -374,6 +379,8 @@ pub struct EvaluateInstalled<'b> {
     referrer: Option<AtomId>,
     observer: Option<&'b mut dyn VmEvaluationObserver>,
     entry_override: Option<EntryExecutionOverride>,
+    #[cfg(feature = "opcode-counters")]
+    installed_counters: Option<&'b mut OpcodeCounters>,
 }
 
 impl<'b> EvaluateInstalled<'b> {
@@ -402,8 +409,25 @@ impl<'b> EvaluateInstalled<'b> {
         self
     }
 
+    /// Redirect opcode-counter writes to an externally-owned
+    /// `OpcodeCounters` for the duration of `.run()`. See
+    /// [`EvaluateScript::with_opcode_counters`] for the full
+    /// description.
+    #[cfg(feature = "opcode-counters")]
+    pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
+        self.installed_counters = Some(counters);
+        self
+    }
+
     /// # Errors
     /// Returns a VM error if entering the installed function, execution, or job checkpointing fails.
+    #[cfg_attr(
+        feature = "opcode-counters",
+        allow(
+            clippy::needless_option_as_deref,
+            reason = "as_deref_mut produces a reborrow we need at two distinct call sites; the inner Option<&mut> can't be consumed twice"
+        )
+    )]
     pub fn run(self) -> VmResult<Value> {
         let EvaluateInstalled {
             vm,
@@ -416,6 +440,8 @@ impl<'b> EvaluateInstalled<'b> {
             referrer,
             observer,
             entry_override,
+            #[cfg(feature = "opcode-counters")]
+            mut installed_counters,
         } = self;
         let host = host.unwrap_or(&NoopHostHooks);
         let mut fallback_registry = RejectingNativeRegistry;
@@ -428,7 +454,12 @@ impl<'b> EvaluateInstalled<'b> {
             Some(o) => o,
             None => &mut fallback_observer,
         };
-        vm.evaluate_entry_with_registry_and_checkpoint(
+
+        #[cfg(feature = "opcode-counters")]
+        if let Some(external) = installed_counters.as_deref_mut() {
+            std::mem::swap(&mut vm.counters, external);
+        }
+        let result = vm.evaluate_entry_with_registry_and_checkpoint(
             agent,
             installed,
             lexical_env,
@@ -439,7 +470,12 @@ impl<'b> EvaluateInstalled<'b> {
             None,
             entry_override,
             observer,
-        )
+        );
+        #[cfg(feature = "opcode-counters")]
+        if let Some(external) = installed_counters.as_deref_mut() {
+            std::mem::swap(&mut vm.counters, external);
+        }
+        result
     }
 }
 
@@ -454,11 +490,7 @@ impl Vm {
             installed: Vec::new(),
             current_exception: None,
             #[cfg(feature = "opcode-counters")]
-            dispatch_counters: OpcodeDispatchCounterStore::new(),
-            #[cfg(feature = "opcode-counters")]
-            call_argument_copy_counts: None,
-            #[cfg(feature = "opcode-counters")]
-            slow_path_counts: None,
+            counters: OpcodeCounters::new(),
             debug_hook: None,
             debug_state: VmDebugState::default(),
             atom_texts: HashMap::new(),
@@ -510,64 +542,22 @@ impl Vm {
         }
     }
 
+    /// Access the VM's opcode instrumentation. Counters are always
+    /// allocated when the feature is on; callers reset/snapshot via the
+    /// returned `&OpcodeCounters`. To redirect counter writes to an
+    /// externally-owned store for a single evaluation, use
+    /// `EvaluateScript::with_opcode_counters` /
+    /// `EvaluateInstalled::with_opcode_counters` on the builder.
     #[cfg(feature = "opcode-counters")]
-    pub const fn enable_opcode_dispatch_counts(&mut self) {
-        // No-op when counters are always allocated. Kept for backward
-        // compatibility with tests that called this method.
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn disable_opcode_dispatch_counts(&mut self) {
-        // Reset to zero so subsequent runs start fresh. No deallocation —
-        // the counter array stays for the asm path.
-        self.dispatch_counters.reset();
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn reset_opcode_dispatch_counts(&mut self) {
-        self.dispatch_counters.reset();
+    #[inline]
+    pub const fn opcode_counters(&self) -> &OpcodeCounters {
+        &self.counters
     }
 
     #[cfg(feature = "opcode-counters")]
     #[inline]
-    pub fn opcode_dispatch_counts(&self) -> Option<OpcodeDispatchCounts> {
-        Some(self.dispatch_counters.snapshot())
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub const fn dispatch_counters(&self) -> &OpcodeDispatchCounterStore {
-        &self.dispatch_counters
-    }
-
-    /// Opt-in counter tracking how many argument values are pushed into
-    /// the VM's `argument_scratch` Vec during call setup. Off by default;
-    /// enable for tests/benches that want to verify the no-Vec hot path
-    /// for ordinary bytecode-to-bytecode calls.
-    #[cfg(feature = "opcode-counters")]
-    pub const fn enable_call_argument_copy_counts(&mut self) {
-        if self.call_argument_copy_counts.is_none() {
-            self.call_argument_copy_counts = Some(CallArgumentCopyCounterStore::new());
-        }
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub const fn disable_call_argument_copy_counts(&mut self) {
-        self.call_argument_copy_counts = None;
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn reset_call_argument_copy_counts(&mut self) {
-        if let Some(counts) = &self.call_argument_copy_counts {
-            counts.reset();
-        }
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    #[inline]
-    pub fn call_argument_copy_counts(&self) -> Option<CallArgumentCopyCounts> {
-        self.call_argument_copy_counts
-            .as_ref()
-            .map(CallArgumentCopyCounterStore::snapshot)
+    pub const fn opcode_counters_mut(&mut self) -> &mut OpcodeCounters {
+        &mut self.counters
     }
 
     /// Records `count` argument values pushed into `argument_scratch`. No-op
@@ -577,9 +567,7 @@ impl Vm {
     #[cfg(feature = "opcode-counters")]
     #[inline]
     pub(in crate::vm) fn record_argument_scratch_pushes(&self, count: u64) {
-        if let Some(counts) = &self.call_argument_copy_counts {
-            counts.record_scratch_pushes(count);
-        }
+        self.counters.record_argument_scratch_pushes(count);
     }
 
     #[cfg(not(feature = "opcode-counters"))]
@@ -593,70 +581,12 @@ impl Vm {
     #[cfg(feature = "opcode-counters")]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, count: u64) {
-        if let Some(counts) = &self.call_argument_copy_counts {
-            counts.record_frame_copies(count);
-        }
+        self.counters.record_argument_frame_copies(count);
     }
 
     #[cfg(not(feature = "opcode-counters"))]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, _count: u64) {}
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn enable_slow_path_counts(&mut self) {
-        // No-op: slow-path counters are always allocated alongside the
-        // dispatch bank in `self.dispatch_counters` (a single
-        // `Box<DispatchCounters>`). Kept for backward compatibility with
-        // tests/benches that called this method when the counters were
-        // a separate optional store. The `SlowPathCounterStore` field
-        // remains for legacy paths but is unused by `slow_path_counts()`.
-        if self.slow_path_counts.is_none() {
-            self.slow_path_counts = Some(crate::slow_path_counts::SlowPathCounterStore::new());
-        }
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn disable_slow_path_counts(&mut self) {
-        self.slow_path_counts = None;
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub fn reset_slow_path_counts(&mut self) {
-        // Reset the asm-driven slow-path banks (where the DSL handlers
-        // actually write via `inc_slow_semantic_counter!` /
-        // `inc_slow_safepoint_counter!`). The legacy Rust-side store is
-        // also reset for symmetry, even though it's no longer wired into
-        // the snapshot path.
-        self.dispatch_counters.counters_mut().slow_semantic.fill(0);
-        self.dispatch_counters.counters_mut().slow_safepoint.fill(0);
-        if let Some(store) = &self.slow_path_counts {
-            store.reset();
-        }
-    }
-
-    /// Snapshot the asm-driven `slow_semantic` + `slow_safepoint` counter
-    /// banks (filled by `inc_slow_semantic_counter!` /
-    /// `inc_slow_safepoint_counter!` at DSL `call_slow!` / `poll_safepoint!`
-    /// sites). The legacy `SlowPathCounterStore` (`record_semantic` /
-    /// `record_safepoint` from Rust) is no longer the source of truth —
-    /// the asm path is. Returns `None` only when slow-path tracking is
-    /// disabled via `disable_slow_path_counts`.
-    #[cfg(feature = "opcode-counters")]
-    pub fn slow_path_counts(&self) -> Option<crate::slow_path_counts::SlowPathCounts> {
-        self.slow_path_counts.as_ref()?;
-        let counters = self.dispatch_counters.counters();
-        Some(
-            crate::slow_path_counts::SlowPathCounts::from_dispatch_arrays(
-                &counters.slow_semantic,
-                &counters.slow_safepoint,
-            ),
-        )
-    }
-
-    #[cfg(feature = "opcode-counters")]
-    pub const fn slow_path_counts_enabled(&self) -> bool {
-        self.slow_path_counts.is_some()
-    }
 
     pub fn set_debug_hook(&mut self, hook: impl VmDebugHook + 'static) {
         self.debug_hook = Some(Box::new(hook));
@@ -1322,6 +1252,8 @@ impl Vm {
             registry: None,
             referrer: None,
             extensions: None,
+            #[cfg(feature = "opcode-counters")]
+            installed_counters: None,
         }
     }
 
@@ -1344,6 +1276,8 @@ impl Vm {
             referrer: None,
             observer: None,
             entry_override: None,
+            #[cfg(feature = "opcode-counters")]
+            installed_counters: None,
         }
     }
 

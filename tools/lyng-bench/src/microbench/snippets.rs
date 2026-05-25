@@ -848,13 +848,11 @@ mod verify_counts {
             .run()
             .unwrap_or_else(|err| panic!("warmup eval failed for {}: {err:?}", snippet.opcode));
 
-        vm.reset_opcode_dispatch_counts();
+        vm.opcode_counters_mut().reset_dispatch_counts();
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap_or_else(|err| panic!("measured eval failed for {}: {err:?}", snippet.opcode));
-        let counts = vm
-            .opcode_dispatch_counts()
-            .expect("opcode-counters feature should provide counts");
+        let counts = vm.opcode_counters().dispatch_counts();
         counts
             .top(8)
             .iter()

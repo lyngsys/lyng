@@ -555,10 +555,9 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
         ))
     );
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -567,10 +566,9 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
         Value::from_smi(11)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::LoadGlobal), 1);
@@ -989,10 +987,9 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
         ))
     );
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1001,10 +998,9 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
         Value::from_smi(9)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::AssignNamedProperty), 1);
@@ -2098,10 +2094,9 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
         ))
     );
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -2110,10 +2105,9 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
         Value::from_smi(33)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::GetNamedProperty), 1);
@@ -2175,10 +2169,9 @@ fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
         ))
     );
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -2187,10 +2180,9 @@ fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
         Value::from_smi(34)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::GetNamedProperty), 1);
@@ -2270,10 +2262,9 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
         ))
     );
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -2282,10 +2273,9 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
         Value::from_smi(42)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::GetNamedProperty), 1);

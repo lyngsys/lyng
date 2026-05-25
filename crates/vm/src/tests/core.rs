@@ -270,7 +270,7 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         // DSL-1 Phase 1.B.0 Task 1: counters are now always allocated;
         // `opcode_dispatch_counts()` returns `Some` even before the
         // first dispatch. Total starts at 0.
-        assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
+        assert_eq!(vm.opcode_counters().dispatch_counts().total(), 0);
         let result = vm
             .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
@@ -279,18 +279,15 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         // Until Task 4 wires the asm-side increment, the dispatch
         // bank stays at zero across runs. Reset to be explicit before
         // the enable/run round.
-        vm.reset_opcode_dispatch_counts();
+        vm.opcode_counters_mut().reset_dispatch_counts();
 
-        vm.enable_opcode_dispatch_counts();
         let result = vm
             .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap();
         assert_eq!(result, Value::from_smi(42));
 
-        let counts = vm
-            .opcode_dispatch_counts()
-            .expect("enabled opcode counters should produce a snapshot");
+        let counts = vm.opcode_counters().dispatch_counts();
         assert_eq!(counts.total(), 4);
         assert_eq!(counts.count(Opcode::LdaOne), 1);
         assert_eq!(counts.count(Opcode::AddSmi), 1);
@@ -298,13 +295,65 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         assert_eq!(counts.count(Opcode::Return), 1);
         assert_eq!(counts.top(2)[0].opcode(), Opcode::AddSmi);
 
-        vm.reset_opcode_dispatch_counts();
-        assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
-        vm.disable_opcode_dispatch_counts();
-        // After `disable_opcode_dispatch_counts`, counters are reset
-        // to zero but the storage remains allocated for the asm path.
-        assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
+        vm.opcode_counters_mut().reset_dispatch_counts();
+        assert_eq!(vm.opcode_counters().dispatch_counts().total(), 0);
     }
+}
+
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn evaluate_builder_with_opcode_counters_redirects_asm_writes_to_external_store() {
+    use lyng_vm::OpcodeCounters;
+
+    let mut function_builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(91).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    function_builder
+        .alloc_registers(2)
+        .expect("test bytecode registers should allocate");
+    function_builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    function_builder
+        .emit_abc(Opcode::AddSmi, 1, 0, 41)
+        .expect("test bytecode should build");
+    function_builder
+        .emit_ax(Opcode::Return, 1)
+        .expect("test bytecode should build");
+    let function = function_builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(91), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Prime the VM's internal counters so we can prove the external
+    // store, not the VM's, accumulates the asm-driven writes during
+    // the run with the builder hook installed.
+    vm.opcode_counters_mut().reset_dispatch_counts();
+    assert_eq!(vm.opcode_counters().dispatch_counts().total(), 0);
+
+    let mut external = OpcodeCounters::new();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_opcode_counters(&mut external)
+        .run()
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    assert_eq!(
+        external.dispatch_counts().count(Opcode::AddSmi),
+        1,
+        "asm-driven dispatch writes during .run() must land in the external OpcodeCounters"
+    );
+    assert_eq!(
+        vm.opcode_counters().dispatch_counts().total(),
+        0,
+        "VM's internal counters must be restored (zero) after the run completes"
+    );
 }
 
 #[cfg(feature = "opcode-counters")]
@@ -334,10 +383,9 @@ fn add_smi_hit_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -345,10 +393,9 @@ fn add_smi_hit_avoids_semantic_slow_path() {
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::AddSmi), 1);
@@ -381,10 +428,9 @@ fn jump_i24_forward_hit_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -392,10 +438,9 @@ fn jump_i24_forward_hit_avoids_semantic_slow_path() {
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::Jump), 1);
@@ -428,10 +473,9 @@ fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -439,10 +483,9 @@ fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::Jump), 2);
@@ -493,10 +536,9 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     vm.request_debug_pause_at(installed.code(), 12);
 
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -505,6 +547,7 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     assert_eq!(result, Value::from_smi(7));
 
     let slow_path = vm
+        .opcode_counters()
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(
@@ -569,10 +612,9 @@ fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -580,10 +622,9 @@ fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::JumpIfFalse8), 1);
@@ -639,10 +680,9 @@ fn simple_nested_call0_return_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -650,10 +690,9 @@ fn simple_nested_call0_return_avoids_semantic_slow_path() {
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::Call0), 1);
@@ -734,10 +773,9 @@ fn simple_tail_call_avoids_semantic_slow_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -746,10 +784,9 @@ fn simple_tail_call_avoids_semantic_slow_path() {
     assert_eq!(result, Value::from_smi(42));
     assert_eq!(vm.peak_frame_depth(), 2);
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::TailCall), 1);
@@ -801,16 +838,13 @@ fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
-    vm.enable_opcode_dispatch_counts();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(1));
 
-    let counts = vm
-        .opcode_dispatch_counts()
-        .expect("enabled opcode counters should produce a snapshot");
+    let counts = vm.opcode_counters().dispatch_counts();
     assert_eq!(
         counts.count(Opcode::LdaOne),
         1,
@@ -848,10 +882,9 @@ fn smi_equal_hit_avoids_semantic_slow_path() {
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -860,10 +893,9 @@ fn smi_equal_hit_avoids_semantic_slow_path() {
         Value::from_bool(true)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::Equal), 1);
@@ -889,10 +921,9 @@ fn nullish_equal_hit_avoids_semantic_slow_path() {
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -901,10 +932,9 @@ fn nullish_equal_hit_avoids_semantic_slow_path() {
         Value::from_bool(true)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::Equal), 1);
@@ -930,10 +960,9 @@ fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
-    vm.enable_opcode_dispatch_counts();
-    vm.enable_slow_path_counts();
-    vm.reset_opcode_dispatch_counts();
-    vm.reset_slow_path_counts();
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
 
     assert_eq!(
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -942,10 +971,9 @@ fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
         Value::from_bool(true)
     );
 
-    let dispatch = vm
-        .opcode_dispatch_counts()
-        .expect("opcode counters should be enabled");
-    let slow_path = vm
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = counters
         .slow_path_counts()
         .expect("slow-path counters should be enabled");
     assert_eq!(dispatch.count(Opcode::StrictEqual), 1);
@@ -975,7 +1003,7 @@ fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -986,6 +1014,7 @@ fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     assert_eq!(result, Value::from_smi(140));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert_eq!(
@@ -1017,7 +1046,7 @@ fn spread_call_still_materializes_into_argument_scratch() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1027,6 +1056,7 @@ fn spread_call_still_materializes_into_argument_scratch() {
     assert_eq!(result, Value::from_smi(6));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert!(
@@ -1051,7 +1081,7 @@ fn bound_function_call_still_materializes_into_argument_scratch() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1061,6 +1091,7 @@ fn bound_function_call_still_materializes_into_argument_scratch() {
     assert_eq!(result, Value::from_smi(16));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert!(
@@ -1087,7 +1118,7 @@ fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1097,6 +1128,7 @@ fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
     assert_eq!(result, Value::from_smi(306));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert!(
@@ -1192,7 +1224,7 @@ fn rest_parameter_function_stays_on_slow_path() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1202,6 +1234,7 @@ fn rest_parameter_function_stays_on_slow_path() {
     assert_eq!(result, Value::from_smi(10));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert!(
@@ -1229,7 +1262,7 @@ fn ordinary_bytecode_calls_avoid_argument_scratch_pushes() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.enable_call_argument_copy_counts();
+    vm.opcode_counters_mut().enable_call_argument_copy();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
         .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -1240,6 +1273,7 @@ fn ordinary_bytecode_calls_avoid_argument_scratch_pushes() {
     assert_eq!(result, Value::from_smi(165));
 
     let counts = vm
+        .opcode_counters()
         .call_argument_copy_counts()
         .expect("enabled call argument copy counters should produce a snapshot");
     assert_eq!(

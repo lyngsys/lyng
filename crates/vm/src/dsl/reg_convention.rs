@@ -138,25 +138,26 @@ pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
 // VM-relative offsets (read from pinned register x22 = VM).
 //
 // Only valid when the `opcode-counters` feature is on; otherwise the
-// `dispatch_counters` field doesn't exist on `Vm`.
+// `counters` field doesn't exist on `Vm`.
 // =============================================================================
 
-/// Byte offset of `Vm::dispatch_counters` (the `OpcodeDispatchCounterStore`).
+/// Byte offset (within `Vm`) of the `Box<DispatchCounters>` that the
+/// asm-side counter macros dereference.
 ///
-/// The asm-side counter macros read `[x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]`
-/// to access the counter store. Note: `OpcodeDispatchCounterStore` is a thin
-/// wrapper around `Box<DispatchCounters>`; its single field is the Box at
-/// offset 0. So the asm path needs TWO loads:
-///   1. `ldr x9, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` — gets the Box's
-///      raw pointer (the first u64 of `OpcodeDispatchCounterStore` is the Box).
-///   2. `ldr x9, [x9]` (or equivalent indexed load) — dereferences the Box
-///      pointer to reach `DispatchCounters`.
+/// Composes two compile-time offsets:
+///   - `offset_of!(Vm, counters)` — `OpcodeCounters` sub-struct on `Vm`.
+///   - `offset_of!(OpcodeCounters, dispatch)` — the `Box<DispatchCounters>`
+///     field inside it (intentionally the first field, so this offset is
+///     0 in practice).
 ///
-/// From there, bank offsets (0, 2048, 4096) index into the flat `[u64; 256]`
-/// banks.
+/// `Box<DispatchCounters>` is layout-equivalent to a raw pointer, so the
+/// asm load `ldr xS, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` reads the
+/// pointer to the heap-allocated `DispatchCounters` directly (one load,
+/// no extra dereference). From there, bank offsets (0, 2048, 4096)
+/// index into the flat `[u64; 256]` banks.
 #[cfg(feature = "opcode-counters")]
-pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize =
-    ::core::mem::offset_of!(crate::vm::Vm, dispatch_counters);
+pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize = ::core::mem::offset_of!(crate::vm::Vm, counters)
+    + ::core::mem::offset_of!(crate::opcode_counts::OpcodeCounters, dispatch);
 
 /// Feature-off fallback. The proc-macro lowerer always emits
 /// `vm_counter_base = const VM_DISPATCH_COUNTERS_PTR_OFFSET` as a named

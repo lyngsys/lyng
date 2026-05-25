@@ -6,12 +6,13 @@
 //!
 //! ## How the asm path reaches the counter array
 //!
-//! `OpcodeDispatchCounterStore { counters: Box<DispatchCounters> }` has
-//! a single `Box<T>` field. `Box<T>` is layout-equivalent to a raw
-//! pointer (8 bytes on 64-bit), so:
+//! `Vm` holds a single `counters: OpcodeCounters` field, whose first
+//! field is `dispatch: Box<DispatchCounters>`. `Box<T>` is
+//! layout-equivalent to a raw pointer (8 bytes on 64-bit), so:
 //!
-//! - `offset_of!(Vm, dispatch_counters)` = offset to the Box (which IS
-//!   the `*mut DispatchCounters` pointer).
+//! - `VM_DISPATCH_COUNTERS_PTR_OFFSET = offset_of!(Vm, counters)
+//!   + offset_of!(OpcodeCounters, dispatch)` — offset to the Box
+//!   (which IS the `*mut DispatchCounters` pointer).
 //! - `ldr xR, [x22, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` directly reads
 //!   the pointer to `DispatchCounters`.
 //!

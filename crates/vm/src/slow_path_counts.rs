@@ -4,58 +4,36 @@
 //!
 //! Gated behind the `opcode-counters` Cargo feature. Production builds
 //! carry no counter code.
+//!
+//! The asm path is the source of truth for slow-path counts — it writes
+//! directly into the `slow_semantic` / `slow_safepoint` banks of
+//! `DispatchCounters` (via `inc_slow_semantic_counter!` /
+//! `inc_slow_safepoint_counter!`). `SlowPathCounterStore` is retained
+//! only as the **enable flag** on `OpcodeCounters`, so
+//! `slow_path_counts()` can return `None` when tracking is disabled.
 
 use lyng_bytecode::{Opcode, OPCODE_COUNT};
-use std::cell::Cell;
 
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 
+/// Empty marker struct — the asm path actually owns the counts (in
+/// `DispatchCounters.slow_semantic` / `slow_safepoint`). This type
+/// exists only so `OpcodeCounters` can store `Option<Self>` as a
+/// runtime enable flag.
 pub struct SlowPathCounterStore {
-    semantic: Box<[Cell<u64>]>,
-    safepoint: Box<[Cell<u64>]>,
+    _private: (),
 }
 
 impl SlowPathCounterStore {
-    pub fn new() -> Self {
-        Self {
-            semantic: (0..OPCODE_COUNT_LEN)
-                .map(|_| Cell::new(0))
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-            safepoint: (0..OPCODE_COUNT_LEN)
-                .map(|_| Cell::new(0))
-                .collect::<Vec<_>>()
-                .into_boxed_slice(),
-        }
+    pub const fn new() -> Self {
+        Self { _private: () }
     }
 
-    #[inline]
-    pub fn record_semantic(&self, opcode: Opcode) {
-        let slot = &self.semantic[usize::from(opcode as u8)];
-        slot.set(slot.get().saturating_add(1));
-    }
-
-    #[inline]
-    pub fn record_safepoint(&self, opcode: Opcode) {
-        let slot = &self.safepoint[usize::from(opcode as u8)];
-        slot.set(slot.get().saturating_add(1));
-    }
-
-    pub fn reset(&self) {
-        for slot in &self.semantic {
-            slot.set(0);
-        }
-        for slot in &self.safepoint {
-            slot.set(0);
-        }
-    }
-
-    pub fn snapshot(&self) -> SlowPathCounts {
-        SlowPathCounts {
-            semantic: self.semantic.iter().map(Cell::get).collect(),
-            safepoint: self.safepoint.iter().map(Cell::get).collect(),
-        }
-    }
+    /// Reset the asm-driven slow-path banks. Called by
+    /// `OpcodeCounters::reset` / `reset_slow_path`; no-op here because
+    /// the actual storage lives in `DispatchCounters` (the caller
+    /// resets those banks directly via `dispatch.slow_*.fill(0)`).
+    pub const fn reset(&self) {}
 }
 
 impl Default for SlowPathCounterStore {
@@ -100,30 +78,3 @@ impl SlowPathCounts {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use lyng_bytecode::Opcode;
-
-    #[test]
-    fn records_semantic_independently_of_safepoint() {
-        let store = SlowPathCounterStore::new();
-        store.record_semantic(Opcode::Add);
-        store.record_semantic(Opcode::Add);
-        store.record_safepoint(Opcode::Add);
-        let snap = store.snapshot();
-        assert_eq!(snap.semantic(Opcode::Add), 2);
-        assert_eq!(snap.safepoint(Opcode::Add), 1);
-    }
-
-    #[test]
-    fn reset_clears_both_counters() {
-        let store = SlowPathCounterStore::new();
-        store.record_semantic(Opcode::Move);
-        store.record_safepoint(Opcode::Move);
-        store.reset();
-        let snap = store.snapshot();
-        assert_eq!(snap.semantic(Opcode::Move), 0);
-        assert_eq!(snap.safepoint(Opcode::Move), 0);
-    }
-}

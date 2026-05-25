@@ -857,11 +857,12 @@ fn run_workload_opcode_counts_once(
         },
     )?;
 
-    vm.enable_opcode_dispatch_counts();
-    vm.reset_opcode_dispatch_counts();
-    if collect_slow_path {
-        vm.enable_slow_path_counts();
-        vm.reset_slow_path_counts();
+    {
+        let counters = vm.opcode_counters_mut();
+        if collect_slow_path {
+            counters.enable_slow_path();
+        }
+        counters.reset();
     }
 
     let value = vm
@@ -880,8 +881,9 @@ fn run_workload_opcode_counts_once(
         })?;
     black_box(value.bits());
 
-    let dispatch = vm.opcode_dispatch_counts().unwrap_or_default();
-    let slow_path = collect_slow_path.then(|| vm.slow_path_counts().unwrap_or_default());
+    let counters = vm.opcode_counters();
+    let dispatch = counters.dispatch_counts();
+    let slow_path = collect_slow_path.then(|| counters.slow_path_counts().unwrap_or_default());
     Ok((dispatch, slow_path))
 }
 

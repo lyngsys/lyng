@@ -2,7 +2,147 @@ use std::cell::Cell;
 
 use lyng_bytecode::{Opcode, OPCODE_COUNT};
 
+use crate::slow_path_counts::{SlowPathCounterStore, SlowPathCounts};
+
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
+
+/// All opcode instrumentation state, lifted out of `Vm`.
+///
+/// Owns the asm-driven dispatch banks (`Box<DispatchCounters>`), the
+/// opt-in call-argument-copy store, and the slow-path enable flag. `Vm`
+/// holds a single instance of this struct (and exposes only
+/// `opcode_counters()` / `opcode_counters_mut()` accessors plus a
+/// builder hook); the asm hot path reads the dispatch-bank pointer via
+/// `VM_DISPATCH_COUNTERS_PTR_OFFSET`, which composes
+/// `offset_of!(Vm, counters) + offset_of!(OpcodeCounters, dispatch)`.
+///
+/// `dispatch` is intentionally the first field so the compile-time
+/// offset stays small and predictable, matching the encoding limits of
+/// AArch64 LDR/STR scaled immediates.
+pub struct OpcodeCounters {
+    // `pub(crate)` so `dsl::reg_convention` can resolve
+    // `offset_of!(OpcodeCounters, dispatch)` for the asm offset binding.
+    pub(crate) dispatch: Box<DispatchCounters>,
+    call_argument_copy: Option<CallArgumentCopyCounterStore>,
+    slow_path: Option<SlowPathCounterStore>,
+}
+
+impl OpcodeCounters {
+    pub fn new() -> Self {
+        Self {
+            dispatch: DispatchCounters::new(),
+            call_argument_copy: None,
+            slow_path: None,
+        }
+    }
+
+    /// Zero every counter bank and opt-in store.
+    pub fn reset(&mut self) {
+        self.dispatch.reset();
+        if let Some(store) = &self.call_argument_copy {
+            store.reset();
+        }
+        if let Some(store) = &self.slow_path {
+            store.reset();
+        }
+    }
+
+    pub fn dispatch_counts(&self) -> OpcodeDispatchCounts {
+        self.dispatch.snapshot_dispatch()
+    }
+
+    pub fn reset_dispatch_counts(&mut self) {
+        self.dispatch.reset();
+    }
+
+    /// Raw `&DispatchCounters` view — exposed for callers (e.g. the
+    /// bench tool) that want to read bank-level counts without going
+    /// through a snapshot.
+    pub fn dispatch_banks(&self) -> &DispatchCounters {
+        &self.dispatch
+    }
+
+    pub fn enable_call_argument_copy(&mut self) {
+        if self.call_argument_copy.is_none() {
+            self.call_argument_copy = Some(CallArgumentCopyCounterStore::new());
+        }
+    }
+
+    pub fn disable_call_argument_copy(&mut self) {
+        self.call_argument_copy = None;
+    }
+
+    pub fn reset_call_argument_copy(&mut self) {
+        if let Some(store) = &self.call_argument_copy {
+            store.reset();
+        }
+    }
+
+    pub fn call_argument_copy_counts(&self) -> Option<CallArgumentCopyCounts> {
+        self.call_argument_copy
+            .as_ref()
+            .map(CallArgumentCopyCounterStore::snapshot)
+    }
+
+    pub fn enable_slow_path(&mut self) {
+        if self.slow_path.is_none() {
+            self.slow_path = Some(SlowPathCounterStore::new());
+        }
+    }
+
+    pub fn disable_slow_path(&mut self) {
+        self.slow_path = None;
+    }
+
+    pub fn reset_slow_path(&mut self) {
+        // The asm path is the source of truth for slow-path counts —
+        // it writes into the `slow_semantic` / `slow_safepoint` banks
+        // of `DispatchCounters`. Reset those alongside the legacy
+        // Rust-side store (kept only so `slow_path_counts()` can return
+        // `None` when disabled).
+        self.dispatch.slow_semantic.fill(0);
+        self.dispatch.slow_safepoint.fill(0);
+        if let Some(store) = &self.slow_path {
+            store.reset();
+        }
+    }
+
+    pub const fn slow_path_enabled(&self) -> bool {
+        self.slow_path.is_some()
+    }
+
+    /// Snapshot the asm-driven slow-path banks. Returns `None` only
+    /// when slow-path tracking has been disabled via
+    /// `disable_slow_path` (the legacy `SlowPathCounterStore` field is
+    /// the enable flag; the actual counts live in `dispatch`).
+    pub fn slow_path_counts(&self) -> Option<SlowPathCounts> {
+        self.slow_path.as_ref()?;
+        Some(SlowPathCounts::from_dispatch_arrays(
+            &self.dispatch.slow_semantic,
+            &self.dispatch.slow_safepoint,
+        ))
+    }
+
+    #[inline]
+    pub(crate) fn record_argument_scratch_pushes(&self, count: u64) {
+        if let Some(store) = &self.call_argument_copy {
+            store.record_scratch_pushes(count);
+        }
+    }
+
+    #[inline]
+    pub(crate) fn record_argument_frame_copies(&self, count: u64) {
+        if let Some(store) = &self.call_argument_copy {
+            store.record_frame_copies(count);
+        }
+    }
+}
+
+impl Default for OpcodeCounters {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Flat counter banks for the asm-driven counter increments.
 ///
@@ -71,64 +211,6 @@ impl Default for DispatchCounters {
             slow_semantic: [0; 256],
             slow_safepoint: [0; 256],
         }
-    }
-}
-
-pub struct OpcodeDispatchCounterStore {
-    counters: Box<DispatchCounters>,
-}
-
-impl OpcodeDispatchCounterStore {
-    pub fn new() -> Self {
-        Self {
-            counters: DispatchCounters::new(),
-        }
-    }
-
-    pub fn counters(&self) -> &DispatchCounters {
-        &self.counters
-    }
-
-    pub fn counters_mut(&mut self) -> &mut DispatchCounters {
-        &mut self.counters
-    }
-
-    /// Raw pointer to the inner `DispatchCounters`, for asm-side reads.
-    /// The asm path reads `[VM, #VM_DISPATCH_COUNTERS_PTR_OFFSET]` to
-    /// get the `OpcodeDispatchCounterStore` pointer (or its inner Box —
-    /// depending on the chosen offset binding strategy).
-    pub fn counters_ptr(&self) -> *const DispatchCounters {
-        &raw const *self.counters
-    }
-
-    #[inline]
-    pub fn increment(&self, opcode: Opcode) {
-        // SAFETY: single-threaded VM; counter writes are tear-free on
-        // aligned u64. The asm path uses non-atomic `add x10, x10, #1`
-        // with the same single-threaded guarantee.
-        unsafe {
-            let counters = &mut *self.counters_ptr().cast_mut();
-            counters.dispatch[opcode as u8 as usize] =
-                counters.dispatch[opcode as u8 as usize].saturating_add(1);
-        }
-    }
-
-    pub fn reset(&self) {
-        // SAFETY: same as `increment` — single-threaded VM.
-        unsafe {
-            let counters = &mut *self.counters_ptr().cast_mut();
-            counters.reset();
-        }
-    }
-
-    pub fn snapshot(&self) -> OpcodeDispatchCounts {
-        self.counters.snapshot_dispatch()
-    }
-}
-
-impl Default for OpcodeDispatchCounterStore {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
