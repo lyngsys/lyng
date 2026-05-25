@@ -102,7 +102,10 @@ fn evaluate_script_drains_nested_promise_jobs_to_quiescence() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let result_promise = result
@@ -136,7 +139,10 @@ fn evaluate_script_runs_callable_promise_reactions() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let result_promise = result
@@ -165,7 +171,10 @@ fn evaluate_script_resolves_promise_all_values_in_order() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -212,13 +221,19 @@ fn evaluate_script_promise_reaction_can_update_global_lexical_binding() {
     let mut registry = RejectingRegistry;
 
     let _ = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
     vm.checkpoint_promise_jobs(agent, &host, &mut registry)
         .expect("promise job should update top-level lexical binding");
 
     let result = vm
-        .script_eval(agent, realm, &readback).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &readback)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .expect("readback should load updated top-level lexical");
 
     assert_eq!(result, Value::from_smi(3));
@@ -256,13 +271,19 @@ fn evaluate_script_promise_reaction_rebinding_is_visible_to_existing_closure() {
     let mut registry = RejectingRegistry;
 
     let _ = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
     vm.checkpoint_promise_jobs(agent, &host, &mut registry)
         .expect("promise job should update top-level lexical binding");
 
     let result = vm
-        .script_eval(agent, realm, &readback).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &readback)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .expect("readback should call existing closure");
     let text = result
         .as_string_ref()
@@ -299,7 +320,10 @@ fn checkpoint_harness_callback_observes_rebound_lexical_from_promise_job() {
     let mut registry = RejectingRegistry;
 
     let _ = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let observe_key = PropertyKey::from_atom(agent.atoms_mut().intern_collectible("observe"));
@@ -327,7 +351,10 @@ fn checkpoint_harness_callback_observes_rebound_lexical_from_promise_job() {
         .expect("promise and harness jobs should drain");
 
     let result = vm
-        .script_eval(agent, realm, &readback).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &readback)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .expect("readback should evaluate");
     let text = result
         .as_string_ref()
@@ -364,7 +391,8 @@ fn evaluate_script_top_level_closures_share_rebound_lexical_binding() {
     let mut vm = Vm::new();
 
     let result = vm
-        .script_eval(agent, realm, &unit).run()
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("script should evaluate");
 
     let text = result
@@ -401,7 +429,8 @@ fn evaluate_script_top_level_arrow_and_function_share_rebound_lexical_binding() 
     let mut vm = Vm::new();
 
     let result = vm
-        .script_eval(agent, realm, &unit).run()
+        .script_eval(agent, realm, &unit)
+        .run()
         .expect("script should evaluate");
 
     let text = result
@@ -445,13 +474,19 @@ fn evaluate_script_named_function_expression_closure_observes_rebound_lexical_bi
     let mut registry = RejectingRegistry;
 
     let _ = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
     vm.checkpoint_promise_jobs(agent, &host, &mut registry)
         .expect("promise job should update top-level lexical binding");
 
     let result = vm
-        .script_eval(agent, realm, &readback).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &readback)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .expect("readback should call saved closure");
     let text = result
         .as_string_ref()
@@ -479,7 +514,10 @@ fn evaluate_script_array_from_async_resolves_sync_iterable_values() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -539,7 +577,10 @@ fn evaluate_script_array_from_async_uses_intrinsic_iterator_symbols() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -791,7 +832,10 @@ fn evaluate_script_resolves_promise_all_settled_records() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -864,7 +908,10 @@ fn evaluate_script_resolves_promise_race_with_first_settlement() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -897,7 +944,10 @@ fn evaluate_script_promise_all_rejects_non_iterables_through_the_returned_promis
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -932,7 +982,10 @@ fn evaluate_script_invokes_promise_all_resolve_for_each_iterated_value() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -966,7 +1019,10 @@ fn evaluate_script_promise_all_result_creation_avoids_array_prototype_setters() 
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -1107,7 +1163,10 @@ fn evaluate_script_resolves_promise_any_with_first_fulfillment() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -1145,7 +1204,10 @@ fn evaluate_script_rejects_promise_any_with_aggregate_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -1179,7 +1241,10 @@ fn evaluate_script_rejects_promise_any_empty_iterable_with_aggregate_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -1227,7 +1292,10 @@ fn evaluate_script_promise_any_preserves_fulfillment_job_order() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result
@@ -1332,7 +1400,10 @@ fn evaluate_script_promise_any_iterator_step_errors_reject_the_result_promise() 
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit).with_host(&host).with_registry(&mut registry).run()
+        .script_eval(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .run()
         .unwrap();
 
     let promise = result

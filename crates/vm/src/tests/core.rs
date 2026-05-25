@@ -72,7 +72,8 @@ fn completed_bytecode_calls_keep_register_storage_inactive_for_reuse() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
@@ -224,7 +225,8 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     assert_eq!(code_slots, &[Value::from_smi(41)]);
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(41));
@@ -270,7 +272,8 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         // first dispatch. Total starts at 0.
         assert_eq!(vm.opcode_dispatch_counts().unwrap().total(), 0);
         let result = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap();
         assert_eq!(result, Value::from_smi(42));
         // Until Task 4 wires the asm-side increment, the dispatch
@@ -280,7 +283,8 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
 
         vm.enable_opcode_dispatch_counts();
         let result = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap();
         assert_eq!(result, Value::from_smi(42));
 
@@ -336,7 +340,8 @@ fn add_smi_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
@@ -382,7 +387,8 @@ fn jump_i24_forward_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
@@ -428,7 +434,8 @@ fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
@@ -492,7 +499,8 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(7));
 
@@ -567,7 +575,8 @@ fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
@@ -636,7 +645,8 @@ fn simple_nested_call0_return_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
 
@@ -730,7 +740,8 @@ fn simple_tail_call_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(42));
     assert_eq!(vm.peak_frame_depth(), 2);
@@ -792,7 +803,8 @@ fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
 
     vm.enable_opcode_dispatch_counts();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     assert_eq!(result, Value::from_smi(1));
 
@@ -842,7 +854,8 @@ fn smi_equal_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_bool(true)
     );
@@ -882,7 +895,8 @@ fn nullish_equal_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_bool(true)
     );
@@ -922,7 +936,8 @@ fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
     vm.reset_slow_path_counts();
 
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::from_bool(true)
     );
@@ -963,7 +978,8 @@ fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     // 5 * sum(0..7) = 5 * 28 = 140
@@ -1004,7 +1020,8 @@ fn spread_call_still_materializes_into_argument_scratch() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
@@ -1037,7 +1054,8 @@ fn bound_function_call_still_materializes_into_argument_scratch() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(16));
@@ -1072,7 +1090,8 @@ fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(306));
@@ -1176,7 +1195,8 @@ fn rest_parameter_function_stays_on_slow_path() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(10));
@@ -1212,7 +1232,8 @@ fn ordinary_bytecode_calls_avoid_argument_scratch_pushes() {
     vm.enable_call_argument_copy_counts();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     // sum over i in 0..10 of (i + (i+1) + (i+2)) = 3*(0+1+...+9) + 30 = 135 + 30 = 165
@@ -1272,7 +1293,8 @@ fn vm_loop_backedges_poll_active_incremental_major_mark() {
         );
 
         let result = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap();
 
         assert_eq!(result, Value::from_smi(3));
@@ -1323,7 +1345,8 @@ fn vm_full_jump_backedges_poll_active_incremental_major_mark() {
     );
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(7));
@@ -1429,7 +1452,8 @@ fn vm_executes_specialized_smi_opcodes_and_fallback_paths() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(72));
@@ -1843,7 +1867,8 @@ fn vm_executes_wide_register_and_constant_operands() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(69_999));
@@ -1898,7 +1923,8 @@ fn vm_executes_wide_conditional_jumps() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(7));
@@ -1918,7 +1944,8 @@ fn global_load_matches_runtime_atom_text_when_ids_differ() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(13));
@@ -1938,7 +1965,8 @@ fn typeof_name_resolution_matches_runtime_atom_text_when_ids_differ() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let string = result
         .as_string_ref()
@@ -2081,7 +2109,8 @@ fn vm_tracks_child_parent_links_and_unconditional_jumps() {
         Some(installed.code())
     );
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::undefined()
     );
@@ -2113,7 +2142,8 @@ fn load_const_supports_atom_backed_string_constants() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let string = result
         .as_string_ref()
@@ -2155,7 +2185,8 @@ fn load_const_supports_utf16_only_atom_backed_string_constants() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let string = result
         .as_string_ref()
@@ -2205,7 +2236,8 @@ fn load_const_still_rejects_builtin_constants_without_runtime_support() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run(),
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run(),
         Err(VmError::UnsupportedConstant {
             code: installed.code(),
             index: 0,
@@ -2239,7 +2271,8 @@ fn load_const_supports_reserved_internal_builtin_constants() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let builtin = result
         .as_object_ref()
@@ -2280,7 +2313,8 @@ fn load_const_supports_phase5_public_builtin_constants() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let builtin = result
         .as_object_ref()
@@ -2321,7 +2355,8 @@ fn load_const_supports_phase5_function_builtin_constants() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let builtin = result
         .as_object_ref()
@@ -2354,7 +2389,8 @@ fn symbol_global_dispatches_through_the_shared_builtins_bridge() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
     let symbol = result
         .as_symbol_ref()
@@ -2415,7 +2451,8 @@ fn function_builtins_dispatch_through_the_shared_builtins_bridge() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(9));
@@ -2450,7 +2487,8 @@ fn function_call_builtin_rebinds_nested_targets_without_frame_leaks() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(19));
@@ -2483,7 +2521,8 @@ fn array_push_preserves_index_setter_observability() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_bool(true));
@@ -2569,7 +2608,8 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     assert_eq!(
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .run()
             .unwrap(),
         Value::undefined()
     );
@@ -2631,7 +2671,8 @@ fn throw_transfers_control_to_matching_catch_handler() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env()).run()
+        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .run()
         .unwrap();
 
     assert_eq!(result, Value::from_smi(13));
