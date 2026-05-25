@@ -1254,6 +1254,42 @@ impl ObjectRuntime {
         self.watchpoint_sets.retain(|_, set| !set.is_invalidated());
     }
 
+    /// Called by the post-mark GC sweep. For every shape that has a populated
+    /// `prototype_transitions` table, drops entries whose `PrototypeKey::Object`
+    /// target is no longer live (as determined by `is_marked`). Drops the table
+    /// itself if it becomes empty, and removes the shape from
+    /// `shapes_with_proto_transitions`.
+    pub fn prune_dead_prototype_transitions(&mut self, is_marked: impl Fn(ObjectRef) -> bool) {
+        let shapes: Vec<ShapeId> = self.shapes_with_proto_transitions.iter().copied().collect();
+        for shape in shapes {
+            let Some(meta) = self.shape_metadata_mut(shape) else {
+                continue;
+            };
+            let Some(table) = meta.prototype_transitions.as_deref_mut() else {
+                continue;
+            };
+            table.retain(|key, _| match key {
+                PrototypeKey::Object(obj) => is_marked(*obj),
+                PrototypeKey::Null => true,
+            });
+            if table.is_empty() {
+                meta.prototype_transitions = None;
+                self.shapes_with_proto_transitions.remove(&shape);
+            }
+        }
+    }
+
+    /// Returns `true` if `shape`'s `prototype_transitions` table has an entry
+    /// for the given `key`. Intended for use in cross-crate tests (e.g. in
+    /// `lyng-env`) that need to assert table presence without accessing the
+    /// private `ShapeMetadata` type.
+    pub fn prototype_transition_entry_exists(&self, shape: ShapeId, key: PrototypeKey) -> bool {
+        self.shape_metadata(shape)
+            .and_then(|m| m.prototype_transitions.as_deref())
+            .map(|table| table.contains_key(&key))
+            .unwrap_or(false)
+    }
+
     /// Read-only accessor for a shape's `WatchpointSet`. Used by tests (including
     /// cross-crate tests in `lyng-env`) to assert post-fire state.
     pub fn watchpoint_sets_inspect(&self, shape: ShapeId) -> Option<&WatchpointSet> {

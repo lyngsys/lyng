@@ -40,6 +40,22 @@ impl Agent {
             additional_roots,
         };
         let report = self.heap.force_collect_tracing(&self.roots, &roots);
+        // Post-mark sweep: prune dead prototype-transition entries and drop
+        // invalidated watchpoint sets. Both operate purely on ObjectRuntime
+        // side tables, so they live here at the Agent layer (ObjectRuntime is
+        // not accessible from inside PrimitiveHeap::sweep_weak_state).
+        //
+        // Note: mark bits are cleared by the end of `force_collect_tracing`
+        // (inside `complete_background_sweep`). We therefore use
+        // `heap.view().object(obj).is_some()` as the liveness test: after the
+        // concurrent sweep, dead objects' slots are freed (return `None`) while
+        // live objects' slots remain occupied (return `Some`).
+        {
+            let heap = &self.heap;
+            self.objects
+                .prune_dead_prototype_transitions(|obj| heap.view().object(obj).is_some());
+        }
+        self.objects.sweep_invalidated_watchpoint_sets();
         self.enqueue_pending_finalization_cleanup_jobs();
         report
     }

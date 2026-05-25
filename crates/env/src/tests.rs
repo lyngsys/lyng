@@ -1913,3 +1913,130 @@ fn null_and_object_prototype_produce_distinct_shapes() {
         "null prototype and object prototype should produce distinct shapes"
     );
 }
+
+// T18 — After a full GC, entries in `prototype_transitions` whose target
+//         prototype object is no longer live are pruned.
+//
+// Design: we establish two entries in s_source.prototype_transitions:
+//   s_source → proto1  (shape_a)
+//   s_source → proto2  (shape_b)
+// Then we let obj1 (and therefore shape_a and proto1) become entirely
+// unreachable by NOT adding obj1 to kept_objects. shape_a's prototype_guard
+// points to proto1; since shape_a is unreachable, proto1 is also unreachable.
+// After GC, the proto1 entry should be pruned while the proto2 entry (kept
+// alive through obj2 → shape_b → prototype_guard = proto2) survives.
+#[test]
+fn dead_prototype_transition_entry_pruned_on_gc() {
+    use lyng_gc::WeakHeapRef;
+    use lyng_objects::PrototypeKey;
+    use lyng_types::ShapeId;
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    // Allocate objects that all begin on the same source shape.
+    // `anchor` stays on s_source and is kept alive so the shape survives GC.
+    let anchor = alloc_plain_object(agent);
+    let obj1 = alloc_plain_object(agent);
+    let obj2 = alloc_plain_object(agent);
+    let proto1 = alloc_plain_object(agent);
+    let proto2 = alloc_plain_object(agent);
+
+    let s_source: ShapeId = agent
+        .heap()
+        .view()
+        .object(anchor)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    // Establish two entries in s_source.prototype_transitions:
+    //   s_source --proto1--> shape_a   (obj1 transitions to proto1)
+    //   s_source --proto2--> shape_b   (obj2 transitions to proto2)
+    agent.set_prototype_of(obj1, Some(proto1)).unwrap();
+    agent.set_prototype_of(obj2, Some(proto2)).unwrap();
+
+    assert!(
+        agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto1)),
+        "entry for proto1 should exist before GC"
+    );
+    assert!(
+        agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto2)),
+        "entry for proto2 should exist before GC"
+    );
+
+    // Keep anchor (keeps s_source alive) and obj2 (keeps shape_b and proto2
+    // alive through prototype_guard). obj1 is intentionally NOT rooted:
+    // it becomes unreachable, so shape_a (and proto1 via its prototype_guard)
+    // are also unreachable after GC.
+    agent.keep_weak_target_alive(WeakHeapRef::Object(anchor));
+    agent.keep_weak_target_alive(WeakHeapRef::Object(obj2));
+
+    agent.force_collect();
+
+    // After GC: proto1 entry should be pruned; proto2 entry should survive.
+    assert!(
+        !agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto1)),
+        "entry for dead proto1 should be pruned after GC"
+    );
+    assert!(
+        agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto2)),
+        "entry for live proto2 should survive GC"
+    );
+}
+
+// T19 — A prototype-transition entry whose target object is still live is
+//         retained across a full GC.
+#[test]
+fn live_prototype_transition_entry_retained_on_gc() {
+    use lyng_gc::WeakHeapRef;
+    use lyng_objects::PrototypeKey;
+    use lyng_types::ShapeId;
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    // `anchor` stays on s_source so the shape stays alive across GC.
+    let anchor = alloc_plain_object(agent);
+    let obj = alloc_plain_object(agent);
+    let proto = alloc_plain_object(agent);
+
+    let s_source: ShapeId = agent
+        .heap()
+        .view()
+        .object(anchor)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    agent.set_prototype_of(obj, Some(proto)).unwrap();
+
+    assert!(
+        agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto)),
+        "entry should exist before GC"
+    );
+
+    // Root anchor (keeps s_source alive) and obj (whose prototype_guard on its
+    // new shape keeps proto alive). proto is therefore still reachable after GC.
+    agent.keep_weak_target_alive(WeakHeapRef::Object(anchor));
+    agent.keep_weak_target_alive(WeakHeapRef::Object(obj));
+
+    agent.force_collect();
+
+    assert!(
+        agent
+            .objects()
+            .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto)),
+        "entry for live proto should survive GC"
+    );
+}
