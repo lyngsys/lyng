@@ -1464,9 +1464,10 @@ fn shared_wait_queue_wakes_waiters_across_os_threads() {
 // ── Watchpoint dispatch tests (Task 1.5) ─────────────────────────────────────
 
 use lyng_objects::{
-    ShapeInvalidationObserver, ShapePropertyKind, ShapeTransitionKey, Watchpoint, WatchpointState,
+    NamedPropertyStorageMode, ShapeInvalidationObserver, ShapePropertyKind, ShapeTransitionKey,
+    Watchpoint, WatchpointState, NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT,
 };
-use lyng_types::{DescriptorAttributes, ShapeId};
+use lyng_types::{DescriptorAttributes, PropertyDescriptor, ShapeId};
 
 /// Returns the root shape (no prototype guard, `LongLived`).
 fn alloc_root_shape(agent: &mut Agent) -> ShapeId {
@@ -1561,4 +1562,210 @@ fn registering_on_different_shape_succeeds_after_fire() {
     agent.fire_watchpoints_for_shape(s2);
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![1, 2]);
+}
+
+// ── Dictionary-transition watchpoint fire tests (Task 2.2) ───────────────────
+
+/// Build a fresh ordinary object with one named property "x" (value 42,
+/// writable/enumerable/configurable).  The returned `ObjectRef` has a
+/// non-root `ShapeId` corresponding to that single property.
+fn alloc_object_with_named_x(agent: &mut Agent) -> lyng_types::ObjectRef {
+    // Use atom 1 as the stand-in for the "x" key — atom identity is opaque in
+    // the object layer, any consistent non-zero atom works for test purposes.
+    let key = PropertyKey::from_atom(AtomId::from_raw(1));
+    let obj = agent.with_heap_and_objects(|heap, objects| {
+        let root = objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::LongLived);
+        objects.alloc_object(&mut heap.mutator(), lyng_objects::ObjectAllocation::ordinary(root), AllocationLifetime::LongLived)
+    });
+    // Add property "x" through the Agent wrapper so the shape advances.
+    let mut desc = PropertyDescriptor::new();
+    desc.set_value(Value::from_smi(42));
+    desc.set_writable(true);
+    desc.set_enumerable(true);
+    desc.set_configurable(true);
+    agent
+        .define_own_property(obj, key, desc, AllocationLifetime::LongLived)
+        .expect("initial property definition should succeed");
+    // Drain the spurious fire from the root-shape (no registered watchpoints,
+    // so take_recording_fires() is still empty, but reset the buffer anyway).
+    let _ = agent.objects_mut().take_recording_fires();
+    obj
+}
+
+// T10 — redefine "x" with configurable:false forces a dictionary transition
+//         that fires the watchpoint registered on the source shape.
+#[test]
+fn dictionary_transition_via_redefine_fires_watchpoint() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    let obj = alloc_object_with_named_x(agent);
+    let original_shape = agent
+        .heap()
+        .view()
+        .object(obj)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(original_shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 7 },
+        })
+        .unwrap();
+
+    // Redefine "x" with configurable:false — attribute change forces dictionary.
+    let key = PropertyKey::from_atom(AtomId::from_raw(1));
+    let mut desc = PropertyDescriptor::new();
+    desc.set_value(Value::from_smi(42));
+    desc.set_writable(true);
+    desc.set_enumerable(true);
+    desc.set_configurable(false);
+    agent
+        .define_own_property(obj, key, desc, AllocationLifetime::LongLived)
+        .expect("redefine should succeed");
+
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![7]);
+    assert_eq!(
+        agent.objects().named_property_storage_mode(obj),
+        Some(NamedPropertyStorageMode::Dictionary),
+        "object should be in dictionary mode after redefine"
+    );
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(original_shape)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated
+    );
+}
+
+// T11 — `delete obj.x` forces a dictionary transition that fires the
+//         watchpoint registered on the source shape.
+#[test]
+fn dictionary_transition_via_delete_fires_watchpoint() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    let obj = alloc_object_with_named_x(agent);
+    let original_shape = agent
+        .heap()
+        .view()
+        .object(obj)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(original_shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 8 },
+        })
+        .unwrap();
+
+    let key = PropertyKey::from_atom(AtomId::from_raw(1));
+    agent.delete(obj, key).expect("delete should succeed");
+
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![8]);
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(original_shape)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated
+    );
+}
+
+// T12 — Adding the (LIMIT+1)-th property while in shape-stable mode forces a
+//         dictionary transition that fires the watchpoint on the brink shape.
+#[test]
+fn dictionary_transition_via_property_overflow_fires_watchpoint() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+
+    // Allocate a root-shape object with no properties.
+    let obj = agent.with_heap_and_objects(|heap, objects| {
+        let root = objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::LongLived);
+        objects.alloc_object(
+            &mut heap.mutator(),
+            lyng_objects::ObjectAllocation::ordinary(root),
+            AllocationLifetime::LongLived,
+        )
+    });
+
+    // Add LIMIT properties (atoms 1 .. LIMIT inclusive) through objects-layer
+    // primitives so that no watchpoints fire (none are registered yet).
+    // We bypass the Agent wrapper here deliberately — using the lower-level
+    // objects API — to avoid spurious fires polluting the recording buffer.
+    let limit = NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT;
+    for atom_raw in 1..=limit {
+        let key = PropertyKey::from_atom(AtomId::from_raw(atom_raw));
+        let mut desc = PropertyDescriptor::new();
+        desc.set_value(Value::from_smi(atom_raw as i32));
+        desc.set_writable(true);
+        desc.set_enumerable(true);
+        desc.set_configurable(true);
+        agent
+            .with_heap_and_objects(|heap, objects| {
+                objects.define_own_property(&mut heap.mutator(), obj, key, desc, AllocationLifetime::LongLived)
+            })
+            .expect("property addition during setup should succeed");
+    }
+
+    // Confirm object is still in shape-stable mode after LIMIT additions.
+    assert_eq!(
+        agent.objects().named_property_storage_mode(obj),
+        Some(NamedPropertyStorageMode::ShapeStable),
+        "object should still be shape-stable before the triggering addition"
+    );
+
+    // Read the brink shape — the one with LIMIT properties on it.
+    let brink_shape = agent
+        .heap()
+        .view()
+        .object(obj)
+        .unwrap()
+        .shape()
+        .unwrap();
+
+    // Register watchpoint on the brink shape.
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(brink_shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 12 },
+        })
+        .unwrap();
+
+    // Adding property #(LIMIT+1) via the Agent wrapper fires watchpoints on
+    // the brink shape and forces the dictionary transition.
+    let overflow_key = PropertyKey::from_atom(AtomId::from_raw(limit + 1));
+    let mut desc = PropertyDescriptor::new();
+    desc.set_value(Value::from_smi((limit + 1) as i32));
+    desc.set_writable(true);
+    desc.set_enumerable(true);
+    desc.set_configurable(true);
+    agent
+        .define_own_property(obj, overflow_key, desc, AllocationLifetime::LongLived)
+        .expect("overflow property addition should succeed");
+
+    assert_eq!(agent.objects_mut().take_recording_fires(), vec![12]);
+    assert_eq!(
+        agent.objects().named_property_storage_mode(obj),
+        Some(NamedPropertyStorageMode::Dictionary),
+        "object should be in dictionary mode after overflow"
+    );
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(brink_shape)
+            .unwrap()
+            .state(),
+        WatchpointState::Invalidated
+    );
 }
