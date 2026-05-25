@@ -406,6 +406,39 @@ impl ObjectRuntime {
         true
     }
 
+    /// Returns `true` when `id`'s `[[Prototype]]` slot is immutable (e.g., module
+    /// namespace objects whose prototype is always `%Object.prototype%`).
+    pub fn has_immutable_prototype(&self, id: ObjectRef) -> bool {
+        self.object_metadata(id)
+            .is_some_and(|m| m.flags.has_immutable_prototype())
+    }
+
+    /// Bumps the invalidation epoch on `id` with cause `PrototypeMutation`.
+    ///
+    /// Returns `true` on success. Should be called after a successful prototype
+    /// mutation so that IC paths that cached the previous prototype are invalidated.
+    pub fn bump_prototype_mutation_epoch(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+    ) -> bool {
+        self.bump_invalidation(heap, id, InvalidationCause::PrototypeMutation)
+    }
+
+    /// Returns `true` when `target` is reachable by following `[[Prototype]]` links
+    /// from `start` (i.e., `target` is an ancestor of `start`). Stops early at Proxy
+    /// objects (which may have a non-ordinary prototype chain).
+    ///
+    /// Used by `[[SetPrototypeOf]]` to detect prototype cycles before they are formed.
+    pub fn check_prototype_chain_contains(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        start: ObjectRef,
+        target: ObjectRef,
+    ) -> InternalMethodResult<bool> {
+        self.prototype_chain_contains(heap, start, target)
+    }
+
     pub fn set_prototype(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,

@@ -4,9 +4,9 @@ use super::{
     Intrinsics, ModuleRecord, ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata,
     RealmRef, RegExpLegacyStaticState, WellKnownSymbols,
 };
-use lyng_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
+use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
-use lyng_objects::{InternalMethodResult, RegExpPayload};
+use lyng_objects::{InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload};
 use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -348,6 +348,87 @@ impl Agent {
             self.fire_watchpoints_for_shape(old);
         }
         result
+    }
+
+    /// Changes the `[[Prototype]]` of `id` to `prototype`, performing a shape
+    /// transition and firing watchpoints on the pre-mutation shape.
+    ///
+    /// This is the production entry point for `Object.setPrototypeOf` and
+    /// `Reflect.setPrototypeOf`. It validates the operation (immutable-prototype
+    /// check, extensibility check, cycle check), then atomically transitions the
+    /// object to a new shape whose prototype guard reflects the new prototype,
+    /// fires watchpoints on the old shape, and bumps the invalidation epoch.
+    ///
+    /// Bootstrap/initialization code that sets prototypes before IC shapes are
+    /// live should use `objects.set_prototype(...)` directly.
+    pub fn set_prototype_of(
+        &mut self,
+        id: ObjectRef,
+        prototype: Option<ObjectRef>,
+    ) -> InternalMethodResult<bool> {
+        // 1. Read current prototype; short-circuit if unchanged.
+        let (current, old_shape) = {
+            let view = self.heap.view();
+            let current = self.objects.get_prototype_of(view, id)?;
+            let old_shape = view
+                .object(id)
+                .and_then(|r| r.shape())
+                .ok_or(InternalMethodError::MissingObject)?;
+            (current, old_shape)
+        };
+        if current == prototype {
+            return Ok(true);
+        }
+
+        // 2. Reject if the object has an immutable prototype slot.
+        if self.objects.has_immutable_prototype(id) {
+            return Ok(false);
+        }
+
+        // 3. Reject if the object is non-extensible.
+        if !self.objects.is_extensible(id)? {
+            return Ok(false);
+        }
+
+        // 4. Reject if setting `prototype` would create a cycle.
+        if let Some(p) = prototype {
+            let view = self.heap.view();
+            if self.objects.check_prototype_chain_contains(view, p, id)? {
+                return Ok(false);
+            }
+        }
+
+        // 5. Resolve (or allocate) the post-mutation shape.
+        let key = PrototypeKey::from_optional(prototype);
+        let new_shape = self.with_heap_and_objects(|heap, objects| {
+            objects.resolve_prototype_transition(&mut heap.mutator(), old_shape, key, AllocationLifetime::Default)
+        });
+
+        // 6. Commit: update the object's shape pointer and prototype handle.
+        let shape_ok = self.with_heap_and_objects(|heap, objects| {
+            objects.retarget_shape(&mut heap.mutator(), id, new_shape)
+        });
+        if !shape_ok {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+        let proto_ok = self.heap.mutator().mut_store_object_handle(
+            ObjectHandleStoreTarget::ObjectPrototype(id),
+            prototype,
+        );
+        if !proto_ok {
+            return Err(InternalMethodError::CorruptObjectState);
+        }
+
+        // 7. Fire watchpoints on the OLD shape — after the object's shape pointer
+        //    has been updated. Matches JSC's setPrototypeDirect ordering.
+        self.fire_watchpoints_for_shape(old_shape);
+
+        // 8. Bump the invalidation epoch.
+        self.with_heap_and_objects(|heap, objects| {
+            objects.bump_prototype_mutation_epoch(&mut heap.mutator(), id);
+        });
+
+        Ok(true)
     }
 
     /// Drains watchpoints registered against `shape` and dispatches each one.

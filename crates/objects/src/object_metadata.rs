@@ -381,6 +381,22 @@ impl ShapeMetadata {
         }
     }
 
+    /// Constructs a new [`ShapeMetadata`] for a shape that has the same property layout
+    /// as `parent` but a different prototype guard. Inherits `properties`,
+    /// `property_lookup`, and `inline_slot_count` from the parent. Begins with its own
+    /// empty `transitions` chain and no `prototype_transitions`.
+    pub(crate) fn proto_derived(parent: &ShapeMetadata) -> Self {
+        Self {
+            transition_key: None,
+            property: parent.property,
+            properties: parent.properties.clone(),
+            property_lookup: parent.property_lookup.clone(),
+            transitions: ShapeTransitionStorage::new(),
+            inline_slot_count: parent.inline_slot_count,
+            prototype_transitions: None,
+        }
+    }
+
     pub(crate) fn property(&self, key: PropertyKey) -> Option<ShapeProperty> {
         self.property_lookup.as_ref().map_or_else(
             || {

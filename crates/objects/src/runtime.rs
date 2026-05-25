@@ -6,10 +6,11 @@ use super::{
     ObjectColdData, ObjectFlags, ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef,
     OrdinaryObjectData, PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData,
     RegExpPayload, RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord,
-    SetObjectData, ShapeAllocation, ShapeId, ShapeMetadata, ShapeProperty, ShapeRecord,
-    ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
-    TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
+    SetObjectData, ShapeAllocation, ShapeHandleStoreTarget, ShapeId, ShapeMetadata, ShapeProperty,
+    ShapeRecord, ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData,
+    TemporalObjectKind, TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
 };
+use crate::object_metadata::PrototypeKey;
 use crate::watchpoint::WatchpointSet;
 use std::collections::{HashMap, HashSet};
 
@@ -197,6 +198,81 @@ impl ObjectRuntime {
             .transitions
             .insert(transition, id);
         Some(id)
+    }
+
+    /// Allocates a fresh shape whose property layout is identical to `parent` but
+    /// whose prototype guard reflects `key`. The new shape begins with empty
+    /// `transitions` and no `prototype_transitions` of its own; it does **not**
+    /// record itself in `parent`'s `transitions` table (only prototype-transition
+    /// lookup uses it).
+    fn allocate_proto_transitioned_shape(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        parent: ShapeId,
+        key: PrototypeKey,
+        lifetime: AllocationLifetime,
+    ) -> ShapeId {
+        let prototype_guard = match key {
+            PrototypeKey::Object(p) => Some(p),
+            PrototypeKey::Null => None,
+        };
+        let parent_meta = self
+            .shape_metadata(parent)
+            .expect("parent shape must exist");
+        let slot_count = heap
+            .view()
+            .shape(parent)
+            .map(|r| r.slot_count())
+            .unwrap_or(0);
+        let new_meta = ShapeMetadata::proto_derived(parent_meta);
+        let id = heap.alloc_shape(
+            RuntimeShapeRecord::new(Some(parent), prototype_guard, slot_count),
+            lifetime,
+        );
+        self.store_shape_metadata(id, new_meta);
+        id
+    }
+
+    /// Returns the shape a `parent`-shaped object should transition to when its
+    /// prototype changes to `key`. Deduplicates via `ShapeMetadata::prototype_transitions`:
+    /// if the transition already exists the cached `ShapeId` is returned; otherwise
+    /// a fresh shape is allocated and the mapping is recorded.
+    pub fn resolve_prototype_transition(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        from: ShapeId,
+        key: PrototypeKey,
+        lifetime: AllocationLifetime,
+    ) -> ShapeId {
+        // Fast path: table already has an entry.
+        if let Some(target) = self
+            .shape_metadata(from)
+            .and_then(|m| m.prototype_transitions.as_deref())
+            .and_then(|table| table.get(&key).copied())
+        {
+            return target;
+        }
+        // Slow path: allocate and record.
+        let new_shape = self.allocate_proto_transitioned_shape(heap, from, key, lifetime);
+        let parent_meta = self
+            .shape_metadata_mut(from)
+            .expect("from shape must exist");
+        parent_meta
+            .prototype_transitions
+            .get_or_insert_with(|| Box::new(HashMap::new()))
+            .insert(key, new_shape);
+        self.shapes_with_proto_transitions.insert(from);
+        new_shape
+    }
+
+    /// Updates the shape pointer of an object in the GC heap.
+    pub fn retarget_shape(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        new_shape: ShapeId,
+    ) -> bool {
+        heap.mut_store_shape_handle(ShapeHandleStoreTarget::ObjectShape(id), Some(new_shape))
     }
 
     /// Test-only accessor for an object's inline named-slot array. Returns the four

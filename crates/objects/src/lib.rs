@@ -58,7 +58,7 @@ pub use self::functions::{
 };
 use self::module_namespace::ModuleNamespaceObject;
 pub use self::module_namespace::{ModuleNamespaceExport, ModuleNamespaceExportTarget};
-pub use self::object_metadata::{ClassPrivateElementKind, PrivateDescriptorSummary};
+pub use self::object_metadata::{ClassPrivateElementKind, PrivateDescriptorSummary, PrototypeKey};
 use self::object_metadata::{
     ClassRecord, ElementStorageMetadata, InstalledPrivateBrand, NamedPropertyDictionary,
     NamedPropertyStorage, ObjectMetadata, RootShapeKey, ShapeMetadata,

@@ -260,7 +260,7 @@ impl ObjectRuntime {
         }
     }
 
-    fn prototype_chain_contains(
+    pub(super) fn prototype_chain_contains(
         &self,
         heap: PrimitiveHeapView<'_>,
         start: ObjectRef,
