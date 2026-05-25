@@ -65,7 +65,7 @@ pub(in crate::vm) struct AsyncGeneratorFrameState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::vm) struct EntryExecutionOverride {
+pub(crate) struct EntryExecutionOverride {
     pub(in crate::vm) this_value: Value,
     pub(in crate::vm) new_target: Option<ObjectRef>,
     pub(in crate::vm) home_object: Option<ObjectRef>,

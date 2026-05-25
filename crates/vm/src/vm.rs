@@ -239,6 +239,7 @@ pub struct Vm {
 
 /// Scoped builder for evaluating a `CompiledScriptUnit`. Holds borrows of the VM, agent,
 /// and required inputs; consumed by `.run()` or `.run_retaining_installed()`.
+#[must_use = "call .run() to execute the script, or .run_retaining_installed() to also keep the InstalledCode"]
 pub struct EvaluateScript<'b> {
     vm: &'b mut Vm,
     agent: &'b mut Agent,
@@ -251,25 +252,21 @@ pub struct EvaluateScript<'b> {
 }
 
 impl<'b> EvaluateScript<'b> {
-    #[must_use]
     pub fn with_host(mut self, host: &'b dyn HostHooks) -> Self {
         self.host = Some(host);
         self
     }
 
-    #[must_use]
     pub fn with_registry(mut self, registry: &'b mut dyn NativeFunctionRegistry) -> Self {
         self.registry = Some(registry);
         self
     }
 
-    #[must_use]
     pub fn with_referrer(mut self, key: &'b ModuleKey) -> Self {
         self.referrer = Some(key);
         self
     }
 
-    #[must_use]
     pub fn with_extensions(mut self, provider: &'b SharedRealmExtensionProvider) -> Self {
         self.extensions = Some(provider);
         self
@@ -348,6 +345,7 @@ impl<'b> EvaluateScript<'b> {
 
 /// Scoped builder for evaluating an already-installed code record. Holds borrows of the VM,
 /// agent, and required inputs; consumed by `.run()`.
+#[must_use = "call .run() to execute the installed code"]
 pub struct EvaluateInstalled<'b> {
     vm: &'b mut Vm,
     agent: &'b mut Agent,
@@ -362,31 +360,26 @@ pub struct EvaluateInstalled<'b> {
 }
 
 impl<'b> EvaluateInstalled<'b> {
-    #[must_use]
     pub fn with_host(mut self, host: &'b dyn HostHooks) -> Self {
         self.host = Some(host);
         self
     }
 
-    #[must_use]
     pub fn with_registry(mut self, registry: &'b mut dyn NativeFunctionRegistry) -> Self {
         self.registry = Some(registry);
         self
     }
 
-    #[must_use]
     pub fn with_referrer(mut self, atom: AtomId) -> Self {
         self.referrer = Some(atom);
         self
     }
 
-    #[must_use]
     pub fn with_observer(mut self, observer: &'b mut dyn VmEvaluationObserver) -> Self {
         self.observer = Some(observer);
         self
     }
 
-    #[must_use]
     pub(crate) fn with_entry_override(mut self, override_: EntryExecutionOverride) -> Self {
         self.entry_override = Some(override_);
         self
@@ -1297,7 +1290,6 @@ impl Vm {
     }
 
     /// Begin evaluating a compiled script unit. Returns a builder; call `.run()` to execute.
-    #[must_use]
     pub fn script_eval<'b>(
         &'b mut self,
         agent: &'b mut Agent,
@@ -1415,7 +1407,6 @@ impl Vm {
     }
 
     /// Begin evaluating an already-installed code record. Returns a builder; call `.run()` to execute.
-    #[must_use]
     pub fn installed_eval<'b>(
         &'b mut self,
         agent: &'b mut Agent,
