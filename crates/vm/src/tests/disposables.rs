@@ -27,7 +27,7 @@ fn disposable_stack_disposes_resources_in_lifo_order() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -61,7 +61,7 @@ fn disposable_stack_move_marks_source_disposed_and_transfers_resources() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -105,7 +105,7 @@ fn async_disposable_stack_dispose_async_awaits_resources_in_lifo_order() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -156,7 +156,7 @@ fn async_disposable_stack_dispose_async_awaits_null_resources_before_resolving()
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -204,7 +204,7 @@ fn async_disposable_stack_rejects_with_nested_suppressed_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -242,7 +242,7 @@ fn using_statement_disposes_resource_on_block_exit() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let value = result
         .as_string_ref()
         .expect("using block should evaluate to a string");
@@ -285,7 +285,7 @@ fn for_of_using_disposes_each_iteration_before_advancing() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let value = result
         .as_string_ref()
         .expect("for-of using should evaluate to a string");
@@ -394,7 +394,7 @@ fn using_declarations_dispose_in_statement_contexts() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let value = result
         .as_string_ref()
         .expect("statement disposal check should return a string");
@@ -431,7 +431,7 @@ fn loop_iteration_slot_sync_active_stack_avoids_scratch_vectors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(30));
     let (source_len, target_len, source_capacity, target_capacity) =
@@ -460,7 +460,7 @@ fn loop_iteration_slot_sync_single_active_environment_avoids_scratch_vectors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(15));
     let (source_len, target_len, source_capacity, target_capacity) =
@@ -503,7 +503,7 @@ fn await_using_waits_for_async_disposal_before_resolving() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -552,7 +552,7 @@ fn skipped_await_using_declaration_does_not_suspend_async_function() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -632,7 +632,7 @@ fn using_block_local_initializer_reads_trigger_reference_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -659,7 +659,7 @@ fn using_function_local_initializer_reads_trigger_reference_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -684,7 +684,7 @@ fn assigning_to_using_bindings_in_for_of_bodies_throws_type_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -707,7 +707,7 @@ fn assigning_to_using_bindings_in_for_update_throws_type_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -740,7 +740,7 @@ fn using_cleanup_nests_multiple_disposal_errors_as_suppressed_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }

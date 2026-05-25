@@ -24,7 +24,7 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -79,7 +79,7 @@ fn dynamic_import_evaluates_options_after_the_specifier_expression() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -119,7 +119,7 @@ fn dynamic_import_accepts_unary_assignment_expressions() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -175,7 +175,7 @@ fn dynamic_import_preserves_script_referrer_after_async_resume() {
     let mut vm = Vm::new();
     let mut registry = RejectingRegistry;
 
-    vm.script_eval(agent, realm, &unit)
+    vm.evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -222,7 +222,7 @@ fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
     let mut vm = Vm::new();
     let mut registry = RejectingRegistry;
 
-    vm.script_eval(agent, realm, &unit)
+    vm.evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -278,7 +278,7 @@ fn dynamic_import_preserves_referrer_through_import_promise_reactions() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -453,7 +453,7 @@ fn dynamic_import_waits_for_current_top_level_await_evaluation() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -600,7 +600,7 @@ fn top_level_await_dynamic_imports_settle_leaf_before_parent() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -692,7 +692,7 @@ fn top_level_await_dynamic_import_rejections_settle_leaf_before_parent() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -731,7 +731,7 @@ fn dynamic_import_rejects_module_parse_errors_with_syntax_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -776,7 +776,7 @@ fn dynamic_import_source_phase_rejects_source_text_modules_with_syntax_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -842,7 +842,7 @@ fn dynamic_import_defer_sync_module_evaluates_on_namespace_access() {
     let mut registry = RejectingRegistry;
 
     let _ = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -1140,7 +1140,7 @@ fn static_import_defer_preserves_prior_evaluation_error_identity() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -1244,7 +1244,7 @@ fn dynamic_import_attributes_reject_non_object_and_non_string_values() {
         let mut registry = RejectingRegistry;
 
         let result = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .with_host(&host)
             .with_registry(&mut registry)
             .with_referrer(&script_referrer)
@@ -1317,7 +1317,7 @@ fn dynamic_import_rejects_ambiguous_module_exports_with_syntax_error() {
     let mut registry = RejectingRegistry;
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)
@@ -1370,7 +1370,7 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
     let provider: crate::SharedRealmExtensionProvider = Arc::new(TestEmbeddingProvider);
 
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .with_referrer(&script_referrer)

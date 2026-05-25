@@ -844,12 +844,12 @@ mod verify_counts {
         );
 
         // Warmup once, then reset and measure a single call.
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap_or_else(|err| panic!("warmup eval failed for {}: {err:?}", snippet.opcode));
 
         vm.reset_opcode_dispatch_counts();
-        vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap_or_else(|err| panic!("measured eval failed for {}: {err:?}", snippet.opcode));
         let counts = vm

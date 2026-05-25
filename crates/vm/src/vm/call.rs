@@ -1024,7 +1024,7 @@ mod tests {
         let mut vm = Vm::new();
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
         let _ = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap();
 
@@ -1077,7 +1077,7 @@ mod tests {
         let mut registry = RejectingNativeRegistry;
 
         let direct = vm
-            .installed_eval(
+            .evaluate_installed(
                 agent,
                 InstalledCode::new(getter_code, getter_entry),
                 getter_environment,

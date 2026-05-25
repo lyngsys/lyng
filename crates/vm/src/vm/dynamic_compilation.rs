@@ -324,7 +324,7 @@ impl Vm {
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
         let script_referrer = Self::active_script_or_module_referrer(agent);
         let mut builder = self
-            .script_eval(agent, realm_record, compilation.unit())
+            .evaluate_script(agent, realm_record, compilation.unit())
             .with_host(host)
             .with_registry(registry);
         if let Some(referrer) = script_referrer.as_ref() {
@@ -440,7 +440,7 @@ impl Vm {
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
         let mut builder = self
-            .installed_eval(agent, installed, lexical_env, variable_env)
+            .evaluate_installed(agent, installed, lexical_env, variable_env)
             .with_host(host)
             .with_registry(registry);
         if let Some(referrer) = script_referrer {
@@ -1653,7 +1653,7 @@ impl Vm {
         self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
         let result = {
             let mut builder = self
-                .installed_eval(agent, installed, lexical_env, variable_env)
+                .evaluate_installed(agent, installed, lexical_env, variable_env)
                 .with_host(host)
                 .with_registry(registry)
                 .with_entry_override(EntryExecutionOverride {

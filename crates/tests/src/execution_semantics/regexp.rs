@@ -520,7 +520,7 @@ fn regexp_literal_cache_keeps_objects_fresh_and_last_index_independent() {
         let realm = agent.default_realm().expect("default realm should exist");
         let mut vm = Vm::new();
         let result = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .run()
             .expect("compiled script should execute");
 
@@ -550,7 +550,7 @@ fn regexp_legacy_static_state_stays_lazy_when_global_loop_never_reads_accessors(
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.script_eval(agent, realm, &unit)
+    vm.evaluate_script(agent, realm, &unit)
         .run()
         .expect("compiled script should execute");
 
@@ -603,12 +603,12 @@ fn regexp_legacy_static_accessors_survive_collection_after_multiple_matches() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.script_eval(agent, realm, &record_unit)
+    vm.evaluate_script(agent, realm, &record_unit)
         .run()
         .expect("recording script should execute");
     agent.force_collect();
     let result = vm
-        .script_eval(agent, realm, &access_unit)
+        .evaluate_script(agent, realm, &access_unit)
         .run()
         .expect("accessor script should execute after collection");
 
@@ -632,13 +632,13 @@ fn regexp_symbol_match_default_global_exec_does_not_materialize_per_match_arrays
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.script_eval(agent, realm, &bootstrap_unit)
+    vm.evaluate_script(agent, realm, &bootstrap_unit)
         .run()
         .expect("bootstrap script should execute");
     let before_objects = runtime.phase6_accounting().heap.objects.live_bytes;
     let agent = runtime.root_agent_mut();
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .run()
         .expect("compiled script should execute");
     let after_objects = runtime.phase6_accounting().heap.objects.live_bytes;

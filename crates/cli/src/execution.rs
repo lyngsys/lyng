@@ -89,7 +89,7 @@ fn execute_script(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
     let provider = shell_extension_provider(invocation);
     let execution_result = {
         let mut builder = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .with_host(host)
             .with_referrer(&script_referrer);
         if let Some(provider) = provider.as_ref() {

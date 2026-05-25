@@ -14,7 +14,7 @@ fn evaluate_script_eval_executes_string_source_in_the_current_realm() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -34,7 +34,7 @@ fn evaluate_script_eval_shortcuts_regexp_literal_source() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -57,7 +57,7 @@ fn evaluate_script_direct_eval_poisoned_scope_reads_var_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -82,7 +82,7 @@ fn evaluate_script_direct_eval_poisoned_scope_hoists_function_declaration() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -107,7 +107,7 @@ fn direct_eval_dynamic_name_resolution_matches_runtime_atom_text_when_ids_differ
     let _ = agent.atoms_mut().intern_collectible("padding");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(7));
 }
@@ -188,7 +188,7 @@ fn evaluate_script_direct_eval_reads_function_local_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -214,7 +214,7 @@ fn evaluate_script_direct_eval_reads_catch_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -237,7 +237,7 @@ fn evaluate_script_direct_eval_matches_test262_global_env_rec() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -260,7 +260,7 @@ fn evaluate_script_direct_eval_reads_test262_global_env_rec_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -287,7 +287,7 @@ fn evaluate_script_direct_eval_matches_test262_global_env_rec_fun() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -310,7 +310,7 @@ fn evaluate_script_direct_eval_parenthesized_string_leading_expression() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -338,7 +338,7 @@ fn evaluate_script_direct_eval_string_comparison_result_shape() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(1));
 }
@@ -361,7 +361,7 @@ fn evaluate_script_with_statement_assigns_existing_object_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(31));
 }
@@ -385,7 +385,7 @@ fn evaluate_script_with_statement_var_initializer_assigns_through_object_environ
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -423,7 +423,7 @@ fn evaluate_script_function_declared_inside_with_captures_object_environment_for
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -461,7 +461,7 @@ fn evaluate_script_function_called_inside_with_uses_declaration_environment() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -497,7 +497,7 @@ fn evaluate_script_function_containing_with_uses_function_this_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -533,7 +533,7 @@ fn evaluate_script_function_called_inside_with_uses_global_this_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -568,7 +568,7 @@ fn evaluate_script_function_called_inside_with_keeps_local_var_separate_from_obj
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -607,7 +607,7 @@ fn evaluate_script_function_called_inside_with_uses_hoisted_local_before_initial
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -678,7 +678,7 @@ fn evaluate_script_function_containing_with_reports_binding_targets() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -720,7 +720,7 @@ fn evaluate_script_with_exception_restores_outer_name_resolution() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -763,7 +763,7 @@ fn evaluate_script_with_call_exception_restores_outer_name_resolution() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -791,7 +791,7 @@ fn evaluate_script_eval_with_statement_preserves_normal_completion_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -824,7 +824,7 @@ fn evaluate_script_eval_with_statement_updates_empty_abrupt_completion() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -857,7 +857,7 @@ fn evaluate_script_direct_eval_with_statement_reads_object_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -880,7 +880,7 @@ fn evaluate_script_with_statement_respects_symbol_unscopables() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(1));
 }
@@ -912,7 +912,7 @@ fn evaluate_script_with_statement_unscopables_keeps_global_hoisted_functions_cal
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(10));
 }
@@ -970,7 +970,7 @@ fn evaluate_script_with_statement_call_target_only_uses_has_trap_for_missing_bin
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(1));
 }
@@ -1003,7 +1003,7 @@ fn evaluate_script_with_statement_propagates_unscopables_get_errors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1043,7 +1043,7 @@ fn evaluate_script_with_statement_rechecks_deleted_binding_after_unscopables() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(1));
 }
@@ -1090,7 +1090,7 @@ fn evaluate_script_with_statement_compound_assignment_uses_stable_identifier_ref
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1159,7 +1159,7 @@ fn evaluate_script_with_statement_inc_dec_looks_up_unscopables_once() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1208,7 +1208,7 @@ fn evaluate_script_with_statement_strict_assignment_keeps_deleted_binding_refere
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1248,7 +1248,7 @@ fn evaluate_script_with_statement_sloppy_assignment_keeps_deleted_binding_refere
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1278,7 +1278,7 @@ fn evaluate_script_logical_and_assignment_infers_identifier_function_name() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1316,7 +1316,7 @@ fn evaluate_script_logical_and_assignment_short_circuits_before_missing_setter()
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(0));
 }
@@ -1345,7 +1345,7 @@ fn evaluate_script_logical_and_assignment_updates_private_fields() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1386,7 +1386,7 @@ fn evaluate_script_logical_and_assignment_throws_on_strict_non_writable_property
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1421,7 +1421,7 @@ fn evaluate_script_logical_and_assignment_updates_private_accessors() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1463,7 +1463,7 @@ fn evaluate_script_logical_and_assignment_checks_null_base_before_key_coercion()
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1491,7 +1491,7 @@ fn evaluate_script_compound_assignment_keeps_initial_identifier_reference_across
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -1525,7 +1525,7 @@ fn evaluate_script_with_statement_closure_keeps_object_environment_live() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1545,7 +1545,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let function_object = result
         .as_object_ref()
         .expect("script should return the function expression object");
@@ -1566,7 +1566,7 @@ fn evaluate_installed_function_expression_closure_can_resolve_global_eval() {
         .expect("function expression closure should preserve its outer environment");
 
     let closure_result = vm
-        .installed_eval(
+        .evaluate_installed(
             agent,
             InstalledCode::new(code, function.id()),
             environment,
@@ -1598,7 +1598,7 @@ fn evaluate_script_with_statement_closure_reads_var_declared_inside_with() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -1620,7 +1620,7 @@ fn evaluate_script_with_statement_single_statement_body_closure_keeps_var_bindin
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(12));
 }
@@ -1646,7 +1646,7 @@ fn evaluate_script_with_statement_expression_and_body_keep_distinct_var_views() 
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(31311));
 }
@@ -1666,7 +1666,7 @@ fn evaluate_script_direct_eval_var_initializer_updates_existing_global_binding()
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(1));
 }
@@ -1685,7 +1685,7 @@ fn evaluate_script_direct_eval_var_initializer_returns_inner_value_and_updates_o
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(11));
 }
@@ -1725,7 +1725,7 @@ fn caught_throw_from_to_primitive_call_propagates_value_through_register_writes(
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     // The catch body must observe `e === "error"` and write it through to
     // `caught`. Before the fix, `caught` ended up `undefined` because the
     // asm REGS pin pointed into a freed register-stack buffer after valueOf

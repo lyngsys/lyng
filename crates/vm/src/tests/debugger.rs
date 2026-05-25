@@ -56,7 +56,7 @@ fn debugger_pauses_at_requested_loop_header_and_reads_frame_state() {
     vm.request_debug_pause_at(installed.code(), loop_offset);
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 
@@ -122,7 +122,7 @@ fn assert_step_command(
     vm.request_debug_pause_at(outer_code, offsets.outer_entry);
 
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 

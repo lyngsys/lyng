@@ -912,7 +912,7 @@ mod tests {
             .expect("default realm should exist after boot");
         let mut vm = Vm::new();
         let result = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .run()
             .expect("script should execute and return a function object");
         let function_object = result
@@ -970,7 +970,7 @@ mod tests {
             .expect("default realm should exist after boot");
         let mut vm = Vm::new();
         let result = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .run()
             .expect("script should execute and return a function object");
         let function_object = result
@@ -1022,7 +1022,7 @@ mod tests {
             .expect("default realm should exist after boot");
         let mut vm = Vm::new();
         let result = vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .run()
             .expect("script should execute and return a function object");
         let function_object = result

@@ -735,7 +735,7 @@ fn run_compiled_script_with_diagnostics(
     let result = {
         let mut observer = DiagnosticVmTimingObserver::new(timings);
         let mut builder = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .with_host(host)
             .with_observer(&mut observer);
         if let Some(referrer) = script_referrer {
@@ -1349,7 +1349,7 @@ fn run_script(
         let global_object = realm.global_object();
         let mut vm = Vm::new();
         match vm
-            .script_eval(agent, realm, &unit)
+            .evaluate_script(agent, realm, &unit)
             .with_host(&host)
             .with_referrer(&script_referrer)
             .with_extensions(provider)

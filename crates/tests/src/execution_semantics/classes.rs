@@ -505,7 +505,7 @@ fn phase6_async_private_methods_async_arrows_capture_parent_arguments() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let result = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .run()
         .expect("compiled script should execute");
     let promise = result
@@ -1922,7 +1922,7 @@ fn phase6_methods_record_home_object_for_super_dispatch() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let method = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .run()
         .expect("compiled script should execute")
         .as_object_ref()

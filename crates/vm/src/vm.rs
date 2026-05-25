@@ -1307,7 +1307,7 @@ impl Vm {
     }
 
     /// Begin evaluating a compiled script unit. Returns a builder; call `.run()` to execute.
-    pub fn script_eval<'b>(
+    pub fn evaluate_script<'b>(
         &'b mut self,
         agent: &'b mut Agent,
         realm: RealmRecord,
@@ -1326,7 +1326,7 @@ impl Vm {
     }
 
     /// Begin evaluating an already-installed code record. Returns a builder; call `.run()` to execute.
-    pub fn installed_eval<'b>(
+    pub fn evaluate_installed<'b>(
         &'b mut self,
         agent: &'b mut Agent,
         installed: InstalledCode,

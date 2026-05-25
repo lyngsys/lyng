@@ -50,7 +50,7 @@ fn compile_and_run_with_host(source: &str, host: impl HostHooks + 'static) -> Va
     let _ = vm
         .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
         .expect("requested bootstrap should succeed");
-    vm.script_eval(agent, realm, &unit)
+    vm.evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .run()
         .expect("script should execute")
@@ -71,7 +71,7 @@ fn compile_and_run_string_with_host(source: &str, host: impl HostHooks + 'static
         .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
         .expect("requested bootstrap should succeed");
     let value = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .run()
         .expect("script should execute");

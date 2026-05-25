@@ -178,7 +178,7 @@ fn compile_and_run(source: &str, provider: Option<&SharedRealmExtensionProvider>
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let mut builder = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&NoopHostHooks);
     if let Some(provider) = provider {
         builder = builder.with_extensions(provider);
@@ -194,7 +194,7 @@ fn compile_and_run_string(source: &str, provider: Option<&SharedRealmExtensionPr
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
     let mut builder = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&NoopHostHooks);
     if let Some(provider) = provider {
         builder = builder.with_extensions(provider);

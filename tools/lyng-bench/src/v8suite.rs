@@ -865,7 +865,7 @@ fn run_workload_opcode_counts_once(
     }
 
     let value = vm
-        .installed_eval(
+        .evaluate_installed(
             agent,
             installed,
             realm_record.global_env(),

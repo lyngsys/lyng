@@ -402,7 +402,7 @@ fn single_eval_bits(unit: &CompiledScriptUnit) -> u64 {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    vm.script_eval(agent, realm, unit)
+    vm.evaluate_script(agent, realm, unit)
         .run()
         .expect("benchmark workload should execute")
         .bits()

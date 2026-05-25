@@ -75,7 +75,7 @@ fn vm_installs_and_executes_hand_authored_bytecode() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 
@@ -116,7 +116,7 @@ fn public_compile_and_evaluate_script_entrypoints_execute_end_to_end() {
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(unit.source(), SourceId::new(23));
     assert_eq!(result, Value::from_smi(42));
@@ -280,7 +280,7 @@ fn public_vm_feedback_footprint_reports_allocated_vector_bytes() {
     assert!(!before.allocated());
     assert_eq!(before.allocated_bytes(), 0);
 
-    vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 

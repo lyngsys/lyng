@@ -528,7 +528,7 @@ fn measure_script_runtime_sample(
 
     for _ in 0..options.warmup_runs {
         let value = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .map_err(|error| format!("warmup execution failed for {}: {error:?}", workload.name))?;
         black_box(value.bits());
@@ -546,7 +546,7 @@ fn measure_script_runtime_sample(
     let mut checksum = 0_u64;
     for _ in 0..options.runs_per_sample {
         let value = black_box(
-            vm.installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                 .run()
                 .map_err(|error| {
                     format!("timed execution failed for {}: {error:?}", workload.name)
@@ -723,7 +723,7 @@ fn capture_memory(
                 })?;
             for _ in 0..options.warmup_runs {
                 let value = vm
-                    .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+                    .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
                     .run()
                     .map_err(|error| {
                         format!(
@@ -844,9 +844,12 @@ fn capture_runtime_snapshots() -> BenchResult<Vec<RuntimeSnapshot>> {
                 "default realm should exist for RegExp literal-cache snapshot".to_string()
             })?;
             let mut vm = Vm::new();
-            let value = vm.script_eval(agent, realm, &unit).run().map_err(|error| {
-                format!("RegExp literal-cache snapshot execution failed: {error:?}")
-            })?;
+            let value = vm
+                .evaluate_script(agent, realm, &unit)
+                .run()
+                .map_err(|error| {
+                    format!("RegExp literal-cache snapshot execution failed: {error:?}")
+                })?;
             black_box(value.bits());
         }
         RuntimeSnapshot {

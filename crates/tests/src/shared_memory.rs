@@ -65,7 +65,7 @@ fn run_spec_script(source: &str) -> Value {
         .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
         .expect("spec bootstrap should succeed");
     let value = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -89,7 +89,7 @@ fn run_spec_script_with_readback(source: &str, readback: &str) -> Value {
         .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
         .expect("spec bootstrap should succeed");
     let _ = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -97,7 +97,7 @@ fn run_spec_script_with_readback(source: &str, readback: &str) -> Value {
     vm.checkpoint_promise_jobs(agent, &host, &mut registry)
         .expect("promise jobs should drain after shared-memory script");
     let value = vm
-        .script_eval(agent, realm, &readback)
+        .evaluate_script(agent, realm, &readback)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -121,7 +121,7 @@ fn run_spec_script_with_forced_collection_and_readback(source: &str, readback: &
         .bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)
         .expect("spec bootstrap should succeed");
     let _ = vm
-        .script_eval(agent, realm, &unit)
+        .evaluate_script(agent, realm, &unit)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()
@@ -130,7 +130,7 @@ fn run_spec_script_with_forced_collection_and_readback(source: &str, readback: &
         .expect("promise jobs should drain before collection");
     let _ = agent.force_collect();
     let value = vm
-        .script_eval(agent, realm, &readback)
+        .evaluate_script(agent, realm, &readback)
         .with_host(&host)
         .with_registry(&mut registry)
         .run()

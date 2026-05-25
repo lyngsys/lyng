@@ -24,7 +24,7 @@ fn explicit_derived_constructors_can_fall_through_after_super_call() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -53,7 +53,7 @@ fn explicit_derived_constructors_can_return_this_immediately_after_super_call() 
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -87,7 +87,7 @@ fn explicit_derived_constructors_throw_for_non_undefined_primitive_returns() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -119,7 +119,7 @@ fn explicit_derived_constructors_preserve_object_return_overrides() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -139,7 +139,7 @@ fn instanceof_accepts_class_constructors_as_rhs() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -175,7 +175,7 @@ fn class_heritage_functions_use_strict_arguments_objects() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(3));
 }
@@ -203,7 +203,7 @@ fn arrow_super_calls_in_finally_initialize_the_enclosing_derived_constructor() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -228,7 +228,7 @@ fn class_declaration_heritage_self_reference_throws_reference_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -253,7 +253,7 @@ fn class_expression_heritage_self_reference_throws_reference_error() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -281,7 +281,7 @@ fn class_static_block_super_property_uses_parent_class_home_object() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = decode_string(
         &agent
             .heap()
@@ -332,7 +332,7 @@ fn evaluate_script_super_property_compound_assignment_uses_stable_reference() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = decode_string(
         &agent
             .heap()
@@ -365,7 +365,7 @@ fn instance_field_arrow_functions_preserve_super_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -390,7 +390,7 @@ fn static_field_arrow_functions_preserve_super_binding() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -436,7 +436,7 @@ fn derived_constructors_reject_this_before_super_even_when_super_returns_an_obje
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -481,7 +481,7 @@ fn derived_constructors_throw_reference_error_on_second_super_after_evaluating_a
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -514,7 +514,7 @@ fn derived_constructors_without_super_throw_reference_error_on_fallthrough() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -621,7 +621,7 @@ fn derived_constructor_this_access_restriction_matches_test262_behavior() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -650,7 +650,7 @@ fn class_constructor_function_call_builtin_throws_type_error_catchably() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }
@@ -686,7 +686,7 @@ fn derived_class_constructor_function_call_builtin_throws_type_error_catchably()
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(2));
 }

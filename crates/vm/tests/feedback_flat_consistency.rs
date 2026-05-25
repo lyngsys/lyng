@@ -42,7 +42,7 @@ fn run_script_n_times(source: &str, iterations: usize) -> (Vm, lyng_types::CodeR
     // and exercise the  IC cache-hit/ slow paths.
     for _ in 0..iterations {
         let _ = vm
-            .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .expect("evaluate");
     }

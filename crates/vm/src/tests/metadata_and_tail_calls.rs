@@ -102,7 +102,7 @@ fn tail_calls_reuse_frame_depth_for_recursive_bytecode_calls() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 
@@ -135,7 +135,7 @@ fn tail_calls_through_rebound_global_eval_reuse_frame_depth() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 
@@ -163,7 +163,7 @@ fn tail_calls_preserve_constructor_fallback_result_semantics() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
     let result = vm
-        .installed_eval(agent, installed, realm.global_env(), realm.global_env())
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 

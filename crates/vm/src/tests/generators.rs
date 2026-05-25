@@ -18,7 +18,7 @@ fn generator_length_uses_expected_argument_count() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(11));
 }
@@ -36,7 +36,7 @@ fn anonymous_generator_expressions_default_name_to_empty_string() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(0));
 }
@@ -61,7 +61,7 @@ fn named_generator_expression_self_binding_ignores_sloppy_reassignment() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(11));
 }
@@ -85,7 +85,7 @@ fn array_is_array_is_installed_for_test262_property_helpers() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(31));
 }
@@ -116,7 +116,7 @@ fn generator_object_spread_uses_copy_data_properties() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let text = result
         .as_string_ref()
         .and_then(|value| {
@@ -150,7 +150,7 @@ fn generator_next_resumes_with_the_sent_value() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let _ = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let first = global_value(agent, &realm, "first");
     let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
@@ -186,7 +186,7 @@ fn generator_return_runs_finally_before_completing() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let final_state = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let final_state = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let result = global_value(agent, &realm, "result");
     let (value, done) = iterator_result_fields(agent, result);
 
@@ -226,7 +226,7 @@ fn for_of_continue_to_outer_loop_closes_the_iterator() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_smi(11));
 }
@@ -251,7 +251,7 @@ fn for_of_destructuring_assignment_defaults_only_for_undefined_values() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let _ = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(global_value(agent, &realm, "counter"), Value::from_smi(1));
     assert_eq!(global_value(agent, &realm, "flag1"), Value::from_bool(true));
@@ -287,7 +287,7 @@ fn typed_array_for_of_tracks_resizable_array_buffer_growth() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let actual = result
         .as_string_ref()
         .and_then(|string| agent.heap().view().string_view(string))
@@ -320,7 +320,7 @@ fn yield_star_delegates_generator_values_and_final_completion() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let _ = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let first = global_value(agent, &realm, "first");
     let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
@@ -370,7 +370,7 @@ fn yield_star_forwards_inner_iterator_result_objects() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -417,7 +417,7 @@ fn yield_star_reads_inner_value_only_when_delegate_is_done() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -465,7 +465,7 @@ fn yield_star_missing_throw_invokes_return_without_arguments() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let result = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
 
     assert_eq!(result, Value::from_bool(true));
 }
@@ -491,7 +491,7 @@ fn generator_methods_on_classes_lower_through_the_shared_class_path() {
     let realm = agent.default_realm().expect("default realm should exist");
     let mut vm = Vm::new();
 
-    let _ = vm.script_eval(agent, realm, &unit).run().unwrap();
+    let _ = vm.evaluate_script(agent, realm, &unit).run().unwrap();
     let first = global_value(agent, &realm, "first");
     let second = global_value(agent, &realm, "second");
     let (first_value, first_done) = iterator_result_fields(agent, first);
