@@ -215,16 +215,7 @@ fn install_descriptor(
     }
     property_descriptor.set_enumerable(attributes.enumerable());
     property_descriptor.set_configurable(attributes.configurable());
-    let defined = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.define_own_property(
-            &mut mutator,
-            target,
-            key,
-            property_descriptor,
-            AllocationLifetime::Default,
-        )
-    });
+    let defined = agent.define_own_property(target, key, property_descriptor, AllocationLifetime::Default);
     if matches!(defined, Ok(true)) {
         return Ok(());
     }

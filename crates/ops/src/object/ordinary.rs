@@ -192,21 +192,13 @@ pub fn ordinary_define_property(
         let Ok(index) = u32::try_from(index) else {
             return Ok(false);
         };
-        let result = agent.with_heap_and_objects(|heap, objects| {
-            objects.define_own_property(
-                &mut heap.mutator(),
-                object,
-                PropertyKey::Index(index),
-                descriptor,
-                lifetime,
-            )
-        });
-        return result.map_err(|error| internal_method_error(agent, error));
+        return agent
+            .define_own_property(object, PropertyKey::Index(index), descriptor, lifetime)
+            .map_err(|error| internal_method_error(agent, error));
     }
-    let result = agent.with_heap_and_objects(|heap, objects| {
-        objects.define_own_property(&mut heap.mutator(), object, key, descriptor, lifetime)
-    });
-    result.map_err(|error| internal_method_error(agent, error))
+    agent
+        .define_own_property(object, key, descriptor, lifetime)
+        .map_err(|error| internal_method_error(agent, error))
 }
 
 /// Ordinary-only `[[IsExtensible]]` over the object substrate.
@@ -345,11 +337,9 @@ pub fn ordinary_delete_property(
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         return Ok(!matches!(numeric_key, TypedArrayNumericKey::Valid(_)));
     }
-    let result = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.delete(&mut mutator, object, key)
-    });
-    result.map_err(|error| internal_method_error(agent, error))
+    agent
+        .delete(object, key)
+        .map_err(|error| internal_method_error(agent, error))
 }
 
 /// Ordinary-only `CreateDataProperty` over the object substrate.
@@ -374,11 +364,9 @@ pub fn ordinary_create_data_property(
     descriptor.set_enumerable(true);
     descriptor.set_configurable(true);
 
-    let result = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.define_own_property(&mut mutator, object, key, descriptor, lifetime)
-    });
-    result.map_err(|error| internal_method_error(agent, error))
+    agent
+        .define_own_property(object, key, descriptor, lifetime)
+        .map_err(|error| internal_method_error(agent, error))
 }
 
 /// ECMAScript `Call` over the public object substrate.

@@ -51,16 +51,7 @@ impl Vm {
         }
         descriptor.set_enumerable(enumerable);
         descriptor.set_configurable(true);
-        let defined = agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            objects.define_own_property(
-                &mut mutator,
-                object,
-                key,
-                descriptor,
-                AllocationLifetime::Default,
-            )
-        });
+        let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
         let defined = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if !defined {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -93,16 +84,7 @@ impl Vm {
         descriptor.set_writable(true);
         descriptor.set_enumerable(false);
         descriptor.set_configurable(true);
-        let defined = agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            objects.define_own_property(
-                &mut mutator,
-                object,
-                key,
-                descriptor,
-                AllocationLifetime::Default,
-            )
-        });
+        let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
         let defined = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if !defined {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));

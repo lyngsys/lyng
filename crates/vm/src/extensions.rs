@@ -188,16 +188,9 @@ impl<'a> RealmExtensionInstallation<'a> {
         key: PropertyKey,
         descriptor: PropertyDescriptor,
     ) -> Result<(), VmError> {
-        let defined = self.agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            objects.define_own_property(
-                &mut mutator,
-                target,
-                key,
-                descriptor,
-                AllocationLifetime::Default,
-            )
-        });
+        let defined = self
+            .agent
+            .define_own_property(target, key, descriptor, AllocationLifetime::Default);
         if matches!(defined, Ok(true)) {
             return Ok(());
         }

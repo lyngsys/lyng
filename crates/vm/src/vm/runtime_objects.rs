@@ -324,16 +324,8 @@ impl Vm {
         descriptor.set_writable(writable);
         descriptor.set_enumerable(enumerable);
         descriptor.set_configurable(configurable);
-        let defined = agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            objects.define_own_property(
-                &mut mutator,
-                object,
-                key,
-                descriptor,
-                AllocationLifetime::Default,
-            )
-        });
+        let defined =
+            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
         let _ = defined.map_err(|error| map_internal_method_error(agent, error))?;
         Ok(())
     }

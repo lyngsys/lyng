@@ -63,37 +63,31 @@ impl Vm {
         name.set_writable(false);
         name.set_enumerable(false);
         name.set_configurable(true);
-        agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            let _ = objects.define_own_property(
-                &mut mutator,
+        let _ = agent.define_own_property(
+            function,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            length,
+            AllocationLifetime::Default,
+        );
+        let _ = agent.define_own_property(
+            function,
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+            name,
+            AllocationLifetime::Default,
+        );
+        if metadata.has_prototype_property() {
+            let mut prototype = PropertyDescriptor::new();
+            prototype.set_value(Value::from_object_ref(object_prototype));
+            prototype.set_writable(false);
+            prototype.set_enumerable(false);
+            prototype.set_configurable(false);
+            let _ = agent.define_own_property(
                 function,
-                PropertyKey::from_atom(WellKnownAtom::length.id()),
-                length,
+                PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+                prototype,
                 AllocationLifetime::Default,
             );
-            let _ = objects.define_own_property(
-                &mut mutator,
-                function,
-                PropertyKey::from_atom(WellKnownAtom::name.id()),
-                name,
-                AllocationLifetime::Default,
-            );
-            if metadata.has_prototype_property() {
-                let mut prototype = PropertyDescriptor::new();
-                prototype.set_value(Value::from_object_ref(object_prototype));
-                prototype.set_writable(false);
-                prototype.set_enumerable(false);
-                prototype.set_configurable(false);
-                let _ = objects.define_own_property(
-                    &mut mutator,
-                    function,
-                    PropertyKey::from_atom(WellKnownAtom::prototype.id()),
-                    prototype,
-                    AllocationLifetime::Default,
-                );
-            }
-        });
+        }
         Ok(function)
     }
 
@@ -156,37 +150,31 @@ impl Vm {
         name.set_writable(false);
         name.set_enumerable(false);
         name.set_configurable(true);
-        agent.with_heap_and_objects(|heap, objects| {
-            let mut mutator = heap.mutator();
-            let _ = objects.define_own_property(
-                &mut mutator,
+        let _ = agent.define_own_property(
+            function,
+            PropertyKey::from_atom(WellKnownAtom::length.id()),
+            length,
+            AllocationLifetime::Default,
+        );
+        let _ = agent.define_own_property(
+            function,
+            PropertyKey::from_atom(WellKnownAtom::name.id()),
+            name,
+            AllocationLifetime::Default,
+        );
+        if metadata.has_prototype_property() {
+            let mut prototype = PropertyDescriptor::new();
+            prototype.set_value(Value::from_object_ref(object_prototype));
+            prototype.set_writable(false);
+            prototype.set_enumerable(false);
+            prototype.set_configurable(false);
+            let _ = agent.define_own_property(
                 function,
-                PropertyKey::from_atom(WellKnownAtom::length.id()),
-                length,
+                PropertyKey::from_atom(WellKnownAtom::prototype.id()),
+                prototype,
                 AllocationLifetime::Default,
             );
-            let _ = objects.define_own_property(
-                &mut mutator,
-                function,
-                PropertyKey::from_atom(WellKnownAtom::name.id()),
-                name,
-                AllocationLifetime::Default,
-            );
-            if metadata.has_prototype_property() {
-                let mut prototype = PropertyDescriptor::new();
-                prototype.set_value(Value::from_object_ref(object_prototype));
-                prototype.set_writable(false);
-                prototype.set_enumerable(false);
-                prototype.set_configurable(false);
-                let _ = objects.define_own_property(
-                    &mut mutator,
-                    function,
-                    PropertyKey::from_atom(WellKnownAtom::prototype.id()),
-                    prototype,
-                    AllocationLifetime::Default,
-                );
-            }
-        });
+        }
         Ok(function)
     }
 }

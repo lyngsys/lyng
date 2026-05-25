@@ -1276,16 +1276,7 @@ pub(in crate::public) fn define_builtin_data_property(
     descriptor.set_writable(writable);
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.define_own_property(
-            &mut mutator,
-            object,
-            key,
-            descriptor,
-            AllocationLifetime::Default,
-        )
-    });
+    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
     assert!(
         matches!(defined, Ok(true)),
         "builtin property installation should succeed"
@@ -1306,16 +1297,7 @@ pub(in crate::public) fn define_builtin_accessor_property(
     descriptor.set_setter(setter.map_or_else(Value::undefined, Value::from_object_ref));
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.define_own_property(
-            &mut mutator,
-            object,
-            key,
-            descriptor,
-            AllocationLifetime::Default,
-        )
-    });
+    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
     assert!(
         matches!(defined, Ok(true)),
         "builtin accessor installation should succeed"

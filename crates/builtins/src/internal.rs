@@ -1209,16 +1209,7 @@ fn define_data_property_with_attrs(
     descriptor.set_writable(writable);
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.with_heap_and_objects(|heap, objects| {
-        let mut mutator = heap.mutator();
-        objects.define_own_property(
-            &mut mutator,
-            object,
-            key,
-            descriptor,
-            AllocationLifetime::Default,
-        )
-    });
+    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
     assert!(
         matches!(defined, Ok(true)),
         "reserved internal builtin property installation should succeed"

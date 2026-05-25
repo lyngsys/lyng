@@ -1411,31 +1411,32 @@ impl Vm {
             AllocationLifetime::Default,
         ));
 
-        let namespace = agent.with_heap_and_objects(|heap, objects| {
+        let object = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
-            let object = objects.alloc_object(
+            objects.alloc_object(
                 &mut mutator,
                 ObjectAllocation::ordinary(root_shape),
                 AllocationLifetime::Default,
-            );
-            let mut descriptor = PropertyDescriptor::new();
-            descriptor.set_value(module_tag);
-            descriptor.set_writable(false);
-            descriptor.set_enumerable(false);
-            descriptor.set_configurable(false);
-            assert!(
-                matches!(
-                    objects.define_own_property(
-                        &mut mutator,
-                        object,
-                        PropertyKey::from_symbol(to_string_tag),
-                        descriptor,
-                        AllocationLifetime::Default,
-                    ),
-                    Ok(true)
+            )
+        });
+        let mut descriptor = PropertyDescriptor::new();
+        descriptor.set_value(module_tag);
+        descriptor.set_writable(false);
+        descriptor.set_enumerable(false);
+        descriptor.set_configurable(false);
+        assert!(
+            matches!(
+                agent.define_own_property(
+                    object,
+                    PropertyKey::from_symbol(to_string_tag),
+                    descriptor,
+                    AllocationLifetime::Default,
                 ),
-                "module namespace @@toStringTag should install on a fresh namespace object"
-            );
+                Ok(true)
+            ),
+            "module namespace @@toStringTag should install on a fresh namespace object"
+        );
+        let namespace = agent.with_heap_and_objects(|_heap, objects| {
             assert!(
                 objects.install_module_namespace_object(object, exports),
                 "module namespace side table should install on freshly allocated ordinary objects"

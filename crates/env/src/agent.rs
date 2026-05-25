@@ -6,8 +6,8 @@ use super::{
 };
 use lyng_gc::{PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
-use lyng_objects::RegExpPayload;
-use lyng_types::{CodeRef, ObjectRef, ShapeId, StringRef};
+use lyng_objects::{InternalMethodResult, RegExpPayload};
+use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -301,6 +301,52 @@ impl Agent {
             }
         }
         ok
+    }
+
+    /// Defines or updates one own property on `id`, firing watchpoints on the
+    /// pre-transition shape when a shape change occurs.
+    ///
+    /// This is the production entry point for property definition.
+    /// Callers must use this rather than calling `objects.define_own_property`
+    /// through `with_heap_and_objects` directly so that shape-invalidation
+    /// watchpoints are fired correctly.
+    pub fn define_own_property(
+        &mut self,
+        id: ObjectRef,
+        key: PropertyKey,
+        descriptor: PropertyDescriptor,
+        lifetime: AllocationLifetime,
+    ) -> InternalMethodResult<bool> {
+        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+
+        let result = self.with_heap_and_objects(|heap, objects| {
+            objects.define_own_property(&mut heap.mutator(), id, key, descriptor, lifetime)
+        });
+
+        if let Some(old) = old_shape {
+            self.fire_watchpoints_for_shape(old);
+        }
+        result
+    }
+
+    /// Deletes one property from `id`, firing watchpoints on the pre-transition
+    /// shape when a shape change occurs.
+    ///
+    /// This is the production entry point for property deletion.
+    /// Callers must use this rather than calling `objects.delete` through
+    /// `with_heap_and_objects` directly so that shape-invalidation watchpoints
+    /// are fired correctly.
+    pub fn delete(&mut self, id: ObjectRef, key: PropertyKey) -> InternalMethodResult<bool> {
+        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+
+        let result = self.with_heap_and_objects(|heap, objects| {
+            objects.delete(&mut heap.mutator(), id, key)
+        });
+
+        if let Some(old) = old_shape {
+            self.fire_watchpoints_for_shape(old);
+        }
+        result
     }
 
     /// Drains watchpoints registered against `shape` and dispatches each one.
