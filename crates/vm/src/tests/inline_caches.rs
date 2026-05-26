@@ -3246,3 +3246,514 @@ fn two_hop_chain_middle_proto_mutation_clears_ic() {
         "A.3: IC slot must be re-installed after re-evaluation"
     );
 }
+
+// -----------------------------------------------------------------------------
+// Spec 2 Phase B — polymorphic out-of-line chain tests (B.1.6)
+// -----------------------------------------------------------------------------
+//
+// `NamedPropertyFeedback.entries` holds at most `POLY_LIMIT` (= 2) entries
+// inline. Entries beyond POLY_LIMIT (logical positions 2..8) live out-of-line
+// in `Vm::polymorphic_chains`, keyed by `(CodeRef, FeedbackSlotId)`. Once a
+// 9th shape is observed the IC transitions to Megamorphic and the chain is
+// dropped. AdaptiveProtoLoad fires must clear both the inline slot and the
+// chain entry.
+
+// B1: After exactly two distinct receiver shapes the IC is Polymorphic with
+// `entry_count == 2`. The inline POLY_LIMIT array is full — no chain entry
+// should exist yet.
+#[test]
+fn b1_polymorphic_two_entries_stay_inline_no_map() {
+    let unit = compile_test_unit(30_100, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut sources = Vec::new();
+    for index in 0..2 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_100 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            2,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_none(),
+        "B1: 2-entry polymorphic IC must keep both entries inline; no chain map entry"
+    );
+}
+
+// B2: A third distinct shape spills one entry into the out-of-line chain.
+// Aggregate `entry_count == 3`; chain length is exactly 1.
+#[test]
+fn b2_polymorphic_third_entry_creates_chain_entry() {
+    let unit = compile_test_unit(30_200, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut sources = Vec::new();
+    for index in 0..3 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_200 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            3,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+    let chain = vm
+        .polymorphic_chain(installed.code(), slot)
+        .expect("B2: third entry must create an out-of-line chain entry");
+    assert_eq!(chain.len(), 1, "B2: chain holds exactly one entry");
+}
+
+// B3: A ninth distinct shape transitions the IC to Megamorphic and the chain
+// entry is dropped.
+#[test]
+fn b3_polymorphic_ninth_entry_transitions_to_mega_and_drops_chain() {
+    let unit = compile_test_unit(30_300, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut sources = Vec::new();
+    for index in 0..9 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_300 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some(("Megamorphic", 0, None))
+    );
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_none(),
+        "B3: Megamorphic transition must drop the chain map entry"
+    );
+}
+
+// B4: Walk order — drive 4 distinct receiver shapes (2 inline + 2 in chain),
+// each carrying a different value at the cached property; re-running the IC
+// on each shape must return that shape's value, exercising both the inline
+// fast path (entries 0..POLY_LIMIT) and the chain walk (POLY_LIMIT..N).
+#[test]
+fn b4_polymorphic_walk_returns_correct_value_for_each_shape() {
+    let unit = compile_test_unit(30_400, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    // Build 4 receivers with distinct shapes and distinct values at `.value`.
+    // The `index`-shaped receiver carries `Value::from_smi(1000 + index)`.
+    let mut sources = Vec::new();
+    for index in 0..4 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_400 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(1000 + i32::try_from(index).expect("index fits i32")),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First pass: install all four shapes into the IC (2 inline + 2 chain).
+    for (index, object) in sources.iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(1000 + i32::try_from(index).expect("index fits i32"))
+        );
+    }
+
+    // Confirm Poly state + chain population (2 inline + 2 in chain).
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            4,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+    assert_eq!(
+        vm.polymorphic_chain(installed.code(), slot)
+            .map(|chain| chain.len()),
+        Some(2),
+        "B4: 4 entries means 2 inline + 2 chain"
+    );
+
+    // Second pass: hit each shape again, in reverse order. Each load must
+    // return the correct cached value, demonstrating that both inline and
+    // chain walks resolve to the right entry.
+    for (index, object) in sources.iter().enumerate().rev() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(1000 + i32::try_from(index).expect("index fits i32")),
+            "B4: walk must return the correct value for shape index {index}"
+        );
+    }
+}
+
+// B5: AdaptiveProtoLoad fire clears both inline + chain. Build a 3-receiver
+// polymorphic IC where all receivers share the same prototype holding the
+// cached property. Each receiver has a distinct local shape, so the IC ends
+// up Polymorphic with 1 chain entry, but every entry's `holder` is the same
+// shared proto. Mutating the proto fires the AdaptiveProtoLoad watchpoint on
+// the proto's shape, which must clear both the inline slot *and* the chain
+// map entry.
+#[test]
+fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
+    let unit = compile_test_unit(30_500, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let extra_name = agent.atoms_mut().intern_collectible("_extra_b5");
+
+    // Single shared prototype that holds `.value`.
+    let proto = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(42),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+
+    // Three receivers, each with a distinct *own* shape (via differing
+    // padding properties) but all sharing the same proto.
+    let mut sources = Vec::new();
+    for index in 0..3 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape).with_prototype(Some(proto)),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_500 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Warm + drive each receiver. The first receiver needs two evaluations
+    // (warmup + slow-path install); the next two only need one each to push
+    // the IC into Polymorphic with 2 inline + 1 chain entry. We just drive
+    // every receiver twice — extra hits on already-cached shapes are no-ops
+    // for the IC state.
+    for object in &sources {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(*object));
+        for _ in 0..2 {
+            assert_eq!(
+                vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                    .run()
+                    .unwrap(),
+                Value::from_smi(42)
+            );
+        }
+    }
+
+    // Pre-mutation: Poly with 2 inline + 1 chain entry, PrototypeData path.
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Polymorphic",
+            3,
+            Some(lyng_objects::NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+    assert_eq!(
+        vm.polymorphic_chain(installed.code(), slot)
+            .map(|chain| chain.len()),
+        Some(1),
+        "B5: 3-entry polymorphic IC must have 1 chain entry"
+    );
+    assert!(vm.named_property_slot_is_present(installed.code(), slot));
+
+    // Mutate the shared proto: add a new property. The shape transition
+    // fires the AdaptiveProtoLoad watchpoints registered on the proto's
+    // pre-mutation shape — one watchpoint per cache entry (inline + chain),
+    // all routed to `clear_ic_slot_if_generation_matches` which drops both
+    // the inline slot and the chain map entry.
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(extra_name),
+        Value::from_smi(0),
+        AllocationLifetime::Default,
+        &mut vm,
+    )
+    .unwrap());
+
+    // Both the inline slot and the chain map entry must be gone.
+    assert!(
+        !vm.named_property_slot_is_present(installed.code(), slot),
+        "B5: AdaptiveProtoLoad fire must clear the inline IC slot"
+    );
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_none(),
+        "B5: AdaptiveProtoLoad fire must drop the chain map entry"
+    );
+}
