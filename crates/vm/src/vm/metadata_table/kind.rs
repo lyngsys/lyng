@@ -1,5 +1,11 @@
 use lyng_bytecode::FeedbackSiteKind;
 
+use super::arith::ARITH_METADATA_STRIDE;
+use super::call::CALL_METADATA_STRIDE;
+use super::comparison::COMPARISON_METADATA_STRIDE;
+use super::keyed_property::KEYED_PROPERTY_METADATA_STRIDE;
+use super::property::PROPERTY_METADATA_STRIDE;
+
 /// IC metadata kinds in the table layout. Each kind owns its own per-kind run
 /// in the buffer. Two `FeedbackSiteKind`s may map to the same `MetadataKind`
 /// (e.g. `NamedPropertyLoad` + `NamedPropertyStore` → `Property`).
@@ -35,15 +41,15 @@ impl MetadataKind {
         self as usize
     }
 
-    /// Byte size of one metadata entry for this kind. Placeholder values for
-    /// Phase C.1; Phase C.2 makes these match the actual per-kind struct sizes.
+    /// Byte size of one metadata entry for this kind. Sourced from the per-kind
+    /// STRIDE constants — single source of truth for the buffer layout math.
     pub const fn stride_bytes(self) -> usize {
         match self {
-            Self::Property => 32,
-            Self::Call => 24,
-            Self::Arith => 8,
-            Self::Comparison => 8,
-            Self::KeyedProperty => 24,
+            Self::Property => PROPERTY_METADATA_STRIDE,
+            Self::Call => CALL_METADATA_STRIDE,
+            Self::Arith => ARITH_METADATA_STRIDE,
+            Self::Comparison => COMPARISON_METADATA_STRIDE,
+            Self::KeyedProperty => KEYED_PROPERTY_METADATA_STRIDE,
         }
     }
 }

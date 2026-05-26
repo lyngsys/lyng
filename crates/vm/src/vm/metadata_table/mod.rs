@@ -3,10 +3,25 @@
 //! Layout: header + per-kind offset table + slot→in-kind-index table + per-kind runs.
 //! Phase C.1 lands the type + allocator; reads and writes wire up in C.2/C.4.
 
+pub mod arith;
+pub mod call;
+pub mod comparison;
+pub mod keyed_property;
 pub mod kind;
+pub mod property;
 
 #[allow(unused_imports)]
+pub use arith::{ArithMetadata, ARITH_METADATA_STRIDE};
+#[allow(unused_imports)]
+pub use call::{CallMetadata, CALL_METADATA_STRIDE};
+#[allow(unused_imports)]
+pub use comparison::{ComparisonMetadata, COMPARISON_METADATA_STRIDE};
+#[allow(unused_imports)]
+pub use keyed_property::{KeyedPropertyMetadata, KEYED_PROPERTY_METADATA_STRIDE};
+#[allow(unused_imports)]
 pub use kind::{MetadataKind, METADATA_KIND_COUNT};
+#[allow(unused_imports)]
+pub use property::{PropertyMetadata, PROPERTY_METADATA_STRIDE};
 
 /// Compact descriptor used by the allocator. Mirrors the shape of
 /// `lyng_bytecode::FeedbackSiteDescriptor` but elides the metadata payload
