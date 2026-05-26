@@ -23,3 +23,22 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 | `RayTrace` | `220` | `336358.6` | 217, 226, 220, 217, 223 |
 | `NavierStokes` | `436` | `340367.0` | 436, 440, 435, 432, 439 |
 | `Splay` | `1314` | `6201.8` | 1277, 1309, 1346, 1346, 1314 |
+
+## Phase C end-state note (re-evaluate at Phase D)
+
+Spec 2 Phase C ends with a documented regression vs the pre-Phase-C baseline
+(commit `857d2528`, scores 484/421/393/291/541/1440 for the same six
+benchmarks). Geomean ≈ −15.5%, missing the spec's ≤3% exit criterion.
+
+Structural overhead remaining at Phase C end:
+
+- `mirror_metadata_slot` runs on every IC mutation alongside `mirror_flat_slot`
+  (descriptor lookup + per-kind dispatch). Phase D removes `mirror_flat_slot`
+  and `feedback_flat_storage`, recovering this cost.
+- The asm IC resolve macro is 3 instructions (with the precomputed-offset
+  table optimization in `4d8c2f39`) vs the prior 2-instruction flat-array
+  resolve. +1 instruction is structural to the indirection.
+- The `record_*` macros are 10 instructions vs the prior 9. Same reason.
+
+Decision: ship Phase C with the regression documented; re-measure at the
+end of Phase D after legacy-storage deletion.

@@ -197,7 +197,7 @@ pub(crate) fn run_via_dsl(
 //
 // Both functions share a 96-byte stack frame:
 //   [sp + 0]  x19, x20   ← PC, REGS
-//   [sp + 16] x21, x22   ← FV, VM
+//   [sp + 16] x21, x22   ← MT, VM
 //   [sp + 32] x23, x24   ← TABLE, STATE
 //   [sp + 48] x25, x26   ← reserved (handler scratch, currently
 //                          unused by the substrate but saved per
@@ -228,7 +228,7 @@ pub(crate) fn run_via_dsl(
 /// |---|---|---|
 /// | PC | x19 | `pb_base + pc_offset` (live byte in bytecode) |
 /// | REGS | x20 | `*mut Value` (register-file base) |
-/// | FV | x21 | `*mut FeedbackEntry` (feedback-vector base) |
+/// | MT | x21 | `*mut u8` (MetadataTable buffer base; Phase C.4) |
 /// | VM | x22 | `*mut Vm` |
 /// | TABLE | x23 | `*const DslHandler` |
 /// | STATE | x24 | `*mut LlIntState` |

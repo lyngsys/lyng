@@ -10,7 +10,7 @@
 //! | ------------- | ------- | ------------------------------- |
 //! | PC            | x19     | *const u8                       |
 //! | REGS          | x20     | *mut Value                      |
-//! | FV            | x21     | *mut `FeedbackEntry`              |
+//! | MT            | x21     | *mut u8 (MetadataTable buffer)  |
 //! | VM            | x22     | *mut Vm                         |
 //! | TABLE         | x23     | *const `DslHandler`               |
 //! | STATE         | x24     | *mut `LlIntState`                 |
@@ -27,12 +27,12 @@
 //!
 //! Refresh discipline (slow-path call):
 //!   PRE:   `state.frame_pc_offset` <- PC - `pb_base`
-//!   POST:  if Refresh: PC/REGS/FV reloaded from state.frame_*
+//!   POST:  if Refresh: PC/REGS/MT reloaded from state.frame_*
 //!
 //! Rust probe hits may use `dispatch_probe_hit_no_refresh!` only when
 //! the probe contract guarantees no frame switch, no register-stack
-//! relocation, and no feedback-vector relocation. That dispatch form
-//! updates PC from the returned payload and leaves pinned REGS/FV intact.
+//! relocation, and no metadata-table relocation. That dispatch form
+//! updates PC from the returned payload and leaves pinned REGS/MT intact.
 //!
 //! Const offsets below are derived from [`LlIntState`] via `offset_of!`
 //! and locked in by `tests::ll_int_state_offsets_stable`.
