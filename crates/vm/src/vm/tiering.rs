@@ -23,6 +23,7 @@ pub struct TieringSnapshot {
     backedge_events: u32,
     invalidation_epoch: u32,
     native_generation: Option<NonZeroU32>,
+    warmup_counter: u16,
 }
 
 impl TieringSnapshot {
@@ -60,6 +61,11 @@ impl TieringSnapshot {
     pub const fn native_generation(self) -> Option<NonZeroU32> {
         self.native_generation
     }
+
+    #[inline]
+    pub const fn warmup_counter(self) -> u16 {
+        self.warmup_counter
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,6 +77,7 @@ pub(super) struct TieringState {
     backedge_events: u32,
     invalidation_epoch: u32,
     native_generation: Option<NonZeroU32>,
+    warmup_counter: u16,
 }
 
 impl Default for TieringState {
@@ -84,6 +91,7 @@ impl Default for TieringState {
             backedge_events: 0,
             invalidation_epoch: 0,
             native_generation: None,
+            warmup_counter: 0,
         }
     }
 }
@@ -99,6 +107,7 @@ impl TieringState {
             backedge_events: self.backedge_events,
             invalidation_epoch: self.invalidation_epoch,
             native_generation: self.native_generation,
+            warmup_counter: self.warmup_counter,
         }
     }
 
@@ -139,6 +148,24 @@ impl TieringState {
 
     // DSL-0c C6: observe_backedge_event deleted with α path's
     // backedge accounting.
+
+    #[inline]
+    pub(super) const fn warmup_counter(&self) -> u16 {
+        self.warmup_counter
+    }
+
+    #[inline]
+    pub(super) fn bump_warmup(&mut self) -> u16 {
+        self.warmup_counter = self.warmup_counter.saturating_add(1);
+        self.warmup_counter
+    }
+
+    /// Saturating increment by `n`; returns the new value.
+    #[inline]
+    pub(super) fn bump_warmup_by(&mut self, n: u16) -> u16 {
+        self.warmup_counter = self.warmup_counter.saturating_add(n);
+        self.warmup_counter
+    }
 
     #[inline]
     fn observe_hotness(&mut self, weight: u32) {
@@ -276,6 +303,42 @@ impl Tiering {
     // DSL-0c C6: observe_backedge_event deleted with α path's
     // backedge accounting. The interpreter has no tier-up accounting
     // post-DSL-0c (design §6 + §10).
+
+    /// Return the warmup counter for `code`, or 0 if no slot exists yet.
+    /// Works on both enabled and disabled `Tiering` stores.
+    #[inline]
+    pub(super) fn warmup_counter(&self, code: CodeRef) -> u16 {
+        self.states
+            .get(code_index(code))
+            .and_then(Option::as_ref)
+            .map_or(0, TieringState::warmup_counter)
+    }
+
+    /// Saturating bump of the warmup counter for `code`; returns the new
+    /// value. Lazily inserts a default slot if none exists. Works on both
+    /// enabled and disabled `Tiering` stores so that allocation-threshold
+    /// logic always has a counter to track.
+    #[inline]
+    pub(super) fn bump_warmup(&mut self, code: CodeRef) -> u16 {
+        let index = code_index(code);
+        if self.states.len() <= index {
+            self.states.resize_with(index + 1, || None);
+        }
+        let state = self.states[index].get_or_insert_with(TieringState::default);
+        state.bump_warmup()
+    }
+
+    /// Saturating increment of the warmup counter by `n` for `code`; returns
+    /// the new value. Lazily inserts a default slot if none exists.
+    #[inline]
+    pub(super) fn bump_warmup_by(&mut self, code: CodeRef, n: u16) -> u16 {
+        let index = code_index(code);
+        if self.states.len() <= index {
+            self.states.resize_with(index + 1, || None);
+        }
+        let state = self.states[index].get_or_insert_with(TieringState::default);
+        state.bump_warmup_by(n)
+    }
 }
 
 impl Vm {

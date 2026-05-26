@@ -956,7 +956,14 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
         .run()
         .unwrap();
     assert_eq!(first, Value::from_smi(3));
-    assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(1));
+    assert_eq!(
+        tiering
+            .snapshot(installed.code())
+            .expect("installed code should expose tiering state after first run")
+            .warmup_counter(),
+        1,
+        "warmup_counter now lives on TieringState; first execution should bump it to 1"
+    );
     assert!(!vm.has_feedback_vector(installed.code()));
     assert_eq!(
         tiering
@@ -979,7 +986,14 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
         .run()
         .unwrap();
     assert_eq!(second, Value::from_smi(3));
-    assert_eq!(vm.feedback_warmup_counter(installed.code()), Some(2));
+    assert_eq!(
+        tiering
+            .snapshot(installed.code())
+            .expect("installed code should expose tiering state after second run")
+            .warmup_counter(),
+        2,
+        "warmup_counter now lives on TieringState; second execution should bump it to 2"
+    );
     assert!(vm.has_feedback_vector(installed.code()));
     assert_eq!(
         vm.feedback_execution_count(installed.code(), call_slot),

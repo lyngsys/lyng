@@ -1934,15 +1934,15 @@ impl FeedbackSiteState {
 /// Per-code-object feedback storage.
 ///
 /// Stored contiguously in `Vm::feedback_vectors: Vec<FeedbackVector>` (one entry per installed
-/// code object). The default-constructed value is an "unallocated" sentinel — empty `sites`
-/// and `warmup_counter == 0` — so the hot path can dispatch through `Vec` indexing with no
-/// `Option` discrimination. Once the warmup counter crosses
-/// `FEEDBACK_ALLOCATION_THRESHOLD`, [`allocate_sites`](Self::allocate_sites) populates the
-/// slot storage in place; `is_allocated()` flips to `true` from then on.
+/// code object). The default-constructed value is an "unallocated" sentinel — empty `sites` —
+/// so the hot path can dispatch through `Vec` indexing with no `Option` discrimination. Once
+/// the warmup counter on `TieringState` crosses `FEEDBACK_ALLOCATION_THRESHOLD`,
+/// [`allocate_sites`](Self::allocate_sites) populates the slot storage in place;
+/// `is_allocated()` flips to `true` from then on. The warmup counter itself lives on
+/// `TieringState` (see `Tiering::bump_warmup` / `Tiering::warmup_counter`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct FeedbackVector {
     sites: Vec<Option<FeedbackSiteState>>,
-    warmup_counter: u16,
 }
 
 impl FeedbackVector {
@@ -1967,25 +1967,6 @@ impl FeedbackVector {
     #[inline]
     const fn is_allocated(&self) -> bool {
         !self.sites.is_empty()
-    }
-
-    #[inline]
-    const fn warmup_counter(&self) -> u16 {
-        self.warmup_counter
-    }
-
-    /// Saturating increment of the warmup counter; returns the new value. Used on the cold
-    /// path before allocation; once allocated the dispatch loop skips this entirely.
-    #[inline]
-    const fn bump_warmup(&mut self) -> u16 {
-        self.warmup_counter = self.warmup_counter.saturating_add(1);
-        self.warmup_counter
-    }
-
-    #[cfg(test)]
-    #[inline]
-    const fn set_warmup_for_test(&mut self, value: u16) {
-        self.warmup_counter = value;
     }
 
     #[inline]
@@ -2259,9 +2240,7 @@ impl Vm {
         self.ensure_feedback_capacity(code);
         let index = code_index(code);
         let needs_allocation = !self.feedback_vectors[index].is_allocated()
-            && self.feedback_vectors[index]
-                .warmup_counter()
-                .saturating_add(1)
+            && self.tiering.warmup_counter(code).saturating_add(1)
                 >= FEEDBACK_ALLOCATION_THRESHOLD;
         let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
             return false;
@@ -2276,7 +2255,7 @@ impl Vm {
         };
 
         if !self.feedback_vectors[index].is_allocated() {
-            self.feedback_vectors[index].bump_warmup();
+            self.tiering.bump_warmup(code);
             if let Some(slot_descriptors) = slot_descriptors.filter(|slots| !slots.is_empty()) {
                 self.feedback_vectors[index].allocate_sites(&slot_descriptors);
             }
@@ -2388,20 +2367,22 @@ impl Vm {
         };
 
         let mut recorded_count = count;
-        let vector = &mut self.feedback_vectors[index];
-        if !vector.is_allocated() {
+        if !self.feedback_vectors[index].is_allocated() {
+            // Read warmup counter from tiering before taking the mutable vector borrow.
+            let current_warmup = self.tiering.warmup_counter(code);
             let events_until_allocation = u32::from(
                 FEEDBACK_ALLOCATION_THRESHOLD
-                    .saturating_sub(vector.warmup_counter())
+                    .saturating_sub(current_warmup)
                     .max(1),
             );
             let warmup_events = count.min(events_until_allocation);
             let warmup_increment =
                 u16::try_from(warmup_events).expect("feedback warmup threshold fits in u16");
-            vector.warmup_counter = vector.warmup_counter.saturating_add(warmup_increment);
+            self.tiering.bump_warmup_by(code, warmup_increment);
             if count < events_until_allocation {
                 recorded_count = 0;
             } else {
+                let vector = &mut self.feedback_vectors[index];
                 if let Some(slot_descriptors) = slot_descriptors.filter(|slots| !slots.is_empty()) {
                     vector.allocate_sites(&slot_descriptors);
                 }
@@ -2411,7 +2392,7 @@ impl Vm {
 
         let wrote = if recorded_count == 0 {
             false
-        } else if let Some(site) = vector.site_mut(slot) {
+        } else if let Some(site) = self.feedback_vectors[index].site_mut(slot) {
             site.record_execution_count(recorded_count);
             true
         } else {
@@ -3084,7 +3065,7 @@ impl Vm {
             slot_count,
             live_site_count,
             allocated_bytes,
-            warmup_counter: vector.map_or(0, FeedbackVector::warmup_counter),
+            warmup_counter: self.tiering.warmup_counter(code),
         })
     }
 
@@ -3111,7 +3092,7 @@ impl Vm {
 
         Some(FeedbackVectorSnapshot::new(
             allocated,
-            vector.map_or(0, FeedbackVector::warmup_counter),
+            self.tiering.warmup_counter(code),
             installed.feedback_slot_descriptors().len(),
             sites,
         ))
@@ -3119,9 +3100,11 @@ impl Vm {
 
     #[cfg(test)]
     pub(crate) fn feedback_warmup_counter(&self, code: CodeRef) -> Option<u16> {
-        self.feedback_vectors
+        // Returns None if the code has no installed slot; otherwise reads warmup from Tiering.
+        self.installed
             .get(code_index(code))
-            .map(FeedbackVector::warmup_counter)
+            .and_then(Option::as_ref)
+            .map(|_| self.tiering.warmup_counter(code))
     }
 
     /// Assert that each flat LLInt IC header matches the legacy feedback
@@ -3411,29 +3394,31 @@ mod tests {
     };
 
     #[test]
-    fn default_feedback_vector_is_unallocated_with_zero_warmup() {
+    fn default_feedback_vector_is_unallocated() {
         let vector = FeedbackVector::default();
         assert!(
             !vector.is_allocated(),
             "default FeedbackVector should report unallocated so the hot path skips it"
         );
-        assert_eq!(vector.warmup_counter(), 0);
     }
 
     #[test]
-    fn bump_warmup_increments_saturating_and_returns_new_value() {
-        let mut vector = FeedbackVector::default();
-        assert_eq!(vector.bump_warmup(), 1);
-        assert_eq!(vector.bump_warmup(), 2);
-        assert_eq!(vector.warmup_counter(), 2);
+    fn bump_warmup_on_tiering_state_increments_saturating_and_returns_new_value() {
+        use super::super::tiering::TieringState;
+        let mut state = TieringState::default();
+        assert_eq!(state.warmup_counter(), 0);
+        assert_eq!(state.bump_warmup(), 1);
+        assert_eq!(state.bump_warmup(), 2);
+        assert_eq!(state.warmup_counter(), 2);
     }
 
     #[test]
-    fn bump_warmup_saturates_at_u16_max() {
-        let mut vector = FeedbackVector::default();
-        vector.set_warmup_for_test(u16::MAX);
-        assert_eq!(vector.bump_warmup(), u16::MAX);
-        assert_eq!(vector.warmup_counter(), u16::MAX);
+    fn bump_warmup_on_tiering_state_saturates_at_u16_max() {
+        use super::super::tiering::TieringState;
+        let mut state = TieringState::default();
+        state.bump_warmup_by(u16::MAX);
+        assert_eq!(state.bump_warmup(), u16::MAX);
+        assert_eq!(state.warmup_counter(), u16::MAX);
     }
 
     #[test]
@@ -3449,20 +3434,21 @@ mod tests {
     }
 
     #[test]
-    fn allocate_sites_preserves_warmup_counter() {
+    fn warmup_counter_lives_on_tiering_state_independent_of_allocation() {
+        // After the warmup counter was lifted from FeedbackVector onto TieringState,
+        // allocating sites has no effect on the counter — they are now independent.
+        use super::super::tiering::TieringState;
         let slot = FeedbackSlotId::from_raw(1).expect("test slot id should be non-zero");
         let descriptor = FeedbackSiteDescriptor::new(slot, 0, FeedbackSiteKind::Arithmetic);
+        let mut state = TieringState::default();
+        state.bump_warmup();
+        state.bump_warmup();
+        assert_eq!(state.warmup_counter(), 2);
         let mut vector = FeedbackVector::default();
-        vector.bump_warmup();
-        vector.bump_warmup();
-        assert_eq!(vector.warmup_counter(), 2);
         vector.allocate_sites(&[Some(descriptor)]);
         assert!(vector.is_allocated());
-        assert_eq!(
-            vector.warmup_counter(),
-            2,
-            "warmup counter survives transition to allocated so footprint reporting stays correct"
-        );
+        // Counter is on TieringState, unaffected by vector allocation.
+        assert_eq!(state.warmup_counter(), 2);
     }
 
     #[test]

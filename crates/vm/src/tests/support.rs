@@ -1,7 +1,7 @@
 pub(super) use crate::{
     seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FeedbackSiteDetail,
     FeedbackVectorSnapshot, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, TierStatus,
-    Tiering, Vm, VmDebugCommand, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
+    Tiering, TieringSnapshot, Vm, VmDebugCommand, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
     VmDebugSafepointKind, VmDebugStepMode, VmDebugger, VmError,
 };
 pub(super) use lyng_bytecode::{
