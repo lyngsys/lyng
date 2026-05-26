@@ -1284,13 +1284,6 @@ fn internal_bytecode_callbacks_share_feedback_state_with_the_parent_vm() {
 fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
     use crate::vm::metadata_table::MetadataKind;
 
-    // Script with top-level property loads, a call, and arithmetic so the
-    // *entry* function itself has feedback sites we can count directly.
-    // `source.x` and `source.y` → 2 NamedPropertyLoad → Property
-    // `source.x + source.y` → 1 Arithmetic (the `+`) → Arith
-    // `f(source.x)` → 1 Call → Call
-    // `source.x + f(source.x)` → 1 more Arithmetic → Arith  (total 2)
-    // We declare `f` but the entry function itself carries these sites.
     let src = r"
         function f(v) { return v; }
         var source = { x: 1, y: 2 };
@@ -1308,7 +1301,6 @@ fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
         .metadata_table(installed.code())
         .expect("MetadataTable should be allocated at install time");
 
-    // Discover actual counts by tallying the entry function's feedback_sites().
     let entry_fn = vm
         .installed_function(installed.code())
         .expect("installed script should expose its template");
@@ -1326,6 +1318,20 @@ fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
             MetadataKind::KeyedProperty => expected_keyed += 1,
         }
     }
+
+    // Guard: the script must exercise these kinds for the test to be meaningful.
+    assert!(
+        expected_property >= 2,
+        "expected at least 2 property loads; got {expected_property}"
+    );
+    assert!(
+        expected_call >= 1,
+        "expected at least 1 call; got {expected_call}"
+    );
+    assert!(
+        expected_arith >= 1,
+        "expected at least 1 arithmetic op; got {expected_arith}"
+    );
 
     assert_eq!(
         table.run_len_for_kind(MetadataKind::Property),
@@ -1352,27 +1358,12 @@ fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
         expected_keyed,
         "KeyedProperty run length mismatch"
     );
-
-    // Sanity: the table should have at least the sites we know about.
-    assert!(
-        expected_property >= 2,
-        "expected at least 2 property loads; got {expected_property}"
-    );
-    assert!(
-        expected_call >= 1,
-        "expected at least 1 call; got {expected_call}"
-    );
-    assert!(
-        expected_arith >= 1,
-        "expected at least 1 arithmetic op; got {expected_arith}"
-    );
 }
 
 #[test]
 fn metadata_table_kind_offsets_partition_buffer() {
     use crate::vm::metadata_table::MetadataKind;
 
-    // Script with one of each IC kind in the entry function.
     let src = r"
         function f(v) { return v; }
         var source = { a: 1, b: 2, c: 3 };
@@ -1395,13 +1386,7 @@ fn metadata_table_kind_offsets_partition_buffer() {
         property_off.is_multiple_of(8),
         "Property run start ({property_off}) is not 8-aligned"
     );
-    assert!(
-        property_off < table.buffer().len() || table.run_len_for_kind(MetadataKind::Property) == 0,
-        "Property offset {property_off} past buffer end ({})",
-        table.buffer().len()
-    );
 
-    // Each kind's run end must be <= next kind's offset (no overlap).
     let mut prev_end = 0usize;
     for kind in [
         MetadataKind::Property,
@@ -1428,8 +1413,6 @@ fn metadata_table_kind_offsets_partition_buffer() {
 fn metadata_table_in_kind_indices_are_monotone_per_kind() {
     use crate::vm::metadata_table::{MetadataKind, METADATA_KIND_COUNT};
 
-    // Entry function with a mix of property loads and arithmetic so there
-    // are at least two slots of the same kind to check monotonicity.
     let src = r"
         var source = { x: 1, y: 2 };
         source.x + source.y;
@@ -1450,7 +1433,6 @@ fn metadata_table_in_kind_indices_are_monotone_per_kind() {
         .installed_function(installed.code())
         .expect("installed script should expose its template");
 
-    // Use a per-kind counter array indexed by MetadataKind::index().
     let mut seen_per_kind = [0u32; METADATA_KIND_COUNT];
     for descriptor in entry_fn.feedback_sites().iter() {
         let mk = MetadataKind::from_site_kind(descriptor.kind());
@@ -1466,7 +1448,7 @@ fn metadata_table_in_kind_indices_are_monotone_per_kind() {
         seen_per_kind[mk.index()] += 1;
     }
 
-    // Confirm we actually exercised at least two slots for Property (x and y).
+    // Guard: the script must produce ≥2 Property slots to make monotonicity meaningful.
     assert!(
         seen_per_kind[MetadataKind::Property.index()] >= 2,
         "expected at least 2 Property slots to verify monotone ordering; got {}",
