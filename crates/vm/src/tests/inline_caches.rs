@@ -3757,3 +3757,189 @@ fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
         "B5: AdaptiveProtoLoad fire must drop the chain map entry"
     );
 }
+
+// B6: GC sweep prunes chain entries for code that is no longer live.
+//
+// Note: there is no public "uninstall" hook on Vm, so we test
+// `prune_dead_code_polymorphic_chains` directly by passing an `is_live`
+// closure that treats the installed code as dead. This is the right level to
+// test: the GC call-site (`force_collect_with_active_roots`) just calls the
+// same retain with the same liveness predicate.
+#[test]
+fn b6_polymorphic_chain_pruned_when_code_dies() {
+    let unit = compile_test_unit(30_600, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    // Build 3 receivers with distinct shapes to push the IC into Polymorphic
+    // with 2 inline entries + 1 chain entry.
+    let mut sources = Vec::new();
+    for index in 0..3 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_600 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    // Pre-condition: chain entry exists with 1 out-of-line entry.
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_some(),
+        "B6: chain entry should exist before prune"
+    );
+
+    // Simulate code death: tell prune_dead_code_polymorphic_chains that no
+    // code is live. The chain entry for `installed.code()` should be removed.
+    vm.prune_dead_code_polymorphic_chains(|_code| false);
+
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_none(),
+        "B6: chain entry must be pruned when code is dead"
+    );
+}
+
+// B7: GC sweep retains chain entries for code that remains live.
+//
+// Mirror of B6: `prune_dead_code_polymorphic_chains` is called with an
+// `is_live` predicate that keeps the installed code alive. The chain entry
+// must survive.
+#[test]
+fn b7_polymorphic_chain_retained_when_code_lives() {
+    let unit = compile_test_unit(30_700, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    // Build 3 receivers with distinct shapes to push the IC into Polymorphic
+    // with 2 inline entries + 1 chain entry.
+    let mut sources = Vec::new();
+    for index in 0..3 {
+        let object = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+        for extra in 0..index {
+            assert!(ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30_700 + extra)),
+                Value::from_smi(extra.cast_signed()),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap());
+        }
+        assert!(ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(index.cast_signed()),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap());
+        sources.push(object);
+    }
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for (index, object) in sources.into_iter().enumerate() {
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
+        );
+    }
+
+    // Pre-condition: chain entry exists with 1 out-of-line entry.
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_some(),
+        "B7: chain entry should exist before prune"
+    );
+
+    // Simulate a GC sweep where this code is still live.
+    let live_code = installed.code();
+    vm.prune_dead_code_polymorphic_chains(|code| code == live_code);
+
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_some(),
+        "B7: chain entry must be retained when code is live"
+    );
+}
