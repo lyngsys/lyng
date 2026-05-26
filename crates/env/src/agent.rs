@@ -467,11 +467,6 @@ impl Agent {
         //    has been updated. Matches JSC's setPrototypeDirect ordering.
         self.fire_watchpoints_for_shape(old_shape, vm_dispatch);
 
-        // 8. Bump the invalidation epoch.
-        self.with_heap_and_objects(|heap, objects| {
-            objects.bump_prototype_mutation_epoch(&mut heap.mutator(), id);
-        });
-
         Ok(true)
     }
 

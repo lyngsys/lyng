@@ -413,18 +413,6 @@ impl ObjectRuntime {
             .is_some_and(|m| m.flags.has_immutable_prototype())
     }
 
-    /// Bumps the invalidation epoch on `id` with cause `PrototypeMutation`.
-    ///
-    /// Returns `true` on success. Should be called after a successful prototype
-    /// mutation so that IC paths that cached the previous prototype are invalidated.
-    pub fn bump_prototype_mutation_epoch(
-        &mut self,
-        heap: &mut PrimitiveMutator<'_>,
-        id: ObjectRef,
-    ) -> bool {
-        self.bump_invalidation(heap, id, InvalidationCause::PrototypeMutation)
-    }
-
     /// Returns `true` when `target` is reachable by following `[[Prototype]]` links
     /// from `start` (i.e., `target` is an ancestor of `start`). Stops early at Proxy
     /// objects (which may have a non-ordinary prototype chain).
@@ -457,6 +445,6 @@ impl ObjectRuntime {
         if !heap.mut_store_object_handle(ObjectHandleStoreTarget::ObjectPrototype(id), prototype) {
             return false;
         }
-        self.bump_invalidation(heap, id, InvalidationCause::PrototypeMutation)
+        true
     }
 }

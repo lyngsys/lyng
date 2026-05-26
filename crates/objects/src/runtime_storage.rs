@@ -1,8 +1,8 @@
 use super::object_metadata::ObjectKindPayload;
 use super::{
     dense_element_growth_capacity, ordinary_property_attrs, AllocationLifetime, ClassRecord,
-    DescriptorAttributes, ElementStorageMetadata, InvalidationCause, InvalidationEvent,
-    ModuleNamespaceObject, NamedPropertyDictionary, NamedPropertyDictionaryEntry,
+    DescriptorAttributes, ElementStorageMetadata, ModuleNamespaceObject, NamedPropertyDictionary,
+    NamedPropertyDictionaryEntry,
     NamedPropertyValue, ObjectMetadata, ObjectRef, ObjectRuntime, ObjectSlotsHandleStoreTarget,
     PrimitiveHeapView, PrimitiveMutator, RegExpPayload, RuntimeObjectRecord, ShapeId,
     ShapeMetadata, ShapePropertyKind, SlotLocation, SparseElementEntry, TemporalObjectData, Value,
@@ -226,27 +226,6 @@ impl ObjectRuntime {
         if let ElementStorageMetadata::Dense { logical_len } = &mut metadata.element_storage {
             *logical_len = (*logical_len).max(min_len);
         }
-    }
-
-    pub(crate) fn bump_invalidation(
-        &mut self,
-        heap: &mut PrimitiveMutator<'_>,
-        id: ObjectRef,
-        cause: InvalidationCause,
-    ) -> bool {
-        if self.object_metadata(id).is_none() || heap.view().object(id).is_none() {
-            return false;
-        }
-        self.next_invalidation_epoch = self.next_invalidation_epoch.saturating_add(1);
-        let epoch = self.next_invalidation_epoch;
-        if !heap.mut_store_object_invalidation_epoch(id, epoch) {
-            return false;
-        }
-        let Some(metadata) = self.object_metadata_mut(id) else {
-            return false;
-        };
-        metadata.last_invalidation = Some(InvalidationEvent::new(epoch, cause));
-        true
     }
 
     pub(crate) fn snapshot_named_property_dictionary(
