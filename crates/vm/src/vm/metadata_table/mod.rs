@@ -173,6 +173,81 @@ impl MetadataTable {
         bytes.copy_from_slice(&self.buffer[byte_off..byte_off + 4]);
         u32::from_ne_bytes(bytes)
     }
+
+    fn entry_byte_offset(&self, kind: MetadataKind, slot_one_based: u32) -> usize {
+        let in_kind = self.in_kind_index_for_slot(slot_one_based) as usize;
+        (self.kind_offset(kind) as usize) + in_kind * kind.stride_bytes()
+    }
+
+    pub fn property(&self, slot: u32) -> &property::PropertyMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Property, slot);
+        // SAFETY: allocator reserves `stride_bytes(Property) = 32` bytes at this offset
+        // inside the Property run; the run starts at an 8-byte-aligned offset (allocator
+        // aligns runs to 8). PropertyMetadata is repr(C) with max field alignment 8, so
+        // this raw cast lands on a properly aligned pointer.
+        unsafe { &*(self.buffer.as_ptr().add(off) as *const property::PropertyMetadata) }
+    }
+
+    pub fn property_mut(&mut self, slot: u32) -> &mut property::PropertyMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Property, slot);
+        // SAFETY: same invariants as `property` above; exclusive &mut self gives
+        // exclusive access to the underlying byte range.
+        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut property::PropertyMetadata) }
+    }
+
+    pub fn call(&self, slot: u32) -> &call::CallMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Call, slot);
+        // SAFETY: allocator reserves `stride_bytes(Call) = 24` bytes at this offset;
+        // run is 8-aligned; CallMetadata is repr(C) with max field alignment 8.
+        unsafe { &*(self.buffer.as_ptr().add(off) as *const call::CallMetadata) }
+    }
+
+    pub fn call_mut(&mut self, slot: u32) -> &mut call::CallMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Call, slot);
+        // SAFETY: same invariants as `call` above; exclusive &mut self.
+        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut call::CallMetadata) }
+    }
+
+    pub fn arith(&self, slot: u32) -> &arith::ArithMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Arith, slot);
+        // SAFETY: allocator reserves `stride_bytes(Arith) = 8` bytes at this offset;
+        // run is 8-aligned; ArithMetadata is repr(C) with max field alignment 4.
+        unsafe { &*(self.buffer.as_ptr().add(off) as *const arith::ArithMetadata) }
+    }
+
+    pub fn arith_mut(&mut self, slot: u32) -> &mut arith::ArithMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Arith, slot);
+        // SAFETY: same invariants as `arith` above; exclusive &mut self.
+        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut arith::ArithMetadata) }
+    }
+
+    pub fn comparison(&self, slot: u32) -> &comparison::ComparisonMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Comparison, slot);
+        // SAFETY: allocator reserves `stride_bytes(Comparison) = 8` bytes at this offset;
+        // run is 8-aligned; ComparisonMetadata is repr(C) with max field alignment 4.
+        unsafe { &*(self.buffer.as_ptr().add(off) as *const comparison::ComparisonMetadata) }
+    }
+
+    pub fn comparison_mut(&mut self, slot: u32) -> &mut comparison::ComparisonMetadata {
+        let off = self.entry_byte_offset(MetadataKind::Comparison, slot);
+        // SAFETY: same invariants as `comparison` above; exclusive &mut self.
+        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut comparison::ComparisonMetadata) }
+    }
+
+    pub fn keyed_property(&self, slot: u32) -> &keyed_property::KeyedPropertyMetadata {
+        let off = self.entry_byte_offset(MetadataKind::KeyedProperty, slot);
+        // SAFETY: allocator reserves `stride_bytes(KeyedProperty) = 24` bytes at this offset;
+        // run is 8-aligned; KeyedPropertyMetadata is repr(C) with max field alignment 8.
+        unsafe { &*(self.buffer.as_ptr().add(off) as *const keyed_property::KeyedPropertyMetadata) }
+    }
+
+    pub fn keyed_property_mut(&mut self, slot: u32) -> &mut keyed_property::KeyedPropertyMetadata {
+        let off = self.entry_byte_offset(MetadataKind::KeyedProperty, slot);
+        // SAFETY: same invariants as `keyed_property` above; exclusive &mut self.
+        unsafe {
+            &mut *(self.buffer.as_mut_ptr().add(off) as *mut keyed_property::KeyedPropertyMetadata)
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -261,5 +336,142 @@ mod tests {
             let off = table.kind_offset_by_index(kind_idx);
             assert!(off as usize <= table.buffer().len());
         }
+    }
+
+    #[test]
+    fn write_then_read_property_metadata_roundtrips() {
+        use crate::vm::metadata_table::property::PropertyMetadata;
+        let sites = vec![
+            SiteDescriptor {
+                slot: 1,
+                kind: FeedbackSiteKind::NamedPropertyLoad,
+            },
+            SiteDescriptor {
+                slot: 2,
+                kind: FeedbackSiteKind::NamedPropertyLoad,
+            },
+        ];
+        let mut table = MetadataTable::allocate(&sites);
+        *table.property_mut(1) = PropertyMetadata {
+            mode: 3,
+            generation: 7,
+            handler_bits: 0xdeadbeef,
+            aux_bits: 0xcafe,
+            execution_count: 42,
+            ..Default::default()
+        };
+        let got = *table.property(1);
+        assert_eq!(got.mode, 3);
+        assert_eq!(got.generation, 7);
+        assert_eq!(got.handler_bits, 0xdeadbeef);
+        assert_eq!(got.aux_bits, 0xcafe);
+        assert_eq!(got.execution_count, 42);
+        assert_eq!(*table.property(2), PropertyMetadata::default());
+    }
+
+    #[test]
+    fn write_then_read_call_metadata_roundtrips() {
+        use crate::vm::metadata_table::call::CallMetadata;
+        let sites = vec![
+            SiteDescriptor {
+                slot: 1,
+                kind: FeedbackSiteKind::Call,
+            },
+            SiteDescriptor {
+                slot: 2,
+                kind: FeedbackSiteKind::Call,
+            },
+        ];
+        let mut table = MetadataTable::allocate(&sites);
+        *table.call_mut(1) = CallMetadata {
+            mode: 5,
+            generation: 11,
+            callee_bits: 0xabcd1234_5678ef90,
+            execution_count: 99,
+            ..Default::default()
+        };
+        let got = *table.call(1);
+        assert_eq!(got.mode, 5);
+        assert_eq!(got.generation, 11);
+        assert_eq!(got.callee_bits, 0xabcd1234_5678ef90);
+        assert_eq!(got.execution_count, 99);
+        assert_eq!(*table.call(2), CallMetadata::default());
+    }
+
+    #[test]
+    fn write_then_read_arith_metadata_roundtrips() {
+        use crate::vm::metadata_table::arith::ArithMetadata;
+        let sites = vec![
+            SiteDescriptor {
+                slot: 1,
+                kind: FeedbackSiteKind::Arithmetic,
+            },
+            SiteDescriptor {
+                slot: 2,
+                kind: FeedbackSiteKind::Arithmetic,
+            },
+        ];
+        let mut table = MetadataTable::allocate(&sites);
+        *table.arith_mut(1) = ArithMetadata {
+            observed_bits: 0xf00d,
+            execution_count: 77,
+        };
+        let got = *table.arith(1);
+        assert_eq!(got.observed_bits, 0xf00d);
+        assert_eq!(got.execution_count, 77);
+        assert_eq!(*table.arith(2), ArithMetadata::default());
+    }
+
+    #[test]
+    fn write_then_read_comparison_metadata_roundtrips() {
+        use crate::vm::metadata_table::comparison::ComparisonMetadata;
+        let sites = vec![
+            SiteDescriptor {
+                slot: 1,
+                kind: FeedbackSiteKind::Comparison,
+            },
+            SiteDescriptor {
+                slot: 2,
+                kind: FeedbackSiteKind::Comparison,
+            },
+        ];
+        let mut table = MetadataTable::allocate(&sites);
+        *table.comparison_mut(1) = ComparisonMetadata {
+            observed_bits: 0x1234,
+            execution_count: 55,
+        };
+        let got = *table.comparison(1);
+        assert_eq!(got.observed_bits, 0x1234);
+        assert_eq!(got.execution_count, 55);
+        assert_eq!(*table.comparison(2), ComparisonMetadata::default());
+    }
+
+    #[test]
+    fn write_then_read_keyed_property_metadata_roundtrips() {
+        use crate::vm::metadata_table::keyed_property::KeyedPropertyMetadata;
+        let sites = vec![
+            SiteDescriptor {
+                slot: 1,
+                kind: FeedbackSiteKind::KeyedPropertyAccess,
+            },
+            SiteDescriptor {
+                slot: 2,
+                kind: FeedbackSiteKind::KeyedPropertyAccess,
+            },
+        ];
+        let mut table = MetadataTable::allocate(&sites);
+        *table.keyed_property_mut(1) = KeyedPropertyMetadata {
+            mode: 2,
+            generation: 9,
+            handler_bits: 0x0102030405060708,
+            execution_count: 33,
+            ..Default::default()
+        };
+        let got = *table.keyed_property(1);
+        assert_eq!(got.mode, 2);
+        assert_eq!(got.generation, 9);
+        assert_eq!(got.handler_bits, 0x0102030405060708);
+        assert_eq!(got.execution_count, 33);
+        assert_eq!(*table.keyed_property(2), KeyedPropertyMetadata::default());
     }
 }
