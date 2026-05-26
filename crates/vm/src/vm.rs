@@ -66,6 +66,7 @@ mod with_env;
 use call::RejectingNativeRegistry;
 use feedback::{FeedbackVector, PolymorphicChain};
 use install::InstalledFunction;
+use metadata_table::MetadataTable;
 use state::{
     ActiveEnvScopeRange, ActiveVmRoots, AsyncFrameState, AsyncGeneratorFrameState,
     AsyncGeneratorRequest, DirectEvalEnvironmentState, DynamicImportPhase, DynamicImportRequest,
@@ -179,6 +180,12 @@ pub struct Vm {
     /// reallocates the flat array, only mutates per-entry content.
     /// See `crate::dsl::feedback_flat` for the storage rationale.
     pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
+    /// Phase C: per-code-object IC metadata buffer, parallel to
+    /// `feedback_flat_storage`, keyed by `code_index(code_ref)`.
+    /// `None` for code that has not yet been installed (or was installed
+    /// before Phase C landed). Allocated eagerly alongside the flat
+    /// storage in `store_installed`; never grown thereafter.
+    pub(crate) metadata_tables: Vec<Option<MetadataTable>>,
     /// Safepoint poll-pending byte read by `poll_safepoint!` (warm
     /// `op_loop_header` / backward jumps). The asm reads
     /// `[x22, VM_POLL_PENDING_OFFSET]` where `x22 = *mut Vm`; the offset
@@ -559,6 +566,7 @@ impl Vm {
             source_texts: HashMap::new(),
             feedback_vectors: Vec::new(),
             feedback_flat_storage: Vec::new(),
+            metadata_tables: Vec::new(),
             polymorphic_chains: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
@@ -636,6 +644,22 @@ impl Vm {
     /// transitions to Megamorphic or is cleared by an AdaptiveProtoLoad fire.
     pub(crate) fn drop_polymorphic_chain(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         self.polymorphic_chains.remove(&(code, slot));
+    }
+
+    /// Phase C: returns the `MetadataTable` for `code`, or `None` if the
+    /// code has not been installed yet.
+    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 1.4")]
+    pub fn metadata_table(&self, code: CodeRef) -> Option<&MetadataTable> {
+        let idx = code_index(code);
+        self.metadata_tables.get(idx).and_then(|t| t.as_ref())
+    }
+
+    /// Phase C: returns a mutable reference to the `MetadataTable` for `code`,
+    /// or `None` if the code has not been installed yet.
+    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 2.x")]
+    pub(crate) fn metadata_table_mut(&mut self, code: CodeRef) -> Option<&mut MetadataTable> {
+        let idx = code_index(code);
+        self.metadata_tables.get_mut(idx).and_then(|t| t.as_mut())
     }
 
     /// Spec 2 Phase B: post-mark GC sweep. Drops polymorphic chain entries

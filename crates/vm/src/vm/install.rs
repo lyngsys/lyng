@@ -3,6 +3,7 @@ use super::{
     BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
     RealmRef, Value, Vm, VmError, VmResult,
 };
+use crate::vm::metadata_table::{MetadataTable, SiteDescriptor};
 use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
 use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
@@ -852,6 +853,20 @@ impl Vm {
             .collect::<Vec<_>>()
             .into_boxed_slice();
         self.feedback_flat_storage[index] = flat;
+        // Phase C: allocate parallel MetadataTable buffer keyed by code_index.
+        if self.metadata_tables.len() <= index {
+            self.metadata_tables.resize_with(index + 1, || None);
+        }
+        let descriptors: Vec<SiteDescriptor> = installed
+            .function
+            .feedback_sites()
+            .iter()
+            .map(|d| SiteDescriptor {
+                slot: d.slot().get(),
+                kind: d.kind(),
+            })
+            .collect();
+        self.metadata_tables[index] = Some(MetadataTable::allocate(&descriptors));
         self.tiering.ensure_slot(code);
         self.installed[index] = Some(Arc::new(installed));
     }
