@@ -1437,7 +1437,7 @@ fn metadata_table_in_kind_indices_are_monotone_per_kind() {
     for descriptor in entry_fn.feedback_sites().iter() {
         let mk = MetadataKind::from_site_kind(descriptor.kind());
         let expected = seen_per_kind[mk.index()];
-        let actual = table.in_kind_index_for_slot(descriptor.slot().get());
+        let actual = table.in_kind_index_for_slot_with_kind(descriptor.slot().get(), mk);
         assert_eq!(
             actual,
             expected,

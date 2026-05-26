@@ -103,18 +103,35 @@ fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
 }
 
 #[test]
-fn llint_feedback_addressing_uses_compact_stride_shift() {
+fn llint_feedback_addressing_uses_precomputed_entry_offset() {
     let feedback_backend = include_str!("../dsl/backend/aarch64/feedback.rs");
 
-    // Phase C.4: record_* macros now address ArithMetadata via lsl #{arith_metadata_stride_shift},
-    // and load_feedback_site! addresses PropertyMetadata via lsl #{property_metadata_stride_shift}.
+    // Phase C precomputed-offset optimization: all four feedback macros
+    // (load_feedback_site!, record_smi!, record_object!, record_double!)
+    // resolve a slot to its entry via a 3-instruction sequence:
+    //   sub  x17, x{slot}, #1
+    //   ldr  w16, [x21, x17, lsl #2]   ← reads slot_to_entry_offset table
+    //   add  x{dst}, x21, x16          ← buffer_base + precomputed_offset
+    // No in-buffer header/kind-offsets dispatch; no stride shifts in asm.
     assert!(
-        feedback_backend.contains("lsl #{arith_metadata_stride_shift}"),
-        "LLInt Arith feedback slot addressing should use the compact ArithMetadata stride shift"
+        feedback_backend.contains("ldr    w16, [x21, x17, lsl #2]"),
+        "LLInt feedback slot addressing should load the precomputed entry offset via [x21, x17, lsl #2]"
     );
     assert!(
-        feedback_backend.contains("lsl #{property_metadata_stride_shift}"),
-        "LLInt Property feedback slot addressing should use the compact PropertyMetadata stride shift"
+        !feedback_backend.contains("#{mt_slot_index_table_offset}"),
+        "LLInt feedback macros must not reference the old slot-index table offset binding"
+    );
+    assert!(
+        !feedback_backend.contains("#{mt_kind_offsets_offset}"),
+        "LLInt feedback macros must not reference the old kind-offsets table offset binding"
+    );
+    assert!(
+        !feedback_backend.contains("#{arith_metadata_stride_shift}"),
+        "LLInt record_* macros must not shift by stride after precomputed-offset optimization"
+    );
+    assert!(
+        !feedback_backend.contains("#{property_metadata_stride_shift}"),
+        "LLInt load_feedback_site! must not shift by stride after precomputed-offset optimization"
     );
     assert!(
         !feedback_backend.contains("feedback_entry_stride} & 0xffff"),

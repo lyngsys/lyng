@@ -8,19 +8,18 @@
 //! All internal scratch use is on `x16` / `x17` (see
 //! `values.rs` for the rationale).
 //!
-//! Bindings expected from the proc-macro lowerer:
+//! Precomputed-offset layout (Phase C optimization):
+//! The MetadataTable buffer starts with a `slot_to_entry_offset[N]` table:
+//! each entry is a `u32` byte offset from the buffer base to the metadata
+//! entry for that (1-based) slot. Asm resolves a slot in 3 instructions:
+//!   sub  x17, x{slot}, #1          (0-based)
+//!   ldr  w16, [x21, x17, lsl #2]   (load precomputed offset)
+//!   add  x{dst}, x21, x16          (buffer + offset = entry ptr)
 //!
+//! Bindings expected from the proc-macro lowerer:
 //! - `{state_mt}` — byte offset of `LlIntState::frame_metadata_table_base`.
-//! - `{mt_kind_offsets_offset}` — byte offset of the kind-offsets table in the
-//!   MetadataTable buffer (= 16 after the 16-byte `LinkingDataHeader`).
-//! - `{mt_slot_index_table_offset}` — byte offset of the slot→in-kind-index
-//!   table in the MetadataTable buffer (= 36).
-//! - `{property_metadata_stride_shift}` — `log2(size_of::<PropertyMetadata>())` = 5.
-//! - `{mt_arith_kind_offset}` — byte offset of `kind_offsets[Arith]` in the
-//!   MetadataTable buffer (= 24; header=16, Arith index=2, 4 bytes/entry).
 //! - `{arith_metadata_observed_bits_offset}` — byte offset of `ArithMetadata::observed_bits` = 0.
 //! - `{arith_metadata_exec_count_offset}` — byte offset of `ArithMetadata::execution_count` = 4.
-//! - `{arith_metadata_stride_shift}` — `log2(size_of::<ArithMetadata>())` = 3.
 //! - `{feedback_mode}` — byte offset of the `LLInt` IC mode byte.
 //! - `{feedback_named_handler_bits}` — byte offset of the packed named
 //!   property handler word.
@@ -31,20 +30,14 @@
 /// write the pointer into `x{$dst}`. x21 (MT pin) must hold the MetadataTable
 /// buffer base (Phase C.4 pin flip).
 ///
-/// Hardcoded for `Property` kind (index 0). The kind-offsets entry for
-/// Property is the first `u32` in the kind-offsets table, so
-/// `kind_offsets[Property] = *(buffer + {mt_kind_offsets_offset})` with no
-/// index multiplication.
+/// Uses the precomputed slot_to_entry_offset table at buffer[0..N*4].
 ///
 /// Scratch: x16, x17 (AAPCS64 IP0/IP1 — never overlap live operand slots).
 ///
-/// 5-instruction sequence (x21 = MetadataTable buffer base):
-/// 0. `sub  x17, x{slot}, #1`                              — 0-based slot index
-/// 1. `add  x16, x21, #{mt_slot_index_table_offset}`       — base of slot→idx table
-/// 2. `ldr  w16, [x16, x17, lsl #2]`                       — idx = table[slot-1]
-/// 3. `ldr  w17, [x21, #{mt_kind_offsets_offset}]`         — koff = kind_offsets[Property]
-/// 4. `add  x{dst}, x21, x17`                              — Property run base
-/// 5. `add  x{dst}, x{dst}, x16, lsl #{property_metadata_stride_shift}` — + idx*32
+/// 3-instruction sequence (x21 = MetadataTable buffer base):
+/// 0. `sub  x17, x{slot}, #1`         — 0-based slot index
+/// 1. `ldr  w16, [x21, x17, lsl #2]`  — w16 = slot_to_entry_offset[slot-1]
+/// 2. `add  x{dst}, x21, x16`         — dst = buffer + entry_offset
 #[macro_export]
 macro_rules! load_feedback_site {
     ($slot:tt => $dst:tt) => {
@@ -53,22 +46,12 @@ macro_rules! load_feedback_site {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            // (1) Point x16 at the slot→in-kind-index table (x21 = MT buffer).
-            "add    x16, x21, #{mt_slot_index_table_offset}\n",
-            // (2) Load the in-kind index for this slot (u32).
-            "ldr    w16, [x16, x17, lsl #2]\n",
-            // (3) Load kind_offsets[Property] = first u32 in the kind-offsets table.
-            "ldr    w17, [x21, #{mt_kind_offsets_offset}]\n",
-            // (4) Property run base = mt_buffer + kind_offset.
+            // (1) Load precomputed entry offset from slot_to_entry_offset table.
+            "ldr    w16, [x21, x17, lsl #2]\n",
+            // (2) Entry pointer = buffer_base + entry_offset.
             "add    x",
             stringify!($dst),
-            ", x21, x17\n",
-            // (5) Entry pointer = run_base + in_kind_index * stride.
-            "add    x",
-            stringify!($dst),
-            ", x",
-            stringify!($dst),
-            ", x16, lsl #{property_metadata_stride_shift}\n",
+            ", x21, x16\n",
         )
     };
 }
@@ -235,23 +218,20 @@ macro_rules! load_named_handler_shape {
 /// Record that an SMI was observed at slot `$slot` and saturating-increment
 /// the pending scalar execution count. Uses x21 as MetadataTable base (Phase C.4).
 ///
-/// Resolves ArithMetadata pointer via: slot_to_in_kind table → kind_offsets[Arith] → entry.
+/// Resolves ArithMetadata pointer via the precomputed slot_to_entry_offset table.
 /// Writes to `ArithMetadata.{observed_bits, execution_count}` (offsets 0 and 4).
 ///
-/// 13-instruction sequence (x16/x17 scratch):
+/// 10-instruction sequence (x16/x17 scratch):
 /// - `0.` sub  x17, x{slot}, #1
-/// - `1.` add  x16, x21, #{mt_slot_index_table_offset}
-/// - `2.` ldr  w16, [x16, x17, lsl #2]
-/// - `3.` ldr  w17, [x21, #{mt_arith_kind_offset}]
-/// - `4.` add  x17, x21, x17
-/// - `5.` add  x16, x17, x16, lsl #{arith_metadata_stride_shift}
-/// - `6.` ldr  w17, [x16, #{arith_metadata_observed_bits_offset}]
-/// - `7.` orr  w17, w17, #0x1
-/// - `8.` str  w17, [x16, #{arith_metadata_observed_bits_offset}]
-/// - `9.` ldr  w17, [x16, #{arith_metadata_exec_count_offset}]
-/// - `10.` adds w17, w17, #1
-/// - `11.` csinv w17, w17, wzr, cc
-/// - `12.` str  w17, [x16, #{arith_metadata_exec_count_offset}]
+/// - `1.` ldr  w16, [x21, x17, lsl #2]
+/// - `2.` add  x16, x21, x16
+/// - `3.` ldr  w17, [x16, #{arith_metadata_observed_bits_offset}]
+/// - `4.` orr  w17, w17, #0x1
+/// - `5.` str  w17, [x16, #{arith_metadata_observed_bits_offset}]
+/// - `6.` ldr  w17, [x16, #{arith_metadata_exec_count_offset}]
+/// - `7.` adds w17, w17, #1
+/// - `8.` csinv w17, w17, wzr, cc
+/// - `9.` str  w17, [x16, #{arith_metadata_exec_count_offset}]
 #[macro_export]
 macro_rules! record_smi {
     ($slot:tt) => {
@@ -260,21 +240,15 @@ macro_rules! record_smi {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            // (1) Slot→in-kind-index table base (x21 = MetadataTable buffer).
-            "add    x16, x21, #{mt_slot_index_table_offset}\n",
-            // (2) in-kind index = slot_to_in_kind[slot-1].
-            "ldr    w16, [x16, x17, lsl #2]\n",
-            // (3) kind_offsets[Arith] = *(mt + mt_arith_kind_offset).
-            "ldr    w17, [x21, #{mt_arith_kind_offset}]\n",
-            // (4) Arith run base = mt + kind_offsets[Arith].
-            "add    x17, x21, x17\n",
-            // (5) Entry pointer = run_base + in_kind_index * stride.
-            "add    x16, x17, x16, lsl #{arith_metadata_stride_shift}\n",
-            // (6-8) Update observed_bits |= SMI bit (0x1).
+            // (1) Load precomputed entry offset.
+            "ldr    w16, [x21, x17, lsl #2]\n",
+            // (2) Entry pointer = buffer_base + entry_offset.
+            "add    x16, x21, x16\n",
+            // (3-5) Update observed_bits |= SMI bit (0x1).
             "ldr    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
             "orr    w17, w17, #0x1\n",
             "str    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
-            // (9-C) Saturating-increment execution_count.
+            // (6-9) Saturating-increment execution_count.
             "ldr    w17, [x16, #{arith_metadata_exec_count_offset}]\n",
             "adds   w17, w17, #1\n",
             "csinv  w17, w17, wzr, cc\n",
@@ -293,21 +267,15 @@ macro_rules! record_object {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            // (1) Slot→in-kind-index table base.
-            "add    x16, x21, #{mt_slot_index_table_offset}\n",
-            // (2) in-kind index.
-            "ldr    w16, [x16, x17, lsl #2]\n",
-            // (3) kind_offsets[Arith].
-            "ldr    w17, [x21, #{mt_arith_kind_offset}]\n",
-            // (4) Arith run base.
-            "add    x17, x21, x17\n",
-            // (5) Entry pointer.
-            "add    x16, x17, x16, lsl #{arith_metadata_stride_shift}\n",
-            // (6-8) Update observed_bits |= Object bit (0x2).
+            // (1) Load precomputed entry offset.
+            "ldr    w16, [x21, x17, lsl #2]\n",
+            // (2) Entry pointer = buffer_base + entry_offset.
+            "add    x16, x21, x16\n",
+            // (3-5) Update observed_bits |= Object bit (0x2).
             "ldr    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
             "orr    w17, w17, #0x2\n",
             "str    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
-            // (9-C) Saturating-increment execution_count.
+            // (6-9) Saturating-increment execution_count.
             "ldr    w17, [x16, #{arith_metadata_exec_count_offset}]\n",
             "adds   w17, w17, #1\n",
             "csinv  w17, w17, wzr, cc\n",
@@ -326,21 +294,15 @@ macro_rules! record_double {
             "sub    x17, x",
             stringify!($slot),
             ", #1\n",
-            // (1) Slot→in-kind-index table base.
-            "add    x16, x21, #{mt_slot_index_table_offset}\n",
-            // (2) in-kind index.
-            "ldr    w16, [x16, x17, lsl #2]\n",
-            // (3) kind_offsets[Arith].
-            "ldr    w17, [x21, #{mt_arith_kind_offset}]\n",
-            // (4) Arith run base.
-            "add    x17, x21, x17\n",
-            // (5) Entry pointer.
-            "add    x16, x17, x16, lsl #{arith_metadata_stride_shift}\n",
-            // (6-8) Update observed_bits |= Double bit (0x4).
+            // (1) Load precomputed entry offset.
+            "ldr    w16, [x21, x17, lsl #2]\n",
+            // (2) Entry pointer = buffer_base + entry_offset.
+            "add    x16, x21, x16\n",
+            // (3-5) Update observed_bits |= Double bit (0x4).
             "ldr    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
             "orr    w17, w17, #0x4\n",
             "str    w17, [x16, #{arith_metadata_observed_bits_offset}]\n",
-            // (9-C) Saturating-increment execution_count.
+            // (6-9) Saturating-increment execution_count.
             "ldr    w17, [x16, #{arith_metadata_exec_count_offset}]\n",
             "adds   w17, w17, #1\n",
             "csinv  w17, w17, wzr, cc\n",

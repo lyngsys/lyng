@@ -48,17 +48,19 @@ pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_bas
 pub const LLINT_STATE_FRAME_METADATA_TABLE_BASE: usize =
     offset_of!(LlIntState, frame_metadata_table_base);
 
-// Phase C Task 4.3: MetadataTable buffer-layout constants re-exported here so
-// the proc-macro lowerer (which emits `::lyng_vm::dsl::reg_convention::` paths
-// reachable from all crates) can reference them via a fully-public path.
+// Phase C Task 4.3 / optimization: MetadataTable per-field constants re-exported
+// here so the proc-macro lowerer (which emits `::lyng_vm::dsl::reg_convention::`
+// paths reachable from all crates) can reference them via a fully-public path.
+//
+// The buffer-layout constants (METADATA_TABLE_HEADER_SIZE, KIND_OFFSETS_OFFSET,
+// SLOT_INDEX_TABLE_OFFSET, ARITH_KIND_OFFSET) have been removed: the new
+// precomputed-offset layout has no in-buffer header or kind-offsets table.
+// Asm resolves a slot via the slot_to_entry_offset table at buffer[0..N*4].
 pub use crate::vm::metadata_table::arith::{
     ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
     ARITH_METADATA_STRIDE_SHIFT,
 };
 pub use crate::vm::metadata_table::property::PROPERTY_METADATA_STRIDE_SHIFT;
-pub use crate::vm::metadata_table::METADATA_TABLE_ARITH_KIND_OFFSET;
-pub use crate::vm::metadata_table::METADATA_TABLE_KIND_OFFSETS_OFFSET;
-pub use crate::vm::metadata_table::METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET;
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_slots_base);
 // Phase 1.B.1: pre-resolved constants array base + this-mirror.

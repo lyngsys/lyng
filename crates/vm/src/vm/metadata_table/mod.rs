@@ -1,6 +1,14 @@
 //! JSC-style per-code-object `MetadataTable`. Spec 2 Phase C.
 //!
-//! Layout: header + per-kind offset table + slot→in-kind-index table + per-kind runs.
+//! Layout (new, precomputed-offset format):
+//!   `[slot_to_entry_offset[N]] [PropertyMetadata run] [CallMetadata run] ...`
+//!
+//! The slot→entry-offset table lives at buffer offset 0. Each entry is a `u32`
+//! byte offset from the buffer base to the corresponding metadata entry. This
+//! lets asm resolve a slot to its entry in 3 instructions (sub/ldr/add) instead
+//! of the former 6. The `kind_offsets`, `per_kind_counts`, and `slot_count`
+//! fields are Rust-side and used only by slow-path accessors and tests.
+//!
 //! Phase C.1 lands the type + allocator; reads and writes wire up in C.2/C.4.
 
 pub mod arith;
@@ -37,57 +45,32 @@ pub struct SiteDescriptor {
     pub kind: lyng_bytecode::FeedbackSiteKind,
 }
 
-#[repr(C)]
-#[allow(dead_code)]
-#[derive(Clone, Copy)]
-struct LinkingDataHeader {
-    buffer_size: u32,
-    slot_count: u32,
-    slot_index_table_offset: u32,
-    _reserved: u32,
-}
-
-/// Size of the [`LinkingDataHeader`] prefix at the start of a MetadataTable buffer.
-/// Used by asm to locate the kind-offsets table and the slot→in-kind-index table.
-pub const METADATA_TABLE_HEADER_SIZE: usize = std::mem::size_of::<LinkingDataHeader>();
-/// Byte offset of the per-kind run-offset table within a MetadataTable buffer.
-pub const METADATA_TABLE_KIND_OFFSETS_OFFSET: usize = METADATA_TABLE_HEADER_SIZE;
-/// Byte size of the per-kind run-offset table (`METADATA_KIND_COUNT × 4`).
-pub const METADATA_TABLE_KIND_OFFSETS_SIZE: usize = METADATA_KIND_COUNT * 4;
-/// Byte offset of the slot→in-kind-index table within a MetadataTable buffer.
-/// Each entry is a `u32`; entry at index `slot - 1` gives the in-kind index for that slot.
-pub const METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET: usize =
-    METADATA_TABLE_KIND_OFFSETS_OFFSET + METADATA_TABLE_KIND_OFFSETS_SIZE;
-
-/// Byte offset within the MetadataTable buffer of the `kind_offsets[Arith]` entry.
-/// `MetadataKind::Arith = 2`, so this is `METADATA_TABLE_KIND_OFFSETS_OFFSET + 2 * 4`.
-pub const METADATA_TABLE_ARITH_KIND_OFFSET: usize = METADATA_TABLE_KIND_OFFSETS_OFFSET + 8;
-
-// Sanity-assert: if LinkingDataHeader size or METADATA_KIND_COUNT changes, this
-// will fail loudly rather than silently producing wrong asm offsets.
-const _: () = assert!(
-    METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET == 36,
-    "MetadataTable slot-index table must start at offset 36; \
-     update asm bindings if LinkingDataHeader or METADATA_KIND_COUNT changed"
-);
-const _: () = assert!(
-    METADATA_TABLE_ARITH_KIND_OFFSET == 24,
-    "METADATA_TABLE_ARITH_KIND_OFFSET must be 24 (header=16, Arith index=2, 4 bytes/entry)"
-);
-
-// Private aliases kept for internal allocator use.
-#[allow(dead_code)]
-const HEADER_SIZE: usize = METADATA_TABLE_HEADER_SIZE;
-#[allow(dead_code)]
-const KIND_OFFSETS_OFFSET: usize = METADATA_TABLE_KIND_OFFSETS_OFFSET;
-#[allow(dead_code)]
-const KIND_OFFSETS_SIZE: usize = METADATA_TABLE_KIND_OFFSETS_SIZE;
-
 /// Per-code-object IC metadata buffer. Phase C.1 ships the type and allocator;
 /// per-kind reads/writes wire up in C.2, the asm fast path consumes it in C.4.
+///
+/// Buffer layout:
+/// ```text
+/// +--------------------------------+ <- buffer base (x21 in asm)
+/// | slot_to_entry_offset[N]        |  N * 4 bytes (u32 per slot)
+/// +--------------------------------+ <- aligned up to 8
+/// | PropertyMetadata run           |  count_property * 32
+/// +--------------------------------+ <- aligned up to 8
+/// | CallMetadata run               |  count_call * 24
+/// +--------------------------------+
+/// | ArithMetadata run              |  count_arith * 8
+/// +--------------------------------+
+/// | ComparisonMetadata run         |  count_comparison * 8
+/// +--------------------------------+
+/// | KeyedPropertyMetadata run      |  count_keyed * 24
+/// +--------------------------------+
+/// ```
+///
+/// `kind_offsets`, `per_kind_counts`, and `slot_count` are Rust-side struct
+/// fields used for slow-path queries and tests; they are NOT in the buffer.
 #[allow(dead_code)]
 pub struct MetadataTable {
     buffer: Box<[u8]>,
+    /// Byte offset from buffer base to the start of each kind's run.
     kind_offsets: [u32; METADATA_KIND_COUNT],
     per_kind_counts: [u32; METADATA_KIND_COUNT],
     slot_count: u32,
@@ -96,7 +79,8 @@ pub struct MetadataTable {
 #[allow(dead_code)]
 impl MetadataTable {
     /// Allocate a fresh table sized to hold per-kind metadata for `sites`.
-    /// Sites need not be sorted; in-kind indices are assigned in slot order.
+    /// Sites need not be sorted; in-kind indices (and entry offsets) are
+    /// assigned in slot-ascending order.
     pub fn allocate(sites: &[SiteDescriptor]) -> Self {
         let slot_count = sites.len() as u32;
 
@@ -107,10 +91,9 @@ impl MetadataTable {
             per_kind_counts[mk.index()] += 1;
         }
 
-        // 2. Compute buffer layout.
-        let slot_index_table_offset = KIND_OFFSETS_OFFSET + KIND_OFFSETS_SIZE;
-        let slot_index_table_size = (slot_count as usize) * 4;
-        let runs_start = align_up(slot_index_table_offset + slot_index_table_size, 8);
+        // 2. Buffer layout: slot_to_entry_offset table (N×4 bytes) + per-kind runs.
+        let slot_table_size = (slot_count as usize) * 4;
+        let runs_start = align_up(slot_table_size, 8);
 
         let mut kind_offsets = [0u32; METADATA_KIND_COUNT];
         let mut cursor = runs_start;
@@ -120,24 +103,15 @@ impl MetadataTable {
             cursor += stride * (per_kind_counts[kind_idx] as usize);
             cursor = align_up(cursor, 8);
         }
-        let buffer_size = cursor;
+        // Ensure buffer is large enough to hold the slot table even if there
+        // are no run entries (e.g. 0-slot table → 0 bytes but still valid).
+        let buffer_size = cursor.max(slot_table_size);
 
         // 3. Allocate zeroed buffer.
         let mut buffer = vec![0u8; buffer_size].into_boxed_slice();
 
-        // 4. Write header (4 × u32 fields at offsets 0/4/8/12).
-        buffer[0..4].copy_from_slice(&(buffer_size as u32).to_ne_bytes());
-        buffer[4..8].copy_from_slice(&slot_count.to_ne_bytes());
-        buffer[8..12].copy_from_slice(&(slot_index_table_offset as u32).to_ne_bytes());
-        buffer[12..16].copy_from_slice(&0u32.to_ne_bytes()); // _reserved
-
-        // 5. Write kind offsets immediately after the header.
-        for (kind_idx, &ko) in kind_offsets.iter().enumerate() {
-            let off = KIND_OFFSETS_OFFSET + kind_idx * 4;
-            buffer[off..off + 4].copy_from_slice(&ko.to_ne_bytes());
-        }
-
-        // 6. Assign in-kind indices in slot-ascending order.
+        // 4. Assign per-slot entry offsets in slot-ascending order and write
+        //    them into the slot_to_entry_offset table at buffer[0..slot_table_size].
         let mut sorted: Vec<SiteDescriptor> = sites.to_vec();
         sorted.sort_by_key(|s| s.slot);
         let mut next_in_kind = [0u32; METADATA_KIND_COUNT];
@@ -145,9 +119,13 @@ impl MetadataTable {
             let mk = MetadataKind::from_site_kind(site.kind);
             let in_kind_idx = next_in_kind[mk.index()];
             next_in_kind[mk.index()] += 1;
+
+            let stride = stride_for_kind_index(mk.index());
+            let entry_offset = kind_offsets[mk.index()] + in_kind_idx * (stride as u32);
+
             let slot_zero_based = (site.slot - 1) as usize;
-            let off = slot_index_table_offset + slot_zero_based * 4;
-            buffer[off..off + 4].copy_from_slice(&in_kind_idx.to_ne_bytes());
+            let off = slot_zero_based * 4;
+            buffer[off..off + 4].copy_from_slice(&entry_offset.to_ne_bytes());
         }
 
         Self {
@@ -194,87 +172,120 @@ impl MetadataTable {
         self.per_kind_counts[kind_index]
     }
 
-    /// Returns the per-kind in-kind index for `slot_one_based`. Reads from the
-    /// in-buffer table (single source of truth, what asm will also read).
-    pub fn in_kind_index_for_slot(&self, slot_one_based: u32) -> u32 {
+    /// Returns the precomputed byte offset (from the buffer base) for the
+    /// metadata entry at `slot_one_based`. This is the value asm reads with:
+    ///   `sub x17, x{slot}, #1`
+    ///   `ldr w16, [x21, x17, lsl #2]`   ← reads this u32
+    ///   `add x{dst}, x21, x16`           ← entry pointer
+    pub fn entry_offset_for_slot(&self, slot_one_based: u32) -> u32 {
         debug_assert!(slot_one_based >= 1 && slot_one_based <= self.slot_count);
         let zero_based = (slot_one_based - 1) as usize;
-        let table_offset = KIND_OFFSETS_OFFSET + KIND_OFFSETS_SIZE;
-        let byte_off = table_offset + zero_based * 4;
+        let byte_off = zero_based * 4;
         let mut bytes = [0u8; 4];
         bytes.copy_from_slice(&self.buffer[byte_off..byte_off + 4]);
         u32::from_ne_bytes(bytes)
     }
 
-    fn entry_byte_offset(&self, kind: MetadataKind, slot_one_based: u32) -> usize {
-        let in_kind = self.in_kind_index_for_slot(slot_one_based) as usize;
-        (self.kind_offset(kind) as usize) + in_kind * kind.stride_bytes()
+    /// Returns the in-kind index for `slot_one_based` given the slot's kind.
+    /// Derived from the precomputed entry offset: `(entry_offset - kind_offset) / stride`.
+    /// Used by tests that know the kind; the kind is always known at the call site.
+    pub fn in_kind_index_for_slot_with_kind(&self, slot_one_based: u32, kind: MetadataKind) -> u32 {
+        let entry_off = self.entry_offset_for_slot(slot_one_based);
+        let kind_off = self.kind_offsets[kind.index()];
+        let stride = kind.stride_bytes() as u32;
+        (entry_off - kind_off) / stride
+    }
+
+    /// Compatibility shim for tests that still call `in_kind_index_for_slot`.
+    /// The kind must be known; this exists to ease the transition. Prefer
+    /// `in_kind_index_for_slot_with_kind` for new code.
+    #[cfg(test)]
+    pub fn in_kind_index_for_slot(&self, slot_one_based: u32) -> u32 {
+        // Test-only: reconstruct the in-kind index by scanning kind_offsets
+        // to determine which kind owns this entry offset.
+        let entry_off = self.entry_offset_for_slot(slot_one_based);
+        for kind_idx in 0..METADATA_KIND_COUNT {
+            let ko = self.kind_offsets[kind_idx];
+            let stride = stride_for_kind_index(kind_idx) as u32;
+            let count = self.per_kind_counts[kind_idx];
+            if count == 0 {
+                continue;
+            }
+            let run_end = ko + count * stride;
+            if entry_off >= ko && entry_off < run_end {
+                return (entry_off - ko) / stride;
+            }
+        }
+        panic!("in_kind_index_for_slot: entry_offset {entry_off} not in any kind run");
+    }
+
+    fn entry_byte_offset(&self, slot_one_based: u32) -> usize {
+        self.entry_offset_for_slot(slot_one_based) as usize
     }
 
     pub fn property(&self, slot: u32) -> &property::PropertyMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Property, slot);
-        // SAFETY: allocator reserves `stride_bytes(Property) = 32` bytes at this offset
-        // inside the Property run; the run starts at an 8-byte-aligned offset (allocator
-        // aligns runs to 8). PropertyMetadata is repr(C) with max field alignment 8, so
-        // this raw cast lands on a properly aligned pointer.
+        let off = self.entry_byte_offset(slot);
+        // SAFETY: allocator reserves `stride_bytes(Property) = 32` bytes at this offset;
+        // the Property run starts at an 8-byte-aligned offset (allocator aligns runs to 8).
+        // PropertyMetadata is repr(C) with max field alignment 8.
         unsafe { &*(self.buffer.as_ptr().add(off) as *const property::PropertyMetadata) }
     }
 
     pub fn property_mut(&mut self, slot: u32) -> &mut property::PropertyMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Property, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `property` above; exclusive &mut self gives
         // exclusive access to the underlying byte range.
         unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut property::PropertyMetadata) }
     }
 
     pub fn call(&self, slot: u32) -> &call::CallMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Call, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Call) = 24` bytes at this offset;
         // run is 8-aligned; CallMetadata is repr(C) with max field alignment 8.
         unsafe { &*(self.buffer.as_ptr().add(off) as *const call::CallMetadata) }
     }
 
     pub fn call_mut(&mut self, slot: u32) -> &mut call::CallMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Call, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `call` above; exclusive &mut self.
         unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut call::CallMetadata) }
     }
 
     pub fn arith(&self, slot: u32) -> &arith::ArithMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Arith, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Arith) = 8` bytes at this offset;
         // run is 8-aligned; ArithMetadata is repr(C) with max field alignment 4.
         unsafe { &*(self.buffer.as_ptr().add(off) as *const arith::ArithMetadata) }
     }
 
     pub fn arith_mut(&mut self, slot: u32) -> &mut arith::ArithMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Arith, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `arith` above; exclusive &mut self.
         unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut arith::ArithMetadata) }
     }
 
     pub fn comparison(&self, slot: u32) -> &comparison::ComparisonMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Comparison, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Comparison) = 8` bytes at this offset;
         // run is 8-aligned; ComparisonMetadata is repr(C) with max field alignment 4.
         unsafe { &*(self.buffer.as_ptr().add(off) as *const comparison::ComparisonMetadata) }
     }
 
     pub fn comparison_mut(&mut self, slot: u32) -> &mut comparison::ComparisonMetadata {
-        let off = self.entry_byte_offset(MetadataKind::Comparison, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `comparison` above; exclusive &mut self.
         unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut comparison::ComparisonMetadata) }
     }
 
     pub fn keyed_property(&self, slot: u32) -> &keyed_property::KeyedPropertyMetadata {
-        let off = self.entry_byte_offset(MetadataKind::KeyedProperty, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(KeyedProperty) = 24` bytes at this offset;
         // run is 8-aligned; KeyedPropertyMetadata is repr(C) with max field alignment 8.
         unsafe { &*(self.buffer.as_ptr().add(off) as *const keyed_property::KeyedPropertyMetadata) }
     }
 
     pub fn keyed_property_mut(&mut self, slot: u32) -> &mut keyed_property::KeyedPropertyMetadata {
-        let off = self.entry_byte_offset(MetadataKind::KeyedProperty, slot);
+        let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `keyed_property` above; exclusive &mut self.
         unsafe {
             &mut *(self.buffer.as_mut_ptr().add(off) as *mut keyed_property::KeyedPropertyMetadata)
@@ -318,10 +329,10 @@ mod tests {
     }
 
     #[test]
-    fn empty_table_has_only_header_and_offset_block() {
+    fn empty_table_has_only_offset_block() {
         let table = MetadataTable::allocate(&[]);
-        // Header (16) + kind_offsets (20) = 36 bytes; aligned up to 40.
-        assert!(table.buffer().len() >= 36);
+        // 0 slots → 0-byte slot table → buffer may be 0 bytes (or minimal).
+        // The important invariants: slot_count=0 and all run lengths are 0.
         assert_eq!(table.slot_count(), 0);
         for kind_idx in 0..METADATA_KIND_COUNT {
             assert_eq!(table.run_len_for_kind_index(kind_idx), 0);
@@ -339,12 +350,31 @@ mod tests {
             site(6, FeedbackSiteKind::NamedPropertyLoad),
         ];
         let table = MetadataTable::allocate(&sites);
-        assert_eq!(table.in_kind_index_for_slot(1), 0);
-        assert_eq!(table.in_kind_index_for_slot(3), 1);
-        assert_eq!(table.in_kind_index_for_slot(6), 2);
-        assert_eq!(table.in_kind_index_for_slot(2), 0);
-        assert_eq!(table.in_kind_index_for_slot(5), 1);
-        assert_eq!(table.in_kind_index_for_slot(4), 0);
+        // Verify in-kind indices via the new with_kind API.
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(1, MetadataKind::Property),
+            0
+        );
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(3, MetadataKind::Property),
+            1
+        );
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(6, MetadataKind::Property),
+            2
+        );
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(2, MetadataKind::Arith),
+            0
+        );
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(5, MetadataKind::Arith),
+            1
+        );
+        assert_eq!(
+            table.in_kind_index_for_slot_with_kind(4, MetadataKind::Call),
+            0
+        );
     }
 
     #[test]
