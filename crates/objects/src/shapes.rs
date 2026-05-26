@@ -17,39 +17,6 @@ pub enum ElementMode {
     Sparse,
 }
 
-/// Coarse invalidation cause family for shape/prototype dependent runtime work.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum InvalidationCause {
-    PrototypeMutation,
-    PropertyRedefinition,
-    PropertyDeletion,
-    DictionaryTransition,
-}
-
-/// Last invalidation event observed for one object.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct InvalidationEvent {
-    epoch: u64,
-    cause: InvalidationCause,
-}
-
-impl InvalidationEvent {
-    #[inline]
-    pub const fn new(epoch: u64, cause: InvalidationCause) -> Self {
-        Self { epoch, cause }
-    }
-
-    #[inline]
-    pub const fn epoch(self) -> u64 {
-        self.epoch
-    }
-
-    #[inline]
-    pub const fn cause(self) -> InvalidationCause {
-        self.cause
-    }
-}
-
 /// One shape dependency recorded by a property inline-cache entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PropertyCacheDependency {
