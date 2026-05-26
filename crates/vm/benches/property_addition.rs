@@ -26,7 +26,7 @@ use lyng_common::AtomId;
 use lyng_env::Runtime;
 use lyng_gc::AllocationLifetime;
 use lyng_host::NoopHostHooks;
-use lyng_objects::ObjectAllocation;
+use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectAllocation};
 use lyng_types::{PropertyDescriptor, PropertyKey, Value};
 
 /// Number of properties to add to each object per iteration.
@@ -87,7 +87,13 @@ fn bench_property_addition(c: &mut Criterion) {
                             desc.set_enumerable(true);
                             desc.set_configurable(true);
                             agent
-                                .define_own_property(obj, key, desc, AllocationLifetime::LongLived)
+                                .define_own_property(
+                                    obj,
+                                    key,
+                                    desc,
+                                    AllocationLifetime::LongLived,
+                                    &mut NoopAdaptiveProtoLoadDispatch,
+                                )
                                 .expect("property addition should not fail in bench");
                         }
                     }
