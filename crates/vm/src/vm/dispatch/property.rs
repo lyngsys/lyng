@@ -14,8 +14,8 @@ use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, ValueStoreTarget};
 use lyng_host::HostHooks;
 use lyng_objects::{
-    InternalMethodError, NamedPropertyCacheEntry, NamedPropertyCachePurpose,
-    NamedPropertyDirectGet, NativeFunctionRegistry, SlotLocation,
+    AdaptiveProtoLoadDispatch, InternalMethodError, NamedPropertyCacheEntry,
+    NamedPropertyCachePurpose, NamedPropertyDirectGet, NativeFunctionRegistry, SlotLocation,
 };
 use lyng_ops::{errors, object};
 use lyng_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
@@ -448,6 +448,7 @@ impl Vm {
             }
             match Self::try_named_property_transition_store(
                 agent,
+                self,
                 object,
                 key,
                 value,
@@ -1683,6 +1684,7 @@ impl Vm {
 
     fn try_named_property_transition_store(
         agent: &mut Agent,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
         object: ObjectRef,
         key: PropertyKey,
         value: Value,
@@ -1707,7 +1709,7 @@ impl Vm {
         // transition was planned — receiver_shape() is the parent shape that
         // was passed to ObjectRuntime::transition_shape inside the plan call.
         if let Ok(Some((_, plan))) = result {
-            agent.fire_watchpoints_for_shape(plan.receiver_shape());
+            agent.fire_watchpoints_for_shape(plan.receiver_shape(), Some(vm_dispatch));
         }
         result
     }

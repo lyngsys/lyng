@@ -18,10 +18,10 @@ use lyng_env::{
 };
 use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
 use lyng_host::{HostHooks, ModuleKey, NoopHostHooks};
-use lyng_objects::{NativeFunctionRegistry, ObjectAllocation};
+use lyng_objects::{AdaptiveProtoLoadDispatch, NativeFunctionRegistry, ObjectAllocation};
 use lyng_types::{
-    AbruptCompletion, BuiltinFunctionId, CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value,
-    WellKnownSymbolId,
+    AbruptCompletion, BuiltinFunctionId, CodeRef, EnvironmentRef, FeedbackSlotId, ObjectRef,
+    RealmRef, Value, WellKnownSymbolId,
 };
 
 use crate::activation::ActivationSideTables;
@@ -1474,5 +1474,38 @@ impl Vm {
             .cloned()
             .ok_or(VmError::MissingInstalledCode(code))?;
         crate::dsl::entry::run_via_dsl(self, agent, host, registry, installed, frame)
+    }
+
+    /// Spec 2 Phase A: dispatched from `Agent::fire_watchpoints_for_shape` when
+    /// an `AdaptiveProtoLoad` observer fires. Clears the IC slot identified by
+    /// `(code, slot)` if its current generation matches `expected_generation`.
+    /// Stale watchpoints from prior installs are silently dropped; the slot
+    /// keeps whatever it currently holds.
+    pub(crate) fn clear_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        expected_generation: u32,
+    ) {
+        let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) else {
+            return;
+        };
+        if vector.generation(slot) != expected_generation {
+            return;
+        }
+        vector.clear_site(slot);
+        vector.bump_generation(slot);
+        self.mirror_flat_slot(code, slot);
+    }
+}
+
+impl AdaptiveProtoLoadDispatch for Vm {
+    fn clear_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    ) {
+        Self::clear_ic_slot_if_generation_matches(self, code, slot, generation);
     }
 }

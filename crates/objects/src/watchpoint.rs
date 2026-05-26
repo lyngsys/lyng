@@ -4,6 +4,8 @@
 //! ordering in `WatchpointSet::fire_all` is load-bearing for reentrancy — see
 //! the design doc at docs/superpowers/specs/2026-05-25-shape-transitions-and-watchpoints-design.md §3.
 
+use lyng_types::{CodeRef, FeedbackSlotId};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WatchpointState {
     Cleared,
@@ -22,6 +24,33 @@ pub enum ShapeInvalidationObserver {
     /// never constructs this variant, so `ObjectRuntime::recording_watchpoint_fires`
     /// stays empty at runtime (24-byte overhead).
     Recording { token: u64 },
+    /// Production consumer (Spec 2). Identifies an IC slot to clear when a
+    /// depended-on shape transitions. `generation` guards against stale
+    /// watchpoints firing on a slot that has been re-cached since registration.
+    AdaptiveProtoLoad {
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    },
+}
+
+/// Dispatch interface for `ShapeInvalidationObserver::AdaptiveProtoLoad` fires.
+///
+/// Defined in `lyng-objects` so that `lyng-env` (which cannot depend on
+/// `lyng-vm`) can accept a `&mut dyn AdaptiveProtoLoadDispatch` parameter in
+/// `Agent::fire_watchpoints_for_shape` without creating a circular crate
+/// dependency. `lyng-vm`'s `Vm` implements this trait.
+pub trait AdaptiveProtoLoadDispatch {
+    /// Called when an `AdaptiveProtoLoad` watchpoint fires. Clears the named IC
+    /// slot identified by `(code, slot)` if its current generation matches
+    /// `generation`; stale watchpoints (generation mismatch) are silently
+    /// dropped.
+    fn clear_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    );
 }
 
 impl ShapeInvalidationObserver {
@@ -32,6 +61,10 @@ impl ShapeInvalidationObserver {
     pub(crate) fn fire_into(&self, sink: &mut Vec<u64>) {
         match self {
             Self::Recording { token } => sink.push(*token),
+            // AdaptiveProtoLoad is a production observer; in tests it should not
+            // be dispatched through this sink. The Agent-layer dispatcher routes
+            // it to Vm::clear_ic_slot_if_generation_matches.
+            Self::AdaptiveProtoLoad { .. } => {}
         }
     }
 }

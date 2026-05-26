@@ -1502,7 +1502,7 @@ fn fire_watchpoints_unknown_shape_is_noop() {
     let agent = runtime.root_agent_mut();
     let shape = alloc_root_shape(agent);
 
-    agent.fire_watchpoints_for_shape(shape);
+    agent.fire_watchpoints_for_shape(shape, None);
 
     assert!(agent.objects_mut().take_recording_fires().is_empty());
 }
@@ -1522,7 +1522,7 @@ fn fire_watchpoints_dispatches_recording() {
         })
         .unwrap();
 
-    agent.fire_watchpoints_for_shape(shape);
+    agent.fire_watchpoints_for_shape(shape, None);
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![99]);
     assert_eq!(
@@ -1550,7 +1550,7 @@ fn registering_on_different_shape_succeeds_after_fire() {
             observer: ShapeInvalidationObserver::Recording { token: 1 },
         })
         .unwrap();
-    agent.fire_watchpoints_for_shape(s1);
+    agent.fire_watchpoints_for_shape(s1, None);
 
     agent
         .objects_mut()
@@ -1559,7 +1559,7 @@ fn registering_on_different_shape_succeeds_after_fire() {
             observer: ShapeInvalidationObserver::Recording { token: 2 },
         })
         .unwrap();
-    agent.fire_watchpoints_for_shape(s2);
+    agent.fire_watchpoints_for_shape(s2, None);
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![1, 2]);
 }

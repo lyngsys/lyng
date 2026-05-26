@@ -7,8 +7,8 @@ use super::{
 use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
 use lyng_objects::{
-    InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload, ShapeInvalidationObserver,
-    ShapeTransitionKey, Watchpoint,
+    AdaptiveProtoLoadDispatch, InternalMethodError, InternalMethodResult, PrototypeKey,
+    RegExpPayload, ShapeInvalidationObserver, ShapeTransitionKey, Watchpoint,
 };
 use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
 use std::{
@@ -300,7 +300,7 @@ impl Agent {
         });
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old);
+            self.fire_watchpoints_for_shape(old, None);
         }
         ok
     }
@@ -327,7 +327,7 @@ impl Agent {
         });
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old);
+            self.fire_watchpoints_for_shape(old, None);
         }
         result
     }
@@ -347,7 +347,7 @@ impl Agent {
             .with_heap_and_objects(|heap, objects| objects.delete(&mut heap.mutator(), id, key));
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old);
+            self.fire_watchpoints_for_shape(old, None);
         }
         result
     }
@@ -436,7 +436,7 @@ impl Agent {
 
         // 7. Fire watchpoints on the OLD shape — after the object's shape pointer
         //    has been updated. Matches JSC's setPrototypeDirect ordering.
-        self.fire_watchpoints_for_shape(old_shape);
+        self.fire_watchpoints_for_shape(old_shape, None);
 
         // 8. Bump the invalidation epoch.
         self.with_heap_and_objects(|heap, objects| {
@@ -451,15 +451,45 @@ impl Agent {
     /// drain and invalidation; dispatch of all observer kinds happens here so
     /// that Spec 2's `AdaptiveProtoLoad` observer can call into `&mut Vm`
     /// without violating Rust borrow rules.
-    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
+    ///
+    /// `vm_dispatch` is `None` for callers that do not have a `&mut Vm` in
+    /// scope (internal agent methods). Callers in `lyng-vm` that hold a
+    /// `&mut Vm` pass `Some(vm)`. If an `AdaptiveProtoLoad` observer fires
+    /// with `vm_dispatch = None` that is a logic error (no production code
+    /// registers `AdaptiveProtoLoad` from an agent-only context), so the arm
+    /// panics in debug builds and is a no-op in release.
+    pub fn fire_watchpoints_for_shape(
+        &mut self,
+        shape: ShapeId,
+        vm_dispatch: Option<&mut dyn AdaptiveProtoLoadDispatch>,
+    ) {
         let Some(fired) = self.objects.drain_watchpoints_for_shape(shape) else {
             return;
         };
+        let mut vm_dispatch = vm_dispatch;
         for wp in fired {
             match wp {
                 Watchpoint::ShapeInvalidation { observer } => match observer {
                     ShapeInvalidationObserver::Recording { token } => {
                         self.objects.push_recording_fire(token);
+                    }
+                    ShapeInvalidationObserver::AdaptiveProtoLoad {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        if let Some(dispatcher) = vm_dispatch.as_deref_mut() {
+                            dispatcher.clear_ic_slot_if_generation_matches(
+                                code, slot, generation,
+                            );
+                        } else {
+                            debug_assert!(
+                                false,
+                                "AdaptiveProtoLoad fired without a Vm dispatcher; \
+                                 no production path should register this observer \
+                                 from an agent-only context"
+                            );
+                        }
                     }
                 },
             }
@@ -491,7 +521,7 @@ impl Agent {
         });
 
         if let Some(parent) = parent_shape {
-            self.fire_watchpoints_for_shape(parent);
+            self.fire_watchpoints_for_shape(parent, None);
         }
         result
     }

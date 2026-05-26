@@ -2106,6 +2106,38 @@ impl FeedbackVector {
             .get(usize::try_from(slot.get().saturating_sub(1)).ok()?)
             .and_then(Option::as_ref)
     }
+
+    /// Returns the per-slot install generation. Placeholder returns `0` until
+    /// Task A.1.5 adds the actual `generation` field to the site state.
+    #[inline]
+    pub(super) fn generation(&self, slot: FeedbackSlotId) -> u32 {
+        // Placeholder — the real field lands in Task A.1.5.
+        let _ = slot;
+        0
+    }
+
+    /// Bumps the per-slot install generation and returns the new value.
+    /// Placeholder returns `0` (no-op) until Task A.1.5 adds the field.
+    #[inline]
+    pub(super) fn bump_generation(&mut self, slot: FeedbackSlotId) -> u32 {
+        // Placeholder — the real field lands in Task A.1.5.
+        let _ = slot;
+        0
+    }
+
+    /// Clears the IC slot at `slot` by setting its `Option<FeedbackSiteState>`
+    /// to `None` (the "uninitialized" representation for this vector).
+    /// Called from `Vm::clear_ic_slot_if_generation_matches` after a
+    /// generation match confirms the watchpoint is not stale.
+    #[inline]
+    pub(super) fn clear_site(&mut self, slot: FeedbackSlotId) {
+        if let Some(entry) = self
+            .sites
+            .get_mut(usize::try_from(slot.get().saturating_sub(1)).ok().unwrap_or(usize::MAX))
+        {
+            *entry = None;
+        }
+    }
 }
 
 impl Vm {
@@ -2150,7 +2182,7 @@ impl Vm {
     }
 
     #[inline]
-    fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+    pub(super) fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
         let header = self
             .feedback_vectors
