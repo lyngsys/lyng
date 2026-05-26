@@ -44,12 +44,33 @@ struct LinkingDataHeader {
     _reserved: u32,
 }
 
+/// Size of the [`LinkingDataHeader`] prefix at the start of a MetadataTable buffer.
+/// Used by asm to locate the kind-offsets table and the slot→in-kind-index table.
+pub const METADATA_TABLE_HEADER_SIZE: usize = std::mem::size_of::<LinkingDataHeader>();
+/// Byte offset of the per-kind run-offset table within a MetadataTable buffer.
+pub const METADATA_TABLE_KIND_OFFSETS_OFFSET: usize = METADATA_TABLE_HEADER_SIZE;
+/// Byte size of the per-kind run-offset table (`METADATA_KIND_COUNT × 4`).
+pub const METADATA_TABLE_KIND_OFFSETS_SIZE: usize = METADATA_KIND_COUNT * 4;
+/// Byte offset of the slot→in-kind-index table within a MetadataTable buffer.
+/// Each entry is a `u32`; entry at index `slot - 1` gives the in-kind index for that slot.
+pub const METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET: usize =
+    METADATA_TABLE_KIND_OFFSETS_OFFSET + METADATA_TABLE_KIND_OFFSETS_SIZE;
+
+// Sanity-assert: if LinkingDataHeader size or METADATA_KIND_COUNT changes, this
+// will fail loudly rather than silently producing wrong asm offsets.
+const _: () = assert!(
+    METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET == 36,
+    "MetadataTable slot-index table must start at offset 36; \
+     update asm bindings if LinkingDataHeader or METADATA_KIND_COUNT changed"
+);
+
+// Private aliases kept for internal allocator use.
 #[allow(dead_code)]
-const HEADER_SIZE: usize = std::mem::size_of::<LinkingDataHeader>();
+const HEADER_SIZE: usize = METADATA_TABLE_HEADER_SIZE;
 #[allow(dead_code)]
-const KIND_OFFSETS_OFFSET: usize = HEADER_SIZE;
+const KIND_OFFSETS_OFFSET: usize = METADATA_TABLE_KIND_OFFSETS_OFFSET;
 #[allow(dead_code)]
-const KIND_OFFSETS_SIZE: usize = METADATA_KIND_COUNT * 4;
+const KIND_OFFSETS_SIZE: usize = METADATA_TABLE_KIND_OFFSETS_SIZE;
 
 /// Per-code-object IC metadata buffer. Phase C.1 ships the type and allocator;
 /// per-kind reads/writes wire up in C.2, the asm fast path consumes it in C.4.

@@ -15,6 +15,9 @@ pub struct PropertyMetadata {
 }
 
 pub const PROPERTY_METADATA_STRIDE: usize = std::mem::size_of::<PropertyMetadata>();
+/// `log2(PROPERTY_METADATA_STRIDE)` — used by asm to scale an in-kind index
+/// to a byte offset within the Property run.
+pub const PROPERTY_METADATA_STRIDE_SHIFT: u32 = 5; // log2(32)
 
 #[allow(dead_code)]
 pub const PROPERTY_METADATA_MODE_OFFSET: usize = offset_of!(PropertyMetadata, mode);
@@ -29,3 +32,7 @@ pub const PROPERTY_METADATA_EXEC_COUNT_OFFSET: usize =
     offset_of!(PropertyMetadata, execution_count);
 
 const _: () = assert!(PROPERTY_METADATA_STRIDE == 32);
+const _: () = assert!(
+    1 << PROPERTY_METADATA_STRIDE_SHIFT == PROPERTY_METADATA_STRIDE,
+    "PROPERTY_METADATA_STRIDE_SHIFT must equal log2(PROPERTY_METADATA_STRIDE)"
+);

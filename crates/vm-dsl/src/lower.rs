@@ -263,13 +263,17 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} mt_ko={mt_kind_offsets_offset} mt_sit={mt_slot_index_table_offset} prop_stride_shift={property_metadata_stride_shift} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
                 state_pb = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
                 state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
                 state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+                // Phase C Task 4.3: byte offset of `LlIntState::frame_metadata_table_base`.
+                // Read by `load_feedback_site!` via `[x24, {state_mt}]` to get the MT buffer
+                // pointer without disturbing x21 (FV pin, still needed by record_* macros).
+                state_mt = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_METADATA_TABLE_BASE,
                 state_object_records = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_RECORDS_BASE,
                 state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
@@ -281,6 +285,12 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 feedback_named_aux_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET,
                 entry_observed = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET,
                 feedback_scalar_execution_count = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
+                // Phase C Task 4.3: MetadataTable buffer-layout constants consumed by
+                // `load_feedback_site!`. Re-exported via `dsl::reg_convention` so they're
+                // accessible from all crates (including integration tests).
+                mt_kind_offsets_offset = const ::lyng_vm::dsl::reg_convention::METADATA_TABLE_KIND_OFFSETS_OFFSET,
+                mt_slot_index_table_offset = const ::lyng_vm::dsl::reg_convention::METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET,
+                property_metadata_stride_shift = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_STRIDE_SHIFT,
                 object_shape = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_SHAPE_OFFSET,
                 object_prototype = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_PROTOTYPE_OFFSET,
                 object_named_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET,
