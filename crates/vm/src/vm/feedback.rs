@@ -6,6 +6,10 @@
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
+use crate::vm::metadata_table::{
+    ArithMetadata, CallMetadata, ComparisonMetadata, KeyedPropertyMetadata, MetadataKind,
+    PropertyMetadata,
+};
 use lyng_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_gc::ValueStoreTarget;
 use lyng_objects::{
@@ -2182,6 +2186,72 @@ impl Vm {
         }
     }
 
+    /// Phase C dual-write: project the semantic `FeedbackVector` slot state
+    /// into the parallel `MetadataTable` per-kind entry. Mirrors what
+    /// `mirror_flat_slot` does for `FeedbackEntry`, but routes per-kind.
+    ///
+    /// Task 2.4 wires this into every `mirror_flat_slot` call site.
+    #[allow(
+        dead_code,
+        reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+    )]
+    pub(super) fn mirror_metadata_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        let index = code_index(code);
+
+        // 1. Resolve kind from the installed descriptor. Drop the installed borrow
+        //    before any mutable access.
+        let kind = {
+            let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
+                return;
+            };
+            let Some(descriptor) = installed.feedback_descriptor_for_slot(slot) else {
+                return;
+            };
+            MetadataKind::from_site_kind(descriptor.kind())
+        };
+
+        // 2. Snapshot everything we need from the feedback vector while holding
+        //    the immutable borrow, then release it before the mutable table write.
+        //    For Property we compute the LlInt header via the same helper
+        //    `mirror_flat_slot` uses, so the two projections stay byte-identical.
+        enum Projection {
+            Property(PropertyMetadata),
+            Call(CallMetadata),
+            Arith(ArithMetadata),
+            Comparison(ComparisonMetadata),
+            KeyedProperty(KeyedPropertyMetadata),
+        }
+        let projection = {
+            let vector = self.feedback_vectors.get(index);
+            let generation = vector.map_or(0, |v| v.generation(slot));
+            let site = vector.and_then(|v| v.site(slot));
+            match kind {
+                MetadataKind::Property => {
+                    let header = site.and_then(Self::named_llint_load_header);
+                    Projection::Property(project_property(header, generation))
+                }
+                MetadataKind::Call => Projection::Call(project_call(site)),
+                MetadataKind::Arith => Projection::Arith(project_arith(site)),
+                MetadataKind::Comparison => Projection::Comparison(project_comparison(site)),
+                MetadataKind::KeyedProperty => {
+                    Projection::KeyedProperty(project_keyed_property(site))
+                }
+            }
+        };
+
+        // 3. Immutable borrow on feedback_vectors is dropped; mutate the table.
+        let Some(table) = self.metadata_table_mut(code) else {
+            return;
+        };
+        match projection {
+            Projection::Property(m) => *table.property_mut(slot.get()) = m,
+            Projection::Call(m) => *table.call_mut(slot.get()) = m,
+            Projection::Arith(m) => *table.arith_mut(slot.get()) = m,
+            Projection::Comparison(m) => *table.comparison_mut(slot.get()) = m,
+            Projection::KeyedProperty(m) => *table.keyed_property_mut(slot.get()) = m,
+        }
+    }
+
     #[inline]
     fn flat_feedback_slot_index(slot: FeedbackSlotId) -> Option<usize> {
         usize::try_from(slot.get().checked_sub(1)?).ok()
@@ -3653,6 +3723,189 @@ impl Vm {
             )),
             _ => None,
         }
+    }
+}
+
+// ── Phase C dual-write projection helpers ────────────────────────────────────
+//
+// Each helper converts a `&FeedbackSiteState` (or the pre-computed
+// `LlIntNamedPropertyHeader`) into the matching per-kind metadata struct.
+// They live outside `impl Vm` so `mirror_metadata_slot` can call them after
+// the feedback-vector borrow is released.
+
+/// Project a named-property IC site into `PropertyMetadata`.
+///
+/// Takes the same `LlIntNamedPropertyHeader` that `mirror_flat_slot` computes
+/// so the two projections are byte-identical (handler_bits, aux_bits, and mode
+/// carry the same values as the corresponding `FeedbackEntry` fields).
+#[allow(
+    dead_code,
+    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+)]
+fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -> PropertyMetadata {
+    use crate::dsl::feedback_flat::{
+        LLINT_IC_MODE_EMPTY, LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
+        LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD, LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
+        LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
+    };
+    let (mode, handler_bits, aux_bits) = match header {
+        Some(LlIntNamedPropertyHeader::OwnInline { handler_bits }) => {
+            (LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD, handler_bits, 0u64)
+        }
+        Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits }) => {
+            (LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD, handler_bits, 0u64)
+        }
+        Some(LlIntNamedPropertyHeader::ProtoInline {
+            receiver_word,
+            proto_word,
+        }) => {
+            // mirror_flat_slot maps: named_handler_bits ← proto_word,
+            //                        named_aux_bits      ← receiver_word
+            (
+                LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
+                proto_word,
+                receiver_word,
+            )
+        }
+        Some(LlIntNamedPropertyHeader::OwnPolymorphic {
+            slot0_handler_bits,
+            slot1_handler_bits,
+        }) => (
+            LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
+            slot0_handler_bits,
+            slot1_handler_bits,
+        ),
+        None => (LLINT_IC_MODE_EMPTY, 0u64, 0u64),
+    };
+    PropertyMetadata {
+        mode,
+        generation,
+        handler_bits,
+        aux_bits,
+        // execution_count: Phase D will be the source of truth. Leave 0
+        // for Phase C; mirror_flat_slot does not populate this field either.
+        execution_count: 0,
+        ..Default::default()
+    }
+}
+
+/// Project a Call/Construct IC site into `CallMetadata`.
+///
+/// `mirror_flat_slot` does not cover Call IC, so we project directly from
+/// `CallFeedback`/`ConstructFeedback`. `callee_bits` is not yet available as
+/// a simple bit-packed word in Phase C; leave 0 (Phase D will own this field).
+/// `mode` encodes the IC state, `execution_count` mirrors the per-site count.
+#[allow(
+    dead_code,
+    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+)]
+fn project_call(site: Option<&FeedbackSiteState>) -> CallMetadata {
+    use crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY;
+    let (mode, execution_count) = match site {
+        Some(FeedbackSiteState::Call(feedback)) => {
+            let mode = match feedback.cache_state {
+                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Monomorphic => 1u8,
+                InlineCacheState::Polymorphic => 2u8,
+                InlineCacheState::Megamorphic => 3u8,
+            };
+            (mode, feedback.execution_count)
+        }
+        Some(FeedbackSiteState::Construct(feedback)) => {
+            let mode = match feedback.cache_state {
+                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Monomorphic => 1u8,
+                InlineCacheState::Polymorphic => 2u8,
+                InlineCacheState::Megamorphic => 3u8,
+            };
+            (mode, feedback.execution_count)
+        }
+        _ => (LLINT_IC_MODE_EMPTY, 0),
+    };
+    CallMetadata {
+        mode,
+        generation: 0,  // Call sites do not carry a generation in Phase A/C.
+        callee_bits: 0, // Phase D will pack the monomorphic callee bits here.
+        execution_count,
+        ..Default::default()
+    }
+}
+
+/// Project an Arithmetic IC site into `ArithMetadata`.
+///
+/// `mirror_flat_slot` uses `scalar_observed_bits` + `scalar_execution_count`
+/// for scalar sites; the semantic source (`ArithmeticFeedback`) only carries
+/// `execution_count`. `observed_bits` defaults to 0 (Phase D will populate it
+/// from the asm-visible scalar feedback path).
+#[allow(
+    dead_code,
+    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+)]
+fn project_arith(site: Option<&FeedbackSiteState>) -> ArithMetadata {
+    let execution_count = match site {
+        Some(FeedbackSiteState::Arithmetic(feedback)) => feedback.execution_count,
+        _ => 0,
+    };
+    ArithMetadata {
+        observed_bits: 0, // Phase D: source from scalar IC path.
+        execution_count,
+    }
+}
+
+/// Project a Comparison IC site into `ComparisonMetadata`.
+///
+/// Analogous to `project_arith`; `ComparisonFeedback` only carries
+/// `execution_count`. `observed_bits` defaults to 0 for the same reason.
+#[allow(
+    dead_code,
+    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+)]
+fn project_comparison(site: Option<&FeedbackSiteState>) -> ComparisonMetadata {
+    let execution_count = match site {
+        Some(FeedbackSiteState::Comparison(feedback)) => feedback.execution_count,
+        _ => 0,
+    };
+    ComparisonMetadata {
+        observed_bits: 0, // Phase D: source from scalar IC path.
+        execution_count,
+    }
+}
+
+/// Project a KeyedPropertyAccess IC site into `KeyedPropertyMetadata`.
+///
+/// Uses the monomorphic named-atom own-data handler bits when the cache is
+/// monomorphic and the family is `NamedAtom` — mirrors the shape of what the
+/// asm inline hit path will consume. Other states default to 0 for `handler_bits`.
+#[allow(
+    dead_code,
+    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
+)]
+fn project_keyed_property(site: Option<&FeedbackSiteState>) -> KeyedPropertyMetadata {
+    use crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY;
+    let (mode, handler_bits, execution_count) = match site {
+        Some(FeedbackSiteState::KeyedProperty(feedback)) => {
+            let mode = match feedback.cache_state {
+                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Monomorphic => 1u8,
+                InlineCacheState::Polymorphic => 2u8,
+                InlineCacheState::Megamorphic => 3u8,
+            };
+            // Pack the monomorphic named-atom own-data handler if available.
+            let handler_bits = if matches!(feedback.cache_state, InlineCacheState::Monomorphic) {
+                feedback.monomorphic_named_own_data_handler.bits()
+            } else {
+                0
+            };
+            (mode, handler_bits, feedback.execution_count)
+        }
+        _ => (LLINT_IC_MODE_EMPTY, 0, 0),
+    };
+    KeyedPropertyMetadata {
+        mode,
+        generation: 0, // KeyedProperty sites do not carry a generation in Phase A/C.
+        handler_bits,
+        execution_count,
+        ..Default::default()
     }
 }
 
