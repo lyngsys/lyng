@@ -2994,3 +2994,257 @@ fn adaptive_proto_load_register_on_invalidated_chain_abandons_install() {
         None
     );
 }
+
+// Spec 2 Phase A — A.2: mutating the holder of a proto-cached property
+// fires the `AdaptiveProtoLoad` watchpoint registered at IC install time,
+// which clears the IC slot. The next read re-caches against the new holder
+// shape and still returns the correct value.
+//
+// Chain: obj → proto. `value` lives on `proto`.
+// After the IC installs as Monomorphic PrototypeData, adding a property
+// to `proto` fires the watchpoint on proto's shape, clearing the slot.
+#[test]
+fn proto_chain_holder_mutation_clears_ic_slot() {
+    let unit = compile_test_unit(20_600, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let extra_name = agent.atoms_mut().intern_collectible("_extra");
+
+    // Build obj → proto. `value` lives on `proto`.
+    let proto = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(42),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+    let obj = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(proto)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(obj));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Two evaluations to warm the counter and install the IC entry.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+
+    // IC should be installed as Monomorphic PrototypeData.
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+    assert!(vm.named_property_slot_is_present(installed.code(), slot));
+
+    // Mutate the holder: add a new property to `proto`. This fires the
+    // `AdaptiveProtoLoad` watchpoint registered on proto's current shape,
+    // clearing the IC slot.
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(extra_name),
+        Value::from_smi(0),
+        AllocationLifetime::Default,
+        &mut vm,
+    )
+    .unwrap());
+
+    // The IC slot must have been cleared by the watchpoint fire.
+    assert!(
+        !vm.named_property_slot_is_present(installed.code(), slot),
+        "A.2: holder mutation must clear the IC slot via AdaptiveProtoLoad watchpoint"
+    );
+
+    // Re-evaluation re-installs the IC and still returns the correct value.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42),
+        "A.2: value must remain correct after IC re-install"
+    );
+    assert!(
+        vm.named_property_slot_is_present(installed.code(), slot),
+        "A.2: IC slot must be re-installed after re-evaluation"
+    );
+}
+
+// Spec 2 Phase A — A.3: mutating an intermediate prototype in a two-hop
+// chain fires the `AdaptiveProtoLoad` watchpoint registered on mid's shape
+// at IC install time, clearing the IC slot. The next read re-installs.
+//
+// Chain: obj → mid → root. `value` lives on `root`.
+// The IC is serviced by the slow chain (3 dependencies). At install time
+// watchpoints are registered on both `mid`'s and `root`'s shapes.
+// Adding a property to `mid` transitions its shape, firing the watchpoint
+// and clearing the IC slot.
+#[test]
+fn two_hop_chain_middle_proto_mutation_clears_ic() {
+    let unit = compile_test_unit(20_700, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let extra_name = agent.atoms_mut().intern_collectible("_extra2");
+
+    // Build obj → mid → root. `value` lives on `root`.
+    let root = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        root,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(99),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+    let mid = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(root)),
+            AllocationLifetime::Default,
+        )
+    });
+    let obj = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(mid)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(obj));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Two evaluations to warm the counter and install the IC entry.
+    // The 3-hop chain is serviced by the slow chain, not the proto fast path.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(99)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(99)
+    );
+
+    // IC should be installed as Monomorphic PrototypeData (slow chain).
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+    assert!(vm.named_property_slot_is_present(installed.code(), slot));
+
+    // Mutate `mid`: add a new property. This transitions mid's shape,
+    // firing the `AdaptiveProtoLoad` watchpoint registered on mid's old
+    // shape at IC install time and clearing the IC slot.
+    assert!(ordinary_create_data_property(
+        agent,
+        mid,
+        PropertyKey::from_atom(extra_name),
+        Value::from_smi(0),
+        AllocationLifetime::Default,
+        &mut vm,
+    )
+    .unwrap());
+
+    // The IC slot must have been cleared.
+    assert!(
+        !vm.named_property_slot_is_present(installed.code(), slot),
+        "A.3: middle-proto mutation must clear the IC slot via AdaptiveProtoLoad watchpoint"
+    );
+
+    // Re-evaluation re-installs the IC and still returns the correct value.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(99),
+        "A.3: value must remain correct after IC re-install"
+    );
+    assert!(
+        vm.named_property_slot_is_present(installed.code(), slot),
+        "A.3: IC slot must be re-installed after re-evaluation"
+    );
+}

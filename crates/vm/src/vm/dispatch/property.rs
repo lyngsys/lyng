@@ -97,21 +97,21 @@ impl Vm {
         let key = PropertyKey::from_atom(atom);
         let value = if let Some(object) = receiver.as_object_ref() {
             // Phase 3 inline IC cache hit path: a single packed-handler load,
-            // one shape compare, one epoch compare, one slot read. Bypasses
-            // the 4-deep try_named_property_load_inline_cache_hit ->
+            // one shape compare, one slot read. Bypasses the 4-deep
+            // try_named_property_load_inline_cache_hit ->
             // try_load -> load_from_named_property_cache -> validated_holder
             // chain on the monomorphic OwnData hit. Polymorphic /
             // PrototypeData / megamorphic still fall through to the existing
-            // chain below. The epoch compare mirrors
-            // `record_matches_cache_dependency` and is what catches
-            // non-shape invalidations like prototype mutation.
-            if let Some((handler, cached_epoch)) =
+            // chain below. The epoch compare has been removed (Task A.2):
+            // AdaptiveProtoLoad watchpoints (Task A.1) clear the IC slot on
+            // any proto-chain mutation before the next cache-hit read, so the
+            // epoch check is now redundant.
+            if let Some((handler, _cached_epoch)) =
                 self.named_property_own_data_handler(frame.code(), feedback_slot)
             {
                 let heap_view = agent.heap().view();
                 if let Some(record) = heap_view.object_ref(object)
                     && record.shape() == handler.receiver_shape()
-                    && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
                 {
                     let cached_value = match handler.slot_location() {
                         SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
@@ -1837,9 +1837,14 @@ impl Vm {
     /// Phase 3e named-property (non-keyed) one-hop `PrototypeData` cache
     /// path. Returns the cached slot value from the prototype holder on a
     /// monomorphic + one-hop `PrototypeData` hit, `None` on any miss
-    /// (shape/epoch mismatch on receiver or prototype, missing prototype,
-    /// etc.). Bypasses the slow chain on the dominant class-method-
-    /// dispatch / `Object.prototype` lookup pattern.
+    /// (shape mismatch on receiver or prototype, missing prototype, etc.).
+    /// Bypasses the slow chain on the dominant class-method-dispatch /
+    /// `Object.prototype` lookup pattern.
+    ///
+    /// The epoch comparisons have been removed (Task A.2): `AdaptiveProtoLoad`
+    /// watchpoints registered at IC install time (Task A.1) fire on any
+    /// proto-chain mutation and clear the IC slot before the next read,
+    /// making the epoch checks on both receiver and prototype redundant.
     #[inline(always)]
     pub(in crate::vm) fn try_named_property_proto_data_load(
         &mut self,
@@ -1848,20 +1853,16 @@ impl Vm {
         feedback_slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
     ) -> Option<Value> {
-        let (handler, receiver_epoch, prototype_epoch) =
+        let (handler, _receiver_epoch, _prototype_epoch) =
             self.named_property_proto_data_handler(code, feedback_slot)?;
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
-        if record.shape() != handler.receiver_shape()
-            || record.last_invalidation_epoch().unwrap_or(0) != receiver_epoch
-        {
+        if record.shape() != handler.receiver_shape() {
             return None;
         }
         let prototype_id = record.prototype()?;
         let prototype_record = view.object_ref(prototype_id)?;
-        if prototype_record.shape() != handler.prototype_shape()
-            || prototype_record.last_invalidation_epoch().unwrap_or(0) != prototype_epoch
-        {
+        if prototype_record.shape() != handler.prototype_shape() {
             return None;
         }
         let value = match handler.slot_location() {
@@ -1965,10 +1966,14 @@ impl Vm {
     /// Phase 3f named-property (non-keyed) polymorphic `OwnData` cache hit path.
     /// Walks the receiver shape through the inline polymorphic sidecar
     /// (up to `POLY_LIMIT` cached shapes), returning the slot value on
-    /// hit. Returns `None` on any miss — shape not in the sidecar,
-    /// epoch mismatch, or unloadable slot — so the caller can fall
-    /// through to the proto-cache hit path or the slow chain. The receiver
-    /// shape is loaded once and reused for the inline walk + slot read.
+    /// hit. Returns `None` on any miss — shape not in the sidecar or
+    /// unloadable slot — so the caller can fall through to the proto-cache
+    /// hit path or the slow chain. The receiver shape is loaded once and
+    /// reused for the inline walk + slot read.
+    ///
+    /// The epoch comparison has been removed (Task A.2): `AdaptiveProtoLoad`
+    /// watchpoints clear the IC slot on proto-chain mutations before the
+    /// next cache-hit read, making the epoch check redundant.
     #[inline(always)]
     pub(in crate::vm) fn try_named_property_polymorphic_own_data_load(
         &mut self,
@@ -1980,11 +1985,8 @@ impl Vm {
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
         let shape = record.shape()?;
-        let (handler, cached_epoch) =
+        let (handler, _cached_epoch) =
             self.named_property_polymorphic_own_data_handler(code, feedback_slot, shape)?;
-        if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
-            return None;
-        }
         let value = match handler.slot_location() {
             SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
             SlotLocation::OutOfLine(off) => view

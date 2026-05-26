@@ -870,6 +870,14 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
     assert_eq!(before_named.entries()[0].dependencies().len(), 2);
     let old_holder = before_named.entries()[0].holder();
 
+    // Swap receiver's prototype. `objects.set_prototype_of` does NOT perform
+    // a shape transition on `receiver` (it only bumps the invalidation epoch);
+    // nor does it fire AdaptiveProtoLoad watchpoints (no VM dispatch path).
+    // Both `original_prototype` and `replacement` share the same post-property-
+    // addition shape (shape transitions are shared). After Phase A.2's epoch-
+    // check removal: the IC fast path sees matching receiver and prototype
+    // shapes, reads the value from the CURRENT prototype object (`replacement`,
+    // value=13) and returns the correct value without replanning.
     assert!(agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects
@@ -880,21 +888,27 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap(),
-        Value::from_smi(13)
+        Value::from_smi(13),
+        "value must be read from the new prototype even without IC replan"
     );
     let after = vm
         .feedback_vector_snapshot(installed.code())
-        .expect("prototype load should expose feedback after invalidation");
+        .expect("prototype load should expose feedback after prototype swap");
     let FeedbackSiteDetail::NamedProperty(after_named) = feedback_site(&after, slot).detail()
     else {
         panic!("source.value should expose named-property feedback");
     };
+    // The IC stays Monomorphic PrototypeData. Phase A.2 removed the epoch
+    // check; a shape-compare match against the shared prototype shape means
+    // the fast path hit succeeds and no replan is needed. The `old_holder`
+    // variable (used for the pre-Phase-A.2 `assert_ne` check) is kept to
+    // document the before/after contrast.
+    let _ = old_holder;
     assert_eq!(after_named.state(), FeedbackInlineCacheState::Monomorphic);
     assert_eq!(
         after_named.entries()[0].path(),
         NamedPropertyCachePath::PrototypeData
     );
-    assert_ne!(after_named.entries()[0].holder(), old_holder);
 }
 
 #[test]

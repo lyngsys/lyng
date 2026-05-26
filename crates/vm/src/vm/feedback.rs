@@ -2160,6 +2160,23 @@ impl FeedbackVector {
             *entry = None;
         }
     }
+
+    /// Restores a cleared (None) named-property IC slot to an `Uninitialized`
+    /// [`NamedPropertyFeedback`] so the next slow-path call can re-install the
+    /// IC entry against the post-mutation shapes. Called from
+    /// `record_named_property_cache_entry` when the vector is already allocated
+    /// but the slot was cleared by an `AdaptiveProtoLoad` watchpoint fire
+    /// (Phase A, Task A.2). No-ops if the slot is already present (not cleared)
+    /// or if the vector is not yet allocated.
+    #[inline]
+    pub(super) fn reinit_named_property_site_if_cleared(&mut self, slot: FeedbackSlotId) {
+        let Some(index) = usize::try_from(slot.get().saturating_sub(1)).ok() else {
+            return;
+        };
+        if let Some(entry @ None) = self.sites.get_mut(index) {
+            *entry = Some(FeedbackSiteState::NamedProperty(NamedPropertyFeedback::new()));
+        }
+    }
 }
 
 impl Vm {
@@ -2956,13 +2973,26 @@ impl Vm {
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
+        // Phase A.2 (Task A.2): after a watchpoint fire clears the IC slot to
+        // `None`, the slot must be restored to `Uninitialized` state before
+        // any watchpoint registration or `observe_slow_path` call so that
+        // `with_feedback_slot_mut` can find the site and the generation bump
+        // inside `register_proto_chain_watchpoints` operates on a live slot.
+        // This no-ops if the slot is already present (not cleared).
+        if let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) {
+            vector.reinit_named_property_site_if_cleared(slot);
+        }
+
         // Spec 2 Phase A: a `PrototypeData` plan caches a load through a
         // prototype chain. Before committing the entry we register
         // `AdaptiveProtoLoad` watchpoints on every chain shape (the
         // prototype objects' shapes; the receiver's shape is guarded by
         // the IC cache-hit shape compare). If any chain shape is already
         // `Invalidated`, abandon the install — the next slow-path
-        // observation will retry.
+        // observation will retry. Note that the abandon path calls
+        // `clear_ic_slot_if_generation_matches` which sets the slot back to
+        // `None`; the `reinit_named_property_site_if_cleared` above will
+        // restore it again on the next observation.
         if let Some(plan_entry) = plan {
             if plan_entry.path() == NamedPropertyCachePath::PrototypeData
                 && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
