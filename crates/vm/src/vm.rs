@@ -171,14 +171,12 @@ pub struct Vm {
     /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
     /// on code GC (via prune_dead_code_polymorphic_chains).
     polymorphic_chains: HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-    /// DSL-0b flat-array feedback storage, parallel to `feedback_vectors`,
-    /// keyed by `code_index(code_ref)`. The asm-DSL substrate's `FV` pin
-    /// (`LlIntState::frame_fv_base`) points at the first entry of the
-    /// corresponding `Box<[FeedbackEntry]>` slot. Eagerly allocated to
-    /// `function.feedback_slot_count()` entries at install (B15) and
-    /// never grown thereafter — the slow path neither widens nor
-    /// reallocates the flat array, only mutates per-entry content.
-    /// See `crate::dsl::feedback_flat` for the storage rationale.
+    /// Legacy scalar feedback mirror. Phase C.4 status: the asm IC fast path
+    /// no longer reads OR writes this storage — both `load_feedback_site!` and
+    /// `record_*` macros now source x21 from `Vm::metadata_tables`. This field
+    /// survives solely to feed `mirror_flat_slot`, which the Phase C.3 debug
+    /// equivalence assertion still compares against. Phase D deletes it
+    /// entirely along with `FeedbackEntry` and `mirror_flat_slot`.
     pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
     /// Phase C: per-code-object IC metadata buffer, parallel to
     /// `feedback_flat_storage`, keyed by `code_index(code_ref)`.

@@ -2142,13 +2142,13 @@ impl Vm {
         result
     }
 
-    /// DSL-0b (B17) flat-array dual-write: project the semantic `FeedbackVector`
-    /// slot state into `feedback_flat_storage` so the assembler `FV` pin sees
-    /// the compact IC header.
-    ///
-    /// **Phase C note:** Callers must invoke [`Self::mirror_metadata_slot`]
-    /// immediately after this function until Phase D, when this function is
-    /// deleted and the asm pin is flipped to `MetadataTable`.
+    /// Phase C.4 status: writes-only scaffolding for the debug equivalence
+    /// assertion. The asm IC fast path has fully moved to `MetadataTable`
+    /// (Property + Arith). This function still projects `FeedbackVector` slot
+    /// state into the `FeedbackEntry` flat layout so `debug_assert_metadata_
+    /// matches_flat` can byte-compare Property entries. Callers must continue
+    /// to invoke `mirror_metadata_slot` immediately after. Phase D deletes
+    /// this function.
     #[inline]
     pub(super) fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
@@ -2194,13 +2194,10 @@ impl Vm {
         }
     }
 
-    /// Phase C dual-write: project the semantic `FeedbackVector` slot state
-    /// into the parallel `MetadataTable` per-kind entry. Mirrors what
-    /// `mirror_flat_slot` does for `FeedbackEntry`, but routes per-kind.
-    ///
-    /// Must be invoked in lockstep with [`Self::mirror_flat_slot`] until
-    /// Phase D, when `mirror_flat_slot` is deleted and the asm pin is flipped
-    /// to `MetadataTable`.
+    /// Phase C.4: writes the canonical IC state into `MetadataTable`. After the
+    /// asm pin flip, the asm fast path reads from this storage exclusively for
+    /// IC resolution and scalar feedback updates. `mirror_flat_slot` continues
+    /// in lockstep until Phase D, solely to feed the debug equivalence assertion.
     pub(super) fn mirror_metadata_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
 
