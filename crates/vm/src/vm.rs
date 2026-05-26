@@ -612,7 +612,12 @@ impl Vm {
     }
 
     /// Returns a mutable reference to the polymorphic chain for `(code, slot)`,
-    /// lazily creating an empty chain on first access.
+    /// lazily creating an empty chain on first access. The slow-path installer
+    /// reaches into `self.polymorphic_chains` directly via a split-borrow
+    /// alongside `feedback_vectors`; this helper is the documented public
+    /// surface for callers that hold an exclusive `&mut Vm` and don't need
+    /// to borrow another field at the same time.
+    #[allow(dead_code, reason = "Spec 2 Phase B accessor surface; install path uses split-borrow")]
     pub(crate) fn polymorphic_chain_mut(
         &mut self,
         code: CodeRef,
@@ -1534,6 +1539,11 @@ impl Vm {
             return;
         }
         vector.clear_site(slot);
+        // Spec 2 Phase B.1.3: drop any out-of-line polymorphic chain attached
+        // to this (code, slot). The site is being reset to `None`, so the
+        // chain must follow it; otherwise stale chain entries would be
+        // visible on the next install.
+        self.drop_polymorphic_chain(code, slot);
         // Note: bump_generation after clear_site is a no-op because clear_site
         // drops the NamedPropertyFeedback that holds the generation counter.
         // Generation resets to 0 on the next fresh install; see doc above.

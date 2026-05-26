@@ -15,7 +15,7 @@ use lyng_objects::{
     PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
-use std::{cmp::Ordering, mem::size_of};
+use std::{cmp::Ordering, collections::HashMap, mem::size_of};
 
 mod polymorphic;
 
@@ -139,15 +139,29 @@ impl NamedPropertyFeedbackSnapshot {
         }
     }
 
+    /// Construct a snapshot from the inline-only `NamedPropertyFeedback` plus
+    /// the optional out-of-line `chain` (Spec 2 Phase B.1.3). The chain
+    /// entries are appended after the inline entries; both halves are kept
+    /// sorted by receiver shape, so the resulting `entries()` slice is also
+    /// sorted (every chain shape > every inline shape by construction).
     #[inline]
-    fn from_feedback(feedback: &NamedPropertyFeedback) -> Self {
+    fn from_feedback(
+        feedback: &NamedPropertyFeedback,
+        chain: Option<&PolymorphicChain>,
+    ) -> Self {
+        let mut entries = Vec::with_capacity(usize::from(feedback.entry_count));
+        for entry in feedback.inline_active_entries() {
+            entries.push(NamedPropertyCacheEntrySnapshot::from_entry(entry));
+        }
+        if let Some(chain) = chain {
+            for entry in chain.entries() {
+                entries.push(NamedPropertyCacheEntrySnapshot::from_entry(*entry));
+            }
+        }
         Self {
             execution_count: feedback.execution_count,
             state: feedback.cache_state.into(),
-            entries: feedback
-                .active_entries()
-                .map(NamedPropertyCacheEntrySnapshot::from_entry)
-                .collect(),
+            entries,
         }
     }
 
@@ -653,8 +667,20 @@ pub struct ComparisonFeedback {
 pub struct NamedPropertyFeedback {
     execution_count: u32,
     cache_state: InlineCacheState,
+    /// Total active entries (inline + out-of-line chain). The first
+    /// `min(entry_count, POLY_LIMIT)` live inline in `entries`; the
+    /// remainder (`entry_count - POLY_LIMIT`) live in
+    /// `Vm::polymorphic_chains[(code, slot)]`. Spec 2 Phase B.1.3.
     entry_count: u8,
-    entries: [Option<NamedPropertyCacheEntry>; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+    /// Inline polymorphic entries (also mirrored into
+    /// `polymorphic_own_data_handlers`). Holds the first `POLY_LIMIT`
+    /// sorted-by-shape cache entries. Out-of-line entries
+    /// (logical positions `POLY_LIMIT..POLYMORPHIC_PROPERTY_CACHE_LIMIT`)
+    /// live in `Vm::polymorphic_chains` keyed by `(code, slot)`. The full
+    /// logical layout — `inline ++ chain` — is sorted by receiver shape;
+    /// every chain entry's shape is strictly greater than every inline
+    /// entry's shape. Spec 2 Phase B.1.3.
+    entries: [Option<NamedPropertyCacheEntry>; POLY_LIMIT],
     /// Bit-packed handler derived from `entries[0]` whenever the cache is
     /// monomorphic and the entry is `OwnData`. `NamedPropertyHandler::NONE` in
     /// every other state. Lets the IC cache hit path skip the four-deep call chain
@@ -861,6 +887,16 @@ pub struct ConstructFeedback {
 // flat-array storage (`crate::dsl::feedback_flat`) can wrap it inside a
 // `FeedbackEntry`. The enum variants are still constructed only through
 // the methods on this file; outside this module the type is opaque.
+//
+// Spec 2 Phase B.1.3 shrunk `NamedPropertyFeedback` (its out-of-line
+// polymorphic entries now live in `Vm::polymorphic_chains`), which widened
+// the size gap between this enum's variants. `KeyedPropertyFeedback` is
+// the largest variant (600 bytes); boxing it is left to a follow-up that
+// extends the same out-of-line treatment to the keyed family.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "Spec 2 Phase B.1.3 will follow up to box KeyedPropertyFeedback; tracked separately"
+)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FeedbackSiteState {
     Arithmetic(ArithmeticFeedback),
@@ -878,7 +914,7 @@ impl NamedPropertyFeedback {
             execution_count: 0,
             cache_state: InlineCacheState::Uninitialized,
             entry_count: 0,
-            entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
+            entries: [None; POLY_LIMIT],
             monomorphic_own_data_handler: NamedPropertyHandler::NONE,
             monomorphic_proto_data_handler: NamedPropertyProtoHandler::NONE,
             polymorphic_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
@@ -950,8 +986,27 @@ impl NamedPropertyFeedback {
         }
     }
 
+    /// Looks up the cache entry for `receiver_shape`, consulting both the
+    /// inline `entries` and the out-of-line `chain` (Spec 2 Phase B.1.3).
     #[inline]
-    fn try_load(&self, agent: &Agent, receiver: ObjectRef) -> Option<Value> {
+    fn lookup_entry_for_shape(
+        &self,
+        chain: Option<&PolymorphicChain>,
+        receiver_shape: ShapeId,
+    ) -> Option<NamedPropertyCacheEntry> {
+        if let Ok(index) = self.search_entry_index(receiver_shape) {
+            return self.entries[index];
+        }
+        chain.and_then(|chain| chain.find_by_shape(receiver_shape).copied())
+    }
+
+    #[inline]
+    fn try_load(
+        &self,
+        agent: &Agent,
+        chain: Option<&PolymorphicChain>,
+        receiver: ObjectRef,
+    ) -> Option<Value> {
         match self.cache_state {
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {}
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => return None,
@@ -960,7 +1015,7 @@ impl NamedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        let entry = self.entries[self.find_entry_index(receiver_shape)?]?;
+        let entry = self.lookup_entry_for_shape(chain, receiver_shape)?;
         if let Ok(Some(value)) =
             agent
                 .objects()
@@ -975,6 +1030,7 @@ impl NamedPropertyFeedback {
     fn try_store(
         &self,
         agent: &mut Agent,
+        chain: Option<&PolymorphicChain>,
         receiver: ObjectRef,
         atom: AtomId,
         value: Value,
@@ -987,7 +1043,7 @@ impl NamedPropertyFeedback {
             .objects()
             .object_header(agent.heap().view(), receiver)?
             .shape();
-        let entry = self.entries[self.find_entry_index(receiver_shape)?]?;
+        let entry = self.lookup_entry_for_shape(chain, receiver_shape)?;
         let result = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             objects.store_to_named_property_cache(
@@ -1004,37 +1060,16 @@ impl NamedPropertyFeedback {
         None
     }
 
+    /// Iterates the inline `entries` slice (at most `POLY_LIMIT`). Out-of-line
+    /// chain entries (logical positions `POLY_LIMIT..entry_count`) live in
+    /// `Vm::polymorphic_chains` and must be appended by callers that have
+    /// access to the chain — see `NamedPropertyFeedbackSnapshot::from_parts`.
+    /// Spec 2 Phase B.1.3.
     #[inline]
-    fn observe_slow_path(&mut self, plan: Option<NamedPropertyCacheEntry>) {
-        let Some(plan) = plan else {
-            self.promote_to_megamorphic();
-            return;
-        };
-        match self.cache_state {
-            InlineCacheState::Megamorphic => {}
-            InlineCacheState::Uninitialized => self.install_first_entry(plan),
-            InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                match self.search_entry_index(plan.receiver_shape()) {
-                    Ok(index) => {
-                        self.entries[index] = Some(plan);
-                        // Any update to entries[0..POLY_LIMIT] may invalidate
-                        // the inline sidecar (handler word, slot location, or
-                        // dependency epoch all derive from the entry).
-                        if index < POLY_LIMIT {
-                            self.refresh_monomorphic_own_data_handler();
-                        }
-                    }
-                    Err(index) => self.insert_entry_at(index, plan),
-                }
-            }
-        }
-    }
-
-    #[inline]
-    fn active_entries(&self) -> impl Iterator<Item = NamedPropertyCacheEntry> + '_ {
+    fn inline_active_entries(&self) -> impl Iterator<Item = NamedPropertyCacheEntry> + '_ {
         self.entries
             .iter()
-            .take(usize::from(self.entry_count))
+            .take(self.inline_count())
             .filter_map(|entry| *entry)
     }
 
@@ -1046,45 +1081,44 @@ impl NamedPropertyFeedback {
         self.refresh_monomorphic_own_data_handler();
     }
 
+    /// Resets the inline cache state to `Megamorphic` and clears the inline
+    /// `entries` array. The out-of-line `Vm::polymorphic_chains[(code, slot)]`
+    /// entry — if any — is the **caller's** responsibility to drop via
+    /// `Vm::drop_polymorphic_chain`. Spec 2 Phase B.1.3.
     #[inline]
     const fn promote_to_megamorphic(&mut self) {
         self.cache_state = InlineCacheState::Megamorphic;
         self.entry_count = 0;
-        self.entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
+        self.entries = [None; POLY_LIMIT];
         self.refresh_monomorphic_own_data_handler();
     }
 
+    /// Number of inline entries currently populated. Equals
+    /// `min(entry_count, POLY_LIMIT)`.
     #[inline]
-    fn find_entry_index(&self, receiver_shape: ShapeId) -> Option<usize> {
-        self.search_entry_index(receiver_shape).ok()
+    fn inline_count(&self) -> usize {
+        usize::from(self.entry_count).min(POLY_LIMIT)
     }
 
+    /// Linear search over the inline `entries` slice (at most `POLY_LIMIT`
+    /// entries). Returns `Ok(index)` on hit and `Err(insertion_point)`
+    /// otherwise, matching `slice::binary_search_by` semantics. The chain
+    /// fallback is consulted separately by callers that need a full lookup
+    /// (see `Vm::find_named_property_cache_entry`). Spec 2 Phase B.1.3.
     #[inline]
     fn search_entry_index(&self, receiver_shape: ShapeId) -> Result<usize, usize> {
-        self.entries[..usize::from(self.entry_count)].binary_search_by(|entry| {
-            let Some(entry) = *entry else {
-                return Ordering::Greater;
+        let inline = self.inline_count();
+        for index in 0..inline {
+            let Some(entry) = self.entries[index] else {
+                continue;
             };
-            entry.receiver_shape().cmp(&receiver_shape)
-        })
-    }
-
-    #[inline]
-    fn insert_entry_at(&mut self, index: usize, entry: NamedPropertyCacheEntry) {
-        let count = usize::from(self.entry_count);
-        if count >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
-            self.promote_to_megamorphic();
-            return;
+            match entry.receiver_shape().cmp(&receiver_shape) {
+                Ordering::Equal => return Ok(index),
+                Ordering::Greater => return Err(index),
+                Ordering::Less => {}
+            }
         }
-        if index < count {
-            self.entries.copy_within(index..count, index + 1);
-        }
-        self.entries[index] = Some(entry);
-        self.entry_count = self.entry_count.saturating_add(1);
-        self.cache_state = InlineCacheState::Polymorphic;
-        // `refresh_monomorphic_own_data_handler` clears the monomorphic words and
-        // repopulates the polymorphic sidecar from the just-grown `entries`.
-        self.refresh_monomorphic_own_data_handler();
+        Err(inline)
     }
 }
 
@@ -1861,7 +1895,11 @@ impl FeedbackSiteState {
     }
 
     #[inline]
-    fn snapshot(&self, descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
+    fn snapshot(
+        &self,
+        descriptor: FeedbackSiteDescriptor,
+        named_property_chain: Option<&PolymorphicChain>,
+    ) -> FeedbackSiteSnapshot {
         match self {
             Self::Arithmetic(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,
@@ -1878,6 +1916,7 @@ impl FeedbackSiteState {
                 feedback.execution_count,
                 FeedbackSiteDetail::NamedProperty(NamedPropertyFeedbackSnapshot::from_feedback(
                     feedback,
+                    named_property_chain,
                 )),
             ),
             Self::KeyedProperty(feedback) => FeedbackSiteSnapshot::new(
@@ -2718,16 +2757,23 @@ impl Vm {
         receiver: ObjectRef,
     ) -> Option<Value> {
         let slot = slot?;
-        let site = self
-            .feedback_vectors
-            .get_mut(code_index(code))?
-            .site_mut(slot)?;
+        // Split-borrow: we need `&mut FeedbackSiteState` for the site
+        // mutation and `&PolymorphicChain` for the out-of-line lookup
+        // simultaneously. Spec 2 Phase B.1.3.
+        let Self {
+            feedback_vectors,
+            polymorphic_chains,
+            tiering,
+            ..
+        } = self;
+        let site = feedback_vectors.get_mut(code_index(code))?.site_mut(slot)?;
+        let chain = polymorphic_chains.get(&(code, slot));
         let value = match site {
-            FeedbackSiteState::NamedProperty(feedback) => feedback.try_load(agent, receiver),
+            FeedbackSiteState::NamedProperty(feedback) => feedback.try_load(agent, chain, receiver),
             _ => None,
         }?;
         site.record_execution();
-        self.tiering.observe_feedback_event(code);
+        tiering.observe_feedback_event(code);
         Some(value)
     }
 
@@ -2740,10 +2786,15 @@ impl Vm {
         atom: AtomId,
         value: Value,
     ) -> Option<bool> {
-        match self.feedback_site_for_slot(code, slot?) {
-            Some(FeedbackSiteState::NamedProperty(feedback)) => {
-                feedback.try_store(agent, receiver, atom, value)
-            }
+        let slot = slot?;
+        match self.feedback_site_for_slot(code, slot) {
+            Some(FeedbackSiteState::NamedProperty(feedback)) => feedback.try_store(
+                agent,
+                self.polymorphic_chain(code, slot),
+                receiver,
+                atom,
+                value,
+            ),
             _ => None,
         }
     }
@@ -2821,11 +2872,233 @@ impl Vm {
         {
             return;
         }
-        let _ = self.with_feedback_slot_mut(code, slot, |site| {
-            if let FeedbackSiteState::NamedProperty(feedback) = site {
-                feedback.observe_slow_path(plan);
+        self.named_property_install_slow_path(code, slot, plan);
+    }
+
+    /// Slow-path install for a named-property IC entry. Replaces the inline
+    /// `NamedPropertyFeedback::observe_slow_path` (Spec 2 Phase B.1.3) because
+    /// the install routing now needs access to both the inline `entries`
+    /// (`&mut NamedPropertyFeedback`) and the out-of-line
+    /// `Vm::polymorphic_chains[(code, slot)]` simultaneously. Performs
+    /// `mirror_flat_slot` after the mutation so the DSL-0b flat-array
+    /// projection stays in sync.
+    fn named_property_install_slow_path(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        plan: Option<NamedPropertyCacheEntry>,
+    ) {
+        let mutated = {
+            let Self {
+                feedback_vectors,
+                polymorphic_chains,
+                ..
+            } = self;
+            (|| {
+                let vector = feedback_vectors.get_mut(code_index(code))?;
+                let site = vector.site_mut(slot)?;
+                let FeedbackSiteState::NamedProperty(feedback) = site else {
+                    return None;
+                };
+                Self::named_property_observe_slow_path(
+                    feedback,
+                    polymorphic_chains,
+                    code,
+                    slot,
+                    plan,
+                );
+                Some(())
+            })()
+            .is_some()
+        };
+        if mutated {
+            self.mirror_flat_slot(code, slot);
+        }
+    }
+
+    /// Core slow-path install transition logic. Operates on the split-borrowed
+    /// inline feedback + out-of-line chain map. Mirrors the legacy
+    /// `NamedPropertyFeedback::observe_slow_path` semantics but routes
+    /// out-of-line entries through `Vm::polymorphic_chains`. Spec 2 Phase B.1.3.
+    fn named_property_observe_slow_path(
+        feedback: &mut NamedPropertyFeedback,
+        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        plan: Option<NamedPropertyCacheEntry>,
+    ) {
+        let Some(plan) = plan else {
+            feedback.promote_to_megamorphic();
+            polymorphic_chains.remove(&(code, slot));
+            return;
+        };
+        match feedback.cache_state {
+            InlineCacheState::Megamorphic => {}
+            InlineCacheState::Uninitialized => feedback.install_first_entry(plan),
+            InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
+                Self::named_property_install_or_update(
+                    feedback,
+                    polymorphic_chains,
+                    code,
+                    slot,
+                    plan,
+                );
             }
-        });
+        }
+    }
+
+    /// Search both halves for an existing entry with the same receiver shape
+    /// and update it in place; otherwise insert at the correct sorted
+    /// position. Drives the inline-displaces-into-chain dance described on
+    /// `NamedPropertyFeedback::entries`. Promotes to `Megamorphic` (and drops
+    /// the chain) when the new entry would push past
+    /// `POLYMORPHIC_PROPERTY_CACHE_LIMIT`. Spec 2 Phase B.1.3.
+    fn named_property_install_or_update(
+        feedback: &mut NamedPropertyFeedback,
+        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        plan: NamedPropertyCacheEntry,
+    ) {
+        let receiver_shape = plan.receiver_shape();
+        match feedback.search_entry_index(receiver_shape) {
+            Ok(index) => {
+                feedback.entries[index] = Some(plan);
+                // Any update to entries[0..POLY_LIMIT] may invalidate the
+                // inline sidecar (handler word, slot location, or
+                // dependency epoch all derive from the entry).
+                feedback.refresh_monomorphic_own_data_handler();
+            }
+            Err(inline_insert) => {
+                // The new shape was not found inline. `inline_insert` is the
+                // sorted insertion point within inline. If it equals
+                // `POLY_LIMIT` the new shape sits past inline — search the
+                // chain next.
+                if inline_insert < POLY_LIMIT {
+                    Self::named_property_insert_into_inline(
+                        feedback,
+                        polymorphic_chains,
+                        code,
+                        slot,
+                        inline_insert,
+                        plan,
+                    );
+                } else {
+                    Self::named_property_insert_into_chain(
+                        feedback,
+                        polymorphic_chains,
+                        code,
+                        slot,
+                        plan,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Insert at `inline_insert < POLY_LIMIT`. If inline is full, the
+    /// rightmost inline entry is displaced to the front of the chain (it
+    /// holds the largest inline shape, which is still smaller than every
+    /// chain shape — the sorted invariant is preserved). Promotes to
+    /// Megamorphic if the resulting total would exceed
+    /// `POLYMORPHIC_PROPERTY_CACHE_LIMIT`.
+    fn named_property_insert_into_inline(
+        feedback: &mut NamedPropertyFeedback,
+        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        inline_insert: usize,
+        plan: NamedPropertyCacheEntry,
+    ) {
+        debug_assert!(inline_insert < POLY_LIMIT);
+        let inline_count = feedback.inline_count();
+        let chain_len = polymorphic_chains
+            .get(&(code, slot))
+            .map_or(0, PolymorphicChain::len);
+        let total = inline_count + chain_len;
+        if total >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            feedback.promote_to_megamorphic();
+            polymorphic_chains.remove(&(code, slot));
+            return;
+        }
+
+        if inline_count >= POLY_LIMIT {
+            // Inline full: displace the largest-shape inline entry to the
+            // front of the chain.
+            let displaced = feedback.entries[POLY_LIMIT - 1]
+                .take()
+                .expect("inline slot must be populated when inline_count >= POLY_LIMIT");
+            let chain = polymorphic_chains
+                .entry((code, slot))
+                .or_insert_with(PolymorphicChain::new);
+            chain.insert_at(0, displaced);
+            // Shift `entries[inline_insert..POLY_LIMIT - 1]` right by one so
+            // entries[inline_insert] becomes free. The slot at
+            // `POLY_LIMIT - 1` was just taken; nothing valuable to overwrite.
+            feedback
+                .entries
+                .copy_within(inline_insert..POLY_LIMIT - 1, inline_insert + 1);
+        } else {
+            // Inline has space: shift entries[inline_insert..inline_count]
+            // right by one.
+            feedback
+                .entries
+                .copy_within(inline_insert..inline_count, inline_insert + 1);
+        }
+        feedback.entries[inline_insert] = Some(plan);
+        feedback.entry_count = feedback.entry_count.saturating_add(1);
+        feedback.cache_state = if feedback.entry_count == 1 {
+            InlineCacheState::Monomorphic
+        } else {
+            InlineCacheState::Polymorphic
+        };
+        feedback.refresh_monomorphic_own_data_handler();
+    }
+
+    /// Insert directly into the chain when the new shape sorts after every
+    /// inline entry. Searches the chain for an existing match (replace in
+    /// place) or finds the sorted insertion point. Promotes to Megamorphic
+    /// when the new entry would push past the global cap.
+    fn named_property_insert_into_chain(
+        feedback: &mut NamedPropertyFeedback,
+        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        plan: NamedPropertyCacheEntry,
+    ) {
+        let receiver_shape = plan.receiver_shape();
+        // Probe the existing chain (if any) first; a hit replaces in place.
+        if let Some(chain) = polymorphic_chains.get_mut(&(code, slot))
+            && let Ok(index) = chain.search_sorted(receiver_shape)
+        {
+            chain.replace_at(index, plan);
+            // Inline sidecar derives from the inline entries only — no
+            // refresh needed for a chain-only update.
+            return;
+        }
+
+        let inline_count = feedback.inline_count();
+        let chain_len = polymorphic_chains
+            .get(&(code, slot))
+            .map_or(0, PolymorphicChain::len);
+        if inline_count + chain_len >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            feedback.promote_to_megamorphic();
+            polymorphic_chains.remove(&(code, slot));
+            return;
+        }
+        let chain = polymorphic_chains
+            .entry((code, slot))
+            .or_insert_with(PolymorphicChain::new);
+        let insert_at = match chain.search_sorted(receiver_shape) {
+            Err(index) => index,
+            Ok(_) => unreachable!(
+                "chain replace branch handled above; chain.search_sorted must miss here"
+            ),
+        };
+        chain.insert_at(insert_at, plan);
+        feedback.entry_count = feedback.entry_count.saturating_add(1);
+        feedback.cache_state = InlineCacheState::Polymorphic;
+        // No inline-sidecar refresh: the inline `entries` slice is untouched.
     }
 
     /// Returns `true` when the install may proceed (all chain shapes
@@ -3086,7 +3359,7 @@ impl Vm {
                     .and_then(|vector| vector.site(descriptor.slot()))
                     .map_or_else(
                         || FeedbackSiteState::unallocated_snapshot(descriptor),
-                        |site| site.snapshot(descriptor),
+                        |site| site.snapshot(descriptor, self.polymorphic_chain(code, descriptor.slot())),
                     )
             })
             .collect::<Vec<_>>();

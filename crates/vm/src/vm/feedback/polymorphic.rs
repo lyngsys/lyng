@@ -1,4 +1,3 @@
-#![allow(dead_code, reason = "Spec 2 Phase B.1.1: type defined here, callers land in B.1.2+")]
 //! Out-of-line storage for polymorphic IC chain entries beyond `POLY_LIMIT`.
 //! Spec 2 Phase B.
 //!
@@ -11,6 +10,14 @@
 //!
 //! On 9th distinct shape the IC transitions to Megamorphic and the chain
 //! entry is dropped (caller's responsibility).
+//!
+//! Sorted-by-shape invariant: the chain is kept in ascending `receiver_shape`
+//! order so that the snapshot iterator (inline ++ chain) yields the entries
+//! sorted. Inline shapes are guaranteed strictly less than chain shapes by
+//! the install logic (an entry in the chain came from a logical position
+//! `>= POLY_LIMIT`).
+
+use std::cmp::Ordering;
 
 use lyng_objects::NamedPropertyCacheEntry;
 use lyng_types::ShapeId;
@@ -36,10 +43,6 @@ impl PolymorphicChain {
         self.entries.len()
     }
 
-    pub(crate) fn is_full(&self) -> bool {
-        self.entries.len() >= POLYMORPHIC_CHAIN_CAP
-    }
-
     /// Linear search by receiver shape. Chain is small (≤6) so linear beats
     /// binary search hash overhead. Returns `None` if no entry matches.
     pub(crate) fn find_by_shape(&self, receiver_shape: ShapeId) -> Option<&NamedPropertyCacheEntry> {
@@ -48,10 +51,35 @@ impl PolymorphicChain {
             .find(|entry| entry.receiver_shape() == receiver_shape)
     }
 
-    /// Pushes a new entry. Caller must verify `!is_full()` before calling.
-    pub(crate) fn push(&mut self, entry: NamedPropertyCacheEntry) {
+    /// Searches the chain for `receiver_shape`. `Ok(index)` if found,
+    /// `Err(insertion_point)` otherwise — same semantics as
+    /// `slice::binary_search`. The chain is kept sorted by ascending
+    /// `receiver_shape`, so linear search returns the correct
+    /// insertion point.
+    pub(crate) fn search_sorted(&self, receiver_shape: ShapeId) -> Result<usize, usize> {
+        for (index, entry) in self.entries.iter().enumerate() {
+            match entry.receiver_shape().cmp(&receiver_shape) {
+                Ordering::Equal => return Ok(index),
+                Ordering::Greater => return Err(index),
+                Ordering::Less => {}
+            }
+        }
+        Err(self.entries.len())
+    }
+
+    /// Replaces the entry at `index`. Caller must have verified the index is
+    /// in range (typically via a prior `search_sorted` returning `Ok(index)`).
+    pub(crate) fn replace_at(&mut self, index: usize, entry: NamedPropertyCacheEntry) {
+        self.entries[index] = entry;
+    }
+
+    /// Inserts `entry` at `index`, shifting later entries right. Caller must
+    /// have verified `self.len() < POLYMORPHIC_CHAIN_CAP` and that
+    /// `index <= self.len()`.
+    pub(crate) fn insert_at(&mut self, index: usize, entry: NamedPropertyCacheEntry) {
         debug_assert!(self.entries.len() < POLYMORPHIC_CHAIN_CAP);
-        self.entries.push(entry);
+        debug_assert!(index <= self.entries.len());
+        self.entries.insert(index, entry);
     }
 
     /// Iterator over entries — used by the slow path for fallback walks
