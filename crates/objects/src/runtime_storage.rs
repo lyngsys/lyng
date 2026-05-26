@@ -2,11 +2,11 @@ use super::object_metadata::ObjectKindPayload;
 use super::{
     dense_element_growth_capacity, ordinary_property_attrs, AllocationLifetime, ClassRecord,
     DescriptorAttributes, ElementStorageMetadata, ModuleNamespaceObject, NamedPropertyDictionary,
-    NamedPropertyDictionaryEntry,
-    NamedPropertyValue, ObjectMetadata, ObjectRef, ObjectRuntime, ObjectSlotsHandleStoreTarget,
-    PrimitiveHeapView, PrimitiveMutator, RegExpPayload, RuntimeObjectRecord, ShapeId,
-    ShapeMetadata, ShapePropertyKind, SlotLocation, SparseElementEntry, TemporalObjectData, Value,
-    ValueStoreTarget, DENSE_ELEMENT_SPARSE_GAP_THRESHOLD,
+    NamedPropertyDictionaryEntry, NamedPropertyValue, ObjectMetadata, ObjectRef, ObjectRuntime,
+    ObjectSlotsHandleStoreTarget, PrimitiveHeapView, PrimitiveMutator, RegExpPayload,
+    RuntimeObjectRecord, ShapeId, ShapeMetadata, ShapePropertyKind, SlotLocation,
+    SparseElementEntry, TemporalObjectData, Value, ValueStoreTarget,
+    DENSE_ELEMENT_SPARSE_GAP_THRESHOLD,
 };
 use std::collections::HashMap;
 

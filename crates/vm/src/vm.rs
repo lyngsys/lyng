@@ -617,7 +617,10 @@ impl Vm {
     /// alongside `feedback_vectors`; this helper is the documented public
     /// surface for callers that hold an exclusive `&mut Vm` and don't need
     /// to borrow another field at the same time.
-    #[allow(dead_code, reason = "Spec 2 Phase B accessor surface; install path uses split-borrow")]
+    #[allow(
+        dead_code,
+        reason = "Spec 2 Phase B accessor surface; install path uses split-borrow"
+    )]
     pub(crate) fn polymorphic_chain_mut(
         &mut self,
         code: CodeRef,
@@ -641,12 +644,13 @@ impl Vm {
     /// The actual call site uses an inline split-borrow retain in
     /// `force_collect_with_active_roots`; this method is the documented
     /// accessor surface for future callers that already hold `&mut Vm`.
-    #[allow(dead_code, reason = "Spec 2 Phase B sweep surface; call site uses inline split-borrow retain in force_collect_with_active_roots")]
-    pub(crate) fn prune_dead_code_polymorphic_chains(
-        &mut self,
-        is_live: impl Fn(CodeRef) -> bool,
-    ) {
-        self.polymorphic_chains.retain(|(code, _slot), _chain| is_live(*code));
+    #[allow(
+        dead_code,
+        reason = "Spec 2 Phase B sweep surface; call site uses inline split-borrow retain in force_collect_with_active_roots"
+    )]
+    pub(crate) fn prune_dead_code_polymorphic_chains(&mut self, is_live: impl Fn(CodeRef) -> bool) {
+        self.polymorphic_chains
+            .retain(|(code, _slot), _chain| is_live(*code));
     }
 
     /// Access the VM's opcode instrumentation. Counters are always
@@ -909,8 +913,11 @@ impl Vm {
         // has not been evicted by dynamic_function_cache cleanup or otherwise
         // uninstalled.
         let installed = &self.installed;
-        self.polymorphic_chains
-            .retain(|(code, _), _| installed.get(code_index(*code)).is_some_and(|s| s.is_some()));
+        self.polymorphic_chains.retain(|(code, _), _| {
+            installed
+                .get(code_index(*code))
+                .is_some_and(|s| s.is_some())
+        });
         report
     }
 

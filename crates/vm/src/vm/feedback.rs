@@ -145,10 +145,7 @@ impl NamedPropertyFeedbackSnapshot {
     /// sorted by receiver shape, so the resulting `entries()` slice is also
     /// sorted (every chain shape > every inline shape by construction).
     #[inline]
-    fn from_feedback(
-        feedback: &NamedPropertyFeedback,
-        chain: Option<&PolymorphicChain>,
-    ) -> Self {
+    fn from_feedback(feedback: &NamedPropertyFeedback, chain: Option<&PolymorphicChain>) -> Self {
         let mut entries = Vec::with_capacity(usize::from(feedback.entry_count));
         for entry in feedback.inline_active_entries() {
             entries.push(NamedPropertyCacheEntrySnapshot::from_entry(entry));
@@ -3359,7 +3356,12 @@ impl Vm {
                     .and_then(|vector| vector.site(descriptor.slot()))
                     .map_or_else(
                         || FeedbackSiteState::unallocated_snapshot(descriptor),
-                        |site| site.snapshot(descriptor, self.polymorphic_chain(code, descriptor.slot())),
+                        |site| {
+                            site.snapshot(
+                                descriptor,
+                                self.polymorphic_chain(code, descriptor.slot()),
+                            )
+                        },
                     )
             })
             .collect::<Vec<_>>();

@@ -45,7 +45,10 @@ impl PolymorphicChain {
 
     /// Linear search by receiver shape. Chain is small (≤6) so linear beats
     /// binary search hash overhead. Returns `None` if no entry matches.
-    pub(crate) fn find_by_shape(&self, receiver_shape: ShapeId) -> Option<&NamedPropertyCacheEntry> {
+    pub(crate) fn find_by_shape(
+        &self,
+        receiver_shape: ShapeId,
+    ) -> Option<&NamedPropertyCacheEntry> {
         self.entries
             .iter()
             .find(|entry| entry.receiver_shape() == receiver_shape)
