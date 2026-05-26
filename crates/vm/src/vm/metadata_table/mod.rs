@@ -78,19 +78,11 @@ impl MetadataTable {
         // 3. Allocate zeroed buffer.
         let mut buffer = vec![0u8; buffer_size].into_boxed_slice();
 
-        // 4. Write header.
-        let header = LinkingDataHeader {
-            buffer_size: buffer_size as u32,
-            slot_count,
-            slot_index_table_offset: slot_index_table_offset as u32,
-            _reserved: 0,
-        };
-        // SAFETY: buffer has at least HEADER_SIZE bytes (16); LinkingDataHeader
-        // is repr(C) with 4-byte fields and the buffer is allocated 8-aligned
-        // (via Vec → Box).
-        unsafe {
-            std::ptr::write(buffer.as_mut_ptr() as *mut LinkingDataHeader, header);
-        }
+        // 4. Write header (4 × u32 fields at offsets 0/4/8/12).
+        buffer[0..4].copy_from_slice(&(buffer_size as u32).to_ne_bytes());
+        buffer[4..8].copy_from_slice(&slot_count.to_ne_bytes());
+        buffer[8..12].copy_from_slice(&(slot_index_table_offset as u32).to_ne_bytes());
+        buffer[12..16].copy_from_slice(&0u32.to_ne_bytes()); // _reserved
 
         // 5. Write kind offsets immediately after the header.
         for (kind_idx, &ko) in kind_offsets.iter().enumerate() {
@@ -170,8 +162,14 @@ impl MetadataTable {
 
 #[allow(dead_code)]
 const fn align_up(value: usize, align: usize) -> usize {
+    debug_assert!(align.is_power_of_two());
     (value + align - 1) & !(align - 1)
 }
+
+const _: () = assert!(
+    METADATA_KIND_COUNT == 5,
+    "stride_for_kind_index must be updated when METADATA_KIND_COUNT changes"
+);
 
 #[allow(dead_code)]
 const fn stride_for_kind_index(kind_index: usize) -> usize {
