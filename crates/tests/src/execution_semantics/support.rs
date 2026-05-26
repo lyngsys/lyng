@@ -7,8 +7,8 @@ use lyng_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveStringView};
 use lyng_host::NoopHostHooks;
 use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
-    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, NoopAdaptiveProtoLoadDispatch,
-    ObjectAllocation, ObjectColdData, ObjectRuntime,
+    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
+    NoopAdaptiveProtoLoadDispatch, ObjectAllocation, ObjectColdData, ObjectRuntime,
 };
 use lyng_ops::object::ordinary_create_data_property;
 use lyng_parser::parse_script;

@@ -12,6 +12,7 @@ use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
     NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyProtoHandler, ObjectFlags,
     ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency, SlotLocation,
+    PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::{cmp::Ordering, mem::size_of};
@@ -2129,9 +2130,9 @@ impl FeedbackVector {
     /// Bumps the per-slot install generation (wrapping add per §8.2) and
     /// returns the new value. Returns `0` if the slot is absent or is not a
     /// `NamedProperty` site.
-    /// Called from Task 4's slow-path install to mint the generation before
-    /// registering `AdaptiveProtoLoad` watchpoints.
-    #[allow(dead_code)] // wired in Task A.1.7 (slow-path install)
+    /// Called from the slow-path install (via `Vm::bump_generation_for_install`)
+    /// to mint the generation before registering `AdaptiveProtoLoad`
+    /// watchpoints.
     #[inline]
     pub(super) fn bump_generation(&mut self, slot: FeedbackSlotId) -> u32 {
         let Some(index) = usize::try_from(slot.get().saturating_sub(1)).ok() else {
@@ -2910,7 +2911,7 @@ impl Vm {
 
     pub(super) fn observe_named_property_slow_path(
         &mut self,
-        agent: &Agent,
+        agent: &mut Agent,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
@@ -2931,11 +2932,12 @@ impl Vm {
             )
             .ok()
             .flatten();
-        self.record_named_property_cache_entry(code, slot, plan);
+        self.record_named_property_cache_entry(agent, code, slot, plan);
     }
 
     pub(super) fn observe_named_property_cache_entry(
         &mut self,
+        agent: &mut Agent,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         plan: Option<NamedPropertyCacheEntry>,
@@ -2944,20 +2946,68 @@ impl Vm {
             return;
         };
         let _ = self.ensure_feedback_slot_execution(code, slot);
-        self.record_named_property_cache_entry(code, slot, plan);
+        self.record_named_property_cache_entry(agent, code, slot, plan);
     }
 
     fn record_named_property_cache_entry(
         &mut self,
+        agent: &mut Agent,
         code: CodeRef,
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
+        // Spec 2 Phase A: a `PrototypeData` plan caches a load through a
+        // prototype chain. Before committing the entry we register
+        // `AdaptiveProtoLoad` watchpoints on every chain shape (the
+        // prototype objects' shapes; the receiver's shape is guarded by
+        // the IC cache-hit shape compare). If any chain shape is already
+        // `Invalidated`, abandon the install — the next slow-path
+        // observation will retry.
+        if let Some(plan_entry) = plan {
+            if plan_entry.path() == NamedPropertyCachePath::PrototypeData
+                && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
+            {
+                return;
+            }
+        }
         let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::NamedProperty(feedback) = site {
                 feedback.observe_slow_path(plan);
             }
         });
+    }
+
+    /// Returns `true` when the install may proceed (all chain shapes
+    /// registered or the chain is empty), `false` when registration was
+    /// abandoned because some shape was already `Invalidated`.
+    ///
+    /// `chain_shapes` are collected from `entry.dependency(1..dependency_count)`:
+    /// dependency[0] is the receiver (covered by the IC cache-hit shape
+    /// compare), so we skip it. The remaining dependencies are the
+    /// prototype objects walked while planning the entry, last being the
+    /// holder.
+    fn register_proto_chain_watchpoints(
+        vm: &mut Self,
+        agent: &mut Agent,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        entry: NamedPropertyCacheEntry,
+    ) -> bool {
+        // Slow-path install runs once per IC re-cache; tiny Vec allocation
+        // is acceptable here (`PROPERTY_CACHE_MAX_DEPENDENCIES == 4`).
+        // `dependency(0)` is the receiver (guarded by the IC cache-hit
+        // shape compare); the remaining entries are the prototype objects'
+        // shapes that we register `AdaptiveProtoLoad` watchpoints on.
+        let mut chain: Vec<ShapeId> = Vec::with_capacity(PROPERTY_CACHE_MAX_DEPENDENCIES);
+        for index in 1..usize::from(entry.dependency_count()) {
+            let Some(dep) = entry.dependency(index) else {
+                return false;
+            };
+            chain.push(dep.shape());
+        }
+        agent
+            .register_adaptive_proto_load_for_chain(code, slot, &chain, vm)
+            .is_ok()
     }
 
     pub(super) fn try_keyed_property_load_inline_cache(
@@ -3049,7 +3099,7 @@ impl Vm {
 
     pub(super) fn observe_keyed_atom_slow_path(
         &mut self,
-        agent: &Agent,
+        agent: &mut Agent,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
@@ -3070,6 +3120,15 @@ impl Vm {
             )
             .ok()
             .flatten();
+        // Spec 2 Phase A: same proto-chain registration as the non-keyed
+        // named-property slow path — see `record_named_property_cache_entry`.
+        if let Some(plan_entry) = plan {
+            if plan_entry.path() == NamedPropertyCachePath::PrototypeData
+                && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
+            {
+                return;
+            }
+        }
         let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {
                 feedback.observe_named_atom_slow_path(atom, plan);
@@ -3433,6 +3492,46 @@ impl Vm {
             )),
             _ => None,
         }
+    }
+
+    /// Returns the IC slot's current `(cache_state, generation)` tuple
+    /// for a NamedProperty site. `None` if the slot is empty or is not a
+    /// NamedProperty site. Used by Spec 2 Phase A tests to assert
+    /// generation-bump and abandon-on-invalidate behaviours.
+    #[cfg(test)]
+    pub(crate) fn named_property_generation_snapshot(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<(&'static str, u32)> {
+        let state = self.feedback_vectors.get(code_index(code))?.site(slot)?;
+        match state {
+            FeedbackSiteState::NamedProperty(feedback) => Some((
+                match feedback.cache_state {
+                    InlineCacheState::Uninitialized => "Uninitialized",
+                    InlineCacheState::Monomorphic => "Monomorphic",
+                    InlineCacheState::Polymorphic => "Polymorphic",
+                    InlineCacheState::Megamorphic => "Megamorphic",
+                },
+                feedback.generation,
+            )),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` iff the slot has a populated `NamedProperty` site
+    /// (i.e. is not `None`/Uninitialized). Used by Spec 2 Phase A tests
+    /// to assert that abandon-on-invalidated kept the slot clear.
+    #[cfg(test)]
+    pub(crate) fn named_property_slot_is_present(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> bool {
+        self.feedback_vectors
+            .get(code_index(code))
+            .and_then(|vector| vector.site(slot))
+            .is_some()
     }
 
     #[cfg(test)]

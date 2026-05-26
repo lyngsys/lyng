@@ -10,7 +10,9 @@ use lyng_objects::{
     AdaptiveProtoLoadDispatch, InternalMethodError, InternalMethodResult, PrototypeKey,
     RegExpPayload, ShapeInvalidationObserver, ShapeTransitionKey, Watchpoint,
 };
-use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
+use lyng_types::{
+    CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef,
+};
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
@@ -509,6 +511,59 @@ impl Agent {
                 },
             }
         }
+    }
+
+    /// Spec 2 Phase A: registers `AdaptiveProtoLoad` watchpoints on each shape
+    /// in a proto-cache's dependency chain (excluding the receiver, which is
+    /// covered by the IC cache-hit shape compare) and returns the post-bump
+    /// generation on success.
+    ///
+    /// `vm_dispatch` is used to mint the new generation and to roll the slot
+    /// back to a fresh state if any shape in `chain_shapes` is already
+    /// `Invalidated`; in that case the caller observes `Err(())` and must
+    /// abandon the install (i.e., not write the IC handler). After an abandon
+    /// the slot's generation has been bumped twice — first by the install
+    /// attempt, then again by the rollback `clear_ic_slot_if_generation_matches`
+    /// path — so any watchpoints registered earlier in the same call will
+    /// carry a stale generation and no-op when they fire.
+    ///
+    /// `chain_shapes` must contain exactly the shapes that the IC cache-hit
+    /// path does *not* validate via direct shape compare. For a
+    /// `PrototypeData` entry that is the prototype objects' shapes
+    /// (entry dependencies `[1..dependency_count]`).
+    pub fn register_adaptive_proto_load_for_chain(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        chain_shapes: &[ShapeId],
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
+    ) -> Result<u32, ()> {
+        // Bump generation BEFORE registration so the new watchpoints carry
+        // the post-install generation.
+        let generation = vm_dispatch.bump_generation_for_install(code, slot);
+
+        for &shape in chain_shapes {
+            let result =
+                self.objects
+                    .watchpoint_set_mut(shape)
+                    .register(Watchpoint::ShapeInvalidation {
+                        observer: ShapeInvalidationObserver::AdaptiveProtoLoad {
+                            code,
+                            slot,
+                            generation,
+                        },
+                    });
+            if result.is_err() {
+                // Some shape is already Invalidated — abandon install.
+                // Clear+bump again so any orphan watchpoints registered
+                // earlier in this same call (on the shapes we already walked)
+                // carry a stale generation and no-op when they fire.
+                vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
+                return Err(());
+            }
+        }
+
+        Ok(generation)
     }
 
     /// Records a property-addition transition on `obj`'s current shape (which

@@ -51,6 +51,12 @@ pub trait AdaptiveProtoLoadDispatch {
         slot: FeedbackSlotId,
         generation: u32,
     );
+
+    /// Bumps the IC slot's generation and returns the new value. Called by
+    /// the slow path before registering `AdaptiveProtoLoad` watchpoints so
+    /// the watchpoints carry the post-install generation. Returns `0` when
+    /// the slot is absent or is not a `NamedProperty` site.
+    fn bump_generation_for_install(&mut self, code: CodeRef, slot: FeedbackSlotId) -> u32;
 }
 
 /// No-op `AdaptiveProtoLoadDispatch` for call sites that have no `Vm`
@@ -69,6 +75,13 @@ impl AdaptiveProtoLoadDispatch for NoopAdaptiveProtoLoadDispatch {
         _expected_generation: u32,
     ) {
         // Intentionally empty: no IC slot to clear in non-Vm contexts.
+    }
+
+    fn bump_generation_for_install(&mut self, _code: CodeRef, _slot: FeedbackSlotId) -> u32 {
+        // No slot to mutate; surface 0 so the caller never registers a
+        // mismatching watchpoint. Bootstrap callers that pass `Noop`
+        // intrinsically don't install proto-cache ICs.
+        0
     }
 }
 

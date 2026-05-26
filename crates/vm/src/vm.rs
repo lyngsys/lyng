@@ -1517,4 +1517,11 @@ impl AdaptiveProtoLoadDispatch for Vm {
     ) {
         Self::clear_ic_slot_if_generation_matches(self, code, slot, generation);
     }
+
+    fn bump_generation_for_install(&mut self, code: CodeRef, slot: FeedbackSlotId) -> u32 {
+        let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) else {
+            return 0;
+        };
+        vector.bump_generation(slot)
+    }
 }

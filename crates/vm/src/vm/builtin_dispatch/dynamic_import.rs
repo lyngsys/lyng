@@ -4,11 +4,11 @@ use super::{
     NativeFunctionRegistry, ObjectAllocation, ObjectRef, PromiseResolvingFunctionKind, PropertyKey,
     RealmRef, ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult,
 };
-use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 use crate::vm::DynamicImportPhase;
 use crate::vm::{DynamicImportRequest, PendingDynamicImport};
 use lyng_bytecode::Opcode;
 use lyng_env::{ModuleStatus, RealmRecord};
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 
 enum DynamicImportEvaluationOutcome {
     Fulfilled {

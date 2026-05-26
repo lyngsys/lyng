@@ -473,6 +473,7 @@ impl Vm {
                         };
                     }
                     self.observe_named_property_cache_entry(
+                        agent,
                         frame.code(),
                         feedback_slot,
                         Some(plan),

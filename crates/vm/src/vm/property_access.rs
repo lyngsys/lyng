@@ -75,6 +75,12 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         self.agent
     }
 
+    fn agent_and_vm_dispatch(
+        &mut self,
+    ) -> (&mut Agent, &mut dyn lyng_objects::AdaptiveProtoLoadDispatch) {
+        (self.agent, self.vm)
+    }
+
     fn abrupt(&mut self, completion: lyng_types::AbruptCompletion) -> Self::Error {
         VmError::Abrupt(completion)
     }
@@ -1281,8 +1287,8 @@ impl Vm {
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<bool> {
-        let deleted = object::ordinary_delete_property(agent, object, key, self)
-            .map_err(VmError::Abrupt)?;
+        let deleted =
+            object::ordinary_delete_property(agent, object, key, self).map_err(VmError::Abrupt)?;
         if deleted && let Some(index) = key.as_index() {
             let _ = self.activation_tables.detach_mapped_argument(object, index);
         }

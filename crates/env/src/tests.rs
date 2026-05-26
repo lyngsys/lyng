@@ -1588,7 +1588,13 @@ fn alloc_object_with_named_x(agent: &mut Agent) -> lyng_types::ObjectRef {
     desc.set_enumerable(true);
     desc.set_configurable(true);
     agent
-        .define_own_property(obj, key, desc, AllocationLifetime::LongLived, &mut NoopAdaptiveProtoLoadDispatch)
+        .define_own_property(
+            obj,
+            key,
+            desc,
+            AllocationLifetime::LongLived,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
         .expect("initial property definition should succeed");
     // Drain the spurious fire from the root-shape (no registered watchpoints,
     // so take_recording_fires() is still empty, but reset the buffer anyway).
@@ -1622,7 +1628,13 @@ fn dictionary_transition_via_redefine_fires_watchpoint() {
     desc.set_enumerable(true);
     desc.set_configurable(false);
     agent
-        .define_own_property(obj, key, desc, AllocationLifetime::LongLived, &mut NoopAdaptiveProtoLoadDispatch)
+        .define_own_property(
+            obj,
+            key,
+            desc,
+            AllocationLifetime::LongLived,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
         .expect("redefine should succeed");
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![7]);
@@ -1660,7 +1672,9 @@ fn dictionary_transition_via_delete_fires_watchpoint() {
         .unwrap();
 
     let key = PropertyKey::from_atom(AtomId::from_raw(1));
-    agent.delete(obj, key, &mut NoopAdaptiveProtoLoadDispatch).expect("delete should succeed");
+    agent
+        .delete(obj, key, &mut NoopAdaptiveProtoLoadDispatch)
+        .expect("delete should succeed");
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![8]);
     assert_eq!(
@@ -1747,7 +1761,13 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
     desc.set_enumerable(true);
     desc.set_configurable(true);
     agent
-        .define_own_property(obj, overflow_key, desc, AllocationLifetime::LongLived, &mut NoopAdaptiveProtoLoadDispatch)
+        .define_own_property(
+            obj,
+            overflow_key,
+            desc,
+            AllocationLifetime::LongLived,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
         .expect("overflow property addition should succeed");
 
     assert_eq!(agent.objects_mut().take_recording_fires(), vec![12]);
@@ -1801,7 +1821,13 @@ fn property_addition_fires_watchpoint_on_parent_shape() {
     desc.set_enumerable(true);
     desc.set_configurable(true);
     agent
-        .define_own_property(obj, key_b, desc, AllocationLifetime::LongLived, &mut NoopAdaptiveProtoLoadDispatch)
+        .define_own_property(
+            obj,
+            key_b,
+            desc,
+            AllocationLifetime::LongLived,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
         .expect("property addition should succeed");
 
     // Watchpoint on s_parent must have fired with token 17.
@@ -1851,7 +1877,9 @@ fn set_prototype_of_allocates_fresh_shape() {
 
     let shape_before = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
-    agent.set_prototype_of(obj, Some(proto), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
+    agent
+        .set_prototype_of(obj, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     let shape_after = agent.heap().view().object(obj).unwrap().shape().unwrap();
 
@@ -1882,8 +1910,12 @@ fn prototype_transition_table_dedups() {
     let s_b_before = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
     assert_eq!(s_a_before, s_b_before, "precondition: same source shape");
 
-    agent.set_prototype_of(obj_a, Some(proto), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
-    agent.set_prototype_of(obj_b, Some(proto), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
+    agent
+        .set_prototype_of(obj_a, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
+    agent
+        .set_prototype_of(obj_b, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     let shape_a = agent.heap().view().object(obj_a).unwrap().shape().unwrap();
     let shape_b = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
@@ -1905,8 +1937,12 @@ fn null_and_object_prototype_produce_distinct_shapes() {
     let obj_a = alloc_plain_object(agent);
     let obj_b = alloc_plain_object(agent);
 
-    agent.set_prototype_of(obj_a, None, &mut NoopAdaptiveProtoLoadDispatch).unwrap();
-    agent.set_prototype_of(obj_b, Some(proto), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
+    agent
+        .set_prototype_of(obj_a, None, &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
+    agent
+        .set_prototype_of(obj_b, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     let shape_a = agent.heap().view().object(obj_a).unwrap().shape().unwrap();
     let shape_b = agent.heap().view().object(obj_b).unwrap().shape().unwrap();
@@ -1950,8 +1986,12 @@ fn dead_prototype_transition_entry_pruned_on_gc() {
     // Establish two entries in s_source.prototype_transitions:
     //   s_source --proto1--> shape_a   (obj1 transitions to proto1)
     //   s_source --proto2--> shape_b   (obj2 transitions to proto2)
-    agent.set_prototype_of(obj1, Some(proto1), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
-    agent.set_prototype_of(obj2, Some(proto2), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
+    agent
+        .set_prototype_of(obj1, Some(proto1), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
+    agent
+        .set_prototype_of(obj2, Some(proto2), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     assert!(
         agent
@@ -2008,7 +2048,9 @@ fn live_prototype_transition_entry_retained_on_gc() {
 
     let s_source: ShapeId = agent.heap().view().object(anchor).unwrap().shape().unwrap();
 
-    agent.set_prototype_of(obj, Some(proto), &mut NoopAdaptiveProtoLoadDispatch).unwrap();
+    agent
+        .set_prototype_of(obj, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     assert!(
         agent

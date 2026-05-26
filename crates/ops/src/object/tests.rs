@@ -284,7 +284,9 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
         ordinary_get(agent, object, key).unwrap(),
         Value::from_smi(13)
     );
-    assert!(ordinary_delete_property(agent, object, key, &mut NoopAdaptiveProtoLoadDispatch).unwrap());
+    assert!(
+        ordinary_delete_property(agent, object, key, &mut NoopAdaptiveProtoLoadDispatch).unwrap()
+    );
     assert!(!ordinary_has_property(agent, object, key).unwrap());
 }
 

@@ -1,7 +1,7 @@
 use crate::{object as ordinary_object, read};
 use lyng_env::Agent;
 use lyng_gc::AllocationLifetime;
-use lyng_objects::NoopAdaptiveProtoLoadDispatch;
+use lyng_objects::AdaptiveProtoLoadDispatch;
 use lyng_types::{AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 use std::collections::HashSet;
 
@@ -13,6 +13,16 @@ pub trait ProxyTrapContext {
     type Error;
 
     fn agent(&mut self) -> &mut Agent;
+
+    /// Splits one mutable borrow into the `Agent` and the
+    /// `AdaptiveProtoLoadDispatch` so callers like the
+    /// `[[SetPrototypeOf]]` non-proxy fallback can pass both into
+    /// `Agent::set_prototype_of` at once. VM-side contexts return
+    /// `(self.agent, self.vm)`; builtin contexts that have no `Vm` in
+    /// scope return `(self.agent, &mut Noop)` (correct only when no
+    /// `AdaptiveProtoLoad` watchpoint can be registered against the
+    /// target shape, e.g. during bootstrap).
+    fn agent_and_vm_dispatch(&mut self) -> (&mut Agent, &mut dyn AdaptiveProtoLoadDispatch);
 
     fn abrupt(&mut self, completion: AbruptCompletion) -> Self::Error;
 
@@ -259,18 +269,13 @@ pub fn set_prototype_of<Cx: ProxyTrapContext>(
     prototype: Option<ObjectRef>,
 ) -> Result<bool, Cx::Error> {
     if !is_proxy(cx, object) {
-        // TODO(spec2-task4b): proxies wrap user objects; this fallback runs in
-        // hot JS execution. Once Task 4b registers AdaptiveProtoLoad
-        // watchpoints, ProxyTrapContext needs a Vm dispatch hook so the
-        // wrapped object's IC slots can be cleared on prototype mutation.
+        // The non-proxy fallback runs in hot JS execution. Spec 2 Phase A:
+        // route `AdaptiveProtoLoad` watchpoint fires through the trap
+        // context's `agent_and_vm_dispatch` so the wrapped object's IC
+        // slots are cleared on prototype mutation.
         let result = {
-            let agent = cx.agent();
-            ordinary_object::ordinary_set_prototype_of(
-                agent,
-                object,
-                prototype,
-                &mut NoopAdaptiveProtoLoadDispatch,
-            )
+            let (agent, dispatch) = cx.agent_and_vm_dispatch();
+            ordinary_object::ordinary_set_prototype_of(agent, object, prototype, dispatch)
         };
         return map_completion(cx, result);
     }

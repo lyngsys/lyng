@@ -300,7 +300,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
     };
 
     let prototype = {
-        let mut bridge = BuiltinProxyBridge { cx };
+        let mut bridge = BuiltinProxyBridge::new(cx);
         object::get_with_receiver_in_context(
             &mut bridge,
             constructor,
@@ -312,7 +312,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
     .ok_or_else(|| type_error(cx))?;
 
     let mut current = {
-        let mut bridge = BuiltinProxyBridge { cx };
+        let mut bridge = BuiltinProxyBridge::new(cx);
         object::get_prototype_of_in_context(&mut bridge, object)?
     };
     while let Some(candidate) = current {
@@ -320,7 +320,7 @@ fn ordinary_has_instance<Cx: PublicBuiltinDispatchContext>(
             return Ok(true);
         }
         current = {
-            let mut bridge = BuiltinProxyBridge { cx };
+            let mut bridge = BuiltinProxyBridge::new(cx);
             object::get_prototype_of_in_context(&mut bridge, candidate)?
         };
     }

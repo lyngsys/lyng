@@ -98,7 +98,13 @@ fn error_constructor_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let error_object = {
         let agent = cx.agent();
-        errors::create_error_object(agent, realm, Some(prototype), message, &mut NoopAdaptiveProtoLoadDispatch)
+        errors::create_error_object(
+            agent,
+            realm,
+            Some(prototype),
+            message,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
     };
     let error_object = map_completion(cx, error_object)?;
     install_error_cause(cx, error_object, options)?;
@@ -213,7 +219,13 @@ fn aggregate_error_builtin<Cx: PublicBuiltinDispatchContext>(
         .unwrap_or(Value::undefined());
     let error = {
         let agent = cx.agent();
-        errors::create_error_object(agent, realm, Some(prototype), message, &mut NoopAdaptiveProtoLoadDispatch)
+        errors::create_error_object(
+            agent,
+            realm,
+            Some(prototype),
+            message,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
     };
     let error = map_completion(cx, error)?;
     install_error_cause(cx, error, options)?;
@@ -289,7 +301,13 @@ fn create_suppressed_error_with_prototype<Cx: PublicBuiltinDispatchContext>(
     let realm = cx.builtin_realm();
     let error = {
         let agent = cx.agent();
-        errors::create_error_object(agent, realm, Some(prototype), message, &mut NoopAdaptiveProtoLoadDispatch)
+        errors::create_error_object(
+            agent,
+            realm,
+            Some(prototype),
+            message,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
     };
     let error = map_completion(cx, error)?;
     install_error_cause(cx, error, options)?;

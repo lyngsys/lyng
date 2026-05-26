@@ -317,7 +317,11 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
     // the proto shortcut so the next access observes the new value.
     // Use Agent::set_prototype_of to trigger shape transition (PR 3).
     agent
-        .set_prototype_of(object, Some(prototype_b), &mut NoopAdaptiveProtoLoadDispatch)
+        .set_prototype_of(
+            object,
+            Some(prototype_b),
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
         .unwrap();
 
     // PR 3: Verify that the shape transitioned on prototype swap.
@@ -2743,5 +2747,250 @@ fn keyed_named_property_load_ic_polymorphic_own_data_handlers_load_returns_value
     assert_eq!(
         vm.keyed_property_cache_snapshot(installed.code(), slot),
         Some(("Polymorphic", Some("NamedAtom"), 2))
+    );
+}
+
+// Spec 2 Phase A — A.4: an orphan `AdaptiveProtoLoad` watchpoint from a
+// prior install no-ops when the IC slot's current generation no longer
+// matches the watchpoint's recorded generation. The dispatch path inside
+// `Agent::fire_watchpoints_for_shape` routes the fire to
+// `Vm::clear_ic_slot_if_generation_matches`, which is the guard.
+#[test]
+fn adaptive_proto_load_orphan_watchpoint_noops_on_generation_mismatch() {
+    let unit = compile_test_unit(20_400, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let prototype = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(42),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    // Capture the prototype's shape now — before any cache install. The
+    // slow path will register an `AdaptiveProtoLoad` watchpoint on this
+    // shape during the first IC install.
+    let proto_shape = agent
+        .with_heap_and_objects(|heap, _objects| heap.view().object(prototype).unwrap().shape())
+        .expect("prototype object should have a shape");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Two evaluations — the first walks up the feedback warmup counter
+    // (FEEDBACK_ALLOCATION_THRESHOLD); the second allocates the sites
+    // array and runs the slow path, which installs the proto-cache IC
+    // entry. Slow path bumps the IC slot's generation 0 → 1 and
+    // registers a watchpoint on `proto_shape` with `generation = 1`.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(NamedPropertyCachePath::PrototypeData)
+        ))
+    );
+    assert_eq!(
+        vm.named_property_generation_snapshot(installed.code(), slot),
+        Some(("Monomorphic", 1))
+    );
+
+    // Bump the IC slot's generation manually — simulates any path that
+    // re-installs (e.g. a second polymorphic chain-shape registration)
+    // without firing the original watchpoint. The orphan watchpoint
+    // registered on `proto_shape` still carries `generation = 1`, but
+    // the slot now carries `generation = 2`.
+    let bumped = <Vm as AdaptiveProtoLoadDispatch>::bump_generation_for_install(
+        &mut vm,
+        installed.code(),
+        slot,
+    );
+    assert_eq!(bumped, 2);
+    assert_eq!(
+        vm.named_property_generation_snapshot(installed.code(), slot),
+        Some(("Monomorphic", 2))
+    );
+
+    // Fire the watchpoint on `proto_shape`. The orphan fires with
+    // `generation = 1`; `clear_ic_slot_if_generation_matches` sees the
+    // slot currently at `generation = 2` and no-ops.
+    agent.fire_watchpoints_for_shape(proto_shape, &mut vm);
+
+    // The slot is still present and still at generation 2 — the orphan
+    // watchpoint did not clear it.
+    assert!(vm.named_property_slot_is_present(installed.code(), slot));
+    assert_eq!(
+        vm.named_property_generation_snapshot(installed.code(), slot),
+        Some(("Monomorphic", 2))
+    );
+}
+
+// Spec 2 Phase A — A.5: when the slow path attempts to install a
+// proto-cache IC entry but some chain shape is already `Invalidated`,
+// the install is abandoned: the IC slot is not committed (the
+// `observe_slow_path` call is skipped), and a subsequent re-evaluation
+// retries the install. The chain shape's `WatchpointSet` cannot accept
+// new watchpoints once invalidated, so the next install registers on
+// the *post-transition* prototype shape — not the dead one.
+#[test]
+fn adaptive_proto_load_register_on_invalidated_chain_abandons_install() {
+    let unit = compile_test_unit(20_500, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for .value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let prototype = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        prototype,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(123),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    // Force the prototype's current shape into the `Invalidated` watchpoint
+    // state *before* the IC install. The slow path will then attempt
+    // `register` on this set, get `Err(Invalidated)`, and abandon the
+    // install.
+    let proto_shape = agent
+        .with_heap_and_objects(|heap, _objects| heap.view().object(prototype).unwrap().shape())
+        .expect("prototype object should have a shape");
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(proto_shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 0xdead },
+        })
+        .unwrap();
+    agent.fire_watchpoints_for_shape(proto_shape, &mut NoopAdaptiveProtoLoadDispatch);
+    assert_eq!(
+        agent
+            .objects()
+            .watchpoint_sets_inspect(proto_shape)
+            .map(|set| set.state()),
+        Some(WatchpointState::Invalidated),
+        "test precondition: proto shape's watchpoint set must be invalidated"
+    );
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Two evaluations: the first warms the slot, the second runs the
+    // slow path. The IC entry is a PrototypeData plan;
+    // `register_adaptive_proto_load_for_chain` walks the chain, hits the
+    // Invalidated set for `proto_shape`, and returns `Err`.
+    // `record_named_property_cache_entry` skips `observe_slow_path`, so
+    // the IC slot is never committed. The script still returns the
+    // correct value (the slow load itself succeeded).
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(123)
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(123)
+    );
+
+    // The IC slot stays absent — confirming the abandon. (Generation is
+    // not observable here because the slot was never committed; the
+    // `named_property_slot_is_present` probe is the load-bearing
+    // assertion.)
+    assert!(
+        !vm.named_property_slot_is_present(installed.code(), slot),
+        "abandon-on-invalidated must leave the IC slot uncommitted"
+    );
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        None
     );
 }

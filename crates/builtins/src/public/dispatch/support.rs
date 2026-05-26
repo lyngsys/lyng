@@ -591,6 +591,25 @@ pub(super) fn numbers_are_equal(left: f64, right: f64) -> bool {
 
 pub(super) struct BuiltinProxyBridge<'a, Cx> {
     pub(super) cx: &'a mut Cx,
+    /// Owned dispatcher used to satisfy `ProxyTrapContext::agent_and_vm_dispatch`.
+    /// Builtin dispatch contexts have no `Vm` in scope, so prototype-mutating
+    /// fallbacks (e.g. proxy `[[SetPrototypeOf]]`) route through a Noop and
+    /// rely on the slow path to re-cache after the next access.
+    ///
+    /// This is correct for builtin contexts because builtins do not call
+    /// hot proxy fallbacks against IC-cached shapes during normal JS
+    /// execution — when they do (rare), the IC slot will simply re-fire
+    /// on the next access rather than be cleared eagerly.
+    pub(super) vm_dispatch_noop: lyng_objects::NoopAdaptiveProtoLoadDispatch,
+}
+
+impl<'a, Cx> BuiltinProxyBridge<'a, Cx> {
+    pub(super) fn new(cx: &'a mut Cx) -> Self {
+        Self {
+            cx,
+            vm_dispatch_noop: lyng_objects::NoopAdaptiveProtoLoadDispatch,
+        }
+    }
 }
 
 impl<Cx: PublicBuiltinDispatchContext> proxy::ProxyTrapContext for BuiltinProxyBridge<'_, Cx> {
@@ -598,6 +617,12 @@ impl<Cx: PublicBuiltinDispatchContext> proxy::ProxyTrapContext for BuiltinProxyB
 
     fn agent(&mut self) -> &mut Agent {
         self.cx.agent()
+    }
+
+    fn agent_and_vm_dispatch(
+        &mut self,
+    ) -> (&mut Agent, &mut dyn lyng_objects::AdaptiveProtoLoadDispatch) {
+        (self.cx.agent(), &mut self.vm_dispatch_noop)
     }
 
     fn abrupt(&mut self, completion: AbruptCompletion) -> Self::Error {
@@ -733,7 +758,7 @@ pub(super) fn proxy_get_prototype_of<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<Option<ObjectRef>, Cx::Error> {
-    object::get_prototype_of_in_context(&mut BuiltinProxyBridge { cx }, object_ref)
+    object::get_prototype_of_in_context(&mut BuiltinProxyBridge::new(cx), object_ref)
 }
 
 pub(super) fn proxy_set_prototype_of<Cx: PublicBuiltinDispatchContext>(
@@ -741,7 +766,7 @@ pub(super) fn proxy_set_prototype_of<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     prototype: Option<ObjectRef>,
 ) -> Result<bool, Cx::Error> {
-    object::set_prototype_of_in_context(&mut BuiltinProxyBridge { cx }, object_ref, prototype)
+    object::set_prototype_of_in_context(&mut BuiltinProxyBridge::new(cx), object_ref, prototype)
 }
 
 pub(super) fn proxy_get_own_property<Cx: PublicBuiltinDispatchContext>(
@@ -749,7 +774,7 @@ pub(super) fn proxy_get_own_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     key: PropertyKey,
 ) -> Result<Option<PropertyDescriptor>, Cx::Error> {
-    object::get_own_property_in_context(&mut BuiltinProxyBridge { cx }, object_ref, key)
+    object::get_own_property_in_context(&mut BuiltinProxyBridge::new(cx), object_ref, key)
 }
 
 pub(super) fn proxy_define_property<Cx: PublicBuiltinDispatchContext>(
@@ -760,7 +785,7 @@ pub(super) fn proxy_define_property<Cx: PublicBuiltinDispatchContext>(
     lifetime: AllocationLifetime,
 ) -> Result<bool, Cx::Error> {
     object::define_property_in_context(
-        &mut BuiltinProxyBridge { cx },
+        &mut BuiltinProxyBridge::new(cx),
         object_ref,
         key,
         descriptor,
@@ -773,28 +798,28 @@ pub(super) fn proxy_has_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
-    object::has_property_in_context(&mut BuiltinProxyBridge { cx }, object_ref, key)
+    object::has_property_in_context(&mut BuiltinProxyBridge::new(cx), object_ref, key)
 }
 
 pub(super) fn proxy_own_property_keys<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<Vec<PropertyKey>, Cx::Error> {
-    object::own_property_keys_in_context(&mut BuiltinProxyBridge { cx }, object_ref)
+    object::own_property_keys_in_context(&mut BuiltinProxyBridge::new(cx), object_ref)
 }
 
 pub(super) fn proxy_is_extensible<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<bool, Cx::Error> {
-    proxy::is_extensible(&mut BuiltinProxyBridge { cx }, object_ref)
+    proxy::is_extensible(&mut BuiltinProxyBridge::new(cx), object_ref)
 }
 
 pub(super) fn proxy_prevent_extensions<Cx: PublicBuiltinDispatchContext>(
     cx: &mut Cx,
     object_ref: ObjectRef,
 ) -> Result<bool, Cx::Error> {
-    proxy::prevent_extensions(&mut BuiltinProxyBridge { cx }, object_ref)
+    proxy::prevent_extensions(&mut BuiltinProxyBridge::new(cx), object_ref)
 }
 
 pub(super) fn proxy_delete_property<Cx: PublicBuiltinDispatchContext>(
@@ -802,7 +827,7 @@ pub(super) fn proxy_delete_property<Cx: PublicBuiltinDispatchContext>(
     object_ref: ObjectRef,
     key: PropertyKey,
 ) -> Result<bool, Cx::Error> {
-    proxy::delete_property(&mut BuiltinProxyBridge { cx }, object_ref, key)
+    proxy::delete_property(&mut BuiltinProxyBridge::new(cx), object_ref, key)
 }
 
 pub(super) fn get_property_from_object<Cx: PublicBuiltinDispatchContext>(
