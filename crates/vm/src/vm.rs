@@ -160,9 +160,9 @@ pub struct Vm {
     source_texts: HashMap<SourceId, Arc<str>>,
     /// Per-installed-code feedback storage, keyed by `code_index(code_ref)`. Every entry is a
     /// real `FeedbackVector` rather than `Option<FeedbackVector>` — the default-constructed
-    /// value is the "unallocated" sentinel (empty slot storage, `warmup_counter == 0`), so
-    /// IC-bearing opcodes drop one Option discriminant on the hot path. The warmup counter
-    /// lives inside the vector itself, replacing the older parallel `feedback_warmup: Vec<u16>`.
+    /// value is the "unallocated" sentinel (empty slot storage), so IC-bearing opcodes drop
+    /// one Option discriminant on the hot path. The warmup counter lives on `Tiering`
+    /// (see `TieringState::warmup_counter`); Spec 2 Phase A lifted it off `FeedbackVector`.
     feedback_vectors: Vec<FeedbackVector>,
     /// DSL-0b flat-array feedback storage, parallel to `feedback_vectors`,
     /// keyed by `code_index(code_ref)`. The asm-DSL substrate's `FV` pin
