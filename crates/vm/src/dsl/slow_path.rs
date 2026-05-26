@@ -211,11 +211,21 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         // active frame; one-past-the-end is well-defined.
                         unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
-                    let fv_base = {
+                    let (fv_base, mt_base) = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        rust.dispatch.vm.feedback_flat_storage[index]
+                        let fv = rust.dispatch.vm.feedback_flat_storage[index]
                             .as_ptr()
-                            .cast_mut()
+                            .cast_mut();
+                        // Phase C Task 4.2: parallel metadata table pin.
+                        let mt: *mut u8 = rust
+                            .dispatch
+                            .vm
+                            .metadata_tables
+                            .get(index)
+                            .and_then(|t| t.as_ref())
+                            .map(|t| t.buffer_ptr() as *mut u8)
+                            .unwrap_or(std::ptr::null_mut());
+                        (fv, mt)
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -233,6 +243,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_pc_offset = new_offset;
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
+                        (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
                     }
@@ -298,11 +309,21 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .function()
                         .instruction_bytes()
                         .as_ptr();
-                    let fv_base = {
+                    let (fv_base, mt_base) = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        rust.dispatch.vm.feedback_flat_storage[index]
+                        let fv = rust.dispatch.vm.feedback_flat_storage[index]
                             .as_ptr()
-                            .cast_mut()
+                            .cast_mut();
+                        // Phase C Task 4.2: parallel metadata table pin.
+                        let mt: *mut u8 = rust
+                            .dispatch
+                            .vm
+                            .metadata_tables
+                            .get(index)
+                            .and_then(|t| t.as_ref())
+                            .map(|t| t.buffer_ptr() as *mut u8)
+                            .unwrap_or(std::ptr::null_mut());
+                        (fv, mt)
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -334,6 +355,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_pb_base = pb_base;
                         (**state).frame_regs_base = regs_base_ptr;
                         (**state).frame_fv_base = fv_base;
+                        // Phase C Task 4.2: refresh the metadata table base in
+                        // lockstep with frame_fv_base.
+                        (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
                         // Phase 1.B.1: refresh the new fields.

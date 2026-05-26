@@ -63,7 +63,7 @@ pub(crate) fn run_via_dsl(
     // the trampoline reads/writes through it on the current thread
     // only (no aliasing UB during the trampoline's single-threaded
     // execution).
-    let fv_base = {
+    let (fv_base, mt_base) = {
         let index = crate::vm::code_index_for_dsl(frame.code());
         // The slot is guaranteed to exist because `store_installed`
         // populates `feedback_flat_storage[index]` to the correct
@@ -71,7 +71,18 @@ pub(crate) fn run_via_dsl(
         // boxed slice's `as_ptr()` is still a valid (non-dangling)
         // pointer; the asm trampoline never dereferences past the
         // slot count anyway.
-        vm.feedback_flat_storage[index].as_ptr().cast_mut()
+        let fv = vm.feedback_flat_storage[index].as_ptr().cast_mut();
+        // Phase C Task 4.2: also pin the metadata table buffer so the
+        // new resolve macro (Task 4.3) can read entries without going
+        // through Rust. Both pointers are live simultaneously; Task 4.3
+        // will flip the asm macro to consume the metadata pointer.
+        let mt: *mut u8 = vm
+            .metadata_tables
+            .get(index)
+            .and_then(|t| t.as_ref())
+            .map(|t| t.buffer_ptr() as *mut u8)
+            .unwrap_or(std::ptr::null_mut());
+        (fv, mt)
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -148,7 +159,7 @@ pub(crate) fn run_via_dsl(
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
-        frame_metadata_table_base: std::ptr::null_mut(),
+        frame_metadata_table_base: mt_base,
         object_records_base,
         object_slots_base,
         // Phase 1.B.1 Task 3: real values derived above before the
