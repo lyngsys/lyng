@@ -634,6 +634,21 @@ impl Vm {
         self.polymorphic_chains.remove(&(code, slot));
     }
 
+    /// Spec 2 Phase B: post-mark GC sweep. Drops polymorphic chain entries
+    /// for code that is no longer live. Mirrors
+    /// `ObjectRuntime::prune_dead_prototype_transitions` from Spec 1.
+    ///
+    /// The actual call site uses an inline split-borrow retain in
+    /// `force_collect_with_active_roots`; this method is the documented
+    /// accessor surface for future callers that already hold `&mut Vm`.
+    #[allow(dead_code, reason = "Spec 2 Phase B sweep surface; call site uses inline split-borrow retain in force_collect_with_active_roots")]
+    pub(crate) fn prune_dead_code_polymorphic_chains(
+        &mut self,
+        is_live: impl Fn(CodeRef) -> bool,
+    ) {
+        self.polymorphic_chains.retain(|(code, _slot), _chain| is_live(*code));
+    }
+
     /// Access the VM's opcode instrumentation. Counters are always
     /// allocated when the feature is on; callers reset/snapshot via the
     /// returned `&OpcodeCounters`. To redirect counter writes to an
@@ -875,14 +890,28 @@ impl Vm {
     }
 
     pub(crate) fn force_collect_with_active_roots(
-        &self,
+        &mut self,
         agent: &mut Agent,
         caller_frame: FrameRecord,
     ) -> PrimitiveCollectionReport {
-        agent.force_collect_with_additional_roots(&ActiveVmRoots {
+        let report = agent.force_collect_with_additional_roots(&ActiveVmRoots {
             vm: self,
             caller_frame: &caller_frame,
-        })
+        });
+        // Spec 2 Phase B (B.2.2): prune polymorphic chain entries for code
+        // that is no longer installed. Mirrors the post-mark sweep in
+        // Agent::force_collect_with_additional_roots for ObjectRuntime's
+        // prototype-transition table, but lives here because Vm owns
+        // polymorphic_chains.
+        //
+        // Liveness predicate: a CodeRef is live iff its slot in
+        // `self.installed` is `Some(Some(_))` — i.e., it was installed and
+        // has not been evicted by dynamic_function_cache cleanup or otherwise
+        // uninstalled.
+        let installed = &self.installed;
+        self.polymorphic_chains
+            .retain(|(code, _), _| installed.get(code_index(*code)).is_some_and(|s| s.is_some()));
+        report
     }
 
     #[inline]
