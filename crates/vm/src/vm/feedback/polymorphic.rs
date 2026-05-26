@@ -22,11 +22,11 @@ use std::cmp::Ordering;
 use lyng_objects::NamedPropertyCacheEntry;
 use lyng_types::ShapeId;
 
-use super::POLYMORPHIC_PROPERTY_CACHE_LIMIT;
+use super::{POLY_LIMIT, POLYMORPHIC_PROPERTY_CACHE_LIMIT};
 
 /// Maximum number of out-of-line entries per chain.
-/// `POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT` once flattened.
-pub(crate) const POLYMORPHIC_CHAIN_CAP: usize = POLYMORPHIC_PROPERTY_CACHE_LIMIT - 2; // = 6
+/// `POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT` (= 6).
+pub(crate) const POLYMORPHIC_CHAIN_CAP: usize = POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT;
 
 pub(crate) struct PolymorphicChain {
     entries: Vec<NamedPropertyCacheEntry>,
