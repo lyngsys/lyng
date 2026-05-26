@@ -53,6 +53,25 @@ pub trait AdaptiveProtoLoadDispatch {
     );
 }
 
+/// No-op `AdaptiveProtoLoadDispatch` for call sites that have no `Vm`
+/// in scope (bootstrap, internal initialization, some tests). Using this
+/// is correct precisely when no `AdaptiveProtoLoad` watchpoint can be
+/// registered against any shape the caller will fire on — i.e., during
+/// runtime setup before any JS executes. In production JS execution
+/// paths, callers must pass a real `&mut Vm` dispatcher.
+pub struct NoopAdaptiveProtoLoadDispatch;
+
+impl AdaptiveProtoLoadDispatch for NoopAdaptiveProtoLoadDispatch {
+    fn clear_ic_slot_if_generation_matches(
+        &mut self,
+        _code: CodeRef,
+        _slot: FeedbackSlotId,
+        _expected_generation: u32,
+    ) {
+        // Intentionally empty: no IC slot to clear in non-Vm contexts.
+    }
+}
+
 impl ShapeInvalidationObserver {
     /// Spec 1 dispatch surface for `Recording`. Spec 2's `AdaptiveProtoLoad`
     /// will add a different dispatch (taking `&mut Agent`); the enum split

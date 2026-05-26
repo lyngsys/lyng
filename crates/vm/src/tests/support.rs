@@ -28,8 +28,8 @@ pub(super) use lyng_host::{
 };
 pub(super) use lyng_objects::{
     FunctionEntryIdentity, InternalMethodResult, NamedPropertyCachePath, NamedPropertyStorageMode,
-    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
-    ObjectRuntime,
+    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, NoopAdaptiveProtoLoadDispatch,
+    ObjectAllocation, ObjectRuntime,
 };
 pub(super) use lyng_ops::object::{ordinary_create_data_property, ordinary_get};
 pub(super) use lyng_parser::{parse_module, parse_script};
@@ -175,6 +175,7 @@ pub(super) fn install_global_value(
         PropertyKey::from_atom(name),
         value,
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
 }

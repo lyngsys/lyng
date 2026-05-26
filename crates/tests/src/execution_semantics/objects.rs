@@ -6,7 +6,7 @@ use lyng_common::AtomTable;
 use lyng_gc::{AllocationLifetime, PrimitiveMutator};
 use lyng_objects::{
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
-    ObjectRuntime,
+    NoopAdaptiveProtoLoadDispatch, ObjectRuntime,
 };
 use lyng_ops::object::ordinary_create_data_property;
 use lyng_types::{PropertyKey, Value};
@@ -1393,6 +1393,7 @@ fn phase5_cross_realm_foundations_use_selected_builtin_and_receiver_realms() {
                     PropertyKey::from_atom(atom),
                     Value::from_object_ref(value),
                     AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
                 )
                 .expect("cross-realm global should install"));
             }

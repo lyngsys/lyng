@@ -1,6 +1,9 @@
 use lyng_env::{Agent, Intrinsics, RealmRecord};
 use lyng_gc::AllocationLifetime;
-use lyng_objects::{InternalMethodError, ObjectAllocation, ObjectFlags};
+use lyng_objects::{
+    AdaptiveProtoLoadDispatch, InternalMethodError, NoopAdaptiveProtoLoadDispatch,
+    ObjectAllocation, ObjectFlags,
+};
 use lyng_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
@@ -62,6 +65,7 @@ pub fn create_error_object(
     realm: RealmRef,
     prototype: Option<ObjectRef>,
     message: Option<Value>,
+    vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
 ) -> Completion<ObjectRef> {
     let realm = agent.realm(realm).ok_or_else(fallback_throw_completion)?;
     let root_shape = realm.root_shape().ok_or_else(fallback_throw_completion)?;
@@ -88,6 +92,7 @@ pub fn create_error_object(
             PropertyKey::from_atom(message_atom),
             descriptor,
             AllocationLifetime::Default,
+            vm_dispatch,
         );
         if !matches!(defined, Ok(true)) {
             return Err(fallback_throw_completion());
@@ -111,7 +116,15 @@ pub fn create_intrinsic_error_object(
 ) -> Completion<ObjectRef> {
     let prototype = intrinsic_error_prototype_for_realm(agent, realm, kind)
         .ok_or_else(fallback_throw_completion)?;
-    create_error_object(agent, realm, Some(prototype), message)
+    // Newly-allocated error object cannot have AdaptiveProtoLoad watchpoints
+    // registered on its initial shape, so the noop dispatcher is sound here.
+    create_error_object(
+        agent,
+        realm,
+        Some(prototype),
+        message,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
 }
 
 /// Returns the current realm-aware throw value for one common error kind.

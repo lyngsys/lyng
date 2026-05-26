@@ -373,7 +373,7 @@ impl<'b> EvaluateScript<'b> {
         let installed = vm.install_script(agent, realm.id(), unit)?;
         let _ = vm.bootstrap_realm(agent, realm.id(), BootstrapMode::SpecOnly)?;
         vm.install_active_realm_extensions(agent, realm.id())?;
-        Vm::instantiate_global_script(agent, realm, unit.instantiation_plan())?;
+        vm.instantiate_global_script(agent, realm, unit.instantiation_plan())?;
         let referrer_atom = referrer.map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
         let mut observer = NoopVmEvaluationObserver;
         let value = vm.evaluate_entry_with_registry_and_checkpoint(

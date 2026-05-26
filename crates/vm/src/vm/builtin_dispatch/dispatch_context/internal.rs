@@ -339,7 +339,8 @@ impl InternalBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         &mut self,
         invocation: BuiltinInvocation<'_>,
     ) -> Result<Value, Self::Error> {
-        Vm::object_literal_set_prototype_builtin(self.agent, invocation.arguments())
+        self.vm
+            .object_literal_set_prototype_builtin(self.agent, invocation.arguments())
     }
 
     fn bind_function_private_env_builtin(

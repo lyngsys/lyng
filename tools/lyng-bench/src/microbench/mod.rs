@@ -152,12 +152,13 @@ fn run_snippet(
     let installed = vm
         .install_script(agent, realm_id, &unit)
         .map_err(|err| format!("install_script failed for {}: {err:?}", snippet.opcode))?;
-    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).map_err(|err| {
-        format!(
-            "instantiate_global_script failed for {}: {err:?}",
-            snippet.opcode
-        )
-    })?;
+    vm.instantiate_global_script(agent, &realm, unit.instantiation_plan())
+        .map_err(|err| {
+            format!(
+                "instantiate_global_script failed for {}: {err:?}",
+                snippet.opcode
+            )
+        })?;
 
     // Warm-up sample: discard timing so we measure steady-state dispatch
     // cost, not the first-eval install + initial-jit overhead.

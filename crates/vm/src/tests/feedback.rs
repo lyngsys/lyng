@@ -589,6 +589,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
                 PropertyKey::from_atom(AtomId::from_raw(21_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -598,6 +599,7 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         sources.push(object);
@@ -677,6 +679,7 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(4),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -825,6 +828,7 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(13),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(receiver));
@@ -840,6 +844,7 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(7),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
 

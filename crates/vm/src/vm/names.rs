@@ -1457,7 +1457,7 @@ impl Vm {
                 .object_environment_delete_binding_with_context(
                     agent, host, registry, frame, record, name,
                 ),
-            CapturedNameTarget::GlobalProperty { .. } => Self::delete_global(agent, frame, name),
+            CapturedNameTarget::GlobalProperty { .. } => self.delete_global(agent, frame, name),
             CapturedNameTarget::Unresolvable { .. } => Ok(true),
         }
     }
@@ -1475,6 +1475,7 @@ impl Vm {
     }
 
     pub(super) fn delete_global(
+        &mut self,
         agent: &mut Agent,
         frame: &FrameRecord,
         name: AtomId,
@@ -1485,12 +1486,9 @@ impl Vm {
         {
             return Ok(false);
         }
-        object::ordinary_delete_property(
-            agent,
-            global.global_object(),
-            PropertyKey::from_atom(name),
-        )
-        .map_err(VmError::Abrupt)
+        let global_object = global.global_object();
+        object::ordinary_delete_property(agent, global_object, PropertyKey::from_atom(name), self)
+            .map_err(VmError::Abrupt)
     }
 
     pub(super) fn global_has_lexical_binding(

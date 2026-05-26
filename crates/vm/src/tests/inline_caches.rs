@@ -132,6 +132,7 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(7),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -198,6 +199,7 @@ fn named_property_load_ic_caches_prototype_data_one_hop() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(42),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let object = agent.with_heap_and_objects(|heap, objects| {
@@ -261,6 +263,7 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(11),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let prototype_b = agent.with_heap_and_objects(|heap, objects| {
@@ -277,6 +280,7 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(22),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let object = agent.with_heap_and_objects(|heap, objects| {
@@ -312,7 +316,9 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
     // The receiver epoch bump (cause = PrototypeMutation) must invalidate
     // the proto shortcut so the next access observes the new value.
     // Use Agent::set_prototype_of to trigger shape transition (PR 3).
-    agent.set_prototype_of(object, Some(prototype_b)).unwrap();
+    agent
+        .set_prototype_of(object, Some(prototype_b), &mut NoopAdaptiveProtoLoadDispatch)
+        .unwrap();
 
     // PR 3: Verify that the shape transitioned on prototype swap.
     let shape_after =
@@ -364,6 +370,7 @@ fn keyed_named_property_load_ic_caches_prototype_data_one_hop() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(99),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let object = agent.with_heap_and_objects(|heap, objects| {
@@ -435,6 +442,7 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
         PropertyKey::from_atom(value_name),
         Value::from_smi(77),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let grandparent = agent.with_heap_and_objects(|heap, objects| {
@@ -673,6 +681,7 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
                 PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -682,6 +691,7 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         sources.push(object);
@@ -750,6 +760,7 @@ fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
                 PropertyKey::from_atom(AtomId::from_raw(24_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -759,6 +770,7 @@ fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         let shape = agent
@@ -848,6 +860,7 @@ fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() 
                 PropertyKey::from_atom(AtomId::from_raw(22_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -857,6 +870,7 @@ fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() 
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         sources.push(object);
@@ -913,6 +927,7 @@ fn named_property_store_ic_caches_own_data_paths() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(1),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -975,6 +990,7 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(1),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -1161,6 +1177,7 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(4),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -1222,6 +1239,7 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
                 PropertyKey::from_atom(AtomId::from_raw(23_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -1231,6 +1249,7 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         sources.push(object);
@@ -1291,6 +1310,7 @@ fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
                 PropertyKey::from_atom(AtomId::from_raw(25_000 + extra)),
                 Value::from_smi(extra.cast_signed()),
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .unwrap());
         }
@@ -1300,6 +1320,7 @@ fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
             PropertyKey::from_atom(value_name),
             Value::from_smi(index.cast_signed()),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
         let shape = agent
@@ -1468,6 +1489,7 @@ fn keyed_dense_index_load_cache_tracks_shape_changes_polymorphically() {
         PropertyKey::from_atom(extra_name),
         Value::from_smi(1),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
 
@@ -1609,6 +1631,7 @@ fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(44),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
@@ -1845,6 +1868,7 @@ fn make_object_with_value(
             PropertyKey::from_atom(AtomId::from_raw(raw_atom)),
             Value::from_smi(0),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
     }
@@ -1854,6 +1878,7 @@ fn make_object_with_value(
         PropertyKey::from_atom(value_atom),
         value,
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     object
@@ -2339,6 +2364,7 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(42),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     let object = agent.with_heap_and_objects(|heap, objects| {

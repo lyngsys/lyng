@@ -12,6 +12,7 @@ impl Vm {
     ///
     /// Returns a VM error if global declaration instantiation fails.
     pub fn instantiate_global_script(
+        &mut self,
         agent: &mut Agent,
         realm: &RealmRecord,
         plan: &GlobalScriptInstantiationPlan,
@@ -59,7 +60,7 @@ impl Vm {
         if plan.function_names().len() + plan.var_names().len()
             >= BULK_GLOBAL_BINDING_DICTIONARY_THRESHOLD
         {
-            ensure_global_object_dictionary(agent, global_object)?;
+            ensure_global_object_dictionary(agent, global_object, self)?;
         }
 
         for name in plan.lexical_names() {
@@ -69,7 +70,7 @@ impl Vm {
 
         for name in plan.function_names() {
             let name = agent.atoms_mut().intern_collectible(name);
-            create_global_function_binding(agent, global_object, name)?;
+            create_global_function_binding(agent, global_object, name, self)?;
             if !agent.global_has_var_name(global_env, name) {
                 let _ = agent.global_add_var_name(global_env, name);
             }
@@ -77,7 +78,7 @@ impl Vm {
 
         for name in plan.var_names() {
             let name = agent.atoms_mut().intern_collectible(name);
-            create_global_var_binding(agent, global_object, name)?;
+            create_global_var_binding(agent, global_object, name, self)?;
             if !agent.global_has_var_name(global_env, name) {
                 let _ = agent.global_add_var_name(global_env, name);
             }
@@ -87,8 +88,12 @@ impl Vm {
     }
 }
 
-fn ensure_global_object_dictionary(agent: &mut Agent, global_object: ObjectRef) -> VmResult<()> {
-    if agent.ensure_named_property_dictionary(global_object) {
+fn ensure_global_object_dictionary(
+    agent: &mut Agent,
+    global_object: ObjectRef,
+    vm_dispatch: &mut dyn lyng_objects::AdaptiveProtoLoadDispatch,
+) -> VmResult<()> {
+    if agent.ensure_named_property_dictionary(global_object, vm_dispatch) {
         Ok(())
     } else {
         Err(VmError::Abrupt(errors::throw_type_error(agent)))
@@ -143,6 +148,7 @@ fn create_global_var_binding(
     agent: &mut Agent,
     global_object: ObjectRef,
     name: AtomId,
+    vm_dispatch: &mut dyn lyng_objects::AdaptiveProtoLoadDispatch,
 ) -> VmResult<()> {
     let key = PropertyKey::from_atom(name);
     if object::ordinary_get_own_property(agent, global_object, key)
@@ -151,21 +157,28 @@ fn create_global_var_binding(
     {
         return Ok(());
     }
-    define_global_binding_property(agent, global_object, key)
+    define_global_binding_property(agent, global_object, key, vm_dispatch)
 }
 
 fn create_global_function_binding(
     agent: &mut Agent,
     global_object: ObjectRef,
     name: AtomId,
+    vm_dispatch: &mut dyn lyng_objects::AdaptiveProtoLoadDispatch,
 ) -> VmResult<()> {
-    define_global_binding_property(agent, global_object, PropertyKey::from_atom(name))
+    define_global_binding_property(
+        agent,
+        global_object,
+        PropertyKey::from_atom(name),
+        vm_dispatch,
+    )
 }
 
 fn define_global_binding_property(
     agent: &mut Agent,
     global_object: ObjectRef,
     key: PropertyKey,
+    vm_dispatch: &mut dyn lyng_objects::AdaptiveProtoLoadDispatch,
 ) -> VmResult<()> {
     let mut descriptor = PropertyDescriptor::new();
     descriptor.set_value(Value::undefined());
@@ -178,6 +191,7 @@ fn define_global_binding_property(
         key,
         descriptor,
         AllocationLifetime::Default,
+        vm_dispatch,
     )
     .map_err(VmError::Abrupt)?;
     if defined {

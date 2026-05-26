@@ -52,7 +52,7 @@ impl Vm {
         descriptor.set_enumerable(enumerable);
         descriptor.set_configurable(true);
         let defined =
-            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default, self);
         let defined = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if !defined {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -86,7 +86,7 @@ impl Vm {
         descriptor.set_enumerable(false);
         descriptor.set_configurable(true);
         let defined =
-            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default, self);
         let defined = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if !defined {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -188,6 +188,7 @@ impl Vm {
     }
 
     pub(super) fn object_literal_set_prototype_builtin(
+        &mut self,
         agent: &mut Agent,
         arguments: &[Value],
     ) -> VmResult<Value> {
@@ -204,8 +205,8 @@ impl Vm {
         } else {
             return Ok(Value::from_object_ref(object));
         };
-        let changed =
-            object::ordinary_set_prototype_of(agent, object, prototype).map_err(VmError::Abrupt)?;
+        let changed = object::ordinary_set_prototype_of(agent, object, prototype, self)
+            .map_err(VmError::Abrupt)?;
         if !changed {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }

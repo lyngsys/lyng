@@ -1655,7 +1655,8 @@ fn global_script_instantiation_precreates_non_configurable_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
+    vm.instantiate_global_script(agent, &realm, unit.instantiation_plan())
+        .unwrap();
 
     let x_atom = unit_runtime_atom(agent, &unit, unit_atom(&unit, "x"));
     let descriptor = agent
@@ -1690,7 +1691,8 @@ fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
         .bootstrap_realm(agent, realm.id(), lyng_builtins::BootstrapMode::SpecOnly)
         .expect("bootstrap should succeed");
     let _ = vm.install_script(agent, realm.id(), &unit).unwrap();
-    Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap();
+    vm.instantiate_global_script(agent, &realm, unit.instantiation_plan())
+        .unwrap();
 
     assert_eq!(
         agent
@@ -1914,6 +1916,7 @@ fn direct_named_property_definitions_preserve_all_named_slots() {
             PropertyKey::from_atom(atom),
             Value::from_smi(value),
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
     }
@@ -2428,6 +2431,7 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
         PropertyKey::from_atom(value_name),
         Value::from_smi(1),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     assert!(ordinary_create_data_property(
@@ -2436,6 +2440,7 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
         PropertyKey::from_atom(source_name),
         Value::from_object_ref(object),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
 

@@ -3,6 +3,7 @@ use super::{
     BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor, BuiltinPropertyKeySpec,
     BuiltinPropertyValueSpec, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value,
 };
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 
 pub fn install_descriptor_tables(
     agent: &mut Agent,
@@ -220,6 +221,7 @@ fn install_descriptor(
         key,
         property_descriptor,
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     );
     if matches!(defined, Ok(true)) {
         return Ok(());

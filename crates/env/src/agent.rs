@@ -292,7 +292,15 @@ impl Agent {
     /// This is the production entry point for dictionary transitions.
     /// Callers must use this rather than `objects.ensure_named_property_dictionary`
     /// directly so that shape-invalidation watchpoints are fired correctly.
-    pub fn ensure_named_property_dictionary(&mut self, id: ObjectRef) -> bool {
+    ///
+    /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
+    /// transition to IC slot clearing. Callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch`.
+    pub fn ensure_named_property_dictionary(
+        &mut self,
+        id: ObjectRef,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
+    ) -> bool {
         let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
 
         let ok = self.with_heap_and_objects(|heap, objects| {
@@ -300,7 +308,7 @@ impl Agent {
         });
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old, None);
+            self.fire_watchpoints_for_shape(old, vm_dispatch);
         }
         ok
     }
@@ -313,12 +321,17 @@ impl Agent {
     /// Callers must use this rather than calling `objects.define_own_property`
     /// through `with_heap_and_objects` directly so that shape-invalidation
     /// watchpoints are fired correctly.
+    ///
+    /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
+    /// transition to IC slot clearing. Callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch`.
     pub fn define_own_property(
         &mut self,
         id: ObjectRef,
         key: PropertyKey,
         descriptor: PropertyDescriptor,
         lifetime: AllocationLifetime,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> InternalMethodResult<bool> {
         let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
 
@@ -327,7 +340,7 @@ impl Agent {
         });
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old, None);
+            self.fire_watchpoints_for_shape(old, vm_dispatch);
         }
         result
     }
@@ -340,14 +353,23 @@ impl Agent {
     /// Callers must use this rather than calling `objects.delete` through
     /// `with_heap_and_objects` directly so that shape-invalidation watchpoints
     /// are fired correctly.
-    pub fn delete(&mut self, id: ObjectRef, key: PropertyKey) -> InternalMethodResult<bool> {
+    ///
+    /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
+    /// transition to IC slot clearing. Callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch`.
+    pub fn delete(
+        &mut self,
+        id: ObjectRef,
+        key: PropertyKey,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
+    ) -> InternalMethodResult<bool> {
         let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
 
         let result = self
             .with_heap_and_objects(|heap, objects| objects.delete(&mut heap.mutator(), id, key));
 
         if let Some(old) = old_shape {
-            self.fire_watchpoints_for_shape(old, None);
+            self.fire_watchpoints_for_shape(old, vm_dispatch);
         }
         result
     }
@@ -363,10 +385,15 @@ impl Agent {
     ///
     /// Bootstrap/initialization code that sets prototypes before IC shapes are
     /// live should use `objects.set_prototype(...)` directly.
+    ///
+    /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
+    /// transition to IC slot clearing. Callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch`.
     pub fn set_prototype_of(
         &mut self,
         id: ObjectRef,
         prototype: Option<ObjectRef>,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> InternalMethodResult<bool> {
         // 1. Read current prototype; short-circuit if unchanged.
         let (current, old_shape) = {
@@ -436,7 +463,7 @@ impl Agent {
 
         // 7. Fire watchpoints on the OLD shape — after the object's shape pointer
         //    has been updated. Matches JSC's setPrototypeDirect ordering.
-        self.fire_watchpoints_for_shape(old_shape, None);
+        self.fire_watchpoints_for_shape(old_shape, vm_dispatch);
 
         // 8. Bump the invalidation epoch.
         self.with_heap_and_objects(|heap, objects| {
@@ -452,21 +479,20 @@ impl Agent {
     /// that Spec 2's `AdaptiveProtoLoad` observer can call into `&mut Vm`
     /// without violating Rust borrow rules.
     ///
-    /// `vm_dispatch` is `None` for callers that do not have a `&mut Vm` in
-    /// scope (internal agent methods). Callers in `lyng-vm` that hold a
-    /// `&mut Vm` pass `Some(vm)`. If an `AdaptiveProtoLoad` observer fires
-    /// with `vm_dispatch = None` that is a logic error (no production code
-    /// registers `AdaptiveProtoLoad` from an agent-only context), so the arm
-    /// panics in debug builds and is a no-op in release.
+    /// `vm_dispatch` is the routing target for `AdaptiveProtoLoad` fires.
+    /// VM-side callers pass `self` (Vm implements the trait); bootstrap and
+    /// internal callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch` (correct only when no
+    /// `AdaptiveProtoLoad` watchpoint can be registered against `shape`,
+    /// i.e., during runtime setup before any JS executes).
     pub fn fire_watchpoints_for_shape(
         &mut self,
         shape: ShapeId,
-        vm_dispatch: Option<&mut dyn AdaptiveProtoLoadDispatch>,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) {
         let Some(fired) = self.objects.drain_watchpoints_for_shape(shape) else {
             return;
         };
-        let mut vm_dispatch = vm_dispatch; // needed so as_deref_mut() can reborrow per iteration
         for wp in fired {
             match wp {
                 Watchpoint::ShapeInvalidation { observer } => match observer {
@@ -478,18 +504,7 @@ impl Agent {
                         slot,
                         generation,
                     } => {
-                        if let Some(dispatcher) = vm_dispatch.as_deref_mut() {
-                            dispatcher.clear_ic_slot_if_generation_matches(
-                                code, slot, generation,
-                            );
-                        } else {
-                            debug_assert!(
-                                false,
-                                "AdaptiveProtoLoad fired without a Vm dispatcher; \
-                                 no production path should register this observer \
-                                 from an agent-only context"
-                            );
-                        }
+                        vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
                     }
                 },
             }
@@ -507,11 +522,16 @@ impl Agent {
     /// transitions. Callers must use this rather than calling
     /// `objects.transition_shape` through `with_heap_and_objects` directly so
     /// that shape-invalidation watchpoints are fired correctly.
+    ///
+    /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
+    /// transition to IC slot clearing. Callers without a `Vm` in scope pass
+    /// `&mut NoopAdaptiveProtoLoadDispatch`.
     pub fn transition_shape(
         &mut self,
         obj: ObjectRef,
         transition: ShapeTransitionKey,
         lifetime: AllocationLifetime,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> Option<ShapeId> {
         let parent_shape = self.heap.view().object(obj).and_then(|r| r.shape());
 
@@ -521,7 +541,7 @@ impl Agent {
         });
 
         if let Some(parent) = parent_shape {
-            self.fire_watchpoints_for_shape(parent, None);
+            self.fire_watchpoints_for_shape(parent, vm_dispatch);
         }
         result
     }

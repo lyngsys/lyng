@@ -7,8 +7,8 @@ use lyng_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveStringView};
 use lyng_host::NoopHostHooks;
 use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
-    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, ObjectAllocation,
-    ObjectColdData, ObjectRuntime,
+    NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry, NoopAdaptiveProtoLoadDispatch,
+    ObjectAllocation, ObjectColdData, ObjectRuntime,
 };
 use lyng_ops::object::ordinary_create_data_property;
 use lyng_parser::parse_script;
@@ -157,6 +157,7 @@ pub(super) fn install_native_global(
         PropertyKey::from_atom(name),
         Value::from_object_ref(function_object),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .expect("native global should install"));
     function_object

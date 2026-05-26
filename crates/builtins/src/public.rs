@@ -12,8 +12,8 @@ use lyng_common::WellKnownAtom;
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
 use lyng_objects::{
-    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
-    ObjectColdData, PrimitiveWrapperKind,
+    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, NoopAdaptiveProtoLoadDispatch,
+    ObjectAllocation, ObjectColdData, PrimitiveWrapperKind,
 };
 use lyng_types::{
     abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
@@ -1276,7 +1276,13 @@ pub(in crate::public) fn define_builtin_data_property(
     descriptor.set_writable(writable);
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+    let defined = agent.define_own_property(
+        object,
+        key,
+        descriptor,
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    );
     assert!(
         matches!(defined, Ok(true)),
         "builtin property installation should succeed"
@@ -1297,7 +1303,13 @@ pub(in crate::public) fn define_builtin_accessor_property(
     descriptor.set_setter(setter.map_or_else(Value::undefined, Value::from_object_ref));
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+    let defined = agent.define_own_property(
+        object,
+        key,
+        descriptor,
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    );
     assert!(
         matches!(defined, Ok(true)),
         "builtin accessor installation should succeed"

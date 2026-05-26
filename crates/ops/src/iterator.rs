@@ -2,6 +2,7 @@ use crate::{errors::throw_type_error, object, read};
 use lyng_common::WellKnownAtom;
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, PrimitiveTracer, TraceHeapEdges};
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 use lyng_types::{
     AbruptCompletion, Completion, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
 };
@@ -288,6 +289,7 @@ pub fn create_iterator_result_object(
         PropertyKey::from_atom(WellKnownAtom::value.id()),
         value,
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )?;
     if !value_defined {
         return Err(throw_type_error(agent));
@@ -299,6 +301,7 @@ pub fn create_iterator_result_object(
         done_key,
         Value::from_bool(done),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )?;
     if !done_defined {
         return Err(throw_type_error(agent));
@@ -670,6 +673,7 @@ mod tests {
             key,
             value,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .unwrap());
     }

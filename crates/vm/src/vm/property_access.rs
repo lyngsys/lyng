@@ -382,6 +382,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
                 key,
                 value,
                 AllocationLifetime::Default,
+                self.vm,
             )
             .map_err(VmError::Abrupt)?;
             if !created {
@@ -865,6 +866,7 @@ impl Vm {
                 key,
                 value,
                 AllocationLifetime::Default,
+                self,
             )
             .map_err(VmError::Abrupt)?;
             if !created {
@@ -1168,15 +1170,19 @@ impl Vm {
         lifetime: AllocationLifetime,
     ) -> VmResult<bool> {
         let Some(index) = key.as_index() else {
-            return object::ordinary_define_property(agent, object_ref, key, descriptor, lifetime)
-                .map_err(VmError::Abrupt);
+            return object::ordinary_define_property(
+                agent, object_ref, key, descriptor, lifetime, self,
+            )
+            .map_err(VmError::Abrupt);
         };
         let Some((environment, slot)) = self
             .activation_tables
             .mapped_argument_slot(object_ref, index)
         else {
-            return object::ordinary_define_property(agent, object_ref, key, descriptor, lifetime)
-                .map_err(VmError::Abrupt);
+            return object::ordinary_define_property(
+                agent, object_ref, key, descriptor, lifetime, self,
+            )
+            .map_err(VmError::Abrupt);
         };
 
         let mut define_descriptor = descriptor;
@@ -1188,9 +1194,15 @@ impl Vm {
             define_descriptor.set_value(Self::read_environment_slot(agent, environment, slot)?);
         }
 
-        let defined =
-            object::ordinary_define_property(agent, object_ref, key, define_descriptor, lifetime)
-                .map_err(VmError::Abrupt)?;
+        let defined = object::ordinary_define_property(
+            agent,
+            object_ref,
+            key,
+            define_descriptor,
+            lifetime,
+            self,
+        )
+        .map_err(VmError::Abrupt)?;
         if !defined {
             return Ok(false);
         }
@@ -1269,8 +1281,8 @@ impl Vm {
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<bool> {
-        let deleted =
-            object::ordinary_delete_property(agent, object, key).map_err(VmError::Abrupt)?;
+        let deleted = object::ordinary_delete_property(agent, object, key, self)
+            .map_err(VmError::Abrupt)?;
         if deleted && let Some(index) = key.as_index() {
             let _ = self.activation_tables.detach_mapped_argument(object, index);
         }

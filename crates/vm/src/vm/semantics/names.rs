@@ -217,8 +217,10 @@ pub fn op_delete_global_semantic(
         Err(error) => return SemanticOutcome::ExitError { error },
     };
     let delete_result = {
-        let DispatchState { agent, frame, .. } = &mut *inner;
-        Vm::delete_global(agent, frame, atom)
+        let DispatchState {
+            agent, frame, vm, ..
+        } = &mut *inner;
+        vm.delete_global(agent, frame, atom)
     };
     let handled = inner.handle_dispatch_result(delete_result);
     let deleted = match handled {

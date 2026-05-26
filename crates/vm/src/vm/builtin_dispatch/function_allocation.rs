@@ -4,6 +4,7 @@ use super::{
     ObjectColdData, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value, Vm, VmError,
     VmResult, WellKnownAtom,
 };
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 
 impl Vm {
     pub(in crate::vm) fn allocate_builtin_function_object(
@@ -68,12 +69,14 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             length,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         let _ = agent.define_own_property(
             function,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
             name,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         if metadata.has_prototype_property() {
             let mut prototype = PropertyDescriptor::new();
@@ -86,6 +89,7 @@ impl Vm {
                 PropertyKey::from_atom(WellKnownAtom::prototype.id()),
                 prototype,
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             );
         }
         Ok(function)
@@ -155,12 +159,14 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             length,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         let _ = agent.define_own_property(
             function,
             PropertyKey::from_atom(WellKnownAtom::name.id()),
             name,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         if metadata.has_prototype_property() {
             let mut prototype = PropertyDescriptor::new();
@@ -173,6 +179,7 @@ impl Vm {
                 PropertyKey::from_atom(WellKnownAtom::prototype.id()),
                 prototype,
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             );
         }
         Ok(function)

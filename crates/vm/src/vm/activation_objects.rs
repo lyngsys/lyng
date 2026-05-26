@@ -3,7 +3,7 @@ use super::{
     Agent, AllocationLifetime, ArgumentsMode, EnvironmentRef, ObjectAllocation, ObjectRef,
     RealmRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
-use lyng_objects::ObjectFlags;
+use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectFlags};
 use lyng_ops::{errors, object};
 use lyng_types::{PropertyDescriptor, PropertyKey, WellKnownSymbolId};
 
@@ -138,6 +138,7 @@ impl Vm {
             PropertyKey::from_atom(callee_atom),
             descriptor,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         let _ = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         Ok(())
@@ -169,6 +170,7 @@ impl Vm {
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             descriptor,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         );
         let _ = defined.map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         Ok(())

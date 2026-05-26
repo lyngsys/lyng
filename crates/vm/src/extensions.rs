@@ -188,9 +188,13 @@ impl<'a> RealmExtensionInstallation<'a> {
         key: PropertyKey,
         descriptor: PropertyDescriptor,
     ) -> Result<(), VmError> {
-        let defined =
-            self.agent
-                .define_own_property(target, key, descriptor, AllocationLifetime::Default);
+        let defined = self.agent.define_own_property(
+            target,
+            key,
+            descriptor,
+            AllocationLifetime::Default,
+            self.vm,
+        );
         if matches!(defined, Ok(true)) {
             return Ok(());
         }

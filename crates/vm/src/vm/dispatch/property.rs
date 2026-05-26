@@ -1709,7 +1709,7 @@ impl Vm {
         // transition was planned — receiver_shape() is the parent shape that
         // was passed to ObjectRuntime::transition_shape inside the plan call.
         if let Ok(Some((_, plan))) = result {
-            agent.fire_watchpoints_for_shape(plan.receiver_shape(), Some(vm_dispatch));
+            agent.fire_watchpoints_for_shape(plan.receiver_shape(), vm_dispatch);
         }
         result
     }

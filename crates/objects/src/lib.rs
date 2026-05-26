@@ -89,8 +89,8 @@ pub use self::temporal::{
     TemporalPlainTimeObjectData, TemporalPlainYearMonthObjectData, TemporalZonedDateTimeObjectData,
 };
 pub use self::watchpoint::{
-    AdaptiveProtoLoadDispatch, Invalidated, ShapeInvalidationObserver, Watchpoint, WatchpointSet,
-    WatchpointState,
+    AdaptiveProtoLoadDispatch, Invalidated, NoopAdaptiveProtoLoadDispatch,
+    ShapeInvalidationObserver, Watchpoint, WatchpointSet, WatchpointState,
 };
 
 #[cfg(test)]

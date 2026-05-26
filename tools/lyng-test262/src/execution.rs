@@ -720,7 +720,7 @@ fn run_compiled_script_with_diagnostics(
     }
 
     let phase_start = Instant::now();
-    let instantiation = Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan());
+    let instantiation = vm.instantiate_global_script(agent, &realm, unit.instantiation_plan());
     timings.global_instantiation = phase_start.elapsed();
     if let Err(error) = instantiation {
         finish_runtime_timing(timings, runtime_start);

@@ -4,8 +4,9 @@ use lyng_common::WellKnownAtom;
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, StringEncoding};
 use lyng_objects::{
-    FunctionEntryIdentity, ObjectAllocation, ObjectColdData, ObjectFlags, ObjectKind,
-    OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, TypedArrayObjectData,
+    FunctionEntryIdentity, NoopAdaptiveProtoLoadDispatch, ObjectAllocation, ObjectColdData,
+    ObjectFlags, ObjectKind, OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData,
+    TypedArrayObjectData,
 };
 use lyng_ops::{errors, iterator, object, proxy, read, typed_array};
 use lyng_types::{
@@ -957,6 +958,7 @@ pub(super) fn define_array_length<Cx: PublicBuiltinDispatchContext>(
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             descriptor,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
     };
     if !map_completion(cx, defined)? {
@@ -1105,6 +1107,7 @@ pub(super) fn create_array_result_with_prototype<Cx: PublicBuiltinDispatchContex
             PropertyKey::from_atom(WellKnownAtom::length.id()),
             descriptor,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
     };
     if !map_completion(cx, defined)? {

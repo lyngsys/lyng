@@ -5,7 +5,7 @@ use super::typed_array_indices::{
 use crate::errors::{internal_method_error, throw_type_error};
 use lyng_env::Agent;
 use lyng_gc::AllocationLifetime;
-use lyng_objects::NativeFunctionRegistry;
+use lyng_objects::{AdaptiveProtoLoadDispatch, NativeFunctionRegistry};
 use lyng_types::{Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 /// Ordinary-only `HasProperty` over the object substrate.
@@ -138,9 +138,10 @@ pub fn ordinary_set_prototype_of(
     agent: &mut Agent,
     object: ObjectRef,
     prototype: Option<ObjectRef>,
+    vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
 ) -> Completion<bool> {
     agent
-        .set_prototype_of(object, prototype)
+        .set_prototype_of(object, prototype, vm_dispatch)
         .map_err(|error| internal_method_error(agent, error))
 }
 
@@ -187,6 +188,7 @@ pub fn ordinary_define_property(
     key: PropertyKey,
     descriptor: PropertyDescriptor,
     lifetime: AllocationLifetime,
+    vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
 ) -> Completion<bool> {
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         let TypedArrayNumericKey::Valid(index) = numeric_key else {
@@ -196,11 +198,17 @@ pub fn ordinary_define_property(
             return Ok(false);
         };
         return agent
-            .define_own_property(object, PropertyKey::Index(index), descriptor, lifetime)
+            .define_own_property(
+                object,
+                PropertyKey::Index(index),
+                descriptor,
+                lifetime,
+                vm_dispatch,
+            )
             .map_err(|error| internal_method_error(agent, error));
     }
     agent
-        .define_own_property(object, key, descriptor, lifetime)
+        .define_own_property(object, key, descriptor, lifetime, vm_dispatch)
         .map_err(|error| internal_method_error(agent, error))
 }
 
@@ -336,12 +344,13 @@ pub fn ordinary_delete_property(
     agent: &mut Agent,
     object: ObjectRef,
     key: PropertyKey,
+    vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
 ) -> Completion<bool> {
     if let Some(numeric_key) = typed_array_numeric_key(agent, object, key) {
         return Ok(!matches!(numeric_key, TypedArrayNumericKey::Valid(_)));
     }
     agent
-        .delete(object, key)
+        .delete(object, key, vm_dispatch)
         .map_err(|error| internal_method_error(agent, error))
 }
 
@@ -360,6 +369,7 @@ pub fn ordinary_create_data_property(
     key: PropertyKey,
     value: Value,
     lifetime: AllocationLifetime,
+    vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
 ) -> Completion<bool> {
     let mut descriptor = PropertyDescriptor::new();
     descriptor.set_value(value);
@@ -368,7 +378,7 @@ pub fn ordinary_create_data_property(
     descriptor.set_configurable(true);
 
     agent
-        .define_own_property(object, key, descriptor, lifetime)
+        .define_own_property(object, key, descriptor, lifetime, vm_dispatch)
         .map_err(|error| internal_method_error(agent, error))
 }
 

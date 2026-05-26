@@ -1,6 +1,7 @@
 use crate::{object as ordinary_object, read};
 use lyng_env::Agent;
 use lyng_gc::AllocationLifetime;
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 use lyng_types::{AbruptCompletion, Completion, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 use std::collections::HashSet;
 
@@ -258,9 +259,18 @@ pub fn set_prototype_of<Cx: ProxyTrapContext>(
     prototype: Option<ObjectRef>,
 ) -> Result<bool, Cx::Error> {
     if !is_proxy(cx, object) {
+        // TODO(spec2-task4b): proxies wrap user objects; this fallback runs in
+        // hot JS execution. Once Task 4b registers AdaptiveProtoLoad
+        // watchpoints, ProxyTrapContext needs a Vm dispatch hook so the
+        // wrapped object's IC slots can be cleared on prototype mutation.
         let result = {
             let agent = cx.agent();
-            ordinary_object::ordinary_set_prototype_of(agent, object, prototype)
+            ordinary_object::ordinary_set_prototype_of(
+                agent,
+                object,
+                prototype,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
         };
         return map_completion(cx, result);
     }

@@ -848,14 +848,13 @@ fn run_workload_opcode_counts_once(
             name = workload.name
         )
     })?;
-    Vm::instantiate_global_script(agent, &realm_record, unit.instantiation_plan()).map_err(
-        |error| {
+    vm.instantiate_global_script(agent, &realm_record, unit.instantiation_plan())
+        .map_err(|error| {
             format!(
                 "global declaration instantiation failed for {name}: {error:?}",
                 name = workload.name
             )
-        },
-    )?;
+        })?;
 
     {
         let counters = vm.opcode_counters_mut();

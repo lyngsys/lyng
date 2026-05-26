@@ -5,7 +5,8 @@ use super::{
 };
 use lyng_objects::{
     FunctionConstructorFlags, FunctionKindFlags, FunctionObjectData, FunctionThisMode,
-    InternalMethodError, ObjectColdData, ObjectFlags, OrdinaryObjectData, RegExpPayload,
+    InternalMethodError, NoopAdaptiveProtoLoadDispatch, ObjectColdData, ObjectFlags,
+    OrdinaryObjectData, RegExpPayload,
 };
 use lyng_ops::{enumeration::ForInEnumerator, errors, iterator, object, proxy};
 use lyng_types::{PropertyDescriptor, PropertyKey};
@@ -301,6 +302,7 @@ impl Vm {
             key,
             descriptor,
             AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
         )
         .map_err(VmError::Abrupt)?;
         if defined {
@@ -324,8 +326,13 @@ impl Vm {
         descriptor.set_writable(writable);
         descriptor.set_enumerable(enumerable);
         descriptor.set_configurable(configurable);
-        let defined =
-            agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+        let defined = agent.define_own_property(
+            object,
+            key,
+            descriptor,
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        );
         let _ = defined.map_err(|error| map_internal_method_error(agent, error))?;
         Ok(())
     }

@@ -834,14 +834,13 @@ mod verify_counts {
         let installed = vm
             .install_script(agent, realm_id, &unit)
             .unwrap_or_else(|err| panic!("install_script failed for {}: {err:?}", snippet.opcode));
-        Vm::instantiate_global_script(agent, &realm, unit.instantiation_plan()).unwrap_or_else(
-            |err| {
+        vm.instantiate_global_script(agent, &realm, unit.instantiation_plan())
+            .unwrap_or_else(|err| {
                 panic!(
                     "instantiate_global_script failed for {}: {err:?}",
                     snippet.opcode
                 )
-            },
-        );
+            });
 
         // Warmup once, then reset and measure a single call.
         vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())

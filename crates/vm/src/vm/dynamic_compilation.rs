@@ -426,10 +426,11 @@ impl Vm {
         } else {
             if let Some(lyng_env::EnvironmentRecord::Global(record)) = agent.environment(global_env)
             {
-                Self::seed_direct_eval_global_var_bindings(
+                let global_object = record.global_object();
+                self.seed_direct_eval_global_var_bindings(
                     agent,
                     global_env,
-                    record.global_object(),
+                    global_object,
                     &root_var_names,
                     &root_function_names,
                 )?;
@@ -1352,6 +1353,7 @@ impl Vm {
     }
 
     fn seed_direct_eval_global_var_bindings(
+        &mut self,
         agent: &mut Agent,
         global_env: lyng_types::EnvironmentRef,
         global_object: ObjectRef,
@@ -1377,6 +1379,7 @@ impl Vm {
                 key,
                 descriptor,
                 AllocationLifetime::Default,
+                self,
             )
             .map_err(VmError::Abrupt)?;
             if !defined {
@@ -1411,6 +1414,7 @@ impl Vm {
                     key,
                     descriptor,
                     AllocationLifetime::Default,
+                    self,
                 )
                 .map_err(VmError::Abrupt)?;
                 if !defined {
@@ -1604,10 +1608,11 @@ impl Vm {
                 _ => None,
             }
         }) {
-            Self::seed_direct_eval_global_var_bindings(
+            let global_object = record.global_object();
+            self.seed_direct_eval_global_var_bindings(
                 agent,
                 caller_variable_env,
-                record.global_object(),
+                global_object,
                 &root_var_names,
                 &root_function_names,
             )?;

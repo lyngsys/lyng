@@ -4,6 +4,7 @@ use super::{
     NativeFunctionRegistry, ObjectAllocation, ObjectRef, PromiseResolvingFunctionKind, PropertyKey,
     RealmRef, ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult,
 };
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 use crate::vm::DynamicImportPhase;
 use crate::vm::{DynamicImportRequest, PendingDynamicImport};
 use lyng_bytecode::Opcode;
@@ -73,6 +74,7 @@ impl Vm {
                     PropertyKey::from_atom(key),
                     value,
                     AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
                 )
                 .map_err(VmError::Abrupt)?;
             }
@@ -85,6 +87,7 @@ impl Vm {
                 PropertyKey::from_atom(url_atom),
                 url,
                 AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
             )
             .map_err(VmError::Abrupt)?;
         }

@@ -7,9 +7,10 @@ use lyng_host::NoopHostHooks;
 use lyng_objects::{
     ArrayBufferObjectData, FunctionConstructorFlags, FunctionObjectData, FunctionThisMode,
     InternalMethodResult, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
-    ObjectAllocation, ObjectColdData, ObjectRuntime, OrdinaryObjectData, PrimitiveWrapperKind,
-    ShapeInvalidationObserver, TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind,
-    TypedArrayElementKind, TypedArrayObjectData, Watchpoint, WatchpointState,
+    NoopAdaptiveProtoLoadDispatch, ObjectAllocation, ObjectColdData, ObjectRuntime,
+    OrdinaryObjectData, PrimitiveWrapperKind, ShapeInvalidationObserver, TemporalInstantObjectData,
+    TemporalObjectData, TemporalObjectKind, TypedArrayElementKind, TypedArrayObjectData,
+    Watchpoint, WatchpointState,
 };
 use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, EnvironmentRef, PropertyKey, RealmRef, WellKnownSymbolId,
@@ -263,6 +264,7 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
         key,
         Value::from_smi(11),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     assert!(ordinary_has_property(agent, object, key).unwrap());
@@ -282,7 +284,7 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
         ordinary_get(agent, object, key).unwrap(),
         Value::from_smi(13)
     );
-    assert!(ordinary_delete_property(agent, object, key).unwrap());
+    assert!(ordinary_delete_property(agent, object, key, &mut NoopAdaptiveProtoLoadDispatch).unwrap());
     assert!(!ordinary_has_property(agent, object, key).unwrap());
 }
 
@@ -839,6 +841,7 @@ fn install_default_object_to_primitive_methods(
         PropertyKey::from_atom(WellKnownAtom::toString.id()),
         Value::from_object_ref(to_string),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     assert!(ordinary_create_data_property(
@@ -847,6 +850,7 @@ fn install_default_object_to_primitive_methods(
         PropertyKey::from_atom(WellKnownAtom::valueOf.id()),
         Value::from_object_ref(value_of),
         AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
     )
     .unwrap());
     (to_string, value_of)
@@ -1042,7 +1046,7 @@ fn ordinary_set_prototype_of_transitions_shape_and_fires_watchpoint() {
     // Exercise the JS-observable path: this is exactly the function that
     // `proxy::set_prototype_of` (non-proxy branch) and `class_helpers.rs`
     // (object-literal `__proto__`) call.
-    ordinary_set_prototype_of(agent, obj, Some(proto))
+    ordinary_set_prototype_of(agent, obj, Some(proto), &mut NoopAdaptiveProtoLoadDispatch)
         .expect("ordinary_set_prototype_of should succeed");
 
     let shape_after = agent.heap().view().object(obj).unwrap().shape().unwrap();

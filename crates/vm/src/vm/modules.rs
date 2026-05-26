@@ -19,7 +19,8 @@ use lyng_host::{
     NoopHostHooks,
 };
 use lyng_objects::{
-    ModuleNamespaceExport, ModuleNamespaceExportTarget, NativeFunctionRegistry, ObjectAllocation,
+    ModuleNamespaceExport, ModuleNamespaceExportTarget, NativeFunctionRegistry,
+    NoopAdaptiveProtoLoadDispatch, ObjectAllocation,
 };
 use lyng_ops::errors;
 use lyng_parser::parse_module;
@@ -1431,6 +1432,7 @@ impl Vm {
                     PropertyKey::from_symbol(to_string_tag),
                     descriptor,
                     AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
                 ),
                 Ok(true)
             ),

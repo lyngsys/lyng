@@ -4,8 +4,8 @@ use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, PrimitiveMutator, PrimitiveTracer, TraceHeapEdges};
 use lyng_objects::{
-    FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, ObjectFlags,
-    OrdinaryObjectData, PrimitiveWrapperKind,
+    FunctionObjectData, FunctionThisMode, NoopAdaptiveProtoLoadDispatch, ObjectAllocation,
+    ObjectColdData, ObjectFlags, OrdinaryObjectData, PrimitiveWrapperKind,
 };
 use lyng_types::{
     internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
@@ -1209,7 +1209,13 @@ fn define_data_property_with_attrs(
     descriptor.set_writable(writable);
     descriptor.set_enumerable(enumerable);
     descriptor.set_configurable(configurable);
-    let defined = agent.define_own_property(object, key, descriptor, AllocationLifetime::Default);
+    let defined = agent.define_own_property(
+        object,
+        key,
+        descriptor,
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    );
     assert!(
         matches!(defined, Ok(true)),
         "reserved internal builtin property installation should succeed"

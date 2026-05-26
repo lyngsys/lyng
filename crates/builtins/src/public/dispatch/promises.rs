@@ -12,6 +12,7 @@ use lyng_env::{
     PromiseFinallyFunctionKind, PromiseFinallyFunctionRecord, PromiseReactionHandler,
     PromiseReactionKind, PromiseResolvingFunctionKind, PromiseState,
 };
+use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 use lyng_ops::{errors, iterator, promise};
 use lyng_types::{
     AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyKey, RealmRef, Value, WellKnownSymbolId,
@@ -1060,7 +1061,13 @@ fn create_aggregate_error_from_values<Cx: PublicBuiltinDispatchContext>(
         .ok_or_else(|| type_error(cx))?;
     let error = {
         let agent = cx.agent();
-        errors::create_error_object(agent, realm, Some(prototype), message)
+        errors::create_error_object(
+            agent,
+            realm,
+            Some(prototype),
+            message,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
     };
     let error = map_completion(cx, error)?;
     let errors_array = create_array_from_values(cx, values)?;
