@@ -45,6 +45,9 @@ pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_o
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
 pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs_base);
 pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
+#[allow(dead_code)]
+pub(crate) const LLINT_STATE_FRAME_METADATA_TABLE_BASE: usize =
+    offset_of!(LlIntState, frame_metadata_table_base);
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_slots_base);
 // Phase 1.B.1: pre-resolved constants array base + this-mirror.

@@ -148,6 +148,7 @@ pub(crate) fn run_via_dsl(
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
         frame_fv_base: fv_base,
+        frame_metadata_table_base: std::ptr::null_mut(),
         object_records_base,
         object_slots_base,
         // Phase 1.B.1 Task 3: real values derived above before the
