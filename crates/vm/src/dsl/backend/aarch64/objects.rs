@@ -18,7 +18,6 @@
 //!   inside `RuntimeObjectRecord`.
 //! - `{object_prototype}` — offset of the raw `Option<ObjectRef>` word
 //!   inside `RuntimeObjectRecord`.
-//! - `{object_last_epoch}` — offset of `last_invalidation_epoch`.
 //! - `{object_inline_slots}` — offset of the first inline named slot.
 //!
 //! Scratch convention: macros use `x16`/`x17` only.
@@ -83,19 +82,6 @@ macro_rules! load_record_prototype_or_branch {
             ", ",
             stringify!($label),
             "\n",
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! load_record_last_epoch {
-    ($rec:tt => $dst:tt) => {
-        concat!(
-            "ldr    x",
-            stringify!($dst),
-            ", [x",
-            stringify!($rec),
-            ", {object_last_epoch}]\n",
         )
     };
 }

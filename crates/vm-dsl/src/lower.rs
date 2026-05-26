@@ -263,7 +263,7 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_last_epoch={object_last_epoch} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -284,7 +284,6 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 object_shape = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_SHAPE_OFFSET,
                 object_prototype = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_PROTOTYPE_OFFSET,
                 object_named_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET,
-                object_last_epoch = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_LAST_INVALIDATION_EPOCH_OFFSET,
                 object_inline_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET,
                 // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
                 // (a `Box<DispatchCounters>` whose raw pointer reads through the
