@@ -51,7 +51,12 @@ pub const LLINT_STATE_FRAME_METADATA_TABLE_BASE: usize =
 // Phase C Task 4.3: MetadataTable buffer-layout constants re-exported here so
 // the proc-macro lowerer (which emits `::lyng_vm::dsl::reg_convention::` paths
 // reachable from all crates) can reference them via a fully-public path.
+pub use crate::vm::metadata_table::arith::{
+    ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
+    ARITH_METADATA_STRIDE_SHIFT,
+};
 pub use crate::vm::metadata_table::property::PROPERTY_METADATA_STRIDE_SHIFT;
+pub use crate::vm::metadata_table::METADATA_TABLE_ARITH_KIND_OFFSET;
 pub use crate::vm::metadata_table::METADATA_TABLE_KIND_OFFSETS_OFFSET;
 pub use crate::vm::metadata_table::METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET;
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);

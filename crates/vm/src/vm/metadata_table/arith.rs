@@ -9,9 +9,14 @@ pub struct ArithMetadata {
 }
 
 pub const ARITH_METADATA_STRIDE: usize = std::mem::size_of::<ArithMetadata>();
-#[allow(dead_code)]
+/// `log2(ARITH_METADATA_STRIDE)` — used by asm to scale an in-kind index
+/// to a byte offset within the Arith run.
+pub const ARITH_METADATA_STRIDE_SHIFT: u32 = 3; // log2(8)
 pub const ARITH_METADATA_OBSERVED_BITS_OFFSET: usize = offset_of!(ArithMetadata, observed_bits);
-#[allow(dead_code)]
 pub const ARITH_METADATA_EXEC_COUNT_OFFSET: usize = offset_of!(ArithMetadata, execution_count);
 
 const _: () = assert!(ARITH_METADATA_STRIDE == 8);
+const _: () = assert!(
+    1 << ARITH_METADATA_STRIDE_SHIFT == ARITH_METADATA_STRIDE as u32,
+    "ARITH_METADATA_STRIDE_SHIFT must equal log2(ARITH_METADATA_STRIDE)"
+);

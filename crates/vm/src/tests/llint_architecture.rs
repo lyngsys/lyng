@@ -106,9 +106,15 @@ fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
 fn llint_feedback_addressing_uses_compact_stride_shift() {
     let feedback_backend = include_str!("../dsl/backend/aarch64/feedback.rs");
 
+    // Phase C.4: record_* macros now address ArithMetadata via lsl #{arith_metadata_stride_shift},
+    // and load_feedback_site! addresses PropertyMetadata via lsl #{property_metadata_stride_shift}.
     assert!(
-        feedback_backend.contains("lsl #{entry_stride_shift}"),
-        "LLInt feedback slot addressing should use the compact FeedbackEntry stride shift"
+        feedback_backend.contains("lsl #{arith_metadata_stride_shift}"),
+        "LLInt Arith feedback slot addressing should use the compact ArithMetadata stride shift"
+    );
+    assert!(
+        feedback_backend.contains("lsl #{property_metadata_stride_shift}"),
+        "LLInt Property feedback slot addressing should use the compact PropertyMetadata stride shift"
     );
     assert!(
         !feedback_backend.contains("feedback_entry_stride} & 0xffff"),
@@ -116,7 +122,7 @@ fn llint_feedback_addressing_uses_compact_stride_shift() {
     );
     assert!(
         !feedback_backend.contains("madd   x16, x17, x16, x21"),
-        "LLInt feedback hot paths should not multiply by a materialized FeedbackEntry stride"
+        "LLInt feedback hot paths should not multiply by a materialized stride"
     );
 }
 

@@ -2497,9 +2497,18 @@ impl Vm {
     }
 
     pub(in crate::vm) fn drain_llint_scalar_feedback(&mut self) {
-        let mut pending = Vec::new();
-        for (code_index, entries) in self.feedback_flat_storage.iter_mut().enumerate() {
-            let Some(code_raw) = u32::try_from(code_index)
+        // Phase C.4: x21 now holds the MetadataTable base. Arith IC sites write
+        // directly to ArithMetadata.{observed_bits, execution_count}. Drain those
+        // from metadata_tables instead of feedback_flat_storage.
+        //
+        // Step 1: collect (code, slot) pairs for all Arith-kind slots, so that the
+        // immutable `installed` borrow can be dropped before we mutate the tables.
+        let mut arith_slots: Vec<(CodeRef, FeedbackSlotId)> = Vec::new();
+        for (tbl_index, installed_opt) in self.installed.iter().enumerate() {
+            let Some(installed) = installed_opt.as_ref() else {
+                continue;
+            };
+            let Some(code_raw) = u32::try_from(tbl_index)
                 .ok()
                 .and_then(|index| index.checked_add(1))
             else {
@@ -2508,39 +2517,36 @@ impl Vm {
             let Some(code) = CodeRef::from_raw(code_raw) else {
                 continue;
             };
-            for (slot_index, entry) in entries.iter_mut().enumerate() {
-                let Some(update) = entry.take_scalar_feedback() else {
-                    continue;
-                };
-                let Some(slot_raw) = u32::try_from(slot_index)
-                    .ok()
-                    .and_then(|index| index.checked_add(1))
-                else {
-                    continue;
-                };
-                if let Some(slot) = FeedbackSlotId::from_raw(slot_raw) {
-                    pending.push((code, slot, update));
+            for descriptor in installed.feedback_slot_descriptors().iter().flatten() {
+                if descriptor.kind() == FeedbackSiteKind::Arithmetic {
+                    arith_slots.push((code, descriptor.slot()));
                 }
             }
         }
 
-        for (code, slot, update) in pending {
-            self.record_llint_scalar_feedback_update(code, slot, update);
+        // Step 2: for each Arith slot, drain ArithMetadata and collect pending updates.
+        let mut pending = Vec::new();
+        for (code, slot) in arith_slots {
+            let Some(table) = self.metadata_table_mut(code) else {
+                continue;
+            };
+            let arith = table.arith_mut(slot.get());
+            let observed_bits = arith.observed_bits;
+            let execution_count = arith.execution_count;
+            if execution_count == 0
+                || observed_bits & crate::dsl::feedback_flat::LLINT_FEEDBACK_OBSERVED_SMI == 0
+            {
+                continue;
+            }
+            // Zero out both fields (drain-and-clear).
+            arith.observed_bits = 0;
+            arith.execution_count = 0;
+            pending.push((code, slot, execution_count));
         }
-    }
 
-    fn record_llint_scalar_feedback_update(
-        &mut self,
-        code: CodeRef,
-        slot: FeedbackSlotId,
-        update: crate::dsl::feedback_flat::ScalarFeedbackUpdate,
-    ) {
-        if update.execution_count == 0
-            || update.observed_bits & crate::dsl::feedback_flat::LLINT_FEEDBACK_OBSERVED_SMI == 0
-        {
-            return;
+        for (code, slot, count) in pending {
+            self.record_feedback_slot_batch(code, slot, count);
         }
-        self.record_feedback_slot_batch(code, slot, update.execution_count);
     }
 
     fn record_feedback_slot_batch(&mut self, code: CodeRef, slot: FeedbackSlotId, count: u32) {

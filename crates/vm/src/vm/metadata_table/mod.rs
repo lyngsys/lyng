@@ -11,7 +11,10 @@ pub mod kind;
 pub mod property;
 
 #[allow(unused_imports)]
-pub use arith::{ArithMetadata, ARITH_METADATA_STRIDE};
+pub use arith::{
+    ArithMetadata, ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
+    ARITH_METADATA_STRIDE, ARITH_METADATA_STRIDE_SHIFT,
+};
 #[allow(unused_imports)]
 pub use call::{CallMetadata, CALL_METADATA_STRIDE};
 #[allow(unused_imports)]
@@ -56,12 +59,20 @@ pub const METADATA_TABLE_KIND_OFFSETS_SIZE: usize = METADATA_KIND_COUNT * 4;
 pub const METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET: usize =
     METADATA_TABLE_KIND_OFFSETS_OFFSET + METADATA_TABLE_KIND_OFFSETS_SIZE;
 
+/// Byte offset within the MetadataTable buffer of the `kind_offsets[Arith]` entry.
+/// `MetadataKind::Arith = 2`, so this is `METADATA_TABLE_KIND_OFFSETS_OFFSET + 2 * 4`.
+pub const METADATA_TABLE_ARITH_KIND_OFFSET: usize = METADATA_TABLE_KIND_OFFSETS_OFFSET + 8;
+
 // Sanity-assert: if LinkingDataHeader size or METADATA_KIND_COUNT changes, this
 // will fail loudly rather than silently producing wrong asm offsets.
 const _: () = assert!(
     METADATA_TABLE_SLOT_INDEX_TABLE_OFFSET == 36,
     "MetadataTable slot-index table must start at offset 36; \
      update asm bindings if LinkingDataHeader or METADATA_KIND_COUNT changed"
+);
+const _: () = assert!(
+    METADATA_TABLE_ARITH_KIND_OFFSET == 24,
+    "METADATA_TABLE_ARITH_KIND_OFFSET must be 24 (header=16, Arith index=2, 4 bytes/entry)"
 );
 
 // Private aliases kept for internal allocator use.

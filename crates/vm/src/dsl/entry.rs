@@ -264,7 +264,7 @@ pub unsafe extern "C" fn run_dsl_trampoline(
         "ldr    w10, [x24, {state_pc}]",        // w10 = pc_offset (u32)
         "add    x19, x9, x10",                  // PC = pb_base + pc_offset
         "ldr    x20, [x24, {state_regs}]",      // REGS = state.frame_regs_base
-        "ldr    x21, [x24, {state_fv}]",        // FV   = state.frame_fv_base
+        "ldr    x21, [x24, {state_mt}]",        // MT   = state.frame_metadata_table_base
         // Tail-dispatch to the first handler.
         "ldrb   w8, [x19]",                     // w8 = opcode byte
         "ldr    x16, [x23, x8, lsl #3]",        // x16 = TABLE[opcode]
@@ -276,7 +276,7 @@ pub unsafe extern "C" fn run_dsl_trampoline(
         state_pb = const crate::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
         state_pc = const crate::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
         state_regs = const crate::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
-        state_fv = const crate::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
+        state_mt = const crate::dsl::reg_convention::LLINT_STATE_FRAME_METADATA_TABLE_BASE,
     );
 }
 

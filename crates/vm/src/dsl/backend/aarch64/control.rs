@@ -33,7 +33,7 @@
 //! - `{state_pc}`   — `const LLINT_STATE_FRAME_PC_OFFSET`.
 //! - `{state_pb}`   — `const LLINT_STATE_FRAME_PB_BASE`.
 //! - `{state_regs}` — `const LLINT_STATE_FRAME_REGS_BASE`.
-//! - `{state_fv}`   — `const LLINT_STATE_FRAME_FV_BASE`.
+//! - `{state_mt}`   — `const LLINT_STATE_FRAME_METADATA_TABLE_BASE`.
 //! - `{state_prefix}` — `const LLINT_STATE_PREFIX`.
 
 // ===========================================================================
@@ -418,7 +418,7 @@ macro_rules! call_rust_probe {
 /// `.s` output and trip the assembler with "symbol already defined".
 ///
 /// Bindings: `{exit}`, `{state_pb}`, `{state_pc}`, `{state_regs}`,
-/// `{state_fv}`.
+/// `{state_mt}`.
 #[macro_export]
 macro_rules! dispatch_after_slow {
     () => {
@@ -426,31 +426,31 @@ macro_rules! dispatch_after_slow {
             // Common case first: tag == Continue (0).
             "cbnz   x0, 1f\n", // → "unusual" handling
             // Continue path: PC = pb_base + new_offset (low 32 of x1).
-            // Also reload REGS / FV from state — a nested call in the
+            // Also reload REGS / MT from state — a nested call in the
             // slow path (e.g. ToPrimitive invoking valueOf bytecode)
             // can resize `Vm::register_stack`, leaving the asm-side
             // REGS pin (`x20`) pointing into freed storage even when
             // frame depth is unchanged. The Rust-side
             // `translate_outcome` Continue arm refreshes
-            // `state.frame_regs_base` / `state.frame_fv_base` from the
-            // live VM on every Continue egress; we reload x20 / x21
+            // `state.frame_regs_base` / `state.frame_metadata_table_base`
+            // from the live VM on every Continue egress; we reload x20 / x21
             // here so the next handler sees the up-to-date pins.
             "ldr    x16, [x24, {state_pb}]\n",
             "add    x19, x16, x1\n",
             "ldr    x20, [x24, {state_regs}]\n",
-            "ldr    x21, [x24, {state_fv}]\n",
+            "ldr    x21, [x24, {state_mt}]\n",
             "ldrb   w8, [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
             "1:\n", // unusual:
             "cmp    x0, #2\n",
             "b.eq   2f\n", // → exit
-            // Refresh path: reload PC / REGS / FV from state.frame_*.
+            // Refresh path: reload PC / REGS / MT from state.frame_*.
             "ldr    w16, [x24, {state_pc}]\n",
             "ldr    x17, [x24, {state_pb}]\n",
             "add    x19, x17, x16\n",
             "ldr    x20, [x24, {state_regs}]\n",
-            "ldr    x21, [x24, {state_fv}]\n",
+            "ldr    x21, [x24, {state_mt}]\n",
             "ldrb   w8,  [x19]\n",
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",

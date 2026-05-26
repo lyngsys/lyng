@@ -57,6 +57,10 @@ pub(crate) enum LlIntIcMode {
     NamedOwnPolymorphic = LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
 }
 
+#[allow(
+    dead_code,
+    reason = "Phase C scaffolding: drain migrated to MetadataTable in C.4; deleted in Phase D"
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct ScalarFeedbackUpdate {
     pub(crate) observed_bits: u32,
@@ -187,6 +191,10 @@ impl FeedbackEntry {
     }
 
     #[inline]
+    #[allow(
+        dead_code,
+        reason = "Phase C scaffolding: drain migrated to MetadataTable in C.4; deleted in Phase D"
+    )]
     pub(crate) const fn take_scalar_feedback(&mut self) -> Option<ScalarFeedbackUpdate> {
         let update = ScalarFeedbackUpdate {
             observed_bits: self.scalar_observed_bits,
