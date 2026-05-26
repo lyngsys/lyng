@@ -11,7 +11,7 @@ use super::{
     TemporalObjectKind, TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
 };
 use crate::object_metadata::PrototypeKey;
-use crate::watchpoint::WatchpointSet;
+use crate::watchpoint::{Watchpoint, WatchpointSet};
 use std::collections::{HashMap, HashSet};
 
 /// Checked-in threshold before stable shapes switch from inline descriptor scan
@@ -1227,30 +1227,25 @@ impl ObjectRuntime {
             .or_insert_with(WatchpointSet::new)
     }
 
-    /// Drains the watchpoint list for `shape`, marks its set `Invalidated`,
-    /// and dispatches `Recording` observers into `recording_watchpoint_fires`.
+    /// Drains the watchpoint list for `shape` and marks its set `Invalidated`.
+    /// Returns the drained watchpoints for the caller to dispatch.
     ///
-    /// This is the objects-layer half of `Agent::fire_watchpoints_for_shape`.
-    /// Running the dispatch here keeps the `pub(crate)` fields encapsulated;
-    /// the `Agent` wrapper re-borrows `self` afterwards for any observer types
-    /// (e.g. Spec 2's `AdaptiveProtoLoad`) that need `&mut Agent`.
-    pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
-        let Some(fired) = self
-            .watchpoint_sets
+    /// Splits dispatch responsibility: `ObjectRuntime` owns the side-table
+    /// (`watchpoint_sets`) and the test sink (`recording_watchpoint_fires`),
+    /// but Spec 2 observer kinds (`AdaptiveProtoLoad`) need `&mut Agent`/`&mut Vm`
+    /// for their fire effects, which only the `Agent` wrapper can provide.
+    /// `Agent::fire_watchpoints_for_shape` is the dispatch site for all kinds.
+    pub fn drain_watchpoints_for_shape(&mut self, shape: ShapeId) -> Option<Vec<Watchpoint>> {
+        self.watchpoint_sets
             .get_mut(&shape)
             .and_then(|s| s.drain_for_fire())
-        else {
-            return;
-        };
-        for wp in fired {
-            match wp {
-                crate::watchpoint::Watchpoint::ShapeInvalidation { observer } => match observer {
-                    crate::watchpoint::ShapeInvalidationObserver::Recording { token } => {
-                        self.recording_watchpoint_fires.push(token);
-                    }
-                },
-            }
-        }
+    }
+
+    /// Dispatch target for the `Recording` observer kind from the Agent layer.
+    /// In production this is unreachable (no caller constructs `Recording`); in
+    /// tests it accumulates tokens that `take_recording_fires` later drains.
+    pub fn push_recording_fire(&mut self, token: u64) {
+        self.recording_watchpoint_fires.push(token);
     }
 
     /// Drops all `WatchpointSet` entries that have reached the `Invalidated`

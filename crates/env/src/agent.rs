@@ -7,7 +7,8 @@ use super::{
 use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
 use lyng_objects::{
-    InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload, ShapeTransitionKey,
+    InternalMethodError, InternalMethodResult, PrototypeKey, RegExpPayload, ShapeInvalidationObserver,
+    ShapeTransitionKey, Watchpoint,
 };
 use lyng_types::{CodeRef, ObjectRef, PropertyDescriptor, PropertyKey, ShapeId, StringRef};
 use std::{
@@ -446,12 +447,23 @@ impl Agent {
     }
 
     /// Drains watchpoints registered against `shape` and dispatches each one.
-    /// Split-borrow pattern: objects-layer dispatch runs first (handling
-    /// `Recording` observers into the side-buffer), then Spec 2's
-    /// `AdaptiveProtoLoad` and other `Agent`-level observers will follow here
-    /// with `&mut self` available for full re-entry if needed.
+    /// `ObjectRuntime::drain_watchpoints_for_shape` handles the side-table
+    /// drain and invalidation; dispatch of all observer kinds happens here so
+    /// that Spec 2's `AdaptiveProtoLoad` observer can call into `&mut Vm`
+    /// without violating Rust borrow rules.
     pub fn fire_watchpoints_for_shape(&mut self, shape: ShapeId) {
-        self.objects.fire_watchpoints_for_shape(shape);
+        let Some(fired) = self.objects.drain_watchpoints_for_shape(shape) else {
+            return;
+        };
+        for wp in fired {
+            match wp {
+                Watchpoint::ShapeInvalidation { observer } => match observer {
+                    ShapeInvalidationObserver::Recording { token } => {
+                        self.objects.push_recording_fire(token);
+                    }
+                },
+            }
+        }
     }
 
     /// Records a property-addition transition on `obj`'s current shape (which
