@@ -3943,3 +3943,128 @@ fn b7_polymorphic_chain_retained_when_code_lives() {
         "B7: chain entry must be retained when code is live"
     );
 }
+
+// C4: asm IC fast path reads from MetadataTable.
+//
+// Strategy: warm the IC for `source.value` so the PropertyMetadata slot has
+// mode=1 (OwnData-inline). Then corrupt the mode to 0 (Uninit), forcing the
+// asm fast path to miss and fall to the slow path. The slow path re-observes
+// the real receiver shape, writes a fresh mode=1, and returns the correct
+// value. After this, mode must no longer be 0.
+//
+// The test is gated on `opcode-counters` so we can confirm that the slow path
+// was triggered: exactly one `GetNamedProperty` semantic is expected after the
+// corruption run.
+#[cfg(feature = "opcode-counters")]
+#[test]
+fn c4_asm_ic_fast_path_reads_from_metadata_table() {
+    use crate::vm::metadata_table::MetadataKind;
+
+    let unit = compile_test_unit(45_001, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(42));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First run: IC is Uninitialized; slow path fires, writes mode=1.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    // Second run: IC is Monomorphic/OwnData; asm fast path should hit.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42)
+    );
+    // Confirm the IC is now Monomorphic.
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        ))
+    );
+
+    // Read the PropertyMetadata mode; it should be 1 (OwnData-inline).
+    let mode_before = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should exist after install")
+        .property(slot.get())
+        .mode;
+    assert_ne!(
+        mode_before, 0,
+        "IC should be warm (mode != 0) before corruption"
+    );
+
+    // Corrupt the mode to 0 (Uninit). The asm fast path checks the mode byte
+    // first; a 0 means "uninitialized" — no known fast-path handler — so it
+    // must branch to the slow path.
+    vm.metadata_table_mut(installed.code())
+        .expect("MetadataTable should be mutable")
+        .property_mut(slot.get())
+        .mode = 0;
+
+    // Enable slow-path counters and reset.
+    let counters = vm.opcode_counters_mut();
+    counters.enable_slow_path();
+    counters.reset();
+
+    // Third run: asm sees mode=0, misses, slow path fires.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(42),
+        "slow path must still return the correct value after IC corruption"
+    );
+
+    // The slow path must have been invoked exactly once.
+    let slow_path = vm
+        .opcode_counters()
+        .slow_path_counts()
+        .expect("slow-path counters should be enabled");
+    assert_eq!(
+        slow_path.semantic(Opcode::GetNamedProperty),
+        1,
+        "C4: corrupted mode=0 must cause exactly one slow-path semantic invocation"
+    );
+
+    // After the slow path, mode must be refreshed to a non-zero sane value.
+    let mode_after = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should still exist")
+        .property(slot.get())
+        .mode;
+    assert_ne!(
+        mode_after, 0,
+        "C4: slow path must refresh PropertyMetadata.mode to a sane non-zero value"
+    );
+
+    let _ = MetadataKind::Property; // import guard — confirms Property kind is used
+}

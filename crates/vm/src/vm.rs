@@ -676,6 +676,29 @@ impl Vm {
             .retain(|(code, _slot), _chain| is_live(*code));
     }
 
+    /// Phase C Task 4.5: post-mark GC sweep. Drops `MetadataTable` entries
+    /// for code objects that are no longer live. Mirrors
+    /// `prune_dead_code_polymorphic_chains` (Phase B) for the metadata_tables
+    /// vec. The vec is indexed by `code_index(code_ref) = code_ref.get() - 1`,
+    /// so index `i` corresponds to `CodeRef::from_raw(i as u32 + 1)`.
+    #[allow(
+        dead_code,
+        reason = "Phase C Task 4.5 sweep surface; called from tests and GC sweep site"
+    )]
+    pub(crate) fn prune_dead_code_metadata_tables(&mut self, is_live: impl Fn(CodeRef) -> bool) {
+        for (index, slot) in self.metadata_tables.iter_mut().enumerate() {
+            if slot.is_none() {
+                continue;
+            }
+            let raw = u32::try_from(index + 1).expect("metadata_tables index should fit u32");
+            if let Some(code) = CodeRef::from_raw(raw)
+                && !is_live(code)
+            {
+                *slot = None;
+            }
+        }
+    }
+
     /// Access the VM's opcode instrumentation. Counters are always
     /// allocated when the feature is on; callers reset/snapshot via the
     /// returned `&OpcodeCounters`. To redirect counter writes to an

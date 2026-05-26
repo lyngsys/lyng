@@ -1455,3 +1455,81 @@ fn metadata_table_in_kind_indices_are_monotone_per_kind() {
         seen_per_kind[MetadataKind::Property.index()]
     );
 }
+
+// C6: GC sweep releases MetadataTable entries for dead code objects.
+//
+// Strategy: install a script so a MetadataTable is allocated, confirm it
+// exists, then call `prune_dead_code_metadata_tables` with an `is_live`
+// predicate that reports the code as dead. The table entry must become `None`.
+//
+// This mirrors the B6 test pattern (`prune_dead_code_polymorphic_chains`),
+// using a direct-unit call instead of a full GC cycle to keep the test
+// isolated from GC timing.
+#[test]
+fn c6_metadata_table_released_when_code_is_pruned_dead() {
+    let unit = compile_test_unit(45_002, "var source = { x: 1 }; source.x;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Run once so execution metadata is exercised.
+    let _ = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let code = installed.code();
+
+    // Pre-condition: MetadataTable exists.
+    assert!(
+        vm.metadata_table(code).is_some(),
+        "C6: MetadataTable should be present after install and run"
+    );
+
+    // Simulate code death: prune_dead_code_metadata_tables treats all code as dead.
+    vm.prune_dead_code_metadata_tables(|_code| false);
+
+    // Post-condition: the table slot must be cleared.
+    assert!(
+        vm.metadata_table(code).is_none(),
+        "C6: MetadataTable must be released when code is pruned dead"
+    );
+}
+
+// C6b: GC sweep retains MetadataTable entries for live code objects.
+//
+// Mirror of C6: `prune_dead_code_metadata_tables` with an `is_live` predicate
+// that keeps the installed code alive — the table must survive.
+#[test]
+fn c6b_metadata_table_retained_when_code_is_live() {
+    let unit = compile_test_unit(45_003, "var source = { x: 1 }; source.x;");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let _ = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let code = installed.code();
+
+    assert!(
+        vm.metadata_table(code).is_some(),
+        "C6b: MetadataTable should be present before prune"
+    );
+
+    // Simulate a GC sweep where this code is still live.
+    vm.prune_dead_code_metadata_tables(|c| c == code);
+
+    assert!(
+        vm.metadata_table(code).is_some(),
+        "C6b: MetadataTable must be retained when code is live"
+    );
+}
