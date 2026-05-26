@@ -1279,3 +1279,197 @@ fn internal_bytecode_callbacks_share_feedback_state_with_the_parent_vm() {
         Some(1)
     );
 }
+
+#[test]
+fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
+    use crate::vm::metadata_table::MetadataKind;
+
+    // Script with top-level property loads, a call, and arithmetic so the
+    // *entry* function itself has feedback sites we can count directly.
+    // `source.x` and `source.y` → 2 NamedPropertyLoad → Property
+    // `source.x + source.y` → 1 Arithmetic (the `+`) → Arith
+    // `f(source.x)` → 1 Call → Call
+    // `source.x + f(source.x)` → 1 more Arithmetic → Arith  (total 2)
+    // We declare `f` but the entry function itself carries these sites.
+    let src = r"
+        function f(v) { return v; }
+        var source = { x: 1, y: 2 };
+        source.x + source.y + f(source.x);
+    ";
+    let unit = compile_test_unit(101, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let table = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should be allocated at install time");
+
+    // Discover actual counts by tallying the entry function's feedback_sites().
+    let entry_fn = vm
+        .installed_function(installed.code())
+        .expect("installed script should expose its template");
+    let mut expected_property: u32 = 0;
+    let mut expected_call: u32 = 0;
+    let mut expected_arith: u32 = 0;
+    let mut expected_comparison: u32 = 0;
+    let mut expected_keyed: u32 = 0;
+    for descriptor in entry_fn.feedback_sites().iter() {
+        match MetadataKind::from_site_kind(descriptor.kind()) {
+            MetadataKind::Property => expected_property += 1,
+            MetadataKind::Call => expected_call += 1,
+            MetadataKind::Arith => expected_arith += 1,
+            MetadataKind::Comparison => expected_comparison += 1,
+            MetadataKind::KeyedProperty => expected_keyed += 1,
+        }
+    }
+
+    assert_eq!(
+        table.run_len_for_kind(MetadataKind::Property),
+        expected_property,
+        "Property run length mismatch"
+    );
+    assert_eq!(
+        table.run_len_for_kind(MetadataKind::Call),
+        expected_call,
+        "Call run length mismatch"
+    );
+    assert_eq!(
+        table.run_len_for_kind(MetadataKind::Arith),
+        expected_arith,
+        "Arith run length mismatch"
+    );
+    assert_eq!(
+        table.run_len_for_kind(MetadataKind::Comparison),
+        expected_comparison,
+        "Comparison run length mismatch"
+    );
+    assert_eq!(
+        table.run_len_for_kind(MetadataKind::KeyedProperty),
+        expected_keyed,
+        "KeyedProperty run length mismatch"
+    );
+
+    // Sanity: the table should have at least the sites we know about.
+    assert!(
+        expected_property >= 2,
+        "expected at least 2 property loads; got {expected_property}"
+    );
+    assert!(
+        expected_call >= 1,
+        "expected at least 1 call; got {expected_call}"
+    );
+    assert!(
+        expected_arith >= 1,
+        "expected at least 1 arithmetic op; got {expected_arith}"
+    );
+}
+
+#[test]
+fn metadata_table_kind_offsets_partition_buffer() {
+    use crate::vm::metadata_table::MetadataKind;
+
+    // Script with one of each IC kind in the entry function.
+    let src = r"
+        function f(v) { return v; }
+        var source = { a: 1, b: 2, c: 3 };
+        source.a + source.b + source.c;
+    ";
+    let unit = compile_test_unit(102, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let table = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should be allocated at install time");
+
+    let property_off = table.kind_offset(MetadataKind::Property) as usize;
+    assert!(
+        property_off.is_multiple_of(8),
+        "Property run start ({property_off}) is not 8-aligned"
+    );
+    assert!(
+        property_off < table.buffer().len() || table.run_len_for_kind(MetadataKind::Property) == 0,
+        "Property offset {property_off} past buffer end ({})",
+        table.buffer().len()
+    );
+
+    // Each kind's run end must be <= next kind's offset (no overlap).
+    let mut prev_end = 0usize;
+    for kind in [
+        MetadataKind::Property,
+        MetadataKind::Call,
+        MetadataKind::Arith,
+        MetadataKind::Comparison,
+        MetadataKind::KeyedProperty,
+    ] {
+        let off = table.kind_offset(kind) as usize;
+        assert!(
+            off >= prev_end,
+            "{kind:?} offset {off} overlaps previous kind run end {prev_end}"
+        );
+        prev_end = off + (table.run_len_for_kind(kind) as usize) * kind.stride_bytes();
+    }
+    assert!(
+        prev_end <= table.buffer().len(),
+        "kind runs extend past buffer end (prev_end={prev_end}, buf_len={})",
+        table.buffer().len()
+    );
+}
+
+#[test]
+fn metadata_table_in_kind_indices_are_monotone_per_kind() {
+    use crate::vm::metadata_table::{MetadataKind, METADATA_KIND_COUNT};
+
+    // Entry function with a mix of property loads and arithmetic so there
+    // are at least two slots of the same kind to check monotonicity.
+    let src = r"
+        var source = { x: 1, y: 2 };
+        source.x + source.y;
+    ";
+    let unit = compile_test_unit(103, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let table = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should be allocated at install time");
+
+    let entry_fn = vm
+        .installed_function(installed.code())
+        .expect("installed script should expose its template");
+
+    // Use a per-kind counter array indexed by MetadataKind::index().
+    let mut seen_per_kind = [0u32; METADATA_KIND_COUNT];
+    for descriptor in entry_fn.feedback_sites().iter() {
+        let mk = MetadataKind::from_site_kind(descriptor.kind());
+        let expected = seen_per_kind[mk.index()];
+        let actual = table.in_kind_index_for_slot(descriptor.slot().get());
+        assert_eq!(
+            actual,
+            expected,
+            "slot {} kind {:?}: expected in-kind index {expected} but got {actual}",
+            descriptor.slot().get(),
+            descriptor.kind(),
+        );
+        seen_per_kind[mk.index()] += 1;
+    }
+
+    // Confirm we actually exercised at least two slots for Property (x and y).
+    assert!(
+        seen_per_kind[MetadataKind::Property.index()] >= 2,
+        "expected at least 2 Property slots to verify monotone ordering; got {}",
+        seen_per_kind[MetadataKind::Property.index()]
+    );
+}
