@@ -2240,8 +2240,7 @@ impl Vm {
         self.ensure_feedback_capacity(code);
         let index = code_index(code);
         let needs_allocation = !self.feedback_vectors[index].is_allocated()
-            && self.tiering.warmup_counter(code).saturating_add(1)
-                >= FEEDBACK_ALLOCATION_THRESHOLD;
+            && self.tiering.warmup_counter(code).saturating_add(1) >= FEEDBACK_ALLOCATION_THRESHOLD;
         let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
             return false;
         };
@@ -2812,12 +2811,11 @@ impl Vm {
         // `clear_ic_slot_if_generation_matches` which sets the slot back to
         // `None`; the `reinit_named_property_site_if_cleared` above will
         // restore it again on the next observation.
-        if let Some(plan_entry) = plan {
-            if plan_entry.path() == NamedPropertyCachePath::PrototypeData
-                && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
-            {
-                return;
-            }
+        if let Some(plan_entry) = plan
+            && plan_entry.path() == NamedPropertyCachePath::PrototypeData
+            && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
+        {
+            return;
         }
         let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::NamedProperty(feedback) = site {
@@ -2971,12 +2969,11 @@ impl Vm {
             .flatten();
         // Spec 2 Phase A: same proto-chain registration as the non-keyed
         // named-property slow path — see `record_named_property_cache_entry`.
-        if let Some(plan_entry) = plan {
-            if plan_entry.path() == NamedPropertyCachePath::PrototypeData
-                && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
-            {
-                return;
-            }
+        if let Some(plan_entry) = plan
+            && plan_entry.path() == NamedPropertyCachePath::PrototypeData
+            && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
+        {
+            return;
         }
         let _ = self.with_feedback_slot_mut(code, slot, |site| {
             if let FeedbackSiteState::KeyedProperty(feedback) = site {

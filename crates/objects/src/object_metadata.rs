@@ -347,6 +347,11 @@ pub struct ShapeMetadata {
     /// array; the remainder live in the heap-allocated `NamedSlotStorage` and are indexed by
     /// `slot_count - inline_slot_count` consecutive positions starting at 0.
     pub(crate) inline_slot_count: u32,
+    /// Lazy per-shape table of `(prototype_key, target_shape)` transitions.
+    /// `Option<Box<HashMap<...>>>` keeps the no-transition case at 8 bytes
+    /// (the >99% case in typical JS); a bare `Option<HashMap<...>>` would
+    /// cost ~32 bytes per shape. See Spec 1 design §5.1.
+    #[allow(clippy::box_collection)]
     pub(crate) prototype_transitions: Option<Box<HashMap<PrototypeKey, ShapeId>>>,
 }
 

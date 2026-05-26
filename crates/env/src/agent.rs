@@ -526,6 +526,10 @@ impl Agent {
     /// path does *not* validate via direct shape compare. For a
     /// `PrototypeData` entry that is the prototype objects' shapes
     /// (entry dependencies `[1..dependency_count]`).
+    /// `Err(())` is used as a plain abort signal: the unit error carries no
+    /// payload and callers only branch on success/failure. A custom error type
+    /// would add noise with no benefit here.
+    #[allow(clippy::result_unit_err)]
     pub fn register_adaptive_proto_load_for_chain(
         &mut self,
         code: CodeRef,

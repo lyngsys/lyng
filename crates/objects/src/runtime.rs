@@ -1214,9 +1214,7 @@ impl ObjectRuntime {
     /// Returns a mutable reference to the `WatchpointSet` for a shape, lazily
     /// creating an empty set on the first access.
     pub fn watchpoint_set_mut(&mut self, shape: ShapeId) -> &mut WatchpointSet {
-        self.watchpoint_sets
-            .entry(shape)
-            .or_insert_with(WatchpointSet::new)
+        self.watchpoint_sets.entry(shape).or_default()
     }
 
     /// Drains the watchpoint list for `shape` and marks its set `Invalidated`.
