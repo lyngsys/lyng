@@ -21,8 +21,8 @@ use lyng_host::{
 };
 use lyng_objects::{
     FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, InternalMethodResult,
-    InvalidationCause, NamedPropertyStorageMode, NativeCallRequest, NativeConstructRequest,
-    NativeFunctionRegistry, ObjectAllocation, ObjectColdData, ObjectRuntime,
+    NamedPropertyStorageMode, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
+    ObjectAllocation, ObjectColdData, ObjectRuntime,
 };
 use lyng_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
@@ -697,15 +697,7 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
                 AllocationLifetime::Default,
             )
             .unwrap());
-        assert_eq!(
-            objects.invalidation_event(object).unwrap().cause(),
-            InvalidationCause::PropertyRedefinition
-        );
         assert!(objects.delete(&mut mutator, object, deleted_key).unwrap());
-        assert_eq!(
-            objects.invalidation_event(object).unwrap().cause(),
-            InvalidationCause::PropertyDeletion
-        );
 
         let replacement_prototype = objects.alloc_object(
             &mut mutator,
@@ -715,10 +707,6 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
         assert!(objects
             .set_prototype_of(&mut mutator, object, Some(replacement_prototype))
             .unwrap());
-        assert_eq!(
-            objects.invalidation_event(object).unwrap().cause(),
-            InvalidationCause::PrototypeMutation
-        );
         assert!(objects.prevent_extensions(mutator.view(), object).unwrap());
         assert!(!objects.is_extensible(object).unwrap());
         assert!(!objects

@@ -1,14 +1,14 @@
 use super::{
     AllocationLifetime, ArrayBufferObjectData, DataViewObjectData, ElementMode,
-    ElementStorageMetadata, ElementStorageRef, InvalidationEvent, MapObjectData,
-    ModuleNamespaceExport, ModuleNamespaceObject, NamedPropertyDictionaryEntry,
-    NamedPropertyStorage, NamedPropertyStorageMode, NamedSlotStorageRef, ObjectAllocation,
-    ObjectColdData, ObjectFlags, ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef,
-    OrdinaryObjectData, PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData,
-    RegExpPayload, RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord,
-    SetObjectData, ShapeAllocation, ShapeHandleStoreTarget, ShapeId, ShapeMetadata, ShapeProperty,
-    ShapeRecord, ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData,
-    TemporalObjectKind, TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
+    ElementStorageMetadata, ElementStorageRef, MapObjectData, ModuleNamespaceExport,
+    ModuleNamespaceObject, NamedPropertyDictionaryEntry, NamedPropertyStorage,
+    NamedPropertyStorageMode, NamedSlotStorageRef, ObjectAllocation, ObjectColdData, ObjectFlags,
+    ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef, OrdinaryObjectData,
+    PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData, RegExpPayload,
+    RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord, SetObjectData,
+    ShapeAllocation, ShapeHandleStoreTarget, ShapeId, ShapeMetadata, ShapeProperty, ShapeRecord,
+    ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
+    TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
 };
 use crate::object_metadata::PrototypeKey;
 use crate::watchpoint::{Watchpoint, WatchpointSet};
@@ -57,7 +57,6 @@ pub struct ObjectRuntime {
     pub(crate) shape_metadata: Vec<Option<ShapeMetadata>>,
     pub(crate) root_shapes: HashMap<RootShapeKey, ShapeId>,
     pub(crate) next_private_brand_raw: u32,
-    pub(crate) next_invalidation_epoch: u64,
     pub(crate) watchpoint_sets: HashMap<ShapeId, WatchpointSet>,
     pub(crate) shapes_with_proto_transitions: HashSet<ShapeId>,
     /// Side-buffer for the test-only `Recording` watchpoint observer. Always
@@ -501,7 +500,6 @@ impl ObjectRuntime {
                         },
                     }
                 },
-                last_invalidation: None,
                 payload: None,
             },
         );
@@ -560,7 +558,6 @@ impl ObjectRuntime {
                 named_property_additions: 0,
                 named_property_churn: 0,
                 element_storage: ElementStorageMetadata::Empty,
-                last_invalidation: None,
                 payload: None,
             },
         );
@@ -1214,11 +1211,6 @@ impl ObjectRuntime {
         heap.object_slots(record.elements()?)
     }
 
-    #[inline]
-    pub const fn current_invalidation_epoch(&self) -> u64 {
-        self.next_invalidation_epoch
-    }
-
     /// Returns a mutable reference to the `WatchpointSet` for a shape, lazily
     /// creating an empty set on the first access.
     pub fn watchpoint_set_mut(&mut self, shape: ShapeId) -> &mut WatchpointSet {
@@ -1301,11 +1293,6 @@ impl ObjectRuntime {
     /// this returns an empty `Vec` in normal operation.
     pub fn take_recording_fires(&mut self) -> Vec<u64> {
         std::mem::take(&mut self.recording_watchpoint_fires)
-    }
-
-    #[inline]
-    pub fn invalidation_event(&self, id: ObjectRef) -> Option<InvalidationEvent> {
-        self.object_metadata(id)?.last_invalidation
     }
 
     #[inline]

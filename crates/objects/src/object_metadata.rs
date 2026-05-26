@@ -1,6 +1,6 @@
 use super::{
     flattened_property_lookup, ArrayBufferObjectData, DataViewObjectData, DescriptorAttributes,
-    ElementMode, GeneratorState, InvalidationEvent, MapObjectData, ModuleNamespaceObject,
+    ElementMode, GeneratorState, MapObjectData, ModuleNamespaceObject,
     NamedPropertyDictionaryEntry, NamedPropertyStorageMode, NamedPropertyValue, ObjectColdData,
     ObjectFlags, ObjectKind, ObjectRef, PropertyKey, RegExpPayload, SetObjectData, ShapeId,
     ShapeProperty, ShapeTransitionKey, SparseElementEntry, TemporalObjectData,
@@ -65,7 +65,6 @@ pub struct ObjectMetadata {
     pub(crate) named_property_additions: u32,
     pub(crate) named_property_churn: u32,
     pub(crate) element_storage: ElementStorageMetadata,
-    pub(crate) last_invalidation: Option<InvalidationEvent>,
     /// Type-specific cold data (`Map`, `Set`, `RegExp`, `TypedArray`, etc.). `None` for
     /// plain ordinary objects, functions, and other kinds that don't need extra payload.
     pub(crate) payload: Option<ObjectKindPayload>,

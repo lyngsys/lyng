@@ -2030,7 +2030,6 @@ fn structural_named_property_churn_transitions_objects_at_explicit_cap() {
     let entry = runtime
         .named_property_dictionary_entry(object, PropertyKey::from_atom(AtomId::from_raw(1)))
         .unwrap();
-    let invalidation = runtime.invalidation_event(object).unwrap();
 
     assert_eq!(
         runtime.named_property_storage_mode(object),
@@ -2043,11 +2042,6 @@ fn structural_named_property_churn_transitions_objects_at_explicit_cap() {
         entry.payload(),
         NamedPropertyValue::data(Value::from_smi(41))
     );
-    assert_eq!(
-        invalidation.cause(),
-        InvalidationCause::DictionaryTransition
-    );
-    assert_eq!(invalidation.epoch(), 1);
 }
 
 #[test]
@@ -2131,80 +2125,6 @@ fn redefining_shape_stable_named_property_uses_dictionary_storage() {
         NamedPropertyValue::data(Value::from_smi(6))
     );
     assert!(!entry.attrs().enumerable());
-}
-
-#[test]
-fn redefine_delete_and_prototype_mutation_bump_invalidation_epochs() {
-    let mut heap = PrimitiveHeap::new();
-    let mut runtime = ObjectRuntime::new();
-    let mut mutator = heap.mutator();
-    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
-    let shape = runtime
-        .transition_shape(
-            &mut mutator,
-            root,
-            ShapeTransitionKey::new(
-                PropertyKey::from_atom(AtomId::from_raw(7)),
-                ShapePropertyKind::Data,
-                attrs(true, true, true),
-            ),
-            AllocationLifetime::Default,
-        )
-        .unwrap();
-    let prototype = runtime.alloc_object(
-        &mut mutator,
-        ObjectAllocation::ordinary(root),
-        AllocationLifetime::Default,
-    );
-    let object = runtime.alloc_object(
-        &mut mutator,
-        ObjectAllocation::ordinary(shape),
-        AllocationLifetime::Default,
-    );
-    let slot_offset = runtime
-        .shape_property(shape, PropertyKey::from_atom(AtomId::from_raw(7)))
-        .expect("shape should record the transitioned property")
-        .slot_offset();
-
-    assert!(runtime.init_named_slot(&mut mutator, object, slot_offset, Value::from_smi(5)));
-    assert!(runtime.redefine_named_property(
-        &mut mutator,
-        object,
-        PropertyKey::from_atom(AtomId::from_raw(7)),
-        NamedPropertyValue::data(Value::from_smi(9)),
-        attrs(false, true, false),
-    ));
-    assert!(runtime.set_prototype(&mut mutator, object, Some(prototype)));
-    assert!(runtime.delete_named_property(
-        &mut mutator,
-        object,
-        PropertyKey::from_atom(AtomId::from_raw(7)),
-    ));
-
-    assert_eq!(
-        runtime
-            .named_property_dictionary_entry(object, PropertyKey::from_atom(AtomId::from_raw(7))),
-        None
-    );
-    assert_eq!(
-        runtime
-            .object_header(mutator.view(), object)
-            .unwrap()
-            .prototype(),
-        Some(prototype)
-    );
-    assert_eq!(runtime.current_invalidation_epoch(), 4);
-    assert_eq!(
-        runtime.invalidation_event(object).unwrap().cause(),
-        InvalidationCause::PropertyDeletion
-    );
-    assert_eq!(
-        mutator
-            .view()
-            .object(object)
-            .and_then(RuntimeObjectRecord::last_invalidation_epoch),
-        Some(4)
-    );
 }
 
 #[test]
