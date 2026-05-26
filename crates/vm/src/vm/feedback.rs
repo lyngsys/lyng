@@ -19,6 +19,8 @@ use std::{cmp::Ordering, mem::size_of};
 
 mod polymorphic;
 
+pub(crate) use polymorphic::PolymorphicChain;
+
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
 const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;

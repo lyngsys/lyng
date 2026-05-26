@@ -63,7 +63,7 @@ mod values;
 mod with_env;
 
 use call::RejectingNativeRegistry;
-use feedback::FeedbackVector;
+use feedback::{FeedbackVector, PolymorphicChain};
 use install::InstalledFunction;
 use state::{
     ActiveEnvScopeRange, ActiveVmRoots, AsyncFrameState, AsyncGeneratorFrameState,
@@ -164,6 +164,11 @@ pub struct Vm {
     /// one Option discriminant on the hot path. The warmup counter lives on `Tiering`
     /// (see `TieringState::warmup_counter`); Spec 2 Phase A lifted it off `FeedbackVector`.
     feedback_vectors: Vec<FeedbackVector>,
+    /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices POLY_LIMIT..8).
+    /// Keyed by (CodeRef, FeedbackSlotId). Lazy: monomorphic and ≤POLY_LIMIT
+    /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
+    /// on code GC (via prune_dead_code_polymorphic_chains).
+    polymorphic_chains: HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
     /// DSL-0b flat-array feedback storage, parallel to `feedback_vectors`,
     /// keyed by `code_index(code_ref)`. The asm-DSL substrate's `FV` pin
     /// (`LlIntState::frame_fv_base`) points at the first entry of the
@@ -553,6 +558,7 @@ impl Vm {
             source_texts: HashMap::new(),
             feedback_vectors: Vec::new(),
             feedback_flat_storage: Vec::new(),
+            polymorphic_chains: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
             activation_tables: ActivationSideTables::default(),
@@ -594,6 +600,33 @@ impl Vm {
             #[cfg(test)]
             peak_frame_depth: 0,
         }
+    }
+
+    /// Returns the polymorphic chain for `(code, slot)` if any.
+    pub(crate) fn polymorphic_chain(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<&PolymorphicChain> {
+        self.polymorphic_chains.get(&(code, slot))
+    }
+
+    /// Returns a mutable reference to the polymorphic chain for `(code, slot)`,
+    /// lazily creating an empty chain on first access.
+    pub(crate) fn polymorphic_chain_mut(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> &mut PolymorphicChain {
+        self.polymorphic_chains
+            .entry((code, slot))
+            .or_insert_with(PolymorphicChain::new)
+    }
+
+    /// Removes the polymorphic chain for `(code, slot)`. Called when the IC
+    /// transitions to Megamorphic or is cleared by an AdaptiveProtoLoad fire.
+    pub(crate) fn drop_polymorphic_chain(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        self.polymorphic_chains.remove(&(code, slot));
     }
 
     /// Access the VM's opcode instrumentation. Counters are always
