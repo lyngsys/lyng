@@ -2137,10 +2137,18 @@ impl Vm {
         // legacy write actually happened (Some(R) path).
         if result.is_some() {
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
         }
         result
     }
 
+    /// DSL-0b (B17) flat-array dual-write: project the semantic `FeedbackVector`
+    /// slot state into `feedback_flat_storage` so the assembler `FV` pin sees
+    /// the compact IC header.
+    ///
+    /// **Phase C note:** Callers must invoke [`Self::mirror_metadata_slot`]
+    /// immediately after this function until Phase D, when this function is
+    /// deleted and the asm pin is flipped to `MetadataTable`.
     #[inline]
     pub(super) fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
@@ -2190,11 +2198,9 @@ impl Vm {
     /// into the parallel `MetadataTable` per-kind entry. Mirrors what
     /// `mirror_flat_slot` does for `FeedbackEntry`, but routes per-kind.
     ///
-    /// Task 2.4 wires this into every `mirror_flat_slot` call site.
-    #[allow(
-        dead_code,
-        reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
-    )]
+    /// Must be invoked in lockstep with [`Self::mirror_flat_slot`] until
+    /// Phase D, when `mirror_flat_slot` is deleted and the asm pin is flipped
+    /// to `MetadataTable`.
     pub(super) fn mirror_metadata_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
 
@@ -2378,6 +2384,7 @@ impl Vm {
             });
         if mirrored {
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_event(code);
         true
@@ -2396,6 +2403,7 @@ impl Vm {
         };
         site.record_execution();
         self.mirror_flat_slot(code, slot);
+        self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         true
     }
@@ -2509,6 +2517,7 @@ impl Vm {
         };
         if wrote {
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_events(code, count);
     }
@@ -2533,6 +2542,7 @@ impl Vm {
             site.record_call_target(agent, callee);
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
             self.tiering.observe_feedback_event(code);
             return;
         }
@@ -2581,6 +2591,7 @@ impl Vm {
             site.record_construct_target(agent, constructor, created);
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
             self.tiering.observe_feedback_event(code);
             return;
         }
@@ -2661,6 +2672,7 @@ impl Vm {
         };
         if wrote {
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_event(code);
     }
@@ -2980,6 +2992,7 @@ impl Vm {
         };
         if mutated {
             self.mirror_flat_slot(code, slot);
+            self.mirror_metadata_slot(code, slot);
         }
     }
 
@@ -3257,6 +3270,7 @@ impl Vm {
         // DSL-0b (B17) dual-write — borrow on `site` is dropped after
         // `record_execution()` so `mirror_flat_slot` can re-borrow.
         self.mirror_flat_slot(code, slot);
+        self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         Some(value)
     }
@@ -3284,6 +3298,7 @@ impl Vm {
         site.record_execution();
         // DSL-0b (B17) dual-write — see paired load helper.
         self.mirror_flat_slot(code, slot);
+        self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         Some(stored)
     }

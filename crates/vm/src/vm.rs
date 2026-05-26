@@ -1609,6 +1609,7 @@ impl Vm {
         // drops the NamedPropertyFeedback that holds the generation counter.
         // Generation resets to 0 on the next fresh install; see doc above.
         self.mirror_flat_slot(code, slot);
+        self.mirror_metadata_slot(code, slot);
     }
 }
 
