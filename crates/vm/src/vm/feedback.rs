@@ -699,6 +699,10 @@ pub struct NamedPropertyFeedback {
     /// `polymorphic_own_data_handlers[i]` — captured at the time the entry was packed
     /// into the sidecar. Zero when the slot is `NamedPropertyHandler::NONE`.
     polymorphic_own_data_epochs: [u64; POLY_LIMIT],
+    /// Spec 2 Phase A: per-site install generation. Bumped on every install /
+    /// re-install. `AdaptiveProtoLoad` watchpoints carry the generation at
+    /// registration time and no-op when this has advanced past it.
+    pub(crate) generation: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -915,6 +919,7 @@ impl NamedPropertyFeedback {
             monomorphic_proto_data_prototype_epoch: 0,
             polymorphic_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
             polymorphic_own_data_epochs: [0; POLY_LIMIT],
+            generation: 0,
         }
     }
 
@@ -2107,22 +2112,38 @@ impl FeedbackVector {
             .and_then(Option::as_ref)
     }
 
-    /// Returns the per-slot install generation. Placeholder returns `0` until
-    /// Task A.1.5 adds the actual `generation` field to the site state.
+    /// Returns the per-slot install generation. Returns `0` if the slot is
+    /// absent or is not a `NamedProperty` site (other site kinds do not carry
+    /// generations in Phase A).
     #[inline]
     pub(super) fn generation(&self, slot: FeedbackSlotId) -> u32 {
-        // Placeholder — the real field lands in Task A.1.5.
-        let _ = slot;
-        0
+        let Some(index) = usize::try_from(slot.get().saturating_sub(1)).ok() else {
+            return 0;
+        };
+        match self.sites.get(index).and_then(Option::as_ref) {
+            Some(FeedbackSiteState::NamedProperty(named)) => named.generation,
+            _ => 0,
+        }
     }
 
-    /// Bumps the per-slot install generation and returns the new value.
-    /// Placeholder returns `0` (no-op) until Task A.1.5 adds the field.
+    /// Bumps the per-slot install generation (wrapping add per §8.2) and
+    /// returns the new value. Returns `0` if the slot is absent or is not a
+    /// `NamedProperty` site.
+    /// Called from Task 4's slow-path install to mint the generation before
+    /// registering `AdaptiveProtoLoad` watchpoints.
+    #[allow(dead_code)] // wired in Task A.1.7 (slow-path install)
     #[inline]
     pub(super) fn bump_generation(&mut self, slot: FeedbackSlotId) -> u32 {
-        // Placeholder — the real field lands in Task A.1.5.
-        let _ = slot;
-        0
+        let Some(index) = usize::try_from(slot.get().saturating_sub(1)).ok() else {
+            return 0;
+        };
+        match self.sites.get_mut(index).and_then(Option::as_mut) {
+            Some(FeedbackSiteState::NamedProperty(named)) => {
+                named.generation = named.generation.wrapping_add(1);
+                named.generation
+            }
+            _ => 0,
+        }
     }
 
     /// Clears the IC slot at `slot` by setting its `Option<FeedbackSiteState>`
@@ -2131,10 +2152,10 @@ impl FeedbackVector {
     /// generation match confirms the watchpoint is not stale.
     #[inline]
     pub(super) fn clear_site(&mut self, slot: FeedbackSlotId) {
-        if let Some(entry) = self
-            .sites
-            .get_mut(usize::try_from(slot.get().saturating_sub(1)).ok().unwrap_or(usize::MAX))
-        {
+        let Some(index) = usize::try_from(slot.get().saturating_sub(1)).ok() else {
+            return;
+        };
+        if let Some(entry) = self.sites.get_mut(index) {
             *entry = None;
         }
     }
@@ -2184,11 +2205,13 @@ impl Vm {
     #[inline]
     pub(super) fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
-        let header = self
-            .feedback_vectors
-            .get(index)
-            .and_then(|vector| vector.site(slot))
+        let vector = self.feedback_vectors.get(index);
+        let header = vector
+            .and_then(|v| v.site(slot))
             .and_then(Self::named_llint_load_header);
+        // Read the generation from the semantic source so the flat entry stays
+        // in sync on every install/clear cycle.
+        let generation = vector.map_or(0, |v| v.generation(slot));
         let Some(slot_index) = Self::flat_feedback_slot_index(slot) else {
             return;
         };
@@ -2200,6 +2223,11 @@ impl Vm {
             return;
         };
         entry.clear_ic_header();
+        // Write generation AFTER clear_ic_header so it is never overwritten by
+        // the blanket IC-field clear. `clear_ic_header` only touches mode and
+        // the named-property handler/epoch fields; generation is metadata, not
+        // IC state, and is deliberately excluded from that reset.
+        entry.generation = generation;
         match header {
             Some(LlIntNamedPropertyHeader::OwnInline {
                 handler_bits,

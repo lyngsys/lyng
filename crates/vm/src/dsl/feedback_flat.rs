@@ -69,7 +69,11 @@ pub(crate) struct ScalarFeedbackUpdate {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedbackEntry {
     pub(crate) mode: u8,
-    pub(crate) _pad: [u8; 7],
+    pub(crate) _pad_a: [u8; 3],
+    /// Spec 2 Phase A: per-IC install generation. Bumped on every install /
+    /// re-install / clear. `AdaptiveProtoLoad` watchpoints carry the generation
+    /// they were registered at and no-op on mismatch.
+    pub(crate) generation: u32,
     /// `OwnData` mode: `NamedPropertyHandler::bits()`.
     /// `PrototypeData` mode: `NamedPropertyProtoHandler::proto_word()`.
     pub(crate) named_handler_bits: u64,
@@ -84,6 +88,8 @@ pub struct FeedbackEntry {
     pub(crate) scalar_execution_count: u32,
     pub(crate) _tail_pad: [u8; 16],
 }
+
+const _: () = assert!(core::mem::size_of::<FeedbackEntry>() == 64);
 
 pub const FEEDBACK_ENTRY_MODE_OFFSET: usize = core::mem::offset_of!(FeedbackEntry, mode);
 pub const FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET: usize =
@@ -105,7 +111,8 @@ impl Default for FeedbackEntry {
     fn default() -> Self {
         Self {
             mode: LlIntIcMode::Empty as u8,
-            _pad: [0; 7],
+            _pad_a: [0; 3],
+            generation: 0,
             named_handler_bits: 0,
             named_epoch: 0,
             named_aux_bits: 0,

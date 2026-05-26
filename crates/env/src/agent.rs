@@ -466,7 +466,7 @@ impl Agent {
         let Some(fired) = self.objects.drain_watchpoints_for_shape(shape) else {
             return;
         };
-        let mut vm_dispatch = vm_dispatch;
+        let mut vm_dispatch = vm_dispatch; // needed so as_deref_mut() can reborrow per iteration
         for wp in fired {
             match wp {
                 Watchpoint::ShapeInvalidation { observer } => match observer {

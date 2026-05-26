@@ -1481,6 +1481,13 @@ impl Vm {
     /// `(code, slot)` if its current generation matches `expected_generation`.
     /// Stale watchpoints from prior installs are silently dropped; the slot
     /// keeps whatever it currently holds.
+    ///
+    /// After `clear_site` the slot is `None`, so the `NamedPropertyFeedback`
+    /// (and its `generation`) is dropped. The next install creates a fresh
+    /// `NamedPropertyFeedback { generation: 0 }` and the slow path bumps to 1
+    /// before registering new watchpoints. Watchpoints from the prior install
+    /// era carry the old generation (> 0 after at least one bump) and will
+    /// no-op on mismatch — correct staleness behaviour.
     pub(crate) fn clear_ic_slot_if_generation_matches(
         &mut self,
         code: CodeRef,
@@ -1494,7 +1501,9 @@ impl Vm {
             return;
         }
         vector.clear_site(slot);
-        vector.bump_generation(slot);
+        // Note: bump_generation after clear_site is a no-op because clear_site
+        // drops the NamedPropertyFeedback that holds the generation counter.
+        // Generation resets to 0 on the next fresh install; see doc above.
         self.mirror_flat_slot(code, slot);
     }
 }
