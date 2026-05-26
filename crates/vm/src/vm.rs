@@ -51,6 +51,7 @@ pub mod install;
 mod internal_calls;
 mod jobs;
 mod loop_iteration;
+pub(crate) mod metadata_table;
 mod modules;
 mod names;
 mod property_access;
