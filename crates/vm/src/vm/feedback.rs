@@ -2330,10 +2330,6 @@ impl Vm {
         );
     }
 
-    #[cfg(not(debug_assertions))]
-    #[inline(always)]
-    fn debug_assert_metadata_matches_flat(&self, _code: CodeRef, _slot: FeedbackSlotId) {}
-
     #[inline]
     fn flat_feedback_slot_index(slot: FeedbackSlotId) -> Option<usize> {
         usize::try_from(slot.get().checked_sub(1)?).ok()
