@@ -280,13 +280,12 @@ fn synthesize_own_data_entry(
     let holder = ObjectRef::from_raw(7).unwrap();
     let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
     if dependency_count >= 1 {
-        dependencies[0] = Some(PropertyCacheDependency::new(holder, receiver_shape, None));
+        dependencies[0] = Some(PropertyCacheDependency::new(holder, receiver_shape));
     }
     if dependency_count >= 2 {
         dependencies[1] = Some(PropertyCacheDependency::new(
             holder,
             holder_shape.unwrap_or(receiver_shape),
-            None,
         ));
     }
     let mut attrs = DescriptorAttributes::empty();
@@ -397,8 +396,8 @@ fn named_property_handler_none_for_prototype_data_path() {
     let shape = ShapeId::from_raw(77).unwrap();
     let holder = ObjectRef::from_raw(7).unwrap();
     let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
-    dependencies[0] = Some(PropertyCacheDependency::new(holder, shape, None));
-    dependencies[1] = Some(PropertyCacheDependency::new(holder, shape, None));
+    dependencies[0] = Some(PropertyCacheDependency::new(holder, shape));
+    dependencies[1] = Some(PropertyCacheDependency::new(holder, shape));
     let entry = NamedPropertyCacheEntry::new(
         shape,
         holder,
@@ -431,13 +430,13 @@ fn synthesize_proto_data_entry(
     let holder = ObjectRef::from_raw(11).unwrap();
     let mut dependencies = [None; crate::shapes::PROPERTY_CACHE_MAX_DEPENDENCIES];
     if dependency_count >= 1 {
-        dependencies[0] = Some(PropertyCacheDependency::new(receiver, receiver_shape, None));
+        dependencies[0] = Some(PropertyCacheDependency::new(receiver, receiver_shape));
     }
     if dependency_count >= 2 {
-        dependencies[1] = Some(PropertyCacheDependency::new(holder, holder_shape, None));
+        dependencies[1] = Some(PropertyCacheDependency::new(holder, holder_shape));
     }
     if dependency_count >= 3 {
-        dependencies[2] = Some(PropertyCacheDependency::new(holder, holder_shape, None));
+        dependencies[2] = Some(PropertyCacheDependency::new(holder, holder_shape));
     }
     let mut attrs = DescriptorAttributes::empty();
     attrs.set_writable(writable);
@@ -673,7 +672,7 @@ fn module_namespace_objects_read_live_bindings_and_reject_mutation() {
 }
 
 #[test]
-fn named_property_store_cache_hits_own_slots_and_invalidates_on_dictionary_transition() {
+fn named_property_store_cache_hits_own_slots_after_dictionary_transition_same_shape() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -732,11 +731,16 @@ fn named_property_store_cache_hits_own_slots_and_invalidates_on_dictionary_trans
         runtime.named_property_storage_mode(object),
         Some(NamedPropertyStorageMode::Dictionary)
     );
+    // Spec 2 Phase A: the cache no longer carries an epoch dependency.
+    // Dictionary transitions that leave the shape unchanged are not detected
+    // by this object-level cache validator. The VM-level invariant is that
+    // the slow path declines to cache dictionary-backed receivers and
+    // watchpoints clear stale IC slots before subsequent cache reads.
     assert_eq!(
         runtime
             .store_to_named_property_cache(&mut mutator, object, key, cache, Value::from_smi(7))
             .unwrap(),
-        None
+        Some(true)
     );
 }
 

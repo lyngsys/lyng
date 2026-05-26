@@ -31,7 +31,7 @@
 //!   reallocate, but that only moves the `Box` smart pointer, not
 //!   the heap buffer it owns).
 //!
-//! Per-entry layout: the first 48 bytes are the `LLInt` scalar/IC
+//! Per-entry layout: the first 32 bytes are the `LLInt` scalar/IC
 //! header. The remaining bytes are explicit padding so the entry is
 //! exactly 64 bytes; asm slot addressing can therefore use a single
 //! shifted add instead of materializing a large Rust enum stride.
@@ -40,10 +40,10 @@ pub const LLINT_IC_MODE_EMPTY: u8 = 0;
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
 pub const LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
 pub const LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
-/// Polymorphic OwnData (`POLY_LIMIT` = 2) inline-slot walk. Reuses the four
-/// 8-byte slots in [`FeedbackEntry`] to pack both handlers and epochs:
-/// `named_handler_bits` / `named_epoch` carry sidecar slot 0;
-/// `named_aux_bits` / `named_aux_epoch` carry sidecar slot 1.
+/// Polymorphic OwnData (`POLY_LIMIT` = 2) inline-slot walk. Reuses the two
+/// 8-byte slots in [`FeedbackEntry`] to pack both handlers:
+/// `named_handler_bits` carries sidecar slot 0;
+/// `named_aux_bits` carries sidecar slot 1.
 pub const LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC: u8 = 4;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 
@@ -77,16 +77,11 @@ pub struct FeedbackEntry {
     /// `OwnData` mode: `NamedPropertyHandler::bits()`.
     /// `PrototypeData` mode: `NamedPropertyProtoHandler::proto_word()`.
     pub(crate) named_handler_bits: u64,
-    /// `OwnData` mode: receiver invalidation epoch.
-    /// `PrototypeData` mode: receiver invalidation epoch.
-    pub(crate) named_epoch: u64,
     /// `PrototypeData` mode: `NamedPropertyProtoHandler::receiver_word()`.
     pub(crate) named_aux_bits: u64,
-    /// `PrototypeData` mode: prototype invalidation epoch.
-    pub(crate) named_aux_epoch: u64,
     pub(crate) scalar_observed_bits: u32,
     pub(crate) scalar_execution_count: u32,
-    pub(crate) _tail_pad: [u8; 16],
+    pub(crate) _tail_pad: [u8; 32],
 }
 
 const _: () = assert!(core::mem::size_of::<FeedbackEntry>() == 64);
@@ -94,12 +89,8 @@ const _: () = assert!(core::mem::size_of::<FeedbackEntry>() == 64);
 pub const FEEDBACK_ENTRY_MODE_OFFSET: usize = core::mem::offset_of!(FeedbackEntry, mode);
 pub const FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, named_handler_bits);
-pub const FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET: usize =
-    core::mem::offset_of!(FeedbackEntry, named_epoch);
 pub const FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, named_aux_bits);
-pub const FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET: usize =
-    core::mem::offset_of!(FeedbackEntry, named_aux_epoch);
 pub const FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET: usize =
     core::mem::offset_of!(FeedbackEntry, scalar_observed_bits);
 pub const FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET: usize =
@@ -114,12 +105,10 @@ impl Default for FeedbackEntry {
             _pad_a: [0; 3],
             generation: 0,
             named_handler_bits: 0,
-            named_epoch: 0,
             named_aux_bits: 0,
-            named_aux_epoch: 0,
             scalar_observed_bits: 0,
             scalar_execution_count: 0,
-            _tail_pad: [0; 16],
+            _tail_pad: [0; 32],
         }
     }
 }
@@ -129,27 +118,21 @@ impl FeedbackEntry {
     pub(crate) const fn clear_ic_header(&mut self) {
         self.mode = LlIntIcMode::Empty as u8;
         self.named_handler_bits = 0;
-        self.named_epoch = 0;
         self.named_aux_bits = 0;
-        self.named_aux_epoch = 0;
     }
 
     #[inline]
-    pub(crate) const fn set_named_own_inline_load(&mut self, handler_bits: u64, epoch: u64) {
+    pub(crate) const fn set_named_own_inline_load(&mut self, handler_bits: u64) {
         self.mode = LlIntIcMode::NamedOwnInlineLoad as u8;
         self.named_handler_bits = handler_bits;
-        self.named_epoch = epoch;
         self.named_aux_bits = 0;
-        self.named_aux_epoch = 0;
     }
 
     #[inline]
-    pub(crate) const fn set_named_own_outline_load(&mut self, handler_bits: u64, epoch: u64) {
+    pub(crate) const fn set_named_own_outline_load(&mut self, handler_bits: u64) {
         self.mode = LlIntIcMode::NamedOwnOutlineLoad as u8;
         self.named_handler_bits = handler_bits;
-        self.named_epoch = epoch;
         self.named_aux_bits = 0;
-        self.named_aux_epoch = 0;
     }
 
     #[inline]
@@ -157,33 +140,25 @@ impl FeedbackEntry {
         &mut self,
         receiver_word: u64,
         proto_word: u64,
-        receiver_epoch: u64,
-        prototype_epoch: u64,
     ) {
         self.mode = LlIntIcMode::NamedProtoInlineLoad as u8;
         self.named_handler_bits = proto_word;
-        self.named_epoch = receiver_epoch;
         self.named_aux_bits = receiver_word;
-        self.named_aux_epoch = prototype_epoch;
     }
 
     /// Install a polymorphic OwnData inline-slot handler pair. Slot 0 is
-    /// stored in the primary handler/epoch fields, slot 1 in the auxiliary
-    /// fields — matches the asm walk in
+    /// stored in the primary handler field, slot 1 in the auxiliary
+    /// field — matches the asm walk in
     /// `op_get_named_property_dsl`'s `.try_poly` label.
     #[inline]
     pub(crate) const fn set_named_own_polymorphic(
         &mut self,
         slot0_handler_bits: u64,
-        slot0_epoch: u64,
         slot1_handler_bits: u64,
-        slot1_epoch: u64,
     ) {
         self.mode = LlIntIcMode::NamedOwnPolymorphic as u8;
         self.named_handler_bits = slot0_handler_bits;
-        self.named_epoch = slot0_epoch;
         self.named_aux_bits = slot1_handler_bits;
-        self.named_aux_epoch = slot1_epoch;
     }
 
     #[inline]
@@ -197,18 +172,8 @@ impl FeedbackEntry {
     }
 
     #[inline]
-    pub(crate) const fn named_epoch(&self) -> u64 {
-        self.named_epoch
-    }
-
-    #[inline]
     pub(crate) const fn named_aux_bits(&self) -> u64 {
         self.named_aux_bits
-    }
-
-    #[inline]
-    pub(crate) const fn named_aux_epoch(&self) -> u64 {
-        self.named_aux_epoch
     }
 
     #[inline]
@@ -240,7 +205,6 @@ impl FeedbackEntry {
 mod tests {
     use super::{
         FeedbackEntry, FEEDBACK_ENTRY_MODE_OFFSET, FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET,
-        FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET, FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET,
         FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET, FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
         FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, FEEDBACK_ENTRY_STRIDE,
         FEEDBACK_ENTRY_STRIDE_SHIFT, LLINT_FEEDBACK_OBSERVED_SMI,
@@ -250,11 +214,9 @@ mod tests {
     fn asm_visible_feedback_entry_layout_is_compact_and_stable() {
         assert_eq!(FEEDBACK_ENTRY_MODE_OFFSET, 0);
         assert_eq!(FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET, 8);
-        assert_eq!(FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET, 16);
-        assert_eq!(FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET, 24);
-        assert_eq!(FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET, 32);
-        assert_eq!(FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, 40);
-        assert_eq!(FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET, 44);
+        assert_eq!(FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET, 16);
+        assert_eq!(FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET, 24);
+        assert_eq!(FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET, 28);
         assert_eq!(FEEDBACK_ENTRY_STRIDE, 64);
         assert_eq!(
             FEEDBACK_ENTRY_STRIDE,
@@ -273,34 +235,24 @@ mod tests {
             FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET
         );
         assert_ne!(
-            FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
-            FEEDBACK_ENTRY_NAMED_EPOCH_OFFSET
-        );
-        assert_ne!(
             FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET,
             FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET
-        );
-        assert_ne!(
-            FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
-            FEEDBACK_ENTRY_NAMED_AUX_EPOCH_OFFSET
         );
     }
 
     #[test]
     fn named_own_polymorphic_install_round_trips_through_aux_slots() {
         let mut entry = FeedbackEntry::default();
-        entry.set_named_own_polymorphic(0xAAAA_AAAA_BBBB_BBBB, 7, 0xCCCC_CCCC_DDDD_DDDD, 9);
+        entry.set_named_own_polymorphic(0xAAAA_AAAA_BBBB_BBBB, 0xCCCC_CCCC_DDDD_DDDD);
         assert_eq!(entry.mode(), super::LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC);
         assert_eq!(entry.named_handler_bits(), 0xAAAA_AAAA_BBBB_BBBB);
-        assert_eq!(entry.named_epoch(), 7);
         assert_eq!(entry.named_aux_bits(), 0xCCCC_CCCC_DDDD_DDDD);
-        assert_eq!(entry.named_aux_epoch(), 9);
     }
 
     #[test]
     fn taking_scalar_feedback_clears_only_scalar_fields() {
         let mut entry = FeedbackEntry::default();
-        entry.set_named_own_inline_load(0x1234, 9);
+        entry.set_named_own_inline_load(0x1234);
         entry.scalar_observed_bits = LLINT_FEEDBACK_OBSERVED_SMI;
         entry.scalar_execution_count = 3;
 
@@ -312,9 +264,7 @@ mod tests {
         assert_eq!(update.execution_count, 3);
         assert_eq!(entry.mode(), super::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD);
         assert_eq!(entry.named_handler_bits(), 0x1234);
-        assert_eq!(entry.named_epoch(), 9);
         assert_eq!(entry.named_aux_bits(), 0);
-        assert_eq!(entry.named_aux_epoch(), 0);
         assert_eq!(entry.scalar_observed_bits(), 0);
         assert_eq!(entry.scalar_execution_count(), 0);
     }

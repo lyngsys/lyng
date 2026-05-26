@@ -486,7 +486,6 @@ impl ObjectRuntime {
         dependency: PropertyCacheDependency,
     ) -> bool {
         record.shape() == Some(dependency.shape())
-            && record.last_invalidation_epoch() == dependency.invalidation_epoch()
     }
 
     #[inline]
@@ -583,11 +582,7 @@ impl ObjectRuntime {
         if index >= PROPERTY_CACHE_MAX_DEPENDENCIES {
             return Ok(false);
         }
-        dependencies[index] = Some(PropertyCacheDependency::new(
-            object,
-            shape,
-            record.last_invalidation_epoch(),
-        ));
+        dependencies[index] = Some(PropertyCacheDependency::new(object, shape));
         *dependency_count = dependency_count.saturating_add(1);
         Ok(true)
     }

@@ -544,13 +544,10 @@ impl Vm {
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
         // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
         // PrototypeData / megamorphic still fall through to the chain below.
-        if let Some((handler, cached_epoch)) =
-            self.named_property_own_data_handler(code, feedback_slot)
-        {
+        if let Some(handler) = self.named_property_own_data_handler(code, feedback_slot) {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object)
                 && record.shape() == handler.receiver_shape()
-                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
             {
                 let cached_value = match handler.slot_location() {
                     SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
@@ -638,13 +635,10 @@ impl Vm {
             return false;
         };
 
-        if let Some((handler, cached_epoch)) =
-            self.named_property_own_data_handler(frame.code(), feedback_slot)
-        {
+        if let Some(handler) = self.named_property_own_data_handler(frame.code(), feedback_slot) {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object)
                 && record.shape() == handler.receiver_shape()
-                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch
             {
                 let cached_value = match handler.slot_location() {
                     SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
@@ -727,12 +721,10 @@ impl Vm {
         // is a silent no-op (just like the slow chain).
         if let Some(target_opt) = self
             .named_property_own_data_handler(code, feedback_slot)
-            .and_then(|(handler, cached_epoch)| {
+            .and_then(|handler| {
                 let view = agent.heap().view();
                 let record = view.object_ref(global_object)?;
-                if record.shape() != handler.receiver_shape()
-                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
-                {
+                if record.shape() != handler.receiver_shape() {
                     return None;
                 }
                 if !handler.writable() {
@@ -846,12 +838,10 @@ impl Vm {
         // ignores the failed store) — preserving the slow chain's behavior.
         if let Some(target_opt) = self
             .named_property_own_data_handler(code, feedback_slot)
-            .and_then(|(handler, cached_epoch)| {
+            .and_then(|handler| {
                 let view = agent.heap().view();
                 let record = view.object_ref(global_object)?;
-                if record.shape() != handler.receiver_shape()
-                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
-                {
+                if record.shape() != handler.receiver_shape() {
                     return None;
                 }
                 if !handler.writable() {

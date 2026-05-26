@@ -106,8 +106,7 @@ impl Vm {
             // AdaptiveProtoLoad watchpoints (Task A.1) clear the IC slot on
             // any proto-chain mutation before the next cache-hit read, so the
             // epoch check is now redundant.
-            if let Some((handler, _cached_epoch)) =
-                self.named_property_own_data_handler(frame.code(), feedback_slot)
+            if let Some(handler) = self.named_property_own_data_handler(frame.code(), feedback_slot)
             {
                 let heap_view = agent.heap().view();
                 if let Some(record) = heap_view.object_ref(object)
@@ -247,13 +246,10 @@ impl Vm {
 
         let cached_target = self
             .named_property_own_data_handler(frame.code(), feedback_slot)
-            .and_then(|(handler, cached_epoch)| {
+            .and_then(|handler| {
                 let view = agent.heap().view();
                 let record = view.object_ref(object)?;
-                if record.shape() != handler.receiver_shape()
-                    || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
-                    || !handler.writable()
-                {
+                if record.shape() != handler.receiver_shape() || !handler.writable() {
                     return None;
                 }
                 match handler.slot_location() {
@@ -338,12 +334,10 @@ impl Vm {
             //   - Inner None        => read-only (writable bit clear), no store
             let cached_target = self
                 .named_property_own_data_handler(frame.code(), feedback_slot)
-                .and_then(|(handler, cached_epoch)| {
+                .and_then(|handler| {
                     let view = agent.heap().view();
                     let record = view.object_ref(object)?;
-                    if record.shape() != handler.receiver_shape()
-                        || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
-                    {
+                    if record.shape() != handler.receiver_shape() {
                         return None;
                     }
                     if !handler.writable() {
@@ -1814,13 +1808,10 @@ impl Vm {
         receiver: ObjectRef,
         atom: AtomId,
     ) -> Option<Value> {
-        let (handler, cached_epoch) =
-            self.keyed_property_named_own_data_handler(code, feedback_slot, atom)?;
+        let handler = self.keyed_property_named_own_data_handler(code, feedback_slot, atom)?;
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
-        if record.shape() != handler.receiver_shape()
-            || record.last_invalidation_epoch().unwrap_or(0) != cached_epoch
-        {
+        if record.shape() != handler.receiver_shape() {
             return None;
         }
         let value = match handler.slot_location() {
@@ -1853,8 +1844,7 @@ impl Vm {
         feedback_slot: Option<FeedbackSlotId>,
         receiver: ObjectRef,
     ) -> Option<Value> {
-        let (handler, _receiver_epoch, _prototype_epoch) =
-            self.named_property_proto_data_handler(code, feedback_slot)?;
+        let handler = self.named_property_proto_data_handler(code, feedback_slot)?;
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
         if record.shape() != handler.receiver_shape() {
@@ -1893,20 +1883,15 @@ impl Vm {
         receiver: ObjectRef,
         atom: AtomId,
     ) -> Option<Value> {
-        let (handler, receiver_epoch, prototype_epoch) =
-            self.keyed_property_named_proto_data_handler(code, feedback_slot, atom)?;
+        let handler = self.keyed_property_named_proto_data_handler(code, feedback_slot, atom)?;
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
-        if record.shape() != handler.receiver_shape()
-            || record.last_invalidation_epoch().unwrap_or(0) != receiver_epoch
-        {
+        if record.shape() != handler.receiver_shape() {
             return None;
         }
         let prototype_id = record.prototype()?;
         let prototype_record = view.object_ref(prototype_id)?;
-        if prototype_record.shape() != handler.prototype_shape()
-            || prototype_record.last_invalidation_epoch().unwrap_or(0) != prototype_epoch
-        {
+        if prototype_record.shape() != handler.prototype_shape() {
             return None;
         }
         let value = match handler.slot_location() {
@@ -1935,13 +1920,11 @@ impl Vm {
         atom: AtomId,
         value: Value,
     ) -> Option<bool> {
-        let (handler, cached_epoch) =
-            self.keyed_property_named_own_data_handler(code, feedback_slot, atom)?;
+        let handler = self.keyed_property_named_own_data_handler(code, feedback_slot, atom)?;
         let (named_slots, shape_match) = {
             let view = agent.heap().view();
             let record = view.object_ref(receiver)?;
-            let shape_match = record.shape() == handler.receiver_shape()
-                && record.last_invalidation_epoch().unwrap_or(0) == cached_epoch;
+            let shape_match = record.shape() == handler.receiver_shape();
             (record.named_slots(), shape_match)
         };
         if !shape_match {
@@ -1985,7 +1968,7 @@ impl Vm {
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
         let shape = record.shape()?;
-        let (handler, _cached_epoch) =
+        let handler =
             self.named_property_polymorphic_own_data_handler(code, feedback_slot, shape)?;
         let value = match handler.slot_location() {
             SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
@@ -2030,11 +2013,8 @@ impl Vm {
             let view = agent.heap().view();
             let record = view.object_ref(receiver)?;
             let shape = record.shape()?;
-            let (handler, cached_epoch) =
+            let handler =
                 self.named_property_polymorphic_own_data_handler(code, feedback_slot, shape)?;
-            if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
-                return None;
-            }
             (handler, record.named_slots())
         };
         if !handler.writable() {
@@ -2068,15 +2048,12 @@ impl Vm {
         let view = agent.heap().view();
         let record = view.object_ref(receiver)?;
         let shape = record.shape()?;
-        let (handler, cached_epoch) = self.keyed_property_named_polymorphic_own_data_handler(
+        let handler = self.keyed_property_named_polymorphic_own_data_handler(
             code,
             feedback_slot,
             atom,
             shape,
         )?;
-        if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
-            return None;
-        }
         let value = match handler.slot_location() {
             SlotLocation::Inline(i) => record.inline_named_slot(i as usize)?,
             SlotLocation::OutOfLine(off) => view
@@ -2198,15 +2175,12 @@ impl Vm {
             let view = agent.heap().view();
             let record = view.object_ref(receiver)?;
             let shape = record.shape()?;
-            let (handler, cached_epoch) = self.keyed_property_named_polymorphic_own_data_handler(
+            let handler = self.keyed_property_named_polymorphic_own_data_handler(
                 code,
                 feedback_slot,
                 atom,
                 shape,
             )?;
-            if record.last_invalidation_epoch().unwrap_or(0) != cached_epoch {
-                return None;
-            }
             (handler, record.named_slots())
         };
         let stored = if handler.writable() {

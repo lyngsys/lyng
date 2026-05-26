@@ -1932,7 +1932,7 @@ fn flat_named_property_header_tracks_monomorphic_inline_load() {
         ))
     );
 
-    let (mode, handler_bits, epoch) = vm
+    let (mode, handler_bits) = vm
         .flat_named_property_header_snapshot(installed.code(), slot)
         .expect("flat header should exist for named-load slot");
     assert_eq!(
@@ -1940,7 +1940,6 @@ fn flat_named_property_header_tracks_monomorphic_inline_load() {
         crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
     );
     assert_ne!(handler_bits, 0);
-    assert_eq!(epoch, 0);
 }
 
 #[test]
@@ -1993,7 +1992,7 @@ fn flat_named_property_header_tracks_monomorphic_outline_load() {
         ))
     );
 
-    let (mode, handler_bits, epoch) = vm
+    let (mode, handler_bits) = vm
         .flat_named_property_header_snapshot(installed.code(), slot)
         .expect("flat header should exist for named-load slot");
     assert_eq!(
@@ -2001,7 +2000,6 @@ fn flat_named_property_header_tracks_monomorphic_outline_load() {
         crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD
     );
     assert_ne!(handler_bits, 0);
-    assert_eq!(epoch, 0);
 }
 
 #[test]

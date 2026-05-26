@@ -202,23 +202,17 @@ pub struct KeyedPropertyFeedbackSnapshot {
 enum LlIntNamedPropertyHeader {
     OwnInline {
         handler_bits: u64,
-        epoch: u64,
     },
     OwnOutline {
         handler_bits: u64,
-        epoch: u64,
     },
     ProtoInline {
         receiver_word: u64,
         proto_word: u64,
-        receiver_epoch: u64,
-        prototype_epoch: u64,
     },
     OwnPolymorphic {
         slot0_handler_bits: u64,
-        slot0_epoch: u64,
         slot1_handler_bits: u64,
-        slot1_epoch: u64,
     },
 }
 
@@ -662,12 +656,6 @@ pub struct NamedPropertyFeedback {
     /// every other state. Lets the IC cache hit path skip the four-deep call chain
     /// on the common case. Sidecar — `entries` remains the system of record.
     monomorphic_own_data_handler: NamedPropertyHandler,
-    /// Raw `last_invalidation_epoch` u64 captured from the receiver at
-    /// cache-install time (0 = never invalidated). Paired with
-    /// `monomorphic_own_data_handler`; the IC cache hit path compares against the receiver's
-    /// current raw epoch to detect any invalidation event (prototype
-    /// mutation, property redefinition, etc.) that doesn't change the shape.
-    monomorphic_own_data_epoch: u64,
     /// Phase 3e proto cache handler — packed receiver shape, prototype shape,
     /// and prototype slot offset derived from `entries[0]` whenever the
     /// cache is monomorphic and the entry is a one-hop `PrototypeData`
@@ -676,15 +664,6 @@ pub struct NamedPropertyFeedback {
     /// exclusive with `monomorphic_own_data_handler` in practice — a cache entry is
     /// either `OwnData` or `PrototypeData`.
     monomorphic_proto_data_handler: NamedPropertyProtoHandler,
-    /// Raw `last_invalidation_epoch` u64 captured from the receiver at
-    /// proto-cache install time. Catches receiver-side invalidations,
-    /// including `set_prototype()` swaps (which bump the receiver's epoch
-    /// with cause `PrototypeMutation`).
-    monomorphic_proto_data_receiver_epoch: u64,
-    /// Raw `last_invalidation_epoch` u64 captured from the prototype holder
-    /// at proto-cache install time. Catches mutations on the prototype
-    /// itself (property redefinition, property deletion).
-    monomorphic_proto_data_prototype_epoch: u64,
     /// Phase 3f polymorphic-OwnData sidecar — mirrors the first `POLY_LIMIT`
     /// `entries` whenever the cache is polymorphic and the entry is
     /// cache-hit eligible (`NamedPropertyHandler::from_entry` returns a
@@ -696,10 +675,6 @@ pub struct NamedPropertyFeedback {
     /// Mega-poly transition leaves this array zeroed. Sidecar — `entries`
     /// remains the system of record.
     polymorphic_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
-    /// Raw `last_invalidation_epoch` u64 paired with each
-    /// `polymorphic_own_data_handlers[i]` — captured at the time the entry was packed
-    /// into the sidecar. Zero when the slot is `NamedPropertyHandler::NONE`.
-    polymorphic_own_data_epochs: [u64; POLY_LIMIT],
     /// Spec 2 Phase A: per-site install generation. Bumped on every install /
     /// re-install. `AdaptiveProtoLoad` watchpoints carry the generation at
     /// registration time and no-op when this has advanced past it.
@@ -755,10 +730,6 @@ pub struct KeyedPropertyFeedback {
     /// eligible; `0` otherwise. The cache hit path compares against the runtime
     /// atom of the keyed access.
     monomorphic_named_atom: u32,
-    /// Raw `last_invalidation_epoch` u64 captured from the receiver at
-    /// named-atom cache install time. Same role as
-    /// `NamedPropertyFeedback::monomorphic_own_data_epoch`.
-    monomorphic_named_own_data_epoch: u64,
     /// Phase 3e named-atom proto cache handler — packed receiver shape,
     /// prototype shape, and slot offset derived from
     /// `named_entries[0].entry` when monomorphic, family is `NamedAtom`,
@@ -766,12 +737,6 @@ pub struct KeyedPropertyFeedback {
     /// exclusive with `monomorphic_named_own_data_handler` for any given keyed-atom
     /// site.
     monomorphic_named_proto_data_handler: NamedPropertyProtoHandler,
-    /// Raw receiver-side `last_invalidation_epoch` captured at proto-cache
-    /// install. Catches prototype swaps via the receiver epoch.
-    monomorphic_named_proto_data_receiver_epoch: u64,
-    /// Raw prototype-side `last_invalidation_epoch` captured at proto-cache
-    /// install. Catches property mutations on the prototype.
-    monomorphic_named_proto_data_prototype_epoch: u64,
     /// Phase 3d dense-index cache handler — packed shape + flags derived
     /// from `dense_entries[0]` when the cache is monomorphic and the
     /// family is `DenseIndex`. NONE otherwise.
@@ -788,9 +753,6 @@ pub struct KeyedPropertyFeedback {
     /// receiver shape (carried in the handler) and the atom against the
     /// runtime keyed access.
     polymorphic_named_atoms: [u32; POLY_LIMIT],
-    /// Raw `last_invalidation_epoch` u64 paired with each
-    /// `polymorphic_named_own_data_handlers[i]`. Zero when the slot is empty.
-    polymorphic_named_own_data_epochs: [u64; POLY_LIMIT],
     /// Phase 3f polymorphic dense-index sidecar — mirrors the first
     /// `POLY_LIMIT` `dense_entries` whenever the cache is polymorphic and
     /// the family is `DenseIndex`. Each slot is `KeyedDenseIndexHandler::NONE`
@@ -914,12 +876,8 @@ impl NamedPropertyFeedback {
             entry_count: 0,
             entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
             monomorphic_own_data_handler: NamedPropertyHandler::NONE,
-            monomorphic_own_data_epoch: 0,
             monomorphic_proto_data_handler: NamedPropertyProtoHandler::NONE,
-            monomorphic_proto_data_receiver_epoch: 0,
-            monomorphic_proto_data_prototype_epoch: 0,
             polymorphic_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
-            polymorphic_own_data_epochs: [0; POLY_LIMIT],
             generation: 0,
         }
     }
@@ -942,14 +900,10 @@ impl NamedPropertyFeedback {
     #[inline]
     const fn refresh_monomorphic_own_data_handler(&mut self) {
         self.monomorphic_own_data_handler = NamedPropertyHandler::NONE;
-        self.monomorphic_own_data_epoch = 0;
         self.monomorphic_proto_data_handler = NamedPropertyProtoHandler::NONE;
-        self.monomorphic_proto_data_receiver_epoch = 0;
-        self.monomorphic_proto_data_prototype_epoch = 0;
         let mut i = 0;
         while i < POLY_LIMIT {
             self.polymorphic_own_data_handlers[i] = NamedPropertyHandler::NONE;
-            self.polymorphic_own_data_epochs[i] = 0;
             i += 1;
         }
         match self.cache_state {
@@ -960,17 +914,12 @@ impl NamedPropertyFeedback {
                 match entry.path() {
                     NamedPropertyCachePath::OwnData => {
                         self.monomorphic_own_data_handler = NamedPropertyHandler::from_entry(entry);
-                        self.monomorphic_own_data_epoch = Self::entry_dependency_epoch(entry, 0);
                     }
                     NamedPropertyCachePath::OwnDataTransition => {}
                     NamedPropertyCachePath::PrototypeData => {
                         let handler = NamedPropertyProtoHandler::from_entry(entry);
                         if handler.is_valid() {
                             self.monomorphic_proto_data_handler = handler;
-                            self.monomorphic_proto_data_receiver_epoch =
-                                Self::entry_dependency_epoch(entry, 0);
-                            self.monomorphic_proto_data_prototype_epoch =
-                                Self::entry_dependency_epoch(entry, 1);
                         }
                     }
                 }
@@ -988,27 +937,12 @@ impl NamedPropertyFeedback {
                         let handler = NamedPropertyHandler::from_entry(entry);
                         if handler.is_valid() {
                             self.polymorphic_own_data_handlers[idx] = handler;
-                            self.polymorphic_own_data_epochs[idx] =
-                                Self::entry_dependency_epoch(entry, 0);
                         }
                     }
                     idx += 1;
                 }
             }
             InlineCacheState::Uninitialized | InlineCacheState::Megamorphic => {}
-        }
-    }
-
-    /// Helper: extract `entry.dependency(index).invalidation_epoch()`,
-    /// returning 0 for absent dependency or unset epoch. Const-fn friendly.
-    #[inline]
-    const fn entry_dependency_epoch(entry: NamedPropertyCacheEntry, index: usize) -> u64 {
-        match entry.dependency(index) {
-            Some(dependency) => match dependency.invalidation_epoch() {
-                Some(epoch) => epoch,
-                None => 0,
-            },
-            None => 0,
         }
     }
 
@@ -1163,14 +1097,10 @@ impl KeyedPropertyFeedback {
             dense_entries: [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT],
             monomorphic_named_own_data_handler: NamedPropertyHandler::NONE,
             monomorphic_named_atom: 0,
-            monomorphic_named_own_data_epoch: 0,
             monomorphic_named_proto_data_handler: NamedPropertyProtoHandler::NONE,
-            monomorphic_named_proto_data_receiver_epoch: 0,
-            monomorphic_named_proto_data_prototype_epoch: 0,
             monomorphic_dense_index_handler: KeyedDenseIndexHandler::NONE,
             polymorphic_named_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
             polymorphic_named_atoms: [0; POLY_LIMIT],
-            polymorphic_named_own_data_epochs: [0; POLY_LIMIT],
             polymorphic_dense_index_handlers: [KeyedDenseIndexHandler::NONE; POLY_LIMIT],
         }
     }
@@ -1187,15 +1117,11 @@ impl KeyedPropertyFeedback {
     fn refresh_monomorphic_own_data_handler(&mut self) {
         self.monomorphic_named_own_data_handler = NamedPropertyHandler::NONE;
         self.monomorphic_named_atom = 0;
-        self.monomorphic_named_own_data_epoch = 0;
         self.monomorphic_named_proto_data_handler = NamedPropertyProtoHandler::NONE;
-        self.monomorphic_named_proto_data_receiver_epoch = 0;
-        self.monomorphic_named_proto_data_prototype_epoch = 0;
         self.monomorphic_dense_index_handler = KeyedDenseIndexHandler::NONE;
         for slot in 0..POLY_LIMIT {
             self.polymorphic_named_own_data_handlers[slot] = NamedPropertyHandler::NONE;
             self.polymorphic_named_atoms[slot] = 0;
-            self.polymorphic_named_own_data_epochs[slot] = 0;
             self.polymorphic_dense_index_handlers[slot] = KeyedDenseIndexHandler::NONE;
         }
         match (self.cache_state, self.family) {
@@ -1205,10 +1131,7 @@ impl KeyedPropertyFeedback {
                         keyed_entry,
                         &mut self.monomorphic_named_own_data_handler,
                         &mut self.monomorphic_named_atom,
-                        &mut self.monomorphic_named_own_data_epoch,
                         &mut self.monomorphic_named_proto_data_handler,
-                        &mut self.monomorphic_named_proto_data_receiver_epoch,
-                        &mut self.monomorphic_named_proto_data_prototype_epoch,
                     );
                 }
             }
@@ -1231,11 +1154,6 @@ impl KeyedPropertyFeedback {
                     if handler.is_valid() {
                         self.polymorphic_named_own_data_handlers[slot] = handler;
                         self.polymorphic_named_atoms[slot] = keyed_entry.atom.raw();
-                        self.polymorphic_named_own_data_epochs[slot] = keyed_entry
-                            .entry
-                            .dependency(0)
-                            .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
-                            .unwrap_or(0);
                     }
                 }
             }
@@ -1254,18 +1172,13 @@ impl KeyedPropertyFeedback {
 
     /// Helper that packs the monomorphic-NamedAtom path into the supplied
     /// sidecar fields. Extracted so `refresh_monomorphic_own_data_handler` can share
-    /// the OwnData/PrototypeData branching with the polymorphic walk
-    /// without duplicating the `dependency(0..1).invalidation_epoch()`
-    /// extraction logic.
+    /// the OwnData/PrototypeData branching with the polymorphic walk.
     #[inline]
     fn populate_named_atom_monomorphic(
         keyed_entry: KeyedNamedPropertyCacheEntry,
         mono_handler: &mut NamedPropertyHandler,
         mono_atom: &mut u32,
-        mono_epoch: &mut u64,
         proto_handler: &mut NamedPropertyProtoHandler,
-        proto_receiver_epoch: &mut u64,
-        proto_prototype_epoch: &mut u64,
     ) {
         match keyed_entry.entry.path() {
             NamedPropertyCachePath::OwnData => {
@@ -1273,11 +1186,6 @@ impl KeyedPropertyFeedback {
                 if handler.is_valid() {
                     *mono_handler = handler;
                     *mono_atom = keyed_entry.atom.raw();
-                    *mono_epoch = keyed_entry
-                        .entry
-                        .dependency(0)
-                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
-                        .unwrap_or(0);
                 }
             }
             NamedPropertyCachePath::OwnDataTransition => {}
@@ -1286,16 +1194,6 @@ impl KeyedPropertyFeedback {
                 if handler.is_valid() {
                     *proto_handler = handler;
                     *mono_atom = keyed_entry.atom.raw();
-                    *proto_receiver_epoch = keyed_entry
-                        .entry
-                        .dependency(0)
-                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
-                        .unwrap_or(0);
-                    *proto_prototype_epoch = keyed_entry
-                        .entry
-                        .dependency(1)
-                        .and_then(lyng_objects::PropertyCacheDependency::invalidation_epoch)
-                        .unwrap_or(0);
                 }
             }
         }
@@ -1666,14 +1564,10 @@ impl KeyedPropertyFeedback {
         self.dense_entries = [None; POLYMORPHIC_PROPERTY_CACHE_LIMIT];
         self.monomorphic_named_own_data_handler = NamedPropertyHandler::NONE;
         self.monomorphic_named_atom = 0;
-        self.monomorphic_named_own_data_epoch = 0;
         self.monomorphic_named_proto_data_handler = NamedPropertyProtoHandler::NONE;
-        self.monomorphic_named_proto_data_receiver_epoch = 0;
-        self.monomorphic_named_proto_data_prototype_epoch = 0;
         self.monomorphic_dense_index_handler = KeyedDenseIndexHandler::NONE;
         self.polymorphic_named_own_data_handlers = [NamedPropertyHandler::NONE; POLY_LIMIT];
         self.polymorphic_named_atoms = [0; POLY_LIMIT];
-        self.polymorphic_named_own_data_epochs = [0; POLY_LIMIT];
         self.polymorphic_dense_index_handlers = [KeyedDenseIndexHandler::NONE; POLY_LIMIT];
     }
 }
@@ -2174,7 +2068,9 @@ impl FeedbackVector {
             return;
         };
         if let Some(entry @ None) = self.sites.get_mut(index) {
-            *entry = Some(FeedbackSiteState::NamedProperty(NamedPropertyFeedback::new()));
+            *entry = Some(FeedbackSiteState::NamedProperty(
+                NamedPropertyFeedback::new(),
+            ));
         }
     }
 }
@@ -2243,40 +2139,24 @@ impl Vm {
         entry.clear_ic_header();
         // Write generation AFTER clear_ic_header so it is never overwritten by
         // the blanket IC-field clear. `clear_ic_header` only touches mode and
-        // the named-property handler/epoch fields; generation is metadata, not
+        // the named-property handler fields; generation is metadata, not
         // IC state, and is deliberately excluded from that reset.
         entry.generation = generation;
         match header {
-            Some(LlIntNamedPropertyHeader::OwnInline {
-                handler_bits,
-                epoch,
-            }) => entry.set_named_own_inline_load(handler_bits, epoch),
-            Some(LlIntNamedPropertyHeader::OwnOutline {
-                handler_bits,
-                epoch,
-            }) => entry.set_named_own_outline_load(handler_bits, epoch),
+            Some(LlIntNamedPropertyHeader::OwnInline { handler_bits }) => {
+                entry.set_named_own_inline_load(handler_bits);
+            }
+            Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits }) => {
+                entry.set_named_own_outline_load(handler_bits);
+            }
             Some(LlIntNamedPropertyHeader::ProtoInline {
                 receiver_word,
                 proto_word,
-                receiver_epoch,
-                prototype_epoch,
-            }) => entry.set_named_proto_inline_load(
-                receiver_word,
-                proto_word,
-                receiver_epoch,
-                prototype_epoch,
-            ),
+            }) => entry.set_named_proto_inline_load(receiver_word, proto_word),
             Some(LlIntNamedPropertyHeader::OwnPolymorphic {
                 slot0_handler_bits,
-                slot0_epoch,
                 slot1_handler_bits,
-                slot1_epoch,
-            }) => entry.set_named_own_polymorphic(
-                slot0_handler_bits,
-                slot0_epoch,
-                slot1_handler_bits,
-                slot1_epoch,
-            ),
+            }) => entry.set_named_own_polymorphic(slot0_handler_bits, slot1_handler_bits),
             None => {}
         }
     }
@@ -2287,7 +2167,7 @@ impl Vm {
     }
 
     #[inline]
-    const fn named_own_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
+    const fn named_own_inline_load_header(site: &FeedbackSiteState) -> Option<u64> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2295,11 +2175,11 @@ impl Vm {
         if !handler.is_valid() || !matches!(handler.slot_location(), SlotLocation::Inline(_)) {
             return None;
         }
-        Some((handler.bits(), feedback.monomorphic_own_data_epoch))
+        Some(handler.bits())
     }
 
     #[inline]
-    const fn named_own_outline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
+    const fn named_own_outline_load_header(site: &FeedbackSiteState) -> Option<u64> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2307,13 +2187,11 @@ impl Vm {
         if !handler.is_valid() || !matches!(handler.slot_location(), SlotLocation::OutOfLine(_)) {
             return None;
         }
-        Some((handler.bits(), feedback.monomorphic_own_data_epoch))
+        Some(handler.bits())
     }
 
     #[inline]
-    const fn named_proto_inline_load_header(
-        site: &FeedbackSiteState,
-    ) -> Option<(u64, u64, u64, u64)> {
+    const fn named_proto_inline_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2321,12 +2199,7 @@ impl Vm {
         if !handler.is_valid() || !matches!(handler.slot_location(), SlotLocation::Inline(_)) {
             return None;
         }
-        Some((
-            handler.receiver_word(),
-            handler.proto_word(),
-            feedback.monomorphic_proto_data_receiver_epoch,
-            feedback.monomorphic_proto_data_prototype_epoch,
-        ))
+        Some((handler.receiver_word(), handler.proto_word()))
     }
 
     /// Phase 3f polymorphic-OwnData header projection. Reports the two
@@ -2338,9 +2211,7 @@ impl Vm {
     /// filled poly state stays on the slow path until that walk is
     /// extended.
     #[inline]
-    const fn named_own_polymorphic_load_header(
-        site: &FeedbackSiteState,
-    ) -> Option<(u64, u64, u64, u64)> {
+    const fn named_own_polymorphic_load_header(site: &FeedbackSiteState) -> Option<(u64, u64)> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
         };
@@ -2354,49 +2225,33 @@ impl Vm {
         {
             return None;
         }
-        Some((
-            handler0.bits(),
-            feedback.polymorphic_own_data_epochs[0],
-            handler1.bits(),
-            feedback.polymorphic_own_data_epochs[1],
-        ))
+        Some((handler0.bits(), handler1.bits()))
     }
 
     #[inline]
     fn named_llint_load_header(site: &FeedbackSiteState) -> Option<LlIntNamedPropertyHeader> {
-        if let Some((handler_bits, epoch)) = Self::named_own_inline_load_header(site) {
-            return Some(LlIntNamedPropertyHeader::OwnInline {
-                handler_bits,
-                epoch,
-            });
+        if let Some(handler_bits) = Self::named_own_inline_load_header(site) {
+            return Some(LlIntNamedPropertyHeader::OwnInline { handler_bits });
         }
-        if let Some((handler_bits, epoch)) = Self::named_own_outline_load_header(site) {
-            return Some(LlIntNamedPropertyHeader::OwnOutline {
-                handler_bits,
-                epoch,
-            });
+        if let Some(handler_bits) = Self::named_own_outline_load_header(site) {
+            return Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits });
         }
         // Polymorphic OwnData takes precedence over ProtoInline — when the
         // IC has transitioned to polymorphic, the monomorphic-proto handler
         // word is NONE, so the order here is monomorphic-Own → polymorphic-
         // Own → monomorphic-Proto for clarity.
-        if let Some((slot0_handler_bits, slot0_epoch, slot1_handler_bits, slot1_epoch)) =
+        if let Some((slot0_handler_bits, slot1_handler_bits)) =
             Self::named_own_polymorphic_load_header(site)
         {
             return Some(LlIntNamedPropertyHeader::OwnPolymorphic {
                 slot0_handler_bits,
-                slot0_epoch,
                 slot1_handler_bits,
-                slot1_epoch,
             });
         }
-        let (receiver_word, proto_word, receiver_epoch, prototype_epoch) =
-            Self::named_proto_inline_load_header(site)?;
+        let (receiver_word, proto_word) = Self::named_proto_inline_load_header(site)?;
         Some(LlIntNamedPropertyHeader::ProtoInline {
             receiver_word,
             proto_word,
-            receiver_epoch,
-            prototype_epoch,
         })
     }
 
@@ -2650,57 +2505,51 @@ impl Vm {
         });
     }
 
-    /// Read the bit-packed monomorphic `OwnData` IC handler plus its paired
-    /// dependency-invalidation epoch for one feedback slot. Returns `None`
-    /// when the slot is absent, the site isn't a named-property site, or the
-    /// cache is in any state other than monomorphic-OwnData. The caller
-    /// must check the epoch against the receiver's current raw epoch to
-    /// detect non-shape invalidations (prototype mutation, dictionary
-    /// transition, etc.) — see `record_matches_cache_dependency`. Phase 3
-    /// IC cache hit path entry point.
+    /// Read the bit-packed monomorphic `OwnData` IC handler for one feedback
+    /// slot. Returns `None` when the slot is absent, the site isn't a
+    /// named-property site, or the cache is in any state other than
+    /// monomorphic-OwnData. Phase 3 IC cache hit path entry point.
+    ///
+    /// Spec 2 Phase A: epoch comparisons are no longer needed because
+    /// `AdaptiveProtoLoad` watchpoints registered at IC install time fire
+    /// on any proto-chain mutation and clear the IC slot before the next
+    /// cache-hit read.
     #[inline(always)]
     pub(super) fn named_property_own_data_handler(
         &self,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
-    ) -> Option<(NamedPropertyHandler, u64)> {
+    ) -> Option<NamedPropertyHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         match site {
             FeedbackSiteState::NamedProperty(feedback)
                 if feedback.monomorphic_own_data_handler.is_valid() =>
             {
-                Some((
-                    feedback.monomorphic_own_data_handler,
-                    feedback.monomorphic_own_data_epoch,
-                ))
+                Some(feedback.monomorphic_own_data_handler)
             }
             _ => None,
         }
     }
 
-    /// Read the bit-packed one-hop `PrototypeData` IC handler plus its paired
-    /// receiver and prototype invalidation epochs for one feedback slot.
-    /// Returns `None` when the slot is absent, the site isn't a named-
-    /// property site, or the cache is in any state other than monomorphic
-    /// one-hop `PrototypeData` (`dependency_count == 2`). Phase 3e IC cache
-    /// path entry point — mirrors [`Self::named_property_own_data_handler`]
-    /// but for the prototype-method-dispatch hot path.
+    /// Read the bit-packed one-hop `PrototypeData` IC handler for one
+    /// feedback slot. Returns `None` when the slot is absent, the site
+    /// isn't a named-property site, or the cache is in any state other
+    /// than monomorphic one-hop `PrototypeData` (`dependency_count == 2`).
+    /// Phase 3e IC cache path entry point — mirrors
+    /// [`Self::named_property_own_data_handler`] but for the
+    /// prototype-method-dispatch hot path.
     #[inline(always)]
     pub(super) fn named_property_proto_data_handler(
         &self,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
-    ) -> Option<(NamedPropertyProtoHandler, u64, u64)> {
+    ) -> Option<NamedPropertyProtoHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         match site {
             FeedbackSiteState::NamedProperty(feedback)
                 if feedback.monomorphic_proto_data_handler.is_valid() =>
             {
-                Some((
-                    feedback.monomorphic_proto_data_handler,
-                    feedback.monomorphic_proto_data_receiver_epoch,
-                    feedback.monomorphic_proto_data_prototype_epoch,
-                ))
+                Some(feedback.monomorphic_proto_data_handler)
             }
             _ => None,
         }
@@ -2727,7 +2576,7 @@ impl Vm {
     }
 
     /// Phase 3d named-keyed cache handler lookup. Returns the packed
-    /// `NamedPropertyHandler` and its dependency epoch only when:
+    /// `NamedPropertyHandler` only when:
     ///   - the site is a `KeyedProperty` site,
     ///   - cache state is monomorphic + family is `NamedAtom`,
     ///   - the cached atom equals the runtime `atom`.
@@ -2737,25 +2586,21 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         atom: AtomId,
-    ) -> Option<(NamedPropertyHandler, u64)> {
+    ) -> Option<NamedPropertyHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         match site {
             FeedbackSiteState::KeyedProperty(feedback)
                 if feedback.monomorphic_named_atom == atom.raw()
                     && feedback.monomorphic_named_own_data_handler.is_valid() =>
             {
-                Some((
-                    feedback.monomorphic_named_own_data_handler,
-                    feedback.monomorphic_named_own_data_epoch,
-                ))
+                Some(feedback.monomorphic_named_own_data_handler)
             }
             _ => None,
         }
     }
 
     /// Phase 3e named-keyed proto cache handler lookup. Returns the packed
-    /// `NamedPropertyProtoHandler` plus the receiver and prototype
-    /// invalidation epochs only when:
+    /// `NamedPropertyProtoHandler` only when:
     ///   - the site is a `KeyedProperty` site,
     ///   - cache state is monomorphic + family is `NamedAtom`,
     ///   - the cached atom equals the runtime `atom`,
@@ -2766,18 +2611,14 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         atom: AtomId,
-    ) -> Option<(NamedPropertyProtoHandler, u64, u64)> {
+    ) -> Option<NamedPropertyProtoHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         match site {
             FeedbackSiteState::KeyedProperty(feedback)
                 if feedback.monomorphic_named_atom == atom.raw()
                     && feedback.monomorphic_named_proto_data_handler.is_valid() =>
             {
-                Some((
-                    feedback.monomorphic_named_proto_data_handler,
-                    feedback.monomorphic_named_proto_data_receiver_epoch,
-                    feedback.monomorphic_named_proto_data_prototype_epoch,
-                ))
+                Some(feedback.monomorphic_named_proto_data_handler)
             }
             _ => None,
         }
@@ -2803,21 +2644,21 @@ impl Vm {
         }
     }
 
-    /// Phase 3f polymorphic-OwnData IC lookup lookup. Walks the
+    /// Phase 3f polymorphic-OwnData IC lookup. Walks the
     /// `[NamedPropertyHandler; POLY_LIMIT]` sidecar for a shape match,
-    /// returning the matching packed handler and its dependency epoch on
-    /// hit. Returns `None` when the slot is absent, the site isn't a
-    /// named-property site, the cache isn't polymorphic, or no cached
-    /// shape matches. Sibling to [`Self::named_property_own_data_handler`]
-    /// for shapes `2..POLY_LIMIT`; the inline call site checks the
-    /// monomorphic word first, then walks here on miss.
+    /// returning the matching packed handler on hit. Returns `None` when
+    /// the slot is absent, the site isn't a named-property site, the
+    /// cache isn't polymorphic, or no cached shape matches. Sibling to
+    /// [`Self::named_property_own_data_handler`] for shapes
+    /// `2..POLY_LIMIT`; the inline call site checks the monomorphic word
+    /// first, then walks here on miss.
     #[inline(always)]
     pub(super) fn named_property_polymorphic_own_data_handler(
         &self,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         receiver_shape: ShapeId,
-    ) -> Option<(NamedPropertyHandler, u64)> {
+    ) -> Option<NamedPropertyHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         let FeedbackSiteState::NamedProperty(feedback) = site else {
             return None;
@@ -2826,7 +2667,7 @@ impl Vm {
         for slot_index in 0..POLY_LIMIT {
             let handler = feedback.polymorphic_own_data_handlers[slot_index];
             if handler.is_valid() && handler.receiver_shape() == target {
-                return Some((handler, feedback.polymorphic_own_data_epochs[slot_index]));
+                return Some(handler);
             }
         }
         None
@@ -2844,7 +2685,7 @@ impl Vm {
         slot: Option<FeedbackSlotId>,
         atom: AtomId,
         receiver_shape: ShapeId,
-    ) -> Option<(NamedPropertyHandler, u64)> {
+    ) -> Option<NamedPropertyHandler> {
         let site = self.feedback_site_for_slot(code, slot?)?;
         let FeedbackSiteState::KeyedProperty(feedback) = site else {
             return None;
@@ -2857,10 +2698,7 @@ impl Vm {
                 && feedback.polymorphic_named_atoms[slot_index] == atom_raw
                 && handler.receiver_shape() == target
             {
-                return Some((
-                    handler,
-                    feedback.polymorphic_named_own_data_epochs[slot_index],
-                ));
+                return Some(handler);
             }
         }
         None
@@ -3312,21 +3150,17 @@ impl Vm {
             for (i, entry) in flat.iter().enumerate() {
                 if entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     || entry.named_handler_bits() != 0
-                    || entry.named_epoch() != 0
                     || entry.named_aux_bits() != 0
-                    || entry.named_aux_epoch() != 0
                     || entry.scalar_observed_bits() != 0
                     || entry.scalar_execution_count() != 0
                 {
                     return Err((
                         i,
                         format!(
-                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
+                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
                             entry.mode(),
                             entry.named_handler_bits(),
-                            entry.named_epoch(),
                             entry.named_aux_bits(),
-                            entry.named_aux_epoch(),
                             entry.scalar_observed_bits(),
                             entry.scalar_execution_count(),
                         ),
@@ -3349,39 +3183,27 @@ impl Vm {
         for (i, (legacy, flat_entry)) in legacy_sites.iter().zip(flat.iter()).enumerate() {
             let expected = legacy.as_ref().and_then(Self::named_llint_load_header);
             match expected {
-                Some(LlIntNamedPropertyHeader::OwnInline {
-                    handler_bits,
-                    epoch,
-                }) if flat_entry.mode()
-                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
-                    && flat_entry.named_handler_bits() == handler_bits
-                    && flat_entry.named_epoch() == epoch
-                    && flat_entry.named_aux_bits() == 0
-                    && flat_entry.named_aux_epoch() == 0
-                    && flat_entry.scalar_observed_bits() == 0
-                    && flat_entry.scalar_execution_count() == 0 => {}
-                Some(LlIntNamedPropertyHeader::OwnOutline {
-                    handler_bits,
-                    epoch,
-                }) if flat_entry.mode()
-                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD
-                    && flat_entry.named_handler_bits() == handler_bits
-                    && flat_entry.named_epoch() == epoch
-                    && flat_entry.named_aux_bits() == 0
-                    && flat_entry.named_aux_epoch() == 0
-                    && flat_entry.scalar_observed_bits() == 0
-                    && flat_entry.scalar_execution_count() == 0 => {}
+                Some(LlIntNamedPropertyHeader::OwnInline { handler_bits })
+                    if flat_entry.mode()
+                        == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
+                        && flat_entry.named_handler_bits() == handler_bits
+                        && flat_entry.named_aux_bits() == 0
+                        && flat_entry.scalar_observed_bits() == 0
+                        && flat_entry.scalar_execution_count() == 0 => {}
+                Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits })
+                    if flat_entry.mode()
+                        == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD
+                        && flat_entry.named_handler_bits() == handler_bits
+                        && flat_entry.named_aux_bits() == 0
+                        && flat_entry.scalar_observed_bits() == 0
+                        && flat_entry.scalar_execution_count() == 0 => {}
                 Some(LlIntNamedPropertyHeader::ProtoInline {
                     receiver_word,
                     proto_word,
-                    receiver_epoch,
-                    prototype_epoch,
                 }) if flat_entry.mode()
                     == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD
                     && flat_entry.named_handler_bits() == proto_word
-                    && flat_entry.named_epoch() == receiver_epoch
                     && flat_entry.named_aux_bits() == receiver_word
-                    && flat_entry.named_aux_epoch() == prototype_epoch
                     && flat_entry.scalar_observed_bits() == 0
                     && flat_entry.scalar_execution_count() == 0 => {}
                 Some(expected) => {
@@ -3392,21 +3214,17 @@ impl Vm {
                 }
                 None if flat_entry.mode() == crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
                     && flat_entry.named_handler_bits() == 0
-                    && flat_entry.named_epoch() == 0
                     && flat_entry.named_aux_bits() == 0
-                    && flat_entry.named_aux_epoch() == 0
                     && flat_entry.scalar_observed_bits() == 0
                     && flat_entry.scalar_execution_count() == 0 => {}
                 None => {
                     return Err((
                         i,
                         format!(
-                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
+                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
                             flat_entry.mode(),
                             flat_entry.named_handler_bits(),
-                            flat_entry.named_epoch(),
                             flat_entry.named_aux_bits(),
-                            flat_entry.named_aux_epoch(),
                             flat_entry.scalar_observed_bits(),
                             flat_entry.scalar_execution_count()
                         ),
@@ -3423,46 +3241,34 @@ impl Vm {
         flat_entry: &crate::dsl::feedback_flat::FeedbackEntry,
     ) -> String {
         let expected_text = match expected {
-            LlIntNamedPropertyHeader::OwnInline {
-                handler_bits,
-                epoch,
-            } => format!(
-                "mode={} handler={handler_bits:#x} epoch={epoch} aux_bits=0x0 aux_epoch=0",
+            LlIntNamedPropertyHeader::OwnInline { handler_bits } => format!(
+                "mode={} handler={handler_bits:#x} aux_bits=0x0",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
             ),
-            LlIntNamedPropertyHeader::OwnOutline {
-                handler_bits,
-                epoch,
-            } => format!(
-                "mode={} handler={handler_bits:#x} epoch={epoch} aux_bits=0x0 aux_epoch=0",
+            LlIntNamedPropertyHeader::OwnOutline { handler_bits } => format!(
+                "mode={} handler={handler_bits:#x} aux_bits=0x0",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD,
             ),
             LlIntNamedPropertyHeader::ProtoInline {
                 receiver_word,
                 proto_word,
-                receiver_epoch,
-                prototype_epoch,
             } => format!(
-                "mode={} handler={proto_word:#x} epoch={receiver_epoch} aux_bits={receiver_word:#x} aux_epoch={prototype_epoch}",
+                "mode={} handler={proto_word:#x} aux_bits={receiver_word:#x}",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
             ),
             LlIntNamedPropertyHeader::OwnPolymorphic {
                 slot0_handler_bits,
-                slot0_epoch,
                 slot1_handler_bits,
-                slot1_epoch,
             } => format!(
-                "mode={} handler={slot0_handler_bits:#x} epoch={slot0_epoch} aux_bits={slot1_handler_bits:#x} aux_epoch={slot1_epoch}",
+                "mode={} handler={slot0_handler_bits:#x} aux_bits={slot1_handler_bits:#x}",
                 crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
             ),
         };
         format!(
-            "slot {slot_index} header diverges: expected {expected_text}, flat mode={} handler={:#x} epoch={} aux_bits={:#x} aux_epoch={} scalar_observed={:#x} scalar_count={}",
+            "slot {slot_index} header diverges: expected {expected_text}, flat mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
             flat_entry.mode(),
             flat_entry.named_handler_bits(),
-            flat_entry.named_epoch(),
             flat_entry.named_aux_bits(),
-            flat_entry.named_aux_epoch(),
             flat_entry.scalar_observed_bits(),
             flat_entry.scalar_execution_count()
         )
@@ -3485,17 +3291,13 @@ impl Vm {
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
-    ) -> Option<(u8, u64, u64)> {
+    ) -> Option<(u8, u64)> {
         let slot_index = Self::flat_feedback_slot_index(slot)?;
         let entry = self
             .feedback_flat_storage
             .get(code_index(code))?
             .get(slot_index)?;
-        Some((
-            entry.mode(),
-            entry.named_handler_bits(),
-            entry.named_epoch(),
-        ))
+        Some((entry.mode(), entry.named_handler_bits()))
     }
 
     #[cfg(test)]

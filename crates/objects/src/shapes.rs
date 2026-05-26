@@ -50,22 +50,17 @@ impl InvalidationEvent {
     }
 }
 
-/// One shape/invalidation dependency recorded by a property inline-cache entry.
+/// One shape dependency recorded by a property inline-cache entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PropertyCacheDependency {
     object: ObjectRef,
     shape: ShapeId,
-    invalidation_epoch: Option<u64>,
 }
 
 impl PropertyCacheDependency {
     #[inline]
-    pub const fn new(object: ObjectRef, shape: ShapeId, invalidation_epoch: Option<u64>) -> Self {
-        Self {
-            object,
-            shape,
-            invalidation_epoch,
-        }
+    pub const fn new(object: ObjectRef, shape: ShapeId) -> Self {
+        Self { object, shape }
     }
 
     #[inline]
@@ -76,11 +71,6 @@ impl PropertyCacheDependency {
     #[inline]
     pub const fn shape(self) -> ShapeId {
         self.shape
-    }
-
-    #[inline]
-    pub const fn invalidation_epoch(self) -> Option<u64> {
-        self.invalidation_epoch
     }
 }
 

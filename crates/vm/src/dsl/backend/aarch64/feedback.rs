@@ -14,12 +14,8 @@
 //! - `{feedback_mode}` — byte offset of the `LLInt` IC mode byte.
 //! - `{feedback_named_handler_bits}` — byte offset of the packed named
 //!   property handler word.
-//! - `{feedback_named_epoch}` — byte offset of the named-property
-//!   invalidation epoch snapshot.
 //! - `{feedback_named_aux_bits}` — byte offset of the auxiliary
 //!   named-property handler word.
-//! - `{feedback_named_aux_epoch}` — byte offset of the auxiliary
-//!   named-property invalidation epoch snapshot.
 //! - `{entry_observed}` — byte offset of the "observed types" word
 //!   inside `FeedbackEntry`.
 //! - `{feedback_scalar_execution_count}` — byte offset of the pending
@@ -134,32 +130,6 @@ macro_rules! load_named_aux_bits {
             ", [x",
             stringify!($entry),
             ", {feedback_named_aux_bits}]\n",
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! load_named_epoch {
-    ($entry:tt => $dst:tt) => {
-        concat!(
-            "ldr    x",
-            stringify!($dst),
-            ", [x",
-            stringify!($entry),
-            ", {feedback_named_epoch}]\n",
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! load_named_aux_epoch {
-    ($entry:tt => $dst:tt) => {
-        concat!(
-            "ldr    x",
-            stringify!($dst),
-            ", [x",
-            stringify!($entry),
-            ", {feedback_named_aux_epoch}]\n",
         )
     };
 }
