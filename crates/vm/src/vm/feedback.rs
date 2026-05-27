@@ -729,7 +729,7 @@ impl Vm {
         self.tiering.observe_feedback_event(code);
         // Always lazily create the state entry and bump execution_count.
         // IC state stays Uninitialized.
-        let state = self.property_ic_states.entry((code, slot)).or_default();
+        let state = self.property_ic_state_or_default_mut(code, slot);
         state.execution_count = state.execution_count.saturating_add(1);
     }
 
@@ -831,12 +831,21 @@ impl Vm {
         if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        // Mutate CallIcState directly (Phase D.2.4 inversion).
-        let call_state = self.call_ic_states.entry((code, slot)).or_default();
-        call_state.execution_count = call_state.execution_count.saturating_add(1);
+        // Split-borrow: &mut CallIcState (via Vec slab) + &mut call_cache_entries.
         let cache_entry = CallCacheEntry::from_callee(agent, callee);
-        let cache_storage = self
-            .call_cache_entries
+        let Self {
+            call_ic_states,
+            call_cache_entries,
+            ..
+        } = self;
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slab = call_ic_states[index]
+            .as_deref_mut()
+            .expect("call_ic_states slab must be allocated at install");
+        let call_state = slab[slot_zero].get_or_insert_with(CallIcState::default);
+        call_state.execution_count = call_state.execution_count.saturating_add(1);
+        let cache_storage = call_cache_entries
             .entry((code, slot))
             .or_insert_with(|| Box::new(CallCacheStorage::default()));
         observe_call_target_on_state(call_state, cache_storage, cache_entry);
@@ -857,7 +866,7 @@ impl Vm {
         callee: ObjectRef,
     ) -> Option<BuiltinFunctionId> {
         let slot = slot?;
-        let ic_state = self.call_ic_states.get(&(code, slot))?;
+        let ic_state = self.call_ic_state(code, slot)?;
         if ic_state.cache_state != InlineCacheState::Monomorphic {
             return None;
         }
@@ -886,11 +895,21 @@ impl Vm {
         if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        let construct_state = self.construct_ic_states.entry((code, slot)).or_default();
-        construct_state.execution_count = construct_state.execution_count.saturating_add(1);
+        // Split-borrow: &mut CallIcState (via construct slab) + &mut construct_cache_entries.
         let cache_entry = ConstructCacheEntry::from_constructor(agent, constructor, created);
-        let cache_storage = self
-            .construct_cache_entries
+        let Self {
+            construct_ic_states,
+            construct_cache_entries,
+            ..
+        } = self;
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slab = construct_ic_states[index]
+            .as_deref_mut()
+            .expect("construct_ic_states slab must be allocated at install");
+        let construct_state = slab[slot_zero].get_or_insert_with(CallIcState::default);
+        construct_state.execution_count = construct_state.execution_count.saturating_add(1);
+        let cache_storage = construct_cache_entries
             .entry((code, slot))
             .or_insert_with(|| Box::new(ConstructCacheStorage::default()));
         observe_construct_target_on_state(
@@ -922,7 +941,7 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
     ) -> Option<NamedPropertyHandler> {
-        let state = self.property_ic_states.get(&(code, slot?))?;
+        let state = self.property_ic_state(code, slot?)?;
         if state.monomorphic_own_data_handler.is_valid() {
             Some(state.monomorphic_own_data_handler)
         } else {
@@ -938,7 +957,7 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
     ) -> Option<NamedPropertyProtoHandler> {
-        let state = self.property_ic_states.get(&(code, slot?))?;
+        let state = self.property_ic_state(code, slot?)?;
         if state.monomorphic_proto_data_handler.is_valid() {
             Some(state.monomorphic_proto_data_handler)
         } else {
@@ -956,7 +975,7 @@ impl Vm {
     /// the update to match the old `FeedbackVector::site_mut` gate.
     #[inline(always)]
     pub(super) fn record_named_property_cache_hit(&mut self, code: CodeRef, slot: FeedbackSlotId) {
-        let Some(state) = self.property_ic_states.get_mut(&(code, slot)) else {
+        let Some(state) = self.property_ic_state_mut(code, slot) else {
             self.tiering.observe_feedback_event(code);
             return;
         };
@@ -986,7 +1005,7 @@ impl Vm {
         slot: Option<FeedbackSlotId>,
         atom: AtomId,
     ) -> Option<NamedPropertyHandler> {
-        let state = self.keyed_property_ic_states.get(&(code, slot?))?;
+        let state = self.keyed_property_ic_state(code, slot?)?;
         if state.monomorphic_named_atom == atom.raw()
             && state.monomorphic_named_own_data_handler.is_valid()
         {
@@ -1004,7 +1023,7 @@ impl Vm {
         slot: Option<FeedbackSlotId>,
         atom: AtomId,
     ) -> Option<NamedPropertyProtoHandler> {
-        let state = self.keyed_property_ic_states.get(&(code, slot?))?;
+        let state = self.keyed_property_ic_state(code, slot?)?;
         if state.monomorphic_named_atom == atom.raw()
             && state.monomorphic_named_proto_data_handler.is_valid()
         {
@@ -1021,7 +1040,7 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
     ) -> Option<KeyedDenseIndexHandler> {
-        let state = self.keyed_property_ic_states.get(&(code, slot?))?;
+        let state = self.keyed_property_ic_state(code, slot?)?;
         if state.monomorphic_dense_index_handler.is_valid() {
             Some(state.monomorphic_dense_index_handler)
         } else {
@@ -1037,7 +1056,7 @@ impl Vm {
         slot: Option<FeedbackSlotId>,
         receiver_shape: ShapeId,
     ) -> Option<NamedPropertyHandler> {
-        let state = self.property_ic_states.get(&(code, slot?))?;
+        let state = self.property_ic_state(code, slot?)?;
         let target = Some(receiver_shape);
         for slot_index in 0..POLY_LIMIT {
             let handler = state.polymorphic_own_data_handlers[slot_index];
@@ -1057,7 +1076,7 @@ impl Vm {
         atom: AtomId,
         receiver_shape: ShapeId,
     ) -> Option<NamedPropertyHandler> {
-        let state = self.keyed_property_ic_states.get(&(code, slot?))?;
+        let state = self.keyed_property_ic_state(code, slot?)?;
         let target = Some(receiver_shape);
         let atom_raw = atom.raw();
         for slot_index in 0..POLY_LIMIT {
@@ -1079,7 +1098,7 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
     ) -> Option<&[KeyedDenseIndexHandler; POLY_LIMIT]> {
-        let state = self.keyed_property_ic_states.get(&(code, slot?))?;
+        let state = self.keyed_property_ic_state(code, slot?)?;
         if matches!(state.cache_state, InlineCacheState::Polymorphic)
             && state.family == Some(KeyedIcFamily::DenseIndex)
         {
@@ -1099,7 +1118,7 @@ impl Vm {
         receiver: ObjectRef,
     ) -> Option<Value> {
         let slot = slot?;
-        let state = self.property_ic_states.get(&(code, slot))?;
+        let state = self.property_ic_state(code, slot)?;
         let chain = self.polymorphic_chains.get(&(code, slot));
         let value = state.try_load(agent, chain, receiver)?;
         // Hit: bump execution count and keep PropertyMetadata in sync.
@@ -1108,7 +1127,7 @@ impl Vm {
         // scenario), the next hit from the Rust direct-dispatch path restores
         // it — fixing the C4 invariant: asm → slow handler → Rust direct hit
         // must refresh the mode byte before returning.
-        let state = self.property_ic_states.entry((code, slot)).or_default();
+        let state = self.property_ic_state_or_default_mut(code, slot);
         state.execution_count = state.execution_count.saturating_add(1);
         let llint_header = Self::named_llint_load_header_from_state(state);
         let generation = state.generation;
@@ -1136,7 +1155,7 @@ impl Vm {
         value: Value,
     ) -> Option<bool> {
         let slot = slot?;
-        let state = self.property_ic_states.get(&(code, slot))?;
+        let state = self.property_ic_state(code, slot)?;
         let chain = self.polymorphic_chains.get(&(code, slot));
         state.try_store(agent, chain, receiver, atom, value)
     }
@@ -1217,12 +1236,20 @@ impl Vm {
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
+        // Split-borrow: we need &mut PropertyIcState and &mut polymorphic_chains
+        // at the same time. Project into the Vec slab without going through the
+        // accessor (which would borrow `self` mutably and block the chains field).
         let Self {
             property_ic_states,
             polymorphic_chains,
             ..
         } = self;
-        let state = property_ic_states.entry((code, slot)).or_default();
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slab = property_ic_states[index]
+            .as_deref_mut()
+            .expect("property_ic_states slab must be allocated at install");
+        let state = slab[slot_zero].get_or_insert_with(PropertyIcState::default);
         Self::named_property_observe_slow_path_on_state(
             state,
             polymorphic_chains,
@@ -1428,7 +1455,7 @@ impl Vm {
         atom: AtomId,
     ) -> Option<Value> {
         let slot = slot?;
-        let state = self.keyed_property_ic_states.get(&(code, slot))?;
+        let state = self.keyed_property_ic_state(code, slot)?;
         let named_entries = self.keyed_property_named_entries.get(&(code, slot));
         try_keyed_named_load(state, named_entries, agent, receiver, atom)
     }
@@ -1443,7 +1470,7 @@ impl Vm {
         value: Value,
     ) -> Option<bool> {
         let slot = slot?;
-        let state = self.keyed_property_ic_states.get(&(code, slot))?;
+        let state = self.keyed_property_ic_state(code, slot)?;
         let named_entries = self.keyed_property_named_entries.get(&(code, slot));
         try_keyed_named_store(state, named_entries, agent, receiver, atom, value)
     }
@@ -1457,7 +1484,7 @@ impl Vm {
         index: u32,
     ) -> Option<Value> {
         let slot = slot?;
-        let state = self.keyed_property_ic_states.get(&(code, slot))?;
+        let state = self.keyed_property_ic_state(code, slot)?;
         let dense_entries = &state.dense_entries;
         let dense_entry_count = state.dense_entry_count;
         let family = state.family;
@@ -1487,10 +1514,7 @@ impl Vm {
         let value = Self::dense_value_from_header(agent, header, index)?;
 
         // Hit: bump keyed state execution count.
-        let state = self
-            .keyed_property_ic_states
-            .entry((code, slot))
-            .or_default();
+        let state = self.keyed_property_ic_state_or_default_mut(code, slot);
         state.execution_count = state.execution_count.wrapping_add(1);
         let ec = state.execution_count;
         if let Some(table) = self.metadata_table_mut(code) {
@@ -1513,7 +1537,7 @@ impl Vm {
         if value == Value::array_hole() {
             return None;
         }
-        let state = self.keyed_property_ic_states.get(&(code, slot))?;
+        let state = self.keyed_property_ic_state(code, slot)?;
         if state.family != Some(KeyedIcFamily::DenseIndex) {
             return None;
         }
@@ -1557,10 +1581,7 @@ impl Vm {
             return None;
         }
         // Hit: bump execution count.
-        let state = self
-            .keyed_property_ic_states
-            .entry((code, slot))
-            .or_default();
+        let state = self.keyed_property_ic_state_or_default_mut(code, slot);
         state.execution_count = state.execution_count.wrapping_add(1);
         let ec = state.execution_count;
         if let Some(table) = self.metadata_table_mut(code) {
@@ -1613,12 +1634,20 @@ impl Vm {
         atom: AtomId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
-        let state = self
-            .keyed_property_ic_states
-            .entry((code, slot))
-            .or_default();
-        let named_entries = self
-            .keyed_property_named_entries
+        // Split-borrow: we need &mut KeyedPropertyIcState and &mut named_entries
+        // map simultaneously.
+        let Self {
+            keyed_property_ic_states,
+            keyed_property_named_entries,
+            ..
+        } = self;
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slab = keyed_property_ic_states[index]
+            .as_deref_mut()
+            .expect("keyed_property_ic_states slab must be allocated at install");
+        let state = slab[slot_zero].get_or_insert_with(KeyedPropertyIcState::default);
+        let named_entries = keyed_property_named_entries
             .entry((code, slot))
             .or_default();
         keyed_observe_named_atom_slow_path(state, named_entries, atom, plan);
@@ -1647,10 +1676,7 @@ impl Vm {
         if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        let state = self
-            .keyed_property_ic_states
-            .entry((code, slot))
-            .or_default();
+        let state = self.keyed_property_ic_state_or_default_mut(code, slot);
         let changed = keyed_observe_dense_index_on_state(state, plan);
         let cache_state = state.cache_state;
         let ec = state.execution_count;
@@ -1689,10 +1715,7 @@ impl Vm {
         if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        let state = self
-            .keyed_property_ic_states
-            .entry((code, slot))
-            .or_default();
+        let state = self.keyed_property_ic_state_or_default_mut(code, slot);
         keyed_observe_generic_on_state(state);
         let cache_state = state.cache_state;
         let ec = state.execution_count;
@@ -1776,15 +1799,15 @@ impl Vm {
         slot: FeedbackSlotId,
     ) -> Option<u32> {
         // For NamedProperty slots, read from PropertyIcState.
-        if let Some(state) = self.property_ic_states.get(&(code, slot)) {
+        if let Some(state) = self.property_ic_state(code, slot) {
             return Some(state.execution_count);
         }
         // For Call slots, read from CallIcState.
-        if let Some(state) = self.call_ic_states.get(&(code, slot)) {
+        if let Some(state) = self.call_ic_state(code, slot) {
             return Some(state.execution_count);
         }
         // For Construct slots, read from ConstructIcState.
-        if let Some(state) = self.construct_ic_states.get(&(code, slot)) {
+        if let Some(state) = self.construct_ic_state(code, slot) {
             return Some(state.execution_count);
         }
         // Arithmetic and Comparison slots have no Rust-side state (Phase D.1.0).
@@ -1801,7 +1824,7 @@ impl Vm {
         u8,
         Option<lyng_objects::NamedPropertyCachePath>,
     )> {
-        let state = self.property_ic_states.get(&(code, slot))?;
+        let state = self.property_ic_state(code, slot)?;
         Some((
             match state.cache_state {
                 InlineCacheState::Uninitialized => "Uninitialized",
@@ -1822,7 +1845,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<(&'static str, u32)> {
-        let state = self.property_ic_states.get(&(code, slot))?;
+        let state = self.property_ic_state(code, slot)?;
         Some((
             match state.cache_state {
                 InlineCacheState::Uninitialized => "Uninitialized",
@@ -1844,7 +1867,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> bool {
-        self.property_ic_states.contains_key(&(code, slot))
+        self.property_ic_state(code, slot).is_some()
     }
 
     #[cfg(test)]
@@ -1853,7 +1876,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<(&'static str, Option<&'static str>, u8)> {
-        let state = self.keyed_property_ic_states.get(&(code, slot))?;
+        let state = self.keyed_property_ic_state(code, slot)?;
         Some((
             match state.cache_state {
                 InlineCacheState::Uninitialized => "Uninitialized",
@@ -2675,20 +2698,19 @@ impl Vm {
         expected_generation: u32,
     ) {
         let matches = self
-            .property_ic_states
-            .get(&(code, slot))
+            .property_ic_state(code, slot)
             .is_some_and(|s| s.generation == expected_generation);
         if !matches {
             return;
         }
-        // Remove the entry entirely — next slow-path visit will re-insert a
+        // Clear the slot entry — next slow-path visit will re-insert a
         // fresh default. This satisfies the D4 invariant: after a watchpoint
         // fire, `property_ic_state(code, slot)` must return `None`.
-        self.property_ic_states.remove(&(code, slot));
+        self.clear_property_ic_state(code, slot);
         // Drop the polymorphic chain.
         self.drop_polymorphic_chain(code, slot);
         // Drop the KeyedPropertyIcState for this slot if present.
-        self.keyed_property_ic_states.remove(&(code, slot));
+        self.clear_keyed_property_ic_state(code, slot);
         // Zero out the PropertyMetadata entry.
         if let Some(table) = self.metadata_table_mut(code) {
             *table.property_mut(slot.get()) = PropertyMetadata::default();

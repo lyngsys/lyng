@@ -834,6 +834,21 @@ impl Vm {
         if self.metadata_tables.len() <= index {
             self.metadata_tables.resize_with(index + 1, || None);
         }
+        // Phase D.4.1: allocate parallel IC side-table slabs keyed by code_index.
+        // Per-slot entries are `None` until the slow path populates them.
+        if self.property_ic_states.len() <= index {
+            self.property_ic_states.resize_with(index + 1, || None);
+        }
+        if self.call_ic_states.len() <= index {
+            self.call_ic_states.resize_with(index + 1, || None);
+        }
+        if self.construct_ic_states.len() <= index {
+            self.construct_ic_states.resize_with(index + 1, || None);
+        }
+        if self.keyed_property_ic_states.len() <= index {
+            self.keyed_property_ic_states
+                .resize_with(index + 1, || None);
+        }
         let descriptors: Vec<SiteDescriptor> = installed
             .function
             .feedback_sites()
@@ -844,9 +859,25 @@ impl Vm {
             })
             .collect();
         self.metadata_tables[index] = Some(MetadataTable::allocate(&descriptors));
+        // Slab size = max slot id (1-based) for this code. Empty for code with
+        // no feedback sites.
+        let slot_count = usize::try_from(installed.function.feedback_slot_count()).unwrap_or(0);
+        self.property_ic_states[index] = Some(allocate_ic_slab(slot_count));
+        self.call_ic_states[index] = Some(allocate_ic_slab(slot_count));
+        self.construct_ic_states[index] = Some(allocate_ic_slab(slot_count));
+        self.keyed_property_ic_states[index] = Some(allocate_ic_slab(slot_count));
         self.tiering.ensure_slot(code);
         self.installed[index] = Some(Arc::new(installed));
     }
+}
+
+#[inline]
+fn allocate_ic_slab<T>(slot_count: usize) -> Box<[Option<T>]> {
+    let mut v: Vec<Option<T>> = Vec::with_capacity(slot_count);
+    for _ in 0..slot_count {
+        v.push(None);
+    }
+    v.into_boxed_slice()
 }
 
 #[cfg(test)]

@@ -169,25 +169,24 @@ pub struct Vm {
     /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
     /// on code GC (via prune_dead_code_polymorphic_chains).
     polymorphic_chains: HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-    /// Phase D.1.1: Rust-only IC state machine for `NamedProperty` slots.
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
-    /// install. Entries are pruned on code GC via
-    /// `prune_dead_code_property_ic_states`. The asm-readable bits (`mode`,
-    /// `generation`, `handler_bits`, `aux_bits`, `execution_count`) live on
-    /// `PropertyMetadata` inside `MetadataTable`; this map holds the remaining
-    /// Rust-only state-machine fields.
-    pub(crate) property_ic_states: HashMap<(CodeRef, FeedbackSlotId), PropertyIcState>,
-    /// Phase D.1.2: Rust-only IC state machine for `Call` slots.
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
-    /// observation. Entries are pruned on code GC via
-    /// `prune_dead_code_call_ic_states`. The asm-readable bits (`mode`,
-    /// `generation`, `callee_bits`, `execution_count`) live on `CallMetadata`
-    /// inside `MetadataTable`; this map holds the Rust-only state.
-    pub(crate) call_ic_states: HashMap<(CodeRef, FeedbackSlotId), CallIcState>,
-    /// Phase D.1.2: Rust-only IC state machine for `Construct` slots.
-    /// Same shape as `call_ic_states`; the kind distinction is implicit in
-    /// which map the entry lives in.
-    pub(crate) construct_ic_states: HashMap<(CodeRef, FeedbackSlotId), CallIcState>,
+    /// Phase D.4.1: Rust-only IC state machine for `NamedProperty` slots.
+    /// Outer `Vec` is indexed by `code_index(code)`; inner `Box<[..]>` is
+    /// indexed by zero-based slot (`slot.get() - 1`). Entries are allocated
+    /// eagerly in `store_installed` (same shape as `metadata_tables`), per-slot
+    /// entries are populated lazily on first slow-path install. Outer slot is
+    /// cleared on code GC via the inline retain in
+    /// `force_collect_with_active_roots` (and `prune_dead_code_property_ic_states`
+    /// for ad-hoc callers). The asm-readable bits live on `PropertyMetadata`
+    /// inside `MetadataTable`; this table holds the remaining Rust-only fields.
+    pub(crate) property_ic_states: Vec<Option<Box<[Option<PropertyIcState>]>>>,
+    /// Phase D.4.1: Rust-only IC state machine for `Call` slots. Same shape as
+    /// `property_ic_states`. The asm-readable bits live on `CallMetadata`
+    /// inside `MetadataTable`; this table holds the Rust-only state.
+    pub(crate) call_ic_states: Vec<Option<Box<[Option<CallIcState>]>>>,
+    /// Phase D.4.1: Rust-only IC state machine for `Construct` slots. Same
+    /// shape as `call_ic_states`; the kind distinction is implicit in which
+    /// table the entry lives in.
+    pub(crate) construct_ic_states: Vec<Option<Box<[Option<CallIcState>]>>>,
     /// Phase D.2.4: per-slot Call cache entries (actual callee/builtin data).
     /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) call_cache_entries: HashMap<(CodeRef, FeedbackSlotId), Box<CallCacheStorage>>,
@@ -199,14 +198,11 @@ pub struct Vm {
     /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) keyed_property_named_entries:
         HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyNamedEntries>,
-    /// Phase D.1.3: Rust-only IC state machine for `KeyedProperty` slots.
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
-    /// observation. Entries are pruned on code GC via
-    /// `prune_dead_code_keyed_property_ic_states`. The asm-readable bits (`mode`,
-    /// `generation`, `handler_bits`, `execution_count`) live on
-    /// `KeyedPropertyMetadata` inside `MetadataTable`; this map holds the
+    /// Phase D.4.1: Rust-only IC state machine for `KeyedProperty` slots. Same
+    /// shape as `property_ic_states`. The asm-readable bits live on
+    /// `KeyedPropertyMetadata` inside `MetadataTable`; this table holds the
     /// Rust-only state (family, entries, sidecars).
-    pub(crate) keyed_property_ic_states: HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyIcState>,
+    pub(crate) keyed_property_ic_states: Vec<Option<Box<[Option<KeyedPropertyIcState>]>>>,
     /// Phase C: per-code-object IC metadata buffer keyed by `code_index(code_ref)`.
     /// `None` for code that has not yet been installed (or was installed
     /// before Phase C landed). Allocated eagerly alongside the flat
@@ -592,13 +588,13 @@ impl Vm {
             source_texts: HashMap::new(),
             metadata_tables: Vec::new(),
             polymorphic_chains: HashMap::new(),
-            property_ic_states: HashMap::new(),
-            call_ic_states: HashMap::new(),
-            construct_ic_states: HashMap::new(),
+            property_ic_states: Vec::new(),
+            call_ic_states: Vec::new(),
+            construct_ic_states: Vec::new(),
             call_cache_entries: HashMap::new(),
             construct_cache_entries: HashMap::new(),
             keyed_property_named_entries: HashMap::new(),
-            keyed_property_ic_states: HashMap::new(),
+            keyed_property_ic_states: Vec::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
             activation_tables: ActivationSideTables::default(),
@@ -710,95 +706,188 @@ impl Vm {
             .retain(|(code, _slot), _chain| is_live(*code));
     }
 
-    /// Phase D.1.1: returns the `PropertyIcState` for `(code, slot)` if any.
+    /// Phase D.4.1: returns the `PropertyIcState` for `(code, slot)` if any.
+    /// Hot path: two index dereferences instead of a HashMap probe.
     #[allow(
         dead_code,
-        reason = "Phase D.1.1 accessor surface; consumed from tests and future D.2.x callers"
+        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
     )]
+    #[inline]
     pub(crate) fn property_ic_state(
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&PropertyIcState> {
-        self.property_ic_states.get(&(code, slot))
+        let slot_zero = (slot.get() - 1) as usize;
+        self.property_ic_states
+            .get(code_index(code))?
+            .as_deref()?
+            .get(slot_zero)?
+            .as_ref()
     }
 
-    /// Phase D.1.1: post-mark GC sweep. Drops `PropertyIcState` entries for
-    /// code that is no longer live. Mirrors `prune_dead_code_polymorphic_chains`.
+    /// Phase D.4.1: returns a mutable reference to the `PropertyIcState` for
+    /// `(code, slot)` if any. Returns `None` if the code is uninstalled, the
+    /// slot is out of range, or the slot is cold.
+    #[inline]
+    pub(crate) fn property_ic_state_mut(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<&mut PropertyIcState> {
+        let slot_zero = (slot.get() - 1) as usize;
+        self.property_ic_states
+            .get_mut(code_index(code))?
+            .as_deref_mut()?
+            .get_mut(slot_zero)?
+            .as_mut()
+    }
+
+    /// Phase D.4.1: returns a mutable reference to the `PropertyIcState` for
+    /// `(code, slot)`, lazily inserting a default state on first access. The
+    /// outer vec slot must have been allocated by `store_installed`.
+    #[inline]
+    pub(crate) fn property_ic_state_or_default_mut(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> &mut PropertyIcState {
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slots = self.property_ic_states[index]
+            .as_deref_mut()
+            .expect("property_ic_states slab must be allocated at install");
+        slots[slot_zero].get_or_insert_with(PropertyIcState::default)
+    }
+
+    /// Phase D.4.1: clears the per-slot entry. Used when a watchpoint fires
+    /// (`AdaptiveProtoLoad`) or the IC is otherwise invalidated.
+    #[inline]
+    pub(crate) fn clear_property_ic_state(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        let slot_zero = (slot.get() - 1) as usize;
+        if let Some(Some(slots)) = self.property_ic_states.get_mut(code_index(code))
+            && let Some(entry) = slots.get_mut(slot_zero)
+        {
+            *entry = None;
+        }
+    }
+
+    /// Phase D.4.1: post-mark GC sweep. Drops the `PropertyIcState` slab for
+    /// code that is no longer live. Mirrors `prune_dead_code_metadata_tables`.
     #[allow(
         dead_code,
-        reason = "Phase D.1.1 sweep surface; call site wired alongside prune_dead_code_polymorphic_chains"
+        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_polymorphic_chains"
     )]
     pub(crate) fn prune_dead_code_property_ic_states(&mut self, is_live: impl Fn(CodeRef) -> bool) {
-        self.property_ic_states
-            .retain(|(code, _slot), _state| is_live(*code));
+        prune_dead_code_ic_slab(&mut self.property_ic_states, is_live);
     }
 
-    /// Phase D.1.2: returns the `CallIcState` for a `Call` slot `(code, slot)`.
+    /// Phase D.4.1: returns the `CallIcState` for a `Call` slot `(code, slot)`.
     #[allow(
         dead_code,
-        reason = "Phase D.1.2 accessor surface; consumed from tests and future D.2.x callers"
+        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
     )]
+    #[inline]
     pub(crate) fn call_ic_state(
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&CallIcState> {
-        self.call_ic_states.get(&(code, slot))
+        let slot_zero = (slot.get() - 1) as usize;
+        self.call_ic_states
+            .get(code_index(code))?
+            .as_deref()?
+            .get(slot_zero)?
+            .as_ref()
     }
 
-    /// Phase D.1.2: returns the `CallIcState` for a `Construct` slot `(code, slot)`.
+    /// Phase D.4.1: returns the `CallIcState` for a `Construct` slot `(code, slot)`.
     #[allow(
         dead_code,
-        reason = "Phase D.1.2 accessor surface; consumed from tests and future D.2.x callers"
+        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
     )]
+    #[inline]
     pub(crate) fn construct_ic_state(
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&CallIcState> {
-        self.construct_ic_states.get(&(code, slot))
+        let slot_zero = (slot.get() - 1) as usize;
+        self.construct_ic_states
+            .get(code_index(code))?
+            .as_deref()?
+            .get(slot_zero)?
+            .as_ref()
     }
 
-    /// Phase D.1.2: post-mark GC sweep. Drops `CallIcState` entries (both Call
-    /// and Construct maps) for code that is no longer live. Mirrors
-    /// `prune_dead_code_property_ic_states`.
+    /// Phase D.4.1: post-mark GC sweep. Drops the `CallIcState` slab for code
+    /// that is no longer live (both Call and Construct tables).
     #[allow(
         dead_code,
-        reason = "Phase D.1.2 sweep surface; call site wired alongside prune_dead_code_property_ic_states"
+        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_property_ic_states"
     )]
     pub(crate) fn prune_dead_code_call_ic_states(&mut self, is_live: impl Fn(CodeRef) -> bool) {
-        self.call_ic_states
-            .retain(|(code, _slot), _state| is_live(*code));
-        self.construct_ic_states
-            .retain(|(code, _slot), _state| is_live(*code));
+        prune_dead_code_ic_slab(&mut self.call_ic_states, &is_live);
+        prune_dead_code_ic_slab(&mut self.construct_ic_states, is_live);
     }
 
-    /// Phase D.1.3: returns the `KeyedPropertyIcState` for `(code, slot)` if any.
+    /// Phase D.4.1: returns the `KeyedPropertyIcState` for `(code, slot)` if any.
     #[allow(
         dead_code,
-        reason = "Phase D.1.3 accessor surface; consumed from tests and future D.2.x callers"
+        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
     )]
+    #[inline]
     pub(crate) fn keyed_property_ic_state(
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&KeyedPropertyIcState> {
-        self.keyed_property_ic_states.get(&(code, slot))
+        let slot_zero = (slot.get() - 1) as usize;
+        self.keyed_property_ic_states
+            .get(code_index(code))?
+            .as_deref()?
+            .get(slot_zero)?
+            .as_ref()
     }
 
-    /// Phase D.1.3: post-mark GC sweep. Drops `KeyedPropertyIcState` entries for
-    /// code that is no longer live. Mirrors `prune_dead_code_call_ic_states`.
+    /// Phase D.4.1: lazily inserts and returns a mutable reference to the
+    /// `KeyedPropertyIcState` for `(code, slot)`.
+    #[inline]
+    pub(crate) fn keyed_property_ic_state_or_default_mut(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> &mut KeyedPropertyIcState {
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slots = self.keyed_property_ic_states[index]
+            .as_deref_mut()
+            .expect("keyed_property_ic_states slab must be allocated at install");
+        slots[slot_zero].get_or_insert_with(KeyedPropertyIcState::default)
+    }
+
+    /// Phase D.4.1: clears the per-slot keyed entry. Used on watchpoint fire.
+    #[inline]
+    pub(crate) fn clear_keyed_property_ic_state(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        let slot_zero = (slot.get() - 1) as usize;
+        if let Some(Some(slots)) = self.keyed_property_ic_states.get_mut(code_index(code))
+            && let Some(entry) = slots.get_mut(slot_zero)
+        {
+            *entry = None;
+        }
+    }
+
+    /// Phase D.4.1: post-mark GC sweep. Drops the `KeyedPropertyIcState` slab
+    /// for code that is no longer live.
     #[allow(
         dead_code,
-        reason = "Phase D.1.3 sweep surface; call site wired alongside prune_dead_code_call_ic_states"
+        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_call_ic_states"
     )]
     pub(crate) fn prune_dead_code_keyed_property_ic_states(
         &mut self,
         is_live: impl Fn(CodeRef) -> bool,
     ) {
-        self.keyed_property_ic_states
-            .retain(|(code, _slot), _state| is_live(*code));
+        prune_dead_code_ic_slab(&mut self.keyed_property_ic_states, is_live);
     }
 
     /// Phase C Task 4.5: post-mark GC sweep. Drops `MetadataTable` entries
@@ -1089,32 +1178,13 @@ impl Vm {
                 .get(code_index(*code))
                 .is_some_and(|s| s.is_some())
         });
-        // Phase D.1.1: prune PropertyIcState side-table entries for code that
-        // is no longer installed, mirroring the polymorphic_chains sweep above.
-        self.property_ic_states.retain(|(code, _), _| {
-            installed
-                .get(code_index(*code))
-                .is_some_and(|s| s.is_some())
-        });
-        // Phase D.1.2: prune CallIcState side-table entries (Call + Construct)
-        // for code that is no longer installed.
-        self.call_ic_states.retain(|(code, _), _| {
-            installed
-                .get(code_index(*code))
-                .is_some_and(|s| s.is_some())
-        });
-        self.construct_ic_states.retain(|(code, _), _| {
-            installed
-                .get(code_index(*code))
-                .is_some_and(|s| s.is_some())
-        });
-        // Phase D.1.3: prune KeyedPropertyIcState side-table entries for code
-        // that is no longer installed.
-        self.keyed_property_ic_states.retain(|(code, _), _| {
-            installed
-                .get(code_index(*code))
-                .is_some_and(|s| s.is_some())
-        });
+        // Phase D.4.1: prune IC side-table slabs for code that is no longer
+        // installed. Each slab is a Vec keyed by code_index; the slab entry is
+        // set to None when the code is dead so the inner Box<[..]> is freed.
+        prune_dead_code_ic_slab_by_installed(&mut self.property_ic_states, installed);
+        prune_dead_code_ic_slab_by_installed(&mut self.call_ic_states, installed);
+        prune_dead_code_ic_slab_by_installed(&mut self.construct_ic_states, installed);
+        prune_dead_code_ic_slab_by_installed(&mut self.keyed_property_ic_states, installed);
         report
     }
 
@@ -1762,8 +1832,49 @@ impl AdaptiveProtoLoadDispatch for Vm {
         // Phase D.2.4: generation now lives on PropertyIcState. Lazily insert a
         // default entry if absent (first slow-path visit for this slot), then
         // bump and return the new generation.
-        let state = self.property_ic_states.entry((code, slot)).or_default();
+        let state = self.property_ic_state_or_default_mut(code, slot);
         state.generation = state.generation.wrapping_add(1);
         state.generation
+    }
+}
+
+/// Phase D.4.1: free `Option<Box<[Option<T>]>>` slabs whose code is no longer
+/// live. Walks the outer Vec by `code_index` and clears slabs whose
+/// `CodeRef` predicate returns `false`.
+fn prune_dead_code_ic_slab<T>(
+    slab: &mut [Option<Box<[Option<T>]>>],
+    is_live: impl Fn(CodeRef) -> bool,
+) {
+    for (index, slot) in slab.iter_mut().enumerate() {
+        if slot.is_none() {
+            continue;
+        }
+        let Some(raw) = u32::try_from(index + 1).ok() else {
+            continue;
+        };
+        let Some(code) = CodeRef::from_raw(raw) else {
+            continue;
+        };
+        if !is_live(code) {
+            *slot = None;
+        }
+    }
+}
+
+/// Phase D.4.1: variant of `prune_dead_code_ic_slab` that checks liveness via
+/// the `installed` vector — a code is live iff its `installed[code_index]` is
+/// `Some(_)`. Used from the GC sweep where we already hold `&self.installed`.
+fn prune_dead_code_ic_slab_by_installed<T>(
+    slab: &mut [Option<Box<[Option<T>]>>],
+    installed: &[Option<std::sync::Arc<install::InstalledFunction>>],
+) {
+    for (index, slot) in slab.iter_mut().enumerate() {
+        if slot.is_none() {
+            continue;
+        }
+        let live = installed.get(index).is_some_and(Option::is_some);
+        if !live {
+            *slot = None;
+        }
     }
 }

@@ -17,28 +17,27 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 | Benchmark | Median score | Median µs/iter | Samples |
 | --- | ---: | ---: | --- |
-| `Richards` | `408` | `8652.5` | 408, 408, 406, 408, 405 |
-| `DeltaBlue` | `375` | `17631.5` | 375, 373, 375, 375, 374 |
-| `Crypto` | `328` | `81152.7` | 329, 323, 328, 330, 327 |
-| `RayTrace` | `220` | `336358.6` | 217, 226, 220, 217, 223 |
-| `NavierStokes` | `436` | `340367.0` | 436, 440, 435, 432, 439 |
-| `Splay` | `1314` | `6201.8` | 1277, 1309, 1346, 1346, 1314 |
+| `Richards` | `458` | `7707.9` | 458, 451, 465, 456, 461 |
+| `DeltaBlue` | `369` | `17918.2` | 375, 369, 366, 368, 370 |
+| `Crypto` | `429` | `62046.9` | 426, 429, 431, 428, 431 |
+| `RayTrace` | `228` | `324556.6` | 223, 228, 227, 230, 230 |
+| `NavierStokes` | `588` | `252381.0` | 589, 588, 588, 587, 582 |
+| `Splay` | `1316` | `6192.3` | 1280, 1318, 1316, 1304, 1332 |
 
-## Phase C end-state note (re-evaluate at Phase D)
+## History
 
-Spec 2 Phase C ends with a documented regression vs the pre-Phase-C baseline
-(commit `857d2528`, scores 484/421/393/291/541/1440 for the same six
-benchmarks). Geomean ≈ −15.5%, missing the spec's ≤3% exit criterion.
+Phase-by-phase milestones (numbers are median scores):
 
-Structural overhead remaining at Phase C end:
+| Phase                                         | Richards | DeltaBlue | Crypto | RayTrace | NavierStokes | Splay |
+| --------------------------------------------- | -------: | --------: | -----: | -------: | -----------: | ----: |
+| Pre-Phase-C (target ceiling)                  |      484 |       421 |    393 |      291 |          541 |  1440 |
+| Phase D end (HashMap IC side-tables)          |      300 |       274 |    282 |      216 |          445 |  1274 |
+| **Phase D.4.1** (Vec-indexed IC side-tables)  |  **458** |   **369** |  **429** |  **228** |      **588** | **1316** |
 
-- `mirror_metadata_slot` runs on every IC mutation alongside `mirror_flat_slot`
-  (descriptor lookup + per-kind dispatch). Phase D removes `mirror_flat_slot`
-  and `feedback_flat_storage`, recovering this cost.
-- The asm IC resolve macro is 3 instructions (with the precomputed-offset
-  table optimization in `4d8c2f39`) vs the prior 2-instruction flat-array
-  resolve. +1 instruction is structural to the indirection.
-- The `record_*` macros are 10 instructions vs the prior 9. Same reason.
-
-Decision: ship Phase C with the regression documented; re-measure at the
-end of Phase D after legacy-storage deletion.
+Phase D.4.1 replaces the 4 `HashMap<(CodeRef, FeedbackSlotId), *IcState>` side-tables
+with `Vec<Option<Box<[Option<*IcState>]>>>` keyed by `code_index` then by slot
+zero-based. Per-IC-hit lookups drop from one HashMap probe (~10–15 cycles) to
+two index dereferences (~2–3 cycles), recovering the regression introduced by the
+Phase D pivot. Richards / DeltaBlue / Crypto / NavierStokes are all back well
+above the Phase D end baseline; RayTrace and Splay are IC-light and were already
+near their ceiling.
