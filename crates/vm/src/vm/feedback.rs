@@ -7,8 +7,7 @@ use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
 use crate::vm::metadata_table::{
-    ArithMetadata, CallMetadata, ComparisonMetadata, KeyedPropertyMetadata, MetadataKind,
-    PropertyMetadata,
+    CallMetadata, KeyedPropertyMetadata, MetadataKind, PropertyMetadata,
 };
 use lyng_bytecode::{FeedbackSiteDescriptor, FeedbackSiteKind};
 use lyng_gc::ValueStoreTarget;
@@ -655,16 +654,6 @@ impl From<KeyedPropertyFamily> for FeedbackKeyedPropertyFamily {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ArithmeticFeedback {
-    execution_count: u32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ComparisonFeedback {
-    execution_count: u32,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NamedPropertyFeedback {
     execution_count: u32,
     cache_state: InlineCacheState,
@@ -900,8 +889,6 @@ pub struct ConstructFeedback {
 )]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FeedbackSiteState {
-    Arithmetic(ArithmeticFeedback),
-    Comparison(ComparisonFeedback),
     NamedProperty(NamedPropertyFeedback),
     KeyedProperty(KeyedPropertyFeedback),
     Call(CallFeedback),
@@ -1815,27 +1802,28 @@ impl ConstructFeedback {
 }
 
 impl FeedbackSiteState {
+    /// Returns `Some(initial_state)` for kinds that carry Rust-side IC state,
+    /// or `None` for kinds (Arithmetic, Comparison) whose feedback is owned
+    /// entirely by the asm-visible `MetadataTable` after Phase C.4.
     #[inline]
-    const fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Self {
+    const fn for_descriptor(descriptor: FeedbackSiteDescriptor) -> Option<Self> {
         match descriptor.kind() {
-            FeedbackSiteKind::Arithmetic => {
-                Self::Arithmetic(ArithmeticFeedback { execution_count: 0 })
-            }
-            FeedbackSiteKind::Comparison => {
-                Self::Comparison(ComparisonFeedback { execution_count: 0 })
-            }
+            // Phase D.1.0: Arithmetic and Comparison feedback is asm-canonical
+            // (written directly to ArithMetadata / ComparisonMetadata).  No
+            // Rust-side variant is needed; leave the slot `None` in the vector.
+            FeedbackSiteKind::Arithmetic | FeedbackSiteKind::Comparison => None,
             FeedbackSiteKind::NamedPropertyLoad | FeedbackSiteKind::NamedPropertyStore => {
-                Self::NamedProperty(NamedPropertyFeedback::new())
+                Some(Self::NamedProperty(NamedPropertyFeedback::new()))
             }
             FeedbackSiteKind::KeyedPropertyAccess => {
-                Self::KeyedProperty(KeyedPropertyFeedback::new())
+                Some(Self::KeyedProperty(KeyedPropertyFeedback::new()))
             }
-            FeedbackSiteKind::Call => {
-                Self::Call(CallFeedback::new(descriptor.metadata().expected_arity()))
-            }
-            FeedbackSiteKind::Construct => Self::Construct(ConstructFeedback::new(
+            FeedbackSiteKind::Call => Some(Self::Call(CallFeedback::new(
                 descriptor.metadata().expected_arity(),
-            )),
+            ))),
+            FeedbackSiteKind::Construct => Some(Self::Construct(ConstructFeedback::new(
+                descriptor.metadata().expected_arity(),
+            ))),
         }
     }
 
@@ -1847,12 +1835,6 @@ impl FeedbackSiteState {
     #[inline]
     const fn record_execution_count(&mut self, count: u32) {
         match self {
-            Self::Arithmetic(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(count);
-            }
-            Self::Comparison(feedback) => {
-                feedback.execution_count = feedback.execution_count.saturating_add(count);
-            }
             Self::NamedProperty(feedback) => {
                 feedback.execution_count = feedback.execution_count.saturating_add(count);
             }
@@ -1902,16 +1884,6 @@ impl FeedbackSiteState {
         named_property_chain: Option<&PolymorphicChain>,
     ) -> FeedbackSiteSnapshot {
         match self {
-            Self::Arithmetic(feedback) => FeedbackSiteSnapshot::new(
-                descriptor,
-                feedback.execution_count,
-                FeedbackSiteDetail::Arithmetic,
-            ),
-            Self::Comparison(feedback) => FeedbackSiteSnapshot::new(
-                descriptor,
-                feedback.execution_count,
-                FeedbackSiteDetail::Comparison,
-            ),
             Self::NamedProperty(feedback) => FeedbackSiteSnapshot::new(
                 descriptor,
                 feedback.execution_count,
@@ -1943,6 +1915,9 @@ impl FeedbackSiteState {
     #[inline]
     const fn unallocated_snapshot(descriptor: FeedbackSiteDescriptor) -> FeedbackSiteSnapshot {
         let detail = match descriptor.kind() {
+            // Phase D.1.0: Arithmetic and Comparison have no Rust-side variant;
+            // their counts live in MetadataTable. Snapshots report execution_count 0
+            // (the MetadataTable is the canonical source after Phase C.4).
             FeedbackSiteKind::Arithmetic => FeedbackSiteDetail::Arithmetic,
             FeedbackSiteKind::Comparison => FeedbackSiteDetail::Comparison,
             FeedbackSiteKind::NamedPropertyLoad | FeedbackSiteKind::NamedPropertyStore => {
@@ -1965,8 +1940,6 @@ impl FeedbackSiteState {
     #[inline]
     const fn execution_count(&self) -> u32 {
         match self {
-            Self::Arithmetic(feedback) => feedback.execution_count,
-            Self::Comparison(feedback) => feedback.execution_count,
             Self::NamedProperty(feedback) => feedback.execution_count,
             Self::KeyedProperty(feedback) => feedback.execution_count,
             Self::Call(feedback) => feedback.execution_count,
@@ -2002,7 +1975,7 @@ impl FeedbackVector {
         self.sites = slot_descriptors
             .iter()
             .copied()
-            .map(|descriptor| descriptor.map(FeedbackSiteState::for_descriptor))
+            .map(|descriptor| descriptor.and_then(FeedbackSiteState::for_descriptor))
             .collect();
     }
 
@@ -2221,8 +2194,6 @@ impl Vm {
         enum Projection {
             Property(PropertyMetadata),
             Call(CallMetadata),
-            Arith(ArithMetadata),
-            Comparison(ComparisonMetadata),
             KeyedProperty(KeyedPropertyMetadata),
         }
         let projection = {
@@ -2235,8 +2206,10 @@ impl Vm {
                     Projection::Property(project_property(header, generation))
                 }
                 MetadataKind::Call => Projection::Call(project_call(site)),
-                MetadataKind::Arith => Projection::Arith(project_arith(site)),
-                MetadataKind::Comparison => Projection::Comparison(project_comparison(site)),
+                // Phase D.1.0: Arith and Comparison are MetadataTable-owned after Phase C.4.
+                // The asm record_* macros write directly; no Rust-side variant exists.
+                // Skip the write to avoid zeroing asm-accumulated counts.
+                MetadataKind::Arith | MetadataKind::Comparison => return,
                 MetadataKind::KeyedProperty => {
                     Projection::KeyedProperty(project_keyed_property(site))
                 }
@@ -2250,8 +2223,6 @@ impl Vm {
         match projection {
             Projection::Property(m) => *table.property_mut(slot.get()) = m,
             Projection::Call(m) => *table.call_mut(slot.get()) = m,
-            Projection::Arith(m) => *table.arith_mut(slot.get()) = m,
-            Projection::Comparison(m) => *table.comparison_mut(slot.get()) = m,
             Projection::KeyedProperty(m) => *table.keyed_property_mut(slot.get()) = m,
         }
 
@@ -3921,46 +3892,6 @@ fn project_call(site: Option<&FeedbackSiteState>) -> CallMetadata {
         callee_bits: 0, // Phase D will pack the monomorphic callee bits here.
         execution_count,
         ..Default::default()
-    }
-}
-
-/// Project an Arithmetic IC site into `ArithMetadata`.
-///
-/// `mirror_flat_slot` uses `scalar_observed_bits` + `scalar_execution_count`
-/// for scalar sites; the semantic source (`ArithmeticFeedback`) only carries
-/// `execution_count`. `observed_bits` defaults to 0 (Phase D will populate it
-/// from the asm-visible scalar feedback path).
-#[allow(
-    dead_code,
-    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
-)]
-fn project_arith(site: Option<&FeedbackSiteState>) -> ArithMetadata {
-    let execution_count = match site {
-        Some(FeedbackSiteState::Arithmetic(feedback)) => feedback.execution_count,
-        _ => 0,
-    };
-    ArithMetadata {
-        observed_bits: 0, // Phase D: source from scalar IC path.
-        execution_count,
-    }
-}
-
-/// Project a Comparison IC site into `ComparisonMetadata`.
-///
-/// Analogous to `project_arith`; `ComparisonFeedback` only carries
-/// `execution_count`. `observed_bits` defaults to 0 for the same reason.
-#[allow(
-    dead_code,
-    reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
-)]
-fn project_comparison(site: Option<&FeedbackSiteState>) -> ComparisonMetadata {
-    let execution_count = match site {
-        Some(FeedbackSiteState::Comparison(feedback)) => feedback.execution_count,
-        _ => 0,
-    };
-    ComparisonMetadata {
-        observed_bits: 0, // Phase D: source from scalar IC path.
-        execution_count,
     }
 }
 

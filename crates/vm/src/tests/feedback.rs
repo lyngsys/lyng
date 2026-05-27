@@ -449,7 +449,17 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
         .feedback_vector_snapshot(installed.code())
         .expect("entry code should expose a feedback snapshot");
     assert!(entry_snapshot.allocated());
-    assert!(feedback_site(&entry_snapshot, comparison_slot).execution_count() >= 1);
+    // Phase D.1.0: Comparison feedback is MetadataTable-owned (no asm callers yet);
+    // the snapshot execution_count is always 0 for Comparison slots.
+    assert_eq!(
+        feedback_site(&entry_snapshot, comparison_slot).execution_count(),
+        0,
+        "Comparison execution_count comes from MetadataTable (no asm callers); must be 0"
+    );
+    assert!(matches!(
+        feedback_site(&entry_snapshot, comparison_slot).detail(),
+        FeedbackSiteDetail::Comparison
+    ));
     let FeedbackSiteDetail::Call(call) = feedback_site(&entry_snapshot, call_slot).detail() else {
         panic!("entry call site should expose call feedback");
     };
@@ -464,10 +474,15 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
     let add_snapshot = vm
         .feedback_vector_snapshot(add_code)
         .expect("add code should expose a feedback snapshot");
+    // Phase D.1.0: Arithmetic execution_count is MetadataTable-owned (asm-written).
+    // drain_llint_scalar_feedback zeroes MetadataTable after each run(); the snapshot
+    // reports execution_count 0 from the unallocated_snapshot path.
     assert_eq!(
         feedback_site(&add_snapshot, arithmetic_slot).execution_count(),
-        1
+        0,
+        "Arithmetic execution_count is MetadataTable-owned after Phase D.1.0; snapshot is always 0"
     );
+    // The slot shape is still Arithmetic — descriptor-level kind is unchanged.
     assert!(matches!(
         feedback_site(&add_snapshot, arithmetic_slot).detail(),
         FeedbackSiteDetail::Arithmetic
@@ -538,13 +553,16 @@ fn llint_scalar_feedback_batch_drain_preserves_warmup_execution_counts() {
     assert_eq!(result, Value::from_smi(4));
     assert_eq!(vm.feedback_warmup_counter(four_code), Some(2));
     assert!(vm.has_feedback_vector(four_code));
-    assert_eq!(
-        vm.feedback_execution_count(four_code, arithmetic_slots[0]),
-        Some(0),
-        "first scalar hit should only warm the vector before allocation"
-    );
-    for slot in &arithmetic_slots[1..] {
-        assert_eq!(vm.feedback_execution_count(four_code, *slot), Some(1));
+    // Phase D.1.0: Arithmetic slots have no Rust-side FeedbackSiteState variant.
+    // feedback_execution_count returns None for Arithmetic slots.
+    // Per-slot execution counts live in MetadataTable (zeroed by drain_llint_scalar_feedback
+    // after each run). The warmup counter (above) is the durable record of drain activity.
+    for slot in &arithmetic_slots {
+        assert_eq!(
+            vm.feedback_execution_count(four_code, *slot),
+            None,
+            "Arithmetic slots have no Rust-side state after Phase D.1.0"
+        );
     }
 }
 
@@ -1075,9 +1093,12 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
     assert_eq!(result, Value::from_smi(6));
     assert_eq!(vm.feedback_warmup_counter(inner_code), Some(2));
     assert!(vm.has_feedback_vector(inner_code));
+    // Phase D.1.0: Arithmetic slots have no Rust-side FeedbackSiteState variant.
+    // feedback_execution_count returns None; warmup counter is the durable record.
     assert_eq!(
         vm.feedback_execution_count(inner_code, arithmetic_slot),
-        Some(1)
+        None,
+        "Arithmetic slots have no Rust-side state after Phase D.1.0"
     );
 }
 
@@ -1274,9 +1295,12 @@ fn internal_bytecode_callbacks_share_feedback_state_with_the_parent_vm() {
     assert_eq!(second, Value::from_smi(0));
     assert_eq!(vm.feedback_warmup_counter(callback_code), Some(2));
     assert!(vm.has_feedback_vector(callback_code));
+    // Phase D.1.0: Arithmetic slots have no Rust-side FeedbackSiteState variant.
+    // feedback_execution_count returns None; warmup counter is the durable record.
     assert_eq!(
         vm.feedback_execution_count(callback_code, arithmetic_slot),
-        Some(1)
+        None,
+        "Arithmetic slots have no Rust-side state after Phase D.1.0"
     );
 }
 

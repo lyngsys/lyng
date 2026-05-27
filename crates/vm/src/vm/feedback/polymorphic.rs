@@ -22,7 +22,7 @@ use std::cmp::Ordering;
 use lyng_objects::NamedPropertyCacheEntry;
 use lyng_types::ShapeId;
 
-use super::{POLY_LIMIT, POLYMORPHIC_PROPERTY_CACHE_LIMIT};
+use super::{POLYMORPHIC_PROPERTY_CACHE_LIMIT, POLY_LIMIT};
 
 /// Maximum number of out-of-line entries per chain.
 /// `POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT` (= 6).
