@@ -20,7 +20,7 @@ use lyng_objects::{
     PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
 
 mod polymorphic;
 
@@ -1114,7 +1114,7 @@ impl Vm {
     ) -> Option<Value> {
         let slot = slot?;
         let state = self.property_ic_state(code, slot)?;
-        let chain = self.polymorphic_chains.get(&(code, slot));
+        let chain = self.polymorphic_chain(code, slot);
         let value = state.try_load(agent, chain, receiver)?;
         // Phase D.4.2: the PropertyMetadata mirror-write was removed from the
         // hot path. `meta.execution_count` is not read by anything in
@@ -1139,7 +1139,7 @@ impl Vm {
     ) -> Option<bool> {
         let slot = slot?;
         let state = self.property_ic_state(code, slot)?;
-        let chain = self.polymorphic_chains.get(&(code, slot));
+        let chain = self.polymorphic_chain(code, slot);
         state.try_store(agent, chain, receiver, atom, value)
     }
 
@@ -1219,9 +1219,9 @@ impl Vm {
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
-        // Split-borrow: we need &mut PropertyIcState and &mut polymorphic_chains
-        // at the same time. Project into the Vec slab without going through the
-        // accessor (which would borrow `self` mutably and block the chains field).
+        // Split-borrow: we need &mut PropertyIcState and the per-(code,slot)
+        // polymorphic-chain entry at the same time. Project into both Vec
+        // slabs without going through accessors.
         let Self {
             property_ic_states,
             polymorphic_chains,
@@ -1233,13 +1233,10 @@ impl Vm {
             .as_deref_mut()
             .expect("property_ic_states slab must be allocated at install");
         let state = slab[slot_zero].get_or_insert_with(PropertyIcState::default);
-        Self::named_property_observe_slow_path_on_state(
-            state,
-            polymorphic_chains,
-            code,
-            slot,
-            plan,
-        );
+        let chain_slot = &mut polymorphic_chains[index]
+            .as_deref_mut()
+            .expect("polymorphic_chains slab must be allocated at install")[slot_zero];
+        Self::named_property_observe_slow_path_on_state(state, chain_slot, plan);
 
         // Write asm-readable bits to PropertyMetadata.
         let llint_header = Self::named_llint_load_header_from_state(state);
@@ -1253,14 +1250,12 @@ impl Vm {
 
     fn named_property_observe_slow_path_on_state(
         state: &mut PropertyIcState,
-        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-        code: CodeRef,
-        slot: FeedbackSlotId,
+        chain_slot: &mut Option<PolymorphicChain>,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
         let Some(plan) = plan else {
             state.promote_to_megamorphic();
-            polymorphic_chains.remove(&(code, slot));
+            *chain_slot = None;
             return;
         };
         match state.cache_state {
@@ -1276,22 +1271,14 @@ impl Vm {
                 state.install_first_entry(plan);
             }
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
-                Self::named_property_install_or_update_on_state(
-                    state,
-                    polymorphic_chains,
-                    code,
-                    slot,
-                    plan,
-                );
+                Self::named_property_install_or_update_on_state(state, chain_slot, plan);
             }
         }
     }
 
     fn named_property_install_or_update_on_state(
         state: &mut PropertyIcState,
-        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-        code: CodeRef,
-        slot: FeedbackSlotId,
+        chain_slot: &mut Option<PolymorphicChain>,
         plan: NamedPropertyCacheEntry,
     ) {
         let receiver_shape = plan.receiver_shape();
@@ -1304,20 +1291,12 @@ impl Vm {
                 if inline_insert < POLY_LIMIT {
                     Self::named_property_insert_into_inline_on_state(
                         state,
-                        polymorphic_chains,
-                        code,
-                        slot,
+                        chain_slot,
                         inline_insert,
                         plan,
                     );
                 } else {
-                    Self::named_property_insert_into_chain_on_state(
-                        state,
-                        polymorphic_chains,
-                        code,
-                        slot,
-                        plan,
-                    );
+                    Self::named_property_insert_into_chain_on_state(state, chain_slot, plan);
                 }
             }
         }
@@ -1325,21 +1304,17 @@ impl Vm {
 
     fn named_property_insert_into_inline_on_state(
         state: &mut PropertyIcState,
-        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-        code: CodeRef,
-        slot: FeedbackSlotId,
+        chain_slot: &mut Option<PolymorphicChain>,
         inline_insert: usize,
         plan: NamedPropertyCacheEntry,
     ) {
         debug_assert!(inline_insert < POLY_LIMIT);
         let inline_count = state.inline_count();
-        let chain_len = polymorphic_chains
-            .get(&(code, slot))
-            .map_or(0, PolymorphicChain::len);
+        let chain_len = chain_slot.as_ref().map_or(0, PolymorphicChain::len);
         let total = inline_count + chain_len;
         if total >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
             state.promote_to_megamorphic();
-            polymorphic_chains.remove(&(code, slot));
+            *chain_slot = None;
             return;
         }
 
@@ -1347,9 +1322,7 @@ impl Vm {
             let displaced = state.entries[POLY_LIMIT - 1]
                 .take()
                 .expect("inline slot must be populated when inline_count >= POLY_LIMIT");
-            let chain = polymorphic_chains
-                .entry((code, slot))
-                .or_insert_with(PolymorphicChain::new);
+            let chain = chain_slot.get_or_insert_with(PolymorphicChain::new);
             chain.insert_at(0, displaced);
             state
                 .entries
@@ -1371,13 +1344,11 @@ impl Vm {
 
     fn named_property_insert_into_chain_on_state(
         state: &mut PropertyIcState,
-        polymorphic_chains: &mut HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
-        code: CodeRef,
-        slot: FeedbackSlotId,
+        chain_slot: &mut Option<PolymorphicChain>,
         plan: NamedPropertyCacheEntry,
     ) {
         let receiver_shape = plan.receiver_shape();
-        if let Some(chain) = polymorphic_chains.get_mut(&(code, slot))
+        if let Some(chain) = chain_slot.as_mut()
             && let Ok(index) = chain.search_sorted(receiver_shape)
         {
             chain.replace_at(index, plan);
@@ -1385,17 +1356,13 @@ impl Vm {
         }
 
         let inline_count = state.inline_count();
-        let chain_len = polymorphic_chains
-            .get(&(code, slot))
-            .map_or(0, PolymorphicChain::len);
+        let chain_len = chain_slot.as_ref().map_or(0, PolymorphicChain::len);
         if inline_count + chain_len >= POLYMORPHIC_PROPERTY_CACHE_LIMIT {
             state.promote_to_megamorphic();
-            polymorphic_chains.remove(&(code, slot));
+            *chain_slot = None;
             return;
         }
-        let chain = polymorphic_chains
-            .entry((code, slot))
-            .or_insert_with(PolymorphicChain::new);
+        let chain = chain_slot.get_or_insert_with(PolymorphicChain::new);
         let insert_at = match chain.search_sorted(receiver_shape) {
             Err(index) => index,
             Ok(_) => unreachable!(

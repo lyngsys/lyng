@@ -165,10 +165,11 @@ pub struct Vm {
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
     /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices POLY_LIMIT..8).
-    /// Keyed by (CodeRef, FeedbackSlotId). Lazy: monomorphic and ≤POLY_LIMIT
-    /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
-    /// on code GC (via prune_dead_code_polymorphic_chains).
-    polymorphic_chains: HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+    /// Vec-indexed (Phase D.4.3): outer `Vec` keyed by `code_index(code)`,
+    /// inner `Box<[..]>` keyed by zero-based slot. Lazy: monomorphic and
+    /// ≤POLY_LIMIT polymorphic slots have a `None` entry. Cleared on
+    /// AdaptiveProtoLoad fire and on code GC.
+    pub(crate) polymorphic_chains: Vec<Option<Box<[Option<PolymorphicChain>]>>>,
     /// Phase D.4.1: Rust-only IC state machine for `NamedProperty` slots.
     /// Outer `Vec` is indexed by `code_index(code)`; inner `Box<[..]>` is
     /// indexed by zero-based slot (`slot.get() - 1`). Entries are allocated
@@ -587,7 +588,7 @@ impl Vm {
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
             metadata_tables: Vec::new(),
-            polymorphic_chains: HashMap::new(),
+            polymorphic_chains: Vec::new(),
             property_ic_states: Vec::new(),
             call_ic_states: Vec::new(),
             construct_ic_states: Vec::new(),
@@ -639,39 +640,56 @@ impl Vm {
     }
 
     /// Returns the polymorphic chain for `(code, slot)` if any.
+    /// Hot path: two index dereferences instead of a HashMap probe.
     #[allow(dead_code, reason = "used in tests via pub(crate)")]
+    #[inline]
     pub(crate) fn polymorphic_chain(
         &self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<&PolymorphicChain> {
-        self.polymorphic_chains.get(&(code, slot))
+        let slot_zero = (slot.get() - 1) as usize;
+        self.polymorphic_chains
+            .get(code_index(code))?
+            .as_deref()?
+            .get(slot_zero)?
+            .as_ref()
     }
 
     /// Returns a mutable reference to the polymorphic chain for `(code, slot)`,
     /// lazily creating an empty chain on first access. The slow-path installer
     /// reaches into `self.polymorphic_chains` directly via a split-borrow
-    /// alongside `feedback_vectors`; this helper is the documented public
+    /// alongside `property_ic_states`; this helper is the documented public
     /// surface for callers that hold an exclusive `&mut Vm` and don't need
     /// to borrow another field at the same time.
     #[allow(
         dead_code,
         reason = "Spec 2 Phase B accessor surface; install path uses split-borrow"
     )]
+    #[inline]
     pub(crate) fn polymorphic_chain_mut(
         &mut self,
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> &mut PolymorphicChain {
-        self.polymorphic_chains
-            .entry((code, slot))
-            .or_insert_with(PolymorphicChain::new)
+        let index = code_index(code);
+        let slot_zero = (slot.get() - 1) as usize;
+        let slots = self.polymorphic_chains[index]
+            .as_deref_mut()
+            .expect("polymorphic_chains slab must be allocated at install");
+        slots[slot_zero].get_or_insert_with(PolymorphicChain::new)
     }
 
     /// Removes the polymorphic chain for `(code, slot)`. Called when the IC
     /// transitions to Megamorphic or is cleared by an AdaptiveProtoLoad fire.
+    #[inline]
     pub(crate) fn drop_polymorphic_chain(&mut self, code: CodeRef, slot: FeedbackSlotId) {
-        self.polymorphic_chains.remove(&(code, slot));
+        let slot_zero = (slot.get() - 1) as usize;
+        if let Some(Some(slots)) = self.polymorphic_chains.get_mut(code_index(code))
+            && let Some(entry) = slots.get_mut(slot_zero)
+        {
+            *entry = None;
+        }
     }
 
     /// Phase C: returns the `MetadataTable` for `code`, or `None` if the
@@ -702,8 +720,7 @@ impl Vm {
         reason = "Spec 2 Phase B sweep surface; call site uses inline split-borrow retain in force_collect_with_active_roots"
     )]
     pub(crate) fn prune_dead_code_polymorphic_chains(&mut self, is_live: impl Fn(CodeRef) -> bool) {
-        self.polymorphic_chains
-            .retain(|(code, _slot), _chain| is_live(*code));
+        prune_dead_code_ic_slab(&mut self.polymorphic_chains, is_live);
     }
 
     /// Phase D.4.1: returns the `PropertyIcState` for `(code, slot)` if any.
@@ -1162,25 +1179,17 @@ impl Vm {
             vm: self,
             caller_frame: &caller_frame,
         });
-        // Spec 2 Phase B (B.2.2): prune polymorphic chain entries for code
-        // that is no longer installed. Mirrors the post-mark sweep in
+        // Phase D.4.1/D.4.3: prune IC side-table slabs for code that is no
+        // longer installed. Each slab is a Vec keyed by code_index; the slab
+        // entry is set to None when the code is dead so the inner Box<[..]>
+        // is freed. Liveness predicate: a CodeRef is live iff its slot in
+        // `self.installed` is `Some(_)` — i.e., it was installed and has not
+        // been evicted by dynamic_function_cache cleanup or otherwise
+        // uninstalled. Mirrors the post-mark sweep in
         // Agent::force_collect_with_additional_roots for ObjectRuntime's
-        // prototype-transition table, but lives here because Vm owns
-        // polymorphic_chains.
-        //
-        // Liveness predicate: a CodeRef is live iff its slot in
-        // `self.installed` is `Some(Some(_))` — i.e., it was installed and
-        // has not been evicted by dynamic_function_cache cleanup or otherwise
-        // uninstalled.
+        // prototype-transition table.
         let installed = &self.installed;
-        self.polymorphic_chains.retain(|(code, _), _| {
-            installed
-                .get(code_index(*code))
-                .is_some_and(|s| s.is_some())
-        });
-        // Phase D.4.1: prune IC side-table slabs for code that is no longer
-        // installed. Each slab is a Vec keyed by code_index; the slab entry is
-        // set to None when the code is dead so the inner Box<[..]> is freed.
+        prune_dead_code_ic_slab_by_installed(&mut self.polymorphic_chains, installed);
         prune_dead_code_ic_slab_by_installed(&mut self.property_ic_states, installed);
         prune_dead_code_ic_slab_by_installed(&mut self.call_ic_states, installed);
         prune_dead_code_ic_slab_by_installed(&mut self.construct_ic_states, installed);

@@ -834,8 +834,9 @@ impl Vm {
         if self.metadata_tables.len() <= index {
             self.metadata_tables.resize_with(index + 1, || None);
         }
-        // Phase D.4.1: allocate parallel IC side-table slabs keyed by code_index.
-        // Per-slot entries are `None` until the slow path populates them.
+        // Phase D.4.1/D.4.3: allocate parallel IC side-table slabs keyed by
+        // code_index. Per-slot entries are `None` until the slow path
+        // populates them.
         if self.property_ic_states.len() <= index {
             self.property_ic_states.resize_with(index + 1, || None);
         }
@@ -848,6 +849,9 @@ impl Vm {
         if self.keyed_property_ic_states.len() <= index {
             self.keyed_property_ic_states
                 .resize_with(index + 1, || None);
+        }
+        if self.polymorphic_chains.len() <= index {
+            self.polymorphic_chains.resize_with(index + 1, || None);
         }
         let descriptors: Vec<SiteDescriptor> = installed
             .function
@@ -866,6 +870,7 @@ impl Vm {
         self.call_ic_states[index] = Some(allocate_ic_slab(slot_count));
         self.construct_ic_states[index] = Some(allocate_ic_slab(slot_count));
         self.keyed_property_ic_states[index] = Some(allocate_ic_slab(slot_count));
+        self.polymorphic_chains[index] = Some(allocate_ic_slab(slot_count));
         self.tiering.ensure_slot(code);
         self.installed[index] = Some(Arc::new(installed));
     }
