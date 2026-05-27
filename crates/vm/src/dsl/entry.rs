@@ -51,38 +51,13 @@ pub(crate) fn run_via_dsl(
     let frame_depth = vm.frames().len();
     let pb_base = installed.function().instruction_bytes().as_ptr();
     let frame_pc_offset = frame.instruction_offset();
-    // DSL-0b (B16): wire the `FV` pin to the eagerly-allocated flat
-    // feedback storage on `Vm::feedback_flat_storage`. The slot is
-    // keyed by `code_index(frame.code())` and was populated to
-    // `function.feedback_slot_count()` default entries at install
-    // (B15). Storage is pointer-stable for the lifetime of the
-    // `InstalledFunction`, so the raw pointer captured here is safe
-    // to hand to the asm trampoline until `run_via_dsl` returns. Cast
-    // the `*const FeedbackEntry` from `.as_ptr()` to `*mut` because
-    // the asm-DSL ABI types `frame_fv_base` as `*mut FeedbackEntry`;
-    // the trampoline reads/writes through it on the current thread
-    // only (no aliasing UB during the trampoline's single-threaded
-    // execution).
-    let (fv_base, mt_base) = {
+    let mt_base = {
         let index = crate::vm::code_index_for_dsl(frame.code());
-        // The slot is guaranteed to exist because `store_installed`
-        // populates `feedback_flat_storage[index]` to the correct
-        // length before any code at `code` can be invoked. An empty
-        // boxed slice's `as_ptr()` is still a valid (non-dangling)
-        // pointer; the asm trampoline never dereferences past the
-        // slot count anyway.
-        let fv = vm.feedback_flat_storage[index].as_ptr().cast_mut();
-        // Phase C Task 4.2: also pin the metadata table buffer so the
-        // new resolve macro (Task 4.3) can read entries without going
-        // through Rust. Both pointers are live simultaneously; Task 4.3
-        // will flip the asm macro to consume the metadata pointer.
-        let mt: *mut u8 = vm
-            .metadata_tables
+        vm.metadata_tables
             .get(index)
             .and_then(|t| t.as_ref())
             .map(|t| t.buffer_ptr() as *mut u8)
-            .unwrap_or(std::ptr::null_mut());
-        (fv, mt)
+            .unwrap_or(std::ptr::null_mut())
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -158,7 +133,6 @@ pub(crate) fn run_via_dsl(
         _pad1: 0,
         frame_pb_base: pb_base,
         frame_regs_base: regs_base,
-        frame_fv_base: fv_base,
         frame_metadata_table_base: mt_base,
         object_records_base,
         object_slots_base,

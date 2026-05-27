@@ -245,16 +245,15 @@ impl DslHarness {
         };
 
         // Build the asm-visible state record. `frame_regs_base` /
-        // `frame_fv_base` / `frame_pb_base` aren't touched by the
-        // slow-path bridge logic under test in B31/B32, so null /
-        // dangling placeholders are safe — the semantic body the test
-        // passes in only reads what it explicitly chooses to read.
+        // `frame_pb_base` aren't touched by the slow-path bridge logic
+        // under test in B31/B32, so null / dangling placeholders are
+        // safe — the semantic body the test passes in only reads what
+        // it explicitly chooses to read.
         let mut state = LlIntState {
             frame_pc_offset: entry_pc,
             _pad1: 0,
             frame_pb_base: core::ptr::null(),
             frame_regs_base: core::ptr::null_mut(),
-            frame_fv_base: core::ptr::null_mut(),
             frame_metadata_table_base: core::ptr::null_mut(),
             object_records_base: core::ptr::null(),
             object_slots_base: core::ptr::null(),

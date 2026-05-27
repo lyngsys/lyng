@@ -241,8 +241,8 @@ impl Vm {
     /// [`Vm::installed_for_code`] for the slow-path `Refresh`
     /// machinery in [`crate::dsl::slow_path`]. Returns the
     /// `Arc<InstalledFunction>` for the post-frame-switch active
-    /// frame so the asm bridge can recompute `pb_base` /
-    /// `frame_fv_base` from a single source of truth.
+    /// frame so the asm bridge can recompute `pb_base` and
+    /// `frame_metadata_table_base` from a single source of truth.
     #[inline]
     pub(crate) fn installed_for_dsl_runtime(
         &self,

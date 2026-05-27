@@ -76,8 +76,8 @@ use state::{
     SuspendedExecutionSideState, TemplateCacheKey, WithEnvironmentState,
 };
 use values::{bytecode_index, code_index, decode_env_operand, string_text_array_index};
-// Re-export `code_index` for the DSL-0b entry shim so it can resolve
-// the `feedback_flat_storage` slot for a frame's `CodeRef` without
+// Re-export `code_index` for the DSL entry shim so it can resolve
+// the metadata-table slot for a frame's `CodeRef` without
 // re-implementing the (id - 1) → usize indexing.
 pub use values::code_index as code_index_for_dsl;
 
@@ -200,15 +200,7 @@ pub struct Vm {
     /// `KeyedPropertyMetadata` inside `MetadataTable`; this map holds the
     /// Rust-only state (family, entries, sidecars).
     pub(crate) keyed_property_ic_states: HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyIcState>,
-    /// Legacy scalar feedback mirror. Phase C.4 status: the asm IC fast path
-    /// no longer reads OR writes this storage — both `load_feedback_site!` and
-    /// `record_*` macros now source x21 from `Vm::metadata_tables`. Phase D.2.2
-    /// removed the flat-slot projection helper (the only remaining writer after
-    /// D.2.1 removed the debug equivalence assertion). Phase D.2.3 deletes this
-    /// field entirely along with `FeedbackEntry`.
-    pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
-    /// Phase C: per-code-object IC metadata buffer, parallel to
-    /// `feedback_flat_storage`, keyed by `code_index(code_ref)`.
+    /// Phase C: per-code-object IC metadata buffer keyed by `code_index(code_ref)`.
     /// `None` for code that has not yet been installed (or was installed
     /// before Phase C landed). Allocated eagerly alongside the flat
     /// storage in `store_installed`; never grown thereafter.
@@ -592,7 +584,6 @@ impl Vm {
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
             feedback_vectors: Vec::new(),
-            feedback_flat_storage: Vec::new(),
             metadata_tables: Vec::new(),
             polymorphic_chains: HashMap::new(),
             property_ic_states: HashMap::new(),

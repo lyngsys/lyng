@@ -263,13 +263,12 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} fv={state_fv} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_stride_shift={entry_stride_shift} fb_stride={feedback_entry_stride} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_observed={entry_observed} fb_count={feedback_scalar_execution_count} arith_obs={arith_metadata_observed_bits_offset} arith_cnt={arith_metadata_exec_count_offset} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} arith_obs={arith_metadata_observed_bits_offset} arith_cnt={arith_metadata_exec_count_offset} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
                 state_pb = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
                 state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
-                state_fv = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_FV_BASE,
                 // Phase C.4: byte offset of `LlIntState::frame_metadata_table_base`.
                 // x21 (MT pin) holds this pointer. `load_feedback_site!` and `record_*!`
                 // macros both resolve through x21 = MetadataTable buffer base.
@@ -278,13 +277,11 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
-                entry_stride_shift = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_STRIDE_SHIFT,
-                feedback_entry_stride = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_STRIDE,
-                feedback_mode = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_MODE_OFFSET,
-                feedback_named_handler_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_HANDLER_BITS_OFFSET,
-                feedback_named_aux_bits = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_NAMED_AUX_BITS_OFFSET,
-                entry_observed = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_OBSERVED_BITS_OFFSET,
-                feedback_scalar_execution_count = const ::lyng_vm::dsl::feedback_flat::FEEDBACK_ENTRY_SCALAR_EXECUTION_COUNT_OFFSET,
+                // Phase D.2.3: feedback_mode/handler/aux now sourced from PropertyMetadata
+                // (same layout as the old FeedbackEntry IC header — mode @0, handler @8, aux @16).
+                feedback_mode = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_MODE_OFFSET,
+                feedback_named_handler_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_HANDLER_BITS_OFFSET,
+                feedback_named_aux_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_AUX_BITS_OFFSET,
                 // Phase C precomputed-offset optimization: `load_feedback_site!` and
                 // `record_*!` macros now resolve slots via the slot_to_entry_offset
                 // table at buffer[0..N*4]. Only the field-level offsets are needed.

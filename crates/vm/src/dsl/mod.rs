@@ -16,7 +16,6 @@
 
 pub mod backend;
 pub mod entry;
-pub mod feedback_flat;
 pub mod handlers;
 pub mod llint_state;
 pub mod opcode_manifest;

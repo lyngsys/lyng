@@ -1699,8 +1699,8 @@ fn evaluate_script_direct_eval_var_initializer_returns_inner_value_and_updates_o
 // (`caught = e` would write into freed memory and read as `undefined`).
 //
 // Fix: in `translate_outcome`'s Continue arm, always recompute
-// `state.frame_regs_base` / `state.frame_fv_base` from the live
-// `Vm::register_stack_storage_mut_ptr` and `feedback_flat_storage`. The
+// `state.frame_regs_base` / `state.frame_metadata_table_base` from the live
+// `Vm::register_stack_storage_mut_ptr` and `metadata_tables`. The
 // asm bridge's `dispatch_after_slow!` Continue path now reloads `x20` /
 // `x21` from those state fields on every slow-path egress so a nested
 // call's realloc is visible to the next dispatched handler. PC stays

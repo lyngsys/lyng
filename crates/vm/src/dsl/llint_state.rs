@@ -7,7 +7,6 @@
 
 use lyng_types::Value;
 
-use crate::dsl::feedback_flat::FeedbackEntry;
 use crate::error::VmError;
 use crate::vm::dispatch_state::DispatchState;
 
@@ -33,7 +32,6 @@ pub struct LlIntState {
     pub _pad1: u32,
     pub frame_pb_base: *const u8,
     pub frame_regs_base: *mut Value,
-    pub frame_fv_base: *mut FeedbackEntry,
     #[allow(dead_code)]
     pub(crate) frame_metadata_table_base: *mut u8,
     pub object_records_base: *const *const lyng_gc::RuntimeObjectRecord,
@@ -171,18 +169,17 @@ mod tests {
         assert_eq!(r::LLINT_STATE_FRAME_PC_OFFSET, 0);
         assert_eq!(r::LLINT_STATE_FRAME_PB_BASE, 8);
         assert_eq!(r::LLINT_STATE_FRAME_REGS_BASE, 16);
-        assert_eq!(r::LLINT_STATE_FRAME_FV_BASE, 24);
-        // Phase C Task 4.1: metadata-table base pointer immediately follows fv_base.
-        assert_eq!(r::LLINT_STATE_FRAME_METADATA_TABLE_BASE, 32);
-        assert_eq!(r::LLINT_STATE_OBJECT_RECORDS_BASE, 40);
-        assert_eq!(r::LLINT_STATE_OBJECT_SLOTS_BASE, 48);
+        // Phase D.2.3: frame_fv_base removed; metadata-table base now at 24.
+        assert_eq!(r::LLINT_STATE_FRAME_METADATA_TABLE_BASE, 24);
+        assert_eq!(r::LLINT_STATE_OBJECT_RECORDS_BASE, 32);
+        assert_eq!(r::LLINT_STATE_OBJECT_SLOTS_BASE, 40);
         // Phase 1.B.1 plus outline-slot LLInt substrate: const/this
         // mirrors plus the two heap pointer tables occupy four 8-byte
         // slots before the scalar block.
-        assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 56);
-        assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 64);
-        assert_eq!(r::LLINT_STATE_PREFIX, 88);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 96);
+        assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
+        assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
+        assert_eq!(r::LLINT_STATE_PREFIX, 80);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 88);
     }
 
     #[test]

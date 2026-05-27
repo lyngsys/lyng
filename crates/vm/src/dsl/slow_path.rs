@@ -129,12 +129,10 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     .frame
                     .set_instruction_offset((**state).frame_pc_offset);
             }
-            // registers_base / fv_base are mirrored back via the
-            // `Refresh` path in `translate_outcome`; semantic bodies
-            // read those through `rust.dispatch.installed.feedback_flat`
-            // and the register window, both of which are still
-            // authoritative on entry (the asm side has not relocated
-            // them).
+            // registers_base is mirrored back via the `Refresh` path
+            // in `translate_outcome`; semantic bodies read through
+            // the register window, which is still authoritative on
+            // entry (the asm side has not relocated it).
         }
     }
 
@@ -165,7 +163,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                 // frame caught the throw — its PC was rewritten by
                 // `transfer_to_exception_handler`. We must promote
                 // this `Continue` into a `Refresh` so the bridge
-                // reloads PC/REGS/FV from `vm.frames().last()`.
+                // reloads PC/REGS/MT from `vm.frames().last()`.
                 //
                 // Under α, the trampoline loop does this check between
                 // every handler call. Under DSL, the asm bridge does
@@ -188,9 +186,9 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                 // call's `reserve_register_window` reallocates the
                 // underlying `Vec<Value>`, the old base pointer in
                 // `x20` is freed — even when frame depth is unchanged
-                // after the nested call returns. Recompute REGS (and
-                // FV) from the live `Vm::register_stack_storage_mut_ptr`
-                // on every Continue egress so the asm bridge picks up
+                // after the nested call returns. Recompute REGS from
+                // the live `Vm::register_stack_storage_mut_ptr` on
+                // every Continue egress so the asm bridge picks up
                 // the post-reallocation base. PC stays sourced from
                 // `rust.dispatch.frame` so handler-local PC advances
                 // (which haven't been synced to `vm.frames`) are
@@ -211,21 +209,15 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         // active frame; one-past-the-end is well-defined.
                         unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
-                    let (fv_base, mt_base) = {
+                    let mt_base: *mut u8 = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        let fv = rust.dispatch.vm.feedback_flat_storage[index]
-                            .as_ptr()
-                            .cast_mut();
-                        // Phase C Task 4.2: parallel metadata table pin.
-                        let mt: *mut u8 = rust
-                            .dispatch
+                        rust.dispatch
                             .vm
                             .metadata_tables
                             .get(index)
                             .and_then(|t| t.as_ref())
                             .map(|t| t.buffer_ptr() as *mut u8)
-                            .unwrap_or(std::ptr::null_mut());
-                        (fv, mt)
+                            .unwrap_or(std::ptr::null_mut())
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -236,13 +228,12 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     // the new PC back into `state.frame_pc_offset` so
                     // a subsequent slow-path Refresh — or the test
                     // harness, which reads via state — sees the
-                    // authoritative value. Likewise refresh REGS/FV
+                    // authoritative value. Likewise refresh REGS/MT
                     // so the asm bridge's next dispatch picks up any
                     // reallocation that happened during nested calls.
                     unsafe {
                         (**state).frame_pc_offset = new_offset;
                         (**state).frame_regs_base = regs_base_ptr;
-                        (**state).frame_fv_base = fv_base;
                         (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
@@ -309,21 +300,15 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .function()
                         .instruction_bytes()
                         .as_ptr();
-                    let (fv_base, mt_base) = {
+                    let mt_base: *mut u8 = {
                         let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        let fv = rust.dispatch.vm.feedback_flat_storage[index]
-                            .as_ptr()
-                            .cast_mut();
-                        // Phase C Task 4.2: parallel metadata table pin.
-                        let mt: *mut u8 = rust
-                            .dispatch
+                        rust.dispatch
                             .vm
                             .metadata_tables
                             .get(index)
                             .and_then(|t| t.as_ref())
                             .map(|t| t.buffer_ptr() as *mut u8)
-                            .unwrap_or(std::ptr::null_mut());
-                        (fv, mt)
+                            .unwrap_or(std::ptr::null_mut())
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -354,9 +339,6 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_pc_offset = active_frame.instruction_offset();
                         (**state).frame_pb_base = pb_base;
                         (**state).frame_regs_base = regs_base_ptr;
-                        (**state).frame_fv_base = fv_base;
-                        // Phase C Task 4.2: refresh the metadata table base in
-                        // lockstep with frame_fv_base.
                         (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;

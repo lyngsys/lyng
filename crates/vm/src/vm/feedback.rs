@@ -877,9 +877,7 @@ pub struct ConstructFeedback {
     entries: [Option<ConstructCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
 }
 
-// Per-site feedback content. Promoted to `pub(crate)` so the DSL-0b
-// flat-array storage (`crate::dsl::feedback_flat`) can wrap it inside a
-// `FeedbackEntry`. The enum variants are still constructed only through
+// Per-site feedback content. The enum variants are constructed only through
 // the methods on this file; outside this module the type is opaque.
 //
 // Spec 2 Phase B.1.3 shrunk `NamedPropertyFeedback` (its out-of-line
@@ -2177,15 +2175,6 @@ impl Vm {
         }
     }
 
-    #[allow(
-        dead_code,
-        reason = "D.2.3: helper used only by flat_named_property_header_snapshot; both deleted when feedback_flat_storage goes away"
-    )]
-    #[inline]
-    fn flat_feedback_slot_index(slot: FeedbackSlotId) -> Option<usize> {
-        usize::try_from(slot.get().checked_sub(1)?).ok()
-    }
-
     #[inline]
     const fn named_own_inline_load_header(site: &FeedbackSiteState) -> Option<u64> {
         let FeedbackSiteState::NamedProperty(feedback) = site else {
@@ -2376,9 +2365,8 @@ impl Vm {
             let arith = table.arith_mut(slot.get());
             let observed_bits = arith.observed_bits;
             let execution_count = arith.execution_count;
-            if execution_count == 0
-                || observed_bits & crate::dsl::feedback_flat::LLINT_FEEDBACK_OBSERVED_SMI == 0
-            {
+            // LLINT_FEEDBACK_OBSERVED_SMI = 0x1 (SMI observed bit in ArithMetadata)
+            if execution_count == 0 || observed_bits & 0x1 == 0 {
                 continue;
             }
             // Zero out both fields (drain-and-clear).
@@ -3561,156 +3549,6 @@ impl Vm {
             .map(|_| self.tiering.warmup_counter(code))
     }
 
-    /// Assert that each flat LLInt IC header matches the legacy feedback
-    /// slot it summarizes. Returns `Ok(())` on full match, or
-    /// `Err((slot_index, diff_string))` describing the first divergence.
-    #[doc(hidden)]
-    #[allow(
-        clippy::too_many_lines,
-        reason = "debug assertion walks every flat feedback shape in one ordered comparison for readable mismatch reports"
-    )]
-    pub fn feedback_flat_matches_legacy(&self, code: CodeRef) -> Result<(), (usize, String)> {
-        let index = code_index(code);
-        let legacy_sites: &[Option<FeedbackSiteState>] = self
-            .feedback_vectors
-            .get(index)
-            .map_or(&[], |vector| vector.sites.as_slice());
-        let empty_flat: &[crate::dsl::feedback_flat::FeedbackEntry] = &[];
-        let flat: &[crate::dsl::feedback_flat::FeedbackEntry] = self
-            .feedback_flat_storage
-            .get(index)
-            .map_or(empty_flat, std::ops::Deref::deref);
-        // Both storages may differ in length only when the legacy vector
-        // is still unallocated and the flat array carries install-time
-        // capacity. In that case every flat entry must be empty.
-        if legacy_sites.is_empty() {
-            for (i, entry) in flat.iter().enumerate() {
-                if entry.mode() != crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
-                    || entry.named_handler_bits() != 0
-                    || entry.named_aux_bits() != 0
-                    || entry.scalar_observed_bits() != 0
-                    || entry.scalar_execution_count() != 0
-                {
-                    return Err((
-                        i,
-                        format!(
-                            "flat slot {i} populated while legacy vector is unallocated: mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
-                            entry.mode(),
-                            entry.named_handler_bits(),
-                            entry.named_aux_bits(),
-                            entry.scalar_observed_bits(),
-                            entry.scalar_execution_count(),
-                        ),
-                    ));
-                }
-            }
-            return Ok(());
-        }
-        // Once allocated, lengths must match.
-        if legacy_sites.len() != flat.len() {
-            return Err((
-                0,
-                format!(
-                    "length mismatch: legacy={} flat={}",
-                    legacy_sites.len(),
-                    flat.len()
-                ),
-            ));
-        }
-        for (i, (legacy, flat_entry)) in legacy_sites.iter().zip(flat.iter()).enumerate() {
-            let expected = legacy.as_ref().and_then(Self::named_llint_load_header);
-            match expected {
-                Some(LlIntNamedPropertyHeader::OwnInline { handler_bits })
-                    if flat_entry.mode()
-                        == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD
-                        && flat_entry.named_handler_bits() == handler_bits
-                        && flat_entry.named_aux_bits() == 0
-                        && flat_entry.scalar_observed_bits() == 0
-                        && flat_entry.scalar_execution_count() == 0 => {}
-                Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits })
-                    if flat_entry.mode()
-                        == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD
-                        && flat_entry.named_handler_bits() == handler_bits
-                        && flat_entry.named_aux_bits() == 0
-                        && flat_entry.scalar_observed_bits() == 0
-                        && flat_entry.scalar_execution_count() == 0 => {}
-                Some(LlIntNamedPropertyHeader::ProtoInline {
-                    receiver_word,
-                    proto_word,
-                }) if flat_entry.mode()
-                    == crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD
-                    && flat_entry.named_handler_bits() == proto_word
-                    && flat_entry.named_aux_bits() == receiver_word
-                    && flat_entry.scalar_observed_bits() == 0
-                    && flat_entry.scalar_execution_count() == 0 => {}
-                Some(expected) => {
-                    return Err((
-                        i,
-                        Self::format_flat_header_divergence(i, expected, flat_entry),
-                    ));
-                }
-                None if flat_entry.mode() == crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY
-                    && flat_entry.named_handler_bits() == 0
-                    && flat_entry.named_aux_bits() == 0
-                    && flat_entry.scalar_observed_bits() == 0
-                    && flat_entry.scalar_execution_count() == 0 => {}
-                None => {
-                    return Err((
-                        i,
-                        format!(
-                            "slot {i} carried a flat LLInt header for an ineligible legacy slot: mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
-                            flat_entry.mode(),
-                            flat_entry.named_handler_bits(),
-                            flat_entry.named_aux_bits(),
-                            flat_entry.scalar_observed_bits(),
-                            flat_entry.scalar_execution_count()
-                        ),
-                    ));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn format_flat_header_divergence(
-        slot_index: usize,
-        expected: LlIntNamedPropertyHeader,
-        flat_entry: &crate::dsl::feedback_flat::FeedbackEntry,
-    ) -> String {
-        let expected_text = match expected {
-            LlIntNamedPropertyHeader::OwnInline { handler_bits } => format!(
-                "mode={} handler={handler_bits:#x} aux_bits=0x0",
-                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
-            ),
-            LlIntNamedPropertyHeader::OwnOutline { handler_bits } => format!(
-                "mode={} handler={handler_bits:#x} aux_bits=0x0",
-                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD,
-            ),
-            LlIntNamedPropertyHeader::ProtoInline {
-                receiver_word,
-                proto_word,
-            } => format!(
-                "mode={} handler={proto_word:#x} aux_bits={receiver_word:#x}",
-                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
-            ),
-            LlIntNamedPropertyHeader::OwnPolymorphic {
-                slot0_handler_bits,
-                slot1_handler_bits,
-            } => format!(
-                "mode={} handler={slot0_handler_bits:#x} aux_bits={slot1_handler_bits:#x}",
-                crate::dsl::feedback_flat::LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
-            ),
-        };
-        format!(
-            "slot {slot_index} header diverges: expected {expected_text}, flat mode={} handler={:#x} aux_bits={:#x} scalar_observed={:#x} scalar_count={}",
-            flat_entry.mode(),
-            flat_entry.named_handler_bits(),
-            flat_entry.named_aux_bits(),
-            flat_entry.scalar_observed_bits(),
-            flat_entry.scalar_execution_count()
-        )
-    }
-
     #[cfg(test)]
     pub(crate) fn feedback_execution_count(
         &self,
@@ -3721,24 +3559,6 @@ impl Vm {
             .get(code_index(code))?
             .site(slot)
             .map(FeedbackSiteState::execution_count)
-    }
-
-    #[cfg(test)]
-    #[allow(
-        dead_code,
-        reason = "D.2.3: tests for flat storage deleted in D.2.2; this snapshot helper goes with feedback_flat_storage"
-    )]
-    pub(crate) fn flat_named_property_header_snapshot(
-        &self,
-        code: CodeRef,
-        slot: FeedbackSlotId,
-    ) -> Option<(u8, u64)> {
-        let slot_index = Self::flat_feedback_slot_index(slot)?;
-        let entry = self
-            .feedback_flat_storage
-            .get(code_index(code))?
-            .get(slot_index)?;
-        Some((entry.mode(), entry.named_handler_bits()))
     }
 
     #[cfg(test)]
@@ -3854,17 +3674,18 @@ impl Vm {
     reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
 )]
 fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -> PropertyMetadata {
-    use crate::dsl::feedback_flat::{
-        LLINT_IC_MODE_EMPTY, LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD,
-        LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD, LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
-        LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
-    };
+    // IC mode constants (match PropertyMetadata.mode field values used by asm).
+    const MODE_EMPTY: u8 = 0;
+    const MODE_NAMED_OWN_INLINE_LOAD: u8 = 1;
+    const MODE_NAMED_PROTO_INLINE_LOAD: u8 = 2;
+    const MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
+    const MODE_NAMED_OWN_POLYMORPHIC: u8 = 4;
     let (mode, handler_bits, aux_bits) = match header {
         Some(LlIntNamedPropertyHeader::OwnInline { handler_bits }) => {
-            (LLINT_IC_MODE_NAMED_OWN_INLINE_LOAD, handler_bits, 0u64)
+            (MODE_NAMED_OWN_INLINE_LOAD, handler_bits, 0u64)
         }
         Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits }) => {
-            (LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD, handler_bits, 0u64)
+            (MODE_NAMED_OWN_OUTLINE_LOAD, handler_bits, 0u64)
         }
         Some(LlIntNamedPropertyHeader::ProtoInline {
             receiver_word,
@@ -3872,21 +3693,17 @@ fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -
         }) => {
             // ProtoInline layout: named_handler_bits ← proto_word,
             //                     named_aux_bits      ← receiver_word
-            (
-                LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
-                proto_word,
-                receiver_word,
-            )
+            (MODE_NAMED_PROTO_INLINE_LOAD, proto_word, receiver_word)
         }
         Some(LlIntNamedPropertyHeader::OwnPolymorphic {
             slot0_handler_bits,
             slot1_handler_bits,
         }) => (
-            LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC,
+            MODE_NAMED_OWN_POLYMORPHIC,
             slot0_handler_bits,
             slot1_handler_bits,
         ),
-        None => (LLINT_IC_MODE_EMPTY, 0u64, 0u64),
+        None => (MODE_EMPTY, 0u64, 0u64),
     };
     PropertyMetadata {
         mode,
@@ -3910,11 +3727,12 @@ fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -
     reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
 )]
 fn project_call(site: Option<&FeedbackSiteState>) -> CallMetadata {
-    use crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY;
+    // IC mode 0 = empty/uninitialized (shared across all IC kinds).
+    const MODE_EMPTY: u8 = 0;
     let (mode, execution_count) = match site {
         Some(FeedbackSiteState::Call(feedback)) => {
             let mode = match feedback.cache_state {
-                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Uninitialized => MODE_EMPTY,
                 InlineCacheState::Monomorphic => 1u8,
                 InlineCacheState::Polymorphic => 2u8,
                 InlineCacheState::Megamorphic => 3u8,
@@ -3923,14 +3741,14 @@ fn project_call(site: Option<&FeedbackSiteState>) -> CallMetadata {
         }
         Some(FeedbackSiteState::Construct(feedback)) => {
             let mode = match feedback.cache_state {
-                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Uninitialized => MODE_EMPTY,
                 InlineCacheState::Monomorphic => 1u8,
                 InlineCacheState::Polymorphic => 2u8,
                 InlineCacheState::Megamorphic => 3u8,
             };
             (mode, feedback.execution_count)
         }
-        _ => (LLINT_IC_MODE_EMPTY, 0),
+        _ => (MODE_EMPTY, 0),
     };
     CallMetadata {
         mode,
@@ -3951,11 +3769,12 @@ fn project_call(site: Option<&FeedbackSiteState>) -> CallMetadata {
     reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
 )]
 fn project_keyed_property(site: Option<&FeedbackSiteState>) -> KeyedPropertyMetadata {
-    use crate::dsl::feedback_flat::LLINT_IC_MODE_EMPTY;
+    // IC mode 0 = empty/uninitialized (shared across all IC kinds).
+    const MODE_EMPTY: u8 = 0;
     let (mode, handler_bits, execution_count) = match site {
         Some(FeedbackSiteState::KeyedProperty(feedback)) => {
             let mode = match feedback.cache_state {
-                InlineCacheState::Uninitialized => LLINT_IC_MODE_EMPTY,
+                InlineCacheState::Uninitialized => MODE_EMPTY,
                 InlineCacheState::Monomorphic => 1u8,
                 InlineCacheState::Polymorphic => 2u8,
                 InlineCacheState::Megamorphic => 3u8,
@@ -3968,7 +3787,7 @@ fn project_keyed_property(site: Option<&FeedbackSiteState>) -> KeyedPropertyMeta
             };
             (mode, handler_bits, feedback.execution_count)
         }
-        _ => (LLINT_IC_MODE_EMPTY, 0, 0),
+        _ => (MODE_EMPTY, 0, 0),
     };
     KeyedPropertyMetadata {
         mode,

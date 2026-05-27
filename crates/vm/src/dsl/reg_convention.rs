@@ -44,7 +44,6 @@ use crate::dsl::llint_state::LlIntState;
 pub const LLINT_STATE_FRAME_PC_OFFSET: usize = offset_of!(LlIntState, frame_pc_offset);
 pub const LLINT_STATE_FRAME_PB_BASE: usize = offset_of!(LlIntState, frame_pb_base);
 pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs_base);
-pub const LLINT_STATE_FRAME_FV_BASE: usize = offset_of!(LlIntState, frame_fv_base);
 pub const LLINT_STATE_FRAME_METADATA_TABLE_BASE: usize =
     offset_of!(LlIntState, frame_metadata_table_base);
 
@@ -60,7 +59,10 @@ pub use crate::vm::metadata_table::arith::{
     ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
     ARITH_METADATA_STRIDE_SHIFT,
 };
-pub use crate::vm::metadata_table::property::PROPERTY_METADATA_STRIDE_SHIFT;
+pub use crate::vm::metadata_table::property::{
+    PROPERTY_METADATA_AUX_BITS_OFFSET, PROPERTY_METADATA_HANDLER_BITS_OFFSET,
+    PROPERTY_METADATA_MODE_OFFSET, PROPERTY_METADATA_STRIDE_SHIFT,
+};
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_slots_base);
 // Phase 1.B.1: pre-resolved constants array base + this-mirror.
