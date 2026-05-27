@@ -65,7 +65,9 @@ mod values;
 mod with_env;
 
 use call::RejectingNativeRegistry;
-use feedback::{FeedbackVector, PolymorphicChain};
+use feedback::{
+    CallCacheStorage, ConstructCacheStorage, KeyedPropertyNamedEntries, PolymorphicChain,
+};
 use ic_state::{CallIcState, KeyedPropertyIcState, PropertyIcState};
 use install::InstalledFunction;
 use metadata_table::MetadataTable;
@@ -162,12 +164,6 @@ pub struct Vm {
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
-    /// Per-installed-code feedback storage, keyed by `code_index(code_ref)`. Every entry is a
-    /// real `FeedbackVector` rather than `Option<FeedbackVector>` — the default-constructed
-    /// value is the "unallocated" sentinel (empty slot storage), so IC-bearing opcodes drop
-    /// one Option discriminant on the hot path. The warmup counter lives on `Tiering`
-    /// (see `TieringState::warmup_counter`); Spec 2 Phase A lifted it off `FeedbackVector`.
-    feedback_vectors: Vec<FeedbackVector>,
     /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices POLY_LIMIT..8).
     /// Keyed by (CodeRef, FeedbackSlotId). Lazy: monomorphic and ≤POLY_LIMIT
     /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
@@ -192,6 +188,17 @@ pub struct Vm {
     /// Same shape as `call_ic_states`; the kind distinction is implicit in
     /// which map the entry lives in.
     pub(crate) construct_ic_states: HashMap<(CodeRef, FeedbackSlotId), CallIcState>,
+    /// Phase D.2.4: per-slot Call cache entries (actual callee/builtin data).
+    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    pub(in crate::vm) call_cache_entries: HashMap<(CodeRef, FeedbackSlotId), Box<CallCacheStorage>>,
+    /// Phase D.2.4: per-slot Construct cache entries.
+    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    pub(in crate::vm) construct_cache_entries:
+        HashMap<(CodeRef, FeedbackSlotId), Box<ConstructCacheStorage>>,
+    /// Phase D.2.4: per-slot KeyedProperty named-atom cache entries.
+    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    pub(in crate::vm) keyed_property_named_entries:
+        HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyNamedEntries>,
     /// Phase D.1.3: Rust-only IC state machine for `KeyedProperty` slots.
     /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
     /// observation. Entries are pruned on code GC via
@@ -583,12 +590,14 @@ impl Vm {
             atom_texts: HashMap::new(),
             preferred_atoms_by_text: HashMap::new(),
             source_texts: HashMap::new(),
-            feedback_vectors: Vec::new(),
             metadata_tables: Vec::new(),
             polymorphic_chains: HashMap::new(),
             property_ic_states: HashMap::new(),
             call_ic_states: HashMap::new(),
             construct_ic_states: HashMap::new(),
+            call_cache_entries: HashMap::new(),
+            construct_cache_entries: HashMap::new(),
+            keyed_property_named_entries: HashMap::new(),
             keyed_property_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
@@ -634,6 +643,7 @@ impl Vm {
     }
 
     /// Returns the polymorphic chain for `(code, slot)` if any.
+    #[allow(dead_code, reason = "used in tests via pub(crate)")]
     pub(crate) fn polymorphic_chain(
         &self,
         code: CodeRef,
@@ -1736,50 +1746,6 @@ impl Vm {
             .ok_or(VmError::MissingInstalledCode(code))?;
         crate::dsl::entry::run_via_dsl(self, agent, host, registry, installed, frame)
     }
-
-    /// Spec 2 Phase A: dispatched from `Agent::fire_watchpoints_for_shape` when
-    /// an `AdaptiveProtoLoad` observer fires. Clears the IC slot identified by
-    /// `(code, slot)` if its current generation matches `expected_generation`.
-    /// Stale watchpoints from prior installs are silently dropped; the slot
-    /// keeps whatever it currently holds.
-    ///
-    /// After `clear_site` the slot is `None`, so the `NamedPropertyFeedback`
-    /// (and its `generation`) is dropped. The next install creates a fresh
-    /// `NamedPropertyFeedback { generation: 0 }` and the slow path bumps to 1
-    /// before registering new watchpoints. Watchpoints from the prior install
-    /// era carry the old generation (> 0 after at least one bump) and will
-    /// no-op on mismatch — correct staleness behaviour.
-    pub(crate) fn clear_ic_slot_if_generation_matches(
-        &mut self,
-        code: CodeRef,
-        slot: FeedbackSlotId,
-        expected_generation: u32,
-    ) {
-        let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) else {
-            return;
-        };
-        if vector.generation(slot) != expected_generation {
-            return;
-        }
-        vector.clear_site(slot);
-        // Spec 2 Phase B.1.3: drop any out-of-line polymorphic chain attached
-        // to this (code, slot). The site is being reset to `None`, so the
-        // chain must follow it; otherwise stale chain entries would be
-        // visible on the next install.
-        self.drop_polymorphic_chain(code, slot);
-        // Phase D.1.1: drop the PropertyIcState for this slot. On the next
-        // slow-path install a fresh default entry will be created.
-        self.property_ic_states.remove(&(code, slot));
-        // Phase D.1.3: drop the KeyedPropertyIcState for this slot. Keyed-atom
-        // sites can register AdaptiveProtoLoad watchpoints (via
-        // `observe_keyed_atom_slow_path`), so the side-table entry must be
-        // cleared when the watchpoint fires just like NamedProperty.
-        self.keyed_property_ic_states.remove(&(code, slot));
-        // Note: bump_generation after clear_site is a no-op because clear_site
-        // drops the NamedPropertyFeedback that holds the generation counter.
-        // Generation resets to 0 on the next fresh install; see doc above.
-        self.mirror_metadata_slot(code, slot);
-    }
 }
 
 impl AdaptiveProtoLoadDispatch for Vm {
@@ -1793,9 +1759,11 @@ impl AdaptiveProtoLoadDispatch for Vm {
     }
 
     fn bump_generation_for_install(&mut self, code: CodeRef, slot: FeedbackSlotId) -> u32 {
-        let Some(vector) = self.feedback_vectors.get_mut(code_index(code)) else {
-            return 0;
-        };
-        vector.bump_generation(slot)
+        // Phase D.2.4: generation now lives on PropertyIcState. Lazily insert a
+        // default entry if absent (first slow-path visit for this slot), then
+        // bump and return the new generation.
+        let state = self.property_ic_states.entry((code, slot)).or_default();
+        state.generation = state.generation.wrapping_add(1);
+        state.generation
     }
 }

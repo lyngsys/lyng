@@ -13,11 +13,8 @@ use crate::vm::feedback::InlineCacheState;
 ///
 /// The asm-readable fields (`mode`, `generation`, `callee_bits`,
 /// `execution_count`) live on the slot's `CallMetadata` entry inside
-/// `MetadataTable`. Slow-path callers dual-write: update `CallIcState`
-/// (canonical state machine) **and** flush `CallMetadata` (asm-readable
-/// bits) after every transition. The legacy `FeedbackSiteState::Call` /
-/// `FeedbackSiteState::Construct` write is kept in parallel until Phase D.2.4
-/// for snapshot API compatibility.
+/// `MetadataTable`. This struct is the SOLE source of truth for IC
+/// state-machine transitions as of Phase D.2.4.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CallIcState {
     pub cache_state: InlineCacheState,
@@ -25,12 +22,10 @@ pub struct CallIcState {
     pub entry_count: u8,
     /// Expected argument count cached at compile time, if known.
     pub expected_arity: Option<u16>,
+    /// Running execution count for this slot (Rust-side accounting).
+    pub execution_count: u32,
 }
 
-#[allow(
-    dead_code,
-    reason = "Phase D.1.2 state-machine surface; methods consumed from tests and future D.2.x callers"
-)]
 impl CallIcState {
     /// Constructs a fresh `CallIcState` in `Uninitialized` state.
     pub const fn new() -> Self {
@@ -38,6 +33,7 @@ impl CallIcState {
             cache_state: InlineCacheState::Uninitialized,
             entry_count: 0,
             expected_arity: None,
+            execution_count: 0,
         }
     }
 }

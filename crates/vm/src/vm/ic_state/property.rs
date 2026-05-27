@@ -19,10 +19,9 @@ use crate::vm::feedback::{InlineCacheState, POLY_LIMIT};
 ///
 /// The asm-readable fields (`mode`, `generation`, `handler_bits`, `aux_bits`,
 /// `execution_count`) live on the slot's `PropertyMetadata` entry inside
-/// `MetadataTable`. Slow-path callers dual-write: update `PropertyIcState`
-/// (canonical state machine) **and** flush `PropertyMetadata` (asm-readable
-/// bits) after every transition. The legacy `FeedbackSiteState::NamedProperty`
-/// write is kept in parallel until Phase D.2.4 for snapshot API compatibility.
+/// `MetadataTable`. This struct is the SOLE source of truth for IC state-machine
+/// transitions as of Phase D.2.4. After every transition, slow-path callers
+/// must flush `PropertyMetadata` directly from this struct.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PropertyIcState {
     pub cache_state: InlineCacheState,
@@ -40,12 +39,18 @@ pub struct PropertyIcState {
     /// Polymorphic OwnData sidecar — mirrors the first `POLY_LIMIT` entries
     /// when the cache is Polymorphic and the entry packs into a valid handler.
     pub polymorphic_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
+    /// Per-site install generation. Bumped on every install / re-install.
+    /// `AdaptiveProtoLoad` watchpoints carry the generation at registration
+    /// time and no-op when this has advanced past it (Phase A).
+    pub generation: u32,
+    /// Running execution count for this slot (not asm-readable; for Rust
+    /// slow-path accounting and test helpers). Phase D.2.4 owns this field.
+    pub execution_count: u32,
+    /// When `true` the slot was cleared by a watchpoint fire and is awaiting
+    /// re-initialization (replaces `FeedbackVector::clear_site` semantics).
+    pub is_cleared: bool,
 }
 
-#[allow(
-    dead_code,
-    reason = "Phase D.1.1 state-machine surface; methods consumed from future D.2.x slow-path callers"
-)]
 impl PropertyIcState {
     /// Constructs a fresh `PropertyIcState` in `Uninitialized` state.
     pub const fn new() -> Self {
@@ -56,6 +61,9 @@ impl PropertyIcState {
             monomorphic_own_data_handler: NamedPropertyHandler::NONE,
             monomorphic_proto_data_handler: NamedPropertyProtoHandler::NONE,
             polymorphic_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
+            generation: 0,
+            execution_count: 0,
+            is_cleared: false,
         }
     }
 

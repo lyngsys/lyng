@@ -48,11 +48,9 @@ pub enum KeyedIcFamily {
 ///
 /// The asm-readable fields (`mode`, `generation`, `handler_bits`,
 /// `execution_count`) live on the slot's `KeyedPropertyMetadata` entry inside
-/// `MetadataTable`. Slow-path callers dual-write: update `KeyedPropertyIcState`
-/// (canonical state machine) **and** flush `KeyedPropertyMetadata` (asm-readable
-/// bits) after every transition. The legacy
-/// `FeedbackSiteState::KeyedProperty` write is kept in parallel until Phase
-/// D.2.4 for snapshot API compatibility.
+/// `MetadataTable`. This struct is the SOLE source of truth for IC state-machine
+/// transitions as of Phase D.2.4. After every transition, slow-path callers
+/// must flush `KeyedPropertyMetadata` directly from this struct.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyedPropertyIcState {
     pub cache_state: InlineCacheState,
@@ -80,12 +78,10 @@ pub struct KeyedPropertyIcState {
     pub polymorphic_named_atoms: [u32; POLY_LIMIT],
     /// Polymorphic dense-index sidecars (first `POLY_LIMIT` entries).
     pub polymorphic_dense_index_handlers: [KeyedDenseIndexHandler; POLY_LIMIT],
+    /// Running execution count for this slot (Rust-side accounting). Phase D.2.4 owns this field.
+    pub execution_count: u32,
 }
 
-#[allow(
-    dead_code,
-    reason = "Phase D.1.3 state-machine surface; methods consumed from tests and future D.2.x callers"
-)]
 impl KeyedPropertyIcState {
     /// Constructs a fresh `KeyedPropertyIcState` in `Uninitialized` state.
     pub const fn new() -> Self {
@@ -103,6 +99,7 @@ impl KeyedPropertyIcState {
             polymorphic_named_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
             polymorphic_named_atoms: [0; POLY_LIMIT],
             polymorphic_dense_index_handlers: [KeyedDenseIndexHandler::NONE; POLY_LIMIT],
+            execution_count: 0,
         }
     }
 }

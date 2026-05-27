@@ -189,7 +189,9 @@ impl Vm {
                         value
                     }
                     NamedPropertyDirectGet::Absent => {
-                        self.record_feedback_slot(frame.code(), feedback_slot);
+                        // Use the absent-specific observer so execution_count
+                        // is tracked without promoting the slot to Megamorphic.
+                        self.observe_absent_named_property_slot(frame.code(), feedback_slot);
                         Value::undefined()
                     }
                 };

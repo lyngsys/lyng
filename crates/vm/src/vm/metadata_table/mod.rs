@@ -81,8 +81,19 @@ impl MetadataTable {
     /// Allocate a fresh table sized to hold per-kind metadata for `sites`.
     /// Sites need not be sorted; in-kind indices (and entry offsets) are
     /// assigned in slot-ascending order.
+    ///
+    /// The slot-to-entry-offset table is sized by `max(site.slot)` (1-based),
+    /// not by `sites.len()`, because slot IDs may be non-contiguous (the
+    /// compiler assigns them sequentially but the descriptor list can be a
+    /// sparse subset). Using `len()` would make the table too small for
+    /// high-numbered slots, causing out-of-bounds writes during population.
     pub fn allocate(sites: &[SiteDescriptor]) -> Self {
-        let slot_count = sites.len() as u32;
+        // Max 1-based slot ID in `sites`; 0 when empty. The slot table must
+        // cover every slot up to max_slot so that entry_offset_for_slot(s)
+        // for any s ≤ max_slot is in bounds. Using sites.len() would be wrong
+        // when slot IDs are non-contiguous (sparse) — the write for a high-
+        // numbered slot would land beyond the allocated table area.
+        let slot_count = sites.iter().map(|s| s.slot).max().unwrap_or(0);
 
         // 1. Tally per-kind counts.
         let mut per_kind_counts = [0u32; METADATA_KIND_COUNT];

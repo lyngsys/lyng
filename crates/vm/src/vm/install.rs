@@ -1,7 +1,7 @@
 use super::{
-    bytecode_index, code_index, feedback::FeedbackVector, Agent, AllocationLifetime, AtomId,
-    BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode,
-    RealmRef, Value, Vm, VmError, VmResult,
+    bytecode_index, code_index, Agent, AllocationLifetime, AtomId, BytecodeFunction,
+    BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef, Value, Vm,
+    VmError, VmResult,
 };
 use crate::vm::metadata_table::{MetadataTable, SiteDescriptor};
 use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
@@ -829,10 +829,6 @@ impl Vm {
         let index = code_index(code);
         if self.installed.len() <= index {
             self.installed.resize_with(index + 1, || None);
-        }
-        if self.feedback_vectors.len() <= index {
-            self.feedback_vectors
-                .resize_with(index + 1, FeedbackVector::default);
         }
         // Phase C: allocate parallel MetadataTable buffer keyed by code_index.
         if self.metadata_tables.len() <= index {

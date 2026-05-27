@@ -78,6 +78,11 @@ pub(super) struct TieringState {
     invalidation_epoch: u32,
     native_generation: Option<NonZeroU32>,
     warmup_counter: u16,
+    /// Phase D.2.4: true once the warmup counter has crossed the allocation
+    /// threshold. Replaces `feedback_vectors.get(idx).is_some()` semantics —
+    /// `FeedbackVector` is deleted; this flag is the new "has the per-code IC
+    /// side-table been activated" marker.
+    allocated: bool,
 }
 
 impl Default for TieringState {
@@ -92,6 +97,7 @@ impl Default for TieringState {
             invalidation_epoch: 0,
             native_generation: None,
             warmup_counter: 0,
+            allocated: false,
         }
     }
 }
@@ -165,6 +171,20 @@ impl TieringState {
     pub(super) fn bump_warmup_by(&mut self, n: u16) -> u16 {
         self.warmup_counter = self.warmup_counter.saturating_add(n);
         self.warmup_counter
+    }
+
+    /// Phase D.2.4: returns `true` once the per-code IC side-tables have been
+    /// activated (warmup threshold crossed). Replaces the old
+    /// `feedback_vectors.get(idx).is_some()` check.
+    #[inline]
+    pub(super) const fn is_allocated(&self) -> bool {
+        self.allocated
+    }
+
+    /// Phase D.2.4: mark this code as having its IC side-tables activated.
+    #[inline]
+    pub(super) fn mark_allocated(&mut self) {
+        self.allocated = true;
     }
 
     #[inline]
@@ -312,6 +332,28 @@ impl Tiering {
             .get(code_index(code))
             .and_then(Option::as_ref)
             .map_or(0, TieringState::warmup_counter)
+    }
+
+    /// Phase D.2.4: returns `true` if the IC side-tables for `code` have been
+    /// activated (warmup threshold crossed). Returns `false` for unknown codes.
+    #[inline]
+    pub(super) fn is_allocated(&self, code: CodeRef) -> bool {
+        self.states
+            .get(code_index(code))
+            .and_then(Option::as_ref)
+            .is_some_and(TieringState::is_allocated)
+    }
+
+    /// Phase D.2.4: mark the IC side-tables for `code` as activated.
+    /// Lazily inserts a default slot if none exists.
+    #[inline]
+    pub(super) fn mark_allocated(&mut self, code: CodeRef) {
+        let index = code_index(code);
+        if self.states.len() <= index {
+            self.states.resize_with(index + 1, || None);
+        }
+        let state = self.states[index].get_or_insert_with(TieringState::default);
+        state.mark_allocated();
     }
 
     /// Saturating bump of the warmup counter for `code`; returns the new

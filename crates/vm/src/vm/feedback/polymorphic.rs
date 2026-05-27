@@ -87,6 +87,10 @@ impl PolymorphicChain {
 
     /// Iterator over entries — used by the slow path for fallback walks
     /// and by GC tracing to visit holder references.
+    #[allow(
+        dead_code,
+        reason = "TODO(Phase E): snapshot restoration will walk chain entries"
+    )]
     pub(crate) fn entries(&self) -> impl Iterator<Item = &NamedPropertyCacheEntry> {
         self.entries.iter()
     }
