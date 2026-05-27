@@ -23,3 +23,33 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 | `RayTrace` | `232` | `318960.8` | 232, 231, 232, 232, 232 |
 | `NavierStokes` | `599` | `247746.2` | 599, 601, 599, 595, 599 |
 | `Splay` | `1431` | `5694.7` | 1393, 1406, 1443, 1431, 1456 |
+
+## Phase D progression (Spec 2)
+
+Phase D rehomes the IC state machine off `FeedbackVector`/`FeedbackSiteState`
+onto per-kind side-tables and deletes the legacy storage. Initial Phase D
+end (D.3.3) showed a substantial regression vs the pre-Phase-C baseline at
+`857d2528` (484/421/393/291/541/1440 — same six benchmarks). Subsequent
+optimization passes recovered most of the gap:
+
+| Stage | Richards | DeltaBlue | Crypto | RayTrace | NavierStokes | Splay |
+|---|---:|---:|---:|---:|---:|---:|
+| Pre-Spec-2 (`857d2528`) | 484 | 421 | 393 | 291 | 541 | 1440 |
+| Phase C end (`ca387992`) | 408 | 375 | 328 | 220 | 436 | 1314 |
+| Phase D end raw (D.3.3) | 300 | 274 | 282 | 216 | 445 | 1274 |
+| D.4.1 (Vec-indexed side-tables) | 458 | 369 | 429 | 228 | 588 | 1316 |
+| D.4.2 (mirror trim off hot path) | 470 | 374 | 436 | 229 | 590 | 1399 |
+| D.4.3 (Vec-indexed polymorphic_chains) | **482** | **393** | **446** | **232** | **599** | **1431** |
+
+D.3.3's regression had two structural causes: HashMap-keyed side-tables for
+the IC state machine (10-15 cycles per probe vs 2-3 for Vec indexing), and
+defensive per-IC-hit work added to keep tests green during D.2.4's dependency
+inversion. D.4.1 and D.4.3 closed the HashMap gap; D.4.2 moved the defensive
+mode-refresh off the per-hit path.
+
+**RayTrace remains -20% below pre-Spec-2.** This gap is structural: the asm
+IC resolve macro is 3 instructions vs the old 2-instruction flat-array form,
+and `record_smi!` is 10 instructions vs 9. RayTrace is arith-heavy (vector
+math) so this per-dispatch overhead dominates. Recovering it would require
+asm-DSL work (e.g. revisiting the metadata-table buffer layout to enable a
+2-instruction resolve) — out of scope for Phase D.

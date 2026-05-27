@@ -107,10 +107,10 @@ macro_rules! branch_named_own_outline_mode {
     };
 }
 
-/// Branch to `$label` unless the flat feedback entry is a polymorphic
-/// `OwnData` inline-slot load header. The pair of cached handlers / epochs
-/// is packed into the existing primary (slot 0) and auxiliary (slot 1)
-/// fields by [`FeedbackEntry::set_named_own_polymorphic`].
+/// Branch to `$label` unless the metadata-table property entry is a
+/// polymorphic `OwnData` inline-slot load header. The pair of cached
+/// handlers is packed into the existing primary (slot 0) and auxiliary
+/// (slot 1) fields by the Rust install path.
 #[macro_export]
 macro_rules! branch_named_own_polymorphic_mode {
     ($entry:tt, $label:tt) => {
