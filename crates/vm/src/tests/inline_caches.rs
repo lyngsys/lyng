@@ -1142,11 +1142,15 @@ fn absent_named_property_load_records_without_megamorphic_feedback() {
         );
     }
 
+    // Phase D.4.2: the absent path now uses the generic `record_feedback_slot`
+    // warmup ping — no PropertyIcState is lazily created. The IC slot stays
+    // absent (and therefore cannot be promoted to Megamorphic, which is the
+    // contract this test protects).
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),
-        Some(("Uninitialized", 0, None))
+        None
     );
-    assert_eq!(vm.feedback_execution_count(installed.code(), slot), Some(2));
+    assert_eq!(vm.feedback_execution_count(installed.code(), slot), None);
 }
 
 #[test]

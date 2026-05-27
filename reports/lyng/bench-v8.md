@@ -17,27 +17,9 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 
 | Benchmark | Median score | Median µs/iter | Samples |
 | --- | ---: | ---: | --- |
-| `Richards` | `458` | `7707.9` | 458, 451, 465, 456, 461 |
-| `DeltaBlue` | `369` | `17918.2` | 375, 369, 366, 368, 370 |
-| `Crypto` | `429` | `62046.9` | 426, 429, 431, 428, 431 |
-| `RayTrace` | `228` | `324556.6` | 223, 228, 227, 230, 230 |
-| `NavierStokes` | `588` | `252381.0` | 589, 588, 588, 587, 582 |
-| `Splay` | `1316` | `6192.3` | 1280, 1318, 1316, 1304, 1332 |
-
-## History
-
-Phase-by-phase milestones (numbers are median scores):
-
-| Phase                                         | Richards | DeltaBlue | Crypto | RayTrace | NavierStokes | Splay |
-| --------------------------------------------- | -------: | --------: | -----: | -------: | -----------: | ----: |
-| Pre-Phase-C (target ceiling)                  |      484 |       421 |    393 |      291 |          541 |  1440 |
-| Phase D end (HashMap IC side-tables)          |      300 |       274 |    282 |      216 |          445 |  1274 |
-| **Phase D.4.1** (Vec-indexed IC side-tables)  |  **458** |   **369** |  **429** |  **228** |      **588** | **1316** |
-
-Phase D.4.1 replaces the 4 `HashMap<(CodeRef, FeedbackSlotId), *IcState>` side-tables
-with `Vec<Option<Box<[Option<*IcState>]>>>` keyed by `code_index` then by slot
-zero-based. Per-IC-hit lookups drop from one HashMap probe (~10–15 cycles) to
-two index dereferences (~2–3 cycles), recovering the regression introduced by the
-Phase D pivot. Richards / DeltaBlue / Crypto / NavierStokes are all back well
-above the Phase D end baseline; RayTrace and Splay are IC-light and were already
-near their ceiling.
+| `Richards` | `470` | `7511.1` | 465, 473, 473, 470, 470 |
+| `DeltaBlue` | `374` | `17678.6` | 374, 371, 376, 366, 375 |
+| `Crypto` | `436` | `61050.7` | 434, 435, 436, 436, 437 |
+| `RayTrace` | `229` | `323139.3` | 225, 224, 229, 231, 231 |
+| `NavierStokes` | `590` | `251525.4` | 590, 590, 591, 597, 590 |
+| `Splay` | `1399` | `5824.9` | 1353, 1402, 1357, 1404, 1399 |

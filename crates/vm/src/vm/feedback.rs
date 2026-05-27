@@ -692,47 +692,6 @@ impl Vm {
         let _ = self.ensure_feedback_slot_execution(code, slot);
     }
 
-    /// Observation for an absent named-property load (property not found on
-    /// object or prototype chain). Unlike `record_feedback_slot`, this always
-    /// creates a `PropertyIcState` entry (lazily) and bumps its
-    /// `execution_count` — even during the warmup phase — so that:
-    ///   - `named_property_cache_snapshot` returns `Some(Uninitialized, 0, None)`,
-    ///   - `feedback_execution_count` returns `Some(n)` where `n` equals the
-    ///     number of times the absent access was observed.
-    ///
-    /// The IC state machine is intentionally NOT advanced: absent property
-    /// loads must not promote the slot to Megamorphic.
-    pub(crate) fn observe_absent_named_property_slot(
-        &mut self,
-        code: CodeRef,
-        slot: Option<FeedbackSlotId>,
-    ) {
-        let Some(slot) = slot else {
-            return;
-        };
-        let index = code_index(code);
-        if self.installed.get(index).and_then(Option::as_ref).is_none() {
-            return;
-        }
-        let installed = self.installed[index].as_ref().unwrap();
-        if installed.feedback_descriptor_for_slot(slot).is_none() {
-            return;
-        }
-        // Signal warmup / allocation progress (same accounting as
-        // `ensure_feedback_slot_execution`, but we do not gate on the result).
-        if !self.tiering.is_allocated(code) {
-            self.tiering.bump_warmup(code);
-            if self.tiering.warmup_counter(code) >= FEEDBACK_ALLOCATION_THRESHOLD {
-                self.tiering.mark_allocated(code);
-            }
-        }
-        self.tiering.observe_feedback_event(code);
-        // Always lazily create the state entry and bump execution_count.
-        // IC state stays Uninitialized.
-        let state = self.property_ic_state_or_default_mut(code, slot);
-        state.execution_count = state.execution_count.saturating_add(1);
-    }
-
     pub(in crate::vm) fn drain_llint_scalar_feedback(&mut self) {
         // Phase C.4: x21 now holds the MetadataTable base. Arith IC sites write
         // directly to ArithMetadata.{observed_bits, execution_count}. Drain those
@@ -973,6 +932,13 @@ impl Vm {
     /// the code has crossed the allocation threshold). A `None` result from
     /// `get_mut` means the slot was never through the slow path; we skip
     /// the update to match the old `FeedbackVector::site_mut` gate.
+    ///
+    /// Phase D.4.2: the PropertyMetadata mirror-write was removed from the
+    /// hot path. `meta.execution_count` is not read by anything in production
+    /// (it was test-only), and `meta.mode` is restored exclusively at
+    /// install time (`named_property_install_slow_path`) and on demand from
+    /// `refresh_named_property_metadata_if_stale` — see the doc-comment
+    /// there for the C4 invariant.
     #[inline(always)]
     pub(super) fn record_named_property_cache_hit(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let Some(state) = self.property_ic_state_mut(code, slot) else {
@@ -980,21 +946,50 @@ impl Vm {
             return;
         };
         state.execution_count = state.execution_count.saturating_add(1);
-        let execution_count = state.execution_count;
-        // Refresh PropertyMetadata on every hit so that a mode byte staled
-        // to 0 (e.g. by a prior zeroing or a late-arriving watchpoint clear)
-        // is restored by the next Rust direct-dispatch hit — C4 invariant.
+        self.tiering.observe_feedback_event(code);
+    }
+
+    /// Restore `PropertyMetadata.mode` from `PropertyIcState` if the asm-visible
+    /// mode byte has been zeroed while the Rust-side state still describes a
+    /// live IC entry.
+    ///
+    /// Called from `execute_get_named_property_opcode` (the slow-path entry
+    /// reachable from the asm `op_get_named_property_dsl` `.slow:` branch).
+    /// Asm reads `meta.mode` to pick an inline IC handler; when asm reads
+    /// `mode == 0` it falls into Rust, and we need to repaint `meta` so the
+    /// next asm execution can take the inline IC route again. This is the C4
+    /// invariant (verified by the `c4_asm_ic_*_reads_from_metadata_table`
+    /// test): `mode = 0` on entry → mode must be non-zero on exit.
+    ///
+    /// The fast common case (mode already non-zero) is a single byte load +
+    /// taken-not-taken branch.
+    #[inline]
+    pub(super) fn refresh_named_property_metadata_if_stale(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) {
+        let Some(table) = self
+            .metadata_tables
+            .get(code_index(code))
+            .and_then(Option::as_ref)
+        else {
+            return;
+        };
+        if table.property(slot.get()).mode != 0 {
+            return;
+        }
+        let Some(state) = self.property_ic_state(code, slot) else {
+            return;
+        };
         let llint_header = Self::named_llint_load_header_from_state(state);
         let generation = state.generation;
+        let execution_count = state.execution_count;
+        // `state` borrow ends here; reacquire `table` mutably for the write.
         if let Some(table) = self.metadata_table_mut(code) {
             let meta = table.property_mut(slot.get());
-            if meta.mode == 0 {
-                Self::project_property_into_meta(llint_header, generation, execution_count, meta);
-            } else {
-                meta.execution_count = execution_count;
-            }
+            Self::project_property_into_meta(llint_header, generation, execution_count, meta);
         }
-        self.tiering.observe_feedback_event(code);
     }
 
     /// Phase 3d named-keyed cache handler lookup.
@@ -1121,26 +1116,14 @@ impl Vm {
         let state = self.property_ic_state(code, slot)?;
         let chain = self.polymorphic_chains.get(&(code, slot));
         let value = state.try_load(agent, chain, receiver)?;
-        // Hit: bump execution count and keep PropertyMetadata in sync.
-        // Refreshing mode on every hit ensures that if the asm-visible
-        // PropertyMetadata.mode was zeroed (e.g. by a test or a corruption
-        // scenario), the next hit from the Rust direct-dispatch path restores
-        // it — fixing the C4 invariant: asm → slow handler → Rust direct hit
-        // must refresh the mode byte before returning.
-        let state = self.property_ic_state_or_default_mut(code, slot);
+        // Phase D.4.2: the PropertyMetadata mirror-write was removed from the
+        // hot path. `meta.execution_count` is not read by anything in
+        // production, and `meta.mode` is restored at install time or via
+        // `refresh_named_property_metadata_if_stale` on slow-path entry.
+        let state = self
+            .property_ic_state_mut(code, slot)
+            .expect("state exists — checked by the immutable borrow above");
         state.execution_count = state.execution_count.saturating_add(1);
-        let llint_header = Self::named_llint_load_header_from_state(state);
-        let generation = state.generation;
-        let ec = state.execution_count;
-        if let Some(table) = self.metadata_table_mut(code) {
-            let meta = table.property_mut(slot.get());
-            meta.execution_count = ec;
-            // Only refresh mode if it looks stale (0 = Uninitialized in asm).
-            // Avoids redundant writes on the common case.
-            if meta.mode == 0 {
-                Self::project_property_into_meta(llint_header, generation, ec, meta);
-            }
-        }
         self.tiering.observe_feedback_event(code);
         Some(value)
     }

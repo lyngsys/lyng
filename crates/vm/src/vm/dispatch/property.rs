@@ -95,6 +95,15 @@ impl Vm {
         let receiver = self.register_stack[receiver_index];
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
+        // Phase D.4.2 (C4 invariant): this function is the asm slow-path entry
+        // for `GetNamedProperty`. If the asm bailed because `meta.mode == 0`
+        // while the Rust-side IC is still live, repaint PropertyMetadata before
+        // returning so the next asm execution can take the inline IC route
+        // again. The common case (mode already non-zero) costs a single byte
+        // load + predicted-not-taken branch.
+        if let Some(slot) = feedback_slot {
+            self.refresh_named_property_metadata_if_stale(frame.code(), slot);
+        }
         let value = if let Some(object) = receiver.as_object_ref() {
             // Phase 3 inline IC cache hit path: a single packed-handler load,
             // one shape compare, one slot read. Bypasses the 4-deep
@@ -189,9 +198,12 @@ impl Vm {
                         value
                     }
                     NamedPropertyDirectGet::Absent => {
-                        // Use the absent-specific observer so execution_count
-                        // is tracked without promoting the slot to Megamorphic.
-                        self.observe_absent_named_property_slot(frame.code(), feedback_slot);
+                        // Phase D.4.2: absent loads only need a warmup ping; they
+                        // must not promote the slot to Megamorphic, and the
+                        // PropertyIcState lazy creation is not load-bearing in
+                        // production (the only reader of the absent-load
+                        // execution_count was a `#[cfg(test)]` snapshot helper).
+                        self.record_feedback_slot(frame.code(), feedback_slot);
                         Value::undefined()
                     }
                 };
