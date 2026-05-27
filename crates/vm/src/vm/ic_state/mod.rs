@@ -3,8 +3,10 @@
 //! Asm-readable bits (mode, generation, handler_bits, aux_bits,
 //! execution_count) live on `MetadataTable.*Metadata` structs.
 
+pub mod call;
 pub mod property;
 
+pub use call::CallIcState;
 pub use property::PropertyIcState;
 // Re-export InlineCacheState so tests and future callers can compare against it
 // without reaching into the private `feedback` module.

@@ -6,7 +6,7 @@
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
-use crate::vm::ic_state::PropertyIcState;
+use crate::vm::ic_state::{CallIcState, PropertyIcState};
 use crate::vm::metadata_table::{
     CallMetadata, KeyedPropertyMetadata, MetadataKind, PropertyMetadata,
 };
@@ -2593,6 +2593,13 @@ impl Vm {
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
+            // Phase D.1.2: sync into CallIcState side-table.
+            Self::sync_call_ic_state_from_feedback(
+                &self.feedback_vectors,
+                &mut self.call_ic_states,
+                code,
+                slot,
+            );
             self.tiering.observe_feedback_event(code);
             return;
         }
@@ -2605,6 +2612,13 @@ impl Vm {
                 feedback.observe_target(agent, callee);
             }
         });
+        // Phase D.1.2: sync into CallIcState side-table (slow path).
+        Self::sync_call_ic_state_from_feedback(
+            &self.feedback_vectors,
+            &mut self.call_ic_states,
+            code,
+            slot,
+        );
     }
 
     #[inline]
@@ -2642,6 +2656,13 @@ impl Vm {
             // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
             self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
+            // Phase D.1.2: sync into ConstructIcState side-table.
+            Self::sync_call_ic_state_from_feedback(
+                &self.feedback_vectors,
+                &mut self.construct_ic_states,
+                code,
+                slot,
+            );
             self.tiering.observe_feedback_event(code);
             return;
         }
@@ -2654,6 +2675,13 @@ impl Vm {
                 feedback.observe_target(agent, constructor, created);
             }
         });
+        // Phase D.1.2: sync into ConstructIcState side-table (slow path).
+        Self::sync_call_ic_state_from_feedback(
+            &self.feedback_vectors,
+            &mut self.construct_ic_states,
+            code,
+            slot,
+        );
     }
 
     /// Read the bit-packed monomorphic `OwnData` IC handler for one feedback
@@ -3089,6 +3117,42 @@ impl Vm {
         ic_state.monomorphic_own_data_handler = feedback.monomorphic_own_data_handler;
         ic_state.monomorphic_proto_data_handler = feedback.monomorphic_proto_data_handler;
         ic_state.polymorphic_own_data_handlers = feedback.polymorphic_own_data_handlers;
+    }
+
+    /// Phase D.1.2: copy the `CallFeedback` or `ConstructFeedback` state into
+    /// the appropriate `CallIcState` side-table entry for `(code, slot)`.
+    /// Called after every legacy slow-path write so the two representations
+    /// stay in sync. `call_map` is `Vm::call_ic_states` for Call slots and
+    /// `Vm::construct_ic_states` for Construct slots.
+    fn sync_call_ic_state_from_feedback(
+        feedback_vectors: &[FeedbackVector],
+        call_map: &mut HashMap<(CodeRef, FeedbackSlotId), CallIcState>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) {
+        let Some(site) = feedback_vectors
+            .get(code_index(code))
+            .and_then(|v| v.site(slot))
+        else {
+            return;
+        };
+        let (cache_state, entry_count, expected_arity) = match site {
+            FeedbackSiteState::Call(feedback) => (
+                feedback.cache_state,
+                feedback.entry_count,
+                feedback.expected_arity,
+            ),
+            FeedbackSiteState::Construct(feedback) => (
+                feedback.cache_state,
+                feedback.entry_count,
+                feedback.expected_arity,
+            ),
+            _ => return,
+        };
+        let ic_state = call_map.entry((code, slot)).or_default();
+        ic_state.cache_state = cache_state;
+        ic_state.entry_count = entry_count;
+        ic_state.expected_arity = expected_arity;
     }
 
     /// Core slow-path install transition logic. Operates on the split-borrowed
