@@ -66,7 +66,7 @@ mod with_env;
 
 use call::RejectingNativeRegistry;
 use feedback::{FeedbackVector, PolymorphicChain};
-use ic_state::{CallIcState, PropertyIcState};
+use ic_state::{CallIcState, KeyedPropertyIcState, PropertyIcState};
 use install::InstalledFunction;
 use metadata_table::MetadataTable;
 use state::{
@@ -192,6 +192,14 @@ pub struct Vm {
     /// Same shape as `call_ic_states`; the kind distinction is implicit in
     /// which map the entry lives in.
     pub(crate) construct_ic_states: HashMap<(CodeRef, FeedbackSlotId), CallIcState>,
+    /// Phase D.1.3: Rust-only IC state machine for `KeyedProperty` slots.
+    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
+    /// observation. Entries are pruned on code GC via
+    /// `prune_dead_code_keyed_property_ic_states`. The asm-readable bits (`mode`,
+    /// `generation`, `handler_bits`, `execution_count`) live on
+    /// `KeyedPropertyMetadata` inside `MetadataTable`; this map holds the
+    /// Rust-only state (family, entries, sidecars).
+    pub(crate) keyed_property_ic_states: HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyIcState>,
     /// Legacy scalar feedback mirror. Phase C.4 status: the asm IC fast path
     /// no longer reads OR writes this storage — both `load_feedback_site!` and
     /// `record_*` macros now source x21 from `Vm::metadata_tables`. This field
@@ -590,6 +598,7 @@ impl Vm {
             property_ic_states: HashMap::new(),
             call_ic_states: HashMap::new(),
             construct_ic_states: HashMap::new(),
+            keyed_property_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
             activation_tables: ActivationSideTables::default(),
@@ -761,6 +770,33 @@ impl Vm {
         self.call_ic_states
             .retain(|(code, _slot), _state| is_live(*code));
         self.construct_ic_states
+            .retain(|(code, _slot), _state| is_live(*code));
+    }
+
+    /// Phase D.1.3: returns the `KeyedPropertyIcState` for `(code, slot)` if any.
+    #[allow(
+        dead_code,
+        reason = "Phase D.1.3 accessor surface; consumed from tests and future D.2.x callers"
+    )]
+    pub(crate) fn keyed_property_ic_state(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<&KeyedPropertyIcState> {
+        self.keyed_property_ic_states.get(&(code, slot))
+    }
+
+    /// Phase D.1.3: post-mark GC sweep. Drops `KeyedPropertyIcState` entries for
+    /// code that is no longer live. Mirrors `prune_dead_code_call_ic_states`.
+    #[allow(
+        dead_code,
+        reason = "Phase D.1.3 sweep surface; call site wired alongside prune_dead_code_call_ic_states"
+    )]
+    pub(crate) fn prune_dead_code_keyed_property_ic_states(
+        &mut self,
+        is_live: impl Fn(CodeRef) -> bool,
+    ) {
+        self.keyed_property_ic_states
             .retain(|(code, _slot), _state| is_live(*code));
     }
 
@@ -1067,6 +1103,13 @@ impl Vm {
                 .is_some_and(|s| s.is_some())
         });
         self.construct_ic_states.retain(|(code, _), _| {
+            installed
+                .get(code_index(*code))
+                .is_some_and(|s| s.is_some())
+        });
+        // Phase D.1.3: prune KeyedPropertyIcState side-table entries for code
+        // that is no longer installed.
+        self.keyed_property_ic_states.retain(|(code, _), _| {
             installed
                 .get(code_index(*code))
                 .is_some_and(|s| s.is_some())
@@ -1736,6 +1779,11 @@ impl Vm {
         // Phase D.1.1: drop the PropertyIcState for this slot. On the next
         // slow-path install a fresh default entry will be created.
         self.property_ic_states.remove(&(code, slot));
+        // Phase D.1.3: drop the KeyedPropertyIcState for this slot. Keyed-atom
+        // sites can register AdaptiveProtoLoad watchpoints (via
+        // `observe_keyed_atom_slow_path`), so the side-table entry must be
+        // cleared when the watchpoint fires just like NamedProperty.
+        self.keyed_property_ic_states.remove(&(code, slot));
         // Note: bump_generation after clear_site is a no-op because clear_site
         // drops the NamedPropertyFeedback that holds the generation counter.
         // Generation resets to 0 on the next fresh install; see doc above.

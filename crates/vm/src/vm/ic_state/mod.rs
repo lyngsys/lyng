@@ -4,9 +4,11 @@
 //! execution_count) live on `MetadataTable.*Metadata` structs.
 
 pub mod call;
+pub mod keyed_property;
 pub mod property;
 
 pub use call::CallIcState;
+pub use keyed_property::KeyedPropertyIcState;
 pub use property::PropertyIcState;
 // Re-export InlineCacheState so tests and future callers can compare against it
 // without reaching into the private `feedback` module.

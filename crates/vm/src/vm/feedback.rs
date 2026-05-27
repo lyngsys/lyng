@@ -6,7 +6,10 @@
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
-use crate::vm::ic_state::{CallIcState, PropertyIcState};
+use crate::vm::ic_state::{
+    keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
+    CallIcState, KeyedPropertyIcState, PropertyIcState,
+};
 use crate::vm::metadata_table::{
     CallMetadata, KeyedPropertyMetadata, MetadataKind, PropertyMetadata,
 };
@@ -3155,6 +3158,55 @@ impl Vm {
         ic_state.expected_arity = expected_arity;
     }
 
+    /// Phase D.1.3: copy the `KeyedPropertyFeedback` inline state into the
+    /// `KeyedPropertyIcState` entry for `(code, slot)`. Called after every
+    /// legacy slow-path write so the two representations stay in sync.
+    fn sync_keyed_property_ic_state_from_feedback(
+        feedback_vectors: &[FeedbackVector],
+        keyed_map: &mut HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyIcState>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) {
+        let Some(site) = feedback_vectors
+            .get(code_index(code))
+            .and_then(|v| v.site(slot))
+        else {
+            return;
+        };
+        let FeedbackSiteState::KeyedProperty(feedback) = site else {
+            return;
+        };
+        let ic_state = keyed_map.entry((code, slot)).or_default();
+        ic_state.cache_state = feedback.cache_state;
+        ic_state.family = feedback.family.map(|f| match f {
+            KeyedPropertyFamily::DenseIndex => KeyedIcFamily::DenseIndex,
+            KeyedPropertyFamily::NamedAtom => KeyedIcFamily::NamedAtom,
+            KeyedPropertyFamily::Generic => KeyedIcFamily::Generic,
+        });
+        ic_state.named_entry_count = feedback.named_entry_count;
+        for i in 0..POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            ic_state.named_entries[i] = feedback.named_entries[i].map(|e| KeyedIcNamedEntry {
+                atom_raw: e.atom.raw(),
+                receiver_shape: e.entry.receiver_shape(),
+            });
+        }
+        ic_state.dense_entry_count = feedback.dense_entry_count;
+        for i in 0..POLYMORPHIC_PROPERTY_CACHE_LIMIT {
+            ic_state.dense_entries[i] = feedback.dense_entries[i].map(|e| KeyedIcDenseEntry {
+                receiver_shape: e.receiver_shape,
+                receiver_flags: e.receiver_flags,
+            });
+        }
+        ic_state.monomorphic_named_own_data_handler = feedback.monomorphic_named_own_data_handler;
+        ic_state.monomorphic_named_atom = feedback.monomorphic_named_atom;
+        ic_state.monomorphic_named_proto_data_handler =
+            feedback.monomorphic_named_proto_data_handler;
+        ic_state.monomorphic_dense_index_handler = feedback.monomorphic_dense_index_handler;
+        ic_state.polymorphic_named_own_data_handlers = feedback.polymorphic_named_own_data_handlers;
+        ic_state.polymorphic_named_atoms = feedback.polymorphic_named_atoms;
+        ic_state.polymorphic_dense_index_handlers = feedback.polymorphic_dense_index_handlers;
+    }
+
     /// Core slow-path install transition logic. Operates on the split-borrowed
     /// inline feedback + out-of-line chain map. Mirrors the legacy
     /// `NamedPropertyFeedback::observe_slow_path` semantics but routes
@@ -3498,6 +3550,13 @@ impl Vm {
                 feedback.observe_named_atom_slow_path(atom, plan);
             }
         });
+        // Phase D.1.3: keep KeyedPropertyIcState in sync after every mutation.
+        Self::sync_keyed_property_ic_state_from_feedback(
+            &self.feedback_vectors,
+            &mut self.keyed_property_ic_states,
+            code,
+            slot,
+        );
     }
 
     fn observe_keyed_index_slow_path(
@@ -3512,6 +3571,13 @@ impl Vm {
                 let _ = feedback.observe_dense_index(plan);
             }
         });
+        // Phase D.1.3: keep KeyedPropertyIcState in sync after every mutation.
+        Self::sync_keyed_property_ic_state_from_feedback(
+            &self.feedback_vectors,
+            &mut self.keyed_property_ic_states,
+            code,
+            slot,
+        );
     }
 
     pub(super) fn observe_keyed_index_access(
@@ -3543,6 +3609,13 @@ impl Vm {
                 feedback.observe_generic();
             }
         });
+        // Phase D.1.3: keep KeyedPropertyIcState in sync after every mutation.
+        Self::sync_keyed_property_ic_state_from_feedback(
+            &self.feedback_vectors,
+            &mut self.keyed_property_ic_states,
+            code,
+            slot,
+        );
     }
 
     #[cfg(test)]
