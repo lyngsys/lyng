@@ -4,20 +4,25 @@
 )]
 
 use super::{
-    code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
+    code_index,
+    status::{
+        ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,
+        KeyedPropertyDenseStatusEntry, KeyedPropertyNamedStatusEntry, KeyedPropertyStatus,
+        MetadataTableFootprint, NamedPropertyStatus, NamedPropertyStatusEntry,
+    },
+    Agent, AtomId, CodeRef, ObjectRef, RealmRef, Value, Vm,
 };
 use crate::vm::ic_state::{
     keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
     CallIcState, KeyedPropertyIcState, PropertyIcState,
 };
-use crate::vm::metadata_table::PropertyMetadata;
+use crate::vm::metadata_table::{MetadataKind, PropertyMetadata, METADATA_KIND_COUNT};
 use lyng_bytecode::FeedbackSiteKind;
 use lyng_gc::ValueStoreTarget;
 use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
     NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyProtoHandler, ObjectFlags,
-    ObjectHeader, ObjectKind, PrimitiveWrapperKind, PropertyCacheDependency, SlotLocation,
-    PROPERTY_CACHE_MAX_DEPENDENCIES,
+    ObjectHeader, ObjectKind, PrimitiveWrapperKind, SlotLocation, PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::cmp::Ordering;
@@ -70,373 +75,6 @@ pub enum FeedbackKeyedPropertyFamily {
     Generic,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NamedPropertyCacheEntrySnapshot {
-    receiver_shape: ShapeId,
-    holder: ObjectRef,
-    holder_shape: ShapeId,
-    slot_offset: u32,
-    path: NamedPropertyCachePath,
-    dependencies: Vec<PropertyCacheDependency>,
-}
-
-impl NamedPropertyCacheEntrySnapshot {
-    #[inline]
-    #[allow(
-        dead_code,
-        reason = "TODO(Phase E): will be re-used when snapshot sites are restored"
-    )]
-    fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
-        let dependencies = (0..usize::from(entry.dependency_count()))
-            .filter_map(|index| entry.dependency(index))
-            .collect();
-        Self {
-            receiver_shape: entry.receiver_shape(),
-            holder: entry.holder(),
-            holder_shape: entry.holder_shape(),
-            slot_offset: entry.slot_offset(),
-            path: entry.path(),
-            dependencies,
-        }
-    }
-
-    #[inline]
-    pub const fn receiver_shape(&self) -> ShapeId {
-        self.receiver_shape
-    }
-
-    #[inline]
-    pub const fn holder(&self) -> ObjectRef {
-        self.holder
-    }
-
-    #[inline]
-    pub const fn holder_shape(&self) -> ShapeId {
-        self.holder_shape
-    }
-
-    #[inline]
-    pub const fn slot_offset(&self) -> u32 {
-        self.slot_offset
-    }
-
-    #[inline]
-    pub const fn path(&self) -> NamedPropertyCachePath {
-        self.path
-    }
-
-    #[inline]
-    pub fn dependencies(&self) -> &[PropertyCacheDependency] {
-        &self.dependencies
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NamedPropertyFeedbackSnapshot {
-    execution_count: u32,
-    state: FeedbackInlineCacheState,
-    entries: Vec<NamedPropertyCacheEntrySnapshot>,
-}
-
-impl NamedPropertyFeedbackSnapshot {
-    #[inline]
-    pub const fn execution_count(&self) -> u32 {
-        self.execution_count
-    }
-
-    #[inline]
-    pub const fn state(&self) -> FeedbackInlineCacheState {
-        self.state
-    }
-
-    #[inline]
-    pub fn entries(&self) -> &[NamedPropertyCacheEntrySnapshot] {
-        &self.entries
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct KeyedNamedPropertyCacheEntrySnapshot {
-    atom: AtomId,
-    entry: NamedPropertyCacheEntrySnapshot,
-}
-
-impl KeyedNamedPropertyCacheEntrySnapshot {
-    #[inline]
-    pub const fn atom(&self) -> AtomId {
-        self.atom
-    }
-
-    #[inline]
-    pub const fn entry(&self) -> &NamedPropertyCacheEntrySnapshot {
-        &self.entry
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct KeyedPropertyFeedbackSnapshot {
-    execution_count: u32,
-    state: FeedbackInlineCacheState,
-    family: Option<FeedbackKeyedPropertyFamily>,
-    entries: Vec<KeyedNamedPropertyCacheEntrySnapshot>,
-    dense_entries: Vec<DenseIndexCacheEntrySnapshot>,
-}
-
-impl KeyedPropertyFeedbackSnapshot {
-    #[inline]
-    pub const fn execution_count(&self) -> u32 {
-        self.execution_count
-    }
-
-    #[inline]
-    pub const fn state(&self) -> FeedbackInlineCacheState {
-        self.state
-    }
-
-    #[inline]
-    pub const fn family(&self) -> Option<FeedbackKeyedPropertyFamily> {
-        self.family
-    }
-
-    #[inline]
-    pub fn entries(&self) -> &[KeyedNamedPropertyCacheEntrySnapshot] {
-        &self.entries
-    }
-
-    #[inline]
-    pub fn dense_entries(&self) -> &[DenseIndexCacheEntrySnapshot] {
-        &self.dense_entries
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CallCacheEntrySnapshot {
-    callee: ObjectRef,
-    callee_shape: ShapeId,
-    realm: Option<RealmRef>,
-    builtin: Option<BuiltinFunctionId>,
-}
-
-impl CallCacheEntrySnapshot {
-    #[inline]
-    pub const fn callee(self) -> ObjectRef {
-        self.callee
-    }
-
-    #[inline]
-    pub const fn callee_shape(self) -> ShapeId {
-        self.callee_shape
-    }
-
-    #[inline]
-    pub const fn realm(self) -> Option<RealmRef> {
-        self.realm
-    }
-
-    #[inline]
-    pub const fn builtin(self) -> Option<BuiltinFunctionId> {
-        self.builtin
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CallFeedbackSnapshot {
-    execution_count: u32,
-    expected_arity: Option<u16>,
-    state: FeedbackInlineCacheState,
-    entries: Vec<CallCacheEntrySnapshot>,
-}
-
-impl CallFeedbackSnapshot {
-    #[inline]
-    pub const fn execution_count(&self) -> u32 {
-        self.execution_count
-    }
-
-    #[inline]
-    pub const fn expected_arity(&self) -> Option<u16> {
-        self.expected_arity
-    }
-
-    #[inline]
-    pub const fn state(&self) -> FeedbackInlineCacheState {
-        self.state
-    }
-
-    #[inline]
-    pub fn entries(&self) -> &[CallCacheEntrySnapshot] {
-        &self.entries
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ConstructCacheEntrySnapshot {
-    constructor: ObjectRef,
-    constructor_shape: ShapeId,
-    realm: Option<RealmRef>,
-    created_shape: Option<ShapeId>,
-}
-
-impl ConstructCacheEntrySnapshot {
-    #[inline]
-    pub const fn constructor(self) -> ObjectRef {
-        self.constructor
-    }
-
-    #[inline]
-    pub const fn constructor_shape(self) -> ShapeId {
-        self.constructor_shape
-    }
-
-    #[inline]
-    pub const fn realm(self) -> Option<RealmRef> {
-        self.realm
-    }
-
-    #[inline]
-    pub const fn created_shape(self) -> Option<ShapeId> {
-        self.created_shape
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ConstructFeedbackSnapshot {
-    execution_count: u32,
-    expected_arity: Option<u16>,
-    state: FeedbackInlineCacheState,
-    entries: Vec<ConstructCacheEntrySnapshot>,
-}
-
-impl ConstructFeedbackSnapshot {
-    #[inline]
-    pub const fn execution_count(&self) -> u32 {
-        self.execution_count
-    }
-
-    #[inline]
-    pub const fn expected_arity(&self) -> Option<u16> {
-        self.expected_arity
-    }
-
-    #[inline]
-    pub const fn state(&self) -> FeedbackInlineCacheState {
-        self.state
-    }
-
-    #[inline]
-    pub fn entries(&self) -> &[ConstructCacheEntrySnapshot] {
-        &self.entries
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DenseIndexCacheEntrySnapshot {
-    receiver_shape: ShapeId,
-    receiver_flags: ObjectFlags,
-}
-
-impl DenseIndexCacheEntrySnapshot {
-    #[inline]
-    pub const fn receiver_shape(self) -> ShapeId {
-        self.receiver_shape
-    }
-
-    #[inline]
-    pub const fn receiver_flags(self) -> ObjectFlags {
-        self.receiver_flags
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum FeedbackSiteDetail {
-    Arithmetic,
-    Comparison,
-    NamedProperty(NamedPropertyFeedbackSnapshot),
-    KeyedProperty(KeyedPropertyFeedbackSnapshot),
-    Call(CallFeedbackSnapshot),
-    Construct(ConstructFeedbackSnapshot),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FeedbackSiteSnapshot {
-    slot: FeedbackSlotId,
-    instruction_offset: u32,
-    kind: FeedbackSiteKind,
-    execution_count: u32,
-    detail: FeedbackSiteDetail,
-}
-
-impl FeedbackSiteSnapshot {
-    #[inline]
-    pub const fn slot(&self) -> FeedbackSlotId {
-        self.slot
-    }
-
-    #[inline]
-    pub const fn instruction_offset(&self) -> u32 {
-        self.instruction_offset
-    }
-
-    #[inline]
-    pub const fn kind(&self) -> FeedbackSiteKind {
-        self.kind
-    }
-
-    #[inline]
-    pub const fn execution_count(&self) -> u32 {
-        self.execution_count
-    }
-
-    #[inline]
-    pub fn detail(&self) -> FeedbackSiteDetail {
-        self.detail.clone()
-    }
-}
-
-/// Snapshot of a code object's feedback state.
-///
-/// TODO(Phase E): re-implement using per-kind status types reading from
-/// PropertyIcState / CallIcState / KeyedPropertyIcState side-tables.
-/// Until then, `sites()` returns an empty slice and the structural fields
-/// (`allocated`, `warmup_counter`, `slot_count`, `live_site_count`) are
-/// still populated from the installed metadata.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FeedbackVectorSnapshot {
-    allocated: bool,
-    warmup_counter: u16,
-    slot_count: usize,
-    live_site_count: usize,
-    sites: Vec<FeedbackSiteSnapshot>,
-}
-
-impl FeedbackVectorSnapshot {
-    #[inline]
-    pub const fn allocated(&self) -> bool {
-        self.allocated
-    }
-
-    #[inline]
-    pub const fn warmup_counter(&self) -> u16 {
-        self.warmup_counter
-    }
-
-    #[inline]
-    pub const fn slot_count(&self) -> usize {
-        self.slot_count
-    }
-
-    #[inline]
-    pub const fn live_site_count(&self) -> usize {
-        self.live_site_count
-    }
-
-    /// TODO(Phase E): returns empty until Phase E restores per-kind status reads.
-    #[inline]
-    pub fn sites(&self) -> &[FeedbackSiteSnapshot] {
-        &self.sites
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum InlineCacheState {
     Uninitialized,
@@ -457,24 +95,13 @@ impl From<InlineCacheState> for FeedbackInlineCacheState {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[allow(
-    dead_code,
-    reason = "TODO(Phase E): variants are used by snapshot From conversion; currently no construction paths"
-)]
-enum KeyedPropertyFamily {
-    DenseIndex,
-    NamedAtom,
-    Generic,
-}
-
-impl From<KeyedPropertyFamily> for FeedbackKeyedPropertyFamily {
+impl From<KeyedIcFamily> for FeedbackKeyedPropertyFamily {
     #[inline]
-    fn from(value: KeyedPropertyFamily) -> Self {
+    fn from(value: KeyedIcFamily) -> Self {
         match value {
-            KeyedPropertyFamily::DenseIndex => Self::DenseIndex,
-            KeyedPropertyFamily::NamedAtom => Self::NamedAtom,
-            KeyedPropertyFamily::Generic => Self::Generic,
+            KeyedIcFamily::DenseIndex => Self::DenseIndex,
+            KeyedIcFamily::NamedAtom => Self::NamedAtom,
+            KeyedIcFamily::Generic => Self::Generic,
         }
     }
 }
@@ -1684,37 +1311,261 @@ impl Vm {
         self.tiering.is_allocated(code)
     }
 
-    #[inline]
-    pub fn feedback_vector_footprint(&self, code: CodeRef) -> Option<FeedbackVectorFootprint> {
-        let index = code_index(code);
-        let installed = self.installed.get(index).and_then(Option::as_ref)?;
-        let slot_count = installed.feedback_slot_descriptors().len();
-        let live_site_count = installed
-            .feedback_slot_descriptors()
+    /// Project the IC state for a `NamedProperty` (Load or Store) slot into
+    /// a plain-value `NamedPropertyStatus`. Returns `None` if `code` isn't
+    /// installed or the slot has no `PropertyIcState` entry yet.
+    ///
+    /// The entries list is composed by walking inline `PropertyIcState.entries`
+    /// followed by the out-of-line `polymorphic_chain(code, slot)`; entries
+    /// come out in ascending receiver-shape order (the install logic keeps
+    /// inline shapes strictly less than chain shapes, and the chain itself
+    /// is sorted).
+    pub fn named_property_status(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<NamedPropertyStatus> {
+        let state = self.property_ic_state(code, slot)?;
+        let mut entries: Vec<NamedPropertyStatusEntry> =
+            Vec::with_capacity(usize::from(state.entry_count));
+        for entry in state
+            .entries
             .iter()
+            .take(state.inline_count())
+            .copied()
             .flatten()
-            .count();
-        let allocated = self.tiering.is_allocated(code);
-        // Estimate allocated bytes: sum of all live PropertyIcState + CallIcState entries
-        // for this code. Approximate — not all side-table entries map 1:1 to slots.
-        let allocated_bytes = if allocated { live_site_count * 8 } else { 0 };
-
-        Some(FeedbackVectorFootprint {
-            allocated,
-            slot_count,
-            live_site_count,
-            allocated_bytes,
-            warmup_counter: self.tiering.warmup_counter(code),
+        {
+            entries.push(NamedPropertyStatusEntry::from_entry(entry));
+        }
+        if let Some(chain) = self.polymorphic_chain(code, slot) {
+            for entry in chain.entries() {
+                entries.push(NamedPropertyStatusEntry::from_entry(*entry));
+            }
+        }
+        Some(NamedPropertyStatus {
+            state: state.cache_state.into(),
+            generation: state.generation,
+            execution_count: state.execution_count,
+            entries,
         })
     }
 
-    /// Returns a snapshot of the feedback state for `code`.
+    /// Project the IC state for a `Call` slot into a plain-value `CallStatus`.
+    /// Returns `None` if `code` isn't installed.
     ///
-    /// TODO(Phase E): `sites()` currently returns an empty slice. Phase E will
-    /// restore per-kind status reads from `PropertyIcState` / `CallIcState` /
-    /// `KeyedPropertyIcState` side-tables.
-    #[inline]
-    pub fn feedback_vector_snapshot(&self, code: CodeRef) -> Option<FeedbackVectorSnapshot> {
+    /// `expected_arity` is read from the compile-time feedback descriptor
+    /// when present, regardless of whether the IC state has been populated;
+    /// this matches the legacy snapshot's behavior.
+    pub fn call_status(&self, code: CodeRef, slot: FeedbackSlotId) -> Option<CallStatus> {
+        let installed = self
+            .installed
+            .get(code_index(code))
+            .and_then(Option::as_ref)?;
+        let descriptor = installed.feedback_descriptor_for_slot(slot)?;
+        let expected_arity = descriptor.metadata().expected_arity();
+        let Some(state) = self.call_ic_state(code, slot) else {
+            return Some(CallStatus {
+                state: FeedbackInlineCacheState::Uninitialized,
+                generation: 0,
+                execution_count: 0,
+                callee: None,
+                entries: Vec::new(),
+                expected_arity,
+            });
+        };
+        let entries = self
+            .call_cache_entries
+            .get(&(code, slot))
+            .map(|storage| {
+                let mut out = Vec::with_capacity(usize::from(state.entry_count));
+                for entry in storage
+                    .entries
+                    .iter()
+                    .take(usize::from(state.entry_count))
+                    .copied()
+                    .flatten()
+                {
+                    out.push(CalleeSummary {
+                        function: entry.callee,
+                        function_shape: entry.callee_shape,
+                        realm: entry.realm,
+                        builtin: entry.builtin,
+                        created_shape: None,
+                    });
+                }
+                out
+            })
+            .unwrap_or_default();
+        let callee = if matches!(state.cache_state, InlineCacheState::Monomorphic) {
+            entries.first().copied()
+        } else {
+            None
+        };
+        let generation = self
+            .metadata_table(code)
+            .map(|table| table.call(slot.get()).generation)
+            .unwrap_or(0);
+        Some(CallStatus {
+            state: state.cache_state.into(),
+            generation,
+            execution_count: state.execution_count,
+            callee,
+            entries,
+            expected_arity,
+        })
+    }
+
+    /// Project the IC state for a `Construct` slot into a plain-value
+    /// `ConstructStatus`. Returns `None` if `code` isn't installed.
+    pub fn construct_status(&self, code: CodeRef, slot: FeedbackSlotId) -> Option<ConstructStatus> {
+        let installed = self
+            .installed
+            .get(code_index(code))
+            .and_then(Option::as_ref)?;
+        let descriptor = installed.feedback_descriptor_for_slot(slot)?;
+        let expected_arity = descriptor.metadata().expected_arity();
+        let Some(state) = self.construct_ic_state(code, slot) else {
+            return Some(ConstructStatus {
+                state: FeedbackInlineCacheState::Uninitialized,
+                generation: 0,
+                execution_count: 0,
+                callee: None,
+                entries: Vec::new(),
+                expected_arity,
+            });
+        };
+        let entries = self
+            .construct_cache_entries
+            .get(&(code, slot))
+            .map(|storage| {
+                let mut out = Vec::with_capacity(usize::from(state.entry_count));
+                for entry in storage
+                    .entries
+                    .iter()
+                    .take(usize::from(state.entry_count))
+                    .copied()
+                    .flatten()
+                {
+                    out.push(CalleeSummary {
+                        function: entry.constructor,
+                        function_shape: entry.constructor_shape,
+                        realm: entry.realm,
+                        builtin: None,
+                        created_shape: entry.created_shape,
+                    });
+                }
+                out
+            })
+            .unwrap_or_default();
+        let callee = if matches!(state.cache_state, InlineCacheState::Monomorphic) {
+            entries.first().copied()
+        } else {
+            None
+        };
+        let generation = self
+            .metadata_table(code)
+            .map(|table| table.call(slot.get()).generation)
+            .unwrap_or(0);
+        Some(ConstructStatus {
+            state: state.cache_state.into(),
+            generation,
+            execution_count: state.execution_count,
+            callee,
+            entries,
+            expected_arity,
+        })
+    }
+
+    /// Project the per-kind metadata for an `Arithmetic` slot into a
+    /// plain-value `ArithStatus`. Returns `None` if `code` isn't installed.
+    ///
+    /// Arithmetic feedback is MetadataTable-owned (no Rust-side IC state):
+    /// reads come straight off the asm-visible `ArithMetadata.observed_bits`
+    /// and `ArithMetadata.execution_count`.
+    pub fn arith_status(&self, code: CodeRef, slot: FeedbackSlotId) -> Option<ArithStatus> {
+        let table = self.metadata_table(code)?;
+        let meta = table.arith(slot.get());
+        Some(ArithStatus::from_metadata(
+            meta.observed_bits,
+            meta.execution_count,
+        ))
+    }
+
+    /// Project the per-kind metadata for a `Comparison` slot into a
+    /// plain-value `ComparisonStatus`. Returns `None` if `code` isn't
+    /// installed.
+    pub fn comparison_status(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<ComparisonStatus> {
+        let table = self.metadata_table(code)?;
+        let meta = table.comparison(slot.get());
+        Some(ComparisonStatus::from_metadata(
+            meta.observed_bits,
+            meta.execution_count,
+        ))
+    }
+
+    /// Project the IC state for a `KeyedPropertyAccess` slot into a
+    /// plain-value `KeyedPropertyStatus`. Returns `None` if `code` isn't
+    /// installed or the slot has no `KeyedPropertyIcState` entry yet.
+    pub fn keyed_property_status(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<KeyedPropertyStatus> {
+        let state = self.keyed_property_ic_state(code, slot)?;
+        let family = state.family.map(FeedbackKeyedPropertyFamily::from);
+        let mut named_entries: Vec<KeyedPropertyNamedStatusEntry> =
+            Vec::with_capacity(usize::from(state.named_entry_count));
+        let storage = self.keyed_property_named_entries.get(&(code, slot));
+        for index in 0..usize::from(state.named_entry_count) {
+            let Some(slot_entry) = state.named_entries[index] else {
+                continue;
+            };
+            let handler_summary = storage
+                .and_then(|s| s.entries.get(index))
+                .and_then(|cell| cell.as_ref())
+                .map(|named| super::status::NamedPropertyHandlerSummary::from_entry(named.entry));
+            named_entries.push(KeyedPropertyNamedStatusEntry {
+                atom: AtomId::from_raw(slot_entry.atom_raw),
+                receiver_shape: slot_entry.receiver_shape,
+                handler_summary,
+            });
+        }
+        let mut dense_entries: Vec<KeyedPropertyDenseStatusEntry> =
+            Vec::with_capacity(usize::from(state.dense_entry_count));
+        for index in 0..usize::from(state.dense_entry_count) {
+            let Some(entry) = state.dense_entries[index] else {
+                continue;
+            };
+            dense_entries.push(KeyedPropertyDenseStatusEntry {
+                receiver_shape: entry.receiver_shape,
+                receiver_flags: entry.receiver_flags,
+            });
+        }
+        let generation = self
+            .metadata_table(code)
+            .map(|table| table.keyed_property(slot.get()).generation)
+            .unwrap_or(0);
+        Some(KeyedPropertyStatus {
+            state: state.cache_state.into(),
+            generation,
+            execution_count: state.execution_count,
+            family,
+            named_entries,
+            dense_entries,
+        })
+    }
+
+    /// Project the per-code IC memory + per-kind site-count footprint.
+    ///
+    /// `allocated_bytes` counts both the `MetadataTable` buffer and the
+    /// per-code Vec-indexed side-table allocations
+    /// (`PropertyIcState`/`CallIcState`/`KeyedPropertyIcState`/polymorphic
+    /// chains) so consumers see the full IC memory cost.
+    pub fn metadata_table_footprint(&self, code: CodeRef) -> Option<MetadataTableFootprint> {
         let index = code_index(code);
         let installed = self.installed.get(index).and_then(Option::as_ref)?;
         let slot_count = installed.feedback_slot_descriptors().len();
@@ -1724,14 +1575,97 @@ impl Vm {
             .flatten()
             .count();
         let allocated = self.tiering.is_allocated(code);
-        Some(FeedbackVectorSnapshot {
+        let warmup_counter = self.tiering.warmup_counter(code);
+
+        let table = self.metadata_table(code);
+        let mut live_site_count_by_kind = [0usize; METADATA_KIND_COUNT];
+        let mut allocated_bytes = 0usize;
+        let mut total_execution_count: u64 = 0;
+        if let Some(table) = table {
+            for (kind_idx, count) in live_site_count_by_kind.iter_mut().enumerate() {
+                *count = usize::try_from(table.run_len_for_kind_index(kind_idx))
+                    .expect("per-kind run length fits in usize");
+            }
+            allocated_bytes = allocated_bytes.saturating_add(table.buffer().len());
+            // Sum execution counts across populated metadata entries.
+            for descriptor in installed.feedback_slot_descriptors().iter().flatten() {
+                let slot_value = descriptor.slot().get();
+                match MetadataKind::from_site_kind(descriptor.kind()) {
+                    MetadataKind::Property => {
+                        total_execution_count = total_execution_count
+                            .saturating_add(u64::from(table.property(slot_value).execution_count));
+                    }
+                    MetadataKind::Call => {
+                        total_execution_count = total_execution_count
+                            .saturating_add(u64::from(table.call(slot_value).execution_count));
+                    }
+                    MetadataKind::Arith => {
+                        total_execution_count = total_execution_count
+                            .saturating_add(u64::from(table.arith(slot_value).execution_count));
+                    }
+                    MetadataKind::Comparison => {
+                        total_execution_count = total_execution_count.saturating_add(u64::from(
+                            table.comparison(slot_value).execution_count,
+                        ));
+                    }
+                    MetadataKind::KeyedProperty => {
+                        total_execution_count = total_execution_count.saturating_add(u64::from(
+                            table.keyed_property(slot_value).execution_count,
+                        ));
+                    }
+                }
+            }
+        }
+        allocated_bytes = allocated_bytes.saturating_add(self.ic_side_table_bytes_for_code(index));
+
+        Some(MetadataTableFootprint {
             allocated,
-            warmup_counter: self.tiering.warmup_counter(code),
+            allocated_bytes,
+            live_site_count_by_kind,
+            total_execution_count,
+            warmup_counter,
             slot_count,
             live_site_count,
-            // TODO(Phase E): populate sites from side-tables.
-            sites: Vec::new(),
         })
+    }
+
+    /// Sum of side-table allocations (PropertyIcState/CallIcState/
+    /// ConstructIcState/KeyedPropertyIcState/PolymorphicChain) for the
+    /// code object at the given `code_index`. Returns 0 when no slab has
+    /// been allocated yet.
+    fn ic_side_table_bytes_for_code(&self, index: usize) -> usize {
+        let mut total = 0usize;
+        if let Some(Some(slab)) = self.property_ic_states.get(index) {
+            total = total.saturating_add(
+                slab.len()
+                    .saturating_mul(std::mem::size_of::<Option<PropertyIcState>>()),
+            );
+        }
+        if let Some(Some(slab)) = self.call_ic_states.get(index) {
+            total = total.saturating_add(
+                slab.len()
+                    .saturating_mul(std::mem::size_of::<Option<CallIcState>>()),
+            );
+        }
+        if let Some(Some(slab)) = self.construct_ic_states.get(index) {
+            total = total.saturating_add(
+                slab.len()
+                    .saturating_mul(std::mem::size_of::<Option<CallIcState>>()),
+            );
+        }
+        if let Some(Some(slab)) = self.keyed_property_ic_states.get(index) {
+            total = total.saturating_add(
+                slab.len()
+                    .saturating_mul(std::mem::size_of::<Option<KeyedPropertyIcState>>()),
+            );
+        }
+        if let Some(Some(slab)) = self.polymorphic_chains.get(index) {
+            total = total.saturating_add(
+                slab.len()
+                    .saturating_mul(std::mem::size_of::<Option<PolymorphicChain>>()),
+            );
+        }
+        total
     }
 
     #[cfg(test)]

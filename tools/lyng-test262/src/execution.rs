@@ -21,8 +21,8 @@ use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{analyze_module, analyze_script};
 use lyng_types::{AbruptCompletion, CodeRef, ObjectRef, PropertyKey, Value};
 use lyng_vm::{
-    FeedbackInlineCacheState, FeedbackSiteDetail, ModuleLoadError, SharedRealmExtensionProvider,
-    Vm, VmError, VmEvaluationObserver,
+    FeedbackInlineCacheState, ModuleLoadError, SharedRealmExtensionProvider, Vm, VmError,
+    VmEvaluationObserver,
 };
 
 use lyng_test262_harness::{Test262PrintObserver, Test262RealmExtension};
@@ -833,26 +833,32 @@ fn collect_vm_diagnostics(vm: &Vm, root: CodeRef, diagnostics: &mut Test262Runti
         let Some(function) = vm.installed_function(code) else {
             continue;
         };
-        if let Some(footprint) = vm.feedback_vector_footprint(code) {
+        if let Some(footprint) = vm.metadata_table_footprint(code) {
             diagnostics.feedback_slots = diagnostics.feedback_slots.max(footprint.slot_count());
             diagnostics.live_feedback_sites = diagnostics
                 .live_feedback_sites
                 .max(footprint.live_site_count());
         }
-        if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
-            diagnostics.megamorphic_sites += snapshot
-                .sites()
-                .iter()
-                .filter(|site| match site.detail() {
-                    FeedbackSiteDetail::NamedProperty(named) => {
-                        named.state() == FeedbackInlineCacheState::Megamorphic
+        for descriptor in function.feedback_sites() {
+            let slot = descriptor.slot();
+            match descriptor.kind() {
+                lyng_bytecode::FeedbackSiteKind::NamedPropertyLoad
+                | lyng_bytecode::FeedbackSiteKind::NamedPropertyStore => {
+                    if let Some(status) = vm.named_property_status(code, slot)
+                        && status.state() == FeedbackInlineCacheState::Megamorphic
+                    {
+                        diagnostics.megamorphic_sites += 1;
                     }
-                    FeedbackSiteDetail::KeyedProperty(keyed) => {
-                        keyed.state() == FeedbackInlineCacheState::Megamorphic
+                }
+                lyng_bytecode::FeedbackSiteKind::KeyedPropertyAccess => {
+                    if let Some(status) = vm.keyed_property_status(code, slot)
+                        && status.state() == FeedbackInlineCacheState::Megamorphic
+                    {
+                        diagnostics.megamorphic_sites += 1;
                     }
-                    _ => false,
-                })
-                .count();
+                }
+                _ => {}
+            }
         }
         if let Some(tiering) = vm.tiering_snapshot(code) {
             diagnostics.tier_hotness = diagnostics.tier_hotness.saturating_add(tiering.hotness());

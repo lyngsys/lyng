@@ -724,7 +724,6 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
     let unit = compile_test_unit(52, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
@@ -800,27 +799,18 @@ fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
         );
     }
 
-    let snapshot = vm
-        .feedback_vector_snapshot(installed.code())
-        .expect("entry code should expose a feedback snapshot");
-    let FeedbackSiteDetail::NamedProperty(named) = snapshot
-        .sites()
-        .iter()
-        .find(|site| site.slot() == slot)
-        .expect("named load site should be present")
-        .detail()
-    else {
-        panic!("source.value should expose named-property feedback");
-    };
-    let actual_shapes = named
-        .entries()
+    let status = vm
+        .named_property_status(installed.code(), slot)
+        .expect("source.value should expose named-property status");
+    let actual_shapes = status
+        .entries
         .iter()
         .map(|entry| entry.receiver_shape().get())
         .collect::<Vec<_>>();
     let mut sorted_shapes = actual_shapes.clone();
     sorted_shapes.sort_unstable();
 
-    assert_eq!(named.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
     assert_eq!(actual_shapes, sorted_shapes);
 }
 
@@ -1283,7 +1273,6 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
     let unit = compile_test_unit(53, "source[\"value\"];");
     let entry = unit.function(unit.entry()).unwrap();
@@ -1355,28 +1344,22 @@ fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
         );
     }
 
-    let snapshot = vm
-        .feedback_vector_snapshot(installed.code())
-        .expect("entry code should expose a feedback snapshot");
-    let FeedbackSiteDetail::KeyedProperty(keyed) = snapshot
-        .sites()
+    let status = vm
+        .keyed_property_status(installed.code(), slot)
+        .expect("source[\"value\"] should expose keyed-property status");
+    let actual_shapes = status
+        .named_entries
         .iter()
-        .find(|site| site.slot() == slot)
-        .expect("keyed access site should be present")
-        .detail()
-    else {
-        panic!("source[\"value\"] should expose keyed-property feedback");
-    };
-    let actual_shapes = keyed
-        .entries()
-        .iter()
-        .map(|entry| entry.entry().receiver_shape().get())
+        .map(|entry| entry.receiver_shape().get())
         .collect::<Vec<_>>();
     let mut sorted_shapes = actual_shapes.clone();
     sorted_shapes.sort_unstable();
 
-    assert_eq!(keyed.state(), FeedbackInlineCacheState::Polymorphic);
-    assert_eq!(keyed.family(), Some(FeedbackKeyedPropertyFamily::NamedAtom));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(
+        status.family(),
+        Some(FeedbackKeyedPropertyFamily::NamedAtom)
+    );
     assert_eq!(actual_shapes, sorted_shapes);
 }
 

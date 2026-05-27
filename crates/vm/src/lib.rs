@@ -55,12 +55,11 @@ pub use opcode_counts::{
 #[cfg(feature = "opcode-counters")]
 pub use slow_path_counts::SlowPathCounts;
 pub use vm::{
-    CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
-    ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
-    FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorFootprint, FeedbackVectorSnapshot,
-    KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot, LoadedModuleRoot,
-    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot, TierStatus, Tiering,
-    TieringSnapshot, Vm, VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext,
-    VmDebugPauseReason, VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
-    VmEvaluationObserver,
+    ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,
+    FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, KeyedPropertyDenseStatusEntry,
+    KeyedPropertyNamedStatusEntry, KeyedPropertyStatus, LoadedModuleRoot, MetadataTableFootprint,
+    NamedPropertyEntryKind, NamedPropertyHandlerSummary, NamedPropertyStatus,
+    NamedPropertyStatusEntry, ScalarObserved, TierStatus, Tiering, TieringSnapshot, Vm,
+    VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
+    VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger, VmEvaluationObserver,
 };

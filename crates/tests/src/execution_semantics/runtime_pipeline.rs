@@ -273,20 +273,22 @@ fn public_vm_feedback_footprint_reports_allocated_vector_bytes() {
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
     let before = vm
-        .feedback_vector_footprint(installed.code())
-        .expect("installed code should expose feedback footprint details");
+        .metadata_table_footprint(installed.code())
+        .expect("installed code should expose metadata footprint details");
     assert!(before.slot_count() > 0);
     assert_eq!(before.live_site_count(), before.slot_count());
     assert!(!before.allocated());
-    assert_eq!(before.allocated_bytes(), 0);
+    // The MetadataTable buffer is allocated at install time, so
+    // `allocated_bytes` is non-zero even before the warmup threshold is
+    // reached; the `allocated()` flag tracks the threshold separately.
 
     vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
         .run()
         .unwrap();
 
     let after = vm
-        .feedback_vector_footprint(installed.code())
-        .expect("installed code should expose feedback footprint after execution");
+        .metadata_table_footprint(installed.code())
+        .expect("installed code should expose metadata footprint after execution");
     assert!(after.allocated());
     assert!(after.allocated_bytes() > 0);
     assert!(after.warmup_counter() >= 2);

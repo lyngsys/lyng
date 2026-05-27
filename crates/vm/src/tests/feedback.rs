@@ -51,17 +51,6 @@ fn feedback_vectors_allocate_lazily_without_changing_entry_script_result() {
     );
 }
 
-fn feedback_site(
-    snapshot: &FeedbackVectorSnapshot,
-    slot: FeedbackSlotId,
-) -> &crate::FeedbackSiteSnapshot {
-    snapshot
-        .sites()
-        .iter()
-        .find(|site| site.slot() == slot)
-        .expect("feedback snapshot should include the requested slot")
-}
-
 fn first_call_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
     unit.function(unit.entry())
         .expect("test unit should have an entry function")
@@ -82,11 +71,7 @@ fn first_construct_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
         .expect("entry script should contain a construct site")
 }
 
-fn evaluated_entry_snapshot(
-    source_id: u32,
-    source: &str,
-    expected: Value,
-) -> (FeedbackVectorSnapshot, FeedbackSlotId) {
+fn evaluated_call_status(source_id: u32, source: &str, expected: Value) -> crate::CallStatus {
     let unit = compile_test_unit(source_id, source);
     let call_slot = first_call_slot(&unit);
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -101,18 +86,15 @@ fn evaluated_entry_snapshot(
         .unwrap();
     assert_eq!(result, expected);
 
-    (
-        vm.feedback_vector_snapshot(installed.code())
-            .expect("entry code should expose a feedback snapshot"),
-        call_slot,
-    )
+    vm.call_status(installed.code(), call_slot)
+        .expect("entry code should expose a call status")
 }
 
-fn evaluated_construct_entry_snapshot(
+fn evaluated_construct_status(
     source_id: u32,
     source: &str,
     expected: Value,
-) -> (FeedbackVectorSnapshot, FeedbackSlotId) {
+) -> crate::ConstructStatus {
     let unit = compile_test_unit(source_id, source);
     let construct_slot = first_construct_slot(&unit);
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -127,17 +109,13 @@ fn evaluated_construct_entry_snapshot(
         .unwrap();
     assert_eq!(result, expected);
 
-    (
-        vm.feedback_vector_snapshot(installed.code())
-            .expect("entry code should expose a feedback snapshot"),
-        construct_slot,
-    )
+    vm.construct_status(installed.code(), construct_slot)
+        .expect("entry code should expose a construct status")
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn call_feedback_snapshot_records_monomorphic_target_identity() {
-    let (snapshot, call_slot) = evaluated_entry_snapshot(
+fn call_status_records_monomorphic_target_identity() {
+    let status = evaluated_call_status(
         601,
         r"
             function target(value) { return value + 1; }
@@ -150,20 +128,15 @@ fn call_feedback_snapshot_records_monomorphic_target_identity() {
         Value::from_smi(10),
     );
 
-    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
-        panic!("call site should expose call feedback");
-    };
-
-    assert_eq!(call.expected_arity(), Some(1));
-    assert_eq!(call.state(), FeedbackInlineCacheState::Monomorphic);
-    assert_eq!(call.entries().len(), 1);
-    assert!(call.entries()[0].realm().is_some());
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(status.entries.len(), 1);
+    assert!(status.entries[0].realm.is_some());
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn call_feedback_snapshot_records_builtin_target_identity() {
-    let (snapshot, call_slot) = evaluated_entry_snapshot(
+fn call_status_records_builtin_target_identity() {
+    let status = evaluated_call_status(
         607,
         r#"
             var text = "abc";
@@ -176,23 +149,18 @@ fn call_feedback_snapshot_records_builtin_target_identity() {
         Value::from_smi(392),
     );
 
-    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
-        panic!("call site should expose call feedback");
-    };
-
-    assert_eq!(call.expected_arity(), Some(1));
-    assert_eq!(call.state(), FeedbackInlineCacheState::Monomorphic);
-    assert_eq!(call.entries().len(), 1);
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(status.entries.len(), 1);
     assert_eq!(
-        call.entries()[0].builtin(),
+        status.entries[0].builtin,
         Some(lyng_types::string_char_code_at_builtin())
     );
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn call_feedback_snapshot_records_polymorphic_target_identities() {
-    let (snapshot, call_slot) = evaluated_entry_snapshot(
+fn call_status_records_polymorphic_target_identities() {
+    let status = evaluated_call_status(
         602,
         r"
             function a(value) { return value + 1; }
@@ -210,21 +178,16 @@ fn call_feedback_snapshot_records_polymorphic_target_identities() {
         Value::from_smi(24),
     );
 
-    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
-        panic!("call site should expose call feedback");
-    };
-
-    assert_eq!(call.expected_arity(), Some(1));
-    assert_eq!(call.state(), FeedbackInlineCacheState::Polymorphic);
-    assert_eq!(call.entries().len(), 2);
-    assert_ne!(call.entries()[0].callee(), call.entries()[1].callee());
-    assert!(call.entries().iter().all(|entry| entry.realm().is_some()));
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(status.entries.len(), 2);
+    assert_ne!(status.entries[0].function, status.entries[1].function);
+    assert!(status.entries.iter().all(|entry| entry.realm.is_some()));
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn call_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
-    let (snapshot, call_slot) = evaluated_entry_snapshot(
+fn call_status_promotes_to_megamorphic_after_cache_limit() {
+    let status = evaluated_call_status(
         603,
         r"
             function f0(value) { return value; }
@@ -256,19 +219,14 @@ fn call_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
         Value::from_smi(45),
     );
 
-    let FeedbackSiteDetail::Call(call) = feedback_site(&snapshot, call_slot).detail() else {
-        panic!("call site should expose call feedback");
-    };
-
-    assert_eq!(call.expected_arity(), Some(1));
-    assert_eq!(call.state(), FeedbackInlineCacheState::Megamorphic);
-    assert!(call.entries().is_empty());
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Megamorphic);
+    assert!(status.entries.is_empty());
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn construct_feedback_snapshot_records_monomorphic_target_and_created_shape() {
-    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+fn construct_status_records_monomorphic_target_and_created_shape() {
+    let status = evaluated_construct_status(
         604,
         r"
             function Target(value) { this.value = value; }
@@ -281,23 +239,16 @@ fn construct_feedback_snapshot_records_monomorphic_target_and_created_shape() {
         Value::from_smi(6),
     );
 
-    let FeedbackSiteDetail::Construct(construct) =
-        feedback_site(&snapshot, construct_slot).detail()
-    else {
-        panic!("construct site should expose construct feedback");
-    };
-
-    assert_eq!(construct.expected_arity(), Some(1));
-    assert_eq!(construct.state(), FeedbackInlineCacheState::Monomorphic);
-    assert_eq!(construct.entries().len(), 1);
-    assert!(construct.entries()[0].realm().is_some());
-    assert!(construct.entries()[0].created_shape().is_some());
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(status.entries.len(), 1);
+    assert!(status.entries[0].realm.is_some());
+    assert!(status.entries[0].created_shape.is_some());
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn construct_feedback_snapshot_records_polymorphic_targets() {
-    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+fn construct_status_records_polymorphic_targets() {
+    let status = evaluated_construct_status(
         605,
         r"
             function A(value) { this.value = value + 1; }
@@ -315,29 +266,19 @@ fn construct_feedback_snapshot_records_polymorphic_targets() {
         Value::from_smi(24),
     );
 
-    let FeedbackSiteDetail::Construct(construct) =
-        feedback_site(&snapshot, construct_slot).detail()
-    else {
-        panic!("construct site should expose construct feedback");
-    };
-
-    assert_eq!(construct.expected_arity(), Some(1));
-    assert_eq!(construct.state(), FeedbackInlineCacheState::Polymorphic);
-    assert_eq!(construct.entries().len(), 2);
-    assert_ne!(
-        construct.entries()[0].constructor(),
-        construct.entries()[1].constructor()
-    );
-    assert!(construct
-        .entries()
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
+    assert_eq!(status.entries.len(), 2);
+    assert_ne!(status.entries[0].function, status.entries[1].function);
+    assert!(status
+        .entries
         .iter()
-        .all(|entry| entry.created_shape().is_some()));
+        .all(|entry| entry.created_shape.is_some()));
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn construct_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
-    let (snapshot, construct_slot) = evaluated_construct_entry_snapshot(
+fn construct_status_promotes_to_megamorphic_after_cache_limit() {
+    let status = evaluated_construct_status(
         606,
         r"
             function C0(value) { this.value = value; }
@@ -369,20 +310,13 @@ fn construct_feedback_snapshot_promotes_to_megamorphic_after_cache_limit() {
         Value::from_smi(45),
     );
 
-    let FeedbackSiteDetail::Construct(construct) =
-        feedback_site(&snapshot, construct_slot).detail()
-    else {
-        panic!("construct site should expose construct feedback");
-    };
-
-    assert_eq!(construct.expected_arity(), Some(1));
-    assert_eq!(construct.state(), FeedbackInlineCacheState::Megamorphic);
-    assert!(construct.entries().is_empty());
+    assert_eq!(status.expected_arity(), Some(1));
+    assert_eq!(status.state(), FeedbackInlineCacheState::Megamorphic);
+    assert!(status.entries.is_empty());
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
+fn metadata_table_footprint_reports_scalar_sites_for_tier_decisions() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
         &mut atoms,
@@ -453,48 +387,38 @@ fn feedback_vector_snapshot_reports_scalar_sites_for_tier_decisions() {
             .is_object());
     }
 
-    let entry_snapshot = vm
-        .feedback_vector_snapshot(installed.code())
-        .expect("entry code should expose a feedback snapshot");
-    assert!(entry_snapshot.allocated());
-    // Phase D.1.0: Comparison feedback is MetadataTable-owned (no asm callers yet);
-    // the snapshot execution_count is always 0 for Comparison slots.
+    let footprint = vm
+        .metadata_table_footprint(installed.code())
+        .expect("entry code should expose a metadata footprint");
+    assert!(footprint.allocated());
+    // Phase D.1.0: Comparison feedback is MetadataTable-owned (no asm callers
+    // yet); execution_count is always 0 for Comparison slots.
+    let comparison_status = vm
+        .comparison_status(installed.code(), comparison_slot)
+        .expect("comparison site should expose comparison status");
     assert_eq!(
-        feedback_site(&entry_snapshot, comparison_slot).execution_count(),
-        0,
+        comparison_status.execution_count, 0,
         "Comparison execution_count comes from MetadataTable (no asm callers); must be 0"
     );
-    assert!(matches!(
-        feedback_site(&entry_snapshot, comparison_slot).detail(),
-        FeedbackSiteDetail::Comparison
-    ));
-    let FeedbackSiteDetail::Call(call) = feedback_site(&entry_snapshot, call_slot).detail() else {
-        panic!("entry call site should expose call feedback");
-    };
-    assert_eq!(call.expected_arity(), Some(2));
-    let FeedbackSiteDetail::Construct(construct) =
-        feedback_site(&entry_snapshot, construct_slot).detail()
-    else {
-        panic!("entry construct site should expose construct feedback");
-    };
-    assert_eq!(construct.expected_arity(), Some(1));
+    let call_status = vm
+        .call_status(installed.code(), call_slot)
+        .expect("entry call site should expose call status");
+    assert_eq!(call_status.expected_arity(), Some(2));
+    let construct_status = vm
+        .construct_status(installed.code(), construct_slot)
+        .expect("entry construct site should expose construct status");
+    assert_eq!(construct_status.expected_arity(), Some(1));
 
-    let add_snapshot = vm
-        .feedback_vector_snapshot(add_code)
-        .expect("add code should expose a feedback snapshot");
     // Phase D.1.0: Arithmetic execution_count is MetadataTable-owned (asm-written).
-    // drain_llint_scalar_feedback zeroes MetadataTable after each run(); the snapshot
-    // reports execution_count 0 from the unallocated_snapshot path.
+    // drain_llint_scalar_feedback zeroes MetadataTable after each run(); the
+    // status reports execution_count 0.
+    let arith_status = vm
+        .arith_status(add_code, arithmetic_slot)
+        .expect("add code should expose an arith status");
     assert_eq!(
-        feedback_site(&add_snapshot, arithmetic_slot).execution_count(),
-        0,
-        "Arithmetic execution_count is MetadataTable-owned after Phase D.1.0; snapshot is always 0"
+        arith_status.execution_count, 0,
+        "Arithmetic execution_count is MetadataTable-owned after Phase D.1.0; drained on each run"
     );
-    // The slot shape is still Arithmetic — descriptor-level kind is unchanged.
-    assert!(matches!(
-        feedback_site(&add_snapshot, arithmetic_slot).detail(),
-        FeedbackSiteDetail::Arithmetic
-    ));
 }
 
 #[test]
@@ -575,8 +499,7 @@ fn llint_scalar_feedback_batch_drain_preserves_warmup_execution_counts() {
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
-fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries() {
+fn named_property_status_reports_cache_state_without_mutable_entries() {
     let unit = compile_test_unit(40, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let value_atom = unit_atom(&unit, "value");
@@ -643,26 +566,22 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
             Value::from_smi(i32::try_from(index).expect("test source index should fit i32"))
         );
 
-        let snapshot = vm
-            .feedback_vector_snapshot(installed.code())
-            .expect("entry code should expose a feedback snapshot");
-        let FeedbackSiteDetail::NamedProperty(named) = feedback_site(&snapshot, slot).detail()
-        else {
-            panic!("source.value should expose named-property feedback");
-        };
+        let status = vm
+            .named_property_status(installed.code(), slot)
+            .expect("source.value should expose named-property status");
         match index {
             0 => {
-                assert_eq!(named.state(), FeedbackInlineCacheState::Monomorphic);
-                assert_eq!(named.entries().len(), 1);
-                assert_eq!(named.entries()[0].path(), NamedPropertyCachePath::OwnData);
+                assert_eq!(status.state(), FeedbackInlineCacheState::Monomorphic);
+                assert_eq!(status.entries.len(), 1);
+                assert_eq!(status.entries[0].path(), NamedPropertyCachePath::OwnData);
             }
             1 => {
-                assert_eq!(named.state(), FeedbackInlineCacheState::Polymorphic);
-                assert_eq!(named.entries().len(), 2);
+                assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
+                assert_eq!(status.entries.len(), 2);
             }
             5 => {
-                assert_eq!(named.state(), FeedbackInlineCacheState::Polymorphic);
-                assert_eq!(named.entries().len(), 6);
+                assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
+                assert_eq!(status.entries.len(), 6);
             }
             _ => {}
         }
@@ -670,12 +589,11 @@ fn feedback_vector_snapshot_reports_property_cache_state_without_mutable_entries
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 #[expect(
     clippy::too_many_lines,
     reason = "semantic regression scenario stays contiguous within its domain-focused test module"
 )]
-fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
+fn keyed_property_status_reports_classifiers() {
     let named_unit = compile_test_unit(41, "source[\"value\"];");
     let named_entry = named_unit.function(named_unit.entry()).unwrap();
     let named_slot = named_entry
@@ -727,20 +645,15 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
             Value::from_smi(4)
         );
     }
-    let named_snapshot = vm
-        .feedback_vector_snapshot(named_installed.code())
-        .expect("named keyed access should expose feedback");
-    let FeedbackSiteDetail::KeyedProperty(named_keyed) =
-        feedback_site(&named_snapshot, named_slot).detail()
-    else {
-        panic!("source[\"value\"] should expose keyed-property feedback");
-    };
-    assert_eq!(named_keyed.state(), FeedbackInlineCacheState::Monomorphic);
+    let named_status = vm
+        .keyed_property_status(named_installed.code(), named_slot)
+        .expect("source[\"value\"] should expose keyed-property status");
+    assert_eq!(named_status.state(), FeedbackInlineCacheState::Monomorphic);
     assert_eq!(
-        named_keyed.family(),
+        named_status.family(),
         Some(FeedbackKeyedPropertyFamily::NamedAtom)
     );
-    assert_eq!(named_keyed.entries().len(), 1);
+    assert_eq!(named_status.named_entries.len(), 1);
 
     let dense_unit = compile_test_unit(42, "let index = 0; source[index];");
     let dense_entry = dense_unit.function(dense_unit.entry()).unwrap();
@@ -787,30 +700,24 @@ fn feedback_vector_snapshot_reports_keyed_property_classifiers() {
             Value::from_smi(12)
         );
     }
-    let dense_snapshot = vm
-        .feedback_vector_snapshot(dense_installed.code())
-        .expect("dense keyed access should expose feedback");
-    let FeedbackSiteDetail::KeyedProperty(dense_keyed) =
-        feedback_site(&dense_snapshot, dense_slot).detail()
-    else {
-        panic!("source[index] should expose keyed-property feedback");
-    };
-    assert_eq!(dense_keyed.state(), FeedbackInlineCacheState::Monomorphic);
+    let dense_status = vm
+        .keyed_property_status(dense_installed.code(), dense_slot)
+        .expect("source[index] should expose keyed-property status");
+    assert_eq!(dense_status.state(), FeedbackInlineCacheState::Monomorphic);
     assert_eq!(
-        dense_keyed.family(),
+        dense_status.family(),
         Some(FeedbackKeyedPropertyFamily::DenseIndex)
     );
-    assert_eq!(dense_keyed.dense_entries().len(), 1);
-    assert!(dense_keyed.entries().is_empty());
+    assert_eq!(dense_status.dense_entries.len(), 1);
+    assert!(dense_status.named_entries.is_empty());
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 #[expect(
     clippy::too_many_lines,
     reason = "semantic regression scenario stays contiguous within its domain-focused test module"
 )]
-fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
+fn prototype_cache_status_replan_after_object_owned_invalidation() {
     let unit = compile_test_unit(43, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let value_atom = unit_atom(&unit, "value");
@@ -885,19 +792,15 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
             Value::from_smi(7)
         );
     }
-    let before = vm
-        .feedback_vector_snapshot(installed.code())
-        .expect("prototype load should expose feedback");
-    let FeedbackSiteDetail::NamedProperty(before_named) = feedback_site(&before, slot).detail()
-    else {
-        panic!("source.value should expose named-property feedback");
-    };
+    let before_status = vm
+        .named_property_status(installed.code(), slot)
+        .expect("source.value should expose named-property status");
     assert_eq!(
-        before_named.entries()[0].path(),
+        before_status.entries[0].path(),
         NamedPropertyCachePath::PrototypeData
     );
-    assert_eq!(before_named.entries()[0].dependencies().len(), 2);
-    let old_holder = before_named.entries()[0].holder();
+    assert_eq!(before_status.entries[0].dependencies().len(), 2);
+    let old_holder = before_status.entries[0].holder();
 
     // Swap receiver's prototype. `objects.set_prototype_of` does NOT perform
     // a shape transition on `receiver` (it only bumps the invalidation epoch);
@@ -920,28 +823,23 @@ fn prototype_cache_snapshots_replan_after_object_owned_invalidation() {
         Value::from_smi(13),
         "value must be read from the new prototype even without IC replan"
     );
-    let after = vm
-        .feedback_vector_snapshot(installed.code())
-        .expect("prototype load should expose feedback after prototype swap");
-    let FeedbackSiteDetail::NamedProperty(after_named) = feedback_site(&after, slot).detail()
-    else {
-        panic!("source.value should expose named-property feedback");
-    };
+    let after_status = vm
+        .named_property_status(installed.code(), slot)
+        .expect("source.value should expose named-property status after prototype swap");
     // The IC stays Monomorphic PrototypeData. Phase A.2 removed the epoch
     // check; a shape-compare match against the shared prototype shape means
     // the fast path hit succeeds and no replan is needed. The `old_holder`
     // variable (used for the pre-Phase-A.2 `assert_ne` check) is kept to
     // document the before/after contrast.
     let _ = old_holder;
-    assert_eq!(after_named.state(), FeedbackInlineCacheState::Monomorphic);
+    assert_eq!(after_status.state(), FeedbackInlineCacheState::Monomorphic);
     assert_eq!(
-        after_named.entries()[0].path(),
+        after_status.entries[0].path(),
         NamedPropertyCachePath::PrototypeData
     );
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -994,7 +892,6 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
         1,
         "warmup_counter now lives on TieringState; first execution should bump it to 1"
     );
-    assert!(!vm.has_feedback_vector(installed.code()));
     assert_eq!(
         tiering
             .snapshot(installed.code())
@@ -1022,13 +919,15 @@ fn tiering_hotness_is_opt_in_and_independent_of_lazy_feedback_allocation() {
             .expect("installed code should expose tiering state after second run")
             .warmup_counter(),
         2,
-        "warmup_counter now lives on TieringState; second execution should bump it to 2"
+        "warmup_counter now lives on TieringState; second execution should bump it to 2 (= allocation threshold)"
     );
-    assert!(vm.has_feedback_vector(installed.code()));
-    assert_eq!(
-        vm.feedback_execution_count(installed.code(), call_slot),
-        Some(1)
-    );
+    // The MetadataTable footprint reports the per-kind site counts even
+    // before allocation; the per-slot status APIs are the source of truth
+    // for IC state after Phase E.
+    let call_status = vm
+        .call_status(installed.code(), call_slot)
+        .expect("call slot should expose call status");
+    assert_eq!(call_status.execution_count, 1);
     let warmed = tiering
         .snapshot(installed.code())
         .expect("installed code should expose tiering state");
@@ -1115,7 +1014,6 @@ fn closures_sharing_one_code_ref_share_feedback_warmup_and_vector_state() {
 }
 
 #[test]
-#[ignore = "TODO(Phase E): port to per-kind status API"]
 fn closures_sharing_one_code_ref_share_tiering_hotness() {
     let mut atoms = AtomTable::new();
     let parsed = parse_script(
@@ -1173,13 +1071,15 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
-    assert!(vm.has_feedback_vector(inner_code));
     let snapshot = tiering
         .snapshot(inner_code)
         .expect("inner code should expose tiering state");
     assert_eq!(snapshot.status(), TierStatus::Collecting);
     assert_eq!(snapshot.hotness(), 2);
     assert_eq!(snapshot.feedback_events(), 2);
+    // Two executions cross the allocation threshold (= 2), so the external
+    // tiering carries the allocated marker.
+    assert!(snapshot.warmup_counter() >= 2);
 }
 
 #[test]

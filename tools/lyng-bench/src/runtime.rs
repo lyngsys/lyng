@@ -14,9 +14,7 @@ use lyng_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
 use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{analyze_module, analyze_script};
 use lyng_types::{CodeRef, Value as JsValue};
-use lyng_vm::{
-    FeedbackInlineCacheState, FeedbackSiteDetail, OpcodeDispatchCounts, SlowPathCounts, Vm,
-};
+use lyng_vm::{FeedbackInlineCacheState, OpcodeDispatchCounts, SlowPathCounts, Vm};
 use serde_json::{json, Value};
 use std::cmp::Ordering;
 use std::env;
@@ -1090,7 +1088,7 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
         let Some(function) = vm.installed_function(code) else {
             continue;
         };
-        if let Some(footprint) = vm.feedback_vector_footprint(code) {
+        if let Some(footprint) = vm.metadata_table_footprint(code) {
             totals.slot_count = totals.slot_count.saturating_add(footprint.slot_count());
             totals.live_site_count = totals
                 .live_site_count
@@ -1102,29 +1100,34 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
                 totals.allocated_code_count = totals.allocated_code_count.saturating_add(1);
             }
         }
-        if let Some(snapshot) = vm.feedback_vector_snapshot(code) {
-            for site in snapshot.sites() {
-                match site.detail() {
-                    FeedbackSiteDetail::Call(call) => match call.state() {
-                        FeedbackInlineCacheState::Uninitialized => {
-                            totals.call_cache_uninit_sites =
-                                totals.call_cache_uninit_sites.saturating_add(1);
+        for descriptor in function.feedback_sites() {
+            let slot = descriptor.slot();
+            match descriptor.kind() {
+                lyng_bytecode::FeedbackSiteKind::Call => {
+                    if let Some(status) = vm.call_status(code, slot) {
+                        match status.state() {
+                            FeedbackInlineCacheState::Uninitialized => {
+                                totals.call_cache_uninit_sites =
+                                    totals.call_cache_uninit_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Monomorphic => {
+                                totals.call_cache_mono_sites =
+                                    totals.call_cache_mono_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Polymorphic => {
+                                totals.call_cache_poly_sites =
+                                    totals.call_cache_poly_sites.saturating_add(1);
+                            }
+                            FeedbackInlineCacheState::Megamorphic => {
+                                totals.call_cache_mega_sites =
+                                    totals.call_cache_mega_sites.saturating_add(1);
+                            }
                         }
-                        FeedbackInlineCacheState::Monomorphic => {
-                            totals.call_cache_mono_sites =
-                                totals.call_cache_mono_sites.saturating_add(1);
-                        }
-                        FeedbackInlineCacheState::Polymorphic => {
-                            totals.call_cache_poly_sites =
-                                totals.call_cache_poly_sites.saturating_add(1);
-                        }
-                        FeedbackInlineCacheState::Megamorphic => {
-                            totals.call_cache_mega_sites =
-                                totals.call_cache_mega_sites.saturating_add(1);
-                        }
-                    },
-                    FeedbackSiteDetail::Construct(construct) => {
-                        match construct.state() {
+                    }
+                }
+                lyng_bytecode::FeedbackSiteKind::Construct => {
+                    if let Some(status) = vm.construct_status(code, slot) {
+                        match status.state() {
                             FeedbackInlineCacheState::Uninitialized => {
                                 totals.construct_cache_uninit_sites =
                                     totals.construct_cache_uninit_sites.saturating_add(1);
@@ -1144,15 +1147,15 @@ fn collect_feedback_totals(vm: &Vm, root: CodeRef) -> BenchResult<FeedbackTotals
                         }
                         totals.construct_created_shape_entries =
                             totals.construct_created_shape_entries.saturating_add(
-                                construct
-                                    .entries()
+                                status
+                                    .entries
                                     .iter()
-                                    .filter(|entry| entry.created_shape().is_some())
+                                    .filter(|entry| entry.created_shape.is_some())
                                     .count(),
                             );
                     }
-                    _ => {}
                 }
+                _ => {}
             }
         }
         for child_index in 0..function.child_functions().len() {

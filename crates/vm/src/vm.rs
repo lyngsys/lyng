@@ -60,6 +60,7 @@ mod registers;
 mod runtime_objects;
 pub mod semantics;
 mod state;
+pub(crate) mod status;
 mod tiering;
 mod values;
 mod with_env;
@@ -89,12 +90,12 @@ pub use debugger::{
     VmDebugCommand, VmDebugFrame, VmDebugHook, VmDebugPauseContext, VmDebugPauseReason,
     VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
 };
-pub use feedback::{
-    CallCacheEntrySnapshot, CallFeedbackSnapshot, ConstructCacheEntrySnapshot,
-    ConstructFeedbackSnapshot, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily,
-    FeedbackSiteDetail, FeedbackSiteSnapshot, FeedbackVectorSnapshot,
-    KeyedNamedPropertyCacheEntrySnapshot, KeyedPropertyFeedbackSnapshot,
-    NamedPropertyCacheEntrySnapshot, NamedPropertyFeedbackSnapshot,
+pub use feedback::{FeedbackInlineCacheState, FeedbackKeyedPropertyFamily};
+pub use status::{
+    ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,
+    KeyedPropertyDenseStatusEntry, KeyedPropertyNamedStatusEntry, KeyedPropertyStatus,
+    MetadataTableFootprint, NamedPropertyEntryKind, NamedPropertyHandlerSummary,
+    NamedPropertyStatus, NamedPropertyStatusEntry, ScalarObserved,
 };
 pub use tiering::{TierStatus, Tiering, TieringSnapshot};
 
@@ -113,42 +114,6 @@ pub trait VmEvaluationObserver {
 struct NoopVmEvaluationObserver;
 
 impl VmEvaluationObserver for NoopVmEvaluationObserver {}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct FeedbackVectorFootprint {
-    allocated: bool,
-    slot_count: usize,
-    live_site_count: usize,
-    allocated_bytes: usize,
-    warmup_counter: u16,
-}
-
-impl FeedbackVectorFootprint {
-    #[inline]
-    pub const fn allocated(self) -> bool {
-        self.allocated
-    }
-
-    #[inline]
-    pub const fn slot_count(self) -> usize {
-        self.slot_count
-    }
-
-    #[inline]
-    pub const fn live_site_count(self) -> usize {
-        self.live_site_count
-    }
-
-    #[inline]
-    pub const fn allocated_bytes(self) -> usize {
-        self.allocated_bytes
-    }
-
-    #[inline]
-    pub const fn warmup_counter(self) -> u16 {
-        self.warmup_counter
-    }
-}
 
 #[derive(Default)]
 pub struct Vm {
