@@ -6,6 +6,7 @@
 use super::{
     code_index, Agent, AtomId, CodeRef, FeedbackVectorFootprint, ObjectRef, RealmRef, Value, Vm,
 };
+use crate::vm::ic_state::PropertyIcState;
 use crate::vm::metadata_table::{
     CallMetadata, KeyedPropertyMetadata, MetadataKind, PropertyMetadata,
 };
@@ -616,7 +617,7 @@ impl FeedbackVectorSnapshot {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum InlineCacheState {
+pub(crate) enum InlineCacheState {
     Uninitialized,
     Monomorphic,
     Polymorphic,
@@ -3016,6 +3017,8 @@ impl Vm {
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
     ) {
+        // Legacy write: keep FeedbackSiteState::NamedProperty in sync for the
+        // snapshot API (FeedbackVectorSnapshot). Removed in Phase D.2.4.
         let mutated = {
             let Self {
                 feedback_vectors,
@@ -3039,10 +3042,53 @@ impl Vm {
             })()
             .is_some()
         };
+
+        // Phase D.1.1: mirror the post-transition NamedPropertyFeedback state
+        // into the PropertyIcState side-table. The legacy write above is the
+        // single source of truth for polymorphic_chains and the IC transition
+        // logic; we read the result back and copy it into PropertyIcState so
+        // both representations stay identical. This avoids any double-mutation
+        // of polymorphic_chains.
+        if mutated {
+            Self::sync_property_ic_state_from_feedback(
+                &self.feedback_vectors,
+                &mut self.property_ic_states,
+                code,
+                slot,
+            );
+        }
+
         if mutated {
             self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
+    }
+
+    /// Phase D.1.1: copy the NamedPropertyFeedback inline state into the
+    /// PropertyIcState entry for `(code, slot)`. Called after every legacy
+    /// slow-path write so the two representations stay byte-identical.
+    fn sync_property_ic_state_from_feedback(
+        feedback_vectors: &[FeedbackVector],
+        property_ic_states: &mut HashMap<(CodeRef, FeedbackSlotId), PropertyIcState>,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) {
+        let Some(site) = feedback_vectors
+            .get(code_index(code))
+            .and_then(|v| v.site(slot))
+        else {
+            return;
+        };
+        let FeedbackSiteState::NamedProperty(feedback) = site else {
+            return;
+        };
+        let ic_state = property_ic_states.entry((code, slot)).or_default();
+        ic_state.cache_state = feedback.cache_state;
+        ic_state.entry_count = feedback.entry_count;
+        ic_state.entries = feedback.entries;
+        ic_state.monomorphic_own_data_handler = feedback.monomorphic_own_data_handler;
+        ic_state.monomorphic_proto_data_handler = feedback.monomorphic_proto_data_handler;
+        ic_state.polymorphic_own_data_handlers = feedback.polymorphic_own_data_handlers;
     }
 
     /// Core slow-path install transition logic. Operates on the split-borrowed

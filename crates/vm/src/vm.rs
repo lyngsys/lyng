@@ -47,6 +47,7 @@ mod exceptions;
 mod feedback;
 mod generators;
 mod global_script;
+pub(crate) mod ic_state;
 pub mod install;
 mod internal_calls;
 mod jobs;
@@ -65,6 +66,7 @@ mod with_env;
 
 use call::RejectingNativeRegistry;
 use feedback::{FeedbackVector, PolymorphicChain};
+use ic_state::PropertyIcState;
 use install::InstalledFunction;
 use metadata_table::MetadataTable;
 use state::{
@@ -171,6 +173,14 @@ pub struct Vm {
     /// polymorphic slots have no entry. Cleared on AdaptiveProtoLoad fire and
     /// on code GC (via prune_dead_code_polymorphic_chains).
     polymorphic_chains: HashMap<(CodeRef, FeedbackSlotId), PolymorphicChain>,
+    /// Phase D.1.1: Rust-only IC state machine for `NamedProperty` slots.
+    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy: created on first slow-path
+    /// install. Entries are pruned on code GC via
+    /// `prune_dead_code_property_ic_states`. The asm-readable bits (`mode`,
+    /// `generation`, `handler_bits`, `aux_bits`, `execution_count`) live on
+    /// `PropertyMetadata` inside `MetadataTable`; this map holds the remaining
+    /// Rust-only state-machine fields.
+    pub(crate) property_ic_states: HashMap<(CodeRef, FeedbackSlotId), PropertyIcState>,
     /// Legacy scalar feedback mirror. Phase C.4 status: the asm IC fast path
     /// no longer reads OR writes this storage — both `load_feedback_site!` and
     /// `record_*` macros now source x21 from `Vm::metadata_tables`. This field
@@ -566,6 +576,7 @@ impl Vm {
             feedback_flat_storage: Vec::new(),
             metadata_tables: Vec::new(),
             polymorphic_chains: HashMap::new(),
+            property_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
             activation_tables: ActivationSideTables::default(),
@@ -674,6 +685,44 @@ impl Vm {
     pub(crate) fn prune_dead_code_polymorphic_chains(&mut self, is_live: impl Fn(CodeRef) -> bool) {
         self.polymorphic_chains
             .retain(|(code, _slot), _chain| is_live(*code));
+    }
+
+    /// Phase D.1.1: returns the `PropertyIcState` for `(code, slot)` if any.
+    #[allow(
+        dead_code,
+        reason = "Phase D.1.1 accessor surface; consumed from tests and future D.2.x callers"
+    )]
+    pub(crate) fn property_ic_state(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<&PropertyIcState> {
+        self.property_ic_states.get(&(code, slot))
+    }
+
+    /// Phase D.1.1: returns a mutable reference to the `PropertyIcState` for
+    /// `(code, slot)`, creating a default entry on first access.
+    #[allow(
+        dead_code,
+        reason = "Phase D.1.1 accessor surface; consumed from future D.2.x callers"
+    )]
+    pub(crate) fn property_ic_state_mut(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> &mut PropertyIcState {
+        self.property_ic_states.entry((code, slot)).or_default()
+    }
+
+    /// Phase D.1.1: post-mark GC sweep. Drops `PropertyIcState` entries for
+    /// code that is no longer live. Mirrors `prune_dead_code_polymorphic_chains`.
+    #[allow(
+        dead_code,
+        reason = "Phase D.1.1 sweep surface; call site wired alongside prune_dead_code_polymorphic_chains"
+    )]
+    pub(crate) fn prune_dead_code_property_ic_states(&mut self, is_live: impl Fn(CodeRef) -> bool) {
+        self.property_ic_states
+            .retain(|(code, _slot), _state| is_live(*code));
     }
 
     /// Phase C Task 4.5: post-mark GC sweep. Drops `MetadataTable` entries
@@ -960,6 +1009,13 @@ impl Vm {
         // uninstalled.
         let installed = &self.installed;
         self.polymorphic_chains.retain(|(code, _), _| {
+            installed
+                .get(code_index(*code))
+                .is_some_and(|s| s.is_some())
+        });
+        // Phase D.1.1: prune PropertyIcState side-table entries for code that
+        // is no longer installed, mirroring the polymorphic_chains sweep above.
+        self.property_ic_states.retain(|(code, _), _| {
             installed
                 .get(code_index(*code))
                 .is_some_and(|s| s.is_some())
@@ -1626,6 +1682,9 @@ impl Vm {
         // chain must follow it; otherwise stale chain entries would be
         // visible on the next install.
         self.drop_polymorphic_chain(code, slot);
+        // Phase D.1.1: drop the PropertyIcState for this slot. On the next
+        // slow-path install a fresh default entry will be created.
+        self.property_ic_states.remove(&(code, slot));
         // Note: bump_generation after clear_site is a no-op because clear_site
         // drops the NamedPropertyFeedback that holds the generation counter.
         // Generation resets to 0 on the next fresh install; see doc above.

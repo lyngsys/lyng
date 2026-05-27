@@ -4068,3 +4068,339 @@ fn c4_asm_ic_fast_path_reads_from_metadata_table() {
 
     let _ = MetadataKind::Property; // import guard — confirms Property kind is used
 }
+
+// -----------------------------------------------------------------------------
+// Spec 2 Phase D.1.1 — PropertyIcState side-table tests (D1-D4)
+// -----------------------------------------------------------------------------
+//
+// These tests verify the new `Vm::property_ic_states` side-table directly,
+// independent of the legacy `FeedbackSiteState::NamedProperty` read path used
+// by the snapshot API. Each test drives the IC through a specific transition
+// and asserts on `vm.property_ic_state(code, slot)`.
+
+use crate::vm::ic_state::InlineCacheState;
+
+// D1: Uninit → Monomorphic. After installing one shape, cache_state must be
+// Monomorphic and entry_count must be 1.
+#[test]
+fn d1_property_ic_state_uninit_to_monomorphic() {
+    let unit = compile_test_unit(50_001, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(1));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let ic_state = vm
+        .property_ic_state(installed.code(), slot)
+        .expect("D1: PropertyIcState should exist after first slow-path install");
+    assert_eq!(
+        ic_state.cache_state,
+        InlineCacheState::Monomorphic,
+        "D1: cache_state must be Monomorphic after one shape"
+    );
+    assert_eq!(
+        ic_state.entry_count, 1,
+        "D1: entry_count must be 1 after installing one shape"
+    );
+}
+
+// D2: Monomorphic → Polymorphic. After installing two distinct shapes,
+// cache_state must be Polymorphic and entry_count must be 2.
+#[test]
+fn d2_property_ic_state_mono_to_polymorphic() {
+    let unit = compile_test_unit(50_002, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    for index in 0..2u32 {
+        // Each object gets a unique extra property to get a distinct shape.
+        let extra_atoms: Vec<u32> = (0..index).map(|i| 50_002 + i).collect();
+        let object = make_object_with_value(
+            agent,
+            root_shape,
+            &extra_atoms,
+            value_name,
+            Value::from_smi(index.cast_signed()),
+        );
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap();
+    }
+
+    let ic_state = vm
+        .property_ic_state(installed.code(), slot)
+        .expect("D2: PropertyIcState should exist after two slow-path installs");
+    assert_eq!(
+        ic_state.cache_state,
+        InlineCacheState::Polymorphic,
+        "D2: cache_state must be Polymorphic after two distinct shapes"
+    );
+    assert_eq!(
+        ic_state.entry_count, 2,
+        "D2: entry_count must be 2 after installing two shapes"
+    );
+}
+
+// D3: Polymorphic → Megamorphic. Drive 9 distinct shapes (POLY_LIMIT=2 inline +
+// chain capacity 6 + one more) → cache_state must be Megamorphic and chain
+// entry must be dropped.
+#[test]
+fn d3_property_ic_state_poly_to_megamorphic() {
+    let unit = compile_test_unit(50_003, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    // 9 shapes: at shape 9 the IC must transition to Megamorphic.
+    for index in 0..9u32 {
+        let extra_atoms: Vec<u32> = (0..index).map(|i| 50_003 + i).collect();
+        let object = make_object_with_value(
+            agent,
+            root_shape,
+            &extra_atoms,
+            value_name,
+            Value::from_smi(index.cast_signed()),
+        );
+        install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap();
+    }
+
+    let ic_state = vm
+        .property_ic_state(installed.code(), slot)
+        .expect("D3: PropertyIcState should exist after mega transition");
+    assert_eq!(
+        ic_state.cache_state,
+        InlineCacheState::Megamorphic,
+        "D3: cache_state must be Megamorphic after 9 distinct shapes"
+    );
+    assert_eq!(
+        ic_state.entry_count, 0,
+        "D3: entry_count must be 0 in Megamorphic state"
+    );
+    assert!(
+        vm.polymorphic_chain(installed.code(), slot).is_none(),
+        "D3: polymorphic chain must be dropped on Mega transition"
+    );
+}
+
+// D4: Clear → Monomorphic. Install a PrototypeData IC entry to get Monomorphic,
+// then mutate the prototype shape to fire the AdaptiveProtoLoad watchpoint,
+// which clears the IC slot (via `clear_ic_slot_if_generation_matches`) and
+// removes the `PropertyIcState` entry. After re-running, the slow path must
+// reinstall and return to Monomorphic.
+//
+// This mirrors the B5 / A.3 AdaptiveProtoLoad tests but asserts on
+// `vm.property_ic_state` instead of (or in addition to) the legacy snapshot.
+#[test]
+fn d4_property_ic_state_clear_and_reinstall() {
+    // Source reads `source.value` where `value` is on a shared prototype.
+    let unit = compile_test_unit(50_004, "source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    let slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, value_atom);
+    let extra_name = agent.atoms_mut().intern_collectible("_extra_d4");
+
+    // Build a prototype that carries `value`, and a receiver object that
+    // delegates to it (PrototypeData IC path).
+    let proto = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(value_name),
+        Value::from_smi(99),
+        AllocationLifetime::Default,
+        &mut NoopAdaptiveProtoLoadDispatch,
+    )
+    .unwrap());
+    let proto_shape = agent
+        .objects()
+        .object_header(agent.heap().view(), proto)
+        .expect("proto must have header")
+        .shape();
+
+    // Receiver has `proto` as its prototype.
+    let receiver = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(proto)),
+            AllocationLifetime::Default,
+        )
+    });
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(receiver));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First two runs: warmup + IC install (PrototypeData path → Monomorphic).
+    for _ in 0..2 {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(99),
+            "D4: initial runs must return the proto value"
+        );
+    }
+
+    // Confirm Monomorphic state in PropertyIcState.
+    {
+        let ic_state = vm
+            .property_ic_state(installed.code(), slot)
+            .expect("D4: PropertyIcState should exist after first install");
+        assert_eq!(
+            ic_state.cache_state,
+            InlineCacheState::Monomorphic,
+            "D4: must be Monomorphic before watchpoint fire"
+        );
+    }
+
+    // Mutate the prototype (add a new property). This fires the
+    // AdaptiveProtoLoad watchpoint on `proto_shape`, which calls
+    // `clear_ic_slot_if_generation_matches`. That clears the
+    // `FeedbackSiteState` slot to `None` AND removes the `PropertyIcState`.
+    assert!(ordinary_create_data_property(
+        agent,
+        proto,
+        PropertyKey::from_atom(extra_name),
+        Value::from_smi(0),
+        AllocationLifetime::Default,
+        &mut vm,
+    )
+    .unwrap());
+
+    // Both feedback slot and PropertyIcState must be gone.
+    assert!(
+        !vm.named_property_slot_is_present(installed.code(), slot),
+        "D4: watchpoint fire must clear the IC slot"
+    );
+    assert!(
+        vm.property_ic_state(installed.code(), slot).is_none(),
+        "D4: watchpoint fire must remove the PropertyIcState entry"
+    );
+
+    // After the proto mutation, `value` is still accessible (now on the
+    // post-transition proto shape).
+    // Re-run: slow path reinstalls against the new prototype shape.
+    let new_proto_shape = agent
+        .objects()
+        .object_header(agent.heap().view(), proto)
+        .expect("proto must still have header after mutation")
+        .shape();
+    assert_ne!(
+        proto_shape, new_proto_shape,
+        "D4: proto shape must have changed after property addition"
+    );
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(99),
+        "D4: value must still be accessible after watchpoint fire + reinstall"
+    );
+
+    // PropertyIcState must be back to Monomorphic.
+    let after = vm
+        .property_ic_state(installed.code(), slot)
+        .expect("D4: PropertyIcState should exist after re-install");
+    assert_eq!(
+        after.cache_state,
+        InlineCacheState::Monomorphic,
+        "D4: must return to Monomorphic after re-install"
+    );
+    assert_eq!(
+        after.entry_count, 1,
+        "D4: entry_count must be 1 after re-install"
+    );
+}
