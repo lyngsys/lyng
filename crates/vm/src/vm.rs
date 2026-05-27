@@ -700,20 +700,6 @@ impl Vm {
         self.property_ic_states.get(&(code, slot))
     }
 
-    /// Phase D.1.1: returns a mutable reference to the `PropertyIcState` for
-    /// `(code, slot)`, creating a default entry on first access.
-    #[allow(
-        dead_code,
-        reason = "Phase D.1.1 accessor surface; consumed from future D.2.x callers"
-    )]
-    pub(crate) fn property_ic_state_mut(
-        &mut self,
-        code: CodeRef,
-        slot: FeedbackSlotId,
-    ) -> &mut PropertyIcState {
-        self.property_ic_states.entry((code, slot)).or_default()
-    }
-
     /// Phase D.1.1: post-mark GC sweep. Drops `PropertyIcState` entries for
     /// code that is no longer live. Mirrors `prune_dead_code_polymorphic_chains`.
     #[allow(
