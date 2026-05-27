@@ -202,10 +202,10 @@ pub struct Vm {
     pub(crate) keyed_property_ic_states: HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyIcState>,
     /// Legacy scalar feedback mirror. Phase C.4 status: the asm IC fast path
     /// no longer reads OR writes this storage — both `load_feedback_site!` and
-    /// `record_*` macros now source x21 from `Vm::metadata_tables`. This field
-    /// survives solely to feed `mirror_flat_slot`, which the Phase C.3 debug
-    /// equivalence assertion still compares against. Phase D deletes it
-    /// entirely along with `FeedbackEntry` and `mirror_flat_slot`.
+    /// `record_*` macros now source x21 from `Vm::metadata_tables`. Phase D.2.2
+    /// removed the flat-slot projection helper (the only remaining writer after
+    /// D.2.1 removed the debug equivalence assertion). Phase D.2.3 deletes this
+    /// field entirely along with `FeedbackEntry`.
     pub(crate) feedback_flat_storage: Vec<Box<[crate::dsl::feedback_flat::FeedbackEntry]>>,
     /// Phase C: per-code-object IC metadata buffer, parallel to
     /// `feedback_flat_storage`, keyed by `code_index(code_ref)`.
@@ -1787,7 +1787,6 @@ impl Vm {
         // Note: bump_generation after clear_site is a no-op because clear_site
         // drops the NamedPropertyFeedback that holds the generation counter.
         // Generation resets to 0 on the next fresh install; see doc above.
-        self.mirror_flat_slot(code, slot);
         self.mirror_metadata_slot(code, slot);
     }
 }

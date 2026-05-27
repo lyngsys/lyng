@@ -2107,75 +2107,21 @@ impl Vm {
             .get_mut(code_index(code))?
             .site_mut(slot)
             .map(f);
-        // DSL-0b (B17): dual-write — after every legacy mutation,
-        // mirror the slot into the flat-array storage so the asm
-        // `FV` pin sees the compact IC header projected from the
-        // semantic source of truth. The projection runs only when the
-        // legacy write actually happened (Some(R) path).
+        // DSL-0b (B17): after every legacy mutation, mirror the slot into
+        // the MetadataTable so the asm dispatch path stays in sync.
+        // The projection runs only when the legacy write actually happened
+        // (Some(R) path).
         if result.is_some() {
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
         result
     }
 
-    /// Phase C.4 status: writes-only scaffolding for the debug equivalence
-    /// assertion. The asm IC dispatch path has fully moved to `MetadataTable`
-    /// (Property + Arith). This function still projects `FeedbackVector` slot
-    /// state into the `FeedbackEntry` flat layout so `debug_assert_metadata_
-    /// matches_flat` can byte-compare Property entries. Callers must continue
-    /// to invoke `mirror_metadata_slot` immediately after. Phase D deletes
-    /// this function.
-    #[inline]
-    pub(super) fn mirror_flat_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
-        let index = code_index(code);
-        let vector = self.feedback_vectors.get(index);
-        let header = vector
-            .and_then(|v| v.site(slot))
-            .and_then(Self::named_llint_load_header);
-        // Read the generation from the semantic source so the flat entry stays
-        // in sync on every install/clear cycle.
-        let generation = vector.map_or(0, |v| v.generation(slot));
-        let Some(slot_index) = Self::flat_feedback_slot_index(slot) else {
-            return;
-        };
-        let Some(entry) = self
-            .feedback_flat_storage
-            .get_mut(index)
-            .and_then(|entries| entries.get_mut(slot_index))
-        else {
-            return;
-        };
-        entry.clear_ic_header();
-        // Write generation AFTER clear_ic_header so it is never overwritten by
-        // the blanket IC-field clear. `clear_ic_header` only touches mode and
-        // the named-property handler fields; generation is metadata, not
-        // IC state, and is deliberately excluded from that reset.
-        entry.generation = generation;
-        match header {
-            Some(LlIntNamedPropertyHeader::OwnInline { handler_bits }) => {
-                entry.set_named_own_inline_load(handler_bits);
-            }
-            Some(LlIntNamedPropertyHeader::OwnOutline { handler_bits }) => {
-                entry.set_named_own_outline_load(handler_bits);
-            }
-            Some(LlIntNamedPropertyHeader::ProtoInline {
-                receiver_word,
-                proto_word,
-            }) => entry.set_named_proto_inline_load(receiver_word, proto_word),
-            Some(LlIntNamedPropertyHeader::OwnPolymorphic {
-                slot0_handler_bits,
-                slot1_handler_bits,
-            }) => entry.set_named_own_polymorphic(slot0_handler_bits, slot1_handler_bits),
-            None => {}
-        }
-    }
-
-    /// Phase C.4: writes the canonical IC state into `MetadataTable`. After the
-    /// asm pin flip, the asm dispatch path reads from this storage exclusively
-    /// for IC resolution and scalar feedback updates. `mirror_flat_slot`
-    /// continues in lockstep until Phase D, solely to feed the debug
-    /// equivalence assertion.
+    /// Phase C.4 / D.2.2: writes the canonical IC state into `MetadataTable`.
+    /// After the asm pin flip, the asm dispatch path reads from this storage
+    /// exclusively for IC resolution and scalar feedback updates. This is now
+    /// the sole post-mutation projection helper (D.2.2 removed the flat-array
+    /// counterpart). D.2.4 deletes this function when FeedbackSiteState goes away.
     pub(super) fn mirror_metadata_slot(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let index = code_index(code);
 
@@ -2193,8 +2139,8 @@ impl Vm {
 
         // 2. Snapshot everything we need from the feedback vector while holding
         //    the immutable borrow, then release it before the mutable table write.
-        //    For Property we compute the LlInt header via the same helper
-        //    `mirror_flat_slot` uses, so the two projections stay byte-identical.
+        //    For Property we compute the LlInt header via `named_llint_load_header`
+        //    and project into PropertyMetadata via `project_property`.
         enum Projection {
             Property(PropertyMetadata),
             Call(CallMetadata),
@@ -2231,6 +2177,10 @@ impl Vm {
         }
     }
 
+    #[allow(
+        dead_code,
+        reason = "D.2.3: helper used only by flat_named_property_header_snapshot; both deleted when feedback_flat_storage goes away"
+    )]
     #[inline]
     fn flat_feedback_slot_index(slot: FeedbackSlotId) -> Option<usize> {
         usize::try_from(slot.get().checked_sub(1)?).ok()
@@ -2356,7 +2306,6 @@ impl Vm {
                 true
             });
         if mirrored {
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_event(code);
@@ -2375,7 +2324,6 @@ impl Vm {
             return false;
         };
         site.record_execution();
-        self.mirror_flat_slot(code, slot);
         self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         true
@@ -2495,7 +2443,6 @@ impl Vm {
             false
         };
         if wrote {
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_events(code, count);
@@ -2519,8 +2466,6 @@ impl Vm {
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_call_target(agent, callee);
-            // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
             // Phase D.1.2: sync into CallIcState side-table.
             Self::sync_call_ic_state_from_feedback(
@@ -2582,8 +2527,6 @@ impl Vm {
             .and_then(|vector| vector.site_mut(slot))
         {
             site.record_construct_target(agent, constructor, created);
-            // DSL-0b (B17) dual-write — see `mirror_flat_slot`.
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
             // Phase D.1.2: sync into ConstructIcState side-table.
             Self::sync_call_ic_state_from_feedback(
@@ -2678,7 +2621,6 @@ impl Vm {
             false
         };
         if wrote {
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
         self.tiering.observe_feedback_event(code);
@@ -2965,9 +2907,8 @@ impl Vm {
     /// `NamedPropertyFeedback::observe_slow_path` (Spec 2 Phase B.1.3) because
     /// the install routing now needs access to both the inline `entries`
     /// (`&mut NamedPropertyFeedback`) and the out-of-line
-    /// `Vm::polymorphic_chains[(code, slot)]` simultaneously. Performs
-    /// `mirror_flat_slot` after the mutation so the DSL-0b flat-array
-    /// projection stays in sync.
+    /// `Vm::polymorphic_chains[(code, slot)]` simultaneously. Calls
+    /// `mirror_metadata_slot` after the mutation to keep MetadataTable in sync.
     fn named_property_install_slow_path(
         &mut self,
         code: CodeRef,
@@ -3016,7 +2957,6 @@ impl Vm {
         }
 
         if mutated {
-            self.mirror_flat_slot(code, slot);
             self.mirror_metadata_slot(code, slot);
         }
     }
@@ -3404,9 +3344,6 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
-        // DSL-0b (B17) dual-write — borrow on `site` is dropped after
-        // `record_execution()` so `mirror_flat_slot` can re-borrow.
-        self.mirror_flat_slot(code, slot);
         self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         Some(value)
@@ -3433,8 +3370,6 @@ impl Vm {
             _ => None,
         }?;
         site.record_execution();
-        // DSL-0b (B17) dual-write — see paired load helper.
-        self.mirror_flat_slot(code, slot);
         self.mirror_metadata_slot(code, slot);
         self.tiering.observe_feedback_event(code);
         Some(stored)
@@ -3789,6 +3724,10 @@ impl Vm {
     }
 
     #[cfg(test)]
+    #[allow(
+        dead_code,
+        reason = "D.2.3: tests for flat storage deleted in D.2.2; this snapshot helper goes with feedback_flat_storage"
+    )]
     pub(crate) fn flat_named_property_header_snapshot(
         &self,
         code: CodeRef,
@@ -3908,9 +3847,8 @@ impl Vm {
 
 /// Project a named-property IC site into `PropertyMetadata`.
 ///
-/// Takes the same `LlIntNamedPropertyHeader` that `mirror_flat_slot` computes
-/// so the two projections are byte-identical (handler_bits, aux_bits, and mode
-/// carry the same values as the corresponding `FeedbackEntry` fields).
+/// Takes a `LlIntNamedPropertyHeader` and projects it into `PropertyMetadata`
+/// (handler_bits, aux_bits, and mode matching the old `FeedbackEntry` layout).
 #[allow(
     dead_code,
     reason = "Phase C Task 2.3 skeleton; Task 2.4 wires this into callsites"
@@ -3932,8 +3870,8 @@ fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -
             receiver_word,
             proto_word,
         }) => {
-            // mirror_flat_slot maps: named_handler_bits ← proto_word,
-            //                        named_aux_bits      ← receiver_word
+            // ProtoInline layout: named_handler_bits ← proto_word,
+            //                     named_aux_bits      ← receiver_word
             (
                 LLINT_IC_MODE_NAMED_PROTO_INLINE_LOAD,
                 proto_word,
@@ -3956,7 +3894,7 @@ fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -
         handler_bits,
         aux_bits,
         // execution_count: Phase D will be the source of truth. Leave 0
-        // for Phase C; mirror_flat_slot does not populate this field either.
+        // for now (D.2.3+ will populate this field).
         execution_count: 0,
         ..Default::default()
     }
@@ -3964,9 +3902,8 @@ fn project_property(header: Option<LlIntNamedPropertyHeader>, generation: u32) -
 
 /// Project a Call/Construct IC site into `CallMetadata`.
 ///
-/// `mirror_flat_slot` does not cover Call IC, so we project directly from
-/// `CallFeedback`/`ConstructFeedback`. `callee_bits` is not yet available as
-/// a simple bit-packed word in Phase C; leave 0 (Phase D will own this field).
+/// Projects directly from `CallFeedback`/`ConstructFeedback`. `callee_bits` is
+/// not yet available as a simple bit-packed word; leave 0 (Phase D owns this).
 /// `mode` encodes the IC state, `execution_count` mirrors the per-site count.
 #[allow(
     dead_code,

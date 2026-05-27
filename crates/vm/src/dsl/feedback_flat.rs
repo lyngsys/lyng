@@ -47,6 +47,10 @@ pub const LLINT_IC_MODE_NAMED_OWN_OUTLINE_LOAD: u8 = 3;
 pub const LLINT_IC_MODE_NAMED_OWN_POLYMORPHIC: u8 = 4;
 pub const LLINT_FEEDBACK_OBSERVED_SMI: u32 = 1;
 
+#[allow(
+    dead_code,
+    reason = "D.2.3: variants only constructed via FeedbackEntry setters which are also dead after D.2.2; deleted with feedback_flat_storage"
+)]
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum LlIntIcMode {
@@ -117,6 +121,10 @@ impl Default for FeedbackEntry {
     }
 }
 
+#[allow(
+    dead_code,
+    reason = "D.2.3: all setters called only from mirror_flat_slot (deleted in D.2.2); removed with FeedbackEntry"
+)]
 impl FeedbackEntry {
     #[inline]
     pub(crate) const fn clear_ic_header(&mut self) {
