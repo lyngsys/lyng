@@ -845,59 +845,100 @@ impl Vm {
         }
         self.named_property_install_slow_path(code, slot, plan, purpose);
 
-        // Register AdaptiveOwnWrite on the source shape for Store installs of
-        // OwnData / OwnDataTransition entries that produced a valid asm
-        // handler. Registering AFTER install so the generation captured here
-        // matches what clear_ic_slot_if_generation_matches will see when the
-        // watchpoint fires.
+        // Store installs of OwnData / OwnDataTransition entries that produced an
+        // asm-visible inline-write handler (mode 5) need AdaptiveOwnWrite
+        // watchpoints so a later shape invalidation clears the slot before the
+        // asm hit path can service a stale entry. See
+        // `register_own_write_watchpoints` for the source-vs-dependency
+        // fail-safe split.
         if purpose == NamedPropertyCachePurpose::Store
             && let Some(plan_entry) = plan
             && matches!(
                 plan_entry.path(),
                 NamedPropertyCachePath::OwnData | NamedPropertyCachePath::OwnDataTransition
             )
-            && let Some(state) = self.property_ic_state(code, slot)
-            && state.monomorphic_own_inline_write_handler.is_valid()
         {
-            let source_shape = plan_entry.receiver_shape();
-            let generation = state.generation;
-            let observer = ShapeInvalidationObserver::AdaptiveOwnWrite {
-                code,
-                slot,
-                generation,
-            };
-            // Registration may fail (Err(Invalidated)) if the shape is
-            // already invalidated — in that case the next slow-path miss
-            // re-attempts on the post-invalidation shape. Drop the result.
-            let _ = agent
-                .objects_mut()
-                .watchpoint_set_mut(source_shape)
-                .register(Watchpoint::ShapeInvalidation { observer });
+            // Read the post-install generation and handler validity, then drop
+            // the immutable borrow before taking `&mut self` to register the
+            // watchpoints (and possibly roll the entry back).
+            let install_generation = self.property_ic_state(code, slot).and_then(|state| {
+                state
+                    .monomorphic_own_inline_write_handler
+                    .is_valid()
+                    .then_some(state.generation)
+            });
+            if let Some(generation) = install_generation {
+                self.register_own_write_watchpoints(agent, code, slot, plan_entry, generation);
+            }
+        }
+    }
 
-            // Register on all additional dependency shapes too. These are
-            // typically prototype shapes for transitioning writes — if any of
-            // them transitions to dictionary or gets a setter added, the IC
-            // must clear. Mirrors the pattern used by
-            // register_proto_chain_watchpoints for AdaptiveProtoLoad on the
-            // read side. Skip index 0 (the receiver / source shape, already
-            // registered above); iterate from 1 onward.
-            for i in 1..usize::from(plan_entry.dependency_count()) {
-                if let Some(dep) = plan_entry.dependency(i) {
-                    let dep_shape = dep.shape();
-                    if dep_shape != source_shape {
-                        let dep_observer = ShapeInvalidationObserver::AdaptiveOwnWrite {
-                            code,
-                            slot,
-                            generation,
-                        };
-                        let _ = agent
-                            .objects_mut()
-                            .watchpoint_set_mut(dep_shape)
-                            .register(Watchpoint::ShapeInvalidation {
-                                observer: dep_observer,
-                            });
-                    }
-                }
+    /// Registers `AdaptiveOwnWrite` watchpoints for a freshly installed
+    /// monomorphic inline-write (`OwnDataInlineWrite`, mode 5) entry.
+    ///
+    /// Source and dependency shapes get deliberately different treatment:
+    ///
+    /// - **Source (receiver) shape — best effort.** A transitioning write has
+    ///   already fired, and thereby permanently invalidated, its own source
+    ///   shape's watchpoint set inside `try_named_property_transition_store`, so
+    ///   this registration is *expected* to fail for transitions and the failure
+    ///   is ignored. The asm hit path re-checks the source shape on every
+    ///   dispatch (`receiver_shape == source_shape`), so it stays correct
+    ///   without a watchpoint here.
+    ///
+    /// - **Dependency (prototype) shapes — fail-safe.** The asm hit path does
+    ///   NOT re-check these; it relies entirely on the watchpoint to clear the
+    ///   slot when a prototype mutates (e.g. the inherited property being frozen
+    ///   or turned into an accessor). If any dependency shape's watchpoint set is
+    ///   already `Invalidated` — and so can never fire again — the entry would be
+    ///   left permanently unguarded, so the just-installed slot is rolled back
+    ///   and dispatch falls to the Rust probe, which re-validates the full
+    ///   dependency chain on every store. Mirrors the read-side fail-safe in
+    ///   `register_proto_chain_watchpoints`.
+    fn register_own_write_watchpoints(
+        &mut self,
+        agent: &mut Agent,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        entry: NamedPropertyCacheEntry,
+        generation: u32,
+    ) {
+        let source_shape = entry.receiver_shape();
+        let _ = agent
+            .objects_mut()
+            .watchpoint_set_mut(source_shape)
+            .register(Watchpoint::ShapeInvalidation {
+                observer: ShapeInvalidationObserver::AdaptiveOwnWrite {
+                    code,
+                    slot,
+                    generation,
+                },
+            });
+
+        // Dependency shapes (index 1 onward) are the correctness-critical ones:
+        // bail the whole install if any cannot be watched.
+        for index in 1..usize::from(entry.dependency_count()) {
+            let Some(dep) = entry.dependency(index) else {
+                continue;
+            };
+            let dep_shape = dep.shape();
+            if dep_shape == source_shape {
+                continue;
+            }
+            if agent
+                .objects_mut()
+                .watchpoint_set_mut(dep_shape)
+                .register(Watchpoint::ShapeInvalidation {
+                    observer: ShapeInvalidationObserver::AdaptiveOwnWrite {
+                        code,
+                        slot,
+                        generation,
+                    },
+                })
+                .is_err()
+            {
+                self.clear_ic_slot_if_generation_matches(code, slot, generation);
+                return;
             }
         }
     }
@@ -978,10 +1019,13 @@ impl Vm {
                 // Note: generation is managed exclusively via
                 // `bump_generation_for_install` (called from
                 // `register_adaptive_proto_load_for_chain` before
-                // watchpoint registration). Do NOT bump it here — OwnData
-                // entries never register watchpoints and would get a
-                // spurious bump; PrototypeData entries bump via the
-                // watchpoint path and would double-bump.
+                // watchpoint registration). Do NOT bump it here.
+                // PrototypeData entries bump via that read-side path and
+                // would double-bump. OwnData / OwnDataTransition Store
+                // entries register AdaptiveOwnWrite watchpoints *after*
+                // install (see `register_own_write_watchpoints`) reusing
+                // the current generation so the projected metadata and the
+                // watchpoint agree; bumping here would desync them.
                 state.install_first_entry(plan);
             }
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {

@@ -4554,3 +4554,118 @@ fn assign_named_property_asm_fast_path_hits_after_warmup() {
     );
 }
 
+// -----------------------------------------------------------------------------
+// A shadowing transition write whose prototype dependency shape is already
+// invalidated must NOT be left asm-serviceable (mode 5)
+// -----------------------------------------------------------------------------
+//
+// A transitioning write that shadows a writable data property inherited from a
+// prototype is cached as `OwnDataTransition` with the prototype object recorded
+// as a dependency. The asm hit path only re-checks the receiver (source) shape;
+// the prototype shape is guarded *solely* by an `AdaptiveOwnWrite` watchpoint
+// registered at install time. If that prototype shape's watchpoint set is
+// already `Invalidated` when the entry is installed (reachable whenever a
+// sibling object sharing the prototype's shape has already transitioned), the
+// watchpoint registration fails — and a permanently-invalidated set will never
+// fire again. Leaving the entry in mode 5 would let the asm fast path service
+// the cached shadowing transition even after the inherited property is later
+// frozen or turned into an accessor, violating [[Set]] semantics.
+//
+// The install must therefore abandon (roll back) the inline-write entry when a
+// dependency-shape watchpoint cannot be registered, mirroring the read-side
+// `register_proto_chain_watchpoints` fail-safe. The slot then falls to the Rust
+// probe, which re-validates the full dependency chain on every store.
+
+#[test]
+fn shadowing_transition_write_not_cached_when_prototype_shape_already_invalidated() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+
+    let unit = compile_test_unit(60_004, "source.value = 9; source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let store_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+
+    // Prototype carrying `value` as a writable data property. Its shape (root +
+    // value) is what a shadowing transition write records as a dependency.
+    let prototype = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(0));
+    let mut vm = Vm::new();
+
+    // Receiver with no own `value`, inheriting the writable `value` from the
+    // prototype. `source.value = 9` shadows it via a cacheable transition whose
+    // dependency-1 shape is the prototype shape.
+    let receiver = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
+            AllocationLifetime::Default,
+        )
+    });
+
+    // Permanently invalidate the prototype shape's watchpoint set, simulating a
+    // prior shape event (e.g. a sibling object sharing the prototype's shape
+    // transitioned, or the prototype was later frozen) that fired and drained a
+    // set that some earlier cache had been watching. A set only reaches the
+    // terminal `Invalidated` state from `Watched`, so register a watchpoint
+    // first, then fire — `fire_watchpoints_for_shape` is the single funnel every
+    // real shape event routes through. The prototype itself keeps the shape.
+    let proto_shape = agent
+        .with_heap_and_objects(|heap, _| heap.view().object(prototype).unwrap().shape())
+        .unwrap();
+    agent
+        .objects_mut()
+        .watchpoint_set_mut(proto_shape)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::Recording { token: 0 },
+        })
+        .expect("fresh shape set must accept a watchpoint");
+    agent.fire_watchpoints_for_shape(proto_shape, &mut vm);
+    assert!(
+        agent
+            .objects_mut()
+            .watchpoint_set_mut(proto_shape)
+            .is_invalidated(),
+        "prototype shape watchpoint set must be invalidated for this regression scenario"
+    );
+
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(receiver));
+
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // The store itself must still produce the correct value via the Rust probe.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(9),
+        "shadowing store + load must evaluate to 9"
+    );
+
+    // The IC slot must NOT be left asm-serviceable: because the prototype
+    // dependency shape was already invalidated, the inline-write entry has no
+    // watchpoint guarding the prototype and must be rolled back to mode 0.
+    let mode = vm
+        .metadata_table(installed.code())
+        .expect("MetadataTable should exist after install")
+        .property(store_slot.get())
+        .mode;
+    assert_ne!(
+        mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "shadowing transition write with an already-invalidated prototype dependency \
+         shape must not be left in asm mode {} (no watchpoint guards the prototype)",
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+    );
+}
