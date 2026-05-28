@@ -32,7 +32,9 @@ pub use keyed_property::{KeyedPropertyMetadata, KEYED_PROPERTY_METADATA_STRIDE};
 #[allow(unused_imports)]
 pub use kind::{MetadataKind, METADATA_KIND_COUNT};
 #[allow(unused_imports)]
-pub use property::{PropertyMetadata, PROPERTY_METADATA_STRIDE};
+pub use property::{
+    PropertyMetadata, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, PROPERTY_METADATA_STRIDE,
+};
 
 /// Compact descriptor used by the allocator. Mirrors the shape of
 /// `lyng_bytecode::FeedbackSiteDescriptor` but elides the metadata payload

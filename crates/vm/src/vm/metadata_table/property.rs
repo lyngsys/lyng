@@ -14,6 +14,11 @@ pub struct PropertyMetadata {
     pub _tail_pad: u32,
 }
 
+/// Mode byte written by `project_property_write_into_meta` for a monomorphic
+/// own-data inline write (including transitioning writes). Consumed by the asm
+/// `op_assign_named_property` fast path.
+pub const LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE: u8 = 5;
+
 pub const PROPERTY_METADATA_STRIDE: usize = std::mem::size_of::<PropertyMetadata>();
 /// `log2(PROPERTY_METADATA_STRIDE)` — used by asm to scale an in-kind index
 /// to a byte offset within the Property run.

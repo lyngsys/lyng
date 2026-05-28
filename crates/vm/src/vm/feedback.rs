@@ -17,12 +17,14 @@ use crate::vm::ic_state::{
     CallIcState, KeyedPropertyIcState, PropertyIcState,
 };
 use crate::vm::metadata_table::{MetadataKind, PropertyMetadata, METADATA_KIND_COUNT};
+pub(crate) use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 use lyng_bytecode::FeedbackSiteKind;
 use lyng_gc::ValueStoreTarget;
 use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
-    NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyProtoHandler, ObjectFlags,
-    ObjectHeader, ObjectKind, PrimitiveWrapperKind, SlotLocation, PROPERTY_CACHE_MAX_DEPENDENCIES,
+    NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyInlineWriteHandler,
+    NamedPropertyProtoHandler, ObjectFlags, ObjectHeader, ObjectKind, PrimitiveWrapperKind,
+    SlotLocation, PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::cmp::Ordering;
@@ -1865,6 +1867,31 @@ impl Vm {
         meta.execution_count = execution_count;
     }
 
+    /// Project the write-side cache state into `PropertyMetadata`. Called
+    /// from the assign opcode's slow-path install (Task 5) when the slot
+    /// is a Store-purpose IC site. Writes mode = `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`
+    /// (= 5), `handler_bits` packed source_shape + slot + writable_flag,
+    /// `aux_bits` = target_shape. When the handler is NONE, zeroes the
+    /// metadata so the asm mode-byte check bails to the Rust probe.
+    pub(super) fn project_property_write_into_meta(
+        write_handler: NamedPropertyInlineWriteHandler,
+        generation: u32,
+        execution_count: u32,
+        meta: &mut PropertyMetadata,
+    ) {
+        if write_handler.is_valid() {
+            meta.mode = LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+            meta.handler_bits = write_handler.handler_bits();
+            meta.aux_bits = write_handler.target_bits();
+        } else {
+            meta.mode = 0;
+            meta.handler_bits = 0;
+            meta.aux_bits = 0;
+        }
+        meta.generation = generation;
+        meta.execution_count = execution_count;
+    }
+
     fn dense_value_from_header(agent: &Agent, header: ObjectHeader, index: u32) -> Option<Value> {
         let elements = header.elements()?;
         let index = usize::try_from(index).expect("u32 index should fit into usize");
@@ -2715,5 +2742,77 @@ mod tests {
         assert!(!call_feedback_builtin_is_frame_safe(eval_builtin()));
         assert!(!call_feedback_builtin_is_frame_safe(function_builtin()));
         assert!(!call_feedback_builtin_is_frame_safe(function_call_builtin()));
+    }
+
+    #[test]
+    fn project_property_write_into_meta_writes_mode_5_for_inline_write() {
+        use crate::vm::ic_state::PropertyIcState;
+        use crate::vm::feedback::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+        use lyng_objects::{
+            INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
+            NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
+        };
+        use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
+
+        let source = ShapeId::from_raw(7).expect("non-zero");
+        let target = ShapeId::from_raw(11).expect("non-zero");
+        let mut attrs = DescriptorAttributes::empty();
+        attrs.set_writable(true);
+        let entry = NamedPropertyCacheEntry::new_for_test(
+            source,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            target,
+            INLINE_SLOT_OFFSET_FLAG | 3,
+            attrs,
+            NamedPropertyCachePath::OwnDataTransition,
+            1,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+
+        let mut state = PropertyIcState::new();
+        state.cache_state = InlineCacheState::Monomorphic;
+        state.entry_count = 1;
+        state.entries[0] = Some(entry);
+        state.refresh_sidecars();
+
+        let mut meta = crate::vm::metadata_table::PropertyMetadata::default();
+        crate::vm::Vm::project_property_write_into_meta(
+            state.monomorphic_own_inline_write_handler,
+            state.generation,
+            state.execution_count,
+            &mut meta,
+        );
+
+        assert_eq!(meta.mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE);
+        let expected = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert_eq!(meta.handler_bits, expected.handler_bits());
+        assert_eq!(meta.aux_bits, expected.target_bits());
+        assert_eq!(meta.generation, 0);
+        assert_eq!(meta.execution_count, 0);
+    }
+
+    #[test]
+    fn project_property_write_into_meta_writes_mode_zero_for_invalid_handler() {
+        use lyng_objects::NamedPropertyInlineWriteHandler;
+
+        let mut meta = crate::vm::metadata_table::PropertyMetadata {
+            mode: 99, // pre-existing garbage we expect to be zeroed
+            handler_bits: 0xdead_beef,
+            aux_bits: 0xcafe,
+            generation: 10,
+            execution_count: 20,
+            ..crate::vm::metadata_table::PropertyMetadata::default()
+        };
+        crate::vm::Vm::project_property_write_into_meta(
+            NamedPropertyInlineWriteHandler::NONE,
+            5,
+            7,
+            &mut meta,
+        );
+        assert_eq!(meta.mode, 0);
+        assert_eq!(meta.handler_bits, 0);
+        assert_eq!(meta.aux_bits, 0);
+        assert_eq!(meta.generation, 5);
+        assert_eq!(meta.execution_count, 7);
     }
 }
