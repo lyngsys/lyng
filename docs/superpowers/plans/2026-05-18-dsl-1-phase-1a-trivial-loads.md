@@ -95,7 +95,7 @@ Expected: 9 opcodes × 7 samples; output has ns/dispatch with confidence interva
 - [ ] **Step 4: Capture pre-Phase-1.A slow-path-share for affected opcodes**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --output /tmp/pre-phase-1a-slowshare.json
@@ -328,7 +328,7 @@ If the result isn't substantially better than pre-phase, the cold-stub may not h
 - [ ] **Step 10: Run V8 v7 with slow-path-share count**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --opcodes LoadUndefined \
@@ -1224,7 +1224,7 @@ Expected: ns/dispatch within 2× of LLInt's matching opcode reference.
 - [ ] **Step 10: Run V8 v7 + slow-path-share**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --opcodes LoadSmi8 \
@@ -1419,7 +1419,7 @@ Expected: ns/dispatch within 2× of LLInt's `op_load_constant` reference.
 - [ ] **Step 10: Run V8 v7 + slow-path-share**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --opcodes LoadConst8 \
@@ -1607,7 +1607,7 @@ Expected: ns/dispatch close to `op_move` (similar shape: register-to-register co
 - [ ] **Step 9: Run V8 v7 + slow-path-share**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --opcodes LoadThis \
@@ -1673,7 +1673,7 @@ Expected: all 9 opcodes show ns/dispatch within 2× of LLInt reference. Document
 - [ ] **Step 3: Run full Phase 1.A slow-path-share sweep**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --require-isolation \
   --count-slow-path-share \
   --output /tmp/post-phase-1a-slowshare.json

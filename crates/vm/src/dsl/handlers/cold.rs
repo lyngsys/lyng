@@ -2699,6 +2699,13 @@ pub extern "C" fn op_get_named_property_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    #[cfg(feature = "diagnostic-counters")]
+    record_named_ic_slow_entry(
+        &mut dispatch,
+        b,
+        slot,
+        crate::vm::IcSlowPathKind::GetNamedProperty,
+    );
     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
         a: a as u16,
         b: b as u16,
@@ -2709,6 +2716,26 @@ pub extern "C" fn op_get_named_property_slow_rs(
     let outcome =
         crate::vm::semantics::property::op_get_named_property_semantic(&mut dispatch, args);
     dispatch.translate_outcome(outcome)
+}
+
+/// Bridge: per-kind, per-cause IC slow-path entry counter bump from a
+/// cold-handler shim. Reads the receiver from operand `receiver_register`
+/// and bumps the classified counter on `Vm::ic_slow_path_counters`.
+/// Centralized so the four named-property slow-path bridges share one
+/// path through the `LlIntDispatchState` borrow dance.
+#[inline]
+#[cfg(all(target_arch = "aarch64", feature = "diagnostic-counters"))]
+fn record_named_ic_slow_entry(
+    dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
+    receiver_register: u32,
+    slot: u32,
+    kind: crate::vm::IcSlowPathKind,
+) {
+    let inner = dispatch.dispatch_state();
+    let crate::vm::dispatch_state::DispatchState {
+        vm, agent, frame, ..
+    } = &mut *inner;
+    vm.record_ic_slow_entry(&**agent, frame, slot, receiver_register as u16, kind);
 }
 
 // =====================================================================
@@ -2738,6 +2765,13 @@ pub extern "C" fn op_set_named_property_slow_rs(
                 .translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError { error });
         }
     };
+    #[cfg(feature = "diagnostic-counters")]
+    record_named_ic_slow_entry(
+        &mut dispatch,
+        u32::from(operands.a),
+        operands.feedback_slot.get(),
+        crate::vm::IcSlowPathKind::SetNamedProperty,
+    );
     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
         a: operands.a,
         b: operands.b,
@@ -2799,6 +2833,8 @@ pub extern "C" fn op_assign_named_property_rust_probe_rs(
         a as u16,
         b as u16,
     );
+    #[cfg(feature = "diagnostic-counters")]
+    dispatch.vm.record_assign_named_property_probe(hit);
     if hit {
         let next_pc = dispatch.frame.instruction_offset();
         // SAFETY: same live-state guarantee as above. Probe hits use
@@ -2827,6 +2863,13 @@ pub extern "C" fn op_assign_named_property_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    #[cfg(feature = "diagnostic-counters")]
+    record_named_ic_slow_entry(
+        &mut dispatch,
+        a,
+        slot,
+        crate::vm::IcSlowPathKind::AssignNamedProperty,
+    );
     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
         a: a as u16,
         b: b as u16,
@@ -2863,6 +2906,13 @@ pub extern "C" fn op_strict_assign_named_property_slow_rs(
 ) -> crate::dsl::slow_path::SlowPathReturn {
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
+    #[cfg(feature = "diagnostic-counters")]
+    record_named_ic_slow_entry(
+        &mut dispatch,
+        a,
+        slot,
+        crate::vm::IcSlowPathKind::StrictAssignNamedProperty,
+    );
     let args = crate::vm::semantics::property::OpPropertyAccessArgs {
         a: a as u16,
         b: b as u16,

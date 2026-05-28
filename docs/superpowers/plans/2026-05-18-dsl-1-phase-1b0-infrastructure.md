@@ -6,7 +6,7 @@
 
 **Architecture:** Replace the `Option<OpcodeDispatchCounterStore>` field on `Vm` with an asm-stable `Box<DispatchCounters>` containing three flat `[u64; 256]` banks (dispatch, slow_semantic, slow_safepoint). The pointer offset is exposed via `offset_of!` and bound into the per-handler `naked_asm!` block. The proc-macro lowerer emits `inc_counter!` at handler entry; `call_slow!` and `poll_safepoint!` macros gain inline counter increments for the slow-path banks. Microbench snippets follow the existing pattern in [`tools/lyng-bench/src/microbench/snippets.rs`](../../../tools/lyng-bench/src/microbench/snippets.rs).
 
-**Tech Stack:** Rust 2024 stable (≥1.88 for `naked_asm!`), `lyng-vm-dsl` proc-macro (modified), AArch64 backend macros, `cargo-features` for `opcode-counters` gate.
+**Tech Stack:** Rust 2024 stable (≥1.88 for `naked_asm!`), `lyng-vm-dsl` proc-macro (modified), AArch64 backend macros, `cargo-features` for `diagnostic-counters` gate.
 
 **Parent spec:** [`docs/superpowers/specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md`](../specs/2026-05-18-dsl-1-phase-1b-locals-and-frame-context-design.md) — Phase 1.B.0.
 
@@ -60,7 +60,7 @@ Expected: 413 + 1186 passing (matching Phase 1.A's end state).
 cargo build --release -p lyng-bench 2>&1 | tail -5
 ```
 
-`lyng-bench` already enables `lyng-vm/opcode-counters` in its Cargo.toml. Verify clean build.
+`lyng-bench` already enables `lyng-vm/diagnostic-counters` in its Cargo.toml. Verify clean build.
 
 - [ ] **Step 3: Capture baseline V8 v7 (for later same-load A/B)**
 
@@ -268,7 +268,7 @@ opcode_dispatch_counts: Option<OpcodeDispatchCounterStore>,
 with:
 
 ```rust
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 dispatch_counters: OpcodeDispatchCounterStore,
 ```
 
@@ -281,7 +281,7 @@ opcode_dispatch_counts: None,
 with (conditionally):
 
 ```rust
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 dispatch_counters: OpcodeDispatchCounterStore::new(),
 ```
 
@@ -292,31 +292,31 @@ For the feature-gated path, the field is ALWAYS present when the feature is on; 
 Replace the `enable_opcode_dispatch_counts`, `disable_opcode_dispatch_counts`, `reset_opcode_dispatch_counts`, `opcode_dispatch_counts`, `maybe_record_opcode_dispatch` functions (vm.rs:309-368) with:
 
 ```rust
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub fn enable_opcode_dispatch_counts(&mut self) {
     // No-op when counters are always allocated. Kept for backward
     // compatibility with tests that called this method.
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub fn disable_opcode_dispatch_counts(&mut self) {
     // Reset to zero so subsequent runs start fresh. No actual
     // deallocation — the counter array stays for the asm path.
     self.dispatch_counters.reset();
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub fn reset_opcode_dispatch_counts(&mut self) {
     self.dispatch_counters.reset();
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[inline]
 pub fn opcode_dispatch_counts(&self) -> Option<OpcodeDispatchCounts> {
     Some(self.dispatch_counters.snapshot())
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub fn dispatch_counters(&self) -> &OpcodeDispatchCounterStore {
     &self.dispatch_counters
 }
@@ -340,7 +340,7 @@ Create `crates/vm/tests/dispatch_counters_layout.rs`:
 //! so a future rustc upgrade or struct re-ordering can't silently
 //! break the asm-side reads.
 
-#![cfg(feature = "opcode-counters")]
+#![cfg(feature = "diagnostic-counters")]
 
 use std::mem::{offset_of, size_of};
 
@@ -434,25 +434,25 @@ In `crates/vm/src/dsl/reg_convention.rs`, after the existing offset consts (like
 /// two-step indirection (Vm field → inner Box) because the Store wraps
 /// the Box.
 ///
-/// Only valid when the `opcode-counters` feature is on; otherwise the
+/// Only valid when the `diagnostic-counters` feature is on; otherwise the
 /// field doesn't exist.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize =
     ::core::mem::offset_of!(crate::vm::Vm, dispatch_counters);
 
 /// Byte offset of the `dispatch` bank within `DispatchCounters`. 0
 /// because it's the first field.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_DISPATCH: usize = 0;
 
 /// Byte offset of the `slow_semantic` bank within `DispatchCounters`.
 /// 256 × 8 = 2048.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_SLOW_SEMANTIC: usize = 256 * 8;
 
 /// Byte offset of the `slow_safepoint` bank within `DispatchCounters`.
 /// 512 × 8 = 4096.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT: usize = 512 * 8;
 ```
 
@@ -505,7 +505,7 @@ The current macro at lines 24-41 takes `$opcode_byte:literal` and emits 4 instru
 Rewrite `crates/vm/src/dsl/backend/aarch64/counters.rs` to:
 
 ```rust
-//! Opcode-counter increments, gated by `--features opcode-counters`.
+//! Opcode-counter increments, gated by `--features diagnostic-counters`.
 //!
 //! When the feature is off, the macros expand to empty strings — zero
 //! per-dispatch cost. When on, each emits 5 instructions to bump the
@@ -533,7 +533,7 @@ Rewrite `crates/vm/src/dsl/backend/aarch64/counters.rs` to:
 // Opcode-counters feature ON: emit real counter increments.
 // =============================================================================
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => {
@@ -547,7 +547,7 @@ macro_rules! inc_dispatch_counter {
     };
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
     ($opcode_byte:literal) => {
@@ -561,7 +561,7 @@ macro_rules! inc_slow_semantic_counter {
     };
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => {
@@ -579,19 +579,19 @@ macro_rules! inc_slow_safepoint_counter {
 // Opcode-counters feature OFF: empty strings (zero per-dispatch cost).
 // =============================================================================
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => { "" };
 }
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
     ($opcode_byte:literal) => { "" };
 }
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => { "" };
@@ -817,7 +817,7 @@ Reframing this step:
 - If the lowerer can call `lyng_bytecode` at proc-macro time (rare — proc-macros can't depend on the same crate they're emitting for, due to dependency cycles), use direct lookup.
 - Otherwise use option (c-revised): require the user to pass `opcode_byte = N` as a literal in `llint_handler!`. Add a compile-time assert in the generated code that verifies the byte matches the expected `Opcode` variant.
 
-Whatever approach the subagent picks, the emission goal is the same: every generated handler begins with `inc_dispatch_counter!(OPCODE_BYTE_LITERAL)` before the decode prologue, gated by `#[cfg(feature = "opcode-counters")]` at the macro expansion level.
+Whatever approach the subagent picks, the emission goal is the same: every generated handler begins with `inc_dispatch_counter!(OPCODE_BYTE_LITERAL)` before the decode prologue, gated by `#[cfg(feature = "diagnostic-counters")]` at the macro expansion level.
 
 - [ ] **Step 5 (continued): Update all 152 `llint_handler!` callsites if needed**
 
@@ -868,7 +868,7 @@ git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 4: wire inc_dispatch_counter! into lowerer
 
 Every llint_handler! generates inc_dispatch_counter!(OPCODE_BYTE) at
-the start of its naked_asm! body when --features opcode-counters is on.
+the start of its naked_asm! body when --features diagnostic-counters is on.
 Opcode byte is supplied per-callsite via opcode_byte = N parameter
 (or whichever resolution strategy the lowerer adopted); a compile-time
 assert keeps the literal honest against the Opcode enum variant.
@@ -936,7 +936,7 @@ But that's using `{opcode_byte}` as a placeholder that `naked_asm!` will resolve
 So the rewritten macro signature should be:
 
 ```rust
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
     ({$binding:ident}) => {  // accepts a binding-name token
@@ -981,7 +981,7 @@ The dispatch counter alone (Task 4) is sufficient to enable per-opcode dispatch-
 - [ ] **Step 4: If wiring works, run a Richards bench with slow-path-share counting**
 
 ```bash
-cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite \
+cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite \
   --samples 1 --count-opcodes --count-slow-path-share \
   --counts-json /tmp/post-task5-slow-counter.json 2>&1 | tail -10
 ```
@@ -1020,7 +1020,7 @@ EOF
 **Files:**
 - Create: `reports/lyng/dsl-1/phase-1b0-counter-overhead.md`
 
-- [ ] **Step 1: Run Richards with and without `--features opcode-counters`**
+- [ ] **Step 1: Run Richards with and without `--features diagnostic-counters`**
 
 ```bash
 # Without counters (default; lyng-bench currently enables them by default — need to override)
@@ -1029,7 +1029,7 @@ cargo run --release -p lyng-bench --no-default-features -- v8suite --samples 7 -
 cargo run --release -p lyng-bench -- v8suite --samples 7 --json /tmp/with-counters.json 2>&1 | tail -5
 ```
 
-Note: `lyng-bench`'s Cargo.toml enables `lyng-vm/opcode-counters` by default. To get the no-counter measurement, may need to add a `--no-default-features` flag OR build a separate binary with counters disabled. If the bench tool doesn't easily support this, instead use:
+Note: `lyng-bench`'s Cargo.toml enables `lyng-vm/diagnostic-counters` by default. To get the no-counter measurement, may need to add a `--no-default-features` flag OR build a separate binary with counters disabled. If the bench tool doesn't easily support this, instead use:
 
 ```bash
 # Build lyng-vm without counters
@@ -1056,7 +1056,7 @@ Create `reports/lyng/dsl-1/phase-1b0-counter-overhead.md`:
 Measured 2026-MM-DD with counters wired into the DSL `dispatch!` tail
 (Task 4) and slow-path bridges (Task 5).
 
-## V8 v7 with vs without `--features opcode-counters`
+## V8 v7 with vs without `--features diagnostic-counters`
 
 | Workload    | Without (median) | With (median) | Overhead |
 |-------------|-----------------:|--------------:|---------:|
@@ -1085,7 +1085,7 @@ git add reports/lyng/dsl-1/phase-1b0-counter-overhead.md
 git commit -m "$(cat <<'EOF'
 DSL-1 Phase 1.B.0 Task 6: measure counter overhead
 
-V8 v7 with vs without --features opcode-counters; per-workload
+V8 v7 with vs without --features diagnostic-counters; per-workload
 overhead computed. Target ≤ 5% per parent §13.12.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>

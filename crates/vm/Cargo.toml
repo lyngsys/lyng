@@ -17,7 +17,7 @@ default = []
 # the bench tool with `-p lyng-bench` (which pulls the feature
 # transitively). Avoid bare `cargo build --release` if you need the
 # counter-free production binary in the same `target/` cache.
-opcode-counters = []
+diagnostic-counters = []
 
 [dependencies]
 lyng-builtins = { workspace = true }

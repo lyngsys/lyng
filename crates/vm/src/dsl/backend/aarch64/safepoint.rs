@@ -35,8 +35,8 @@
 ///   the pending-poll label via an unconditional branch.
 ///
 /// Bindings: `{vm_poll}`, `{vm_counter_base}` (only referenced when
-/// `opcode-counters` feature is on).
-#[cfg(feature = "opcode-counters")]
+/// `diagnostic-counters` feature is on).
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! poll_safepoint {
     ($label_pending:tt, opcode_byte = $op:literal) => {
@@ -68,7 +68,7 @@ macro_rules! poll_safepoint {
     };
 }
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! poll_safepoint {
     // Feature OFF: opcode_byte is silently consumed, no counter emission.

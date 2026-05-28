@@ -32,8 +32,11 @@ Runs one Lyng JS entry file through the shared default-realm bootstrap.
 The CLI does not install harness globals, browser globals, or Node-style globals.
 
 Options:
-  --shell    Install non-spec shell globals (currently: print).
-  --test262  Install the Test262 host harness ($262 globals, print, setTimeout).
+  --shell             Install non-spec shell globals (currently: print).
+  --test262           Install the Test262 host harness ($262 globals, print, setTimeout).
+  --dump-ic-counters  After the script returns, write the IC slow-path
+                      counter table to stderr. Requires the binary to be
+                      built with --features diagnostic-counters.
 ";
 
 /// High-level CLI command.
@@ -50,6 +53,7 @@ pub struct CliInvocation {
     bootstrap_mode: BootstrapMode,
     shell_mode: bool,
     test262_mode: bool,
+    dump_ic_counters: bool,
 }
 
 impl CliInvocation {
@@ -65,7 +69,19 @@ impl CliInvocation {
             bootstrap_mode,
             shell_mode,
             test262_mode,
+            dump_ic_counters: false,
         }
+    }
+
+    #[inline]
+    pub const fn with_dump_ic_counters(mut self, dump: bool) -> Self {
+        self.dump_ic_counters = dump;
+        self
+    }
+
+    #[inline]
+    pub const fn dump_ic_counters(&self) -> bool {
+        self.dump_ic_counters
     }
 
     #[inline]
@@ -111,6 +127,7 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
     let _program_name = args.next();
     let mut shell_mode = false;
     let mut test262_mode = false;
+    let mut dump_ic_counters = false;
     let mut script_path = None;
 
     for arg in args.by_ref() {
@@ -123,6 +140,10 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
         }
         if arg == "--test262" {
             test262_mode = true;
+            continue;
+        }
+        if arg == "--dump-ic-counters" {
+            dump_ic_counters = true;
             continue;
         }
         if arg.to_string_lossy().starts_with('-') {
@@ -147,12 +168,15 @@ pub fn parse_args(args: impl IntoIterator<Item = OsString>) -> CliResult<CliComm
         )));
     }
 
-    Ok(CliCommand::Run(CliInvocation::new(
-        PathBuf::from(script_path),
-        BootstrapMode::SpecOnly,
-        shell_mode,
-        test262_mode,
-    )))
+    Ok(CliCommand::Run(
+        CliInvocation::new(
+            PathBuf::from(script_path),
+            BootstrapMode::SpecOnly,
+            shell_mode,
+            test262_mode,
+        )
+        .with_dump_ic_counters(dump_ic_counters),
+    ))
 }
 
 /// Runs one parsed CLI command.

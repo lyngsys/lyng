@@ -109,7 +109,7 @@ macro_rules! dispatch {
 ///   call site bypasses the lowerer; emits no counter inc).
 ///
 /// Bindings: `<shim>` (per call site), `{state_pb}`, `{state_pc}`,
-/// `{vm_counter_base}` (when `opcode-counters` feature is on).
+/// `{vm_counter_base}` (when `diagnostic-counters` feature is on).
 #[macro_export]
 macro_rules! call_slow {
     // ---- 0 args ----

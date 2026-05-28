@@ -2600,6 +2600,69 @@ impl Vm {
             *table.property_mut(slot.get()) = PropertyMetadata::default();
         }
     }
+
+    /// Classify a property-IC slow-path entry by inspecting the live
+    /// [`PropertyIcState`] against the receiver's current shape. Used by
+    /// [`super::IcSlowPathCounters`] to bucket slow-path entries by cause.
+    /// Reads only — does not mutate the IC state.
+    #[cfg(feature = "diagnostic-counters")]
+    pub(crate) fn classify_named_slow_cause_for_object(
+        &self,
+        agent: &Agent,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        object: ObjectRef,
+    ) -> super::IcSlowPathCause {
+        use super::IcSlowPathCause;
+        let Some(state) = self.property_ic_state(code, slot) else {
+            return IcSlowPathCause::Uninitialized;
+        };
+        match state.cache_state {
+            InlineCacheState::Uninitialized => IcSlowPathCause::Uninitialized,
+            InlineCacheState::Megamorphic => IcSlowPathCause::Megamorphic,
+            InlineCacheState::Polymorphic => IcSlowPathCause::Polymorphic,
+            InlineCacheState::Monomorphic => {
+                // Phase A.2 removed the epoch check from the asm; watchpoints now
+                // clear the slot directly. `is_cleared = true` after a slow-path
+                // visit indicates a watchpoint fire that hasn't been re-installed yet.
+                if state.is_cleared {
+                    return IcSlowPathCause::EpochMismatch;
+                }
+                let view = agent.heap().view();
+                let Some(record) = view.object_ref(object) else {
+                    return IcSlowPathCause::Other;
+                };
+                let receiver_shape = record.shape();
+                let own_handler = state.monomorphic_own_data_handler;
+                let proto_handler = state.monomorphic_proto_data_handler;
+                if own_handler.is_valid() {
+                    if own_handler.receiver_shape() != receiver_shape {
+                        IcSlowPathCause::ShapeMismatch
+                    } else {
+                        // Same shape — the asm inline cache hit path should have
+                        // matched. Remaining reasons: out-of-line slot,
+                        // non-writable on the assign side, or other asm
+                        // bail conditions not visible here.
+                        IcSlowPathCause::ModeMismatch
+                    }
+                } else if proto_handler.is_valid() {
+                    if proto_handler.receiver_shape() != receiver_shape {
+                        IcSlowPathCause::ShapeMismatch
+                    } else {
+                        // Receiver matched; the asm `try_proto` branch failed
+                        // on the prototype guard. Bucket as ModeMismatch (the
+                        // proto side has no separate cause in the simplified
+                        // post–Phase A taxonomy).
+                        IcSlowPathCause::ModeMismatch
+                    }
+                } else {
+                    // Monomorphic but no inline cache hit handler — entry is
+                    // OwnDataTransition or another asm-incompatible shape.
+                    IcSlowPathCause::ModeMismatch
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

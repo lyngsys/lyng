@@ -95,7 +95,7 @@ pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
 // =============================================================================
 // VM-relative offsets (read from pinned register x22 = VM).
 //
-// Only valid when the `opcode-counters` feature is on; otherwise the
+// Only valid when the `diagnostic-counters` feature is on; otherwise the
 // `counters` field doesn't exist on `Vm`.
 // =============================================================================
 
@@ -113,7 +113,7 @@ pub const RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET: usize =
 /// pointer to the heap-allocated `DispatchCounters` directly (one load,
 /// no extra dereference). From there, bank offsets (0, 2048, 4096)
 /// index into the flat `[u64; 256]` banks.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize = ::core::mem::offset_of!(crate::vm::Vm, counters)
     + ::core::mem::offset_of!(crate::opcode_counts::OpcodeCounters, dispatch);
 
@@ -124,26 +124,26 @@ pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize = ::core::mem::offset_of!(crate
 /// is off the `inc_dispatch_counter!` / `inc_slow_*_counter!` macros all
 /// expand to empty strings and never reference the binding at runtime, so
 /// the value is irrelevant — `0` is a safe sentinel.
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 pub const VM_DISPATCH_COUNTERS_PTR_OFFSET: usize = 0;
 
 /// Byte offset of the `dispatch` bank within `DispatchCounters`. 0
 /// because it's the first field of the `#[repr(C)]` struct.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_DISPATCH: usize = 0;
 
 /// Byte offset of the `slow_semantic` bank within `DispatchCounters`.
 /// 256 × 8 = 2048 (one full bank past `dispatch`).
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_SLOW_SEMANTIC: usize = 256 * 8;
 
 /// Byte offset of the `slow_safepoint` bank within `DispatchCounters`.
 /// 512 × 8 = 4096 (two full banks past `dispatch`).
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub const DISPATCH_COUNTER_BANK_SLOW_SAFEPOINT: usize = 512 * 8;
 
 #[cfg(test)]
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 mod counter_offset_tests {
     use super::*;
 

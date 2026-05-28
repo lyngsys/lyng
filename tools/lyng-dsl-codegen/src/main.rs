@@ -2725,7 +2725,7 @@ fn write_stub(out: &mut String, stub: &Stub) {
     // the discriminant of the matching `Opcode` variant so the proc-
     // macro lowerer can splice it into the leading
     // `inc_dispatch_counter!(N)` body fragment (no-op when the
-    // `opcode-counters` feature is off; bumps `Vm::dispatch_counters`'
+    // `diagnostic-counters` feature is off; bumps `Vm::dispatch_counters`'
     // dispatch bank otherwise).
     let opcode_byte = stub.opcode as u8;
     out.push_str("#[cfg(target_arch = \"aarch64\")]\n");

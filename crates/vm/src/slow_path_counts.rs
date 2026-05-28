@@ -2,7 +2,7 @@
 //! (called from cold stubs or hot-handler fall-back) and "safepoint"
 //! entries (called from warm-handler poll bridges).
 //!
-//! Gated behind the `opcode-counters` Cargo feature. Production builds
+//! Gated behind the `diagnostic-counters` Cargo feature. Production builds
 //! carry no counter code.
 //!
 //! The asm path is the source of truth for slow-path counts — it writes

@@ -15,7 +15,7 @@
 
 [meta]
 source_data = "reports/lyng/r0/v8-v7-top30.tsv"
-refresh_command = "cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- v8suite --count-opcodes --counts-json /tmp/r0-opcode-counts.json"
+refresh_command = "cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- v8suite --count-opcodes --counts-json /tmp/r0-opcode-counts.json"
 default_target_slow_path_share = 0.20
 
 [[opcodes]]

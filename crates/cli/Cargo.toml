@@ -8,6 +8,13 @@ default-run = "lyng"
 name = "lyng"
 path = "src/main.rs"
 
+[features]
+# Forwards to `lyng-vm`'s feature of the same name. When enabled, the
+# `lyng` binary supports `--dump-ic-counters` and bumps IC slow-path
+# counters / opcode dispatch counters on every slow entry. OFF by
+# default so production builds carry zero counter code.
+diagnostic-counters = ["lyng-vm/diagnostic-counters"]
+
 [dependencies]
 lyng-builtins = { workspace = true }
 lyng-common = { workspace = true }

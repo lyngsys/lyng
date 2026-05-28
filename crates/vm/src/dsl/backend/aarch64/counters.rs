@@ -1,4 +1,4 @@
-//! Opcode-counter increments, gated by `--features opcode-counters`.
+//! Opcode-counter increments, gated by `--features diagnostic-counters`.
 //!
 //! When the feature is off, the macros expand to empty strings — zero
 //! per-dispatch cost. When on, each emits 4 instructions to bump the
@@ -57,7 +57,7 @@
 // Opcode-counters feature ON: emit real counter increments.
 // =============================================================================
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => {
@@ -74,7 +74,7 @@ macro_rules! inc_dispatch_counter {
     };
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
     ($opcode_byte:literal) => {
@@ -97,7 +97,7 @@ macro_rules! inc_slow_semantic_counter {
     };
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[macro_export]
 macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => {
@@ -121,7 +121,7 @@ macro_rules! inc_slow_safepoint_counter {
 // Opcode-counters feature OFF: empty strings (zero per-dispatch cost).
 // =============================================================================
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_dispatch_counter {
     ($opcode_byte:literal) => {
@@ -129,7 +129,7 @@ macro_rules! inc_dispatch_counter {
     };
 }
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_slow_semantic_counter {
     ($opcode_byte:literal) => {
@@ -137,7 +137,7 @@ macro_rules! inc_slow_semantic_counter {
     };
 }
 
-#[cfg(not(feature = "opcode-counters"))]
+#[cfg(not(feature = "diagnostic-counters"))]
 #[macro_export]
 macro_rules! inc_slow_safepoint_counter {
     ($opcode_byte:literal) => {

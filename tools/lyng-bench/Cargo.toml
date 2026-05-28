@@ -17,11 +17,12 @@ lyng-parser.workspace = true
 lyng-sema.workspace = true
 lyng-test262 = { path = "../lyng-test262" }
 lyng-types.workspace = true
-# `opcode-counters` enables the `Vm::enable_opcode_dispatch_counts` API and
-# the counted-trampoline path that `lyng-bench runtime --count-opcodes`
-# relies on. Production builds (`-p lyng-cli`) leave the feature off so
-# the `lyng` binary carries no counter code (`lyng-3lqp`).
-lyng-vm = { workspace = true, features = ["opcode-counters"] }
+# `diagnostic-counters` enables `Vm::enable_opcode_dispatch_counts`, the
+# counted-trampoline path that `lyng-bench runtime --count-opcodes` relies on,
+# and the IC slow-path entry counters dumped via `--dump-ic-counters`.
+# Production builds (`-p lyng-cli`) leave the feature off so the `lyng` binary
+# carries no counter code.
+lyng-vm = { workspace = true, features = ["diagnostic-counters"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"

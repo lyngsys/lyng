@@ -124,7 +124,7 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
     let length = &ast.length;
     let opcode_byte = &ast.opcode_byte;
     // Counter-increment fragment, emitted as the FIRST body fragment
-    // BEFORE the operand-decode prologue. When the `opcode-counters`
+    // BEFORE the operand-decode prologue. When the `diagnostic-counters`
     // feature is on the macro emits 4 instructions bumping the
     // dispatch-bank slot for this opcode; when off it expands to the
     // empty string and is invisible. Either way the `vm_counter_base`
@@ -294,7 +294,7 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
                 // (a `Box<DispatchCounters>` whose raw pointer reads through the
                 // `*mut DispatchCounters` repr-equivalence). When the
-                // `opcode-counters` feature is off the binding falls back to `0`
+                // `diagnostic-counters` feature is off the binding falls back to `0`
                 // via the sentinel const in `reg_convention.rs`; the counter
                 // macros themselves emit empty strings in that config, so the
                 // binding is referenced only by the leading comment.

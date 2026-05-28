@@ -4,7 +4,7 @@
 
 **Goal:** Build the measurement infrastructure (three new `lyng-bench` subcommands, slow-path-share counter mode, opcode-share config) and three evidence reports (value-layout, ABI, safepoints) that gate the asm-DSL interpreter work specified in [docs/lyng/2026-05-16-asm-dsl-llint-interpreter-design.md](../../lyng/2026-05-16-asm-dsl-llint-interpreter-design.md).
 
-**Architecture:** Extend the existing `tools/lyng-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/vm/` behind the existing `opcode-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/AGENTS.md`, `docs/lyng/engineering-standards.md`, `docs/lyng/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/lyng/`.
+**Architecture:** Extend the existing `tools/lyng-bench/` Rust crate with three new subcommand modules (`microbench`, `asm_diff`, `capture_llint`) plus a `hot_opcodes` config parser. Add a new `SlowPathCounterStore` to `crates/vm/` behind the existing `diagnostic-counters` Cargo feature. Write three multi-page Markdown evidence reports documenting the current Value layout, the `LlIntState`/`LlIntRustContext` ABI, and the safepoint/poll model. Update three policy docs (`crates/AGENTS.md`, `docs/lyng/engineering-standards.md`, `docs/lyng/architecture.md`) to permit DSL-scoped unsafe. Capture initial baselines under `reports/lyng/`.
 
 **Tech Stack:** Rust stable (rustc ≥ 1.88 needed for DSL phase; R-0 itself uses any current stable), `serde_json` (already in `lyng-bench` deps), `toml` (new dep for `hot-opcodes.toml`), system tools (`otool` on macOS for LLInt capture), `cargo asm` (optional convenience; fallback to `cargo rustc --emit=asm`).
 
@@ -238,7 +238,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Run:
   ```sh
-  cargo build --release -p lyng-bench --features lyng-vm/opcode-counters
+  cargo build --release -p lyng-bench --features lyng-vm/diagnostic-counters
   ```
   Expected: clean build.
 
@@ -2576,7 +2576,7 @@ Before starting, verify the prerequisites are met. Run from repo root.
   //! (called from cold stubs or hot-handler fall-back) and "safepoint"
   //! entries (called from warm-handler poll bridges).
   //!
-  //! Gated behind the `opcode-counters` Cargo feature. Production builds
+  //! Gated behind the `diagnostic-counters` Cargo feature. Production builds
   //! carry no counter code.
 
   use std::cell::Cell;
@@ -2679,49 +2679,49 @@ Before starting, verify the prerequisites are met. Run from repo root.
 
   Edit `crates/vm/src/lib.rs` to add:
   ```rust
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub mod slow_path_counts;
   ```
 
   In `crates/vm/src/vm.rs`, find the `opcode_dispatch_counts` field (around line 157) and add a sibling:
   ```rust
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   slow_path_counts: Option<crate::slow_path_counts::SlowPathCounterStore>,
   ```
 
   In `Vm::new` (around line 224), initialize:
   ```rust
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   slow_path_counts: None,
   ```
 
   Add accessor methods next to the existing `enable_opcode_dispatch_counts`:
   ```rust
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub fn enable_slow_path_counts(&mut self) {
       if self.slow_path_counts.is_none() {
           self.slow_path_counts = Some(crate::slow_path_counts::SlowPathCounterStore::new());
       }
   }
 
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub fn disable_slow_path_counts(&mut self) {
       self.slow_path_counts = None;
   }
 
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub fn reset_slow_path_counts(&mut self) {
       if let Some(store) = &self.slow_path_counts {
           store.reset();
       }
   }
 
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub fn slow_path_counts(&self) -> Option<crate::slow_path_counts::SlowPathCounts> {
       self.slow_path_counts.as_ref().map(|store| store.snapshot())
   }
 
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   pub fn slow_path_counts_enabled(&self) -> bool {
       self.slow_path_counts.is_some()
   }
@@ -2730,14 +2730,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 4: Run tests**
 
   ```sh
-  cargo test --features opcode-counters -p lyng-vm slow_path_counts
+  cargo test --features diagnostic-counters -p lyng-vm slow_path_counts
   ```
   Expected: 2 PASS.
 
 - [ ] **Step 5: Verify Vm public API still compiles**
 
   ```sh
-  cargo build --release -p lyng-vm --features opcode-counters
+  cargo build --release -p lyng-vm --features diagnostic-counters
   cargo build --release -p lyng-vm   # without feature
   ```
   Expected: both succeed.
@@ -2802,14 +2802,14 @@ Before starting, verify the prerequisites are met. Run from repo root.
 - [ ] **Step 5: Run tests**
 
   ```sh
-  cargo test --features lyng-vm/opcode-counters -p lyng-bench
+  cargo test --features lyng-vm/diagnostic-counters -p lyng-bench
   ```
   Expected: pass.
 
 - [ ] **Step 6: Smoke test**
 
   ```sh
-  cargo run --release -p lyng-bench --features lyng-vm/opcode-counters -- runtime --count-opcodes --count-slow-path-share --preset inner-loop
+  cargo run --release -p lyng-bench --features lyng-vm/diagnostic-counters -- runtime --count-opcodes --count-slow-path-share --preset inner-loop
   ```
   Expected: report includes the slow-path-share table. Counts will all be 0 until DSL handlers actually call `record_semantic`/`record_safepoint` — that wiring lands in DSL-0a/b. The R-0 deliverable is the *infrastructure*, not yet the actual increments.
 
@@ -3424,7 +3424,7 @@ After completing all tasks, verify:
 - [ ] All 8 dcat sub-tickets land as `in_review` or `closed`.
 - [ ] `cargo build --release -p lyng-bench` is clean.
 - [ ] `cargo test -p lyng-bench` passes.
-- [ ] `cargo test -p lyng-vm --features opcode-counters` passes.
+- [ ] `cargo test -p lyng-vm --features diagnostic-counters` passes.
 - [ ] `lyng-bench asm-diff --mode check` exits 0.
 - [ ] `lyng-bench microbench --samples 3 --iters 100000` exits 0.
 - [ ] `lyng-bench capture-llint --opcodes op_add --source excerpt --jsc-source /Users/sondre/dev/WebKit` exits 0.

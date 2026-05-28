@@ -6,7 +6,7 @@
 //! so a future rustc upgrade or struct re-ordering can't silently
 //! break the asm-side reads.
 
-#![cfg(feature = "opcode-counters")]
+#![cfg(feature = "diagnostic-counters")]
 
 use std::mem::{offset_of, size_of};
 

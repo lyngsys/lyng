@@ -116,6 +116,18 @@ fn execute_script(invocation: &CliInvocation, host: &CliHost) -> Result<ScriptOu
         }
     };
 
+    if invocation.dump_ic_counters() {
+        #[cfg(feature = "diagnostic-counters")]
+        {
+            let dump = vm.dump_ic_slow_path_counters();
+            eprintln!("{dump}");
+        }
+        #[cfg(not(feature = "diagnostic-counters"))]
+        eprintln!(
+            "--dump-ic-counters: lyng-cli was built without the `diagnostic-counters` feature; no counters to dump.",
+        );
+    }
+
     Ok(ScriptOutcome {
         exit_code,
         display_name: loaded.display_name,

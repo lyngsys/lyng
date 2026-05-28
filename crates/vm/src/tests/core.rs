@@ -235,7 +235,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     assert!(agent.current_execution_context().is_none());
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
     let mut builder = BytecodeBuilder::new(
@@ -300,7 +300,7 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
     }
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn evaluate_builder_with_opcode_counters_redirects_asm_writes_to_external_store() {
     use lyng_vm::OpcodeCounters;
@@ -358,7 +358,7 @@ fn evaluate_builder_with_opcode_counters_redirects_asm_writes_to_external_store(
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn add_smi_hit_avoids_semantic_slow_path() {
     let mut builder = BytecodeBuilder::new(
@@ -408,7 +408,7 @@ fn add_smi_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn jump_i24_forward_hit_avoids_semantic_slow_path() {
     let function = BytecodeFunction::new(
@@ -453,7 +453,7 @@ fn jump_i24_forward_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
     let function = BytecodeFunction::new(
@@ -503,17 +503,17 @@ fn jump_i24_backward_hit_without_pending_poll_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 struct ResumeDebugHook;
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 impl VmDebugHook for ResumeDebugHook {
     fn on_pause(&mut self, _context: VmDebugPauseContext<'_>) -> VmDebugCommand {
         VmDebugCommand::Resume
     }
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     let function = BytecodeFunction::new(
@@ -565,7 +565,7 @@ fn jump_i24_backward_pending_debug_uses_safepoint_not_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
     let mut builder = BytecodeBuilder::new(
@@ -638,7 +638,7 @@ fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
     // Originally Phase 4b's `vm_star_fusion_elides_star_dispatch_after_lda`
@@ -708,7 +708,7 @@ fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn smi_equal_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(545, "left == right;");
@@ -747,7 +747,7 @@ fn smi_equal_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn nullish_equal_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(547, "left == right;");
@@ -786,7 +786,7 @@ fn nullish_equal_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(546, "left === right;");
@@ -825,7 +825,7 @@ fn primitive_strict_equal_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     let unit = compile_test_unit(
@@ -871,7 +871,7 @@ fn generic_call_with_more_than_three_args_also_avoids_scratch_pushes() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn spread_call_still_materializes_into_argument_scratch() {
     let unit = compile_test_unit(
@@ -906,7 +906,7 @@ fn spread_call_still_materializes_into_argument_scratch() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn bound_function_call_still_materializes_into_argument_scratch() {
     let unit = compile_test_unit(
@@ -941,7 +941,7 @@ fn bound_function_call_still_materializes_into_argument_scratch() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn nonstrict_function_referencing_arguments_object_stays_on_slow_path() {
     let unit = compile_test_unit(
@@ -1044,7 +1044,7 @@ fn specialized_path_handles_iife_closure_helpers_calling_each_other() {
     assert_eq!(result, Value::from_smi(1));
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn rest_parameter_function_stays_on_slow_path() {
     let unit = compile_test_unit(
@@ -1084,7 +1084,7 @@ fn rest_parameter_function_stays_on_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn ordinary_bytecode_calls_avoid_argument_scratch_pushes() {
     let unit = compile_test_unit(

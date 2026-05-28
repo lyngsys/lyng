@@ -535,7 +535,7 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn global_property_load_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(544, "globalValue;");
@@ -951,7 +951,7 @@ fn named_property_store_ic_caches_own_data_paths() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn named_property_store_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(543, "source.value = 9; source.value;");
@@ -1960,7 +1960,7 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_t
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn named_property_load_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(542, "source.value;");
@@ -2029,7 +2029,7 @@ fn named_property_load_ic_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn named_property_load_polymorphic_ic_hits_avoid_semantic_slow_path() {
     // Polymorphic OwnData inline-slot two-shape walk. After priming the IC
@@ -2127,7 +2127,7 @@ fn named_property_load_polymorphic_ic_hits_avoid_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(548, "source.value;");
@@ -2202,7 +2202,7 @@ fn named_property_load_outline_ic_hit_avoids_semantic_slow_path() {
     );
 }
 
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
     let unit = compile_test_unit(543, "source.value;");
@@ -3827,10 +3827,10 @@ fn b7_polymorphic_chain_retained_when_code_lives() {
 // the real receiver shape, writes a fresh mode=1, and returns the correct
 // value. After this, mode must no longer be 0.
 //
-// The test is gated on `opcode-counters` so we can confirm that the slow path
+// The test is gated on `diagnostic-counters` so we can confirm that the slow path
 // was triggered: exactly one `GetNamedProperty` semantic is expected after the
 // corruption run.
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 #[test]
 fn c4_asm_ic_fast_path_reads_from_metadata_table() {
     use crate::vm::metadata_table::MetadataKind;

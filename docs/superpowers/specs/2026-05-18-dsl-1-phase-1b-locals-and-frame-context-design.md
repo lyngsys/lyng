@@ -145,7 +145,7 @@ This is the highest-stakes worker in Phase 1.B. Brief includes:
 
 **1.B.0 — Infra works:**
 - 10.A: counter records ~4.66B Move dispatches on Richards run (matches pre-DSL-0c counter output within 5%).
-- 10.A: per-feature-gated overhead: `v8suite` with vs without `--features opcode-counters` shows ≤5% Richards delta.
+- 10.A: per-feature-gated overhead: `v8suite` with vs without `--features diagnostic-counters` shows ≤5% Richards delta.
 - 10.B: `microbench --samples 7` reports ns/dispatch with CI95 for all 14 in-scope opcodes — no "no snippet" entries.
 
 **1.B.1 — Refactor green:**

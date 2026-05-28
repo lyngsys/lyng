@@ -29,7 +29,7 @@ use crate::enumeration::{ForInStateTable, IteratorStateTable};
 use crate::error::VmResult;
 use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider};
 use crate::name_refs::CapturedNameReferenceTable;
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 use crate::opcode_counts::OpcodeCounters;
 use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
@@ -48,6 +48,8 @@ mod feedback;
 mod generators;
 mod global_script;
 pub(crate) mod ic_state;
+#[cfg(feature = "diagnostic-counters")]
+mod ic_slow_counters;
 pub mod install;
 mod internal_calls;
 mod jobs;
@@ -91,6 +93,8 @@ pub use debugger::{
     VmDebugSafepoint, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
 };
 pub use feedback::{FeedbackInlineCacheState, FeedbackKeyedPropertyFamily};
+#[cfg(feature = "diagnostic-counters")]
+pub use ic_slow_counters::{IcSlowPathCause, IcSlowPathCounters, IcSlowPathKind};
 pub use status::{
     ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,
     KeyedPropertyDenseStatusEntry, KeyedPropertyNamedStatusEntry, KeyedPropertyStatus,
@@ -123,7 +127,7 @@ pub struct Vm {
     dispatch_frame_check_epoch: u32,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     pub(crate) counters: OpcodeCounters,
     debugger: VmDebugger,
     atom_texts: HashMap<AtomId, Box<str>>,
@@ -182,6 +186,14 @@ pub struct Vm {
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
     pub(crate) tiering: Tiering,
+    /// Per-kind, per-cause IC slow-path entry counters. Inert by
+    /// default — every counter starts at zero and is bumped exactly
+    /// once per slow-path entry from the cold handler bridges in
+    /// `crate::dsl::handlers::cold`. See [`IcSlowPathCounters`] for
+    /// the table layout. Gated behind the `diagnostic-counters`
+    /// feature so production builds carry no per-slow-entry overhead.
+    #[cfg(feature = "diagnostic-counters")]
+    pub(crate) ic_slow_path_counters: IcSlowPathCounters,
     activation_tables: ActivationSideTables,
     for_in_states: ForInStateTable,
     iterator_states: IteratorStateTable,
@@ -234,7 +246,7 @@ pub struct EvaluateScript<'b> {
     registry: Option<&'b mut dyn NativeFunctionRegistry>,
     referrer: Option<&'b ModuleKey>,
     extensions: Option<&'b SharedRealmExtensionProvider>,
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
     installed_debugger: Option<&'b mut VmDebugger>,
     installed_tiering: Option<&'b mut Tiering>,
@@ -268,7 +280,7 @@ impl<'b> EvaluateScript<'b> {
     /// swapped back when the run returns — so the caller can read
     /// dispatch / slow-path / call-argument-copy snapshots off their
     /// own `OpcodeCounters` afterwards.
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
         self.installed_counters = Some(counters);
         self
@@ -319,7 +331,7 @@ impl<'b> EvaluateScript<'b> {
             registry,
             referrer,
             extensions,
-            #[cfg(feature = "opcode-counters")]
+            #[cfg(feature = "diagnostic-counters")]
             mut installed_counters,
             mut installed_debugger,
             mut installed_tiering,
@@ -331,7 +343,7 @@ impl<'b> EvaluateScript<'b> {
             None => &mut fallback_registry,
         };
 
-        #[cfg(feature = "opcode-counters")]
+        #[cfg(feature = "diagnostic-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
@@ -355,7 +367,7 @@ impl<'b> EvaluateScript<'b> {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
         }
-        #[cfg(feature = "opcode-counters")]
+        #[cfg(feature = "diagnostic-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
@@ -407,7 +419,7 @@ pub struct EvaluateInstalled<'b> {
     referrer: Option<AtomId>,
     observer: Option<&'b mut dyn VmEvaluationObserver>,
     entry_override: Option<EntryExecutionOverride>,
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     installed_counters: Option<&'b mut OpcodeCounters>,
     installed_debugger: Option<&'b mut VmDebugger>,
     installed_tiering: Option<&'b mut Tiering>,
@@ -443,7 +455,7 @@ impl<'b> EvaluateInstalled<'b> {
     /// `OpcodeCounters` for the duration of `.run()`. See
     /// [`EvaluateScript::with_opcode_counters`] for the full
     /// description.
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
         self.installed_counters = Some(counters);
         self
@@ -481,7 +493,7 @@ impl<'b> EvaluateInstalled<'b> {
             referrer,
             observer,
             entry_override,
-            #[cfg(feature = "opcode-counters")]
+            #[cfg(feature = "diagnostic-counters")]
             mut installed_counters,
             mut installed_debugger,
             mut installed_tiering,
@@ -498,7 +510,7 @@ impl<'b> EvaluateInstalled<'b> {
             None => &mut fallback_observer,
         };
 
-        #[cfg(feature = "opcode-counters")]
+        #[cfg(feature = "diagnostic-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
@@ -528,7 +540,7 @@ impl<'b> EvaluateInstalled<'b> {
             std::mem::swap(&mut vm.debugger, external);
             vm.refresh_dsl_poll_pending();
         }
-        #[cfg(feature = "opcode-counters")]
+        #[cfg(feature = "diagnostic-counters")]
         if let Some(external) = installed_counters.as_deref_mut() {
             std::mem::swap(&mut vm.counters, external);
         }
@@ -546,7 +558,7 @@ impl Vm {
             dispatch_frame_check_epoch: 0,
             installed: Vec::new(),
             current_exception: None,
-            #[cfg(feature = "opcode-counters")]
+            #[cfg(feature = "diagnostic-counters")]
             counters: OpcodeCounters::new(),
             debugger: VmDebugger::default(),
             atom_texts: HashMap::new(),
@@ -563,6 +575,8 @@ impl Vm {
             keyed_property_ic_states: Vec::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
+            #[cfg(feature = "diagnostic-counters")]
+            ic_slow_path_counters: IcSlowPathCounters::new(),
             activation_tables: ActivationSideTables::default(),
             for_in_states: ForInStateTable::default(),
             iterator_states: IteratorStateTable::default(),
@@ -901,13 +915,13 @@ impl Vm {
     /// externally-owned store for a single evaluation, use
     /// `EvaluateScript::with_opcode_counters` /
     /// `EvaluateInstalled::with_opcode_counters` on the builder.
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     #[inline]
     pub const fn opcode_counters(&self) -> &OpcodeCounters {
         &self.counters
     }
 
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     #[inline]
     pub const fn opcode_counters_mut(&mut self) -> &mut OpcodeCounters {
         &mut self.counters
@@ -915,15 +929,15 @@ impl Vm {
 
     /// Records `count` argument values pushed into `argument_scratch`. No-op
     /// when the counter is disabled (the default in production builds and
-    /// when the `opcode-counters` feature is off). Inlined so the disabled
+    /// when the `diagnostic-counters` feature is off). Inlined so the disabled
     /// case compiles to a single load+branch.
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     #[inline]
     pub(in crate::vm) fn record_argument_scratch_pushes(&self, count: u64) {
         self.counters.record_argument_scratch_pushes(count);
     }
 
-    #[cfg(not(feature = "opcode-counters"))]
+    #[cfg(not(feature = "diagnostic-counters"))]
     #[inline]
     pub(in crate::vm) fn record_argument_scratch_pushes(&self, _count: u64) {}
 
@@ -931,13 +945,13 @@ impl Vm {
     /// Symmetric with `record_argument_scratch_pushes` — together they let
     /// tests verify that ordinary calls copy each argument exactly once
     /// (`frame_copies` == n, `scratch_pushes` == 0) instead of twice.
-    #[cfg(feature = "opcode-counters")]
+    #[cfg(feature = "diagnostic-counters")]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, count: u64) {
         self.counters.record_argument_frame_copies(count);
     }
 
-    #[cfg(not(feature = "opcode-counters"))]
+    #[cfg(not(feature = "diagnostic-counters"))]
     #[inline]
     pub(in crate::vm) fn record_argument_frame_copies(&self, _count: u64) {}
 
@@ -1389,7 +1403,7 @@ impl Vm {
             registry: None,
             referrer: None,
             extensions: None,
-            #[cfg(feature = "opcode-counters")]
+            #[cfg(feature = "diagnostic-counters")]
             installed_counters: None,
             installed_debugger: None,
             installed_tiering: None,
@@ -1415,7 +1429,7 @@ impl Vm {
             referrer: None,
             observer: None,
             entry_override: None,
-            #[cfg(feature = "opcode-counters")]
+            #[cfg(feature = "diagnostic-counters")]
             installed_counters: None,
             installed_debugger: None,
             installed_tiering: None,

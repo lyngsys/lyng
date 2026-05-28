@@ -771,7 +771,7 @@ mod verify_counts {
     //! Verify per-snippet opcode counts against declared `opcodes_per_iter`.
     //!
     //! Run with: `cargo test --release -p lyng-bench --features
-    //! lyng-vm/opcode-counters verify_opcodes_per_iter -- --nocapture`.
+    //! lyng-vm/diagnostic-counters verify_opcodes_per_iter -- --nocapture`.
     //!
     //! The test compiles each snippet, runs one bench(iters) call with a
     //! small iters value, and snapshots the dispatch counts. It then

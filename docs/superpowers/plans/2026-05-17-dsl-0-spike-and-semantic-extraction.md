@@ -136,7 +136,7 @@ crates/vm/src/dsl/
         ├── control.rs          # dispatch!, dispatch_after_slow!, call_slow!, branch_*!, dispatch_prefixed!
         ├── feedback.rs         # load_feedback_site!, value_profile!, record_smi!, ...
         ├── memory.rs           # load_byte!, load_word!, load_quad!, store_byte!, store_word!, store_quad!
-        ├── counters.rs         # inc_counter! (gated by --features opcode-counters)
+        ├── counters.rs         # inc_counter! (gated by --features diagnostic-counters)
         └── safepoint.rs        # poll_safepoint!
 ```
 
@@ -3770,7 +3770,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 - [ ] **Step 1: Implement `inc_counter!`**
 
   ```rust
-  //! Opcode-counter increment, gated by `--features opcode-counters`.
+  //! Opcode-counter increment, gated by `--features diagnostic-counters`.
   //!
   //! When the feature is off, the macro expands to an empty string — zero
   //! per-dispatch cost. When on, emits 3 instructions:
@@ -3780,7 +3780,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
   //!   add  x10, x10, #1
   //!   str  x10, [x9]
 
-  #[cfg(feature = "opcode-counters")]
+  #[cfg(feature = "diagnostic-counters")]
   #[macro_export]
   macro_rules! inc_counter {
       ($opcode_byte:literal) => {
@@ -3794,7 +3794,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
       };
   }
 
-  #[cfg(not(feature = "opcode-counters"))]
+  #[cfg(not(feature = "diagnostic-counters"))]
   #[macro_export]
   macro_rules! inc_counter {
       ($opcode_byte:literal) => { "" };
@@ -3807,7 +3807,7 @@ This is the most-used backend module. `dispatch!()` is the tail-jump at the end 
 
   ```sh
   cargo build -p lyng-vm
-  cargo build -p lyng-vm --features opcode-counters
+  cargo build -p lyng-vm --features diagnostic-counters
   ```
 
 - [ ] **Step 3: Commit**
@@ -5508,7 +5508,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
 - [ ] **Step 1: Author the test**
 
-  Compares per-opcode dispatch counts produced under DSL dispatch with `--features opcode-counters` against a pre-recorded alpha baseline captured during Pre-flight or A20.
+  Compares per-opcode dispatch counts produced under DSL dispatch with `--features diagnostic-counters` against a pre-recorded alpha baseline captured during Pre-flight or A20.
 
   ```rust
   #[test]
@@ -5526,12 +5526,12 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
   }
   ```
 
-  Pre-record the alpha-baseline counts by running Richards under opcode-counters during Task A20 (refresh if needed; the alpha-baseline reference file goes in `reports/lyng/dsl-0a-opcode-counts-richards.json`).
+  Pre-record the alpha-baseline counts by running Richards under diagnostic-counters during Task A20 (refresh if needed; the alpha-baseline reference file goes in `reports/lyng/dsl-0a-opcode-counts-richards.json`).
 
 - [ ] **Step 2: Run**
 
   ```sh
-  cargo test -p lyng-vm --features opcode-counters --test dsl_opcode_counter_parity
+  cargo test -p lyng-vm --features diagnostic-counters --test dsl_opcode_counter_parity
   ```
 
 - [ ] **Step 3: Commit**
@@ -5615,7 +5615,7 @@ Mirrors Task A19's `SEMANTIC_FN_PTRS` pattern but for DSL handlers.
 
   ```sh
   cargo test -p lyng-vm -p lyng-bytecode -p lyng-objects -p lyng-tests -p lyng-compiler
-  cargo test -p lyng-vm --features opcode-counters
+  cargo test -p lyng-vm --features diagnostic-counters
   cargo build --release -p lyng-vm -p lyng-bench
   cargo clippy --all-targets --all-features -- -W clippy::pedantic -W clippy::nursery 2>&1 | tail -30
   ```

@@ -29,9 +29,9 @@ mod extensions;
 mod frame;
 mod installed;
 mod name_refs;
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 mod opcode_counts;
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 mod slow_path_counts;
 pub(crate) mod vm;
 
@@ -47,12 +47,12 @@ pub use frame::{
     seed_registers, FrameFlags, FrameMetadata, FrameRecord, FrameState, RegisterWindow,
 };
 pub use installed::InstalledCode;
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub use opcode_counts::{
     CallArgumentCopyCounts, DispatchCounters, OpcodeCounters, OpcodeDispatchCount,
     OpcodeDispatchCounts,
 };
-#[cfg(feature = "opcode-counters")]
+#[cfg(feature = "diagnostic-counters")]
 pub use slow_path_counts::SlowPathCounts;
 pub use vm::{
     ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,

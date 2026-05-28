@@ -354,7 +354,7 @@ Remove `op_get_named_property_rust_probe_rs` and `Vm::try_get_named_property_rus
 Run:
 
 ```sh
-cargo test -p lyng-vm --features opcode-counters named_property_load_ic_hit_avoids_semantic_slow_path
+cargo test -p lyng-vm --features diagnostic-counters named_property_load_ic_hit_avoids_semantic_slow_path
 ```
 
 Expected: pass with `GetNamedProperty` dispatch count `1` and semantic slow-path count `0`.
@@ -384,7 +384,7 @@ Run:
 cargo test -p lyng-gc object_record_pointer_table_tracks_allocated_objects
 cargo test -p lyng-vm-dsl
 cargo test -p lyng-vm llint_
-cargo test -p lyng-vm --features opcode-counters named_property_load_ic_hit_avoids_semantic_slow_path
+cargo test -p lyng-vm --features diagnostic-counters named_property_load_ic_hit_avoids_semantic_slow_path
 ```
 
 - [ ] **Step 3: Run broader VM library tests**
@@ -393,7 +393,7 @@ Run:
 
 ```sh
 cargo test -p lyng-vm --lib
-cargo test -p lyng-vm --features opcode-counters --lib
+cargo test -p lyng-vm --features diagnostic-counters --lib
 ```
 
 - [ ] **Step 4: Run release Richards**

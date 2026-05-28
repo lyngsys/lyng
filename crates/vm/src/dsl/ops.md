@@ -230,7 +230,7 @@ domain semantics) over these raw forms.
 
 `backend/aarch64/counters.rs`
 
-| Macro          | `--features opcode-counters`           | Default                |
+| Macro          | `--features diagnostic-counters`           | Default                |
 | -------------- | -------------------------------------- | ---------------------- |
 | `inc_counter!` | 4 instr (ldr + ldr + add + str)        | empty string (0 instr) |
 

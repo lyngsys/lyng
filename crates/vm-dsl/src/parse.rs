@@ -21,7 +21,7 @@
 //! `Opcode` enum variant. The lowerer threads it into
 //! `inc_dispatch_counter!(N)` — the leading body fragment in the asm
 //! template — so each handler bumps its per-opcode dispatch counter on
-//! entry (when the `opcode-counters` feature is on; the macro expands to
+//! entry (when the `diagnostic-counters` feature is on; the macro expands to
 //! an empty string when the feature is off).
 //!
 //! `<body>` is a sequence of DSL-op macro invocations, each terminated by
@@ -79,7 +79,7 @@ pub struct HandlerAst {
     /// `u8` discriminant of the matching `Opcode` variant. Threaded
     /// into `inc_dispatch_counter!(N)` as the leading body fragment,
     /// so each handler bumps its per-opcode dispatch counter on entry
-    /// (no-op when the `opcode-counters` feature is off).
+    /// (no-op when the `diagnostic-counters` feature is off).
     pub(crate) opcode_byte: LitInt,
     /// Layout identifier (e.g. `AbcSlot`, `None`).
     pub(crate) layout: Ident,
