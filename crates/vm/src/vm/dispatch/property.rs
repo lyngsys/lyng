@@ -485,6 +485,7 @@ impl Vm {
                         frame.code(),
                         feedback_slot,
                         Some(plan),
+                        NamedPropertyCachePurpose::Store,
                     );
                     advance_dispatch_frame(frame, instruction_len);
                     return Ok(());

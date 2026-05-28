@@ -799,7 +799,7 @@ impl Vm {
             )
             .ok()
             .flatten();
-        self.record_named_property_cache_entry(agent, code, slot, plan);
+        self.record_named_property_cache_entry(agent, code, slot, plan, purpose);
     }
 
     pub(super) fn observe_named_property_cache_entry(
@@ -808,6 +808,7 @@ impl Vm {
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         plan: Option<NamedPropertyCacheEntry>,
+        purpose: NamedPropertyCachePurpose,
     ) {
         let Some(slot) = slot else {
             return;
@@ -816,7 +817,7 @@ impl Vm {
         if !self.ensure_feedback_slot_execution(code, slot) {
             return;
         }
-        self.record_named_property_cache_entry(agent, code, slot, plan);
+        self.record_named_property_cache_entry(agent, code, slot, plan, purpose);
     }
 
     fn record_named_property_cache_entry(
@@ -825,6 +826,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
+        purpose: NamedPropertyCachePurpose,
     ) {
         // Phase D.2.4: cleared slots are removed from the map entirely by
         // `clear_ic_slot_if_generation_matches`. No reinit check needed here;
@@ -838,7 +840,7 @@ impl Vm {
         {
             return;
         }
-        self.named_property_install_slow_path(code, slot, plan);
+        self.named_property_install_slow_path(code, slot, plan, purpose);
     }
 
     /// Slow-path install for a named-property IC entry.
@@ -847,6 +849,7 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
         plan: Option<NamedPropertyCacheEntry>,
+        purpose: NamedPropertyCachePurpose,
     ) {
         // Split-borrow: we need &mut PropertyIcState and the per-(code,slot)
         // polymorphic-chain entry at the same time. Project into both Vec
@@ -867,13 +870,36 @@ impl Vm {
             .expect("polymorphic_chains slab must be allocated at install")[slot_zero];
         Self::named_property_observe_slow_path_on_state(state, chain_slot, plan);
 
-        // Write asm-readable bits to PropertyMetadata.
-        let llint_header = Self::named_llint_load_header_from_state(state);
+        // Write asm-readable bits to PropertyMetadata, routing on purpose.
+        // Store slots project the write-side handler (mode = 5); Load slots use
+        // the existing load-side projection (mode = 1/2/3/4).
+        // Extract all Copy fields from `state` before releasing the split-borrow
+        // so that `self.metadata_table_mut(code)` can take `&mut self`.
         let generation = state.generation;
         let execution_count = state.execution_count;
+        let write_handler = state.monomorphic_own_inline_write_handler;
+        let llint_header = Self::named_llint_load_header_from_state(state);
+        // Split-borrow on `state` / `chain_slot` ends here.
         if let Some(table) = self.metadata_table_mut(code) {
             let meta = table.property_mut(slot.get());
-            Self::project_property_into_meta(llint_header, generation, execution_count, meta);
+            match purpose {
+                NamedPropertyCachePurpose::Store => {
+                    Self::project_property_write_into_meta(
+                        write_handler,
+                        generation,
+                        execution_count,
+                        meta,
+                    );
+                }
+                NamedPropertyCachePurpose::Load => {
+                    Self::project_property_into_meta(
+                        llint_header,
+                        generation,
+                        execution_count,
+                        meta,
+                    );
+                }
+            }
         }
     }
 

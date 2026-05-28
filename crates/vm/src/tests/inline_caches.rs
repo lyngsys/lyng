@@ -4279,3 +4279,80 @@ fn d4_property_ic_state_clear_and_reinstall() {
         "D4: entry_count must be 1 after re-install"
     );
 }
+
+// -----------------------------------------------------------------------------
+// Task 5: Store-purpose IC install writes mode = 5 (LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE)
+// -----------------------------------------------------------------------------
+//
+// Stores to an existing own-data property produce an OwnData-path cache entry
+// with dependency_count == 1 (just the receiver). This is the simplest shape
+// that produces a valid NamedPropertyInlineWriteHandler — and therefore mode 5.
+//
+// Strategy: pre-create `source` with property `value`, then run
+// `source.value = 9;` to warm the store slot through the slow path
+// (Uninit → Monomorphic/OwnData). After install, PropertyMetadata.mode must
+// be LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE (= 5).
+
+#[test]
+fn t5_store_slow_path_install_writes_mode_5_into_metadata() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+
+    let unit = compile_test_unit(60_001, "source.value = 9; source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let store_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+    // Pre-create the object with an existing `value` property so the store
+    // hits the OwnData path (dependency_count == 1 → valid inline-write handler).
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(1));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First run: slow path fires (Uninit → Monomorphic/OwnData), installs mode = 5.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(9),
+        "T5: store + load must evaluate to 9"
+    );
+
+    // Confirm the IC is Monomorphic / OwnData.
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), store_slot),
+        Some((
+            "Monomorphic",
+            1,
+            Some(lyng_objects::NamedPropertyCachePath::OwnData)
+        )),
+        "T5: store slot must be Monomorphic/OwnData after first run"
+    );
+
+    // The key assertion: mode must be LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE (= 5).
+    let mode = vm
+        .metadata_table(installed.code())
+        .expect("T5: MetadataTable should exist after install")
+        .property(store_slot.get())
+        .mode;
+    assert_eq!(
+        mode,
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "T5: Store-purpose IC install must write mode = {} into PropertyMetadata, got {}",
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        mode,
+    );
+}
