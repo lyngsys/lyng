@@ -104,6 +104,40 @@ impl NamedPropertyCacheEntry {
         }
     }
 
+    /// Test-fixture constructor. Builds a `NamedPropertyCacheEntry` with the
+    /// exact field values supplied — no validation, no planner involvement.
+    /// **Production code must NEVER call this** — use
+    /// `ObjectRuntime::plan_named_property_cache_entry` so the planner's
+    /// invariants (dependency tracking, shape liveness, hop limits) stay
+    /// authoritative. Exists solely so cross-crate unit tests can build a
+    /// minimal cache entry without setting up the full heap + object machinery.
+    #[doc(hidden)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "test fixture mirrors the fixed cache-entry fields"
+    )]
+    pub const fn new_for_test(
+        receiver_shape: ShapeId,
+        holder: ObjectRef,
+        holder_shape: ShapeId,
+        slot_offset: u32,
+        attrs: DescriptorAttributes,
+        path: NamedPropertyCachePath,
+        dependency_count: u8,
+        dependencies: [Option<PropertyCacheDependency>; PROPERTY_CACHE_MAX_DEPENDENCIES],
+    ) -> Self {
+        Self::new(
+            receiver_shape,
+            holder,
+            holder_shape,
+            slot_offset,
+            attrs,
+            path,
+            dependency_count,
+            dependencies,
+        )
+    }
+
     #[inline]
     pub const fn receiver_shape(self) -> ShapeId {
         self.receiver_shape

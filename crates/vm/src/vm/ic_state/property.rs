@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 
 use lyng_objects::{
     NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyHandler,
-    NamedPropertyProtoHandler,
+    NamedPropertyInlineWriteHandler, NamedPropertyProtoHandler,
 };
 use lyng_types::ShapeId;
 
@@ -36,6 +36,14 @@ pub struct PropertyIcState {
     pub monomorphic_own_data_handler: NamedPropertyHandler,
     /// Monomorphic one-hop PrototypeData sidecar.
     pub monomorphic_proto_data_handler: NamedPropertyProtoHandler,
+    /// Monomorphic `OwnDataInlineWrite` sidecar (Spec 3 transition IC).
+    /// `NamedPropertyInlineWriteHandler::NONE` when not applicable:
+    /// non-OwnData/non-OwnDataTransition path, polymorphic, megamorphic,
+    /// uninitialized, or out-of-line slot — see
+    /// [`NamedPropertyInlineWriteHandler::from_entry`]. Asm-readable bits
+    /// project into `PropertyMetadata` mode = 5 in Task 4; the write fast
+    /// path in `op_assign_named_property_dsl` consumes them in Task 8.
+    pub monomorphic_own_inline_write_handler: NamedPropertyInlineWriteHandler,
     /// Polymorphic OwnData sidecar — mirrors the first `POLY_LIMIT` entries
     /// when the cache is Polymorphic and the entry packs into a valid handler.
     pub polymorphic_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
@@ -60,6 +68,7 @@ impl PropertyIcState {
             entries: [None; POLY_LIMIT],
             monomorphic_own_data_handler: NamedPropertyHandler::NONE,
             monomorphic_proto_data_handler: NamedPropertyProtoHandler::NONE,
+            monomorphic_own_inline_write_handler: NamedPropertyInlineWriteHandler::NONE,
             polymorphic_own_data_handlers: [NamedPropertyHandler::NONE; POLY_LIMIT],
             generation: 0,
             execution_count: 0,
@@ -80,6 +89,7 @@ impl PropertyIcState {
     pub const fn refresh_sidecars(&mut self) {
         self.monomorphic_own_data_handler = NamedPropertyHandler::NONE;
         self.monomorphic_proto_data_handler = NamedPropertyProtoHandler::NONE;
+        self.monomorphic_own_inline_write_handler = NamedPropertyInlineWriteHandler::NONE;
         let mut i = 0;
         while i < POLY_LIMIT {
             self.polymorphic_own_data_handlers[i] = NamedPropertyHandler::NONE;
@@ -93,8 +103,13 @@ impl PropertyIcState {
                 match entry.path() {
                     NamedPropertyCachePath::OwnData => {
                         self.monomorphic_own_data_handler = NamedPropertyHandler::from_entry(entry);
+                        self.monomorphic_own_inline_write_handler =
+                            NamedPropertyInlineWriteHandler::from_entry(entry);
                     }
-                    NamedPropertyCachePath::OwnDataTransition => {}
+                    NamedPropertyCachePath::OwnDataTransition => {
+                        self.monomorphic_own_inline_write_handler =
+                            NamedPropertyInlineWriteHandler::from_entry(entry);
+                    }
                     NamedPropertyCachePath::PrototypeData => {
                         let handler = NamedPropertyProtoHandler::from_entry(entry);
                         if handler.is_valid() {
@@ -170,5 +185,85 @@ impl PropertyIcState {
 impl Default for PropertyIcState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lyng_objects::{
+        INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
+        NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
+    };
+    use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
+
+    use super::*;
+
+    fn writable_attrs() -> DescriptorAttributes {
+        let mut attrs = DescriptorAttributes::empty();
+        attrs.set_writable(true);
+        attrs
+    }
+
+    #[test]
+    fn refresh_sidecars_populates_monomorphic_own_inline_write_handler() {
+        let source = ShapeId::from_raw(7).expect("non-zero");
+        let target = ShapeId::from_raw(11).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new_for_test(
+            source,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            target,
+            INLINE_SLOT_OFFSET_FLAG | 2,
+            writable_attrs(),
+            NamedPropertyCachePath::OwnDataTransition,
+            // dependency_count = 1 is required by NamedPropertyInlineWriteHandler::from_entry
+            // (it returns NONE for any count != 1). The dependency slots are left as None because
+            // from_entry only checks the count; this fixture predates a full dependency mock.
+            1,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+
+        let mut state = PropertyIcState::new();
+        state.cache_state = InlineCacheState::Monomorphic;
+        state.entry_count = 1;
+        state.entries[0] = Some(entry);
+        state.refresh_sidecars();
+
+        let expected = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert_eq!(state.monomorphic_own_inline_write_handler, expected);
+        assert!(state.monomorphic_own_inline_write_handler.is_valid());
+    }
+
+    #[test]
+    fn refresh_sidecars_populates_inline_write_handler_for_own_data_too() {
+        // Non-transitioning write: receiver_shape == holder_shape.
+        let shape = ShapeId::from_raw(42).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new_for_test(
+            shape,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            shape, // holder == receiver — no transition
+            INLINE_SLOT_OFFSET_FLAG | 0,
+            writable_attrs(),
+            NamedPropertyCachePath::OwnData,
+            // dependency_count = 1 is required by NamedPropertyInlineWriteHandler::from_entry
+            // (it returns NONE for any count != 1). The dependency slots are left as None because
+            // from_entry only checks the count; this fixture predates a full dependency mock.
+            1,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+
+        let mut state = PropertyIcState::new();
+        state.cache_state = InlineCacheState::Monomorphic;
+        state.entry_count = 1;
+        state.entries[0] = Some(entry);
+        state.refresh_sidecars();
+
+        let expected = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert_eq!(state.monomorphic_own_inline_write_handler, expected);
+        assert!(state.monomorphic_own_inline_write_handler.is_valid());
+        // Verify source == target for the non-transition case.
+        assert_eq!(
+            state.monomorphic_own_inline_write_handler.source_shape(),
+            state.monomorphic_own_inline_write_handler.target_shape(),
+        );
     }
 }
