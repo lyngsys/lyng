@@ -126,6 +126,27 @@ macro_rules! branch_named_own_polymorphic_mode {
     };
 }
 
+/// Branch to `$label` unless the metadata-table property entry is a
+/// monomorphic `OwnDataInlineWrite` header. `mode == 5` —
+/// `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`. The packed handler word
+/// carries (source_shape, slot, writable_flag, inline_flag) in the
+/// same layout as the read-side own-inline mode; `aux_bits` carries
+/// the target shape.
+#[macro_export]
+macro_rules! branch_named_own_inline_write_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #5\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
 #[macro_export]
 macro_rules! load_named_handler_bits {
     ($entry:tt => $dst:tt) => {
@@ -211,6 +232,24 @@ macro_rules! load_named_handler_shape {
             ", x",
             stringify!($handler),
             ", #32\n",
+        )
+    };
+}
+
+/// Load the target shape from the feedback entry's `aux_bits` field
+/// into register `$dst`. The low 32 bits of `aux_bits` carry the target
+/// `ShapeId` raw u32 (high 32 bits reserved/zero). Used by the
+/// `OwnDataInlineWrite` asm fast path to update the object's shape
+/// pointer after the inline-slot store.
+#[macro_export]
+macro_rules! load_named_target_shape {
+    ($entry:tt => $dst:tt) => {
+        concat!(
+            "ldr    w",
+            stringify!($dst),
+            ", [x",
+            stringify!($entry),
+            ", {feedback_named_aux_bits}]\n",
         )
     };
 }
@@ -309,4 +348,21 @@ macro_rules! record_double {
             "str    w17, [x16, #{arith_metadata_exec_count_offset}]\n",
         )
     };
+}
+
+#[cfg(test)]
+mod inline_write_macro_tests {
+    #[test]
+    fn branch_named_own_inline_write_mode_emits_mode_5_check() {
+        let asm = branch_named_own_inline_write_mode!(9, miss);
+        assert!(asm.contains("ldrb   w16, [x9, {feedback_mode}]"));
+        assert!(asm.contains("cmp    w16, #5"));
+        assert!(asm.contains("b.ne"));
+    }
+
+    #[test]
+    fn load_named_target_shape_emits_aux_bits_load() {
+        let asm = load_named_target_shape!(9 => 10);
+        assert!(asm.contains("ldr    w10, [x9, {feedback_named_aux_bits}]"));
+    }
 }

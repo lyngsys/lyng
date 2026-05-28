@@ -64,6 +64,25 @@ macro_rules! load_record_shape {
     };
 }
 
+/// Store the 32-bit target shape value in `$src` into the object
+/// record's shape field. Used by the `OwnDataInlineWrite` asm fast
+/// path to update the object's shape pointer after the inline-slot
+/// store, in lockstep with the slow path's `transition_shape` +
+/// retarget_shape sequence (for transitioning writes) or a no-op
+/// store-of-same-value (for non-transitioning writes).
+#[macro_export]
+macro_rules! store_record_shape {
+    ($record:tt, $src:tt) => {
+        concat!(
+            "str    w",
+            stringify!($src),
+            ", [x",
+            stringify!($record),
+            ", {object_shape}]\n",
+        )
+    };
+}
+
 /// Load the prototype `ObjectRef` handle from an `ObjectRecord` at `$rec`
 /// into `$dst`, branching to `$label` when the receiver has no
 /// prototype. The raw `Option<ObjectRef>` representation is a u32
@@ -172,4 +191,14 @@ macro_rules! load_outline_slot {
             ", lsl #3]\n",
         )
     };
+}
+
+#[cfg(test)]
+mod store_record_shape_tests {
+    #[test]
+    fn store_record_shape_emits_str_at_shape_offset() {
+        let asm = store_record_shape!(11, 12);
+        assert!(asm.contains("str    w12, [x11"));
+        assert!(asm.contains("{object_shape}"));
+    }
 }
