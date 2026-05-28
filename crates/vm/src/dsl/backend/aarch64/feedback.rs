@@ -198,6 +198,44 @@ macro_rules! load_named_inline_slot_index_or_branch {
     };
 }
 
+/// Validate a packed named-property handler as a *writable* inline-slot
+/// handler and extract its low 30-bit slot index. Branches to `$label`
+/// when the handler is invalid (`bits == 0`), an out-of-line slot
+/// (bit 31 = 0), or read-only (bit 30 = 0). Store-side counterpart of
+/// [`load_named_inline_slot_index_or_branch!`]: the writable-bit check
+/// (bit 30 of the packed handler — see
+/// `NamedPropertyHandler::HANDLER_WRITABLE_FLAG`) distinguishes a
+/// store-eligible monomorphic OwnData entry from a read-only one.
+/// Read-only hits must miss to the Rust probe / slow path so the
+/// strict-mode TypeError contract is preserved.
+#[macro_export]
+macro_rules! load_named_inline_writable_slot_index_or_branch {
+    ($handler:tt => $slot_index:tt, $label:tt) => {
+        concat!(
+            "cbz    x",
+            stringify!($handler),
+            ", ",
+            stringify!($label),
+            "\n",
+            "tbz    x",
+            stringify!($handler),
+            ", #31, ",
+            stringify!($label),
+            "\n",
+            "tbz    x",
+            stringify!($handler),
+            ", #30, ",
+            stringify!($label),
+            "\n",
+            "ubfx   x",
+            stringify!($slot_index),
+            ", x",
+            stringify!($handler),
+            ", #0, #30\n",
+        )
+    };
+}
+
 /// Validate a packed named-property handler as an out-of-line-slot
 /// handler and extract its low 30-bit slot index.
 #[macro_export]

@@ -37,9 +37,12 @@ fn llint_rust_probes_are_explicitly_enumerated() {
         cold_handlers.contains("call_rust_probe!(op_assign_named_property_rust_probe_rs"),
         "AssignNamedProperty is an explicit temporary Rust probe until its LLInt store IC layout exists"
     );
+    // StrictAssignNamedProperty shares the AssignNamedProperty probe (the
+    // probe handles writable monomorphic OwnData stores; the strict-only
+    // TypeError stays in the slow path).
     assert_eq!(
-        probe_call_count, 2,
-        "Rust probe bridges are not LLInt fast paths; only LoadGlobal and AssignNamedProperty are currently allowed"
+        probe_call_count, 3,
+        "Rust probe bridges are not LLInt fast paths; only LoadGlobal, AssignNamedProperty, and StrictAssignNamedProperty are currently allowed"
     );
 }
 
@@ -49,8 +52,8 @@ fn llint_rust_probe_hits_use_no_refresh_dispatch() {
 
     assert_eq!(
         cold_handlers.matches("dispatch_probe_hit_no_refresh!();").count(),
-        2,
-        "LoadGlobal and AssignNamedProperty probe hits must use the documented no-refresh dispatch form"
+        3,
+        "LoadGlobal, AssignNamedProperty, and StrictAssignNamedProperty probe hits must use the documented no-refresh dispatch form"
     );
     assert!(
         !cold_handlers.contains("dispatch_from_payload!();"),

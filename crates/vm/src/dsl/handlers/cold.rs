@@ -41,20 +41,22 @@
 use crate::{
     add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
-    branch_named_own_outline_mode, branch_named_own_polymorphic_mode,
-    branch_named_proto_inline_mode, branch_nonzero, branch_raw_equal_strict_result,
-    call_rust_probe, call_slow, check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne,
-    dec_smi_overflow, decode_a, decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax,
-    dispatch, dispatch_after_slow, dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc,
-    load_constant, load_feedback_site, load_local_fixed, load_named_aux_bits,
-    load_named_handler_bits, load_named_handler_shape, load_named_inline_slot_index_or_branch,
-    load_named_outline_slot_index_or_branch, load_object_record_from_state_or_branch,
-    load_outline_slot, load_record_inline_slot, load_record_outline_slots_from_state_or_branch,
-    load_record_prototype_or_branch, load_record_shape, load_reg, load_state_value,
-    load_uninit_lex_sentinel, mul_smi_overflow, record_smi, shift_left_smi, shift_right_smi,
-    store_acc, store_local_fixed, store_reg, sub_smi_overflow, tag_bool_const, tag_null, tag_smi,
-    tag_smi_const, tag_smi_from_signed_byte, tag_undefined, tagged_kind_or_branch,
-    untag_object_ref, untag_smi,
+    branch_named_own_inline_write_mode, branch_named_own_outline_mode,
+    branch_named_own_polymorphic_mode, branch_named_proto_inline_mode, branch_nonzero,
+    branch_raw_equal_strict_result, branch_value_references_heap, call_rust_probe, call_slow,
+    check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a,
+    decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
+    dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc, load_constant, load_feedback_site,
+    load_local_fixed, load_named_aux_bits, load_named_handler_bits, load_named_handler_shape,
+    load_named_inline_slot_index_or_branch, load_named_inline_writable_slot_index_or_branch,
+    load_named_outline_slot_index_or_branch, load_named_target_shape,
+    load_object_record_from_state_or_branch, load_outline_slot, load_record_inline_slot,
+    load_record_outline_slots_from_state_or_branch, load_record_prototype_or_branch,
+    load_record_shape, load_reg, load_state_value, load_uninit_lex_sentinel, mul_smi_overflow,
+    record_smi, shift_left_smi, shift_right_smi, store_acc, store_local_fixed,
+    store_record_inline_slot, store_record_shape, store_reg, sub_smi_overflow, tag_bool_const,
+    tag_null, tag_smi, tag_smi_const, tag_smi_from_signed_byte, tag_undefined,
+    tagged_kind_or_branch, untag_object_ref, untag_smi,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -2791,11 +2793,76 @@ pub extern "C" fn op_set_named_property_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_assign_named_property_dsl, opcode_byte = 79, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        // Monomorphic `OwnDataInlineWrite` fast path. Cheap mode-byte
+        // check bails 3 instructions in; the hit path performs the
+        // primitive-value inline-slot store + atomic shape pointer
+        // update, then dispatches without touching the Rust probe.
+        //
+        // Bail conditions (all go to `.probe`, which re-decodes operands):
+        // - mode != 5 (uncached / read-side cached / polymorphic /
+        //   megamorphic / outline write)
+        // - receiver is not an object
+        // - cached entry is read-only (writable bit unset)
+        // - receiver shape doesn't match cached source shape
+        // - value is a heap reference (GC barrier required)
+        //
+        // Operand binding (layout = AbcSlot):
+        //   a    = receiver register
+        //   b    = value register
+        //   c    = atom-constant index (unused on the inline path)
+        //   slot = feedback slot
+        //
+        // Cheap mode-byte check first — operand registers untouched
+        // so `.probe` reuses them without re-decode.
+        load_feedback_site!(slot => t0);
+        branch_named_own_inline_write_mode!(t0, .probe);
+
+        // Hit-path validation. Commits to the chain — subsequent bails
+        // land at `.probe_dirty` which re-decodes before calling the
+        // Rust probe.
+        load_reg!(a => a);
+        check_object_ref!(a, .probe_dirty);
+        untag_object_ref!(a);
+        load_named_handler_bits!(t0 => slot);
+        load_named_target_shape!(t0 => t1);
+
+        // Validate inline + writable bits, extract 30-bit slot index
+        // into `c`. Read-only entries miss to the Rust probe so the
+        // strict-mode TypeError contract stays in the slow path.
+        load_named_inline_writable_slot_index_or_branch!(slot => c, .probe_dirty);
+
+        // Shape guard. Reuse `t0` (entry pointer, no longer needed
+        // after the handler-bits + aux-bits loads above) as the
+        // cached source-shape scratch — keeps scratch usage at the
+        // 7-register budget.
+        load_object_record_from_state_or_branch!(a => a, .probe_dirty);
+        load_record_shape!(a => t2);
+        load_named_handler_shape!(slot => t0);
+        cmp_branch_ne!(t2, t0, .probe_dirty);
+
+        // GC barrier safety: only primitive writes can skip the card
+        // mark + incremental value barrier. Heap-referencing kinds
+        // bail to the Rust probe which routes through `mut_store_value`.
+        load_reg!(b => b);
+        branch_value_references_heap!(b, .probe_dirty);
+
+        // Commit: inline-slot store, then update the object's shape
+        // pointer to target_shape (no-op for non-transitioning writes
+        // since source_shape == target_shape in that case).
+        store_record_inline_slot!(a, c, b);
+        store_record_shape!(a, t1);
+        dispatch!();
+
+        .probe_dirty:
+        // Hit-path validation clobbered operand registers — re-decode
+        // before calling the probe.
+        decode_abc_slot!(a, b, c, slot);
+        .probe:
         call_rust_probe!(op_assign_named_property_rust_probe_rs, args = [a, b, c, slot]);
         branch_nonzero!(0, .slow);
         dispatch_probe_hit_no_refresh!();
         .slow:
-        // The Rust probe can clobber caller-saved operand registers.
+        // Probe can clobber caller-saved registers.
         decode_abc_slot!(a, b, c, slot);
         call_slow!(op_assign_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
@@ -2889,6 +2956,49 @@ pub extern "C" fn op_assign_named_property_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_strict_assign_named_property_dsl, opcode_byte = 80, layout = AbcSlot, length = 6, |a, b, c, slot| {
+        // Strict-mode counterpart of `op_assign_named_property_dsl`.
+        // Same asm fast path: the cached `OwnDataInlineWrite` entry only
+        // matches writable monomorphic transitions, so the inline hit
+        // path is correct under both strict and sloppy semantics. The
+        // strict-only `TypeError` for read-only / non-writable slots
+        // lives in the Rust slow path (`op_strict_assign_named_property_slow_rs`),
+        // which all miss paths bail to.
+        //
+        // The probe (`op_assign_named_property_rust_probe_rs`) is shared
+        // because it only handles the writable case (`!handler.writable()`
+        // returns false); read-only hits return false and fall through
+        // to the strict slow path, preserving the TypeError contract.
+        load_feedback_site!(slot => t0);
+        branch_named_own_inline_write_mode!(t0, .probe);
+
+        load_reg!(a => a);
+        check_object_ref!(a, .probe_dirty);
+        untag_object_ref!(a);
+        load_named_handler_bits!(t0 => slot);
+        load_named_target_shape!(t0 => t1);
+
+        load_named_inline_writable_slot_index_or_branch!(slot => c, .probe_dirty);
+
+        load_object_record_from_state_or_branch!(a => a, .probe_dirty);
+        load_record_shape!(a => t2);
+        load_named_handler_shape!(slot => t0);
+        cmp_branch_ne!(t2, t0, .probe_dirty);
+
+        load_reg!(b => b);
+        branch_value_references_heap!(b, .probe_dirty);
+
+        store_record_inline_slot!(a, c, b);
+        store_record_shape!(a, t1);
+        dispatch!();
+
+        .probe_dirty:
+        decode_abc_slot!(a, b, c, slot);
+        .probe:
+        call_rust_probe!(op_assign_named_property_rust_probe_rs, args = [a, b, c, slot]);
+        branch_nonzero!(0, .slow);
+        dispatch_probe_hit_no_refresh!();
+        .slow:
+        decode_abc_slot!(a, b, c, slot);
         call_slow!(op_strict_assign_named_property_slow_rs, args = [a, b, c, slot]);
         dispatch_after_slow!();
     }

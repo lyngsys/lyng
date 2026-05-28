@@ -4462,3 +4462,102 @@ fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
         mode_after,
     );
 }
+
+// -----------------------------------------------------------------------------
+// Task 8: asm monomorphic-write fast path intercepts hot loop writes
+// -----------------------------------------------------------------------------
+//
+// Once the slow path has installed an `OwnDataInlineWrite` entry (mode = 5),
+// subsequent dispatches of the same op_assign_named_property site must hit the
+// asm fast path: the rust probe should be invoked only on cold dispatches
+// (warmup), never on the steady-state hot loop. Track `assign_probe_dispatches`
+// to confirm — the asm bails to the rust probe only on miss, so a fast-path
+// hit leaves the counter untouched.
+
+#[cfg(feature = "diagnostic-counters")]
+#[test]
+fn t8_assign_named_property_asm_fast_path_hits_after_warmup() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+
+    let unit = compile_test_unit(60_003, "source.value = 9; source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let store_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(1));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First run: slow path installs mode = 5.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(9),
+        "T8: warmup run must evaluate to 9"
+    );
+    let mode = vm
+        .metadata_table(installed.code())
+        .expect("T8: MetadataTable should exist after warmup")
+        .property(store_slot.get())
+        .mode;
+    assert_eq!(
+        mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "T8: warmup must install mode = {}, got {}",
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode,
+    );
+
+    // Snapshot the probe counter after warmup; subsequent runs must NOT
+    // bump it because the asm fast path intercepts every dispatch.
+    let dispatches_after_warmup = vm.ic_slow_path_counters().assign_probe_dispatches();
+
+    // Re-run the script many times. Each run executes the store opcode once;
+    // if the asm fast path is wired correctly, none of these dispatches reach
+    // the rust probe.
+    const HOT_ITERATIONS: usize = 50;
+    for _ in 0..HOT_ITERATIONS {
+        assert_eq!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap(),
+            Value::from_smi(9),
+        );
+    }
+
+    let dispatches_after_hot = vm.ic_slow_path_counters().assign_probe_dispatches();
+    let probe_dispatches_during_hot = dispatches_after_hot - dispatches_after_warmup;
+    assert!(
+        probe_dispatches_during_hot < 5,
+        "T8: asm fast path must intercept hot loop writes; rust probe was invoked {} times across {} hot dispatches (cold tolerance: <5)",
+        probe_dispatches_during_hot,
+        HOT_ITERATIONS,
+    );
+
+    // Final sanity: the IC slot must still be in mode = 5 after the hot loop
+    // (no transitions, no watchpoint fires, just hits).
+    let mode_after = vm
+        .metadata_table(installed.code())
+        .expect("T8: MetadataTable should still exist after hot loop")
+        .property(store_slot.get())
+        .mode;
+    assert_eq!(
+        mode_after, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "T8: IC mode must remain {} after hot loop, got {}",
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode_after,
+    );
+}
+

@@ -268,6 +268,58 @@ macro_rules! check_double {
     };
 }
 
+/// Branch to `$label` when `$reg` holds a heap-referencing tagged
+/// `Value`. Used by inline-slot store fast paths to bypass GC write
+/// barriers safely: a write of a primitive (SMI, double, bool, null,
+/// undefined, sentinel) into an object slot never needs the
+/// incremental-marking value barrier (because the value can't be a
+/// heap referent) nor the generational card mark (because primitives
+/// can't point to young objects). When the macro does NOT branch, the
+/// caller may freely `str` the value into an inline slot without
+/// touching the barrier helpers.
+///
+/// 7 instructions worst case: `lsr` + `movz` + `cmp` to test the
+/// canonical-NaN tag header (doubles bail to the not-heap fall-through
+/// path), then `ubfx` + `cmp` + `b.hs` to test whether the tag kind is
+/// in the heap-referencing range (`ObjectRef = 5`, `StringRef = 6`,
+/// `SymbolRef = 7`, `BigIntRef = 8`, `SuspendedExecutionRef = 10`).
+/// `Sentinel = 9` is an internal-only kind that doesn't reference the
+/// heap; the `b.hs #5` form conservatively treats it as
+/// heap-referencing too (pushing Sentinel writes through the Rust probe
+/// instead of inlining), which is safe and never appears on the
+/// AssignNamedProperty hot path.
+///
+/// Heap-referencing tag kinds per `crates/types/src/value.rs::TagKind`:
+/// `ObjectRef=5`, `StringRef=6`, `SymbolRef=7`, `BigIntRef=8`,
+/// `SuspendedExecutionRef=10`. We branch on kind `>= 5` after first
+/// checking the value is tagged (high 16 bits == 0x7ff8); doubles
+/// (non-`0x7ff8` high half) skip past the kind check as primitives.
+#[macro_export]
+macro_rules! branch_value_references_heap {
+    ($reg:tt, $label:tt) => {
+        concat!(
+            // High 16 bits == 0x7ff8 ⇒ value is tagged (or canonical
+            // NaN). Doubles have a different high half and are
+            // primitive — fall through past the kind check.
+            "lsr    x16, x",
+            stringify!($reg),
+            ", #48\n",
+            "movz   x17, #0x7ff8\n",
+            "cmp    x16, x17\n",
+            // Tagged path: extract the 16-bit kind and test `>= 5`.
+            "b.ne   1f\n",
+            "ubfx   x16, x",
+            stringify!($reg),
+            ", #32, #16\n",
+            "cmp    x16, #5\n",
+            "b.hs   ",
+            stringify!($label),
+            "\n",
+            "1:\n",
+        )
+    };
+}
+
 /// After a raw `Value` equality match, branch to `$true_label` when the
 /// value is known to be strictly equal to itself, or `$false_label` for
 /// the canonical NaN value.
