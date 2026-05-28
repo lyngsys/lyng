@@ -321,7 +321,18 @@ impl NamedPropertyHandler {
 /// rely on the existing slab persistence in `ObjectRuntime::shape_metadata`.
 /// If shape collection is ever introduced, this struct's consumers (the
 /// asm fast path + the IC cache hit-path verifier) would need to participate
-/// in pinning or sweep — see the design doc §6.
+/// in pinning or sweep.
+///
+/// **Why only `source_shape` is watched, not `target_shape`:** the asm hit
+/// path validates `receiver_shape == source_shape` inline; on mismatch it
+/// bails to the Rust probe. Watchpoints invalidate the cache on events
+/// the asm cannot detect (dictionary transitions, prototype mutations,
+/// property additions on the source). The target shape doesn't need its
+/// own watchpoint: a transition-hit produces a receiver with the target
+/// shape; the next dispatch with that same target shape would fail the
+/// source-shape compare and fall to the probe, where the planner would
+/// install a fresh entry. Non-transition hits leave `source == target`
+/// — the existing source-shape watchpoint already covers them.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NamedPropertyInlineWriteHandler {
