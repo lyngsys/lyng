@@ -289,6 +289,16 @@ impl ObjectRuntime {
             return Ok(None);
         }
 
+        // Walk the prototype chain pushing each prototype as a dependency.
+        // When a prototype carries the key as a *writable data* property, the
+        // ordinary [[Set]] semantics define a new own property on the receiver
+        // that shadows the prototype value — a transition we CAN cache.
+        // Stop walking at that point: prototypes past the shadowing site are
+        // not consulted by `ordinary_set`, so their shapes do not influence
+        // cache correctness. Bail out on any prototype carrying the key as
+        // an accessor or as a non-writable data property: those paths either
+        // invoke a setter or silently fail and must not be cached as a plain
+        // transitioning own-write.
         let mut current = receiver_header.prototype();
         while let Some(object) = current {
             let header = self
@@ -305,8 +315,15 @@ impl ObjectRuntime {
             )? {
                 return Ok(None);
             }
-            if self.shape_property(header.shape(), key).is_some() {
-                return Ok(None);
+            if let Some(proto_prop) = self.shape_property(header.shape(), key) {
+                // Only writable data can be safely shadowed by a transition.
+                if proto_prop.kind() != ShapePropertyKind::Data
+                    || !proto_prop.attrs().writable()
+                {
+                    return Ok(None);
+                }
+                // Shadowing path settled at this prototype — stop walking.
+                break;
             }
             current = header.prototype();
         }
@@ -528,9 +545,11 @@ impl ObjectRuntime {
             }
             current = record.prototype();
         }
-        if current.is_some() {
-            return Ok(None);
-        }
+        // The dependency chain MAY terminate early at a "shadowing" prototype —
+        // one that itself carries `entry.key()` as a writable data property —
+        // and the planner intentionally stops walking past that point because
+        // `ordinary_set` itself stops there. Validation therefore does not
+        // require the prototype chain to be empty after the deps are matched.
         Ok(Some(receiver_record))
     }
 

@@ -798,7 +798,12 @@ fn named_property_transition_store_cache_adds_absent_own_data_properties() {
 }
 
 #[test]
-fn named_property_transition_store_cache_rejects_inherited_properties() {
+fn named_property_transition_store_cache_plans_shadowing_writable_data_property() {
+    // When a writable data property of the same key exists on the prototype
+    // chain, an ordinary [[Set]] defines a new own data property on the
+    // receiver that shadows the prototype value. That defines a shape
+    // transition we can cache: the transition plan must succeed (Some)
+    // and carry the shadowed prototype as a dependency.
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -816,6 +821,52 @@ fn named_property_transition_store_cache_rejects_inherited_properties() {
             prototype,
             key,
             data_descriptor(Value::from_smi(7), true, true),
+            AllocationLifetime::Default,
+        )
+        .unwrap());
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
+        AllocationLifetime::Default,
+    );
+
+    let plan = runtime
+        .plan_named_property_transition_store_entry(
+            &mut mutator,
+            object,
+            key,
+            AllocationLifetime::Default,
+        )
+        .unwrap()
+        .expect("writable data on prototype must yield a shadowing transition plan");
+    // Two dependencies: receiver (dep[0]) and the shadowed prototype (dep[1]).
+    assert_eq!(plan.dependency_count(), 2);
+    assert_eq!(plan.dependency(1).map(|d| d.object()), Some(prototype));
+}
+
+#[test]
+fn named_property_transition_store_cache_rejects_inherited_non_writable_data() {
+    // A non-writable inherited data property must still bail (ordinary [[Set]]
+    // returns false without creating an own property), so no transition can
+    // be cached.
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(906));
+
+    let prototype = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime
+        .define_own_property(
+            &mut mutator,
+            prototype,
+            key,
+            // writable = false → not shadowable.
+            data_descriptor(Value::from_smi(7), false, true),
             AllocationLifetime::Default,
         )
         .unwrap());
