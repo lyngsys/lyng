@@ -4356,3 +4356,109 @@ fn t5_store_slow_path_install_writes_mode_5_into_metadata() {
         mode,
     );
 }
+
+// -----------------------------------------------------------------------------
+// Task 6: AdaptiveOwnWrite watchpoint clears the IC slot on shape invalidation
+// -----------------------------------------------------------------------------
+//
+// After the store IC is installed (mode = 5), triggering a dictionary
+// transition on the source object's shape must fire the registered
+// AdaptiveOwnWrite watchpoint, which clears the IC slot (mode → 0).
+//
+// Strategy: same setup as T5. After the store IC is installed, redefine the
+// source object's `value` property with `configurable: false` via
+// `agent.define_own_property(..., &mut vm)`. This changes the descriptor,
+// triggering the dictionary transition path and firing any watchpoints
+// registered on the pre-transition shape — including the AdaptiveOwnWrite
+// watchpoint that Task 6 registers.
+
+#[test]
+fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+
+    let unit = compile_test_unit(60_002, "source.value = 9; source.value;");
+    let entry = unit.function(unit.entry()).unwrap();
+    let store_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyStore)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-store site for source.value");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let source_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "source"));
+    let value_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "value"));
+    // Pre-create the object with an existing `value` property so the store
+    // hits the OwnData path (dependency_count == 1 → valid inline-write handler).
+    let object = make_object_with_value(agent, root_shape, &[], value_name, Value::from_smi(1));
+    install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // First run: slow path fires (Uninit → Monomorphic/OwnData), installs mode = 5.
+    assert_eq!(
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap(),
+        Value::from_smi(9),
+        "T6: store + load must evaluate to 9"
+    );
+
+    // Confirm mode = 5 before the dictionary transition.
+    let mode_before = vm
+        .metadata_table(installed.code())
+        .expect("T6: MetadataTable should exist after install")
+        .property(store_slot.get())
+        .mode;
+    assert_eq!(
+        mode_before,
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "T6: Store-purpose IC must be mode {} before dictionary transition, got {}",
+        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        mode_before,
+    );
+
+    // Capture the source object's shape BEFORE the transition; needed for
+    // diagnostic purposes only — the watchpoint fires via agent.define_own_property.
+    let source_shape_before = agent
+        .with_heap_and_objects(|heap, _objects| heap.view().object(object).unwrap().shape())
+        .expect("source object should have a shape before dictionary transition");
+    let _ = source_shape_before; // suppress unused warning
+
+    // Trigger a dictionary transition by redefining `value` with
+    // `configurable: false`. This changes the descriptor attributes on a
+    // shape-stable property, which sends the object into dictionary mode and
+    // fires all watchpoints registered on the pre-transition shape.
+    {
+        let mut redefine = lyng_types::PropertyDescriptor::new();
+        redefine.set_configurable(false);
+        agent
+            .define_own_property(
+                object,
+                PropertyKey::from_atom(value_name),
+                redefine,
+                AllocationLifetime::Default,
+                &mut vm,
+            )
+            .expect("T6: redefine must succeed");
+    }
+
+    // After the dictionary transition the AdaptiveOwnWrite watchpoint must
+    // have fired and cleared the IC slot (mode → 0).
+    let mode_after = vm
+        .metadata_table(installed.code())
+        .expect("T6: MetadataTable should still exist after watchpoint fire")
+        .property(store_slot.get())
+        .mode;
+    assert_eq!(
+        mode_after, 0,
+        "T6: AdaptiveOwnWrite watchpoint must clear IC slot (mode → 0) after dictionary transition, got {}",
+        mode_after,
+    );
+}

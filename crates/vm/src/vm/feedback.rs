@@ -24,7 +24,7 @@ use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
     NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyInlineWriteHandler,
     NamedPropertyProtoHandler, ObjectFlags, ObjectHeader, ObjectKind, PrimitiveWrapperKind,
-    SlotLocation, PROPERTY_CACHE_MAX_DEPENDENCIES,
+    ShapeInvalidationObserver, SlotLocation, Watchpoint, PROPERTY_CACHE_MAX_DEPENDENCIES,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::cmp::Ordering;
@@ -841,6 +841,36 @@ impl Vm {
             return;
         }
         self.named_property_install_slow_path(code, slot, plan, purpose);
+
+        // Spec 2 Task 6: register AdaptiveOwnWrite on the source shape for Store
+        // installs of OwnData / OwnDataTransition entries that produced a valid
+        // asm handler. Registering AFTER install so the generation captured here
+        // matches what clear_ic_slot_if_generation_matches will see when the
+        // watchpoint fires.
+        if purpose == NamedPropertyCachePurpose::Store
+            && let Some(plan_entry) = plan
+            && matches!(
+                plan_entry.path(),
+                NamedPropertyCachePath::OwnData | NamedPropertyCachePath::OwnDataTransition
+            )
+            && let Some(state) = self.property_ic_state(code, slot)
+            && state.monomorphic_own_inline_write_handler.is_valid()
+        {
+            let source_shape = plan_entry.receiver_shape();
+            let generation = state.generation;
+            let observer = ShapeInvalidationObserver::AdaptiveOwnWrite {
+                code,
+                slot,
+                generation,
+            };
+            // Registration may fail (Err(Invalidated)) if the shape is
+            // already invalidated — in that case the next slow-path miss
+            // re-attempts on the post-invalidation shape. Drop the result.
+            let _ = agent
+                .objects_mut()
+                .watchpoint_set_mut(source_shape)
+                .register(Watchpoint::ShapeInvalidation { observer });
+        }
     }
 
     /// Slow-path install for a named-property IC entry.
