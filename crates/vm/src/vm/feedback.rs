@@ -870,6 +870,32 @@ impl Vm {
                 .objects_mut()
                 .watchpoint_set_mut(source_shape)
                 .register(Watchpoint::ShapeInvalidation { observer });
+
+            // Register on all additional dependency shapes too. These are
+            // typically prototype shapes for transitioning writes — if any of
+            // them transitions to dictionary or gets a setter added, the IC
+            // must clear. Mirrors the pattern used by
+            // register_proto_chain_watchpoints for AdaptiveProtoLoad on the
+            // read side. Skip index 0 (the receiver / source shape, already
+            // registered above); iterate from 1 onward.
+            for i in 1..usize::from(plan_entry.dependency_count()) {
+                if let Some(dep) = plan_entry.dependency(i) {
+                    let dep_shape = dep.shape();
+                    if dep_shape != source_shape {
+                        let dep_observer = ShapeInvalidationObserver::AdaptiveOwnWrite {
+                            code,
+                            slot,
+                            generation,
+                        };
+                        let _ = agent
+                            .objects_mut()
+                            .watchpoint_set_mut(dep_shape)
+                            .register(Watchpoint::ShapeInvalidation {
+                                observer: dep_observer,
+                            });
+                    }
+                }
+            }
         }
     }
 

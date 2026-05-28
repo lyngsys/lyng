@@ -361,9 +361,18 @@ impl NamedPropertyInlineWriteHandler {
     /// Build a write handler from a cache entry. Returns [`Self::NONE`] for
     /// entries the asm write fast path cannot service:
     /// - `PrototypeData` paths (no own-data write semantics)
-    /// - Multi-dependency entries (more than one shape guard required)
+    /// - Zero-dependency entries (should never occur in practice; defensive)
+    /// - Entries with more than `PROPERTY_CACHE_MAX_DEPENDENCIES` dependencies
     /// - Out-of-line slot entries (MVP scope; deferred)
     /// - Slot offsets exceeding 30 bits (defensive)
+    ///
+    /// Multi-dependency entries (dependency_count > 1) are accepted. The
+    /// additional dependencies are typically prototype shapes that validate
+    /// no setter intercepts the write. The asm hit path only checks the
+    /// receiver (source) shape; all other dependencies are guarded by
+    /// `AdaptiveOwnWrite` watchpoints registered at install time. If any
+    /// dependency shape invalidates, the watchpoint fires and clears the IC
+    /// slot — mirroring `AdaptiveProtoLoad` on the read side.
     #[inline]
     #[must_use]
     pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
@@ -371,7 +380,13 @@ impl NamedPropertyInlineWriteHandler {
             NamedPropertyCachePath::OwnData | NamedPropertyCachePath::OwnDataTransition => {}
             NamedPropertyCachePath::PrototypeData => return Self::NONE,
         }
-        if entry.dependency_count() != 1 {
+        // Accept any dependency_count from 1 to PROPERTY_CACHE_MAX_DEPENDENCIES.
+        // dependency_count == 0 is a planner invariant violation; reject it
+        // defensively. Counts above the max cannot have been recorded.
+        if entry.dependency_count() == 0 {
+            return Self::NONE;
+        }
+        if entry.dependency_count() as usize > PROPERTY_CACHE_MAX_DEPENDENCIES {
             return Self::NONE;
         }
         let encoded_offset = entry.slot_offset();
@@ -1098,10 +1113,11 @@ mod inline_write_handler_tests {
     }
 
     #[test]
-    fn from_multi_dependency_entry_is_none() {
-        // Even an inline OwnData entry must be rejected when the
-        // dependency count exceeds 1 — the asm shape guard cannot
-        // validate more than one shape.
+    fn from_multi_dependency_entry_is_valid_when_inline() {
+        // Multi-dependency OwnData entries are now accepted. The extra
+        // dependencies (e.g. prototype shapes validating no-setter) are
+        // guarded by AdaptiveOwnWrite watchpoints at install time; the asm
+        // hit path only validates the receiver shape.
         let shape = ShapeId::from_raw(13).expect("non-zero");
         let entry = NamedPropertyCacheEntry::new(
             shape,
@@ -1110,7 +1126,55 @@ mod inline_write_handler_tests {
             INLINE_SLOT_OFFSET_FLAG | 0,
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
-            2, // dependency_count > 1 → must reject
+            2, // dependency_count > 1 — accepted now
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(handler.is_valid());
+        assert_eq!(handler.source_shape(), Some(shape));
+        assert_eq!(handler.target_shape(), Some(shape));
+    }
+
+    #[test]
+    fn from_transition_entry_with_two_dependencies_is_valid() {
+        // OwnDataTransition with dependency_count == 2 — typical constructor
+        // pattern (receiver shape + one prototype shape). Must be accepted.
+        let source = ShapeId::from_raw(17).expect("non-zero");
+        let target = ShapeId::from_raw(23).expect("non-zero");
+        let proto_shape = ShapeId::from_raw(5).expect("non-zero");
+        let proto_obj = ObjectRef::from_raw(2).expect("non-zero");
+        let mut deps = [None; PROPERTY_CACHE_MAX_DEPENDENCIES];
+        deps[1] = Some(PropertyCacheDependency::new(proto_obj, proto_shape));
+        let entry = NamedPropertyCacheEntry::new(
+            source,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            target,
+            INLINE_SLOT_OFFSET_FLAG | 2, // inline slot 2
+            writable_attrs(),
+            NamedPropertyCachePath::OwnDataTransition,
+            2, // receiver + prototype dependency
+            deps,
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(handler.is_valid());
+        assert_eq!(handler.source_shape(), Some(source));
+        assert_eq!(handler.target_shape(), Some(target));
+        assert_eq!(handler.slot_location(), SlotLocation::Inline(2));
+        assert!(handler.writable());
+    }
+
+    #[test]
+    fn from_zero_dependency_entry_is_none() {
+        // dependency_count == 0 is a planner invariant violation; reject defensively.
+        let shape = ShapeId::from_raw(3).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            shape,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            shape,
+            INLINE_SLOT_OFFSET_FLAG | 0,
+            writable_attrs(),
+            NamedPropertyCachePath::OwnData,
+            0, // violates planner invariant
             [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );
         let handler = NamedPropertyInlineWriteHandler::from_entry(entry);

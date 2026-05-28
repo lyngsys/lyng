@@ -215,9 +215,9 @@ mod tests {
             INLINE_SLOT_OFFSET_FLAG | 2,
             writable_attrs(),
             NamedPropertyCachePath::OwnDataTransition,
-            // dependency_count = 1 is required by NamedPropertyInlineWriteHandler::from_entry
-            // (it returns NONE for any count != 1). The dependency slots are left as None because
-            // from_entry only checks the count; this fixture predates a full dependency mock.
+            // dependency_count = 1: simple receiver-only entry. from_entry
+            // accepts 1..=PROPERTY_CACHE_MAX_DEPENDENCIES; this uses the
+            // minimum to keep the fixture simple.
             1,
             [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );
@@ -244,9 +244,7 @@ mod tests {
             INLINE_SLOT_OFFSET_FLAG | 0,
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
-            // dependency_count = 1 is required by NamedPropertyInlineWriteHandler::from_entry
-            // (it returns NONE for any count != 1). The dependency slots are left as None because
-            // from_entry only checks the count; this fixture predates a full dependency mock.
+            // dependency_count = 1: receiver-only, simplest valid entry.
             1,
             [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );
