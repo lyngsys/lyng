@@ -13,16 +13,19 @@ Score = `100 × reference_µs / mean_µs` (V8 standard formula); higher is bette
 - lyng binary: `target/release/lyng`
 - V8 v7 sources: `testdata/js-benchmarks/v8-v7`
 
-## Scores
+## Scores (post-Spec-3 transition IC)
 
 | Benchmark | Median score | Median µs/iter | Samples |
 | --- | ---: | ---: | --- |
-| `Richards` | `482` | `7324.1` | 484, 483, 477, 477, 482 |
-| `DeltaBlue` | `393` | `16823.9` | 394, 393, 393, 389, 391 |
-| `Crypto` | `446` | `59681.8` | 446, 444, 446, 447, 446 |
-| `RayTrace` | `232` | `318960.8` | 232, 231, 232, 232, 232 |
-| `NavierStokes` | `599` | `247746.2` | 599, 601, 599, 595, 599 |
-| `Splay` | `1431` | `5694.7` | 1393, 1406, 1443, 1431, 1456 |
+| `Richards` | `475` | `7400.8` | 475, 477, 466 |
+| `DeltaBlue` | `386` | `17084.8` | 385, 387, 385 |
+| `Crypto` | `427` | `62337.5` | 426, 427, 426 |
+| `RayTrace` | `268` | `274070.0` | 270, 266, 268 |
+| `NavierStokes` | `572` | `259440.6` | 572, 568, 570 |
+| `Splay` | `1461` | `5577.8` | 1461, 1471, 1395 |
+
+(3-run medians on a thermally-stabilized system. Splay has the highest
+run-to-run variance (~5%); other benchmarks were stable to ~1%.)
 
 ## Phase D progression (Spec 2)
 
@@ -53,3 +56,44 @@ and `record_smi!` is 10 instructions vs 9. RayTrace is arith-heavy (vector
 math) so this per-dispatch overhead dominates. Recovering it would require
 asm-DSL work (e.g. revisiting the metadata-table buffer layout to enable a
 2-instruction resolve) — out of scope for Phase D.
+
+## Transition IC (Spec 3) bench journey
+
+Post-Phase-D RayTrace sat at 232 (-25% vs pre-Spec-2's 291). Diagnostic
+counter data showed 98.3% of `AssignNamedProperty` slow entries were
+classified `shape_mismatch` — the IC was Monomorphic with a valid handler,
+but the receiver shape never matched. RayTrace's Prototype.js-style
+`Class.create` pattern (`Vector.prototype = { x: 0, y: 0, z: 0, initialize: ... }`)
+meant every constructor's `this.x = x` walked the prototype chain, found
+`x` on the prototype, and bailed the planner — leaving the IC to install
+against the WRONG (post-transition) receiver shape.
+
+Spec 3 adds an asm-recognized `OwnDataInlineWrite` IC kind (mode = 5)
+that caches `(source_shape, target_shape, slot_location)`, the
+`AdaptiveOwnWrite` watchpoint variant, and a planner fix that handles
+prototype shadowing of writable data properties.
+
+| Stage | Richards | DeltaBlue | Crypto | RayTrace | NavierStokes | Splay |
+|---|---:|---:|---:|---:|---:|---:|
+| Pre-Spec-2 (`857d2528`) | 484 | 421 | 393 | 291 | 541 | 1440 |
+| Phase D end (`b8b3c83f`) | 470 | 389 | 441 | 232 | 602 | 1465 |
+| Spec 3 (transition IC, current) | **475** | **386** | **427** | **268** | **572** | **1461** |
+
+**RayTrace recovers 60% of the post-Spec-2 gap** (232 → 268 vs pre-Spec-2's
+291). The remaining 23-point gap is structural — primarily because the
+monomorphic-only MVP doesn't asm-cache polymorphic writes (mode = 6
+deferred) or outline-slot writes (mode = 7 deferred). Counter data after
+the planner fix confirms `shape_mismatch` slow entries dropped from 7M to 1.
+
+**Modest regressions on Crypto (-3%) and NavierStokes (-5%).** The new
+asm path adds a 3-instruction mode-byte check on the cold (uncached)
+assign dispatch path. For benchmarks with few assigns but many other
+ops, this fixed overhead shows up as a small per-dispatch tax not offset
+by transition-IC hits. Splay's variance is high enough that its 0.3%
+delta is within noise.
+
+**Net architectural outcome:** the IC layer now matches the JSC-canonical
+write fast-path shape (single mode-byte check, cached transition arrow,
+watchpoint invalidation on dependency shape events). Subsequent
+follow-ups (polymorphic-write asm, outline-slot write asm) can plug into
+this foundation without further architectural changes.
