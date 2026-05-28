@@ -4281,7 +4281,7 @@ fn d4_property_ic_state_clear_and_reinstall() {
 }
 
 // -----------------------------------------------------------------------------
-// Task 5: Store-purpose IC install writes mode = 5 (LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE)
+// Store-purpose IC install writes mode = 5 (LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE)
 // -----------------------------------------------------------------------------
 //
 // Stores to an existing own-data property produce an OwnData-path cache entry
@@ -4294,7 +4294,7 @@ fn d4_property_ic_state_clear_and_reinstall() {
 // be LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE (= 5).
 
 #[test]
-fn t5_store_slow_path_install_writes_mode_5_into_metadata() {
+fn store_slow_path_install_writes_mode_5_into_metadata() {
     use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 
     let unit = compile_test_unit(60_001, "source.value = 9; source.value;");
@@ -4328,7 +4328,7 @@ fn t5_store_slow_path_install_writes_mode_5_into_metadata() {
             .run()
             .unwrap(),
         Value::from_smi(9),
-        "T5: store + load must evaluate to 9"
+        "store + load must evaluate to 9"
     );
 
     // Confirm the IC is Monomorphic / OwnData.
@@ -4339,41 +4339,41 @@ fn t5_store_slow_path_install_writes_mode_5_into_metadata() {
             1,
             Some(lyng_objects::NamedPropertyCachePath::OwnData)
         )),
-        "T5: store slot must be Monomorphic/OwnData after first run"
+        "store slot must be Monomorphic/OwnData after first run"
     );
 
     // The key assertion: mode must be LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE (= 5).
     let mode = vm
         .metadata_table(installed.code())
-        .expect("T5: MetadataTable should exist after install")
+        .expect("MetadataTable should exist after install")
         .property(store_slot.get())
         .mode;
     assert_eq!(
         mode,
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "T5: Store-purpose IC install must write mode = {} into PropertyMetadata, got {}",
+        "Store-purpose IC install must write mode = {} into PropertyMetadata, got {}",
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
         mode,
     );
 }
 
 // -----------------------------------------------------------------------------
-// Task 6: AdaptiveOwnWrite watchpoint clears the IC slot on shape invalidation
+// AdaptiveOwnWrite watchpoint clears the IC slot on shape invalidation
 // -----------------------------------------------------------------------------
 //
 // After the store IC is installed (mode = 5), triggering a dictionary
 // transition on the source object's shape must fire the registered
 // AdaptiveOwnWrite watchpoint, which clears the IC slot (mode → 0).
 //
-// Strategy: same setup as T5. After the store IC is installed, redefine the
-// source object's `value` property with `configurable: false` via
-// `agent.define_own_property(..., &mut vm)`. This changes the descriptor,
-// triggering the dictionary transition path and firing any watchpoints
-// registered on the pre-transition shape — including the AdaptiveOwnWrite
-// watchpoint that Task 6 registers.
+// Strategy: same setup as the mode-5 install test. After the store IC is
+// installed, redefine the source object's `value` property with
+// `configurable: false` via `agent.define_own_property(..., &mut vm)`. This
+// changes the descriptor, triggering the dictionary transition path and
+// firing every watchpoint registered on the pre-transition shape —
+// including the AdaptiveOwnWrite watchpoint installed alongside the IC.
 
 #[test]
-fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
+fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
     use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 
     let unit = compile_test_unit(60_002, "source.value = 9; source.value;");
@@ -4407,29 +4407,22 @@ fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
             .run()
             .unwrap(),
         Value::from_smi(9),
-        "T6: store + load must evaluate to 9"
+        "store + load must evaluate to 9"
     );
 
     // Confirm mode = 5 before the dictionary transition.
     let mode_before = vm
         .metadata_table(installed.code())
-        .expect("T6: MetadataTable should exist after install")
+        .expect("MetadataTable should exist after install")
         .property(store_slot.get())
         .mode;
     assert_eq!(
         mode_before,
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "T6: Store-purpose IC must be mode {} before dictionary transition, got {}",
+        "Store-purpose IC must be mode {} before dictionary transition, got {}",
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
         mode_before,
     );
-
-    // Capture the source object's shape BEFORE the transition; needed for
-    // diagnostic purposes only — the watchpoint fires via agent.define_own_property.
-    let source_shape_before = agent
-        .with_heap_and_objects(|heap, _objects| heap.view().object(object).unwrap().shape())
-        .expect("source object should have a shape before dictionary transition");
-    let _ = source_shape_before; // suppress unused warning
 
     // Trigger a dictionary transition by redefining `value` with
     // `configurable: false`. This changes the descriptor attributes on a
@@ -4446,25 +4439,25 @@ fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
                 AllocationLifetime::Default,
                 &mut vm,
             )
-            .expect("T6: redefine must succeed");
+            .expect("redefine must succeed");
     }
 
     // After the dictionary transition the AdaptiveOwnWrite watchpoint must
     // have fired and cleared the IC slot (mode → 0).
     let mode_after = vm
         .metadata_table(installed.code())
-        .expect("T6: MetadataTable should still exist after watchpoint fire")
+        .expect("MetadataTable should still exist after watchpoint fire")
         .property(store_slot.get())
         .mode;
     assert_eq!(
         mode_after, 0,
-        "T6: AdaptiveOwnWrite watchpoint must clear IC slot (mode → 0) after dictionary transition, got {}",
+        "AdaptiveOwnWrite watchpoint must clear IC slot (mode → 0) after dictionary transition, got {}",
         mode_after,
     );
 }
 
 // -----------------------------------------------------------------------------
-// Task 8: asm monomorphic-write fast path intercepts hot loop writes
+// asm monomorphic-write fast path intercepts hot loop writes
 // -----------------------------------------------------------------------------
 //
 // Once the slow path has installed an `OwnDataInlineWrite` entry (mode = 5),
@@ -4476,7 +4469,7 @@ fn t6_adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
 
 #[cfg(feature = "diagnostic-counters")]
 #[test]
-fn t8_assign_named_property_asm_fast_path_hits_after_warmup() {
+fn assign_named_property_asm_fast_path_hits_after_warmup() {
     use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 
     let unit = compile_test_unit(60_003, "source.value = 9; source.value;");
@@ -4508,16 +4501,16 @@ fn t8_assign_named_property_asm_fast_path_hits_after_warmup() {
             .run()
             .unwrap(),
         Value::from_smi(9),
-        "T8: warmup run must evaluate to 9"
+        "warmup run must evaluate to 9"
     );
     let mode = vm
         .metadata_table(installed.code())
-        .expect("T8: MetadataTable should exist after warmup")
+        .expect("MetadataTable should exist after warmup")
         .property(store_slot.get())
         .mode;
     assert_eq!(
         mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "T8: warmup must install mode = {}, got {}",
+        "warmup must install mode = {}, got {}",
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode,
     );
 
@@ -4542,7 +4535,7 @@ fn t8_assign_named_property_asm_fast_path_hits_after_warmup() {
     let probe_dispatches_during_hot = dispatches_after_hot - dispatches_after_warmup;
     assert!(
         probe_dispatches_during_hot < 5,
-        "T8: asm fast path must intercept hot loop writes; rust probe was invoked {} times across {} hot dispatches (cold tolerance: <5)",
+        "asm fast path must intercept hot loop writes; rust probe was invoked {} times across {} hot dispatches (cold tolerance: <5)",
         probe_dispatches_during_hot,
         HOT_ITERATIONS,
     );
@@ -4551,12 +4544,12 @@ fn t8_assign_named_property_asm_fast_path_hits_after_warmup() {
     // (no transitions, no watchpoint fires, just hits).
     let mode_after = vm
         .metadata_table(installed.code())
-        .expect("T8: MetadataTable should still exist after hot loop")
+        .expect("MetadataTable should still exist after hot loop")
         .property(store_slot.get())
         .mode;
     assert_eq!(
         mode_after, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "T8: IC mode must remain {} after hot loop, got {}",
+        "IC mode must remain {} after hot loop, got {}",
         LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode_after,
     );
 }

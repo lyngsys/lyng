@@ -833,7 +833,10 @@ impl Vm {
         // `named_property_install_slow_path` will lazily insert a fresh entry
         // via `entry(...).or_default()` if the map entry is absent.
 
-        // Spec 2 Phase A: register AdaptiveProtoLoad watchpoints for PrototypeData plans.
+        // PrototypeData plans need an AdaptiveProtoLoad watchpoint on every
+        // prototype shape in the dependency chain so a prototype mutation
+        // (set_prototype, dictionary transition, property addition) clears
+        // the IC before the next dispatch can read a stale slot.
         if let Some(plan_entry) = plan
             && plan_entry.path() == NamedPropertyCachePath::PrototypeData
             && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
@@ -842,9 +845,9 @@ impl Vm {
         }
         self.named_property_install_slow_path(code, slot, plan, purpose);
 
-        // Spec 2 Task 6: register AdaptiveOwnWrite on the source shape for Store
-        // installs of OwnData / OwnDataTransition entries that produced a valid
-        // asm handler. Registering AFTER install so the generation captured here
+        // Register AdaptiveOwnWrite on the source shape for Store installs of
+        // OwnData / OwnDataTransition entries that produced a valid asm
+        // handler. Registering AFTER install so the generation captured here
         // matches what clear_ic_slot_if_generation_matches will see when the
         // watchpoint fires.
         if purpose == NamedPropertyCachePurpose::Store
@@ -1278,7 +1281,8 @@ impl Vm {
             )
             .ok()
             .flatten();
-        // Spec 2 Phase A: register proto-chain watchpoints.
+        // Register AdaptiveProtoLoad watchpoints for keyed PrototypeData
+        // plans — same invariant as the named-property install above.
         if let Some(plan_entry) = plan
             && plan_entry.path() == NamedPropertyCachePath::PrototypeData
             && !Self::register_proto_chain_watchpoints(self, agent, code, slot, plan_entry)
@@ -1950,8 +1954,8 @@ impl Vm {
     }
 
     /// Project the write-side cache state into `PropertyMetadata`. Called
-    /// from the assign opcode's slow-path install (Task 5) when the slot
-    /// is a Store-purpose IC site. Writes mode = `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`
+    /// from the assign opcode's slow-path install when the slot is a
+    /// Store-purpose IC site. Writes mode = `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`
     /// (= 5), `handler_bits` packed source_shape + slot + writable_flag,
     /// `aux_bits` = target_shape. When the handler is NONE, zeroes the
     /// metadata so the asm mode-byte check bails to the Rust probe.

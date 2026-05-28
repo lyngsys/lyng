@@ -363,7 +363,8 @@ impl NamedPropertyInlineWriteHandler {
     /// - `PrototypeData` paths (no own-data write semantics)
     /// - Zero-dependency entries (should never occur in practice; defensive)
     /// - Entries with more than `PROPERTY_CACHE_MAX_DEPENDENCIES` dependencies
-    /// - Out-of-line slot entries (MVP scope; deferred)
+    /// - Out-of-line slot entries (only inline writes are wired through the
+    ///   asm fast path; outline writes fall through to the slow chain)
     /// - Slot offsets exceeding 30 bits (defensive)
     ///
     /// Multi-dependency entries (dependency_count > 1) are accepted. The
@@ -428,8 +429,8 @@ impl NamedPropertyInlineWriteHandler {
     }
 
     /// Decoded slot location. Only meaningful when [`Self::is_valid`].
-    /// MVP: always returns `SlotLocation::Inline` (outline writes are
-    /// filtered to [`Self::NONE`] by [`Self::from_entry`]).
+    /// Always returns `SlotLocation::Inline` — outline writes are
+    /// filtered to [`Self::NONE`] by [`Self::from_entry`].
     #[inline]
     #[must_use]
     pub const fn slot_location(self) -> SlotLocation {

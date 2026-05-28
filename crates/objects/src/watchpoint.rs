@@ -32,13 +32,12 @@ pub enum ShapeInvalidationObserver {
         slot: FeedbackSlotId,
         generation: u32,
     },
-    /// Spec 2 transition-IC: AdaptiveOwnWrite — clears the
-    /// `OwnDataInlineWrite` IC slot at `(code, slot)` if its generation
-    /// still matches `generation`. Registered by the slow path on the
-    /// receiver's source shape when a monomorphic write entry is
-    /// installed. Fires when the source shape goes dictionary, has a
-    /// new property added, or receives a prototype mutation — the slot
-    /// is cleared and re-installs on the next slow-path miss.
+    /// Clears the `OwnDataInlineWrite` IC slot at `(code, slot)` if its
+    /// generation still matches `generation`. Registered by the slow path
+    /// on the receiver's source shape when a monomorphic write entry is
+    /// installed. Fires when the source shape goes dictionary, has a new
+    /// property added, or receives a prototype mutation — the slot is
+    /// cleared and re-installs on the next slow-path miss.
     AdaptiveOwnWrite {
         code: CodeRef,
         slot: FeedbackSlotId,

@@ -36,13 +36,14 @@ pub struct PropertyIcState {
     pub monomorphic_own_data_handler: NamedPropertyHandler,
     /// Monomorphic one-hop PrototypeData sidecar.
     pub monomorphic_proto_data_handler: NamedPropertyProtoHandler,
-    /// Monomorphic `OwnDataInlineWrite` sidecar (Spec 3 transition IC).
+    /// Monomorphic `OwnDataInlineWrite` sidecar.
     /// `NamedPropertyInlineWriteHandler::NONE` when not applicable:
     /// non-OwnData/non-OwnDataTransition path, polymorphic, megamorphic,
     /// uninitialized, or out-of-line slot — see
     /// [`NamedPropertyInlineWriteHandler::from_entry`]. Asm-readable bits
-    /// project into `PropertyMetadata` mode = 5 in Task 4; the write fast
-    /// path in `op_assign_named_property_dsl` consumes them in Task 8.
+    /// project into `PropertyMetadata` mode = 5
+    /// (`LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`); the write fast path in
+    /// `op_assign_named_property_dsl` consumes them.
     pub monomorphic_own_inline_write_handler: NamedPropertyInlineWriteHandler,
     /// Polymorphic OwnData sidecar — mirrors the first `POLY_LIMIT` entries
     /// when the cache is Polymorphic and the entry packs into a valid handler.
