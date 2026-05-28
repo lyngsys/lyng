@@ -23,14 +23,14 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `141` |
 | Selected files | `53053` |
 | Runnable files | `49729` |
-| Passed files | `49727` |
-| Failed files | `2` |
+| Passed files | `49720` |
+| Failed files | `9` |
 | Panicked files | `0` |
 | Skipped files | `3324` |
-| Pass rate (selected files) | `93.73%` |
+| Pass rate (selected files) | `93.72%` |
 | Selected variant executions | `101853` |
 | Runnable variant executions | `95205` |
-| Time | `61.0s` |
+| Time | `53.4s` |
 
 ## Delta From Previous Report
 
@@ -40,11 +40,11 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Excluded files from selection | `141` | `141` | `+0` |
 | Selected files | `53053` | `53053` | `+0` |
 | Runnable files | `49729` | `49729` | `+0` |
-| Passed files | `49669` | `49727` | `+58` |
-| Failed files | `60` | `2` | `-58` |
+| Passed files | `49727` | `49720` | `-7` |
+| Failed files | `2` | `9` | `+7` |
 | Panicked files | `0` | `0` | `+0` |
 | Skipped files | `3324` | `3324` | `+0` |
-| Pass rate (selected files) | `93.62%` | `93.73%` | `+0.11pp` |
+| Pass rate (selected files) | `93.73%` | `93.72%` | `-0.01pp` |
 | Selected variant executions | `101853` | `101853` | `+0` |
 | Runnable variant executions | `95205` | `95205` | `+0` |
 
@@ -61,11 +61,11 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | Category | Selected files | Runnable files | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1086` | `1086` | `1086` | `0` | `0` | `0` | `100.00%` |
-| `built-ins` | `23402` | `23402` | `23402` | `0` | `0` | `0` | `100.00%` |
+| `built-ins` | `23402` | `23402` | `23400` | `2` | `0` | `0` | `99.99%` |
 | `harness` | `116` | `116` | `116` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `3324` | `0` | `0` | `0` | `3324` | `0` | `0.00%` |
 | `language` | `23640` | `23640` | `23638` | `2` | `0` | `0` | `99.99%` |
-| `staging` | `1485` | `1485` | `1485` | `0` | `0` | `0` | `100.00%` |
+| `staging` | `1485` | `1485` | `1480` | `5` | `0` | `0` | `99.66%` |
 
 ## Variant Execution Breakdown
 
@@ -73,19 +73,19 @@ It executes the current Lyng JS runtime harness across the Test262 corpus with p
 | --- | ---: |
 | Selected variant executions | `101853` |
 | Runnable variant executions | `95205` |
-| Passed variants | `95201` |
-| Failed variants | `4` |
+| Passed variants | `95187` |
+| Failed variants | `18` |
 | Panicked variants | `0` |
 | Skipped variants | `6648` |
 
 | Category | Selected variants | Runnable variants | Pass | Fail | Skip | Panic | Rate |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `annexB` | `1377` | `1377` | `1377` | `0` | `0` | `0` | `100.00%` |
-| `built-ins` | `46503` | `46503` | `46503` | `0` | `0` | `0` | `100.00%` |
+| `built-ins` | `46503` | `46503` | `46499` | `4` | `0` | `0` | `99.99%` |
 | `harness` | `232` | `232` | `232` | `0` | `0` | `0` | `100.00%` |
 | `intl402` | `6648` | `0` | `0` | `0` | `6648` | `0` | `0.00%` |
 | `language` | `44347` | `44347` | `44343` | `4` | `0` | `0` | `99.99%` |
-| `staging` | `2746` | `2746` | `2746` | `0` | `0` | `0` | `100.00%` |
+| `staging` | `2746` | `2746` | `2736` | `10` | `0` | `0` | `99.64%` |
 
 ## Slowest Test Timings
 
@@ -95,86 +95,86 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Test file | Variants | Total time | Slowest variant |
 | --- | ---: | ---: | ---: |
-| `staging/sm/Array/toSpliced-dense.js` | `2` | `12.984s` | `6.541s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `4.027s` | `2.029s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `3.935s` | `1.985s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `2.989s` | `1.519s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.962s` | `1.519s` |
-| `language/comments/S7.4_A5.js` | `2` | `2.014s` | `1.007s` |
-| `language/comments/S7.4_A6.js` | `2` | `2.010s` | `1.006s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `2.001s` | `1.047s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.974s` | `0.999s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.940s` | `0.971s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js` | `2` | `1.925s` | `1.000s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.925s` | `0.969s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js` | `2` | `1.922s` | `0.968s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js` | `2` | `1.894s` | `0.973s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.888s` | `0.956s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js` | `2` | `1.884s` | `0.992s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sundanese.js` | `2` | `1.862s` | `0.981s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js` | `2` | `1.859s` | `0.940s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js` | `2` | `1.850s` | `0.927s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.849s` | `0.952s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.839s` | `0.920s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js` | `2` | `1.831s` | `0.948s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sogdian.js` | `2` | `1.830s` | `0.991s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js` | `2` | `1.812s` | `0.953s` |
-| `staging/sm/RegExp/unicode-braced.js` | `2` | `1.792s` | `0.904s` |
+| `staging/sm/Array/toSpliced-dense.js` | `2` | `12.561s` | `6.311s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js` | `2` | `3.661s` | `1.843s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js` | `2` | `3.631s` | `1.851s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js` | `2` | `2.535s` | `1.285s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js` | `2` | `2.528s` | `1.270s` |
+| `language/comments/S7.4_A5.js` | `2` | `2.013s` | `1.007s` |
+| `language/comments/S7.4_A6.js` | `2` | `2.008s` | `1.006s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js` | `2` | `1.772s` | `0.898s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js` | `2` | `1.764s` | `0.905s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js` | `2` | `1.736s` | `0.892s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js` | `2` | `1.725s` | `0.882s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js` | `2` | `1.715s` | `0.884s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js` | `2` | `1.675s` | `0.864s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js` | `2` | `1.616s` | `0.839s` |
+| `staging/sm/RegExp/unicode-braced.js` | `2` | `1.527s` | `0.771s` |
+| `staging/sm/RegExp/unicode-class-braced.js` | `2` | `1.494s` | `0.748s` |
+| `staging/sm/Date/dst-offset-caching-1-of-8.js` | `2` | `1.367s` | `0.709s` |
+| `language/identifiers/start-unicode-10.0.0.js` | `2` | `1.216s` | `0.610s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js` | `2` | `1.091s` | `0.549s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js` | `2` | `1.087s` | `0.549s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Phoenician.js` | `2` | `1.086s` | `0.635s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Phags_Pa.js` | `2` | `1.075s` | `0.569s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Carian.js` | `2` | `1.059s` | `0.546s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Palmyrene.js` | `2` | `1.053s` | `0.529s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js` | `2` | `1.049s` | `0.544s` |
 
 ### Slowest Variants
 
 | Test variant | Outcome | Time |
 | --- | --- | ---: |
-| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.541s` |
-| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.443s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `2.029s` |
-| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `1.998s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `1.985s` |
-| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `1.950s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.519s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `1.519s` |
-| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `1.469s` |
-| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.443s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `1.047s` |
+| `staging/sm/Array/toSpliced-dense.js [non-strict]` | `pass` | `6.311s` |
+| `staging/sm/Array/toSpliced-dense.js [strict]` | `pass` | `6.249s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [strict]` | `pass` | `1.851s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [non-strict]` | `pass` | `1.843s` |
+| `built-ins/decodeURIComponent/S15.1.3.2_A2.5_T1.js [strict]` | `pass` | `1.818s` |
+| `built-ins/decodeURI/S15.1.3.1_A2.5_T1.js [non-strict]` | `pass` | `1.780s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [strict]` | `pass` | `1.285s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [non-strict]` | `pass` | `1.270s` |
+| `staging/sm/TypedArray/sort_large_countingsort.js [strict]` | `pass` | `1.258s` |
+| `staging/sm/TypedArray/element-setting-converts-using-ToNumber.js [non-strict]` | `pass` | `1.250s` |
 | `language/comments/S7.4_A5.js [non-strict]` | `fail` | `1.007s` |
 | `language/comments/S7.4_A5.js [strict]` | `fail` | `1.007s` |
 | `language/comments/S7.4_A6.js [strict]` | `fail` | `1.006s` |
-| `language/comments/S7.4_A6.js [non-strict]` | `fail` | `1.004s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js [strict]` | `pass` | `1.000s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.999s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js [strict]` | `pass` | `0.992s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sogdian.js [strict]` | `pass` | `0.991s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sundanese.js [non-strict]` | `pass` | `0.981s` |
-| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.975s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js [strict]` | `pass` | `0.973s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.971s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.969s` |
-| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.969s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [non-strict]` | `pass` | `0.968s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.956s` |
-| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.956s` |
-| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `0.954s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [strict]` | `pass` | `0.953s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Rejang.js [strict]` | `pass` | `0.953s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.952s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js [strict]` | `pass` | `0.948s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Psalter_Pahlavi.js [strict]` | `pass` | `0.942s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js [strict]` | `pass` | `0.940s` |
-| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.932s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js [non-strict]` | `pass` | `0.927s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js [non-strict]` | `pass` | `0.925s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Siddham.js [strict]` | `pass` | `0.924s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Soyombo.js [non-strict]` | `pass` | `0.922s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.920s` |
-| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `0.919s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sharada.js [non-strict]` | `pass` | `0.919s` |
-| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `pass` | `0.910s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sora_Sompeng.js [non-strict]` | `pass` | `0.907s` |
-| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.904s` |
-| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.897s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js [non-strict]` | `pass` | `0.892s` |
-| `staging/sm/RegExp/unicode-braced.js [strict]` | `pass` | `0.888s` |
-| `built-ins/RegExp/property-escapes/generated/Script_-_Shavian.js [non-strict]` | `pass` | `0.884s` |
+| `language/comments/S7.4_A6.js [non-strict]` | `fail` | `1.002s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [non-strict]` | `pass` | `0.905s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [non-strict]` | `pass` | `0.898s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [strict]` | `pass` | `0.892s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [non-strict]` | `pass` | `0.884s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [non-strict]` | `pass` | `0.882s` |
+| `staging/sm/Date/dst-offset-caching-6-of-8.js [strict]` | `pass` | `0.874s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [strict]` | `pass` | `0.864s` |
+| `staging/sm/Date/dst-offset-caching-5-of-8.js [strict]` | `pass` | `0.859s` |
+| `staging/sm/Date/dst-offset-caching-2-of-8.js [non-strict]` | `pass` | `0.844s` |
+| `staging/sm/Date/dst-offset-caching-8-of-8.js [strict]` | `pass` | `0.843s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [strict]` | `pass` | `0.839s` |
+| `staging/sm/Date/dst-offset-caching-3-of-8.js [strict]` | `pass` | `0.831s` |
+| `staging/sm/Date/dst-offset-caching-4-of-8.js [non-strict]` | `pass` | `0.811s` |
+| `staging/sm/Date/dst-offset-caching-7-of-8.js [non-strict]` | `pass` | `0.777s` |
+| `staging/sm/RegExp/unicode-braced.js [non-strict]` | `pass` | `0.771s` |
+| `staging/sm/RegExp/unicode-braced.js [strict]` | `pass` | `0.757s` |
+| `staging/sm/RegExp/unicode-class-braced.js [strict]` | `pass` | `0.748s` |
+| `staging/sm/RegExp/unicode-class-braced.js [non-strict]` | `pass` | `0.746s` |
+| `staging/sm/Date/dst-offset-caching-1-of-8.js [strict]` | `pass` | `0.709s` |
+| `staging/sm/Date/dst-offset-caching-1-of-8.js [non-strict]` | `pass` | `0.658s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Phoenician.js [strict]` | `pass` | `0.635s` |
+| `language/identifiers/start-unicode-10.0.0.js [strict]` | `pass` | `0.610s` |
+| `language/identifiers/start-unicode-10.0.0.js [non-strict]` | `pass` | `0.606s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Phags_Pa.js [non-strict]` | `pass` | `0.569s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Saurashtra.js [non-strict]` | `pass` | `0.549s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [non-strict]` | `pass` | `0.549s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js [strict]` | `pass` | `0.549s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Inscriptional_Parthian.js [non-strict]` | `pass` | `0.548s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Carian.js [non-strict]` | `pass` | `0.546s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Sidetic.js [strict]` | `pass` | `0.544s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Yi.js [strict]` | `pass` | `0.543s` |
+| `built-ins/RegExp/property-escapes/generated/General_Category_-_Decimal_Number.js [non-strict]` | `pass` | `0.542s` |
+| `built-ins/RegExp/property-escapes/generated/Script_-_Runic.js [strict]` | `pass` | `0.538s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Miao.js [non-strict]` | `pass` | `0.538s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Old_Hungarian.js [non-strict]` | `pass` | `0.537s` |
+| `built-ins/RegExp/property-escapes/generated/Script_Extensions_-_Batak.js [strict]` | `pass` | `0.536s` |
 
 ## Skip Breakdown
 
@@ -192,7 +192,12 @@ Wall-clock timing is measured around each worker test request. File totals sum t
 
 | Cluster | Outcome | Count | Examples |
 | --- | --- | ---: | --- |
-| `language/comments` | `timeout after 1.0s` | `4` | `language/comments/S7.4_A5.js [strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [non-strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [strict]: timeout after 1.0s` |
+| `built-ins/Proxy/defineProperty` | `runtime error: Test262Error` | `4` | `built-ins/Proxy/defineProperty/return-boolean-and-define-target.js [non-strict]: runtime error: Test262Error`<br>`built-ins/Proxy/defineProperty/return-boolean-and-define-target.js [strict]: runtime error: Test262Error`<br>`built-ins/Proxy/defineProperty/trap-is-undefined.js [non-strict]: runtime error: Test262Error` |
+| `language/comments` | `timeout after 1.0s` | `4` | `language/comments/S7.4_A5.js [non-strict]: timeout after 1.0s`<br>`language/comments/S7.4_A5.js [strict]: timeout after 1.0s`<br>`language/comments/S7.4_A6.js [non-strict]: timeout after 1.0s` |
+| `staging/sm/RegExp` | `runtime error: Test262Error` | `4` | `staging/sm/RegExp/lastIndex-match-or-replace.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/lastIndex-match-or-replace.js [strict]: runtime error: Test262Error`<br>`staging/sm/RegExp/lastIndex-search.js [non-strict]: runtime error: Test262Error` |
+| `staging/sm/class` | `runtime error: Test262Error` | `2` | `staging/sm/class/className.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/class/className.js [strict]: runtime error: Test262Error` |
+| `staging/sm/expressions` | `runtime error: Test262Error` | `2` | `staging/sm/expressions/object-literal-__proto__.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/expressions/object-literal-__proto__.js [strict]: runtime error: Test262Error` |
+| `staging/sm/regress` | `runtime error: Test262Error` | `2` | `staging/sm/regress/regress-503860.js [non-strict]: runtime error: Test262Error`<br>`staging/sm/regress/regress-503860.js [strict]: runtime error: Test262Error` |
 
 ## Notes
 
