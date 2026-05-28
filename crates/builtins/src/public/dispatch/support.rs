@@ -604,7 +604,7 @@ pub(super) struct BuiltinProxyBridge<'a, Cx> {
 }
 
 impl<'a, Cx> BuiltinProxyBridge<'a, Cx> {
-    pub(super) fn new(cx: &'a mut Cx) -> Self {
+    pub(super) const fn new(cx: &'a mut Cx) -> Self {
         Self {
             cx,
             vm_dispatch_noop: lyng_objects::NoopAdaptiveProtoLoadDispatch,

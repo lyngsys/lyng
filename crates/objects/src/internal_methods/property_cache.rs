@@ -317,9 +317,7 @@ impl ObjectRuntime {
             }
             if let Some(proto_prop) = self.shape_property(header.shape(), key) {
                 // Only writable data can be safely shadowed by a transition.
-                if proto_prop.kind() != ShapePropertyKind::Data
-                    || !proto_prop.attrs().writable()
-                {
+                if proto_prop.kind() != ShapePropertyKind::Data || !proto_prop.attrs().writable() {
                     return Ok(None);
                 }
                 // Shadowing path settled at this prototype — stop walking.

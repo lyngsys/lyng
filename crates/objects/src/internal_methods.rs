@@ -418,6 +418,11 @@ impl ObjectRuntime {
     /// objects (which may have a non-ordinary prototype chain).
     ///
     /// Used by `[[SetPrototypeOf]]` to detect prototype cycles before they are formed.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any `InternalMethodError` raised while walking the
+    /// `[[Prototype]]` chain (e.g. a Proxy trap failure).
     pub fn check_prototype_chain_contains(
         &self,
         heap: PrimitiveHeapView<'_>,

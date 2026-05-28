@@ -317,7 +317,7 @@ impl NamedPropertyHandler {
 /// non-NONE handler by [`Self::from_entry`] — the sole constructor — so
 /// `slot_location()` can unconditionally return `SlotLocation::Inline`.
 ///
-/// **ShapeId stability assumption:** the handler stores raw shape ids that
+/// **`ShapeId` stability assumption:** the handler stores raw shape ids that
 /// rely on the existing slab persistence in `ObjectRuntime::shape_metadata`.
 /// If shape collection is ever introduced, this struct's consumers (the
 /// asm fast path + the IC cache hit-path verifier) would need to participate
@@ -378,7 +378,7 @@ impl NamedPropertyInlineWriteHandler {
     ///   asm fast path; outline writes fall through to the slow chain)
     /// - Slot offsets exceeding 30 bits (defensive)
     ///
-    /// Multi-dependency entries (dependency_count > 1) are accepted. The
+    /// Multi-dependency entries (`dependency_count` > 1) are accepted. The
     /// additional dependencies are typically prototype shapes that validate
     /// no setter intercepts the write. The asm hit path only checks the
     /// receiver (source) shape; all other dependencies are guarded by
@@ -1072,7 +1072,7 @@ mod inline_write_handler_tests {
             shape,
             ObjectRef::from_raw(1).expect("non-zero"),
             shape, // holder == receiver — no transition
-            INLINE_SLOT_OFFSET_FLAG | 0,
+            INLINE_SLOT_OFFSET_FLAG,
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
             1,
@@ -1109,7 +1109,7 @@ mod inline_write_handler_tests {
             receiver,
             ObjectRef::from_raw(1).expect("non-zero"),
             holder,
-            INLINE_SLOT_OFFSET_FLAG | 0,
+            INLINE_SLOT_OFFSET_FLAG,
             writable_attrs(),
             NamedPropertyCachePath::PrototypeData,
             2,
@@ -1135,7 +1135,7 @@ mod inline_write_handler_tests {
             shape,
             ObjectRef::from_raw(1).expect("non-zero"),
             shape,
-            INLINE_SLOT_OFFSET_FLAG | 0,
+            INLINE_SLOT_OFFSET_FLAG,
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
             2, // dependency_count > 1 — accepted now
@@ -1183,7 +1183,7 @@ mod inline_write_handler_tests {
             shape,
             ObjectRef::from_raw(1).expect("non-zero"),
             shape,
-            INLINE_SLOT_OFFSET_FLAG | 0,
+            INLINE_SLOT_OFFSET_FLAG,
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
             0, // violates planner invariant

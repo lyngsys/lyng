@@ -1246,7 +1246,7 @@ fn metadata_table_allocated_at_install_with_correct_per_kind_counts() {
     let mut expected_arith: u32 = 0;
     let mut expected_comparison: u32 = 0;
     let mut expected_keyed: u32 = 0;
-    for descriptor in entry_fn.feedback_sites().iter() {
+    for descriptor in entry_fn.feedback_sites() {
         match MetadataKind::from_site_kind(descriptor.kind()) {
             MetadataKind::Property => expected_property += 1,
             MetadataKind::Call => expected_call += 1,
@@ -1371,7 +1371,7 @@ fn metadata_table_in_kind_indices_are_monotone_per_kind() {
         .expect("installed script should expose its template");
 
     let mut seen_per_kind = [0u32; METADATA_KIND_COUNT];
-    for descriptor in entry_fn.feedback_sites().iter() {
+    for descriptor in entry_fn.feedback_sites() {
         let mk = MetadataKind::from_site_kind(descriptor.kind());
         let expected = seen_per_kind[mk.index()];
         let actual = table.in_kind_index_for_slot_with_kind(descriptor.slot().get(), mk);

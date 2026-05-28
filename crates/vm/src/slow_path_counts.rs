@@ -33,6 +33,7 @@ impl SlowPathCounterStore {
     /// `OpcodeCounters::reset` / `reset_slow_path`; no-op here because
     /// the actual storage lives in `DispatchCounters` (the caller
     /// resets those banks directly via `dispatch.slow_*.fill(0)`).
+    #[allow(clippy::unused_self)]
     pub const fn reset(&self) {}
 }
 

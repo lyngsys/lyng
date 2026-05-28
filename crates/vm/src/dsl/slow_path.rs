@@ -216,8 +216,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                             .metadata_tables
                             .get(index)
                             .and_then(|t| t.as_ref())
-                            .map(|t| t.buffer_ptr() as *mut u8)
-                            .unwrap_or(std::ptr::null_mut())
+                            .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
@@ -307,8 +306,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                             .metadata_tables
                             .get(index)
                             .and_then(|t| t.as_ref())
-                            .map(|t| t.buffer_ptr() as *mut u8)
-                            .unwrap_or(std::ptr::null_mut())
+                            .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
                     };
                     let object_records_base =
                         rust.dispatch.agent.heap().view().object_record_ptr_table();

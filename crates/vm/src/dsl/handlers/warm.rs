@@ -106,6 +106,9 @@ pub extern "C" fn op_jump8_poll_rs(
             },
         });
     }
+    // Relative advance; the bounds check above guarantees the resulting target
+    // PC is in `[0, u32::MAX]`, so narrowing the advance to `u32` is intentional.
+    #[allow(clippy::cast_sign_loss)]
     let pc_advance = (2_i64 + i64::from(delta)) as u32;
     dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::Continue { pc_advance })
 }

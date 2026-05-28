@@ -9,7 +9,7 @@
 //! `values.rs` for the rationale).
 //!
 //! Precomputed-offset layout (Phase C optimization):
-//! The MetadataTable buffer starts with a `slot_to_entry_offset[N]` table:
+//! The `MetadataTable` buffer starts with a `slot_to_entry_offset[N]` table:
 //! each entry is a `u32` byte offset from the buffer base to the metadata
 //! entry for that (1-based) slot. Asm resolves a slot in 3 instructions:
 //!   sub  x17, x{slot}, #1          (0-based)
@@ -27,17 +27,17 @@
 //!   named-property handler word.
 
 /// Resolve a 1-based `FeedbackSlotId` to a `*mut PropertyMetadata` entry and
-/// write the pointer into `x{$dst}`. x21 (MT pin) must hold the MetadataTable
+/// write the pointer into `x{$dst}`. x21 (MT pin) must hold the `MetadataTable`
 /// buffer base (Phase C.4 pin flip).
 ///
-/// Uses the precomputed slot_to_entry_offset table at buffer[0..N*4].
+/// Uses the precomputed `slot_to_entry_offset` table at buffer[0..N*4].
 ///
 /// Scratch: x16, x17 (AAPCS64 IP0/IP1 — never overlap live operand slots).
 ///
-/// 3-instruction sequence (x21 = MetadataTable buffer base):
+/// 3-instruction sequence (x21 = `MetadataTable` buffer base):
 /// 0. `sub  x17, x{slot}, #1`         — 0-based slot index
-/// 1. `ldr  w16, [x21, x17, lsl #2]`  — w16 = slot_to_entry_offset[slot-1]
-/// 2. `add  x{dst}, x21, x16`         — dst = buffer + entry_offset
+/// 1. `ldr  w16, [x21, x17, lsl #2]`  — w16 = `slot_to_entry_offset`[slot-1]
+/// 2. `add  x{dst}, x21, x16`         — dst = buffer + `entry_offset`
 #[macro_export]
 macro_rules! load_feedback_site {
     ($slot:tt => $dst:tt) => {
@@ -129,7 +129,7 @@ macro_rules! branch_named_own_polymorphic_mode {
 /// Branch to `$label` unless the metadata-table property entry is a
 /// monomorphic `OwnDataInlineWrite` header. `mode == 5` —
 /// `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`. The packed handler word
-/// carries (source_shape, slot, writable_flag, inline_flag) in the
+/// carries (`source_shape`, slot, `writable_flag`, `inline_flag`) in the
 /// same layout as the read-side own-inline mode; `aux_bits` carries
 /// the target shape.
 #[macro_export]
@@ -205,9 +205,9 @@ macro_rules! load_named_inline_slot_index_or_branch {
 /// [`load_named_inline_slot_index_or_branch!`]: the writable-bit check
 /// (bit 30 of the packed handler — see
 /// `NamedPropertyHandler::HANDLER_WRITABLE_FLAG`) distinguishes a
-/// store-eligible monomorphic OwnData entry from a read-only one.
+/// store-eligible monomorphic `OwnData` entry from a read-only one.
 /// Read-only hits must miss to the Rust probe / slow path so the
-/// strict-mode TypeError contract is preserved.
+/// strict-mode `TypeError` contract is preserved.
 #[macro_export]
 macro_rules! load_named_inline_writable_slot_index_or_branch {
     ($handler:tt => $slot_index:tt, $label:tt) => {
@@ -293,22 +293,22 @@ macro_rules! load_named_target_shape {
 }
 
 /// Record that an SMI was observed at slot `$slot` and saturating-increment
-/// the pending scalar execution count. Uses x21 as MetadataTable base (Phase C.4).
+/// the pending scalar execution count. Uses x21 as `MetadataTable` base (Phase C.4).
 ///
-/// Resolves ArithMetadata pointer via the precomputed slot_to_entry_offset table.
+/// Resolves `ArithMetadata` pointer via the precomputed `slot_to_entry_offset` table.
 /// Writes to `ArithMetadata.{observed_bits, execution_count}` (offsets 0 and 4).
 ///
 /// 10-instruction sequence (x16/x17 scratch):
 /// - `0.` sub  x17, x{slot}, #1
 /// - `1.` ldr  w16, [x21, x17, lsl #2]
 /// - `2.` add  x16, x21, x16
-/// - `3.` ldr  w17, [x16, #{arith_metadata_observed_bits_offset}]
+/// - `3.` ldr  w17, [x16, #{`arith_metadata_observed_bits_offset`}]
 /// - `4.` orr  w17, w17, #0x1
-/// - `5.` str  w17, [x16, #{arith_metadata_observed_bits_offset}]
-/// - `6.` ldr  w17, [x16, #{arith_metadata_exec_count_offset}]
+/// - `5.` str  w17, [x16, #{`arith_metadata_observed_bits_offset`}]
+/// - `6.` ldr  w17, [x16, #{`arith_metadata_exec_count_offset`}]
 /// - `7.` adds w17, w17, #1
 /// - `8.` csinv w17, w17, wzr, cc
-/// - `9.` str  w17, [x16, #{arith_metadata_exec_count_offset}]
+/// - `9.` str  w17, [x16, #{`arith_metadata_exec_count_offset`}]
 #[macro_export]
 macro_rules! record_smi {
     ($slot:tt) => {
@@ -335,7 +335,7 @@ macro_rules! record_smi {
 }
 
 /// Record an Object observation (bit 1). SMI bit 0; Object bit 1.
-/// Uses x21 as MetadataTable base (Phase C.4). See `record_smi!` for layout.
+/// Uses x21 as `MetadataTable` base (Phase C.4). See `record_smi!` for layout.
 #[macro_export]
 macro_rules! record_object {
     ($slot:tt) => {
@@ -362,7 +362,7 @@ macro_rules! record_object {
 }
 
 /// Record a Double observation (bit 2 of observed types).
-/// Uses x21 as MetadataTable base (Phase C.4). See `record_smi!` for layout.
+/// Uses x21 as `MetadataTable` base (Phase C.4). See `record_smi!` for layout.
 #[macro_export]
 macro_rules! record_double {
     ($slot:tt) => {

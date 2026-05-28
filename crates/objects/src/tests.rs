@@ -841,7 +841,11 @@ fn named_property_transition_store_cache_plans_shadowing_writable_data_property(
         .expect("writable data on prototype must yield a shadowing transition plan");
     // Two dependencies: receiver (dep[0]) and the shadowed prototype (dep[1]).
     assert_eq!(plan.dependency_count(), 2);
-    assert_eq!(plan.dependency(1).map(|d| d.object()), Some(prototype));
+    assert_eq!(
+        plan.dependency(1)
+            .map(super::shapes::PropertyCacheDependency::object),
+        Some(prototype)
+    );
 }
 
 #[test]

@@ -1716,7 +1716,7 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
     for atom_raw in 1..=limit {
         let key = PropertyKey::from_atom(AtomId::from_raw(atom_raw));
         let mut desc = PropertyDescriptor::new();
-        desc.set_value(Value::from_smi(atom_raw as i32));
+        desc.set_value(Value::from_smi(atom_raw.cast_signed()));
         desc.set_writable(true);
         desc.set_enumerable(true);
         desc.set_configurable(true);
@@ -1756,7 +1756,7 @@ fn dictionary_transition_via_property_overflow_fires_watchpoint() {
     // the brink shape and forces the dictionary transition.
     let overflow_key = PropertyKey::from_atom(AtomId::from_raw(limit + 1));
     let mut desc = PropertyDescriptor::new();
-    desc.set_value(Value::from_smi((limit + 1) as i32));
+    desc.set_value(Value::from_smi((limit + 1).cast_signed()));
     desc.set_writable(true);
     desc.set_enumerable(true);
     desc.set_configurable(true);
@@ -1897,6 +1897,7 @@ fn set_prototype_of_allocates_fresh_shape() {
 // T14 — Two objects that share the same source shape and transition to the same
 //         target prototype land on the *same* destination shape (deduplication).
 #[test]
+#[allow(clippy::similar_names)] // `s_a_before`/`s_b_before` mirror obj_a/obj_b
 fn prototype_transition_table_dedups() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();

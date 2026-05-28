@@ -17,6 +17,6 @@ pub const ARITH_METADATA_EXEC_COUNT_OFFSET: usize = offset_of!(ArithMetadata, ex
 
 const _: () = assert!(ARITH_METADATA_STRIDE == 8);
 const _: () = assert!(
-    1 << ARITH_METADATA_STRIDE_SHIFT == ARITH_METADATA_STRIDE as u32,
+    1 << ARITH_METADATA_STRIDE_SHIFT == ARITH_METADATA_STRIDE,
     "ARITH_METADATA_STRIDE_SHIFT must equal log2(ARITH_METADATA_STRIDE)"
 );

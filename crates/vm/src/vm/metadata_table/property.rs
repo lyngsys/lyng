@@ -4,6 +4,9 @@ use std::mem::offset_of;
 /// 32-byte stride. Phase C.2 dual-write only; Phase D becomes system of record.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+// `_pad`/`_tail_pad` are explicit layout padding kept `pub` so the asm offset
+// asserts and `repr(C)` layout stay verifiable from outside the module.
+#[allow(clippy::pub_underscore_fields)]
 pub struct PropertyMetadata {
     pub mode: u8,
     pub _pad: [u8; 3],

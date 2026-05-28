@@ -64,15 +64,15 @@ pub struct KeyedPropertyIcState {
     pub dense_entry_count: u8,
     /// Inline dense-index entries.
     pub dense_entries: [Option<KeyedIcDenseEntry>; KEYED_ENTRY_LIMIT],
-    /// Monomorphic named-atom OwnData sidecar.
+    /// Monomorphic named-atom `OwnData` sidecar.
     pub monomorphic_named_own_data_handler: NamedPropertyHandler,
     /// Raw atom id for the monomorphic named-atom entry. `0` = absent.
     pub monomorphic_named_atom: u32,
-    /// Monomorphic named-atom one-hop PrototypeData sidecar.
+    /// Monomorphic named-atom one-hop `PrototypeData` sidecar.
     pub monomorphic_named_proto_data_handler: NamedPropertyProtoHandler,
     /// Monomorphic dense-index sidecar.
     pub monomorphic_dense_index_handler: KeyedDenseIndexHandler,
-    /// Polymorphic named-atom OwnData sidecars (first `POLY_LIMIT` entries).
+    /// Polymorphic named-atom `OwnData` sidecars (first `POLY_LIMIT` entries).
     pub polymorphic_named_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
     /// Raw atom ids paired with `polymorphic_named_own_data_handlers`. `0` = absent.
     pub polymorphic_named_atoms: [u32; POLY_LIMIT],

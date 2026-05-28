@@ -47,14 +47,14 @@ mod exceptions;
 mod feedback;
 mod generators;
 mod global_script;
-pub(crate) mod ic_state;
 #[cfg(feature = "diagnostic-counters")]
 mod ic_slow_counters;
+pub mod ic_state;
 pub mod install;
 mod internal_calls;
 mod jobs;
 mod loop_iteration;
-pub(crate) mod metadata_table;
+pub mod metadata_table;
 mod modules;
 mod names;
 mod property_access;
@@ -62,7 +62,7 @@ mod registers;
 mod runtime_objects;
 pub mod semantics;
 mod state;
-pub(crate) mod status;
+pub mod status;
 mod tiering;
 mod values;
 mod with_env;
@@ -133,11 +133,11 @@ pub struct Vm {
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
-    /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices POLY_LIMIT..8).
+    /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices `POLY_LIMIT..8`).
     /// Vec-indexed (Phase D.4.3): outer `Vec` keyed by `code_index(code)`,
     /// inner `Box<[..]>` keyed by zero-based slot. Lazy: monomorphic and
-    /// ≤POLY_LIMIT polymorphic slots have a `None` entry. Cleared on
-    /// AdaptiveProtoLoad fire and on code GC.
+    /// ≤`POLY_LIMIT` polymorphic slots have a `None` entry. Cleared on
+    /// `AdaptiveProtoLoad` fire and on code GC.
     pub(crate) polymorphic_chains: Vec<Option<Box<[Option<PolymorphicChain>]>>>,
     /// Phase D.4.1: Rust-only IC state machine for `NamedProperty` slots.
     /// Outer `Vec` is indexed by `code_index(code)`; inner `Box<[..]>` is
@@ -164,7 +164,7 @@ pub struct Vm {
     /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) construct_cache_entries:
         HashMap<(CodeRef, FeedbackSlotId), Box<ConstructCacheStorage>>,
-    /// Phase D.2.4: per-slot KeyedProperty named-atom cache entries.
+    /// Phase D.2.4: per-slot `KeyedProperty` named-atom cache entries.
     /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) keyed_property_named_entries:
         HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyNamedEntries>,
@@ -263,7 +263,7 @@ impl<'b> EvaluateScript<'b> {
         self
     }
 
-    pub fn with_referrer(mut self, key: &'b ModuleKey) -> Self {
+    pub const fn with_referrer(mut self, key: &'b ModuleKey) -> Self {
         self.referrer = Some(key);
         self
     }
@@ -281,7 +281,7 @@ impl<'b> EvaluateScript<'b> {
     /// dispatch / slow-path / call-argument-copy snapshots off their
     /// own `OpcodeCounters` afterwards.
     #[cfg(feature = "diagnostic-counters")]
-    pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
+    pub const fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
         self.installed_counters = Some(counters);
         self
     }
@@ -290,7 +290,7 @@ impl<'b> EvaluateScript<'b> {
     /// `.run_retaining_installed()`. The debugger is swapped into the VM at
     /// run entry and swapped back at run exit, so pause-control mutations
     /// (and step state the hook installed) persist on the caller's struct.
-    pub fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
+    pub const fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
         self.installed_debugger = Some(debugger);
         self
     }
@@ -302,7 +302,7 @@ impl<'b> EvaluateScript<'b> {
     /// The default `Vm::new()` holds an empty `Tiering`, so without this
     /// hook the VM allocates no per-install tier slots and `observe_*`
     /// calls short-circuit before any `Vec` indexing.
-    pub fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
+    pub const fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
         self.installed_tiering = Some(tiering);
         self
     }
@@ -436,7 +436,7 @@ impl<'b> EvaluateInstalled<'b> {
         self
     }
 
-    pub fn with_referrer(mut self, atom: AtomId) -> Self {
+    pub const fn with_referrer(mut self, atom: AtomId) -> Self {
         self.referrer = Some(atom);
         self
     }
@@ -446,7 +446,7 @@ impl<'b> EvaluateInstalled<'b> {
         self
     }
 
-    pub(crate) fn with_entry_override(mut self, override_: EntryExecutionOverride) -> Self {
+    pub(crate) const fn with_entry_override(mut self, override_: EntryExecutionOverride) -> Self {
         self.entry_override = Some(override_);
         self
     }
@@ -456,21 +456,21 @@ impl<'b> EvaluateInstalled<'b> {
     /// [`EvaluateScript::with_opcode_counters`] for the full
     /// description.
     #[cfg(feature = "diagnostic-counters")]
-    pub fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
+    pub const fn with_opcode_counters(mut self, counters: &'b mut OpcodeCounters) -> Self {
         self.installed_counters = Some(counters);
         self
     }
 
     /// Install a caller-owned [`VmDebugger`] for the duration of `.run()`.
     /// See [`EvaluateScript::with_debugger`] for the full description.
-    pub fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
+    pub const fn with_debugger(mut self, debugger: &'b mut VmDebugger) -> Self {
         self.installed_debugger = Some(debugger);
         self
     }
 
     /// Install a caller-owned [`Tiering`] for the duration of `.run()`. See
     /// [`EvaluateScript::with_tiering`] for the full description.
-    pub fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
+    pub const fn with_tiering(mut self, tiering: &'b mut Tiering) -> Self {
         self.installed_tiering = Some(tiering);
         self
     }
@@ -619,7 +619,7 @@ impl Vm {
     }
 
     /// Returns the polymorphic chain for `(code, slot)` if any.
-    /// Hot path: two index dereferences instead of a HashMap probe.
+    /// Hot path: two index dereferences instead of a `HashMap` probe.
     #[allow(dead_code, reason = "used in tests via pub(crate)")]
     #[inline]
     pub(crate) fn polymorphic_chain(
@@ -660,7 +660,7 @@ impl Vm {
     }
 
     /// Removes the polymorphic chain for `(code, slot)`. Called when the IC
-    /// transitions to Megamorphic or is cleared by an AdaptiveProtoLoad fire.
+    /// transitions to Megamorphic or is cleared by an `AdaptiveProtoLoad` fire.
     #[inline]
     pub(crate) fn drop_polymorphic_chain(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let slot_zero = (slot.get() - 1) as usize;
@@ -703,7 +703,7 @@ impl Vm {
     }
 
     /// Phase D.4.1: returns the `PropertyIcState` for `(code, slot)` if any.
-    /// Hot path: two index dereferences instead of a HashMap probe.
+    /// Hot path: two index dereferences instead of a `HashMap` probe.
     #[allow(
         dead_code,
         reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
@@ -888,7 +888,7 @@ impl Vm {
 
     /// Phase C Task 4.5: post-mark GC sweep. Drops `MetadataTable` entries
     /// for code objects that are no longer live. Mirrors
-    /// `prune_dead_code_polymorphic_chains` (Phase B) for the metadata_tables
+    /// `prune_dead_code_polymorphic_chains` (Phase B) for the `metadata_tables`
     /// vec. The vec is indexed by `code_index(code_ref) = code_ref.get() - 1`,
     /// so index `i` corresponds to `CodeRef::from_raw(i as u32 + 1)`.
     #[allow(

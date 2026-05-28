@@ -2826,7 +2826,7 @@ fn adaptive_proto_load_register_on_invalidated_chain_abandons_install() {
         agent
             .objects()
             .watchpoint_sets_inspect(proto_shape)
-            .map(|set| set.state()),
+            .map(lyng_objects::WatchpointSet::state),
         Some(WatchpointState::Invalidated),
         "test precondition: proto shape's watchpoint set must be invalidated"
     );
@@ -3000,6 +3000,7 @@ fn proto_chain_holder_mutation_clears_ic_slot() {
 // Adding a property to `mid` transitions its shape, firing the watchpoint
 // and clearing the IC slot.
 #[test]
+#[allow(clippy::too_many_lines)]
 fn two_hop_chain_middle_proto_mutation_clears_ic() {
     let unit = compile_test_unit(20_700, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
@@ -3471,12 +3472,13 @@ fn b4_polymorphic_walk_returns_correct_value_for_each_shape() {
             Some(lyng_objects::NamedPropertyCachePath::OwnData)
         ))
     );
-    assert_eq!(
-        vm.polymorphic_chain(installed.code(), slot)
-            .map(|chain| chain.len()),
-        Some(2),
-        "B4: 4 entries means 2 inline + 2 chain"
-    );
+    // `PolymorphicChain` is not nameable here (its module is private), so the
+    // method reference clippy suggests for the closure would not compile.
+    #[allow(clippy::redundant_closure_for_method_calls)]
+    let chain_len = vm
+        .polymorphic_chain(installed.code(), slot)
+        .map(|chain| chain.len());
+    assert_eq!(chain_len, Some(2), "B4: 4 entries means 2 inline + 2 chain");
 
     // Second pass: hit each shape again, in reverse order. Each load must
     // return the correct cached value, demonstrating that both inline and
@@ -3501,6 +3503,7 @@ fn b4_polymorphic_walk_returns_correct_value_for_each_shape() {
 // the proto's shape, which must clear both the inline slot *and* the chain
 // map entry.
 #[test]
+#[allow(clippy::too_many_lines)]
 fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
     let unit = compile_test_unit(30_500, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
@@ -3599,9 +3602,14 @@ fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
             Some(lyng_objects::NamedPropertyCachePath::PrototypeData)
         ))
     );
+    // `PolymorphicChain` is not nameable here (its module is private), so the
+    // method reference clippy suggests for the closure would not compile.
+    #[allow(clippy::redundant_closure_for_method_calls)]
+    let chain_len = vm
+        .polymorphic_chain(installed.code(), slot)
+        .map(|chain| chain.len());
     assert_eq!(
-        vm.polymorphic_chain(installed.code(), slot)
-            .map(|chain| chain.len()),
+        chain_len,
         Some(1),
         "B5: 3-entry polymorphic IC must have 1 chain entry"
     );
@@ -4134,6 +4142,7 @@ fn d3_property_ic_state_poly_to_megamorphic() {
 // This mirrors the B5 / A.3 AdaptiveProtoLoad tests but asserts on
 // `vm.property_ic_state` instead of (or in addition to) the legacy snapshot.
 #[test]
+#[allow(clippy::too_many_lines)]
 fn d4_property_ic_state_clear_and_reinstall() {
     // Source reads `source.value` where `value` is on a shared prototype.
     let unit = compile_test_unit(50_004, "source.value;");
@@ -4349,11 +4358,8 @@ fn store_slow_path_install_writes_mode_5_into_metadata() {
         .property(store_slot.get())
         .mode;
     assert_eq!(
-        mode,
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "Store-purpose IC install must write mode = {} into PropertyMetadata, got {}",
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        mode,
+        mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "Store-purpose IC install must write mode = {LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE} into PropertyMetadata, got {mode}",
     );
 }
 
@@ -4417,11 +4423,8 @@ fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
         .property(store_slot.get())
         .mode;
     assert_eq!(
-        mode_before,
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "Store-purpose IC must be mode {} before dictionary transition, got {}",
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        mode_before,
+        mode_before, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+        "Store-purpose IC must be mode {LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE} before dictionary transition, got {mode_before}",
     );
 
     // Trigger a dictionary transition by redefining `value` with
@@ -4451,8 +4454,7 @@ fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
         .mode;
     assert_eq!(
         mode_after, 0,
-        "AdaptiveOwnWrite watchpoint must clear IC slot (mode → 0) after dictionary transition, got {}",
-        mode_after,
+        "AdaptiveOwnWrite watchpoint must clear IC slot (mode → 0) after dictionary transition, got {mode_after}",
     );
 }
 
@@ -4471,6 +4473,8 @@ fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
 #[test]
 fn assign_named_property_asm_fast_path_hits_after_warmup() {
     use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+
+    const HOT_ITERATIONS: usize = 50;
 
     let unit = compile_test_unit(60_003, "source.value = 9; source.value;");
     let entry = unit.function(unit.entry()).unwrap();
@@ -4510,8 +4514,7 @@ fn assign_named_property_asm_fast_path_hits_after_warmup() {
         .mode;
     assert_eq!(
         mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "warmup must install mode = {}, got {}",
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode,
+        "warmup must install mode = {LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE}, got {mode}",
     );
 
     // Snapshot the probe counter after warmup; subsequent runs must NOT
@@ -4521,7 +4524,6 @@ fn assign_named_property_asm_fast_path_hits_after_warmup() {
     // Re-run the script many times. Each run executes the store opcode once;
     // if the asm fast path is wired correctly, none of these dispatches reach
     // the rust probe.
-    const HOT_ITERATIONS: usize = 50;
     for _ in 0..HOT_ITERATIONS {
         assert_eq!(
             vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
@@ -4535,9 +4537,7 @@ fn assign_named_property_asm_fast_path_hits_after_warmup() {
     let probe_dispatches_during_hot = dispatches_after_hot - dispatches_after_warmup;
     assert!(
         probe_dispatches_during_hot < 5,
-        "asm fast path must intercept hot loop writes; rust probe was invoked {} times across {} hot dispatches (cold tolerance: <5)",
-        probe_dispatches_during_hot,
-        HOT_ITERATIONS,
+        "asm fast path must intercept hot loop writes; rust probe was invoked {probe_dispatches_during_hot} times across {HOT_ITERATIONS} hot dispatches (cold tolerance: <5)",
     );
 
     // Final sanity: the IC slot must still be in mode = 5 after the hot loop
@@ -4549,8 +4549,7 @@ fn assign_named_property_asm_fast_path_hits_after_warmup() {
         .mode;
     assert_eq!(
         mode_after, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-        "IC mode must remain {} after hot loop, got {}",
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, mode_after,
+        "IC mode must remain {LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE} after hot loop, got {mode_after}",
     );
 }
 
@@ -4665,7 +4664,6 @@ fn shadowing_transition_write_not_cached_when_prototype_shape_already_invalidate
     assert_ne!(
         mode, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
         "shadowing transition write with an already-invalidated prototype dependency \
-         shape must not be left in asm mode {} (no watchpoint guards the prototype)",
-        LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
+         shape must not be left in asm mode {LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE} (no watchpoint guards the prototype)",
     );
 }

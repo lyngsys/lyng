@@ -68,7 +68,7 @@ macro_rules! load_record_shape {
 /// record's shape field. Used by the `OwnDataInlineWrite` asm fast
 /// path to update the object's shape pointer after the inline-slot
 /// store, in lockstep with the slow path's `transition_shape` +
-/// retarget_shape sequence (for transitioning writes) or a no-op
+/// `retarget_shape` sequence (for transitioning writes) or a no-op
 /// store-of-same-value (for non-transitioning writes).
 #[macro_export]
 macro_rules! store_record_shape {

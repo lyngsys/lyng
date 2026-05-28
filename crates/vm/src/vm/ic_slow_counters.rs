@@ -18,6 +18,7 @@ use crate::vm::Vm;
 use crate::FrameRecord;
 use lyng_env::Agent;
 use lyng_types::{CodeRef, FeedbackSlotId};
+use std::fmt::Write as _;
 
 /// Reason a slow-path entry happened. Mirrors the structural decision
 /// tree of the aarch64 `branch_named_*_mode!` chain in
@@ -102,6 +103,9 @@ impl IcSlowPathCause {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+// Variants intentionally mirror the IC opcode-family names; the shared
+// `NamedProperty` suffix is meaningful, not accidental noise.
+#[allow(clippy::enum_variant_names)]
 pub enum IcSlowPathKind {
     #[default]
     GetNamedProperty,
@@ -169,31 +173,31 @@ impl IcSlowPathCounters {
     }
 
     #[inline]
-    pub(crate) fn bump(&mut self, kind: IcSlowPathKind, cause: IcSlowPathCause) {
+    pub(crate) const fn bump(&mut self, kind: IcSlowPathKind, cause: IcSlowPathCause) {
         let row = &mut self.cells[kind.index()];
         row[cause.index()] = row[cause.index()].saturating_add(1);
         row[IcSlowPathCause::TOTAL_INDEX] = row[IcSlowPathCause::TOTAL_INDEX].saturating_add(1);
     }
 
     #[inline]
-    pub(crate) fn bump_assign_probe_dispatch(&mut self) {
+    pub(crate) const fn bump_assign_probe_dispatch(&mut self) {
         self.assign_probe_dispatches = self.assign_probe_dispatches.saturating_add(1);
     }
 
     #[inline]
-    pub(crate) fn bump_assign_probe_hit(&mut self) {
+    pub(crate) const fn bump_assign_probe_hit(&mut self) {
         self.assign_probe_hits = self.assign_probe_hits.saturating_add(1);
     }
 
     #[inline]
     #[must_use]
-    pub fn count(&self, kind: IcSlowPathKind, cause: IcSlowPathCause) -> u64 {
+    pub const fn count(&self, kind: IcSlowPathKind, cause: IcSlowPathCause) -> u64 {
         self.cells[kind.index()][cause.index()]
     }
 
     #[inline]
     #[must_use]
-    pub fn total(&self, kind: IcSlowPathKind) -> u64 {
+    pub const fn total(&self, kind: IcSlowPathKind) -> u64 {
         self.cells[kind.index()][IcSlowPathCause::TOTAL_INDEX]
     }
 
@@ -214,33 +218,33 @@ impl IcSlowPathCounters {
     /// header line with the total, followed by one indented line per
     /// non-zero cause.
     #[must_use]
+    // Counts cast to `f64` only to compute a display percentage; precision loss
+    // would require > 2^52 slow-path entries, which never happens.
+    #[allow(clippy::cast_precision_loss)]
     pub fn dump(&self) -> String {
         let mut out = String::new();
         out.push_str("# IC slow-path entry counters\n");
-        out.push_str(&format!(
-            "AssignNamedProperty probe dispatches: {}\n",
-            self.assign_probe_dispatches
-        ));
-        out.push_str(&format!(
-            "AssignNamedProperty probe hits:       {}\n",
-            self.assign_probe_hits
-        ));
+        let probe_dispatches = self.assign_probe_dispatches;
+        let probe_hits = self.assign_probe_hits;
+        writeln!(
+            out,
+            "AssignNamedProperty probe dispatches: {probe_dispatches}"
+        )
+        .unwrap();
+        writeln!(out, "AssignNamedProperty probe hits:       {probe_hits}").unwrap();
         let assign_total = self.total(IcSlowPathKind::AssignNamedProperty);
         let probe_miss = self
             .assign_probe_dispatches
             .saturating_sub(self.assign_probe_hits);
-        out.push_str(&format!(
-            "AssignNamedProperty probe misses (=> slow entries): {}  (cross-check: kind total = {})\n",
-            probe_miss, assign_total
-        ));
+        writeln!(
+            out,
+            "AssignNamedProperty probe misses (=> slow entries): {probe_miss}  (cross-check: kind total = {assign_total})"
+        )
+        .unwrap();
         out.push('\n');
         for kind in IcSlowPathKind::ALL {
             let total = self.total(kind);
-            out.push_str(&format!(
-                "{:30} total slow entries: {}\n",
-                kind.name(),
-                total
-            ));
+            writeln!(out, "{:30} total slow entries: {total}", kind.name()).unwrap();
             for cause in IcSlowPathCause::ALL {
                 let n = self.count(kind, cause);
                 if n == 0 {
@@ -251,12 +255,7 @@ impl IcSlowPathCounters {
                 } else {
                     0.0
                 };
-                out.push_str(&format!(
-                    "    {:18} {:>10}  ({:5.1}%)\n",
-                    cause.name(),
-                    n,
-                    pct
-                ));
+                writeln!(out, "    {:18} {n:>10}  ({pct:5.1}%)", cause.name()).unwrap();
             }
         }
         out
@@ -305,7 +304,7 @@ impl Vm {
     /// (every dispatch of the opcode hits this — there's no asm fast
     /// path) and whether it succeeded. Lets the dump report
     /// "probe miss rate" alongside the per-kind slow-path total.
-    pub(crate) fn record_assign_named_property_probe(&mut self, hit: bool) {
+    pub(crate) const fn record_assign_named_property_probe(&mut self, hit: bool) {
         self.ic_slow_path_counters.bump_assign_probe_dispatch();
         if hit {
             self.ic_slow_path_counters.bump_assign_probe_hit();

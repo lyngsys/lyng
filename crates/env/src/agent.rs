@@ -303,7 +303,11 @@ impl Agent {
         id: ObjectRef,
         vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> bool {
-        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+        let old_shape = self
+            .heap
+            .view()
+            .object(id)
+            .and_then(lyng_gc::RuntimeObjectRecord::shape);
 
         let ok = self.with_heap_and_objects(|heap, objects| {
             objects.ensure_named_property_dictionary(&mut heap.mutator(), id)
@@ -327,6 +331,11 @@ impl Agent {
     /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
     /// transition to IC slot clearing. Callers without a `Vm` in scope pass
     /// `&mut NoopAdaptiveProtoLoadDispatch`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any `InternalMethodError` raised by the underlying
+    /// `[[DefineOwnProperty]]` operation.
     pub fn define_own_property(
         &mut self,
         id: ObjectRef,
@@ -335,7 +344,11 @@ impl Agent {
         lifetime: AllocationLifetime,
         vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> InternalMethodResult<bool> {
-        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+        let old_shape = self
+            .heap
+            .view()
+            .object(id)
+            .and_then(lyng_gc::RuntimeObjectRecord::shape);
 
         let result = self.with_heap_and_objects(|heap, objects| {
             objects.define_own_property(&mut heap.mutator(), id, key, descriptor, lifetime)
@@ -359,13 +372,22 @@ impl Agent {
     /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
     /// transition to IC slot clearing. Callers without a `Vm` in scope pass
     /// `&mut NoopAdaptiveProtoLoadDispatch`.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any `InternalMethodError` raised by the underlying
+    /// `[[Delete]]` operation.
     pub fn delete(
         &mut self,
         id: ObjectRef,
         key: PropertyKey,
         vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> InternalMethodResult<bool> {
-        let old_shape = self.heap.view().object(id).and_then(|r| r.shape());
+        let old_shape = self
+            .heap
+            .view()
+            .object(id)
+            .and_then(lyng_gc::RuntimeObjectRecord::shape);
 
         let result = self
             .with_heap_and_objects(|heap, objects| objects.delete(&mut heap.mutator(), id, key));
@@ -391,6 +413,11 @@ impl Agent {
     /// `vm_dispatch` routes any `AdaptiveProtoLoad` watchpoints fired by this
     /// transition to IC slot clearing. Callers without a `Vm` in scope pass
     /// `&mut NoopAdaptiveProtoLoadDispatch`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InternalMethodError` if `id` has no shape, or propagates any
+    /// error from the immutable-prototype, extensibility, or cycle checks.
     pub fn set_prototype_of(
         &mut self,
         id: ObjectRef,
@@ -403,7 +430,7 @@ impl Agent {
             let current = self.objects.get_prototype_of(view, id)?;
             let old_shape = view
                 .object(id)
-                .and_then(|r| r.shape())
+                .and_then(lyng_gc::RuntimeObjectRecord::shape)
                 .ok_or(InternalMethodError::MissingObject)?;
             (current, old_shape)
         };
@@ -500,10 +527,8 @@ impl Agent {
                         code,
                         slot,
                         generation,
-                    } => {
-                        vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
                     }
-                    ShapeInvalidationObserver::AdaptiveOwnWrite {
+                    | ShapeInvalidationObserver::AdaptiveOwnWrite {
                         code,
                         slot,
                         generation,
@@ -536,6 +561,11 @@ impl Agent {
     /// `Err(())` is used as a plain abort signal: the unit error carries no
     /// payload and callers only branch on success/failure. A custom error type
     /// would add noise with no benefit here.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(())` if any shape in `chain_shapes` is already
+    /// `Invalidated`, signalling that the caller must abandon the IC install.
     #[allow(clippy::result_unit_err)]
     pub fn register_adaptive_proto_load_for_chain(
         &mut self,
@@ -594,7 +624,11 @@ impl Agent {
         lifetime: AllocationLifetime,
         vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
     ) -> Option<ShapeId> {
-        let parent_shape = self.heap.view().object(obj).and_then(|r| r.shape());
+        let parent_shape = self
+            .heap
+            .view()
+            .object(obj)
+            .and_then(lyng_gc::RuntimeObjectRecord::shape);
 
         let result = self.with_heap_and_objects(|heap, objects| {
             let parent = parent_shape?;

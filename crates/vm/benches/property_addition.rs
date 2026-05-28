@@ -1,6 +1,6 @@
 //! Microbenchmark: property-addition hot path regression guard (Spec 1).
 //!
-//! Spec 1 added a WatchpointSet lookup on every property-addition store in the
+//! Spec 1 added a `WatchpointSet` lookup on every property-addition store in the
 //! IC fast path. This bench measures the cost of a tight property-addition loop
 //! so that Spec 1's overhead can be quantified relative to the pre-Spec-1
 //! baseline.
@@ -82,7 +82,7 @@ fn bench_property_addition(c: &mut Criterion) {
                         for i in 0..PROPS_PER_OBJ {
                             let key = PropertyKey::from_atom(AtomId::from_raw(ATOM_BASE + i));
                             let mut desc = PropertyDescriptor::new();
-                            desc.set_value(Value::from_smi(i as i32));
+                            desc.set_value(Value::from_smi(i.cast_signed()));
                             desc.set_writable(true);
                             desc.set_enumerable(true);
                             desc.set_configurable(true);

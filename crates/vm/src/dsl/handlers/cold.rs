@@ -2737,7 +2737,7 @@ fn record_named_ic_slow_entry(
     let crate::vm::dispatch_state::DispatchState {
         vm, agent, frame, ..
     } = &mut *inner;
-    vm.record_ic_slow_entry(&**agent, frame, slot, receiver_register as u16, kind);
+    vm.record_ic_slow_entry(agent, frame, slot, receiver_register as u16, kind);
 }
 
 // =====================================================================

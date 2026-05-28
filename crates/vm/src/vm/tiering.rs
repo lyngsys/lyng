@@ -161,14 +161,14 @@ impl TieringState {
     }
 
     #[inline]
-    pub(super) fn bump_warmup(&mut self) -> u16 {
+    pub(super) const fn bump_warmup(&mut self) -> u16 {
         self.warmup_counter = self.warmup_counter.saturating_add(1);
         self.warmup_counter
     }
 
     /// Saturating increment by `n`; returns the new value.
     #[inline]
-    pub(super) fn bump_warmup_by(&mut self, n: u16) -> u16 {
+    pub(super) const fn bump_warmup_by(&mut self, n: u16) -> u16 {
         self.warmup_counter = self.warmup_counter.saturating_add(n);
         self.warmup_counter
     }
@@ -183,7 +183,7 @@ impl TieringState {
 
     /// Phase D.2.4: mark this code as having its IC side-tables activated.
     #[inline]
-    pub(super) fn mark_allocated(&mut self) {
+    pub(super) const fn mark_allocated(&mut self) {
         self.allocated = true;
     }
 
@@ -211,7 +211,7 @@ impl TieringState {
 /// read snapshots off the caller-owned struct afterwards.
 ///
 /// The current shape is scaffolding for an eventual JSC-style tier ladder
-/// (LLInt → Baseline → DFG → FTL). DSL-0c (§2, §6, §10) deliberately defers
+/// (`LLInt` → Baseline → DFG → FTL). DSL-0c (§2, §6, §10) deliberately defers
 /// the JIT and tier accounting; this struct exists so the bookkeeping can
 /// be opt-in at near-zero cost until that work lands.
 pub struct Tiering {
@@ -230,7 +230,7 @@ impl Tiering {
     /// Construct an *active* tiering store. Slots are allocated on
     /// `ensure_slot`, and IC feedback observations accumulate hotness.
     #[inline]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             states: Vec::new(),
             enabled: true,
@@ -243,7 +243,7 @@ impl Tiering {
     /// internal store on `Vm::new()` so the default VM pays nothing for
     /// the tiering scaffold until a caller opts in via `with_tiering`.
     #[inline]
-    pub(super) fn disabled() -> Self {
+    pub(super) const fn disabled() -> Self {
         Self {
             states: Vec::new(),
             enabled: false,

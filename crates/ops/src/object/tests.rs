@@ -1021,7 +1021,7 @@ fn alloc_plain_object_ops(agent: &mut Agent) -> lyng_types::ObjectRef {
 /// branch and the object-literal `__proto__` lowering) must:
 ///   1. transition the object to a new shape;
 ///   2. fire watchpoints registered on the old shape; and
-///   3. leave the old shape's WatchpointSet in the `Invalidated` state.
+///   3. leave the old shape's `WatchpointSet` in the `Invalidated` state.
 ///
 /// This test exercises the actual entry point that `Object.setPrototypeOf` and
 /// `{ __proto__: v }` land on after PR 3's wiring fix.

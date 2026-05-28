@@ -71,8 +71,9 @@ pub trait AdaptiveProtoLoadDispatch {
 }
 
 /// No-op `AdaptiveProtoLoadDispatch` for call sites that have no `Vm`
-/// in scope (bootstrap, internal initialization, some tests). Using this
-/// is correct precisely when no `AdaptiveProtoLoad` watchpoint can be
+/// in scope (bootstrap, internal initialization, some tests).
+///
+/// Using this is correct precisely when no `AdaptiveProtoLoad` watchpoint can be
 /// registered against any shape the caller will fire on — i.e., during
 /// runtime setup before any JS executes. In production JS execution
 /// paths, callers must pass a real `&mut Vm` dispatcher.
@@ -108,8 +109,7 @@ impl ShapeInvalidationObserver {
             // in tests they should not be dispatched through this sink. The
             // Agent-layer dispatcher routes them to
             // Vm::clear_ic_slot_if_generation_matches.
-            Self::AdaptiveProtoLoad { .. } => {}
-            Self::AdaptiveOwnWrite { .. } => {}
+            Self::AdaptiveProtoLoad { .. } | Self::AdaptiveOwnWrite { .. } => {}
         }
     }
 }
@@ -131,21 +131,27 @@ impl Default for WatchpointSet {
 }
 
 impl WatchpointSet {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             state: WatchpointState::Cleared,
             watchpoints: Vec::new(),
         }
     }
 
-    pub fn state(&self) -> WatchpointState {
+    pub const fn state(&self) -> WatchpointState {
         self.state
     }
 
-    pub fn is_invalidated(&self) -> bool {
+    pub const fn is_invalidated(&self) -> bool {
         matches!(self.state, WatchpointState::Invalidated)
     }
 
+    /// Registers `wp` on this set, transitioning `Cleared`/`Watched` → `Watched`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err(Invalidated)` if the set has already fired — a fired set is
+    /// permanently invalidated and rejects new registrations.
     pub fn register(&mut self, wp: Watchpoint) -> Result<(), Invalidated> {
         if matches!(self.state, WatchpointState::Invalidated) {
             return Err(Invalidated);
@@ -253,7 +259,11 @@ mod tests {
             generation: 5,
         };
         match observer {
-            ShapeInvalidationObserver::AdaptiveOwnWrite { code, slot, generation } => {
+            ShapeInvalidationObserver::AdaptiveOwnWrite {
+                code,
+                slot,
+                generation,
+            } => {
                 assert_eq!(code.get(), 7);
                 assert_eq!(slot.get(), 3);
                 assert_eq!(generation, 5);

@@ -12,7 +12,7 @@
 //!
 //! - `x19` = PC      (bytecode-stream pointer)
 //! - `x20` = REGS    (register-file base, `*mut Value`)
-//! - `x21` = MT      (MetadataTable buffer base, `*mut u8`)
+//! - `x21` = MT      (`MetadataTable` buffer base, `*mut u8`)
 //!
 //! Narrow-form decoders only (Wide / `ExtraWide` land in Batch 7
 //! alongside `op_wide` / `op_extra_wide`).

@@ -3,8 +3,8 @@
 //!
 //! Each `(CodeRef, FeedbackSlotId)` that grows into a 3+ entry polymorphic
 //! state gets a `PolymorphicChain` entry in `Vm::polymorphic_chains`.
-//! The chain holds entries [POLY_LIMIT..POLYMORPHIC_PROPERTY_CACHE_LIMIT].
-//! Entries [0..POLY_LIMIT] stay inline in `NamedPropertyFeedback.entries`
+//! The chain holds entries [`POLY_LIMIT..POLYMORPHIC_PROPERTY_CACHE_LIMIT`].
+//! Entries [`0..POLY_LIMIT`] stay inline in `NamedPropertyFeedback.entries`
 //! to keep the asm fast path's sidecar (`polymorphic_own_data_handlers`)
 //! addressable in the existing layout.
 //!
@@ -26,9 +26,9 @@ use super::{POLYMORPHIC_PROPERTY_CACHE_LIMIT, POLY_LIMIT};
 
 /// Maximum number of out-of-line entries per chain.
 /// `POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT` (= 6).
-pub(crate) const POLYMORPHIC_CHAIN_CAP: usize = POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT;
+pub const POLYMORPHIC_CHAIN_CAP: usize = POLYMORPHIC_PROPERTY_CACHE_LIMIT - POLY_LIMIT;
 
-pub(crate) struct PolymorphicChain {
+pub struct PolymorphicChain {
     entries: Vec<NamedPropertyCacheEntry>,
 }
 
@@ -39,7 +39,7 @@ impl PolymorphicChain {
         }
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.entries.len()
     }
 

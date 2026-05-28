@@ -11,6 +11,13 @@
 //!
 //! Phase C.1 lands the type + allocator; reads and writes wire up in C.2/C.4.
 
+// This module reinterprets a deliberately byte-addressed `Box<[u8]>` buffer as
+// runs of `repr(C)` metadata structs; every such pointer cast carries a SAFETY
+// comment documenting the allocator's 8-byte run alignment. The offsets and
+// strides cast to `u32` are small, bounded buffer quantities (asm reads them as
+// `u32`) that provably fit, so the truncation lint is a false positive here.
+#![allow(clippy::cast_ptr_alignment, clippy::cast_possible_truncation)]
+
 pub mod arith;
 pub mod call;
 pub mod comparison;
@@ -165,23 +172,23 @@ impl MetadataTable {
         self.buffer.as_mut_ptr()
     }
 
-    pub fn slot_count(&self) -> u32 {
+    pub const fn slot_count(&self) -> u32 {
         self.slot_count
     }
 
-    pub fn kind_offset(&self, kind: MetadataKind) -> u32 {
+    pub const fn kind_offset(&self, kind: MetadataKind) -> u32 {
         self.kind_offsets[kind.index()]
     }
 
-    pub fn kind_offset_by_index(&self, kind_index: usize) -> u32 {
+    pub const fn kind_offset_by_index(&self, kind_index: usize) -> u32 {
         self.kind_offsets[kind_index]
     }
 
-    pub fn run_len_for_kind(&self, kind: MetadataKind) -> u32 {
+    pub const fn run_len_for_kind(&self, kind: MetadataKind) -> u32 {
         self.per_kind_counts[kind.index()]
     }
 
-    pub fn run_len_for_kind_index(&self, kind_index: usize) -> u32 {
+    pub const fn run_len_for_kind_index(&self, kind_index: usize) -> u32 {
         self.per_kind_counts[kind_index]
     }
 
@@ -241,67 +248,113 @@ impl MetadataTable {
         // SAFETY: allocator reserves `stride_bytes(Property) = 32` bytes at this offset;
         // the Property run starts at an 8-byte-aligned offset (allocator aligns runs to 8).
         // PropertyMetadata is repr(C) with max field alignment 8.
-        unsafe { &*(self.buffer.as_ptr().add(off) as *const property::PropertyMetadata) }
+        unsafe {
+            &*self
+                .buffer
+                .as_ptr()
+                .add(off)
+                .cast::<property::PropertyMetadata>()
+        }
     }
 
     pub fn property_mut(&mut self, slot: u32) -> &mut property::PropertyMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `property` above; exclusive &mut self gives
         // exclusive access to the underlying byte range.
-        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut property::PropertyMetadata) }
+        unsafe {
+            &mut *self
+                .buffer
+                .as_mut_ptr()
+                .add(off)
+                .cast::<property::PropertyMetadata>()
+        }
     }
 
     pub fn call(&self, slot: u32) -> &call::CallMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Call) = 24` bytes at this offset;
         // run is 8-aligned; CallMetadata is repr(C) with max field alignment 8.
-        unsafe { &*(self.buffer.as_ptr().add(off) as *const call::CallMetadata) }
+        unsafe { &*self.buffer.as_ptr().add(off).cast::<call::CallMetadata>() }
     }
 
     pub fn call_mut(&mut self, slot: u32) -> &mut call::CallMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `call` above; exclusive &mut self.
-        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut call::CallMetadata) }
+        unsafe {
+            &mut *self
+                .buffer
+                .as_mut_ptr()
+                .add(off)
+                .cast::<call::CallMetadata>()
+        }
     }
 
     pub fn arith(&self, slot: u32) -> &arith::ArithMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Arith) = 8` bytes at this offset;
         // run is 8-aligned; ArithMetadata is repr(C) with max field alignment 4.
-        unsafe { &*(self.buffer.as_ptr().add(off) as *const arith::ArithMetadata) }
+        unsafe { &*self.buffer.as_ptr().add(off).cast::<arith::ArithMetadata>() }
     }
 
     pub fn arith_mut(&mut self, slot: u32) -> &mut arith::ArithMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `arith` above; exclusive &mut self.
-        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut arith::ArithMetadata) }
+        unsafe {
+            &mut *self
+                .buffer
+                .as_mut_ptr()
+                .add(off)
+                .cast::<arith::ArithMetadata>()
+        }
     }
 
     pub fn comparison(&self, slot: u32) -> &comparison::ComparisonMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(Comparison) = 8` bytes at this offset;
         // run is 8-aligned; ComparisonMetadata is repr(C) with max field alignment 4.
-        unsafe { &*(self.buffer.as_ptr().add(off) as *const comparison::ComparisonMetadata) }
+        unsafe {
+            &*self
+                .buffer
+                .as_ptr()
+                .add(off)
+                .cast::<comparison::ComparisonMetadata>()
+        }
     }
 
     pub fn comparison_mut(&mut self, slot: u32) -> &mut comparison::ComparisonMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `comparison` above; exclusive &mut self.
-        unsafe { &mut *(self.buffer.as_mut_ptr().add(off) as *mut comparison::ComparisonMetadata) }
+        unsafe {
+            &mut *self
+                .buffer
+                .as_mut_ptr()
+                .add(off)
+                .cast::<comparison::ComparisonMetadata>()
+        }
     }
 
     pub fn keyed_property(&self, slot: u32) -> &keyed_property::KeyedPropertyMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: allocator reserves `stride_bytes(KeyedProperty) = 24` bytes at this offset;
         // run is 8-aligned; KeyedPropertyMetadata is repr(C) with max field alignment 8.
-        unsafe { &*(self.buffer.as_ptr().add(off) as *const keyed_property::KeyedPropertyMetadata) }
+        unsafe {
+            &*self
+                .buffer
+                .as_ptr()
+                .add(off)
+                .cast::<keyed_property::KeyedPropertyMetadata>()
+        }
     }
 
     pub fn keyed_property_mut(&mut self, slot: u32) -> &mut keyed_property::KeyedPropertyMetadata {
         let off = self.entry_byte_offset(slot);
         // SAFETY: same invariants as `keyed_property` above; exclusive &mut self.
         unsafe {
-            &mut *(self.buffer.as_mut_ptr().add(off) as *mut keyed_property::KeyedPropertyMetadata)
+            &mut *self
+                .buffer
+                .as_mut_ptr()
+                .add(off)
+                .cast::<keyed_property::KeyedPropertyMetadata>()
         }
     }
 }
@@ -430,7 +483,7 @@ mod tests {
         *table.property_mut(1) = PropertyMetadata {
             mode: 3,
             generation: 7,
-            handler_bits: 0xdeadbeef,
+            handler_bits: 0xdead_beef,
             aux_bits: 0xcafe,
             execution_count: 42,
             ..Default::default()
@@ -438,7 +491,7 @@ mod tests {
         let got = *table.property(1);
         assert_eq!(got.mode, 3);
         assert_eq!(got.generation, 7);
-        assert_eq!(got.handler_bits, 0xdeadbeef);
+        assert_eq!(got.handler_bits, 0xdead_beef);
         assert_eq!(got.aux_bits, 0xcafe);
         assert_eq!(got.execution_count, 42);
         assert_eq!(*table.property(2), PropertyMetadata::default());
@@ -461,14 +514,14 @@ mod tests {
         *table.call_mut(1) = CallMetadata {
             mode: 5,
             generation: 11,
-            callee_bits: 0xabcd1234_5678ef90,
+            callee_bits: 0xabcd_1234_5678_ef90,
             execution_count: 99,
             ..Default::default()
         };
         let got = *table.call(1);
         assert_eq!(got.mode, 5);
         assert_eq!(got.generation, 11);
-        assert_eq!(got.callee_bits, 0xabcd1234_5678ef90);
+        assert_eq!(got.callee_bits, 0xabcd_1234_5678_ef90);
         assert_eq!(got.execution_count, 99);
         assert_eq!(*table.call(2), CallMetadata::default());
     }
@@ -538,14 +591,14 @@ mod tests {
         *table.keyed_property_mut(1) = KeyedPropertyMetadata {
             mode: 2,
             generation: 9,
-            handler_bits: 0x0102030405060708,
+            handler_bits: 0x0102_0304_0506_0708,
             execution_count: 33,
             ..Default::default()
         };
         let got = *table.keyed_property(1);
         assert_eq!(got.mode, 2);
         assert_eq!(got.generation, 9);
-        assert_eq!(got.handler_bits, 0x0102030405060708);
+        assert_eq!(got.handler_bits, 0x0102_0304_0506_0708);
         assert_eq!(got.execution_count, 33);
         assert_eq!(*table.keyed_property(2), KeyedPropertyMetadata::default());
     }

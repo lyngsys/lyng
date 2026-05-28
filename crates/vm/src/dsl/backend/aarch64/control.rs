@@ -11,7 +11,7 @@
 //! | ---- | ------------------------------------ |
 //! | x19  | PC (`*const u8`)                     |
 //! | x20  | REGS (`*mut Value`)                  |
-//! | x21  | MT (`*mut u8`, MetadataTable buffer) |
+//! | x21  | MT (`*mut u8`, `MetadataTable` buffer) |
 //! | x22  | VM (`*mut Vm`)                       |
 //! | x23  | TABLE (`*const DslHandler`)          |
 //! | x24  | STATE (`*mut LlIntState`)            |

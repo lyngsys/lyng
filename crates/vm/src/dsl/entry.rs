@@ -56,8 +56,7 @@ pub(crate) fn run_via_dsl(
         vm.metadata_tables
             .get(index)
             .and_then(|t| t.as_ref())
-            .map(|t| t.buffer_ptr() as *mut u8)
-            .unwrap_or(std::ptr::null_mut())
+            .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
     };
 
     // DSL-0c: REGS pin must point at the active frame's register
@@ -202,7 +201,7 @@ pub(crate) fn run_via_dsl(
 /// |---|---|---|
 /// | PC | x19 | `pb_base + pc_offset` (live byte in bytecode) |
 /// | REGS | x20 | `*mut Value` (register-file base) |
-/// | MT | x21 | `*mut u8` (MetadataTable buffer base; Phase C.4) |
+/// | MT | x21 | `*mut u8` (`MetadataTable` buffer base; Phase C.4) |
 /// | VM | x22 | `*mut Vm` |
 /// | TABLE | x23 | `*const DslHandler` |
 /// | STATE | x24 | `*mut LlIntState` |

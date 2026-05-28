@@ -18,7 +18,7 @@ const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 ///
 /// `dispatch` is intentionally the first field so the compile-time
 /// offset stays small and predictable, matching the encoding limits of
-/// AArch64 LDR/STR scaled immediates.
+/// `AArch64` LDR/STR scaled immediates.
 pub struct OpcodeCounters {
     // `pub(crate)` so `dsl::reg_convention` can resolve
     // `offset_of!(OpcodeCounters, dispatch)` for the asm offset binding.
@@ -62,13 +62,13 @@ impl OpcodeCounters {
         &self.dispatch
     }
 
-    pub fn enable_call_argument_copy(&mut self) {
+    pub const fn enable_call_argument_copy(&mut self) {
         if self.call_argument_copy.is_none() {
             self.call_argument_copy = Some(CallArgumentCopyCounterStore::new());
         }
     }
 
-    pub fn disable_call_argument_copy(&mut self) {
+    pub const fn disable_call_argument_copy(&mut self) {
         self.call_argument_copy = None;
     }
 
@@ -84,13 +84,13 @@ impl OpcodeCounters {
             .map(CallArgumentCopyCounterStore::snapshot)
     }
 
-    pub fn enable_slow_path(&mut self) {
+    pub const fn enable_slow_path(&mut self) {
         if self.slow_path.is_none() {
             self.slow_path = Some(SlowPathCounterStore::new());
         }
     }
 
-    pub fn disable_slow_path(&mut self) {
+    pub const fn disable_slow_path(&mut self) {
         self.slow_path = None;
     }
 

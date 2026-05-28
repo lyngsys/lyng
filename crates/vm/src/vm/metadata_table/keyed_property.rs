@@ -3,6 +3,9 @@ use std::mem::offset_of;
 /// Per-slot metadata for `KeyedPropertyAccess` IC sites. 24-byte stride.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+// `_pad`/`_tail` are explicit layout padding kept `pub` so the asm offset
+// asserts and `repr(C)` layout stay verifiable from outside the module.
+#[allow(clippy::pub_underscore_fields)]
 pub struct KeyedPropertyMetadata {
     pub mode: u8,
     pub _pad: [u8; 3],

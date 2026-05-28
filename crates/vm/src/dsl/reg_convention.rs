@@ -10,7 +10,7 @@
 //! | ------------- | ------- | ------------------------------- |
 //! | PC            | x19     | *const u8                       |
 //! | REGS          | x20     | *mut Value                      |
-//! | MT            | x21     | *mut u8 (MetadataTable buffer)  |
+//! | MT            | x21     | *mut u8 (`MetadataTable` buffer)  |
 //! | VM            | x22     | *mut Vm                         |
 //! | TABLE         | x23     | *const `DslHandler`               |
 //! | STATE         | x24     | *mut `LlIntState`                 |

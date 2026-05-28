@@ -25,7 +25,7 @@ pub struct MetadataTableFootprint {
     ///   1 = Call
     ///   2 = Arith
     ///   3 = Comparison
-    ///   4 = KeyedProperty
+    ///   4 = `KeyedProperty`
     pub live_site_count_by_kind: [usize; METADATA_KIND_COUNT],
     /// Sum of execution counts across all IC slots for this code object.
     pub total_execution_count: u64,

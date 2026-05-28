@@ -7,7 +7,7 @@
 //! GC heaps, and feedback caches don't leak between samples. The driver
 //! collects `--samples` runs per benchmark (default 5), computes the
 //! per-benchmark median score, and emits a markdown report alongside a
-//! stable-keyed JSON document for tracking progress toward JSC LLInt parity.
+//! stable-keyed JSON document for tracking progress toward JSC `LLInt` parity.
 //!
 //! The score model is V8's standard reciprocal-time formula:
 //! `score = 100 × reference_µs / mean_µs`, where the reference comes

@@ -16,8 +16,8 @@ use crate::vm::ic_state::{
     keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
     CallIcState, KeyedPropertyIcState, PropertyIcState,
 };
+pub use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 use crate::vm::metadata_table::{MetadataKind, PropertyMetadata, METADATA_KIND_COUNT};
-pub(crate) use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 use lyng_bytecode::FeedbackSiteKind;
 use lyng_gc::ValueStoreTarget;
 use lyng_objects::{
@@ -31,7 +31,7 @@ use std::cmp::Ordering;
 
 mod polymorphic;
 
-pub(crate) use polymorphic::PolymorphicChain;
+pub use polymorphic::PolymorphicChain;
 
 const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
@@ -78,7 +78,7 @@ pub enum FeedbackKeyedPropertyFamily {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum InlineCacheState {
+pub enum InlineCacheState {
     Uninitialized,
     Monomorphic,
     Polymorphic,
@@ -258,7 +258,7 @@ pub(super) struct ConstructCacheStorage {
     pub(super) entries: [Option<ConstructCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
 }
 
-/// Per-code-object KeyedProperty named-atom cache entries. These are
+/// Per-code-object `KeyedProperty` named-atom cache entries. These are
 /// the actual cache entry data; `KeyedPropertyIcState` holds the
 /// Rust-only structural state (entry count, family, sidecars).
 /// Stored in `Vm::keyed_property_named_entries`.
@@ -556,13 +556,13 @@ impl Vm {
     /// Side-effect helper for the inlined IC cache hit path: increment the
     /// per-site execution counter and emit a tier feedback event.
     ///
-    /// Only updates the execution count when the PropertyIcState already
+    /// Only updates the execution count when the `PropertyIcState` already
     /// exists (i.e. the slow path has previously initialized this slot and
     /// the code has crossed the allocation threshold). A `None` result from
     /// `get_mut` means the slot was never through the slow path; we skip
     /// the update to match the old `FeedbackVector::site_mut` gate.
     ///
-    /// Phase D.4.2: the PropertyMetadata mirror-write was removed from the
+    /// Phase D.4.2: the `PropertyMetadata` mirror-write was removed from the
     /// hot path. `meta.execution_count` is not read by anything in production
     /// (it was test-only), and `meta.mode` is restored exclusively at
     /// install time (`named_property_install_slow_path`) and on demand from
@@ -1121,11 +1121,8 @@ impl Vm {
             return;
         }
         let chain = chain_slot.get_or_insert_with(PolymorphicChain::new);
-        let insert_at = match chain.search_sorted(receiver_shape) {
-            Err(index) => index,
-            Ok(_) => unreachable!(
-                "chain replace branch handled above; chain.search_sorted must miss here"
-            ),
+        let Err(insert_at) = chain.search_sorted(receiver_shape) else {
+            unreachable!("chain replace branch handled above; chain.search_sorted must miss here")
         };
         chain.insert_at(insert_at, plan);
         state.entry_count = state.entry_count.saturating_add(1);
@@ -1209,12 +1206,10 @@ impl Vm {
             .objects()
             .object_header(agent.heap().view(), receiver)?;
         let matched = (0..usize::from(dense_entry_count)).any(|i| {
-            if let Some(entry) = dense_entries[i] {
+            dense_entries[i].is_some_and(|entry| {
                 DenseIndexCacheEntry::new(entry.receiver_shape, entry.receiver_flags)
                     .matches_header(header)
-            } else {
-                false
-            }
+            })
         });
         if !matched {
             return None;
@@ -1259,12 +1254,10 @@ impl Vm {
         let dense_entries = &state.dense_entries;
         let dense_entry_count = state.dense_entry_count;
         let matched = (0..usize::from(dense_entry_count)).any(|i| {
-            if let Some(entry) = dense_entries[i] {
+            dense_entries[i].is_some_and(|entry| {
                 DenseIndexCacheEntry::new(entry.receiver_shape, entry.receiver_flags)
                     .matches_header(header)
-            } else {
-                false
-            }
+            })
         });
         if !matched {
             return None;
@@ -1535,8 +1528,7 @@ impl Vm {
         };
         let generation = self
             .metadata_table(code)
-            .map(|table| table.call(slot.get()).generation)
-            .unwrap_or(0);
+            .map_or(0, |table| table.call(slot.get()).generation);
         Some(CallStatus {
             state: state.cache_state.into(),
             generation,
@@ -1596,8 +1588,7 @@ impl Vm {
         };
         let generation = self
             .metadata_table(code)
-            .map(|table| table.call(slot.get()).generation)
-            .unwrap_or(0);
+            .map_or(0, |table| table.call(slot.get()).generation);
         Some(ConstructStatus {
             state: state.cache_state.into(),
             generation,
@@ -1679,8 +1670,7 @@ impl Vm {
         }
         let generation = self
             .metadata_table(code)
-            .map(|table| table.keyed_property(slot.get()).generation)
-            .unwrap_or(0);
+            .map_or(0, |table| table.keyed_property(slot.get()).generation);
         Some(KeyedPropertyStatus {
             state: state.cache_state.into(),
             generation,
@@ -1697,6 +1687,11 @@ impl Vm {
     /// per-code Vec-indexed side-table allocations
     /// (`PropertyIcState`/`CallIcState`/`KeyedPropertyIcState`/polymorphic
     /// chains) so consumers see the full IC memory cost.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a per-kind run length does not fit in `usize`, which cannot
+    /// happen for any table this allocator builds.
     pub fn metadata_table_footprint(&self, code: CodeRef) -> Option<MetadataTableFootprint> {
         let index = code_index(code);
         let installed = self.installed.get(index).and_then(Option::as_ref)?;
@@ -1854,7 +1849,7 @@ impl Vm {
     }
 
     /// Returns the IC slot's current `(cache_state, generation)` tuple
-    /// for a NamedProperty site. `None` if the slot is empty.
+    /// for a `NamedProperty` site. `None` if the slot is empty.
     #[cfg(test)]
     pub(crate) fn named_property_generation_snapshot(
         &self,
@@ -1915,7 +1910,7 @@ impl Vm {
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    fn named_llint_load_header_from_state(
+    const fn named_llint_load_header_from_state(
         state: &PropertyIcState,
     ) -> Option<LlIntNamedPropertyHeader> {
         // OwnInline
@@ -1958,7 +1953,7 @@ impl Vm {
         None
     }
 
-    fn project_property_into_meta(
+    const fn project_property_into_meta(
         header: Option<LlIntNamedPropertyHeader>,
         generation: u32,
         execution_count: u32,
@@ -2000,10 +1995,10 @@ impl Vm {
     /// Project the write-side cache state into `PropertyMetadata`. Called
     /// from the assign opcode's slow-path install when the slot is a
     /// Store-purpose IC site. Writes mode = `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`
-    /// (= 5), `handler_bits` packed source_shape + slot + writable_flag,
-    /// `aux_bits` = target_shape. When the handler is NONE, zeroes the
+    /// (= 5), `handler_bits` packed `source_shape` + slot + `writable_flag`,
+    /// `aux_bits` = `target_shape`. When the handler is NONE, zeroes the
     /// metadata so the asm mode-byte check bails to the Rust probe.
-    pub(super) fn project_property_write_into_meta(
+    pub(super) const fn project_property_write_into_meta(
         write_handler: NamedPropertyInlineWriteHandler,
         generation: u32,
         execution_count: u32,
@@ -2273,7 +2268,10 @@ fn keyed_observe_generic_on_state(state: &mut KeyedPropertyIcState) {
 
 // ── Keyed IC helper free functions ────────────────────────────────────────────
 
-fn keyed_install_first_dense_entry(state: &mut KeyedPropertyIcState, entry: KeyedIcDenseEntry) {
+const fn keyed_install_first_dense_entry(
+    state: &mut KeyedPropertyIcState,
+    entry: KeyedIcDenseEntry,
+) {
     state.family = Some(KeyedIcFamily::DenseIndex);
     state.dense_entries[0] = Some(entry);
     state.dense_entry_count = 1;
@@ -2538,7 +2536,7 @@ fn try_keyed_named_store(
 
 // ── Call/Construct IC helpers (free functions) ────────────────────────────────
 
-fn ic_mode_from_cache_state(state: InlineCacheState) -> u8 {
+const fn ic_mode_from_cache_state(state: InlineCacheState) -> u8 {
     match state {
         InlineCacheState::Uninitialized => 0,
         InlineCacheState::Monomorphic => 1,
@@ -2582,14 +2580,11 @@ fn observe_call_target_on_state(
             state.cache_state = InlineCacheState::Polymorphic;
         }
         InlineCacheState::Polymorphic => {
-            let ce = match cache_entry {
-                Some(ce) => ce,
-                None => {
-                    state.cache_state = InlineCacheState::Megamorphic;
-                    state.entry_count = 0;
-                    storage.entries = [None; POLYMORPHIC_CALL_CACHE_LIMIT];
-                    return;
-                }
+            let Some(ce) = cache_entry else {
+                state.cache_state = InlineCacheState::Megamorphic;
+                state.entry_count = 0;
+                storage.entries = [None; POLYMORPHIC_CALL_CACHE_LIMIT];
+                return;
             };
             for index in 0..usize::from(state.entry_count) {
                 if storage.entries[index].is_some_and(|e| e.callee == ce.callee) {
@@ -2793,24 +2788,24 @@ impl Vm {
                 let own_handler = state.monomorphic_own_data_handler;
                 let proto_handler = state.monomorphic_proto_data_handler;
                 if own_handler.is_valid() {
-                    if own_handler.receiver_shape() != receiver_shape {
-                        IcSlowPathCause::ShapeMismatch
-                    } else {
+                    if own_handler.receiver_shape() == receiver_shape {
                         // Same shape — the asm inline cache hit path should have
                         // matched. Remaining reasons: out-of-line slot,
                         // non-writable on the assign side, or other asm
                         // bail conditions not visible here.
                         IcSlowPathCause::ModeMismatch
+                    } else {
+                        IcSlowPathCause::ShapeMismatch
                     }
                 } else if proto_handler.is_valid() {
-                    if proto_handler.receiver_shape() != receiver_shape {
-                        IcSlowPathCause::ShapeMismatch
-                    } else {
+                    if proto_handler.receiver_shape() == receiver_shape {
                         // Receiver matched; the asm `try_proto` branch failed
                         // on the prototype guard. Bucket as ModeMismatch (the
                         // proto side has no separate cause in the simplified
                         // post–Phase A taxonomy).
                         IcSlowPathCause::ModeMismatch
+                    } else {
+                        IcSlowPathCause::ShapeMismatch
                     }
                 } else {
                     // Monomorphic but no inline cache hit handler — entry is
@@ -2876,11 +2871,11 @@ mod tests {
 
     #[test]
     fn project_property_write_into_meta_writes_mode_5_for_inline_write() {
-        use crate::vm::ic_state::PropertyIcState;
         use crate::vm::feedback::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
+        use crate::vm::ic_state::PropertyIcState;
         use lyng_objects::{
-            INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
-            NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
+            NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyInlineWriteHandler,
+            INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
         };
         use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
 

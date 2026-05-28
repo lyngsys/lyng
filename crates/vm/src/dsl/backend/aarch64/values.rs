@@ -287,7 +287,7 @@ macro_rules! check_double {
 /// heap; the `b.hs #5` form conservatively treats it as
 /// heap-referencing too (pushing Sentinel writes through the Rust probe
 /// instead of inlining), which is safe and never appears on the
-/// AssignNamedProperty hot path.
+/// `AssignNamedProperty` hot path.
 ///
 /// Heap-referencing tag kinds per `crates/types/src/value.rs::TagKind`:
 /// `ObjectRef=5`, `StringRef=6`, `SymbolRef=7`, `BigIntRef=8`,

@@ -389,7 +389,7 @@ impl ShapeMetadata {
     /// as `parent` but a different prototype guard. Inherits `properties`,
     /// `property_lookup`, and `inline_slot_count` from the parent. Begins with its own
     /// empty `transitions` chain and no `prototype_transitions`.
-    pub(crate) fn proto_derived(parent: &ShapeMetadata) -> Self {
+    pub(crate) fn proto_derived(parent: &Self) -> Self {
         Self {
             transition_key: None,
             property: parent.property,
@@ -539,7 +539,7 @@ pub enum PrototypeKey {
 }
 
 impl PrototypeKey {
-    pub fn from_optional(proto: Option<ObjectRef>) -> Self {
+    pub const fn from_optional(proto: Option<ObjectRef>) -> Self {
         match proto {
             Some(obj) => Self::Object(obj),
             None => Self::Null,

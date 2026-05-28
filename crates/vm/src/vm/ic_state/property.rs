@@ -31,10 +31,10 @@ pub struct PropertyIcState {
     pub entry_count: u8,
     /// Inline polymorphic entries — at most `POLY_LIMIT` entries.
     pub entries: [Option<NamedPropertyCacheEntry>; POLY_LIMIT],
-    /// Monomorphic OwnData sidecar. `NamedPropertyHandler::NONE` when not
+    /// Monomorphic `OwnData` sidecar. `NamedPropertyHandler::NONE` when not
     /// applicable (non-OwnData, Poly, Mega, or Uninit).
     pub monomorphic_own_data_handler: NamedPropertyHandler,
-    /// Monomorphic one-hop PrototypeData sidecar.
+    /// Monomorphic one-hop `PrototypeData` sidecar.
     pub monomorphic_proto_data_handler: NamedPropertyProtoHandler,
     /// Monomorphic `OwnDataInlineWrite` sidecar.
     /// `NamedPropertyInlineWriteHandler::NONE` when not applicable:
@@ -45,7 +45,7 @@ pub struct PropertyIcState {
     /// (`LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`); the write fast path in
     /// `op_assign_named_property_dsl` consumes them.
     pub monomorphic_own_inline_write_handler: NamedPropertyInlineWriteHandler,
-    /// Polymorphic OwnData sidecar — mirrors the first `POLY_LIMIT` entries
+    /// Polymorphic `OwnData` sidecar — mirrors the first `POLY_LIMIT` entries
     /// when the cache is Polymorphic and the entry packs into a valid handler.
     pub polymorphic_own_data_handlers: [NamedPropertyHandler; POLY_LIMIT],
     /// Per-site install generation. Bumped on every install / re-install.
@@ -192,8 +192,8 @@ impl Default for PropertyIcState {
 #[cfg(test)]
 mod tests {
     use lyng_objects::{
-        INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
-        NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
+        NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyInlineWriteHandler,
+        INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
     };
     use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
 
@@ -241,8 +241,8 @@ mod tests {
         let entry = NamedPropertyCacheEntry::new_for_test(
             shape,
             ObjectRef::from_raw(1).expect("non-zero"),
-            shape, // holder == receiver — no transition
-            INLINE_SLOT_OFFSET_FLAG | 0,
+            shape,                   // holder == receiver — no transition
+            INLINE_SLOT_OFFSET_FLAG, // inline slot offset 0
             writable_attrs(),
             NamedPropertyCachePath::OwnData,
             // dependency_count = 1: receiver-only, simplest valid entry.

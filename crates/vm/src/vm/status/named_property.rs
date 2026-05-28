@@ -31,6 +31,7 @@ impl From<NamedPropertyCachePath> for NamedPropertyEntryKind {
 }
 
 /// Plain-value summary of the cache-entry payload the slow path installed.
+///
 /// Pulled directly off the `NamedPropertyCacheEntry`; everything tests care
 /// about (path, holder, slot offset, dependencies) is surfaced as a value.
 #[derive(Clone, Debug, PartialEq, Eq)]

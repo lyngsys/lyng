@@ -221,8 +221,7 @@ impl ObjectRuntime {
         let slot_count = heap
             .view()
             .shape(parent)
-            .map(|r| r.slot_count())
-            .unwrap_or(0);
+            .map_or(0, lyng_gc::RuntimeShapeRecord::slot_count);
         let new_meta = ShapeMetadata::proto_derived(parent_meta);
         let id = heap.alloc_shape(
             RuntimeShapeRecord::new(Some(parent), prototype_guard, slot_count),
@@ -236,6 +235,11 @@ impl ObjectRuntime {
     /// prototype changes to `key`. Deduplicates via `ShapeMetadata::prototype_transitions`:
     /// if the transition already exists the cached `ShapeId` is returned; otherwise
     /// a fresh shape is allocated and the mapping is recorded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `from`'s shape metadata is missing; it must exist for any
+    /// shape being transitioned.
     pub fn resolve_prototype_transition(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
@@ -1228,7 +1232,7 @@ impl ObjectRuntime {
     pub fn drain_watchpoints_for_shape(&mut self, shape: ShapeId) -> Option<Vec<Watchpoint>> {
         self.watchpoint_sets
             .get_mut(&shape)
-            .and_then(|s| s.drain_for_fire())
+            .and_then(super::watchpoint::WatchpointSet::drain_for_fire)
     }
 
     /// Dispatch target for the `Recording` observer kind from the Agent layer.
@@ -1276,8 +1280,7 @@ impl ObjectRuntime {
     pub fn prototype_transition_entry_exists(&self, shape: ShapeId, key: PrototypeKey) -> bool {
         self.shape_metadata(shape)
             .and_then(|m| m.prototype_transitions.as_deref())
-            .map(|table| table.contains_key(&key))
-            .unwrap_or(false)
+            .is_some_and(|table| table.contains_key(&key))
     }
 
     /// Read-only accessor for a shape's `WatchpointSet`. Used by tests (including
