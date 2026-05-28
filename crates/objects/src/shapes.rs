@@ -265,6 +265,145 @@ impl NamedPropertyHandler {
     }
 }
 
+/// Bit-packed monomorphic `OwnDataInlineWrite` cache handler.
+///
+/// Layout — two 64-bit words:
+///   `handler_bits` (same layout as [`NamedPropertyHandler`]):
+///     bits  0..30  inline slot index
+///     bit   30     writable flag (`HANDLER_WRITABLE_FLAG`)
+///     bit   31     inline-slot flag (`INLINE_SLOT_OFFSET_FLAG`) — must be set
+///     bits 32..64  source `ShapeId` raw `u32` (pre-write shape, `NonZero`)
+///   `target_bits`:
+///     bits  0..32  target `ShapeId` raw `u32` (post-write shape; equal to
+///                  source for non-transitioning writes)
+///     bits 32..64  reserved (currently always zero)
+///
+/// `is_valid()` is `false` when `handler_bits == 0` (the NONE sentinel).
+/// `INLINE_SLOT_OFFSET_FLAG` is structurally guaranteed set in every
+/// non-NONE handler by [`Self::from_entry`] — the sole constructor — so
+/// `slot_location()` can unconditionally return `SlotLocation::Inline`.
+///
+/// **ShapeId stability assumption:** the handler stores raw shape ids that
+/// rely on the existing slab persistence in `ObjectRuntime::shape_metadata`.
+/// If shape collection is ever introduced, this struct's consumers (the
+/// asm fast path + the IC cache hit-path verifier) would need to participate
+/// in pinning or sweep — see the design doc §6.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct NamedPropertyInlineWriteHandler {
+    handler_bits: u64,
+    target_bits: u64,
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "handler words intentionally unpack fixed-width bit fields"
+)]
+impl NamedPropertyInlineWriteHandler {
+    /// Sentinel value indicating "no cache handler available".
+    pub const NONE: Self = Self {
+        handler_bits: 0,
+        target_bits: 0,
+    };
+
+    /// Raw handler word: source shape in high 32 bits, inline-slot flag +
+    /// writable flag + slot index in low 32 bits. Consumed by the asm
+    /// `op_assign_named_property` fast path via `load_named_handler_bits!`.
+    #[inline]
+    #[must_use]
+    pub const fn handler_bits(self) -> u64 {
+        self.handler_bits
+    }
+
+    /// Raw target word: post-write target `ShapeId` raw u32 in low 32 bits,
+    /// high 32 bits reserved. Consumed by the asm `op_assign_named_property`
+    /// fast path via `load_named_target_shape!`.
+    #[inline]
+    #[must_use]
+    pub const fn target_bits(self) -> u64 {
+        self.target_bits
+    }
+
+    /// Build a write handler from a cache entry. Returns [`Self::NONE`] for
+    /// entries the asm write fast path cannot service:
+    /// - `PrototypeData` paths (no own-data write semantics)
+    /// - Multi-dependency entries (more than one shape guard required)
+    /// - Out-of-line slot entries (MVP scope; deferred)
+    /// - Slot offsets exceeding 30 bits (defensive)
+    #[inline]
+    #[must_use]
+    pub const fn from_entry(entry: NamedPropertyCacheEntry) -> Self {
+        match entry.path() {
+            NamedPropertyCachePath::OwnData | NamedPropertyCachePath::OwnDataTransition => {}
+            NamedPropertyCachePath::PrototypeData => return Self::NONE,
+        }
+        if entry.dependency_count() != 1 {
+            return Self::NONE;
+        }
+        let encoded_offset = entry.slot_offset();
+        if encoded_offset & INLINE_SLOT_OFFSET_FLAG == 0 {
+            return Self::NONE;
+        }
+        let offset_bits = encoded_offset & INLINE_SLOT_OFFSET_MASK;
+        if offset_bits > HANDLER_SLOT_OFFSET_MASK {
+            return Self::NONE;
+        }
+        let source_shape = entry.receiver_shape();
+        let target_shape = entry.holder_shape();
+        let writable_bit = if entry.attrs().writable() {
+            HANDLER_WRITABLE_FLAG
+        } else {
+            0
+        };
+        let low = INLINE_SLOT_OFFSET_FLAG | writable_bit | offset_bits;
+        let handler_bits = ((source_shape.get() as u64) << 32) | (low as u64);
+        let target_bits = target_shape.get() as u64;
+        Self {
+            handler_bits,
+            target_bits,
+        }
+    }
+
+    /// Returns the cached source (pre-write) `ShapeId`.
+    #[inline]
+    #[must_use]
+    pub const fn source_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw((self.handler_bits >> 32) as u32)
+    }
+
+    /// Returns the cached target (post-write) `ShapeId`.
+    #[inline]
+    #[must_use]
+    pub const fn target_shape(self) -> Option<ShapeId> {
+        ShapeId::from_raw(self.target_bits as u32)
+    }
+
+    /// Decoded slot location. Only meaningful when [`Self::is_valid`].
+    /// MVP: always returns `SlotLocation::Inline` (outline writes are
+    /// filtered to [`Self::NONE`] by [`Self::from_entry`]).
+    #[inline]
+    #[must_use]
+    pub const fn slot_location(self) -> SlotLocation {
+        let low = self.handler_bits as u32;
+        let offset = low & HANDLER_SLOT_OFFSET_MASK;
+        SlotLocation::Inline(offset)
+    }
+
+    /// `true` when the cached property is writable.
+    #[inline]
+    #[must_use]
+    pub const fn writable(self) -> bool {
+        (self.handler_bits as u32) & HANDLER_WRITABLE_FLAG != 0
+    }
+
+    /// `true` when this handler carries a valid `OwnDataInlineWrite` cache path.
+    #[inline]
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        self.handler_bits != 0
+    }
+}
+
 /// Bit-packed monomorphic one-hop `PrototypeData` inline-cache handler.
 ///
 /// Phase 3e extension of [`NamedPropertyHandler`] for `PrototypeData` cache
@@ -830,6 +969,118 @@ impl ShapeAllocation {
     #[inline]
     pub const fn slot_count(self) -> u32 {
         self.slot_count
+    }
+}
+
+#[cfg(test)]
+mod inline_write_handler_tests {
+    use super::*;
+
+    fn writable_attrs() -> DescriptorAttributes {
+        let mut attrs = DescriptorAttributes::empty();
+        attrs.set_writable(true);
+        attrs
+    }
+
+    #[test]
+    fn from_transition_entry_packs_source_shape_target_shape_and_inline_slot() {
+        let source = ShapeId::from_raw(7).expect("non-zero");
+        let target = ShapeId::from_raw(11).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            /* receiver_shape */ source,
+            /* holder */ ObjectRef::from_raw(1).expect("non-zero"),
+            /* holder_shape */ target,
+            /* slot_offset */ INLINE_SLOT_OFFSET_FLAG | 3, // inline slot 3
+            /* attrs */ writable_attrs(),
+            NamedPropertyCachePath::OwnDataTransition,
+            /* dependency_count */ 1,
+            /* dependencies */ [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(handler.is_valid());
+        assert_eq!(handler.source_shape(), Some(source));
+        assert_eq!(handler.target_shape(), Some(target));
+        assert_eq!(handler.slot_location(), SlotLocation::Inline(3));
+        assert!(handler.writable());
+    }
+
+    #[test]
+    fn from_own_data_entry_uses_same_source_and_target_shape() {
+        let shape = ShapeId::from_raw(42).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            shape,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            shape, // holder == receiver — no transition
+            INLINE_SLOT_OFFSET_FLAG | 0,
+            writable_attrs(),
+            NamedPropertyCachePath::OwnData,
+            1,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(handler.is_valid());
+        assert_eq!(handler.source_shape(), Some(shape));
+        assert_eq!(handler.target_shape(), Some(shape));
+    }
+
+    #[test]
+    fn from_outline_entry_is_none() {
+        let shape = ShapeId::from_raw(5).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            shape,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            shape,
+            7, // INLINE_SLOT_OFFSET_FLAG NOT set → outline slot 7
+            writable_attrs(),
+            NamedPropertyCachePath::OwnData,
+            1,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(!handler.is_valid());
+    }
+
+    #[test]
+    fn from_prototype_data_entry_is_none() {
+        let receiver = ShapeId::from_raw(1).expect("non-zero");
+        let holder = ShapeId::from_raw(2).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            receiver,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            holder,
+            INLINE_SLOT_OFFSET_FLAG | 0,
+            writable_attrs(),
+            NamedPropertyCachePath::PrototypeData,
+            2,
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(!handler.is_valid());
+    }
+
+    #[test]
+    fn none_sentinel_is_invalid() {
+        assert!(!NamedPropertyInlineWriteHandler::NONE.is_valid());
+    }
+
+    #[test]
+    fn from_multi_dependency_entry_is_none() {
+        // Even an inline OwnData entry must be rejected when the
+        // dependency count exceeds 1 — the asm shape guard cannot
+        // validate more than one shape.
+        let shape = ShapeId::from_raw(13).expect("non-zero");
+        let entry = NamedPropertyCacheEntry::new(
+            shape,
+            ObjectRef::from_raw(1).expect("non-zero"),
+            shape,
+            INLINE_SLOT_OFFSET_FLAG | 0,
+            writable_attrs(),
+            NamedPropertyCachePath::OwnData,
+            2, // dependency_count > 1 → must reject
+            [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
+        );
+        let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
+        assert!(!handler.is_valid());
     }
 }
 

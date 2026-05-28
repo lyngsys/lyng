@@ -503,6 +503,13 @@ impl Agent {
                     } => {
                         vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
                     }
+                    ShapeInvalidationObserver::AdaptiveOwnWrite {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
+                    }
                 },
             }
         }

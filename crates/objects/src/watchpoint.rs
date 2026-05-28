@@ -32,6 +32,18 @@ pub enum ShapeInvalidationObserver {
         slot: FeedbackSlotId,
         generation: u32,
     },
+    /// Spec 2 transition-IC: AdaptiveOwnWrite — clears the
+    /// `OwnDataInlineWrite` IC slot at `(code, slot)` if its generation
+    /// still matches `generation`. Registered by the slow path on the
+    /// receiver's source shape when a monomorphic write entry is
+    /// installed. Fires when the source shape goes dictionary, has a
+    /// new property added, or receives a prototype mutation — the slot
+    /// is cleared and re-installs on the next slow-path miss.
+    AdaptiveOwnWrite {
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    },
 }
 
 /// Dispatch interface for `ShapeInvalidationObserver::AdaptiveProtoLoad` fires.
@@ -93,10 +105,12 @@ impl ShapeInvalidationObserver {
     pub(crate) fn fire_into(&self, sink: &mut Vec<u64>) {
         match self {
             Self::Recording { token } => sink.push(*token),
-            // AdaptiveProtoLoad is a production observer; in tests it should not
-            // be dispatched through this sink. The Agent-layer dispatcher routes
-            // it to Vm::clear_ic_slot_if_generation_matches.
+            // AdaptiveProtoLoad and AdaptiveOwnWrite are production observers;
+            // in tests they should not be dispatched through this sink. The
+            // Agent-layer dispatcher routes them to
+            // Vm::clear_ic_slot_if_generation_matches.
             Self::AdaptiveProtoLoad { .. } => {}
+            Self::AdaptiveOwnWrite { .. } => {}
         }
     }
 }
@@ -230,6 +244,23 @@ mod tests {
         set.fire_all_into(&mut sink);
         assert_eq!(set.state(), WatchpointState::Invalidated); // terminal even from Cleared
         assert!(sink.is_empty());
+    }
+
+    #[test]
+    fn adaptive_own_write_observer_carries_code_slot_generation() {
+        let observer = ShapeInvalidationObserver::AdaptiveOwnWrite {
+            code: CodeRef::from_raw(7).expect("non-zero"),
+            slot: FeedbackSlotId::from_raw(3).expect("non-zero"),
+            generation: 5,
+        };
+        match observer {
+            ShapeInvalidationObserver::AdaptiveOwnWrite { code, slot, generation } => {
+                assert_eq!(code.get(), 7);
+                assert_eq!(slot.get(), 3);
+                assert_eq!(generation, 5);
+            }
+            _ => panic!("expected AdaptiveOwnWrite variant"),
+        }
     }
 
     // T5 — dispatch order matches registration order
