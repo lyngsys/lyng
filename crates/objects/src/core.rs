@@ -22,6 +22,7 @@ impl ObjectFlags {
     pub const IMMUTABLE_PROTOTYPE: Self = Self(1 << 6);
     pub const ERROR_OBJECT: Self = Self(1 << 7);
     pub const IS_HTMLDDA: Self = Self(1 << 8);
+    pub const CELL_BACKED_DICTIONARY: Self = Self(1 << 9);
 
     #[inline]
     pub const fn empty() -> Self {
@@ -81,6 +82,11 @@ impl ObjectFlags {
     #[inline]
     pub const fn uses_named_property_dictionary(self) -> bool {
         self.contains(Self::NAMED_PROPERTIES_DICTIONARY)
+    }
+
+    #[inline]
+    pub const fn uses_cell_backed_dictionary(self) -> bool {
+        self.contains(Self::CELL_BACKED_DICTIONARY)
     }
 
     #[inline]
@@ -167,3 +173,17 @@ pub enum InternalMethodError {
 
 /// Result type used by internal-method entrypoints.
 pub type InternalMethodResult<T> = Result<T, InternalMethodError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cell_backed_dictionary_flag_roundtrips() {
+        let flags = ObjectFlags::empty().union(ObjectFlags::CELL_BACKED_DICTIONARY);
+        assert!(flags.uses_cell_backed_dictionary());
+        assert!(!ObjectFlags::empty().uses_cell_backed_dictionary());
+        // Independent from the dictionary flag:
+        assert!(!ObjectFlags::CELL_BACKED_DICTIONARY.contains(ObjectFlags::NAMED_PROPERTIES_DICTIONARY));
+    }
+}
