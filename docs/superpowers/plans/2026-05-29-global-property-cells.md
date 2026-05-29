@@ -689,7 +689,20 @@ git commit -m "feat(vm): global object is cell-backed from realm creation"
 
 ---
 
-## Phase 2 — Global lexical bindings as cells
+## Phase 2 — Global lexical bindings (REFRAMED during execution)
+
+> **Deviation (decided during execution, commit `3e7cd439`):** Phase 2 does NOT
+> introduce `ValueCell`s for lexical bindings. `EnvironmentMetadata` is agent-side
+> (`Vec<Option<EnvironmentMetadata>>`), so lexical cells there would be untraced —
+> the same GC pitfall Phase 0 fixed. Instead, lexical binding *values stay in
+> GC-traced environment slots*, and `(environment, slot)` is the stable handle.
+> Phase 2 only retires the O(n) lexical scan via an O(1) `name→index` map
+> (`HashMap<AtomId, u32>` alongside the existing `lexical_bindings` Vec). Phase 3's
+> global IC caches `(environment, slot)` for lexical globals (analogous to caching
+> a `ValueCellRef` for var globals). Tasks 2.1–2.3 below are superseded by the
+> single committed change; kept for history.
+
+
 
 ### Task 2.1: `GlobalLexicalBindingRecord` carries a cell; add a `name→cell` map
 
