@@ -3,91 +3,91 @@
     {
       "error": null,
       "file": "richards.js",
-      "median_score": 482.0,
-      "median_us_per_iter": 7324.066390041494,
+      "median_score": 458.0,
+      "median_us_per_iter": 7707.860262008734,
       "name": "Richards",
       "reference_us": 35302,
       "samples": [
-        484.0,
-        483.0,
-        477.0,
-        477.0,
-        482.0
+        454.0,
+        447.0,
+        462.0,
+        459.0,
+        458.0
       ]
     },
     {
       "error": null,
       "file": "deltablue.js",
-      "median_score": 393.0,
-      "median_us_per_iter": 16823.918575063613,
+      "median_score": 379.0,
+      "median_us_per_iter": 17445.38258575198,
       "name": "DeltaBlue",
       "reference_us": 66118,
       "samples": [
-        394.0,
-        393.0,
-        393.0,
-        389.0,
-        391.0
+        379.0,
+        379.0,
+        379.0,
+        379.0,
+        377.0
       ]
     },
     {
       "error": null,
       "file": "crypto.js",
-      "median_score": 446.0,
-      "median_us_per_iter": 59681.83856502242,
+      "median_score": 444.0,
+      "median_us_per_iter": 59950.67567567567,
       "name": "Crypto",
       "reference_us": 266181,
       "samples": [
+        448.0,
         446.0,
         444.0,
-        446.0,
-        447.0,
-        446.0
+        444.0,
+        443.0
       ]
     },
     {
       "error": null,
       "file": "raytrace.js",
-      "median_score": 232.0,
-      "median_us_per_iter": 318960.775862069,
+      "median_score": 454.0,
+      "median_us_per_iter": 162993.1718061674,
       "name": "RayTrace",
       "reference_us": 739989,
       "samples": [
-        232.0,
-        231.0,
-        232.0,
-        232.0,
-        232.0
+        451.0,
+        455.0,
+        449.0,
+        454.0,
+        459.0
       ]
     },
     {
       "error": null,
       "file": "navier-stokes.js",
-      "median_score": 599.0,
-      "median_us_per_iter": 247746.24373956595,
+      "median_score": 587.0,
+      "median_us_per_iter": 252810.90289608177,
       "name": "NavierStokes",
       "reference_us": 1484000,
       "samples": [
-        599.0,
-        601.0,
-        599.0,
-        595.0,
-        599.0
+        584.0,
+        589.0,
+        587.0,
+        589.0,
+        580.0
       ]
     },
     {
       "error": null,
       "file": "splay.js",
-      "median_score": 1431.0,
-      "median_us_per_iter": 5694.689028651293,
+      "median_score": 1425.0,
+      "median_us_per_iter": 5718.666666666667,
       "name": "Splay",
       "reference_us": 81491,
       "samples": [
-        1393.0,
-        1406.0,
-        1443.0,
-        1431.0,
-        1456.0
+        1429.0,
+        1399.0,
+        1446.0,
+        1425.0,
+        1414.0
       ]
     }
   ],
