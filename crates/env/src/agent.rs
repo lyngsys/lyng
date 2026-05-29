@@ -319,6 +319,25 @@ impl Agent {
         ok
     }
 
+    /// Marks `id` as a cell-backed dictionary (see
+    /// [`lyng_objects::ObjectRuntime::set_cell_backed_dictionary`]). Callers
+    /// should already have placed `id` in dictionary mode via
+    /// [`Self::ensure_named_property_dictionary`].
+    pub fn set_cell_backed_dictionary(&mut self, id: ObjectRef) -> bool {
+        self.objects.set_cell_backed_dictionary(id)
+    }
+
+    /// Returns the backing primitive-value cell for a cell-backed dictionary
+    /// entry, or `None` when the entry is missing or not cell-backed. Delegates
+    /// to [`lyng_objects::ObjectRuntime::cell_backed_entry`].
+    pub fn cell_backed_entry(
+        &self,
+        id: ObjectRef,
+        key: PropertyKey,
+    ) -> Option<lyng_gc::PrimitiveValueCellRef> {
+        self.objects.cell_backed_entry(id, key)
+    }
+
     /// Defines or updates one own property on `id`, always firing watchpoints on the
     /// pre-call shape. (May fire spuriously even when no shape change occurred —
     /// Spec 1's `Recording` observers tolerate this.)

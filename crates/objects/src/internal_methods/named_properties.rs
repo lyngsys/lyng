@@ -187,6 +187,24 @@ impl ObjectRuntime {
         true
     }
 
+    /// Marks `id` as a cell-backed dictionary by unioning
+    /// [`ObjectFlags::CELL_BACKED_DICTIONARY`] onto its metadata.
+    ///
+    /// Mirrors how [`Self::ensure_named_property_dictionary`] unions
+    /// `NAMED_PROPERTIES_DICTIONARY`. Callers are expected to have already
+    /// placed `id` in dictionary mode; the flag governs whether
+    /// [`Self::redefine_named_property`] routes data values through
+    /// [`crate::NamedPropertyValue::DataCell`] entries.
+    ///
+    /// Returns `false` if `id` has no metadata.
+    pub fn set_cell_backed_dictionary(&mut self, id: ObjectRef) -> bool {
+        let Some(metadata) = self.object_metadata_mut(id) else {
+            return false;
+        };
+        metadata.flags = metadata.flags.union(ObjectFlags::CELL_BACKED_DICTIONARY);
+        true
+    }
+
     pub fn redefine_named_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,

@@ -3,7 +3,7 @@ use crate::{
     realm_index, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutKind, Intrinsics,
     RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
 };
-use lyng_objects::ObjectAllocation;
+use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectAllocation};
 use lyng_types::{ObjectRef, RealmRef, ShapeId};
 
 impl Agent {
@@ -40,6 +40,18 @@ impl Agent {
             );
             (global_object, root_shape)
         });
+        // Make the realm's global object a cell-backed dictionary from creation,
+        // BEFORE any builtins or global bindings are installed, so every global
+        // `var`/`function`, sloppy implicit global, `globalThis.x = …`, and
+        // builtin becomes a `NamedPropertyValue::DataCell` entry routed through
+        // `redefine_named_property`. Real engines keep the global object in
+        // dictionary mode anyway; doing this at creation makes cell-backing
+        // independent of declaration count. The object is freshly allocated and
+        // empty here, so the dictionary transition cannot fire any meaningful
+        // shape-invalidation watchpoints — a `NoopAdaptiveProtoLoadDispatch` is
+        // sufficient.
+        self.ensure_named_property_dictionary(global_object, &mut NoopAdaptiveProtoLoadDispatch);
+        self.set_cell_backed_dictionary(global_object);
         let global_env = self
             .alloc_global_environment(None, global_layout, global_object, lifetime)
             .expect("default realm global environment should allocate");

@@ -94,6 +94,11 @@ fn ensure_global_object_dictionary(
     vm_dispatch: &mut dyn lyng_objects::AdaptiveProtoLoadDispatch,
 ) -> VmResult<()> {
     if agent.ensure_named_property_dictionary(global_object, vm_dispatch) {
+        // Defensive: the realm's global object is flagged cell-backed at realm
+        // creation, but if any global object reaches dictionary mode via the
+        // bulk-threshold path without that flagging, keep it consistent so its
+        // bindings route through cells too.
+        agent.set_cell_backed_dictionary(global_object);
         Ok(())
     } else {
         Err(VmError::Abrupt(errors::throw_type_error(agent)))

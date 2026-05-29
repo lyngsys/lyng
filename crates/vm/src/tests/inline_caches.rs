@@ -103,12 +103,21 @@ fn store_env_slot_rejects_reassigning_initialized_const_bindings() {
 fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
     let unit = compile_test_unit(30, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();
+    let value_atom = unit_atom(&unit, "value");
+    // Select the `.value` access specifically. The bare `source` global load is
+    // also a `NamedPropertyLoad` site, but the realm's global object is now a
+    // cell-backed dictionary (globals are `DataCell` entries), so global loads
+    // are no longer shape-cacheable and go Megamorphic. This test exercises the
+    // ordinary `.value` access on a shape-stable receiver.
     let slot = entry
         .feedback_sites()
         .iter()
-        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(value_atom)
+        })
         .map(|descriptor| descriptor.slot())
-        .expect("entry script should contain a named-load site");
+        .expect("entry script should contain a named-load site for .value");
 
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -495,7 +504,13 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
 }
 
 #[test]
-fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property() {
+fn global_property_load_ic_is_megamorphic_for_cell_backed_global() {
+    // The realm's global object is a cell-backed dictionary from creation, so a
+    // global `var` is stored as a `NamedPropertyValue::DataCell` entry rather
+    // than a shape slot. The named-property cache planner bails on dictionary
+    // receivers, so global loads are uncacheable and the IC settles Megamorphic.
+    // A dedicated cell-aware global IC is a later phase; this asserts the
+    // interim behavior while keeping value semantics correct.
     let unit = compile_test_unit(36, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -527,17 +542,17 @@ fn global_property_load_ic_becomes_monomorphic_for_global_object_data_property()
     );
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),
-        Some((
-            "Monomorphic",
-            1,
-            Some(lyng_objects::NamedPropertyCachePath::OwnData)
-        ))
+        Some(("Megamorphic", 0, None))
     );
 }
 
 #[cfg(feature = "diagnostic-counters")]
 #[test]
-fn global_property_load_ic_hit_avoids_semantic_slow_path() {
+fn global_property_load_takes_semantic_slow_path_for_cell_backed_global() {
+    // With the global object cell-backed (dictionary), the global load IC cannot
+    // be planned and stays Megamorphic, so every `LoadGlobal` resolves through
+    // the semantic slow bridge. Restoring a fast bridge here is the job of the
+    // future cell-aware global IC phase.
     let unit = compile_test_unit(544, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -569,11 +584,7 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
     );
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),
-        Some((
-            "Monomorphic",
-            1,
-            Some(lyng_objects::NamedPropertyCachePath::OwnData)
-        ))
+        Some(("Megamorphic", 0, None))
     );
 
     let counters = vm.opcode_counters_mut();
@@ -595,13 +606,17 @@ fn global_property_load_ic_hit_avoids_semantic_slow_path() {
     assert_eq!(dispatch.count(Opcode::LoadGlobal), 1);
     assert_eq!(
         slow_path.semantic(Opcode::LoadGlobal),
-        0,
-        "cached global-object load IC hit should avoid the semantic slow bridge"
+        1,
+        "uncacheable cell-backed global load resolves via the semantic slow bridge"
     );
 }
 
 #[test]
-fn global_property_store_ic_caches_global_object_data_property() {
+fn global_property_store_ic_is_megamorphic_for_cell_backed_global() {
+    // Stores to a global flow through `redefine_named_property` on the
+    // cell-backed dictionary global object, so the store IC cannot plan an
+    // OwnData slot and stays Megamorphic. Value semantics (the running counter)
+    // are unaffected; only the IC fast path is deferred to the global IC phase.
     let unit = compile_test_unit(
         37,
         "var globalValue; globalValue = globalValue + 1; globalValue;",
@@ -636,11 +651,7 @@ fn global_property_store_ic_caches_global_object_data_property() {
     );
     assert_eq!(
         vm.named_property_cache_snapshot(installed.code(), slot),
-        Some((
-            "Monomorphic",
-            1,
-            Some(lyng_objects::NamedPropertyCachePath::OwnData)
-        ))
+        Some(("Megamorphic", 0, None))
     );
 }
 

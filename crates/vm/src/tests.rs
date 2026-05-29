@@ -15,6 +15,7 @@ mod errors;
 mod eval_and_with;
 mod feedback;
 mod generators;
+mod global_cells;
 mod inline_caches;
 mod llint_architecture;
 mod metadata_and_tail_calls;
