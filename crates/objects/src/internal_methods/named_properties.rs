@@ -199,6 +199,46 @@ impl ObjectRuntime {
             return false;
         }
 
+        // On a cell-backed dictionary object, data payloads are routed through a
+        // heap `ValueCell`. Overwriting an existing cell-backed entry MUST reuse the
+        // same cell (write through it) so that any inline-cache reference cached to
+        // that cell never dangles. Accessor payloads bypass cell routing.
+        let cell_backed = self
+            .object_metadata(id)
+            .is_some_and(|m| m.flags.uses_cell_backed_dictionary());
+        let cell_payload = if cell_backed {
+            match payload {
+                NamedPropertyValue::Data(value) => Some(value),
+                NamedPropertyValue::DataCell(source) => Some(
+                    match heap.view().value_cell(source) {
+                        Some(record) => record.stored_value(),
+                        None => return false,
+                    },
+                ),
+                NamedPropertyValue::Accessor { .. } => None,
+            }
+        } else {
+            None
+        };
+
+        let payload = if let Some(value) = cell_payload {
+            // Read the existing cell ref (immutable borrow) before any heap cell op.
+            let cell = if let Some(existing) = self.cell_backed_entry(id, key) {
+                // REUSE: write through the existing cell, preserving identity.
+                heap.mut_store_value(ValueStoreTarget::ValueCell(existing), value);
+                existing
+            } else {
+                // No prior cell-backed entry (fresh key, or migrating a plain
+                // `Data` bootstrap entry): allocate a new tenured cell.
+                let cell = heap.alloc_value_cell(AllocationLifetime::Default);
+                heap.init_store_value(ValueStoreTarget::ValueCell(cell), value);
+                cell
+            };
+            NamedPropertyValue::DataCell(cell)
+        } else {
+            payload
+        };
+
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
         };
@@ -215,12 +255,21 @@ impl ObjectRuntime {
         id: ObjectRef,
         key: PropertyKey,
     ) -> bool {
-        let Some(record) = heap.view().object(id) else {
-            return false;
-        };
-        let Some(metadata) = self.object_metadata(id) else {
-            return false;
-        };
+        self.delete_named_property_entry(heap, id, key).is_some()
+    }
+
+    /// Removes a named property and returns the removed dictionary entry, or `None`
+    /// when the property was absent or could not be removed. The returned entry lets a
+    /// later phase drain and free any backing cell (`NamedPropertyValue::DataCell`)
+    /// from inline-cache dependency tracking.
+    pub fn delete_named_property_entry(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        id: ObjectRef,
+        key: PropertyKey,
+    ) -> Option<NamedPropertyDictionaryEntry> {
+        let record = heap.view().object(id)?;
+        let metadata = self.object_metadata(id)?;
         let present = match &metadata.named_properties {
             NamedPropertyStorage::ShapeStable => record
                 .shape()
@@ -229,23 +278,23 @@ impl ObjectRuntime {
             NamedPropertyStorage::Dictionary(dictionary) => dictionary.entry(key).is_some(),
         };
         if !present {
-            return false;
+            return None;
         }
         if !self.ensure_named_property_dictionary(heap, id) {
-            return false;
+            return None;
         }
 
-        let Some(metadata) = self.object_metadata_mut(id) else {
-            return false;
-        };
+        let metadata = self.object_metadata_mut(id)?;
         let NamedPropertyStorage::Dictionary(dictionary) = &mut metadata.named_properties else {
-            return false;
+            return None;
         };
-        if dictionary.remove(key).is_none() {
-            return false;
-        }
+        let removed = dictionary.remove(key)?;
         metadata.named_property_churn = metadata.named_property_churn.saturating_add(1);
-        self.refresh_integrity_level_flags(heap.view(), id)
+        if self.refresh_integrity_level_flags(heap.view(), id) {
+            Some(removed)
+        } else {
+            None
+        }
     }
 
     pub(super) fn ordinary_own_named_property(

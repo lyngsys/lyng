@@ -4323,3 +4323,88 @@ fn dictionary_datacell_entry_reads_through_cell() {
     assert_eq!(descriptor.enumerable(), Some(true));
     assert_eq!(descriptor.configurable(), Some(true));
 }
+
+#[test]
+fn cell_backed_redefine_preserves_cell_identity_on_overwrite() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(2002));
+    let entry_attrs = attrs(true, true, true);
+
+    // Cell-backed dictionary object: force dictionary mode + set the flag.
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime.ensure_named_property_dictionary(&mut mutator, object));
+    {
+        let metadata = runtime
+            .object_metadata_mut(object)
+            .expect("object must have metadata");
+        metadata.flags = metadata.flags.union(ObjectFlags::CELL_BACKED_DICTIONARY);
+    }
+
+    // First define: undefined. This must allocate a cell.
+    assert!(runtime.redefine_named_property(
+        &mut mutator,
+        object,
+        key,
+        NamedPropertyValue::Data(Value::undefined()),
+        entry_attrs,
+    ));
+    let c0 = runtime.cell_backed_entry(object, key);
+    assert!(c0.is_some(), "first cell-backed define must allocate a cell");
+
+    // Overwrite with 7. The cell MUST be reused (same ref) and written through.
+    assert!(runtime.redefine_named_property(
+        &mut mutator,
+        object,
+        key,
+        NamedPropertyValue::Data(Value::from_smi(7)),
+        entry_attrs,
+    ));
+    assert_eq!(
+        runtime.cell_backed_entry(object, key),
+        c0,
+        "overwrite must reuse the SAME cell (identity preserved)"
+    );
+    let descriptor = runtime
+        .get_own_property(mutator.view(), object, key)
+        .expect("get_own_property must not error")
+        .expect("entry must be present");
+    assert_eq!(
+        descriptor.value(),
+        Some(Value::from_smi(7)),
+        "overwrite must be visible through the reused cell"
+    );
+
+    // Non-cell-backed dictionary object: redefine stores a plain Data entry.
+    let plain = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime.ensure_named_property_dictionary(&mut mutator, plain));
+    assert!(runtime.redefine_named_property(
+        &mut mutator,
+        plain,
+        key,
+        NamedPropertyValue::Data(Value::from_smi(9)),
+        entry_attrs,
+    ));
+    assert_eq!(
+        runtime.cell_backed_entry(plain, key),
+        None,
+        "non-cell-backed object must not allocate a cell"
+    );
+    let entry = runtime
+        .named_property_dictionary_entry(plain, key)
+        .expect("entry must be present");
+    assert!(
+        matches!(entry.payload(), NamedPropertyValue::Data(_)),
+        "non-cell-backed object must store a plain Data entry"
+    );
+}

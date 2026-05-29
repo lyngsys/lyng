@@ -1355,6 +1355,21 @@ impl ObjectRuntime {
         dictionary.entry(key)
     }
 
+    /// Returns the backing [`lyng_gc::PrimitiveValueCellRef`] for a cell-backed dictionary entry,
+    /// or `None` when the object is missing, not in dictionary mode, has no entry for the
+    /// key, or the entry is not a [`NamedPropertyValue::DataCell`].
+    pub fn cell_backed_entry(
+        &self,
+        id: ObjectRef,
+        key: PropertyKey,
+    ) -> Option<lyng_gc::PrimitiveValueCellRef> {
+        let metadata = self.object_metadata(id)?;
+        let NamedPropertyStorage::Dictionary(dictionary) = &metadata.named_properties else {
+            return None;
+        };
+        dictionary.entry(key)?.payload().cell()
+    }
+
     pub fn named_property_dictionary_entries(
         &self,
         id: ObjectRef,
