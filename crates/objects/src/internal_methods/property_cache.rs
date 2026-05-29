@@ -315,9 +315,22 @@ impl ObjectRuntime {
             )? {
                 return Ok(None);
             }
-            if let Some(proto_prop) = self.shape_property(header.shape(), key) {
-                // Only writable data can be safely shadowed by a transition.
-                if proto_prop.kind() != ShapePropertyKind::Data || !proto_prop.attrs().writable() {
+            // Dictionary-aware own-property lookup: a prototype that went
+            // dictionary (e.g. via `__defineSetter__`, which redefines the key
+            // as an accessor and forces dictionary storage) hides the property
+            // from `shape_property`, so a shape-only check would miss the
+            // setter and wrongly cache a plain transitioning own-write that
+            // shadows it.
+            if let Some(proto_desc) = self.ordinary_own_named_property(heap.view(), object, key)? {
+                // Only a writable *data* property can be safely shadowed by a
+                // transition. An accessor (its setter intercepts the write) or
+                // a non-writable data property (the write silently fails or
+                // throws) must fall to the generic [[Set]] slow path.
+                let writable_data = proto_desc.has_value()
+                    && !proto_desc.has_get()
+                    && !proto_desc.has_set()
+                    && proto_desc.writable() == Some(true);
+                if !writable_data {
                     return Ok(None);
                 }
                 // Shadowing path settled at this prototype — stop walking.

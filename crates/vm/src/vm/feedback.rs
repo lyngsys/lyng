@@ -2879,17 +2879,21 @@ mod tests {
         };
         use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
 
-        let source = ShapeId::from_raw(7).expect("non-zero");
-        let target = ShapeId::from_raw(11).expect("non-zero");
+        // Non-transitioning own-data write (source == target): the asm-cacheable
+        // case. Transitioning writes (source != target) are intentionally not
+        // asm-cacheable (the asm hit cannot re-validate the prototype chain on a
+        // prototype-independent shape — see `NamedPropertyInlineWriteHandler::
+        // from_entry`), so they would project mode 0.
+        let shape = ShapeId::from_raw(7).expect("non-zero");
         let mut attrs = DescriptorAttributes::empty();
         attrs.set_writable(true);
         let entry = NamedPropertyCacheEntry::new_for_test(
-            source,
+            shape,
             ObjectRef::from_raw(1).expect("non-zero"),
-            target,
+            shape,
             INLINE_SLOT_OFFSET_FLAG | 3,
             attrs,
-            NamedPropertyCachePath::OwnDataTransition,
+            NamedPropertyCachePath::OwnData,
             1,
             [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );

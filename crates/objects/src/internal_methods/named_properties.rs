@@ -152,6 +152,7 @@ impl ObjectRuntime {
         if metadata.named_properties.is_dictionary() {
             return true;
         }
+        let old_shape = record.shape();
 
         let preserve_named_slots = self.has_reserved_named_slots(heap.view(), record);
         let dictionary = self.snapshot_named_property_dictionary(heap.view(), id);
@@ -169,6 +170,19 @@ impl ObjectRuntime {
             )
         {
             return false;
+        }
+
+        // Retarget the object onto a fresh, transition-detached shape so the
+        // inline-cache fast paths (which guard inline-slot reads/writes with a
+        // bit-exact shape compare) miss on this now-dictionary object — its
+        // inline slots stay physically populated, so a stale shape match would
+        // otherwise return outdated values after a later delete / redefinition.
+        // See `ObjectRuntime::allocate_dictionary_shape`.
+        if let Some(old_shape) = old_shape
+            && let Some(dictionary_shape) =
+                self.allocate_dictionary_shape(heap, old_shape, AllocationLifetime::Default)
+        {
+            self.retarget_shape(heap, id, dictionary_shape);
         }
         true
     }

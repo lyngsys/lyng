@@ -672,7 +672,7 @@ fn module_namespace_objects_read_live_bindings_and_reject_mutation() {
 }
 
 #[test]
-fn named_property_store_cache_hits_own_slots_after_dictionary_transition_same_shape() {
+fn named_property_store_cache_misses_after_dictionary_transition_changes_shape() {
     let mut heap = PrimitiveHeap::new();
     let mut runtime = ObjectRuntime::new();
     let mut mutator = heap.mutator();
@@ -731,16 +731,19 @@ fn named_property_store_cache_hits_own_slots_after_dictionary_transition_same_sh
         runtime.named_property_storage_mode(object),
         Some(NamedPropertyStorageMode::Dictionary)
     );
-    // Spec 2 Phase A: the cache no longer carries an epoch dependency.
-    // Dictionary transitions that leave the shape unchanged are not detected
-    // by this object-level cache validator. The VM-level invariant is that
-    // the slow path declines to cache dictionary-backed receivers and
-    // watchpoints clear stale IC slots before subsequent cache reads.
+    // Entering dictionary storage retargets the object onto a fresh,
+    // transition-detached shape (`allocate_dictionary_shape`), so the stale
+    // cache entry — captured against the pre-dictionary shape — no longer
+    // matches the receiver and the store misses. This is what prevents the
+    // IC fast path from writing through to a property that was redefined
+    // read-only (or deleted) while the receiver kept its old `ShapeId`. The
+    // caller re-resolves on the miss and correctly declines the read-only
+    // write.
     assert_eq!(
         runtime
             .store_to_named_property_cache(&mut mutator, object, key, cache, Value::from_smi(7))
             .unwrap(),
-        Some(true)
+        None
     );
 }
 

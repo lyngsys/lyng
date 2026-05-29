@@ -206,7 +206,12 @@ mod tests {
     }
 
     #[test]
-    fn refresh_sidecars_populates_monomorphic_own_inline_write_handler() {
+    fn refresh_sidecars_leaves_inline_write_handler_invalid_for_transition_entry() {
+        // Transitioning writes (source_shape != target_shape) are not
+        // asm-cacheable: the asm hit cannot re-validate the prototype chain on
+        // a prototype-independent shape (see `NamedPropertyInlineWriteHandler::
+        // from_entry`). `refresh_sidecars` therefore leaves the inline-write
+        // handler at NONE for such entries, so dispatch falls to the slow path.
         let source = ShapeId::from_raw(7).expect("non-zero");
         let target = ShapeId::from_raw(11).expect("non-zero");
         let entry = NamedPropertyCacheEntry::new_for_test(
@@ -216,9 +221,6 @@ mod tests {
             INLINE_SLOT_OFFSET_FLAG | 2,
             writable_attrs(),
             NamedPropertyCachePath::OwnDataTransition,
-            // dependency_count = 1: simple receiver-only entry. from_entry
-            // accepts 1..=PROPERTY_CACHE_MAX_DEPENDENCIES; this uses the
-            // minimum to keep the fixture simple.
             1,
             [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );
@@ -229,9 +231,7 @@ mod tests {
         state.entries[0] = Some(entry);
         state.refresh_sidecars();
 
-        let expected = NamedPropertyInlineWriteHandler::from_entry(entry);
-        assert_eq!(state.monomorphic_own_inline_write_handler, expected);
-        assert!(state.monomorphic_own_inline_write_handler.is_valid());
+        assert!(!state.monomorphic_own_inline_write_handler.is_valid());
     }
 
     #[test]

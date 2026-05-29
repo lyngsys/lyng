@@ -411,6 +411,26 @@ impl NamedPropertyInlineWriteHandler {
         }
         let source_shape = entry.receiver_shape();
         let target_shape = entry.holder_shape();
+        // Transitioning writes (`source_shape != target_shape`) add a new own
+        // property and are only valid when no setter / non-writable data
+        // property on the receiver's prototype chain would intercept the
+        // write — a condition the planner verifies by walking that chain.
+        // But ordinary-object shapes are prototype-independent (two objects
+        // with the same property layout but different `[[Prototype]]` share a
+        // `ShapeId`), so the asm hit path's `receiver_shape == source_shape`
+        // compare does NOT establish that a different receiver has the same
+        // prototype chain. Serving this handler to a same-shape object with a
+        // different prototype would shadow an inherited setter (see
+        // `staging/sm/regress/regress-503860.js`). The asm hit cannot cheaply
+        // re-validate the prototype within its register budget, so
+        // transitioning writes are not cached here; they fall to the slow
+        // path, which re-plans against the receiver's actual prototype chain.
+        // Non-transitioning writes (`source == target`, overwriting an
+        // existing own property) are prototype-independent and stay on the
+        // fast path.
+        if source_shape.get() != target_shape.get() {
+            return Self::NONE;
+        }
         let writable_bit = if entry.attrs().writable() {
             HANDLER_WRITABLE_FLAG
         } else {
@@ -1044,7 +1064,17 @@ mod inline_write_handler_tests {
     }
 
     #[test]
-    fn from_transition_entry_packs_source_shape_target_shape_and_inline_slot() {
+    fn from_transition_entry_is_none_because_proto_chain_is_unvalidated() {
+        // Transitioning writes (`source_shape != target_shape`) add a new own
+        // property whose validity depends on the receiver's prototype chain
+        // (no setter / non-writable interceptor). Ordinary-object shapes are
+        // prototype-independent, so the asm hit's `receiver_shape ==
+        // source_shape` compare cannot establish that a different same-shape
+        // receiver shares the prototype chain (see
+        // `staging/sm/regress/regress-503860.js`). The asm hit cannot
+        // re-validate the prototype within its register budget, so
+        // transitioning entries are not asm-cacheable; they fall to the slow
+        // path, which re-plans against the receiver's actual prototype chain.
         let source = ShapeId::from_raw(7).expect("non-zero");
         let target = ShapeId::from_raw(11).expect("non-zero");
         let entry = NamedPropertyCacheEntry::new(
@@ -1058,11 +1088,7 @@ mod inline_write_handler_tests {
             /* dependencies */ [None; PROPERTY_CACHE_MAX_DEPENDENCIES],
         );
         let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
-        assert!(handler.is_valid());
-        assert_eq!(handler.source_shape(), Some(source));
-        assert_eq!(handler.target_shape(), Some(target));
-        assert_eq!(handler.slot_location(), SlotLocation::Inline(3));
-        assert!(handler.writable());
+        assert!(!handler.is_valid());
     }
 
     #[test]
@@ -1148,9 +1174,14 @@ mod inline_write_handler_tests {
     }
 
     #[test]
-    fn from_transition_entry_with_two_dependencies_is_valid() {
-        // OwnDataTransition with dependency_count == 2 — typical constructor
-        // pattern (receiver shape + one prototype shape). Must be accepted.
+    fn from_transition_entry_with_two_dependencies_is_none() {
+        // OwnDataTransition with dependency_count == 2 — the constructor
+        // pattern (receiver shape + one prototype shape). Even though the
+        // planner validated this prototype chain, the entry is not
+        // asm-cacheable: a different object sharing the (prototype-independent)
+        // receiver shape may have a different prototype whose chain the asm
+        // hit cannot re-validate. Falls to the slow path. See
+        // `from_transition_entry_is_none_because_proto_chain_is_unvalidated`.
         let source = ShapeId::from_raw(17).expect("non-zero");
         let target = ShapeId::from_raw(23).expect("non-zero");
         let proto_shape = ShapeId::from_raw(5).expect("non-zero");
@@ -1168,11 +1199,7 @@ mod inline_write_handler_tests {
             deps,
         );
         let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
-        assert!(handler.is_valid());
-        assert_eq!(handler.source_shape(), Some(source));
-        assert_eq!(handler.target_shape(), Some(target));
-        assert_eq!(handler.slot_location(), SlotLocation::Inline(2));
-        assert!(handler.writable());
+        assert!(!handler.is_valid());
     }
 
     #[test]

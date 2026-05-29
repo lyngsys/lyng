@@ -231,6 +231,43 @@ impl ObjectRuntime {
         id
     }
 
+    /// Allocates a fresh, transition-table-detached shape with the same
+    /// property layout and prototype guard as `parent`. Used when an object
+    /// enters dictionary storage: the object keeps its prototype and logical
+    /// layout but must no longer share a `ShapeId` with shape-stable objects.
+    ///
+    /// The inline-cache fast paths guard own-property inline-slot reads and
+    /// writes with a bit-exact `record.shape() == handler.receiver_shape()`
+    /// compare (and, since the Spec 2 epoch removal, nothing else). A
+    /// dictionary object keeps its inline slots physically populated, so
+    /// leaving it on the shared structural shape would let those fast paths
+    /// return stale values after a later delete / redefinition. Giving the
+    /// object its own detached shape makes every IC keyed on the old shape
+    /// miss on this object while staying valid for all other objects still on
+    /// the shared shape — the same surgical invalidation `setPrototypeOf`
+    /// already performs. The new shape is not recorded in any transition
+    /// table; each dictionary object gets its own identity (dictionary
+    /// transitions are gated behind a churn threshold, so this does not
+    /// meaningfully grow the shape population).
+    pub(crate) fn allocate_dictionary_shape(
+        &mut self,
+        heap: &mut PrimitiveMutator<'_>,
+        parent: ShapeId,
+        lifetime: AllocationLifetime,
+    ) -> Option<ShapeId> {
+        let parent_record = heap.view().shape(parent)?;
+        let prototype_guard = parent_record.prototype_guard();
+        let slot_count = parent_record.slot_count();
+        let parent_meta = self.shape_metadata(parent)?;
+        let new_meta = ShapeMetadata::proto_derived(parent_meta);
+        let id = heap.alloc_shape(
+            RuntimeShapeRecord::new(Some(parent), prototype_guard, slot_count),
+            lifetime,
+        );
+        self.store_shape_metadata(id, new_meta);
+        Some(id)
+    }
+
     /// Returns the shape a `parent`-shaped object should transition to when its
     /// prototype changes to `key`. Deduplicates via `ShapeMetadata::prototype_transitions`:
     /// if the transition already exists the cached `ShapeId` is returned; otherwise
