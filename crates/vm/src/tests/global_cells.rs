@@ -186,9 +186,7 @@ fn load_global_lexical_hits_env_slot_ic() {
     let mut vm = Vm::new();
     // First unit declares the global lexical binding `y`. Use `evaluate_script`
     // so the global lexical instantiation plan runs and `y` is bound + set.
-    vm.evaluate_script(agent, realm.clone(), &decl)
-        .run()
-        .unwrap();
+    vm.evaluate_script(agent, realm, &decl).run().unwrap();
 
     // Second unit reads it via `LoadGlobal`.
     let read_installed = vm.install_script(agent, realm.id(), &read).unwrap();
@@ -300,4 +298,60 @@ fn global_value_reassignment_seen_through_ic() {
 
     // a == 1 (first read), b == 2 (after reassignment) => 1*10 + 2 == 12.
     assert_eq!(result, Value::from_smi(12));
+}
+
+/// A `[[Delete]]` of a cell-backed global property (the path reached by
+/// `delete globalThis.x`, `Reflect.deleteProperty`, and qualified
+/// `delete this.x`, all of which funnel through `Agent::delete` rather than the
+/// sloppy unqualified `delete x` statement) frees the entry's backing cell and
+/// MUST bump the global structure generation, so any per-site `Cell` IC
+/// re-resolves instead of dereferencing the freed cell. This asserts the
+/// invalidation contract directly and deterministically at the `Agent::delete`
+/// chokepoint.
+#[test]
+fn delete_of_cell_backed_global_bumps_structure_generation() {
+    let unit = compile_test_unit(7299, "var x = 1; x");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+    let global_object = realm.global_object();
+    let x_name = unit_runtime_atom(agent, &unit, unit_atom(&unit, "x"));
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    // Precondition: `x` is a cell-backed entry on the global object.
+    assert!(
+        agent
+            .cell_backed_entry(global_object, PropertyKey::from_atom(x_name))
+            .is_some(),
+        "global `x` should be cell-backed before the delete"
+    );
+
+    let gen_before = agent.global_structure_generation(global_env);
+    let deleted = agent
+        .delete(
+            global_object,
+            PropertyKey::from_atom(x_name),
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .expect("delete should succeed");
+    assert!(deleted, "configurable global `x` should be deletable");
+
+    assert!(
+        agent.global_structure_generation(global_env) > gen_before,
+        "deleting a cell-backed global must bump the structure generation \
+         (else a cached Cell IC reads the freed cell)"
+    );
+    assert!(
+        agent
+            .cell_backed_entry(global_object, PropertyKey::from_atom(x_name))
+            .is_none(),
+        "the cell-backed entry should be gone after delete"
+    );
 }

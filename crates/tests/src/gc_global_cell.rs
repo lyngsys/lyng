@@ -58,8 +58,9 @@ use lyng_types::{PropertyDescriptor, PropertyKey, Value};
 ///
 /// 1. Gets the default realm's global object.
 /// 2. Forces the global object into dictionary mode.
-/// 3. Allocates a fresh heap object ("inner object") with `AllocationLifetime::Default`
-///    (tenured, goes directly to old-space).
+/// 3. Allocates a fresh heap object ("inner object") with `AllocationLifetime::Default`.
+///    (Major collection re-marks both young and old space, so the object's
+///    generation does not matter here — it survives iff the metadata hook traces it.)
 /// 4. Stores a sentinel property (`__gc_sentinel__ = 0xDEAD`) on the inner object.
 /// 5. Stores the inner object as a dictionary property (`__inner_var__`) on the
 ///    global, dropping the only other reference. The inner object is now ONLY
@@ -99,7 +100,8 @@ fn dictionary_global_object_value_survives_collection() {
     }
 
     // --- Step 3: Allocate a fresh heap object (the "inner object") ---
-    // AllocationLifetime::Default => tenured immediately (old-space).
+    // Major collection re-marks young+old space, so the object's generation is
+    // irrelevant to this (major-GC) test; survival depends only on the metadata hook.
     // We deliberately hold NO explicit GC root for this object.
     let inner_object = agent.with_heap_and_objects(|heap, objects| {
         let root_shape = objects
@@ -213,5 +215,76 @@ fn dictionary_global_object_value_survives_collection() {
          property still reads 0xDEAD. \
          See crates/gc/src/rooting.rs (TraceObjectMetadataEdges) and \
          crates/objects/src/gc_integration.rs (ObjectRuntime impl) for the tracing path."
+    );
+}
+
+/// A runtime-created cell-backed global VALUE must survive a MINOR (nursery)
+/// collection. The minor collector does not trace dictionary-mode metadata
+/// edges, so the only thing keeping a cell-backed global alive across a minor
+/// GC is the cell being TENURED. `redefine_named_property` therefore allocates
+/// backing cells `LongLived`; if it ever regresses to `Default` (nursery), the
+/// cell is reclaimed and the binding's value is silently lost.
+#[test]
+fn minor_gc_cell_backed_global_value_survives() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_object = realm.global_object();
+
+    // Sanity: the realm global object is cell-backed from creation.
+    assert!(
+        agent.object_uses_cell_backed_dictionary(global_object),
+        "global object should be cell-backed"
+    );
+
+    // Define a fresh data property at runtime -> routed through a Default-lifetime
+    // ValueCell. Use an SMI value so survival is testable purely via the cell.
+    let var_atom = agent.atoms_mut().intern("__minor_probe__");
+    let var_key = PropertyKey::from_atom(var_atom);
+    {
+        let mut desc = PropertyDescriptor::new();
+        desc.set_value(Value::from_smi(0x1234));
+        desc.set_writable(true);
+        desc.set_enumerable(true);
+        desc.set_configurable(true);
+        agent
+            .define_own_property(
+                global_object,
+                var_key,
+                desc,
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .expect("define runtime global cell");
+    }
+
+    let cell = agent
+        .cell_backed_entry(global_object, var_key)
+        .expect("entry should be cell-backed");
+    let young_before = agent.heap().view().value_cell(cell).is_some();
+    assert!(young_before, "cell should exist before minor GC");
+
+    // Run a minor (nursery) collection. The dictionary entry holding `cell` lives
+    // off-heap in ObjectMetadata; minor GC does not trace it.
+    {
+        let roots = agent.roots() as *const _;
+        // SAFETY shim for the borrow checker: roots and heap are disjoint fields.
+        let roots = unsafe { &*roots };
+        agent.heap_mut().force_minor_collect(roots);
+    }
+
+    assert!(
+        agent.heap().view().value_cell(cell).is_some(),
+        "REGRESSION: cell-backed global cell was reclaimed by a minor GC — the \
+         backing cell must be allocated LongLived (tenured), not Default (nursery)"
+    );
+    let entry_value = agent
+        .cell_backed_entry(global_object, var_key)
+        .and_then(|c| agent.heap().view().value_cell(c))
+        .map(|r| r.stored_value());
+    assert_eq!(
+        entry_value,
+        Some(Value::from_smi(0x1234)),
+        "the global binding's value must be intact after a minor GC"
     );
 }

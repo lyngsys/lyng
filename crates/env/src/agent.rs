@@ -438,6 +438,18 @@ impl Agent {
         if let Some(old) = old_shape {
             self.fire_watchpoints_for_shape(old, vm_dispatch);
         }
+        // Deleting a cell-backed global entry frees (orphans) its backing cell.
+        // Any per-site global cell IC caching that cell must re-resolve, so bump
+        // the structure generation. This covers ALL [[Delete]] paths — qualified
+        // `delete globalThis.x`, `Reflect.deleteProperty`, sloppy `delete x` —
+        // since they all funnel through here. Gated on the cell-backed flag so
+        // ordinary-object deletes pay nothing. Over-bumping is safe.
+        if matches!(result, Ok(true))
+            && self.object_uses_cell_backed_dictionary(id)
+            && let Some(global_env) = self.global_env_for_object(id)
+        {
+            self.bump_global_structure_generation(global_env);
+        }
         result
     }
 

@@ -256,7 +256,15 @@ impl ObjectRuntime {
             } else {
                 // No prior cell-backed entry (fresh key, or migrating a plain
                 // `Data` bootstrap entry): allocate a new tenured cell.
-                let cell = heap.alloc_value_cell(AllocationLifetime::Default);
+                //
+                // MUST be `LongLived` (old-space), not `Default`. The minor
+                // (nursery) collector does NOT trace dictionary-mode metadata
+                // edges (see crates/objects/src/gc_integration.rs); the only
+                // thing that keeps a cell-backed entry's value alive across a
+                // minor GC is the cell being tenured. A `Default` cell is
+                // nursery-eligible (Young) and would be reclaimed by the next
+                // minor GC, silently dropping the global binding's value.
+                let cell = heap.alloc_value_cell(AllocationLifetime::LongLived);
                 heap.init_store_value(ValueStoreTarget::ValueCell(cell), value);
                 cell
             };
