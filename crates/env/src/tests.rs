@@ -942,6 +942,20 @@ fn global_and_object_environment_families_keep_binding_domains_separate() {
     assert_eq!(lexical_binding.name(), AtomId::from_raw(91));
     assert_eq!(lexical_binding.environment(), global_env);
     assert_eq!(lexical_binding.slot(), 0);
+
+    // The O(1) `name -> binding` index must resolve a second, distinct binding
+    // and must overwrite (not duplicate) an existing binding by name.
+    assert!(agent.global_set_lexical_binding(global_env, AtomId::from_raw(93), global_env, 4));
+    let second = agent
+        .global_lexical_binding(global_env, AtomId::from_raw(93))
+        .expect("second global lexical binding should be tracked");
+    assert_eq!(second.slot(), 4);
+    assert!(agent.global_set_lexical_binding(global_env, AtomId::from_raw(91), global_env, 7));
+    let rebound = agent
+        .global_lexical_binding(global_env, AtomId::from_raw(91))
+        .expect("rebound global lexical binding should be tracked");
+    assert_eq!(rebound.slot(), 7);
+    // Overwrite must not duplicate the Vec entry: 91 (rebound) + 93 = 2 records.
     assert!(!agent.global_has_var_name(global_env, AtomId::from_raw(92)));
     assert!(agent.global_add_var_name(global_env, AtomId::from_raw(92)));
     assert!(agent.global_has_var_name(global_env, AtomId::from_raw(92)));
@@ -953,7 +967,25 @@ fn global_and_object_environment_families_keep_binding_domains_separate() {
     assert_eq!(global_record.global_object(), global_object);
     assert_eq!(global_record.layout(), global_layout);
     assert!(global_record.has_lexical_name(AtomId::from_raw(91)));
-    assert_eq!(global_record.lexical_bindings(), &[lexical_binding]);
+    // Backing Vec holds exactly one record per name: 91 (rebound to slot 7,
+    // in its original insertion position) followed by 93 (slot 4).
+    assert_eq!(global_record.lexical_bindings().len(), 2);
+    assert_eq!(
+        global_record.lexical_binding(AtomId::from_raw(91)),
+        Some(GlobalLexicalBindingRecord::new(
+            AtomId::from_raw(91),
+            global_env,
+            7
+        ))
+    );
+    assert_eq!(
+        global_record.lexical_binding(AtomId::from_raw(93)),
+        Some(GlobalLexicalBindingRecord::new(
+            AtomId::from_raw(93),
+            global_env,
+            4
+        ))
+    );
     assert!(global_record.has_var_name(AtomId::from_raw(92)));
     assert_eq!(
         agent.environment_outer(global_env),

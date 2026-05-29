@@ -2,7 +2,7 @@ use super::{EnvironmentLayoutId, ThisBindingStatus};
 use lyng_common::AtomId;
 use lyng_gc::EnvironmentSlotsRef;
 use lyng_types::{EnvironmentRef, ObjectRef, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Read-only typed view over one declarative environment record.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -176,6 +176,7 @@ pub struct GlobalEnvironmentRecord {
     pub(crate) global_object: ObjectRef,
     pub(crate) lexical_names: HashSet<AtomId>,
     pub(crate) lexical_bindings: Vec<GlobalLexicalBindingRecord>,
+    pub(crate) lexical_index: HashMap<AtomId, u32>,
     pub(crate) var_names: HashSet<AtomId>,
 }
 
@@ -260,10 +261,9 @@ impl GlobalEnvironmentRecord {
 
     #[inline]
     pub fn lexical_binding(&self, name: AtomId) -> Option<GlobalLexicalBindingRecord> {
-        self.lexical_bindings
-            .iter()
-            .copied()
-            .find(|binding| binding.name() == name)
+        self.lexical_index
+            .get(&name)
+            .map(|index| self.lexical_bindings[*index as usize])
     }
 
     #[inline]
@@ -372,6 +372,10 @@ pub enum EnvironmentMetadata {
         layout: EnvironmentLayoutId,
         lexical_names: HashSet<AtomId>,
         lexical_bindings: Vec<GlobalLexicalBindingRecord>,
+        /// O(1) `name -> index-into-`lexical_bindings`` lookup. Kept in sync
+        /// with `lexical_bindings` on every insert/update so global lexical
+        /// resolution avoids the previous linear scan.
+        lexical_index: HashMap<AtomId, u32>,
         var_names: HashSet<AtomId>,
     },
     Object {

@@ -57,3 +57,70 @@ fn global_var_write_through_cell() {
         "global `x` should remain backed by a primitive-value cell after a write"
     );
 }
+
+/// Declaring many global `let` bindings and reading specific ones back must
+/// resolve to the correct values. This is the behavioral guard for the O(1)
+/// `name -> binding` index that replaces the previous linear scan.
+#[test]
+fn many_global_lexical_bindings_resolve_correctly() {
+    let mut src = String::new();
+    for i in 0..50 {
+        src.push_str(&format!("let l{i} = {i};\n"));
+    }
+    // Read a spread of specific bindings (first, middle, last) and combine them
+    // into a single distinct number: l0 + l25 * 100 + l49 * 10000 = 492500.
+    src.push_str("l0 + l25 * 100 + l49 * 10000;");
+    let unit = compile_test_unit(7110, &src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect("many global lexicals should resolve");
+
+    assert_eq!(result, Value::from_smi(492_500));
+}
+
+/// `let` and `const` global declarations resolve and combine correctly.
+#[test]
+fn global_let_const_still_work() {
+    let unit = compile_test_unit(7111, "let a = 1; const b = 2; a + b");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect("global let/const should resolve");
+
+    assert_eq!(result, Value::from_smi(3));
+}
+
+/// The temporal dead zone is unaffected by the resolution index: reading a
+/// `let` binding before its declaration must throw a `ReferenceError`.
+#[test]
+fn global_lexical_tdz_preserved() {
+    let unit = compile_test_unit(
+        7112,
+        "var ok = 0; try { a; } catch (e) { ok = e instanceof ReferenceError ? 1 : 2; } let a = 1; ok",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect("script with TDZ catch should complete");
+
+    assert_eq!(result, Value::from_smi(1));
+}

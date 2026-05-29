@@ -10,7 +10,7 @@ use crate::{
 use lyng_common::AtomId;
 use lyng_gc::AllocationLifetime;
 use lyng_types::{ObjectRef, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 impl Agent {
     /// Allocates one immutable environment layout record.
@@ -149,6 +149,7 @@ impl Agent {
                 layout,
                 lexical_names: HashSet::new(),
                 lexical_bindings: Vec::new(),
+                lexical_index: HashMap::new(),
                 var_names: HashSet::new(),
             },
             lifetime,
@@ -225,6 +226,7 @@ impl Agent {
                 layout,
                 lexical_names,
                 lexical_bindings,
+                lexical_index,
                 var_names,
             } => Some(EnvironmentRecord::Global(GlobalEnvironmentRecord {
                 id,
@@ -234,6 +236,7 @@ impl Agent {
                 global_object: record.function_object()?,
                 lexical_names: lexical_names.clone(),
                 lexical_bindings: lexical_bindings.clone(),
+                lexical_index: lexical_index.clone(),
                 var_names: var_names.clone(),
             })),
             EnvironmentMetadata::Object { with_environment } => {
@@ -485,11 +488,12 @@ impl Agent {
     ) -> Option<GlobalLexicalBindingRecord> {
         match self.environment_metadata(id) {
             Some(EnvironmentMetadata::Global {
-                lexical_bindings, ..
-            }) => lexical_bindings
-                .iter()
-                .copied()
-                .find(|binding| binding.name() == name),
+                lexical_bindings,
+                lexical_index,
+                ..
+            }) => lexical_index
+                .get(&name)
+                .map(|index| lexical_bindings[*index as usize]),
             _ => None,
         }
     }
@@ -511,20 +515,22 @@ impl Agent {
         slot: u32,
     ) -> bool {
         let Some(EnvironmentMetadata::Global {
-            lexical_bindings, ..
+            lexical_bindings,
+            lexical_index,
+            ..
         }) = self.environment_metadata_mut(id)
         else {
             return false;
         };
 
         let binding = GlobalLexicalBindingRecord::new(name, environment, slot);
-        if let Some(existing) = lexical_bindings
-            .iter_mut()
-            .find(|existing| existing.name() == name)
-        {
-            *existing = binding;
+        if let Some(&index) = lexical_index.get(&name) {
+            lexical_bindings[index as usize] = binding;
         } else {
+            let index = u32::try_from(lexical_bindings.len())
+                .expect("global lexical bindings must fit in u32");
             lexical_bindings.push(binding);
+            lexical_index.insert(name, index);
         }
         true
     }
