@@ -26,6 +26,7 @@ mod core;
 mod descriptors;
 mod function_dispatch;
 mod functions;
+mod gc_integration;
 mod internal_methods;
 mod module_namespace;
 mod object_metadata;

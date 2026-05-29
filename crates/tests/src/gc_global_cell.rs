@@ -1,5 +1,5 @@
-//! Task 0.1 (global-property-cells feature): Characterize whether dictionary-mode
-//! global object values are traced by the GC.
+//! Task 0.3 (global-property-cells feature): Verify that dictionary-mode object
+//! property values ARE traced by the GC.
 //!
 //! ## Background
 //!
@@ -12,52 +12,37 @@
 //! This side-table lives OUTSIDE the GC heap (it is agent-side Rust memory, not a
 //! GC-heap arena allocation).
 //!
-//! ## CRITICAL FINDING (empirically confirmed by the test below)
+//! ## The original gap (Task 0.1) and its fix (Task 0.3)
 //!
-//! **Dictionary-mode global property values are NOT traced by the GC.**
+//! Originally, dictionary-mode property values were NOT traced: the GC mark walk
+//! starts from `AgentCollectionSnapshot` (`crates/env/src/agent.rs`), which only
+//! visits GC-heap `RuntimeObjectRecord` fields (named_slots, inline_named_slots,
+//! prototype, elements, private_slots, payloads) via `trace_heap_edges`. None of
+//! those correspond to dictionary entries, so any value reachable ONLY through a
+//! dictionary entry was silently collected.
 //!
-//! The test `dictionary_global_object_value_survives_collection` below confirms
-//! this: an object stored ONLY as a dictionary entry value on the global object —
-//! with NO other GC-visible root — is collected by `force_collect`. After GC,
-//! attempting to access the object returns `InternalMethodError::MissingObject`.
+//! Task 0.3 closes the gap with a per-object metadata mark hook:
+//!   - `lyng_gc::TraceObjectMetadataEdges` (defined in `crates/gc/src/rooting.rs`)
+//!     is a callback trait invoked for every live object as it is processed in the
+//!     mark loop's `MarkWorkItem::Object` arm, right after `trace_heap_edges`.
+//!   - `ObjectRuntime` implements it in `crates/objects/src/gc_integration.rs`,
+//!     walking `ObjectMetadata::named_properties::Dictionary::entries` and marking
+//!     each entry's `Data`/`Accessor` `Value`s.
+//!   - The env layer (`crates/env/src/agent/weak_finalization.rs`) passes
+//!     `&self.objects` as the metadata tracer into `force_collect_tracing`.
 //!
-//! ## Why there is no tracing
+//! This test confirms the fix: a TENURED object reachable ONLY through a dictionary
+//! entry on the global object now SURVIVES a full `force_collect` (major) cycle.
 //!
-//! The GC mark walk starts from `AgentCollectionSnapshot`
-//! (`crates/env/src/agent.rs:54`). This snapshot includes `realms`, `intrinsics`,
-//! `execution_contexts`, `modules`, etc., but does NOT include `objects: ObjectRuntime`
-//! and therefore does NOT include `ObjectRuntime::object_metadata`.
+//! ## Scope (major collection only)
 //!
-//! When the mark walk visits the global object's heap record, it calls
-//! `trace_object_edges` (`crates/gc/src/rooting.rs:1068`), which traces:
-//!   - `record.named_slots()` — the out-of-line heap-allocated slot storage
-//!   - `record.inline_named_slots()` — slots packed into the object record itself
-//!   - `record.prototype()`
-//!   - `record.elements()`
-//!   - `record.private_slots()`
-//!   - `record.function_payload()` / `record.ordinary_payload()`
-//!
-//! None of these correspond to dictionary entries. Dictionary entries live in
-//! `ObjectMetadata::named_properties::Dictionary::entries` (agent-side Rust memory),
-//! which is never visited during the mark phase.
-//!
-//! ## Implication for the global-property-cells feature
-//!
-//! The `global-property-cells` feature MUST ensure that global var values are stored
-//! in GC-visible storage (e.g., `ValueCell`s whose refs are in the object's
-//! `named_slots` or `inline_named_slots`) rather than in agent-side dictionary
-//! entries. The current architecture has a latent GC tracing gap for all
-//! dictionary-mode objects whose values are only referenced from dictionary entries.
-//!
-//! In practice this gap is usually papered over because:
-//! (a) Most dictionary-mode objects are reachable from the execution context or
-//!     environment, which IS traced, so their values are transitively reachable via
-//!     other paths.
-//! (b) The global object itself IS traced (via `realms -> global_object`), but its
-//!     DICTIONARY VALUES are not transitively reachable through that path because
-//!     `trace_object_edges` does not visit `ObjectMetadata`.
-//!
-//! Any value ONLY reachable through a dictionary entry will be silently collected.
+//! The hook covers MAJOR (stop-the-world) collection. Minor (nursery) collection
+//! does NOT trace dictionary metadata: dictionary writes don't dirty cards and
+//! `PrimitiveMinorTracer` doesn't visit metadata, so a YOUNG value reachable only
+//! through a dictionary entry can still die in a minor GC. This test allocates the
+//! inner object with `AllocationLifetime::Default` (tenured) and exercises only the
+//! major path; the minor-GC gap is an accepted, pre-existing limitation that global
+//! property cells sidestep by allocating cells tenured.
 
 use lyng_env::Runtime;
 use lyng_gc::AllocationLifetime;
@@ -66,8 +51,8 @@ use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectAllocation};
 use lyng_types::{PropertyDescriptor, PropertyKey, Value};
 
 /// Confirm that a heap object stored ONLY as a dictionary-mode global property value
-/// is collected by a full GC cycle (`force_collect`), demonstrating the GC tracing
-/// gap for dictionary entry values.
+/// SURVIVES a full GC cycle (`force_collect`), exercising the metadata mark hook
+/// (`TraceObjectMetadataEdges`) that traces dictionary entry values.
 ///
 /// ## What this test does
 ///
@@ -78,16 +63,17 @@ use lyng_types::{PropertyDescriptor, PropertyKey, Value};
 /// 4. Stores a sentinel property (`__gc_sentinel__ = 0xDEAD`) on the inner object.
 /// 5. Stores the inner object as a dictionary property (`__inner_var__`) on the
 ///    global, dropping the only other reference. The inner object is now ONLY
-///    reachable through the dictionary entry — which is NOT in the GC root graph.
+///    reachable through the dictionary entry — which lives in `ObjectMetadata`,
+///    traced via the metadata mark hook (NOT via the heap-record edge walk).
 /// 6. Calls `agent.force_collect()` to run a complete mark-and-sweep.
-/// 7. Attempts to read back the inner object and asserts it was COLLECTED (the
-///    dictionary `Value` reference is now dangling and the object is gone).
+/// 7. Reads back the inner object and asserts it SURVIVED: its heap record still
+///    exists and its sentinel property still reads `0xDEAD`.
 ///
 /// ## Result
 ///
-/// The test passes when the inner object IS collected — confirming the gap.
-/// If the inner object were to survive, the test would panic with an explicit
-/// message, documenting that a tracing mechanism was added.
+/// The test passes when the inner object SURVIVES — confirming the metadata mark
+/// hook traces dictionary-mode property values. If the inner object were collected,
+/// the test panics, signaling the tracing path regressed.
 #[test]
 fn dictionary_global_object_value_survives_collection() {
     let mut runtime = Runtime::new(NoopHostHooks);
@@ -170,21 +156,19 @@ fn dictionary_global_object_value_survives_collection() {
 
     // At this point the Rust stack value `inner_object: ObjectRef` is NOT a GC root
     // (ObjectRef is a plain copy-type handle, not registered in PrimitiveRoots).
-    // The only path to the inner object is the dictionary entry on the global object,
-    // which is NOT traced by the GC mark walk.
+    // The only path to the inner object is the dictionary entry on the global object.
+    // That entry IS traced by the metadata mark hook (TraceObjectMetadataEdges), so
+    // the inner object must survive collection.
 
     // --- Step 6: Run a full GC cycle ---
     let _report = agent.force_collect();
 
-    // --- Step 7: Verify the inner object was COLLECTED ---
-    // The dictionary entry on the global still exists (it's in agent-side Rust memory,
-    // not GC-managed), but the ObjectRef it contains now points to freed GC memory.
-    // Accessing it via the object runtime should return MissingObject.
+    // --- Step 7: Verify the inner object SURVIVED ---
     let global_descriptor = agent
         .objects()
         .get_own_property(agent.heap().view(), global_object, var_key)
         .expect("global object itself should still be accessible after GC")
-        .expect("dictionary entry should still exist in ObjectMetadata (it is not GC-managed)");
+        .expect("dictionary entry should still exist in ObjectMetadata");
 
     let recovered_value = global_descriptor
         .value()
@@ -194,23 +178,40 @@ fn dictionary_global_object_value_survives_collection() {
         .as_object_ref()
         .expect("recovered value should be an object ref");
 
-    // The heap record for inner_object should be GONE — it was collected.
+    // The heap record for inner_object should STILL EXIST — it was traced via the
+    // metadata mark hook and therefore survived collection.
     let heap_record = agent.heap().view().object(recovered_inner);
     assert!(
-        heap_record.is_none(),
-        "FINDING CHANGED: inner object SURVIVED GC — this means a tracing path for \
-         dictionary entry values now exists. Update this test and the module-level \
-         documentation to reflect the new tracing mechanism. \
+        heap_record.is_some(),
+        "REGRESSION: inner object was COLLECTED — the dictionary metadata mark hook \
+         (TraceObjectMetadataEdges) failed to trace the dictionary entry value. \
          inner_object={recovered_inner:?}"
     );
 
+    // The sentinel property must still read back its original value, proving the
+    // surviving record is intact (not just an un-reclaimed but corrupted slot).
+    let sentinel_descriptor = agent
+        .objects()
+        .get_own_property(agent.heap().view(), recovered_inner, sentinel_key)
+        .expect("inner object should be accessible after GC")
+        .expect("sentinel property should still exist on the surviving inner object");
+
+    let recovered_sentinel = sentinel_descriptor
+        .value()
+        .expect("sentinel property should be a data property with a value");
+
+    assert_eq!(
+        recovered_sentinel,
+        sentinel_value,
+        "surviving inner object's sentinel property should still read 0xDEAD"
+    );
+
     println!(
-        "CONFIRMED FINDING: dictionary-mode global property value was COLLECTED by force_collect. \
-         The ObjectRef {recovered_inner:?} stored in the dictionary entry now points to freed \
-         GC memory (heap().view().object() returned None). \
-         Dictionary entry Values are NOT traced by the GC mark walk. \
-         See crates/gc/src/rooting.rs:1068 (trace_object_edges) and \
-         crates/env/src/agent.rs:54 (AgentCollectionSnapshot) for the authoritative \
-         evidence of the missing tracing path."
+        "CONFIRMED: dictionary-mode global property value SURVIVED force_collect via the \
+         metadata mark hook. The ObjectRef {recovered_inner:?} stored in the dictionary \
+         entry is still live (heap().view().object() returned Some) and its sentinel \
+         property still reads 0xDEAD. \
+         See crates/gc/src/rooting.rs (TraceObjectMetadataEdges) and \
+         crates/objects/src/gc_integration.rs (ObjectRuntime impl) for the tracing path."
     );
 }

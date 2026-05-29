@@ -1,4 +1,4 @@
-use crate::rooting::PrimitiveMajorMarkMetrics;
+use crate::rooting::{PrimitiveMajorMarkMetrics, TraceObjectMetadataEdges};
 use crate::{
     card_table::CardDomain, nursery::PrimitiveAllocationProfile, PrimitiveBigIntRecord,
     PrimitiveCollectionStats, PrimitiveDomainStats, PrimitiveHeap, PrimitiveRoots,
@@ -248,9 +248,25 @@ impl PrimitiveHeap {
         roots: &PrimitiveRoots,
         additional_roots: &T,
     ) -> PrimitiveCollectionReport {
+        self.force_collect_tracing_with_metadata(roots, additional_roots, &())
+    }
+
+    /// Stop-the-world major collection that also traces out-of-heap object metadata
+    /// edges (dictionary-mode property values) via `metadata_tracer`.
+    pub fn force_collect_tracing_with_metadata<T: TraceHeapEdges + ?Sized>(
+        &mut self,
+        roots: &PrimitiveRoots,
+        additional_roots: &T,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
+    ) -> PrimitiveCollectionReport {
         let before = self.accounting();
         let mut metrics = PrimitiveMajorMarkMetrics::new(self.major_mark_slice_budget().max(1));
-        let stats = self.collect_tracing_with_mark_metrics(roots, additional_roots, &mut metrics);
+        let stats = self.collect_tracing_with_mark_metrics(
+            roots,
+            additional_roots,
+            &mut metrics,
+            metadata_tracer,
+        );
         self.record_last_major_mark_stats(&stats);
         let after = self.accounting();
         let next_budget_bytes = next_collection_budget(after.live_bytes);
@@ -359,7 +375,7 @@ impl PrimitiveHeap {
         before: &PrimitiveHeapAccounting,
     ) -> PrimitiveCollectionReport {
         let mut metrics = PrimitiveMajorMarkMetrics::new(self.major_mark_slice_budget().max(1));
-        let stats = self.collect_tracing_with_mark_metrics(roots, &(), &mut metrics);
+        let stats = self.collect_tracing_with_mark_metrics(roots, &(), &mut metrics, &());
         self.record_last_major_mark_stats(&stats);
         let after = self.accounting();
         let next_budget_bytes = next_collection_budget(after.live_bytes);

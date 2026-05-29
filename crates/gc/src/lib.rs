@@ -51,7 +51,7 @@ pub use nursery::{NurseryStats, PrimitiveAllocationProfile};
 pub use rooting::{
     PrimitiveCollectionStats, PrimitiveIncrementalMark, PrimitiveMarkProgress, PrimitiveMarkStep,
     PrimitiveRootGuard, PrimitiveRootScope, PrimitiveRoots, PrimitiveTraceStats, PrimitiveTracer,
-    TraceHeapEdges,
+    TraceHeapEdges, TraceObjectMetadataEdges,
 };
 pub use weak::WeakHeapRef;
 pub use writer::{HeapRef, HeapWriter};

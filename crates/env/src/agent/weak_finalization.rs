@@ -36,10 +36,21 @@ impl Agent {
         additional_roots: &T,
     ) -> PrimitiveCollectionReport {
         let roots = AgentCollectionRoots {
+            // `from_agent` takes `&self` and produces an owned snapshot, so no borrow
+            // of `self` outlives this line — clearing the way for the disjoint
+            // shared(`objects`)/mut(`heap`) borrows below.
             snapshot: AgentCollectionSnapshot::from_agent(self),
             additional_roots,
         };
-        let report = self.heap.force_collect_tracing(&self.roots, &roots);
+        // Pass `&self.objects` as the per-object metadata tracer so dictionary-mode
+        // property values (stored in ObjectRuntime's metadata side-table, outside the
+        // GC heap) are marked during the stop-the-world walk. Disjoint field borrows:
+        // `heap` mutably, `objects`/`roots` shared.
+        let report = self.heap.force_collect_tracing_with_metadata(
+            &self.roots,
+            &roots,
+            &self.objects,
+        );
         // Post-mark sweep: prune dead prototype-transition entries and drop
         // invalidated watchpoint sets. Both operate purely on ObjectRuntime
         // side tables, so they live here at the Agent layer (ObjectRuntime is

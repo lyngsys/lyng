@@ -17,6 +17,25 @@ pub trait TraceHeapEdges {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>);
 }
 
+/// Per-object mark hook for tracing edges that live OUTSIDE the GC heap record —
+/// notably dictionary-mode property values stored in the objects layer's
+/// `ObjectMetadata` side-table (`crates/objects`). The GC layer cannot see
+/// `ObjectRuntime`, so the env layer supplies an implementor (`&self.objects`) that
+/// the mark loop invokes for every live object as it is processed.
+///
+/// Invoked in the `MarkWorkItem::Object` arm of the mark loop, immediately after the
+/// heap record's own `trace_heap_edges`. The default `()` impl is a no-op, used by
+/// callers (e.g. unit tests, or incremental drivers without an objects layer) that
+/// have no metadata to trace.
+pub trait TraceObjectMetadataEdges {
+    fn trace_object_metadata_edges(&self, object: ObjectRef, tracer: &mut PrimitiveTracer<'_>);
+}
+
+impl TraceObjectMetadataEdges for () {
+    #[inline]
+    fn trace_object_metadata_edges(&self, _object: ObjectRef, _tracer: &mut PrimitiveTracer<'_>) {}
+}
+
 /// Summary of marks performed during a trace walk.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PrimitiveTraceStats {
@@ -93,6 +112,9 @@ pub struct PrimitiveRootGuard<'a, T> {
 pub struct PrimitiveTracer<'a> {
     heap: &'a mut PrimitiveHeap,
     marker: &'a mut PrimitiveIncrementalMark,
+    /// Per-object hook for tracing out-of-heap edges (dictionary metadata values).
+    /// Defaults to `&()` (no-op) for callers without an objects layer.
+    metadata_tracer: &'a dyn TraceObjectMetadataEdges,
 }
 
 /// Young-generation tracer for minor collections.
@@ -534,12 +556,30 @@ impl PrimitiveMajorMarkMetrics {
 }
 
 impl<'a> PrimitiveTracer<'a> {
+    /// Construct a tracer with no object-metadata hook (out-of-heap dictionary
+    /// values will NOT be traced). Used by unit tests and any caller that has no
+    /// objects layer in scope.
     #[inline]
     pub const fn new(
         heap: &'a mut PrimitiveHeap,
         marker: &'a mut PrimitiveIncrementalMark,
     ) -> Self {
-        Self { heap, marker }
+        Self::new_with_metadata(heap, marker, &())
+    }
+
+    /// Construct a tracer that invokes `metadata_tracer` for every live object,
+    /// tracing out-of-heap edges (dictionary-mode property values in `ObjectMetadata`).
+    #[inline]
+    pub const fn new_with_metadata(
+        heap: &'a mut PrimitiveHeap,
+        marker: &'a mut PrimitiveIncrementalMark,
+        metadata_tracer: &'a dyn TraceObjectMetadataEdges,
+    ) -> Self {
+        Self {
+            heap,
+            marker,
+            metadata_tracer,
+        }
     }
 
     #[inline]
@@ -702,6 +742,12 @@ impl<'a> PrimitiveTracer<'a> {
                 if let Some(record) = self.heap.object(id) {
                     record.trace_heap_edges(self);
                 }
+                // Trace out-of-heap edges (dictionary-mode property values in the
+                // objects layer's ObjectMetadata side-table). No-op when the tracer
+                // was constructed without a metadata hook (`&()`). Copy the `&dyn`
+                // out first so the `&mut self` reborrow below does not conflict.
+                let metadata_tracer = self.metadata_tracer;
+                metadata_tracer.trace_object_metadata_edges(id, self);
             }
             MarkWorkItem::FunctionPayload(id) => {
                 if let Some(record) = self.heap.function_payload(id) {
@@ -1211,6 +1257,18 @@ impl PrimitiveHeap {
         true
     }
 
+    /// Advance an in-progress incremental major mark by one slice.
+    ///
+    /// NOTE (Task 0.3 / 0.4 boundary): this driver is called from the mutator
+    /// (`Vm::poll_incremental_mark_safepoint`) which does NOT have `ObjectRuntime`
+    /// in scope, so it cannot supply a `TraceObjectMetadataEdges` hook — it traces
+    /// with the `&()` no-op. Today this is sound because no production code path
+    /// ever calls `begin_incremental_mark*` (it is started only in tests), so
+    /// `active_major_mark` is always `None` here in production and this short-circuits
+    /// immediately. The stop-the-world `force_collect` path (the only production
+    /// major-mark driver) DOES trace dictionary metadata. Wiring the metadata hook
+    /// through the incremental path requires a design decision tracked by Task 0.4
+    /// (incremental-marking barrier for dictionary writes).
     pub fn poll_incremental_mark_step(&mut self) -> Option<PrimitiveMarkStep> {
         let mut marker = self.active_major_mark.take()?;
         let step = self.mark_step(&mut marker, self.major_mark_slice_budget());
@@ -1248,7 +1306,18 @@ impl PrimitiveHeap {
         marker: &mut PrimitiveIncrementalMark,
         budget: usize,
     ) -> PrimitiveMarkStep {
-        let mut tracer = PrimitiveTracer::new(self, marker);
+        self.mark_step_with_metadata(marker, budget, &())
+    }
+
+    /// Process up to `budget` mark work items, tracing out-of-heap dictionary edges
+    /// for every live object via `metadata_tracer`.
+    pub fn mark_step_with_metadata(
+        &mut self,
+        marker: &mut PrimitiveIncrementalMark,
+        budget: usize,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
+    ) -> PrimitiveMarkStep {
+        let mut tracer = PrimitiveTracer::new_with_metadata(self, marker, metadata_tracer);
         tracer.mark_step(budget)
     }
 
@@ -1267,7 +1336,7 @@ impl PrimitiveHeap {
         &mut self,
         mut marker: PrimitiveIncrementalMark,
     ) -> PrimitiveCollectionStats {
-        self.finish_incremental_mark_with_budget(&mut marker, usize::MAX, None)
+        self.finish_incremental_mark_with_budget(&mut marker, usize::MAX, None, &())
     }
 
     pub fn collect(&mut self, roots: &PrimitiveRoots) -> PrimitiveCollectionStats {
@@ -1280,7 +1349,12 @@ impl PrimitiveHeap {
         additional_roots: &T,
     ) -> PrimitiveCollectionStats {
         let mut marker = self.start_incremental_mark_tracing(roots, additional_roots);
-        self.finish_incremental_mark_with_budget(&mut marker, self.major_mark_slice_budget(), None)
+        self.finish_incremental_mark_with_budget(
+            &mut marker,
+            self.major_mark_slice_budget(),
+            None,
+            &(),
+        )
     }
 
     pub(crate) fn collect_tracing_with_mark_metrics<T: TraceHeapEdges + ?Sized>(
@@ -1288,12 +1362,14 @@ impl PrimitiveHeap {
         roots: &PrimitiveRoots,
         additional_roots: &T,
         metrics: &mut PrimitiveMajorMarkMetrics,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
     ) -> PrimitiveCollectionStats {
         let mut marker = self.start_incremental_mark_tracing(roots, additional_roots);
         self.finish_incremental_mark_with_budget(
             &mut marker,
             self.major_mark_slice_budget(),
             Some(metrics),
+            metadata_tracer,
         )
     }
 
@@ -1302,11 +1378,12 @@ impl PrimitiveHeap {
         marker: &mut PrimitiveIncrementalMark,
         budget: usize,
         mut metrics: Option<&mut PrimitiveMajorMarkMetrics>,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
     ) -> PrimitiveCollectionStats {
         let budget = budget.max(1);
         while marker.pending_work_items() > budget {
             let start = std::time::Instant::now();
-            let step = self.mark_step(marker, budget);
+            let step = self.mark_step_with_metadata(marker, budget, metadata_tracer);
             if let Some(metrics) = metrics.as_deref_mut() {
                 metrics.record_slice(step.work_items_processed, start.elapsed());
             }
@@ -1316,9 +1393,9 @@ impl PrimitiveHeap {
         }
 
         let finish_start = std::time::Instant::now();
-        let mut finish_work_items = self.drain_mark_work_unbounded(marker);
+        let mut finish_work_items = self.drain_mark_work_unbounded(marker, metadata_tracer);
         let ephemeron_fixes =
-            self.trace_weak_structures_to_fixpoint(marker, &mut finish_work_items);
+            self.trace_weak_structures_to_fixpoint(marker, &mut finish_work_items, metadata_tracer);
         let gray_work_items_after_finish = marker.pending_work_items();
         if let Some(metrics) = metrics.as_deref_mut() {
             metrics.record_finish(
@@ -1375,10 +1452,16 @@ impl PrimitiveHeap {
         }
     }
 
-    fn drain_mark_work_unbounded(&mut self, marker: &mut PrimitiveIncrementalMark) -> usize {
+    fn drain_mark_work_unbounded(
+        &mut self,
+        marker: &mut PrimitiveIncrementalMark,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
+    ) -> usize {
         let mut work_items = 0;
         while marker.has_work() {
-            work_items += self.mark_step(marker, usize::MAX).work_items_processed;
+            work_items += self
+                .mark_step_with_metadata(marker, usize::MAX, metadata_tracer)
+                .work_items_processed;
         }
         work_items
     }
@@ -1387,6 +1470,7 @@ impl PrimitiveHeap {
         &mut self,
         marker: &mut PrimitiveIncrementalMark,
         finish_work_items: &mut usize,
+        metadata_tracer: &dyn TraceObjectMetadataEdges,
     ) -> usize {
         let mut ephemeron_fixes = 0;
 
@@ -1394,7 +1478,7 @@ impl PrimitiveHeap {
             let before = marker.total_live_marks();
             let weak_maps = self.weak_map_snapshots();
             {
-                let mut tracer = PrimitiveTracer::new(self, marker);
+                let mut tracer = PrimitiveTracer::new_with_metadata(self, marker, metadata_tracer);
                 for (owner, entries) in weak_maps {
                     if !tracer.heap.is_object_marked(owner) {
                         continue;
@@ -1417,7 +1501,7 @@ impl PrimitiveHeap {
                 }
             }
 
-            *finish_work_items += self.drain_mark_work_unbounded(marker);
+            *finish_work_items += self.drain_mark_work_unbounded(marker, metadata_tracer);
 
             let after = marker.total_live_marks();
             if after == before {
