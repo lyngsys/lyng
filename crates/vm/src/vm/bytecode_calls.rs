@@ -321,6 +321,7 @@ impl Vm {
                 ),
         );
         agent.push_execution_context(context);
+        self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
@@ -463,6 +464,7 @@ impl Vm {
         .with_callee(Some(prepared.callee))
         .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
         agent.push_execution_context(context);
+        self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);

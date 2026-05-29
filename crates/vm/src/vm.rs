@@ -193,6 +193,18 @@ pub struct Vm {
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
     pub(crate) tiering: Tiering,
+    /// LLInt feedback drain optimization: codes whose frames were entered
+    /// since the last `drain_llint_scalar_feedback`. Step 1 of the drain
+    /// scans only these (non-executed code has `execution_count == 0` on all
+    /// arith slots, so draining it is a guaranteed no-op). Cleared each drain.
+    executed_codes: Vec<CodeRef>,
+    /// Parallel to `self.installed` (indexed by `code_index(code)`): dedup
+    /// stamp recording the `drain_generation` at which a code was last pushed
+    /// to `executed_codes`. Grown lazily by `note_executed_code`.
+    code_executed_stamp: Vec<u32>,
+    /// Current dedup generation for `code_executed_stamp`; bumped each drain so
+    /// stamps from the prior cycle no longer match and codes re-queue.
+    drain_generation: u32,
     /// Per-kind, per-cause IC slow-path entry counters. Inert by
     /// default — every counter starts at zero and is bumped exactly
     /// once per slow-path entry from the cold handler bridges in
@@ -583,6 +595,12 @@ impl Vm {
             global_cell_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
+            executed_codes: Vec::new(),
+            code_executed_stamp: Vec::new(),
+            // Start at 1: lazily-grown `code_executed_stamp` entries default to
+            // 0, so a generation of 0 would spuriously match an unqueued code's
+            // stamp and skip it on its first frame entry.
+            drain_generation: 1,
             #[cfg(feature = "diagnostic-counters")]
             ic_slow_path_counters: IcSlowPathCounters::new(),
             activation_tables: ActivationSideTables::default(),
@@ -1618,6 +1636,7 @@ impl Vm {
             .expect("register stack base should fit into usize for truncation");
         let prior_context_depth = agent.execution_contexts().len();
         agent.push_execution_context(context);
+        self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);

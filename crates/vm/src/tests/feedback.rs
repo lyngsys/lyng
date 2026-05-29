@@ -499,6 +499,96 @@ fn llint_scalar_feedback_batch_drain_preserves_warmup_execution_counts() {
 }
 
 #[test]
+fn drain_only_scans_executed_code() {
+    // A script with two functions: `runs` (called, does arithmetic) and
+    // `never` (installed, has an arithmetic site, but never invoked). The
+    // drain after each `run` must only scan executed code: `never`'s feedback
+    // is left untouched, and `executed_codes` is cleared post-drain.
+    let mut atoms = AtomTable::new();
+    let parsed = parse_script(
+        &mut atoms,
+        SourceId::new(58),
+        r"
+            function runs(x) {
+                x = x + 1;
+                return x;
+            }
+            function never(y) {
+                y = y + 1;
+                return y;
+            }
+            runs(0);
+        ",
+    );
+    assert!(!parsed.diagnostics.has_errors());
+    let sema = analyze_script(&parsed, &atoms);
+    assert!(!sema.diagnostics.has_errors());
+    let unit = compile_script(&parsed, &sema, &mut atoms).unwrap();
+
+    let runs_name = unit_atom(&unit, "runs");
+    let never_name = unit_atom(&unit, "never");
+    let entry = unit.function(unit.entry()).expect("entry function exists");
+    let child_index = |target: &BytecodeFunction| {
+        entry
+            .child_functions()
+            .iter()
+            .position(|child| *child == target.id())
+            .and_then(|index| u32::try_from(index).ok())
+            .expect("function should be a direct child of entry")
+    };
+    let runs_function = unit
+        .functions()
+        .iter()
+        .find(|function| function.name() == Some(runs_name))
+        .expect("runs function should be lowered");
+    let never_function = unit
+        .functions()
+        .iter()
+        .find(|function| function.name() == Some(never_name))
+        .expect("never function should be lowered");
+    let runs_child = child_index(runs_function);
+    let never_child = child_index(never_function);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let runs_code = vm
+        .installed_child_code(installed.code(), runs_child)
+        .expect("runs function should have installed code");
+    let never_code = vm
+        .installed_child_code(installed.code(), never_child)
+        .expect("never function should have installed code");
+
+    // Before any run, nothing has executed.
+    assert!(vm.executed_codes_for_test().is_empty());
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+    assert_eq!(result, Value::from_smi(1));
+
+    // After the run + drain, `executed_codes` is cleared for the next cycle.
+    assert!(
+        vm.executed_codes_for_test().is_empty(),
+        "drain must clear executed_codes"
+    );
+
+    // The executed function tiered up (its arith feedback was drained).
+    assert!(vm.feedback_warmup_counter(runs_code).is_some());
+
+    // The never-executed function was never queued for draining: no feedback
+    // vector was allocated and its warmup counter never advanced.
+    assert!(
+        !vm.has_feedback_vector(never_code),
+        "never-executed code must not be drained"
+    );
+    assert_eq!(vm.feedback_warmup_counter(never_code), Some(0));
+}
+
+#[test]
 fn named_property_status_reports_cache_state_without_mutable_entries() {
     let unit = compile_test_unit(40, "source.value;");
     let entry = unit.function(unit.entry()).unwrap();

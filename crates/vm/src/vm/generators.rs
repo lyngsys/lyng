@@ -1586,6 +1586,7 @@ impl Vm {
         frame.set_instruction_offset(record.instruction_offset());
 
         agent.push_execution_context(context);
+        self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();
         self.request_dispatch_frame_check();

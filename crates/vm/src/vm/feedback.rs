@@ -321,6 +321,26 @@ impl Vm {
         let _ = self.ensure_feedback_slot_execution(code, slot);
     }
 
+    /// Record that `code`'s frame was entered since the last LLInt feedback
+    /// drain, so `drain_llint_scalar_feedback`'s Step 1 scans it. Deduped via
+    /// `code_executed_stamp` against the current `drain_generation`, so each
+    /// code is queued at most once per drain cycle.
+    pub(in crate::vm) fn note_executed_code(&mut self, code: CodeRef) {
+        let i = code_index(code);
+        if i >= self.code_executed_stamp.len() {
+            self.code_executed_stamp.resize(i + 1, 0);
+        }
+        if self.code_executed_stamp[i] != self.drain_generation {
+            self.code_executed_stamp[i] = self.drain_generation;
+            self.executed_codes.push(code);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn executed_codes_for_test(&self) -> &[CodeRef] {
+        &self.executed_codes
+    }
+
     pub(in crate::vm) fn drain_llint_scalar_feedback(&mut self) {
         // Phase C.4: x21 now holds the MetadataTable base. Arith IC sites write
         // directly to ArithMetadata.{observed_bits, execution_count}. Drain those
@@ -328,18 +348,18 @@ impl Vm {
         //
         // Step 1: collect (code, slot) pairs for all Arith-kind slots, so that the
         // immutable `installed` borrow can be dropped before we mutate the tables.
+        //
+        // Scan ONLY code executed since the last drain. Code that did not run
+        // has `execution_count == 0` on every arith slot, so draining it is a
+        // guaranteed no-op — skipping it avoids an O(total feedback slots
+        // program-wide) scan on every (frequently re-entrant) `Vm::run`.
         let mut arith_slots: Vec<(CodeRef, FeedbackSlotId)> = Vec::new();
-        for (tbl_index, installed_opt) in self.installed.iter().enumerate() {
-            let Some(installed) = installed_opt.as_ref() else {
-                continue;
-            };
-            let Some(code_raw) = u32::try_from(tbl_index)
-                .ok()
-                .and_then(|index| index.checked_add(1))
-            else {
-                continue;
-            };
-            let Some(code) = CodeRef::from_raw(code_raw) else {
+        // Take the list so we can clear it and avoid borrowing `self` immutably
+        // while we mutate the tables in Step 2.
+        let executed = std::mem::take(&mut self.executed_codes);
+        for &code in &executed {
+            let index = code_index(code);
+            let Some(installed) = self.installed.get(index).and_then(Option::as_ref) else {
                 continue;
             };
             for descriptor in installed.feedback_slot_descriptors().iter().flatten() {
@@ -348,6 +368,10 @@ impl Vm {
                 }
             }
         }
+        // Bump the dedup generation so prior-cycle stamps no longer match and
+        // codes re-queue via `note_executed_code` on their next frame entry.
+        // (`executed` is dropped here; `executed_codes` is now empty.)
+        self.drain_generation = self.drain_generation.wrapping_add(1);
 
         // Step 2: for each Arith slot, drain ArithMetadata and collect pending updates.
         let mut pending = Vec::new();
