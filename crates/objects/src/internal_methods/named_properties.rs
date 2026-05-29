@@ -290,11 +290,12 @@ impl ObjectRuntime {
         };
         let removed = dictionary.remove(key)?;
         metadata.named_property_churn = metadata.named_property_churn.saturating_add(1);
-        if self.refresh_integrity_level_flags(heap.view(), id) {
-            Some(removed)
-        } else {
-            None
-        }
+        // The entry is already removed; refresh integrity flags for its side effect
+        // only. We must still return the removed entry so a later cell-draining phase
+        // can free its backing cell even in the corruption edge case where refresh
+        // reports failure.
+        self.refresh_integrity_level_flags(heap.view(), id);
+        Some(removed)
     }
 
     pub(super) fn ordinary_own_named_property(

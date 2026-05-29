@@ -70,9 +70,11 @@ pub fn descriptor_from_payload(
             descriptor.set_writable(attrs.writable());
         }
         NamedPropertyValue::DataCell(_) => {
-            // DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2.
-            // Nothing constructs DataCell yet, so this arm is unreachable in the current codebase.
-            unreachable!("DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2")
+            // Unreachable: cell-backed dictionary payloads are dereferenced into a plain
+            // `Data` value by `descriptor_from_cell_payload` before reaching this helper.
+            // Callers that build descriptors directly (shape-stable slot reads, pre-deref
+            // construction) only ever pass `Data` or `Accessor`.
+            unreachable!("DataCell must be dereferenced via descriptor_from_cell_payload before descriptor_from_payload")
         }
         NamedPropertyValue::Accessor { get, set } => {
             descriptor.set_getter(get);
@@ -352,9 +354,11 @@ pub fn write_named_payload(
     let success = match payload {
         NamedPropertyValue::Data(value) => store(heap, primary_target, value),
         NamedPropertyValue::DataCell(_) => {
-            // DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2.
-            // Nothing constructs DataCell yet, so this arm is unreachable in the current codebase.
-            unreachable!("DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2")
+            // Unreachable: this writes payloads into shape-stable inline/out-of-line slots,
+            // which never hold cells. Cell-backed dictionary entries are routed and written
+            // through their `ValueCell` in `redefine_named_property`, not here, and are read
+            // back via `descriptor_from_cell_payload` rather than this slot path.
+            unreachable!("DataCell entries are written through their ValueCell in redefine_named_property, never into shape slots")
         }
         NamedPropertyValue::Accessor { get, set } => {
             let setter_target = match primary_target {
