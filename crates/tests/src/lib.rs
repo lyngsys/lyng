@@ -65,3 +65,6 @@ mod op_ldar_inline;
 
 #[cfg(test)]
 mod dsl_increment_writeback;
+
+#[cfg(test)]
+mod gc_global_cell;
