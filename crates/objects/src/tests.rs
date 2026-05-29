@@ -4272,3 +4272,54 @@ fn sweep_invalidated_watchpoint_sets_keeps_watched_and_cleared() {
     assert!(runtime.watchpoint_sets_inspect(s_watched).is_some());
     assert!(runtime.watchpoint_sets_inspect(s_invalidated).is_none());
 }
+
+#[test]
+fn dictionary_datacell_entry_reads_through_cell() {
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+    let root = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let key = PropertyKey::from_atom(AtomId::from_raw(2001));
+
+    // Allocate an object and force it into dictionary mode.
+    let object = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(root),
+        AllocationLifetime::Default,
+    );
+    assert!(runtime.ensure_named_property_dictionary(&mut mutator, object));
+
+    // Allocate a ValueCell and initialise it to 42.
+    let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
+    assert!(mutator.init_store_value(
+        ValueStoreTarget::ValueCell(cell),
+        Value::from_smi(42),
+    ));
+
+    // Insert a DataCell entry directly into the dictionary.
+    let entry_attrs = attrs(true, true, true);
+    {
+        let metadata = runtime
+            .object_metadata_mut(object)
+            .expect("object must have metadata");
+        let NamedPropertyStorage::Dictionary(dictionary) = &mut metadata.named_properties else {
+            panic!("object must be in dictionary mode");
+        };
+        dictionary.upsert(key, NamedPropertyValue::DataCell(cell), entry_attrs);
+    }
+
+    // Reading the property must return a data descriptor with the cell's value.
+    let descriptor = runtime
+        .get_own_property(mutator.view(), object, key)
+        .expect("get_own_property must not error")
+        .expect("DataCell entry must be present");
+
+    assert_eq!(
+        descriptor.value(),
+        Some(Value::from_smi(42)),
+        "descriptor value must read through the cell"
+    );
+    assert_eq!(descriptor.writable(), Some(true));
+    assert_eq!(descriptor.enumerable(), Some(true));
+    assert_eq!(descriptor.configurable(), Some(true));
+}

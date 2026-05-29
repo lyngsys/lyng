@@ -269,9 +269,33 @@ impl ObjectRuntime {
                 let descriptor = self.descriptor_from_shape_property(heap, id, property)?;
                 Ok(Some(descriptor))
             }
-            NamedPropertyStorage::Dictionary(dictionary) => Ok(dictionary
-                .entry(key)
-                .map(|entry| descriptor_from_payload(entry.payload(), entry.attrs()))),
+            NamedPropertyStorage::Dictionary(dictionary) => match dictionary.entry(key) {
+                Some(entry) => Ok(Some(
+                    self.descriptor_from_cell_payload(heap, entry.payload(), entry.attrs())?,
+                )),
+                None => Ok(None),
+            },
+        }
+    }
+
+    /// Produce a [`PropertyDescriptor`] from a dictionary entry payload, dereferencing
+    /// [`NamedPropertyValue::DataCell`] through the heap before delegating to
+    /// [`descriptor_from_payload`].  All other variants are forwarded directly.
+    fn descriptor_from_cell_payload(
+        &self,
+        heap: PrimitiveHeapView<'_>,
+        payload: NamedPropertyValue,
+        attrs: DescriptorAttributes,
+    ) -> InternalMethodResult<PropertyDescriptor> {
+        match payload {
+            NamedPropertyValue::DataCell(cell) => {
+                let value = heap
+                    .value_cell(cell)
+                    .ok_or(InternalMethodError::CorruptObjectState)?
+                    .stored_value();
+                Ok(descriptor_from_payload(NamedPropertyValue::Data(value), attrs))
+            }
+            other => Ok(descriptor_from_payload(other, attrs)),
         }
     }
 
