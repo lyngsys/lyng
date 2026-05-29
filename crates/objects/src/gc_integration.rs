@@ -39,6 +39,7 @@ impl TraceObjectMetadataEdges for ObjectRuntime {
         for entry in dict.entries.values() {
             match entry.payload {
                 NamedPropertyValue::Data(value) => tracer.mark_value(value),
+                NamedPropertyValue::DataCell(cell) => tracer.mark_value_cell(cell),
                 NamedPropertyValue::Accessor { get, set } => {
                     tracer.mark_value(get);
                     tracer.mark_value(set);

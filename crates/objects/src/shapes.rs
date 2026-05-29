@@ -1,4 +1,5 @@
 use super::{DescriptorAttributes, ObjectFlags, ObjectRef, PropertyKey, ShapeId, Value};
+use lyng_gc::PrimitiveValueCellRef;
 
 pub const PROPERTY_CACHE_MAX_DEPENDENCIES: usize = 4;
 
@@ -705,6 +706,10 @@ impl KeyedDenseIndexHandler {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NamedPropertyValue {
     Data(Value),
+    /// A cell-backed global property whose value is stored in a heap
+    /// [`PrimitiveValueCellRef`] rather than inline. Introduced in Task 1.1;
+    /// constructed starting in Task 1.3; reads handled in Task 1.2.
+    DataCell(PrimitiveValueCellRef),
     Accessor { get: Value, set: Value },
 }
 
@@ -722,23 +727,35 @@ impl NamedPropertyValue {
     #[inline]
     pub const fn kind(self) -> ShapePropertyKind {
         match self {
-            Self::Data(_) => ShapePropertyKind::Data,
+            Self::Data(_) | Self::DataCell(_) => ShapePropertyKind::Data,
             Self::Accessor { .. } => ShapePropertyKind::Accessor,
         }
     }
 
+    /// Returns the cell ref if this is a [`Self::DataCell`] entry, `None` otherwise.
+    #[inline]
+    pub const fn cell(self) -> Option<PrimitiveValueCellRef> {
+        match self {
+            Self::DataCell(cell) => Some(cell),
+            Self::Data(_) | Self::Accessor { .. } => None,
+        }
+    }
+
+    /// Returns the inline value for [`Self::Data`] entries.
+    /// Returns `None` for [`Self::DataCell`] (value is in the cell; Task 1.2 handles reads)
+    /// and for accessors.
     #[inline]
     pub const fn data_value(self) -> Option<Value> {
         match self {
             Self::Data(value) => Some(value),
-            Self::Accessor { .. } => None,
+            Self::DataCell(_) | Self::Accessor { .. } => None,
         }
     }
 
     #[inline]
     pub const fn accessor_values(self) -> Option<(Value, Value)> {
         match self {
-            Self::Data(_) => None,
+            Self::Data(_) | Self::DataCell(_) => None,
             Self::Accessor { get, set } => Some((get, set)),
         }
     }
@@ -1218,6 +1235,21 @@ mod inline_write_handler_tests {
         );
         let handler = NamedPropertyInlineWriteHandler::from_entry(entry);
         assert!(!handler.is_valid());
+    }
+}
+
+#[cfg(test)]
+mod named_property_value_tests {
+    use super::*;
+
+    #[test]
+    fn named_property_value_datacell_reports_data_kind() {
+        let cell = lyng_gc::PrimitiveValueCellRef::from_raw(1).unwrap();
+        let v = NamedPropertyValue::DataCell(cell);
+        assert_eq!(v.kind(), ShapePropertyKind::Data);
+        assert_eq!(v.cell(), Some(cell));
+        assert_eq!(v.data_value(), None); // value lives in the cell, not inline
+        assert_eq!(NamedPropertyValue::data(Value::from_smi(1)).cell(), None);
     }
 }
 

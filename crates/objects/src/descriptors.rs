@@ -59,7 +59,7 @@ pub const fn descriptor_kind(
     }
 }
 
-pub const fn descriptor_from_payload(
+pub fn descriptor_from_payload(
     payload: NamedPropertyValue,
     attrs: DescriptorAttributes,
 ) -> PropertyDescriptor {
@@ -68,6 +68,11 @@ pub const fn descriptor_from_payload(
         NamedPropertyValue::Data(value) => {
             descriptor.set_value(value);
             descriptor.set_writable(attrs.writable());
+        }
+        NamedPropertyValue::DataCell(_) => {
+            // DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2.
+            // Nothing constructs DataCell yet, so this arm is unreachable in the current codebase.
+            unreachable!("DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2")
         }
         NamedPropertyValue::Accessor { get, set } => {
             descriptor.set_getter(get);
@@ -346,6 +351,11 @@ pub fn write_named_payload(
 
     let success = match payload {
         NamedPropertyValue::Data(value) => store(heap, primary_target, value),
+        NamedPropertyValue::DataCell(_) => {
+            // DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2.
+            // Nothing constructs DataCell yet, so this arm is unreachable in the current codebase.
+            unreachable!("DataCell entries are produced starting in Task 1.3; reads handled in Task 1.2")
+        }
         NamedPropertyValue::Accessor { get, set } => {
             let setter_target = match primary_target {
                 ValueStoreTarget::InlineNamedSlot(id, index) => {
