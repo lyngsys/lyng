@@ -149,6 +149,164 @@ git add crates/objects/src/core.rs
 git commit -m "feat(objects): add CELL_BACKED_DICTIONARY object flag"
 ```
 
+### Task 0.3: Trace dictionary entry values via a per-object metadata mark hook
+
+**Why (from Task 0.1):** dictionary-mode property values live in agent-side
+`ObjectRuntime::object_metadata`, which the GC mark walk never visits — a heap
+object reachable only through a dictionary entry is collected. This task fixes
+the latent bug generally and creates the hook that will later mark `DataCell`
+cell refs. Approach (validated against the GC architecture): a callback trait the
+marker invokes per marked object; `ObjectRuntime` implements it to mark its
+dictionary entry values.
+
+**Files:**
+- Modify: `crates/gc/src/rooting.rs` (the `MarkWorkItem::Object(id)` arm ~701; `PrimitiveTracer` ~93; tracer construction sites)
+- Modify: `crates/gc/src/collection.rs` (`force_collect_tracing` ~246) and any other tracer entry points (incremental `mark_step`, minor GC) so the metadata tracer is threaded through ALL of them
+- Modify: `crates/env/src/agent/weak_finalization.rs` (`force_collect_with_additional_roots` ~34) and any incremental-collection driver in `crates/env` to pass `&self.objects`
+- Create: `crates/objects/src/gc_integration.rs` (impl the trait for `ObjectRuntime`)
+- Test: extend `crates/tests/src/gc_global_cell.rs`
+
+- [ ] **Step 1: Flip the Task 0.1 test to assert survival**
+
+Rename `dictionary_global_object_value_survives_collection` so the name matches
+intent, and change the final assertion from "collected" to "survives": after
+`force_collect()`, the inner object's heap record must still exist AND its
+sentinel property must read back as `0xDEAD`. Update the module doc comment to
+describe the (new) tracing mechanism.
+
+```rust
+#[test]
+fn dictionary_global_object_value_survives_collection() {
+    // ... same setup ...
+    let _ = agent.force_collect();
+    let heap_record = agent.heap().view().object(recovered_inner);
+    assert!(heap_record.is_some(), "dictionary entry value must survive GC");
+    // assert sentinel property still reads 0xDEAD via get_own_property on recovered_inner
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `cargo test -p lyng-tests dictionary_global_object_value_survives_collection`
+Expected: FAIL — value still collected (no tracing yet).
+
+- [ ] **Step 3: Add the metadata mark hook**
+
+In `crates/gc/src/rooting.rs` define a callback trait and a no-op impl for `()`:
+
+```rust
+pub trait TraceObjectMetadataEdges {
+    fn trace_object_metadata_edges(&self, object: ObjectRef, tracer: &mut PrimitiveTracer<'_>);
+}
+impl TraceObjectMetadataEdges for () {
+    fn trace_object_metadata_edges(&self, _: ObjectRef, _: &mut PrimitiveTracer<'_>) {}
+}
+```
+
+Add `metadata_tracer: &'a dyn TraceObjectMetadataEdges` to `PrimitiveTracer`, and
+in the `MarkWorkItem::Object(id)` arm, after `record.trace_heap_edges(self)`,
+call `self.metadata_tracer.trace_object_metadata_edges(id, self)`. Thread the
+`&dyn TraceObjectMetadataEdges` through EVERY tracer construction site (force
+collect AND incremental/minor mark slices) — grep for `PrimitiveTracer {` and
+every `force_collect_tracing`/`mark_step` caller. Default existing callers that
+have no objects layer to `&()`.
+
+In `crates/objects/src/gc_integration.rs`:
+
+```rust
+use crate::{NamedPropertyStorage, NamedPropertyValue, ObjectRuntime};
+use lyng_gc::{ObjectRef, PrimitiveTracer, TraceObjectMetadataEdges};
+
+impl TraceObjectMetadataEdges for ObjectRuntime {
+    fn trace_object_metadata_edges(&self, object: ObjectRef, tracer: &mut PrimitiveTracer<'_>) {
+        let Some(metadata) = self.object_metadata(object) else { return };
+        let NamedPropertyStorage::Dictionary(dict) = &metadata.named_properties else { return };
+        for entry in dict.entries.values() {
+            match entry.payload {
+                NamedPropertyValue::Data(value) => tracer.mark_value(value),
+                NamedPropertyValue::Accessor { get, set } => {
+                    tracer.mark_value(get);
+                    tracer.mark_value(set);
+                }
+                // DataCell arm added in Task 1.1's follow-up (mark the cell ref).
+            }
+        }
+    }
+}
+```
+
+Wire `&self.objects` as the metadata tracer in the agent collection entry
+point(s). Mind the borrow split: build `AgentCollectionSnapshot::from_agent(self)`
+first, then split-borrow `heap` (mut) and `objects` (shared) as separate fields.
+
+- [ ] **Step 4: Run to verify it passes + full test262**
+
+Run: `cargo test -p lyng-tests dictionary_global_object_value_survives_collection`
+Expected: PASS.
+Run: `cargo run -p lyng-test262 -- 2>&1 | tail -20`
+Expected: no new failures. **Record the baseline pass count on `main` now** (check out main in a throwaway worktree or note a prior run) so later phases can compare.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/gc/src/rooting.rs crates/gc/src/collection.rs crates/env/src/agent/weak_finalization.rs crates/objects/src/gc_integration.rs crates/objects/src/lib.rs crates/tests/src/gc_global_cell.rs
+git commit -m "fix(gc): trace dictionary-mode object property values via metadata mark hook"
+```
+
+### Task 0.4: Incremental-marking write barrier for dictionary edge writes
+
+**Why:** dictionary entries are written agent-side (`NamedPropertyDictionary::upsert`),
+bypassing the heap write barrier. If a value (or, later, a cell ref) is inserted
+into a dictionary entry of an already-marked (black) object *during* incremental
+marking, the mark hook from Task 0.3 already ran for that object and won't run
+again — the new edge is missed and the value can be collected mid-cycle. This
+task adds a barrier so such writes shade the new value.
+
+**Files:**
+- Modify: `crates/objects/src/internal_methods/named_properties.rs` (`redefine_named_property` ~190 / wherever `dictionary.upsert` is called)
+- Modify: `crates/gc/src` (expose a "shade value if incremental mark in progress and owner is black" entry the objects layer can call; mirror `incremental_value_barrier` in `crates/gc/src/writer.rs`)
+- Test: `crates/tests/src/gc_global_cell.rs`
+
+- [ ] **Step 1: Write the failing test**
+
+```rust
+#[test]
+fn dictionary_value_written_during_incremental_mark_survives() {
+    // 1. Force the global object to dictionary mode and mark it (start an
+    //    incremental mark and step until the global object is black — use the
+    //    incremental mark API the gc crate exposes; mirror any existing
+    //    incremental-marking test under crates/tests or crates/gc).
+    // 2. While the mark is in progress, define a NEW global var holding a fresh
+    //    heap object (sole ref) -> goes through the dictionary upsert path.
+    // 3. Finish the mark + sweep.
+    // 4. Assert the new object survived.
+}
+```
+
+If no incremental-marking test harness exists to drive steps, report
+NEEDS_CONTEXT before guessing — the controller will supply the incremental API.
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `cargo test -p lyng-tests dictionary_value_written_during_incremental_mark_survives`
+Expected: FAIL — new value collected mid-cycle.
+
+- [ ] **Step 3: Add the barrier on dictionary writes**
+
+Expose a barrier helper from the gc layer (e.g. `PrimitiveMutator::dictionary_edge_write_barrier(owner: ObjectRef, value: Value)`) that shades `value` when `incremental_mark_in_progress()` and `owner` is marked — reusing `incremental_value_barrier` internals. Call it from the dictionary `upsert` path (in `redefine_named_property`, before/after the upsert) for the owning object and the written value (and, once cells exist, when inserting a `DataCell` ref, shade the cell). The objects layer has `&mut PrimitiveMutator` in these paths.
+
+- [ ] **Step 4: Run to verify it passes**
+
+Run: `cargo test -p lyng-tests dictionary_value_written_during_incremental_mark_survives`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "fix(gc): write barrier for dictionary edge writes during incremental marking"
+```
+
 ---
 
 ## Phase 1 — Cell-backed dictionary storage (global object only)
@@ -217,6 +375,12 @@ remaining `match` on `NamedPropertyValue` the compiler flags. Known sites to
 expect: `data_value`, `accessor_values`, and `descriptor_from_payload` in
 `crates/objects/src/internal_methods/named_properties.rs` (handled in Task 1.2 —
 for now add a `Self::DataCell(_) => unreachable!("cell-backed read goes through descriptor_from_cell_payload")` placeholder ONLY in non-read helpers, and leave `descriptor_from_payload` for Task 1.2). Do not leave `unreachable!` in any path a cell-backed entry can reach; Task 1.2 replaces them.
+
+**Also extend the GC metadata mark hook** (`crates/objects/src/gc_integration.rs`
+from Task 0.3): add a `NamedPropertyValue::DataCell(cell) => tracer.mark_value_cell(cell)`
+arm so cell refs in dictionary entries are traced (the cell's `stored_value` is
+then traced by the existing `ValueCell` machinery). Without this, cell-backed
+global values would be collected.
 
 - [ ] **Step 4: Run to verify it passes**
 
