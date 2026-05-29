@@ -377,6 +377,12 @@ pub enum EnvironmentMetadata {
         /// resolution avoids the previous linear scan.
         lexical_index: HashMap<AtomId, u32>,
         var_names: HashSet<AtomId>,
+        /// Coarse generation counter bumped ONLY on structural global changes
+        /// (binding deleted, data <-> accessor redefine, a new lexical shadowing
+        /// a var). Plain value writes do NOT bump it. Per-site global cell ICs
+        /// capture this at install time and re-resolve on mismatch, so a stale
+        /// IC never dereferences a freed cell. Agent-side `u32`; no GC concern.
+        global_structure_generation: u32,
     },
     Object {
         with_environment: bool,

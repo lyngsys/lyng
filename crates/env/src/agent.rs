@@ -338,6 +338,14 @@ impl Agent {
         self.objects.cell_backed_entry(id, key)
     }
 
+    /// Returns `true` when `id` is a cell-backed dictionary (only the realm's
+    /// global object). Cheap pre-filter for the structure-generation bump in
+    /// [`Self::define_own_property`].
+    #[inline]
+    pub fn object_uses_cell_backed_dictionary(&self, id: ObjectRef) -> bool {
+        self.objects.uses_cell_backed_dictionary(id)
+    }
+
     /// Defines or updates one own property on `id`, always firing watchpoints on the
     /// pre-call shape. (May fire spuriously even when no shape change occurred —
     /// Spec 1's `Recording` observers tolerate this.)
@@ -375,6 +383,22 @@ impl Agent {
 
         if let Some(old) = old_shape {
             self.fire_watchpoints_for_shape(old, vm_dispatch);
+        }
+        // A `[[DefineOwnProperty]]` on a realm's global object can change a
+        // binding's kind (data <-> accessor) or replace its backing cell —
+        // structural changes that must invalidate any per-site global cell IC.
+        // Plain global value writes (`x = v`) go through `[[Set]]`, not this
+        // path, so the load IC is not defeated. Over-bumping here is safe.
+        //
+        // Gated on the cell-backed-dictionary flag (only the global object
+        // carries it) so the realm scan never runs for ordinary objects — this
+        // keeps `[[DefineOwnProperty]]` on regular objects free of any added
+        // per-call cost.
+        if matches!(result, Ok(true))
+            && self.object_uses_cell_backed_dictionary(id)
+            && let Some(global_env) = self.global_env_for_object(id)
+        {
+            self.bump_global_structure_generation(global_env);
         }
         result
     }

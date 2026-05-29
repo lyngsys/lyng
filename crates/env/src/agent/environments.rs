@@ -151,6 +151,7 @@ impl Agent {
                 lexical_bindings: Vec::new(),
                 lexical_index: HashMap::new(),
                 var_names: HashSet::new(),
+                global_structure_generation: 0,
             },
             lifetime,
         ))
@@ -228,6 +229,7 @@ impl Agent {
                 lexical_bindings,
                 lexical_index,
                 var_names,
+                ..
             } => Some(EnvironmentRecord::Global(GlobalEnvironmentRecord {
                 id,
                 outer: record.outer(),
@@ -548,6 +550,35 @@ impl Agent {
             return false;
         };
         var_names.insert(name)
+    }
+
+    /// Returns the coarse structure generation for the global environment `id`,
+    /// or 0 when `id` is not a global environment. Per-site global cell ICs
+    /// compare this against the generation captured at install time; a mismatch
+    /// forces re-resolution so a stale IC never dereferences a freed cell.
+    pub fn global_structure_generation(&self, id: EnvironmentRef) -> u32 {
+        match self.environment_metadata(id) {
+            Some(EnvironmentMetadata::Global {
+                global_structure_generation,
+                ..
+            }) => *global_structure_generation,
+            _ => 0,
+        }
+    }
+
+    /// Bumps the coarse structure generation for the global environment `id`.
+    /// Call on STRUCTURAL global changes only (binding deleted, data <->
+    /// accessor redefine, a new lexical shadowing a var) — never on plain value
+    /// writes. Over-bumping is safe (just forces re-resolution); under-bumping
+    /// risks a use-after-free via a stale cell IC. Saturates at `u32::MAX`.
+    pub fn bump_global_structure_generation(&mut self, id: EnvironmentRef) {
+        if let Some(EnvironmentMetadata::Global {
+            global_structure_generation,
+            ..
+        }) = self.environment_metadata_mut(id)
+        {
+            *global_structure_generation = global_structure_generation.saturating_add(1);
+        }
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -124,3 +124,180 @@ fn global_lexical_tdz_preserved() {
 
     assert_eq!(result, Value::from_smi(1));
 }
+
+use crate::vm::ic_state::GlobalCellTarget;
+
+/// Helper: the feedback slot of the (first) `NamedPropertyLoad` site in the
+/// script entry function — the `LoadGlobal` site for the trailing global read.
+fn entry_named_load_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
+    let entry = unit.function(unit.entry()).unwrap();
+    entry
+        .feedback_sites()
+        .iter()
+        .rev()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a named-load site for the global access")
+}
+
+/// `var x = 5; x; x` — the second `LoadGlobal` should resolve through the cell
+/// IC, leaving a `Cell` target cached for the load site.
+#[test]
+fn load_global_var_hits_cell_ic() {
+    let unit = compile_test_unit(7200, "var x = 5; x; x");
+    let slot = entry_named_load_slot(&unit);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(5));
+    let ic = vm
+        .global_cell_ic_state(installed.code(), slot)
+        .expect("global cell IC should be installed for the var load site");
+    assert!(
+        matches!(ic.target, GlobalCellTarget::Cell(_)),
+        "global `var` should cache a Cell target, got {:?}",
+        ic.target
+    );
+}
+
+/// A global lexical binding read from a *different* compilation unit lowers to
+/// `LoadGlobal` (cross-unit references resolve as `ResolutionKind::Global`), so
+/// the cell IC should cache an `EnvSlot` target. (Same-unit lexical reads lower
+/// to a direct env-slot load and never reach `LoadGlobal`.)
+#[test]
+fn load_global_lexical_hits_env_slot_ic() {
+    let decl = compile_test_unit(7201, "let y = 9;");
+    let read = compile_test_unit(7211, "y; y");
+    let slot = entry_named_load_slot(&read);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    // First unit declares the global lexical binding `y`. Use `evaluate_script`
+    // so the global lexical instantiation plan runs and `y` is bound + set.
+    vm.evaluate_script(agent, realm.clone(), &decl)
+        .run()
+        .unwrap();
+
+    // Second unit reads it via `LoadGlobal`.
+    let read_installed = vm.install_script(agent, realm.id(), &read).unwrap();
+    let result = vm
+        .evaluate_installed(
+            agent,
+            read_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(9));
+    let ic = vm
+        .global_cell_ic_state(read_installed.code(), slot)
+        .expect("global cell IC should be installed for the lexical load site");
+    assert!(
+        matches!(ic.target, GlobalCellTarget::EnvSlot(_, _)),
+        "global `let` read cross-unit should cache an EnvSlot target, got {:?}",
+        ic.target
+    );
+}
+
+/// A configurable global created via assignment (`globalThis.foo = 7`) is read
+/// back twice and the load site caches an IC — proving configurable globals ARE
+/// cached under the generation scheme (no per-binding configurability gating).
+#[test]
+fn load_global_configurable_builtin_is_cached() {
+    let unit = compile_test_unit(7202, "globalThis.foo = 7; foo; foo");
+    let slot = entry_named_load_slot(&unit);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(7));
+    let ic = vm
+        .global_cell_ic_state(installed.code(), slot)
+        .expect("configurable global load site should install a cell IC");
+    assert!(
+        matches!(ic.target, GlobalCellTarget::Cell(_)),
+        "configurable global should cache a Cell target, got {:?}",
+        ic.target
+    );
+}
+
+/// Deleting a sloppy global between cached reads must NOT use the stale IC: the
+/// generation bump on delete forces re-resolution, so the final read sees the
+/// binding gone (`typeof x === "undefined"`) instead of a stale value / crash.
+#[test]
+fn deleting_global_does_not_use_stale_ic() {
+    let unit = compile_test_unit(
+        7203,
+        "x = 1; function r(){ return typeof x; } r(); r(); delete x; r();",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect("delete-global script should complete");
+
+    let string = result
+        .as_string_ref()
+        .expect("typeof should return a string");
+    let view = agent
+        .heap()
+        .view()
+        .string_view(string)
+        .expect("string should exist in the heap");
+    assert_eq!(
+        decode_string(&view),
+        "undefined",
+        "after delete, the cached site must re-resolve and see the binding gone"
+    );
+}
+
+/// A global value reassignment between cached reads must be observed live
+/// through the IC (the cell is read on every hit; value changes do not bump the
+/// generation).
+#[test]
+fn global_value_reassignment_seen_through_ic() {
+    let unit = compile_test_unit(
+        7204,
+        "var v = 1; function r(){ return v; } var a = r(); v = 2; var b = r(); a * 10 + b",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let result = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect("value-reassignment script should complete");
+
+    // a == 1 (first read), b == 2 (after reassignment) => 1*10 + 2 == 12.
+    assert_eq!(result, Value::from_smi(12));
+}

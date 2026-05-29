@@ -14,7 +14,7 @@ use super::{
 };
 use crate::vm::ic_state::{
     keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
-    CallIcState, KeyedPropertyIcState, PropertyIcState,
+    CallIcState, GlobalCellIcState, GlobalCellTarget, KeyedPropertyIcState, PropertyIcState,
 };
 pub use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
 use crate::vm::metadata_table::{MetadataKind, PropertyMetadata, METADATA_KIND_COUNT};
@@ -2727,12 +2727,51 @@ impl Vm {
     /// Spec 2 Phase A: dispatched from `Agent::fire_watchpoints_for_shape` when
     /// an `AdaptiveProtoLoad` observer fires. Clears the IC slot identified by
     /// `(code, slot)` if its current generation matches `expected_generation`.
+    /// Phase 3 (global property cells): returns the cached global cell IC for
+    /// `(code, slot)` if any. The caller MUST verify `structure_gen` against the
+    /// live `global_structure_generation` before dereferencing the target.
+    #[inline]
+    pub(crate) fn global_cell_ic_state(
+        &self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+    ) -> Option<GlobalCellIcState> {
+        self.global_cell_ic_states.get(&(code, slot)).copied()
+    }
+
+    /// Phase 3 (global property cells): installs (or replaces) the cached
+    /// global resolution for `(code, slot)`. `structure_gen` is the live
+    /// `global_structure_generation` captured at resolution time.
+    #[inline]
+    pub(crate) fn install_global_cell_ic(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        target: GlobalCellTarget,
+        structure_gen: u32,
+    ) {
+        self.global_cell_ic_states
+            .insert((code, slot), GlobalCellIcState::new(target, structure_gen));
+    }
+
+    /// Phase 3 (global property cells): drops the cached global resolution for
+    /// `(code, slot)`. The generation check is the primary invalidation guard;
+    /// this is a defensive clear wired into `clear_ic_slot_if_generation_matches`.
+    #[inline]
+    pub(crate) fn clear_global_cell_ic(&mut self, code: CodeRef, slot: FeedbackSlotId) {
+        self.global_cell_ic_states.remove(&(code, slot));
+    }
+
     pub(crate) fn clear_ic_slot_if_generation_matches(
         &mut self,
         code: CodeRef,
         slot: FeedbackSlotId,
         expected_generation: u32,
     ) {
+        // Defensive: drop any cached global cell resolution for this site. The
+        // `structure_gen` check is the primary guard, but clearing here keeps
+        // the side table from accumulating entries for invalidated sites.
+        self.clear_global_cell_ic(code, slot);
         let matches = self
             .property_ic_state(code, slot)
             .is_some_and(|s| s.generation == expected_generation);

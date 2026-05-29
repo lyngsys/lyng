@@ -504,13 +504,14 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
 }
 
 #[test]
-fn global_property_load_ic_is_megamorphic_for_cell_backed_global() {
+fn global_property_load_uses_cell_ic_for_cell_backed_global() {
     // The realm's global object is a cell-backed dictionary from creation, so a
     // global `var` is stored as a `NamedPropertyValue::DataCell` entry rather
-    // than a shape slot. The named-property cache planner bails on dictionary
-    // receivers, so global loads are uncacheable and the IC settles Megamorphic.
-    // A dedicated cell-aware global IC is a later phase; this asserts the
-    // interim behavior while keeping value semantics correct.
+    // than a shape slot. Phase 3 of global property cells caches WHERE the global
+    // resolves in a per-site global cell IC, so repeated loads read the cell
+    // directly and never reach the shape-based named-property slow path. The
+    // named-property cache therefore stays uninitialized (`None`) for this site
+    // while the global cell IC carries a `Cell` target.
     let unit = compile_test_unit(36, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -540,19 +541,25 @@ fn global_property_load_ic_is_megamorphic_for_cell_backed_global() {
             .unwrap(),
         Value::from_smi(11)
     );
-    assert_eq!(
-        vm.named_property_cache_snapshot(installed.code(), slot),
-        Some(("Megamorphic", 0, None))
+    // The global cell IC short-circuits before the shape-based named-property
+    // slow path, so that cache never transitions to Megamorphic.
+    assert_eq!(vm.named_property_cache_snapshot(installed.code(), slot), None);
+    let ic = vm
+        .global_cell_ic_state(installed.code(), slot)
+        .expect("cell-backed global load should install a global cell IC");
+    assert!(
+        matches!(ic.target, crate::vm::ic_state::GlobalCellTarget::Cell(_)),
+        "global value should cache a Cell target, got {:?}",
+        ic.target
     );
 }
 
 #[cfg(feature = "diagnostic-counters")]
 #[test]
-fn global_property_load_takes_semantic_slow_path_for_cell_backed_global() {
-    // With the global object cell-backed (dictionary), the global load IC cannot
-    // be planned and stays Megamorphic, so every `LoadGlobal` resolves through
-    // the semantic slow bridge. Restoring a fast bridge here is the job of the
-    // future cell-aware global IC phase.
+fn global_property_load_uses_cell_ic_fast_path_for_cell_backed_global() {
+    // Phase 3 of global property cells installs a per-site global cell IC on the
+    // cold `LoadGlobal`. Once warm, the load reads the backing cell directly via
+    // the global cell fast path and no longer enters the semantic slow bridge.
     let unit = compile_test_unit(544, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -582,9 +589,11 @@ fn global_property_load_takes_semantic_slow_path_for_cell_backed_global() {
             .unwrap(),
         Value::from_smi(11)
     );
-    assert_eq!(
-        vm.named_property_cache_snapshot(installed.code(), slot),
-        Some(("Megamorphic", 0, None))
+    // The cell IC short-circuits before the shape-based named-property slow path.
+    assert_eq!(vm.named_property_cache_snapshot(installed.code(), slot), None);
+    assert!(
+        vm.global_cell_ic_state(installed.code(), slot).is_some(),
+        "cell-backed global load should install a global cell IC",
     );
 
     let counters = vm.opcode_counters_mut();
@@ -606,8 +615,8 @@ fn global_property_load_takes_semantic_slow_path_for_cell_backed_global() {
     assert_eq!(dispatch.count(Opcode::LoadGlobal), 1);
     assert_eq!(
         slow_path.semantic(Opcode::LoadGlobal),
-        1,
-        "uncacheable cell-backed global load resolves via the semantic slow bridge"
+        0,
+        "warm cell-backed global load is served by the global cell IC, not the semantic bridge"
     );
 }
 

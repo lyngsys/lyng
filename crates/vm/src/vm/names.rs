@@ -3,6 +3,7 @@ use super::{
     VmError, VmResult, WellKnownSymbolId,
 };
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
+use crate::vm::ic_state::GlobalCellTarget;
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
 use crate::vm::dispatch::advance_dispatch_frame;
@@ -531,7 +532,44 @@ impl Vm {
         feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<Value> {
         let global = Self::find_global_environment_ref(agent, frame.variable_env())?;
+
+        // Phase 3 global cell IC FAST PATH. If this site previously resolved a
+        // global and the coarse `global_structure_generation` is unchanged, read
+        // the cached cell/slot directly — no name hashing, no descriptor build,
+        // O(1) and independent of dictionary size. The generation check happens
+        // BEFORE any cell deref, so a structural change (delete / data<->accessor
+        // redefine / new shadowing lexical) that bumped the generation forces
+        // re-resolution and never dereferences a freed cell.
+        if let Some(slot) = feedback_slot
+            && let Some(ic) = self.global_cell_ic_state(code, slot)
+            && ic.structure_gen == agent.global_structure_generation(global)
+        {
+            match ic.target {
+                GlobalCellTarget::Cell(cell) => {
+                    if let Some(record) = agent.heap().view().value_cell(cell) {
+                        return Ok(record.stored_value());
+                    }
+                }
+                GlobalCellTarget::EnvSlot(env, env_slot) => {
+                    // `read_environment_slot` performs the TDZ check
+                    // (uninitialized lexical -> ReferenceError).
+                    return Self::read_environment_slot(agent, env, env_slot);
+                }
+            }
+        }
+
         if let Some(binding) = Self::lookup_global_lexical_binding_ref(agent, global, name) {
+            // COLD/miss install: a global lexical binding resolves to an
+            // environment slot, read live (with TDZ) on subsequent hits.
+            if let Some(slot) = feedback_slot {
+                let current_gen = agent.global_structure_generation(global);
+                self.install_global_cell_ic(
+                    code,
+                    slot,
+                    GlobalCellTarget::EnvSlot(binding.environment(), binding.slot()),
+                    current_gen,
+                );
+            }
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return Self::read_environment_slot(agent, environment, binding.slot());
@@ -540,6 +578,16 @@ impl Vm {
         let global_object = agent
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
+
+        // COLD/miss install for a cell-backed global-object data entry. Capture
+        // the cell now so subsequent hits read it live via `stored_value()`.
+        if let Some(slot) = feedback_slot
+            && let Some(cell) =
+                agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
+        {
+            let current_gen = agent.global_structure_generation(global);
+            self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);
+        }
         // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
         // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
@@ -628,6 +676,22 @@ impl Vm {
         let Ok(global) = Self::find_global_environment_ref(agent, frame.variable_env()) else {
             return false;
         };
+        // Phase 3 global cell IC FAST PATH (probe variant). Only the `Cell`
+        // target is served here — `EnvSlot` needs the mutable-agent TDZ check
+        // and falls through to the semantic `load_global_with_feedback`. The
+        // generation check guards against stale (freed) cells.
+        if let Some(slot) = feedback_slot
+            && let Some(ic) = self.global_cell_ic_state(frame.code(), slot)
+            && ic.structure_gen == agent.global_structure_generation(global)
+            && let GlobalCellTarget::Cell(cell) = ic.target
+            && let Some(record) = agent.heap().view().value_cell(cell)
+        {
+            let value = record.stored_value();
+            self.write_register(frame.registers(), target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
         if Self::lookup_global_lexical_binding_ref(agent, global, name).is_some() {
             return false;
         }
@@ -1477,8 +1541,20 @@ impl Vm {
             return Ok(false);
         }
         let global_object = global.global_object();
-        object::ordinary_delete_property(agent, global_object, PropertyKey::from_atom(name), self)
-            .map_err(VmError::Abrupt)
+        let deleted = object::ordinary_delete_property(
+            agent,
+            global_object,
+            PropertyKey::from_atom(name),
+            self,
+        )
+        .map_err(VmError::Abrupt)?;
+        if deleted {
+            // Deleting a cell-backed global frees its backing cell. Bump the
+            // structure generation so every cached `LoadGlobal` site re-resolves
+            // instead of dereferencing the freed cell (use-after-free guard).
+            agent.bump_global_structure_generation(global.id());
+        }
+        Ok(deleted)
     }
 
     pub(super) fn global_has_lexical_binding(

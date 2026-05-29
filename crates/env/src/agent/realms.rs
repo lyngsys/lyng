@@ -4,7 +4,7 @@ use crate::{
     RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
 };
 use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectAllocation};
-use lyng_types::{ObjectRef, RealmRef, ShapeId};
+use lyng_types::{EnvironmentRef, ObjectRef, RealmRef, ShapeId};
 
 impl Agent {
     #[inline]
@@ -117,6 +117,25 @@ impl Agent {
 
     pub fn realm_global_object(&self, realm: RealmRef) -> Option<ObjectRef> {
         self.heap.view().realm(realm)?.global_object()
+    }
+
+    /// If `object` is the global object of some realm known to this agent,
+    /// returns that realm's global environment ref. Used to bump the global
+    /// structure generation on structural `[[DefineOwnProperty]]` /`[[Delete]]`
+    /// changes to a global object (so per-site global cell ICs re-resolve).
+    /// Linear over realms (typically one); only consulted on the define/delete
+    /// slow paths, never on plain value writes.
+    pub fn global_env_for_object(&self, object: ObjectRef) -> Option<EnvironmentRef> {
+        for &realm in &self.realms {
+            let view = self.heap.view();
+            let Some(record) = view.realm(realm) else {
+                continue;
+            };
+            if record.global_object() == Some(object) {
+                return record.global_env();
+            }
+        }
+        None
     }
 
     pub fn realm_root_shape(&self, realm: RealmRef) -> Option<ShapeId> {

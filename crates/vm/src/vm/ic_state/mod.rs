@@ -4,10 +4,12 @@
 //! `execution_count`) live on `MetadataTable.*Metadata` structs.
 
 pub mod call;
+pub mod global_cell;
 pub mod keyed_property;
 pub mod property;
 
 pub use call::CallIcState;
+pub use global_cell::{GlobalCellIcState, GlobalCellTarget};
 pub use keyed_property::KeyedPropertyIcState;
 pub use property::PropertyIcState;
 // Re-export InlineCacheState so tests and future callers can compare against it

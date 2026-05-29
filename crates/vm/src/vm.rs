@@ -71,7 +71,7 @@ use call::RejectingNativeRegistry;
 use feedback::{
     CallCacheStorage, ConstructCacheStorage, KeyedPropertyNamedEntries, PolymorphicChain,
 };
-use ic_state::{CallIcState, KeyedPropertyIcState, PropertyIcState};
+use ic_state::{CallIcState, GlobalCellIcState, KeyedPropertyIcState, PropertyIcState};
 use install::InstalledFunction;
 use metadata_table::MetadataTable;
 use state::{
@@ -173,6 +173,13 @@ pub struct Vm {
     /// `KeyedPropertyMetadata` inside `MetadataTable`; this table holds the
     /// Rust-only state (family, entries, sidecars).
     pub(crate) keyed_property_ic_states: Vec<Option<Box<[Option<KeyedPropertyIcState>]>>>,
+    /// Phase 3 (global property cells): per-site global cell IC, keyed by
+    /// `(CodeRef, FeedbackSlotId)`. Caches where a `LoadGlobal` resolves so
+    /// repeated reads skip name resolution. Lazy; correctness is guarded by the
+    /// `structure_gen` stored in each entry against the live
+    /// `global_structure_generation`, so stale entries (including ones for dead
+    /// code) are inert — they re-resolve on the next gen mismatch.
+    pub(crate) global_cell_ic_states: HashMap<(CodeRef, FeedbackSlotId), GlobalCellIcState>,
     /// Phase C: per-code-object IC metadata buffer keyed by `code_index(code_ref)`.
     /// `None` for code that has not yet been installed (or was installed
     /// before Phase C landed). Allocated eagerly alongside the flat
@@ -573,6 +580,7 @@ impl Vm {
             construct_cache_entries: HashMap::new(),
             keyed_property_named_entries: HashMap::new(),
             keyed_property_ic_states: Vec::new(),
+            global_cell_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             tiering: Tiering::disabled(),
             #[cfg(feature = "diagnostic-counters")]
@@ -1742,9 +1750,19 @@ impl Vm {
         lexical_env: EnvironmentRef,
         plan: &GlobalScriptInstantiationPlan,
     ) {
+        let mut bound_any = false;
         for binding in plan.lexical_bindings() {
             let name = agent.atoms_mut().intern_collectible(binding.name());
             let _ = agent.global_set_lexical_binding(global_env, name, lexical_env, binding.slot());
+            bound_any = true;
+        }
+        if bound_any {
+            // A new global lexical binding may shadow an existing var/builtin on
+            // the global object, redirecting future `LoadGlobal`s for that name
+            // from the cell to the lexical slot. Conservatively bump the
+            // structure generation so any cached site re-resolves. This only
+            // runs at script/eval instantiation, so the cost is negligible.
+            agent.bump_global_structure_generation(global_env);
         }
     }
 

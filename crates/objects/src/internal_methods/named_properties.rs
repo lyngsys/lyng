@@ -205,6 +205,14 @@ impl ObjectRuntime {
         true
     }
 
+    /// Returns `true` when `id` is a cell-backed dictionary. Only the realm's
+    /// global object carries this flag, so it is a cheap pre-filter before the
+    /// realm scan that maps an object back to its global environment.
+    pub fn uses_cell_backed_dictionary(&self, id: ObjectRef) -> bool {
+        self.object_metadata(id)
+            .is_some_and(|m| m.flags.uses_cell_backed_dictionary())
+    }
+
     pub fn redefine_named_property(
         &mut self,
         heap: &mut PrimitiveMutator<'_>,
