@@ -260,7 +260,20 @@ bypassing the heap write barrier. If a value (or, later, a cell ref) is inserted
 into a dictionary entry of an already-marked (black) object *during* incremental
 marking, the mark hook from Task 0.3 already ran for that object and won't run
 again — the new edge is missed and the value can be collected mid-cycle. This
-task adds a barrier so such writes shade the new value.
+task adds a barrier so such writes shade the new value. It covers both `Data`
+values and (later) `DataCell` cell refs, since both flow through `upsert`.
+
+**Scope note (decided after Task 0.3):** the *generational* facet — a YOUNG value
+reachable only through an OLD object's dictionary entry being lost in a MINOR GC
+(dictionary writes don't dirty cards; `PrimitiveMinorTracer` doesn't visit
+metadata) — is an accepted pre-existing limitation and is NOT addressed here. The
+global-property-cells feature sidesteps it by allocating global cells **tenured**
+(`AllocationLifetime::Default`, already specified in Task 1.3): a tenured cell ref
+is an old→old edge handled by major collection (Task 0.3), and the cell's *value*
+gets full generational + incremental barriers for free via the existing
+`ValueCell` machinery (`set_value_cell_value` dirties cards + shades). This task is
+only the incremental-marking barrier, which tenure does NOT solve (a black object
+gaining a new edge mid-major-cycle must shade regardless of generation).
 
 **Files:**
 - Modify: `crates/objects/src/internal_methods/named_properties.rs` (`redefine_named_property` ~190 / wherever `dictionary.upsert` is called)
