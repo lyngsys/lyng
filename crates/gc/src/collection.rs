@@ -375,6 +375,12 @@ impl PrimitiveHeap {
         before: &PrimitiveHeapAccounting,
     ) -> PrimitiveCollectionReport {
         let mut metrics = PrimitiveMajorMarkMetrics::new(self.major_mark_slice_budget().max(1));
+        // NOTE: `&()` (no metadata tracer) is safe only because this growth-triggered
+        // Major path is dormant in production — env/vm never installs mutator
+        // `PrimitiveRoots`, so `maybe_collect_for_growth` early-returns before reaching
+        // here. If mutator roots are ever wired up, this MUST pass the real metadata
+        // tracer or dictionary-entry values will be missed. See Task 0.4 /
+        // gc_integration.rs.
         let stats = self.collect_tracing_with_mark_metrics(roots, &(), &mut metrics, &());
         self.record_last_major_mark_stats(&stats);
         let after = self.accounting();

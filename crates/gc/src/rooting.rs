@@ -1265,10 +1265,12 @@ impl PrimitiveHeap {
     /// with the `&()` no-op. Today this is sound because no production code path
     /// ever calls `begin_incremental_mark*` (it is started only in tests), so
     /// `active_major_mark` is always `None` here in production and this short-circuits
-    /// immediately. The stop-the-world `force_collect` path (the only production
-    /// major-mark driver) DOES trace dictionary metadata. Wiring the metadata hook
-    /// through the incremental path requires a design decision tracked by Task 0.4
-    /// (incremental-marking barrier for dictionary writes).
+    /// immediately. The stop-the-world `force_collect` path (the major-mark driver
+    /// that is actually reached in production) DOES trace dictionary metadata; the
+    /// other major driver (`finish_collection_report`'s growth-triggered collect) is
+    /// likewise dormant. Wiring the metadata hook through the incremental path
+    /// requires a design decision tracked by Task 0.4 (incremental-marking barrier
+    /// for dictionary writes).
     pub fn poll_incremental_mark_step(&mut self) -> Option<PrimitiveMarkStep> {
         let mut marker = self.active_major_mark.take()?;
         let step = self.mark_step(&mut marker, self.major_mark_slice_budget());
