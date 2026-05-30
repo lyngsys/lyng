@@ -70,12 +70,18 @@ impl SampleHistogram {
 
     #[must_use]
     pub fn fast(&self, opcode: Opcode) -> u64 {
-        self.fast.get(usize::from(opcode as u8)).copied().unwrap_or(0)
+        self.fast
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
     }
 
     #[must_use]
     pub fn slow(&self, opcode: Opcode) -> u64 {
-        self.slow.get(usize::from(opcode as u8)).copied().unwrap_or(0)
+        self.slow
+            .get(usize::from(opcode as u8))
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Total samples attributed to an opcode (fast + slow lanes).

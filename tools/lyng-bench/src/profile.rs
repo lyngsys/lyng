@@ -95,7 +95,12 @@ pub(crate) fn parse_options(args: &[String]) -> Result<Options, String> {
             }
             "--samply" => options.samply = true,
             "--help" | "-h" => return Err(help_text()),
-            other => return Err(format!("unknown profile option: {other}\n\n{}", help_text())),
+            other => {
+                return Err(format!(
+                    "unknown profile option: {other}\n\n{}",
+                    help_text()
+                ))
+            }
         }
     }
     if options.samples == 0 {
@@ -262,8 +267,11 @@ pub(crate) mod samply {
         harness: &str,
         options: &Options,
     ) -> Result<(), String> {
-        let script_path = std::env::temp_dir()
-            .join(format!("lyng-profile-{}-{}.js", workload.name, std::process::id()));
+        let script_path = std::env::temp_dir().join(format!(
+            "lyng-profile-{}-{}.js",
+            workload.name,
+            std::process::id()
+        ));
         std::fs::write(&script_path, harness)
             .map_err(|e| format!("failed to write samply script: {e}"))?;
         let out_path = format!("reports/lyng/samply-{}.json.gz", workload.name);
@@ -519,9 +527,14 @@ mod tests {
 
     #[test]
     fn parses_filter_interval_and_samply() {
-        let options =
-            parse_options(&args(&["--filter", "RayTrace", "--interval-us", "100", "--samply"]))
-                .unwrap();
+        let options = parse_options(&args(&[
+            "--filter",
+            "RayTrace",
+            "--interval-us",
+            "100",
+            "--samply",
+        ]))
+        .unwrap();
         assert_eq!(options.filter.as_deref(), Some("RayTrace"));
         assert_eq!(options.interval_us, 100);
         assert!(options.samply);
@@ -563,8 +576,7 @@ mod tests {
         assert!(!sema.diagnostics.has_errors());
         let unit = lyng_compiler::compile_script(&parsed, &sema, &mut atoms).unwrap();
         let workload = V8Workload::new("LoopMicro", "n/a");
-        let (dispatch, hist) =
-            profile_once(&workload, &unit, Duration::from_micros(50)).unwrap();
+        let (dispatch, hist) = profile_once(&workload, &unit, Duration::from_micros(50)).unwrap();
         assert!(
             hist.total() > 0,
             "sampler should capture samples on a 2M-iter loop"

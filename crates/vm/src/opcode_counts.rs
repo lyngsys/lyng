@@ -222,7 +222,8 @@ impl DispatchCounters {
         self.dispatch.fill(0);
         self.slow_semantic.fill(0);
         self.slow_safepoint.fill(0);
-        self.current_opcode.store(CURRENT_OPCODE_IDLE, Ordering::Relaxed);
+        self.current_opcode
+            .store(CURRENT_OPCODE_IDLE, Ordering::Relaxed);
     }
 
     /// Snapshot the dispatch bank into an `OpcodeDispatchCounts`.
