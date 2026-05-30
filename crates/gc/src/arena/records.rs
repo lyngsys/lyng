@@ -312,7 +312,14 @@ define_gc_buffer_ref!(
     SuspendedRegistersRef
 );
 
+/// Byte offset of `stored_value` within `PrimitiveValueCellRecord`. The asm
+/// mode-7 GlobalCellLoad hit loads the cell's `Value` from this offset. `Value`
+/// is `#[repr(transparent)] u64`; `#[repr(C)]` keeps `stored_value` first so this
+/// stays 0. Pinned by `value_cell_layout_tests`.
+pub const PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET: usize = 0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(C)]
 pub struct PrimitiveValueCellRecord {
     pub(super) stored_value: Value,
     pub(super) linked_string: Option<StringRef>,
@@ -999,4 +1006,20 @@ pub struct PrimitiveDomainStats {
     pub default_slots: usize,
     pub long_lived_slots: usize,
     pub side_allocations: SideAllocationStats,
+}
+
+#[cfg(test)]
+mod value_cell_layout_tests {
+    use super::{PrimitiveValueCellRecord, PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET};
+    use std::mem::offset_of;
+
+    #[test]
+    fn stored_value_is_at_pinned_offset() {
+        // The asm mode-7 GlobalCellLoad hit loads the cell value from
+        // [record_ptr, #PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET].
+        assert_eq!(
+            offset_of!(PrimitiveValueCellRecord, stored_value),
+            PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET
+        );
+    }
 }
