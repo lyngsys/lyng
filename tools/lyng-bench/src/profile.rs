@@ -255,7 +255,6 @@ fn profile_workload(
 /// the in-process sampler above is the default opcode-level signal.
 pub(crate) mod samply {
     use super::{Options, V8Workload};
-    use std::io::Write as _;
     use std::process::Command;
 
     pub(crate) fn capture(
@@ -263,12 +262,15 @@ pub(crate) mod samply {
         harness: &str,
         options: &Options,
     ) -> Result<(), String> {
-        let script_path = std::env::temp_dir().join(format!("lyng-profile-{}.js", workload.name));
-        let mut file = std::fs::File::create(&script_path)
-            .map_err(|e| format!("failed to write samply script: {e}"))?;
-        file.write_all(harness.as_bytes())
+        let script_path = std::env::temp_dir()
+            .join(format!("lyng-profile-{}-{}.js", workload.name, std::process::id()));
+        std::fs::write(&script_path, harness)
             .map_err(|e| format!("failed to write samply script: {e}"))?;
         let out_path = format!("reports/lyng/samply-{}.json.gz", workload.name);
+        if let Some(parent) = std::path::Path::new(&out_path).parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create samply output dir: {e}"))?;
+        }
 
         let result = Command::new("samply")
             .arg("record")
