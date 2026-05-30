@@ -145,24 +145,6 @@ impl Default for OpcodeCounters {
     }
 }
 
-/// Flat counter banks for the asm-driven counter increments.
-///
-/// Layout is `#[repr(C)]` with three sequential `[u64; 256]` banks:
-/// - `dispatch[op]`        — bumped at handler entry by `inc_dispatch_counter!`
-/// - `slow_semantic[op]`   — bumped at `call_slow!` invocation site
-/// - `slow_safepoint[op]`  — bumped at `poll_safepoint!` pending branch
-///
-/// Followed by a single `current_opcode` `AtomicU64` cell (offset 6144)
-/// publishing the live opcode for the sampling profiler.
-///
-/// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
-/// space for the full byte range even though Lyng uses ~157 opcodes,
-/// to keep offset math cheap (compile-time bank offsets are 0, 2048,
-/// 4096 — all encodable as `AArch64` LDR/STR immediates).
-///
-/// Box-allocated so the Vm pointer stays stable across struct moves
-/// (Vm itself isn't pinned; the asm-side `[VM, #offset]` access reads
-/// the pointer first, then indexes into the heap-allocated array).
 /// Sentinel stored in `DispatchCounters::current_opcode` when no opcode
 /// has been dispatched yet (set at construction and on `reset`). Samples
 /// that observe this value are attributed to the "non-opcode / native"
@@ -190,6 +172,24 @@ pub fn decode_current_opcode(raw: u64) -> Option<(Opcode, bool)> {
     Opcode::from_byte(byte).map(|opcode| (opcode, in_slow))
 }
 
+/// Flat counter banks for the asm-driven counter increments.
+///
+/// Layout is `#[repr(C)]` with three sequential `[u64; 256]` banks:
+/// - `dispatch[op]`        — bumped at handler entry by `inc_dispatch_counter!`
+/// - `slow_semantic[op]`   — bumped at `call_slow!` invocation site
+/// - `slow_safepoint[op]`  — bumped at `poll_safepoint!` pending branch
+///
+/// Followed by a single `current_opcode` `AtomicU64` cell (offset 6144)
+/// publishing the live opcode for the sampling profiler.
+///
+/// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
+/// space for the full byte range even though Lyng uses ~157 opcodes,
+/// to keep offset math cheap (compile-time bank offsets are 0, 2048,
+/// 4096 — all encodable as `AArch64` LDR/STR immediates).
+///
+/// Box-allocated so the Vm pointer stays stable across struct moves
+/// (Vm itself isn't pinned; the asm-side `[VM, #offset]` access reads
+/// the pointer first, then indexes into the heap-allocated array).
 #[repr(C)]
 pub struct DispatchCounters {
     pub dispatch: [u64; 256],
