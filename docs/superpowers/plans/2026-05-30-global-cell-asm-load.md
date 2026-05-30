@@ -650,6 +650,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 Rewrite `op_load_global_dsl` so a mode-7 site is served inline; everything else bails to the unchanged Rust probe/cold path.
 
+> **REQUIRED cross-realm hardening (carried from Task 4 review):** the Task-4 generation mirror is a single slot tracking the *entry* realm's global env. Under cross-realm execution (nested direct-eval / module eval in another realm), a mode-7 hit in that realm's code would compare against the wrong realm's generation. The freed-cell case is still caught by the asm null-check (delete nulls the pointer-table entry), so it is not UAF — but a narrow wrong-value window remains (cross-realm + coincidental generation equality + data→accessor redefine). Before the asm reader goes live, make the mirror realm-correct via the cheapest option: **(2)** save/restore `dsl_global_env` (+ generation) around nested `evaluate_entry_*` entry (stack discipline, zero per-egress cost), or **(1)** re-prime from the active frame's realm in `translate_outcome`. Add a cross-realm staleness test (a mode-7 site in realm B, mutate B's global, confirm no stale/wrong read). This is a correctness gate for Task 8, not optional.
+
 **Files:**
 - Modify: `crates/vm/src/dsl/backend/aarch64/feedback.rs` (+ `objects.rs` if the cell-deref macro lives there)
 - Modify: `crates/vm/src/dsl/handlers/cold.rs:476` (`op_load_global_dsl`)
