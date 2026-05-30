@@ -31,3 +31,11 @@ fn dispatch_counters_field_offsets_are_stable() {
     // backing `Box<[u64]>`; pin it so a layout change can't break that.
     assert_eq!(align_of::<DispatchCounters>(), 8);
 }
+
+#[test]
+fn current_opcode_slow_bit_matches_asm_literal() {
+    // The slow-semantic asm publish in dsl/backend/aarch64/counters.rs uses the
+    // literal `+ 256`; the Rust decoder uses CURRENT_OPCODE_SLOW_BIT. They must
+    // stay equal. If SLOW_BIT changes, update the asm literal in counters.rs.
+    assert_eq!(lyng_vm::CURRENT_OPCODE_SLOW_BIT, 256);
+}

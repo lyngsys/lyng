@@ -291,6 +291,10 @@ pub(crate) mod samply {
             .arg(&script_path)
             .status();
 
+        // samply has finished reading the script by the time status() returns;
+        // clean up the temp file regardless of outcome.
+        let _ = std::fs::remove_file(&script_path);
+
         match result {
             Ok(status) if status.success() => {
                 println!(
@@ -547,9 +551,9 @@ mod tests {
 
     #[test]
     fn samply_capture_reports_error_gracefully() {
-        // Force a deterministic failure regardless of whether `samply` is
-        // installed: a bogus lyng-bin makes samply exit nonzero, and if samply
-        // is absent we get a NotFound error. Either way: Err, never a panic.
+        // Deterministic regardless of environment: if `samply` is absent we get
+        // NotFound; if it's installed, the bogus lyng-bin makes it exit nonzero.
+        // Either way capture() returns Err and never panics.
         let options = Options {
             samply: true,
             lyng_bin: "/nonexistent/lyng-binary-xyz".to_string(),
