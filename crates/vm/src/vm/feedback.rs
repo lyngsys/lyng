@@ -2749,6 +2749,7 @@ fn refresh_matching_construct_entry_created_shape(
     }
     if entry.created_shape.is_none() {
         entry.created_shape = ConstructCacheEntry::created_shape(agent, created);
+        entry.prototype = ConstructCacheEntry::created_prototype(agent, created);
         storage.entries[index] = Some(entry);
     }
     true

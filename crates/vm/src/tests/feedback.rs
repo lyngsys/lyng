@@ -1534,7 +1534,7 @@ fn construct_cache_entry_records_resolved_prototype() {
     // instance so the test can read its [[Prototype]] from the agent and verify
     // the cached prototype matches.
     let unit = compile_test_unit(
-        700,
+        104,
         r"
             function F() { this.x = 1; }
             var last;
