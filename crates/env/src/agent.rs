@@ -590,6 +590,17 @@ impl Agent {
                     } => {
                         vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
                     }
+                    ShapeInvalidationObserver::ConstructIcClear {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        // Construct-prototype watchpoints are registered on per-constructor sets
+                        // (keyed by ObjectRef), not shape-keyed sets, so this arm is not expected
+                        // to fire from the shape path; route it correctly for soundness regardless.
+                        vm_dispatch
+                            .clear_construct_ic_slot_if_generation_matches(code, slot, generation);
+                    }
                 },
             }
         }
