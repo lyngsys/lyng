@@ -527,3 +527,42 @@ fn baseline_global_ic_generation_primed_at_entry() {
          so the primed baseline is non-zero (proving priming actually ran)"
     );
 }
+
+/// Task 6 GUARD: serving a mode-7 (cell-backed) global read via the probe's thin
+/// fast path must remain correct across:
+///  - a plain warmed read (fast read returns the value),
+///  - a reassignment with no structural change (generation unchanged → the live
+///    cell read reflects the new value),
+///  - a structural change (delete + re-`var`) that bumps the generation, so the
+///    fast read MUST bail and re-resolve rather than serve a stale cell.
+///
+/// Encodes each read into the script result: `a` (=5) read after warming, `b`
+/// (=6) read after a plain reassignment, `c` (=7) read after delete+recreate.
+/// `a*100 + b*10 + c == 567` proves all three reads observed the correct live
+/// value. Passes on the pre-refactor code too (it is a correctness guard).
+#[test]
+fn mode_7_fast_read_returns_correct_value_through_mutation_and_invalidation() {
+    let src = "var g = 5; g; var a = g;\n\
+               g = 6; var b = g;\n\
+               delete globalThis.g; var g = 7; var c = g;\n\
+               a * 100 + b * 10 + c";
+    let unit = compile_test_unit(7303, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        result,
+        Value::from_smi(567),
+        "mode-7 reads must be live across reassignment (5->6, no gen bump) and \
+         re-resolve after a structural delete+recreate (gen bump → 7), not serve a stale cell"
+    );
+}

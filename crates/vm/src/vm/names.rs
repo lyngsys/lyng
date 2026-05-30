@@ -712,6 +712,36 @@ impl Vm {
         atom_operand: u32,
         feedback_slot: Option<FeedbackSlotId>,
     ) -> bool {
+        // Mode-7 fast read: the site already resolved to a cell-backed global
+        // (Task 5 projected mode 7). Serve the hit straight from the projected
+        // metadata, skipping the three per-dispatch overheads the cold path
+        // below always pays: name canonicalization (`read_atom_constant`), the
+        // global-env CHAIN walk (`find_global_environment_ref`), and the
+        // global-cell IC-state HashMap lookup (`global_cell_ic_state`).
+        //
+        // Realm-correct: the live generation comes from the EXECUTING frame's
+        // realm (frame.realm() -> global_env -> generation, all DIRECT lookups,
+        // NOT the env-chain walk and NOT the entry-realm-only Vm mirror), so it
+        // stays correct under cross-realm execution. `value_cell()` returns None
+        // for a freed cell (safety net); a generation mismatch or any miss falls
+        // through to the full cold path below.
+        if let Some(slot) = feedback_slot
+            && let Some((meta_mode, meta_generation, meta_handler_bits)) = self
+                .metadata_table(frame.code())
+                .map(|table| table.property(slot.get()))
+                .map(|meta| (meta.mode, meta.generation, meta.handler_bits))
+            && meta_mode == crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD
+            && let Some(global_env) = agent.realm(frame.realm()).map(|realm| realm.global_env())
+            && meta_generation == agent.global_structure_generation(global_env)
+            && let Some(cell) = PrimitiveValueCellRef::from_raw(meta_handler_bits as u32)
+            && let Some(record) = agent.heap().view().value_cell(cell)
+        {
+            let value = record.stored_value();
+            self.write_register(frame.registers(), target, value);
+            advance_dispatch_frame(frame, instruction_len);
+            return true;
+        }
+
         let Ok(name) = self.read_atom_constant(frame.code(), atom_operand) else {
             return false;
         };
