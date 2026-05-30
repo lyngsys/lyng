@@ -235,19 +235,19 @@ impl ObjectRuntime {
         let cell_payload = if cell_backed {
             match payload {
                 NamedPropertyValue::Data(value) => Some(value),
-                NamedPropertyValue::DataCell(source) => Some(
-                    match heap.view().value_cell(source) {
+                NamedPropertyValue::DataCell(source) => {
+                    Some(match heap.view().value_cell(source) {
                         Some(record) => record.stored_value(),
                         None => return false,
-                    },
-                ),
+                    })
+                }
                 NamedPropertyValue::Accessor { .. } => None,
             }
         } else {
             None
         };
 
-        let payload = if let Some(value) = cell_payload {
+        let payload = cell_payload.map_or(payload, |value| {
             // Read the existing cell ref (immutable borrow) before any heap cell op.
             let cell = if let Some(existing) = self.cell_backed_entry(id, key) {
                 // REUSE: write through the existing cell, preserving identity.
@@ -269,9 +269,7 @@ impl ObjectRuntime {
                 cell
             };
             NamedPropertyValue::DataCell(cell)
-        } else {
-            payload
-        };
+        });
 
         let Some(metadata) = self.object_metadata_mut(id) else {
             return false;
@@ -354,9 +352,11 @@ impl ObjectRuntime {
                 Ok(Some(descriptor))
             }
             NamedPropertyStorage::Dictionary(dictionary) => match dictionary.entry(key) {
-                Some(entry) => Ok(Some(
-                    self.descriptor_from_cell_payload(heap, entry.payload(), entry.attrs())?,
-                )),
+                Some(entry) => Ok(Some(Self::descriptor_from_cell_payload(
+                    heap,
+                    entry.payload(),
+                    entry.attrs(),
+                )?)),
                 None => Ok(None),
             },
         }
@@ -366,7 +366,6 @@ impl ObjectRuntime {
     /// [`NamedPropertyValue::DataCell`] through the heap before delegating to
     /// [`descriptor_from_payload`].  All other variants are forwarded directly.
     fn descriptor_from_cell_payload(
-        &self,
         heap: PrimitiveHeapView<'_>,
         payload: NamedPropertyValue,
         attrs: DescriptorAttributes,
@@ -377,7 +376,10 @@ impl ObjectRuntime {
                     .value_cell(cell)
                     .ok_or(InternalMethodError::CorruptObjectState)?
                     .stored_value();
-                Ok(descriptor_from_payload(NamedPropertyValue::Data(value), attrs))
+                Ok(descriptor_from_payload(
+                    NamedPropertyValue::Data(value),
+                    attrs,
+                ))
             }
             other => Ok(descriptor_from_payload(other, attrs)),
         }

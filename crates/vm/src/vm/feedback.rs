@@ -321,7 +321,7 @@ impl Vm {
         let _ = self.ensure_feedback_slot_execution(code, slot);
     }
 
-    /// Record that `code`'s frame was entered since the last LLInt feedback
+    /// Record that `code`'s frame was entered since the last `LLInt` feedback
     /// drain, so `drain_llint_scalar_feedback`'s Step 1 scans it. Deduped via
     /// `code_executed_stamp` against the current `drain_generation`, so each
     /// code is queued at most once per drain cycle.

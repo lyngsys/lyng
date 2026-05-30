@@ -16,8 +16,8 @@
 //!
 //! Originally, dictionary-mode property values were NOT traced: the GC mark walk
 //! starts from `AgentCollectionSnapshot` (`crates/env/src/agent.rs`), which only
-//! visits GC-heap `RuntimeObjectRecord` fields (named_slots, inline_named_slots,
-//! prototype, elements, private_slots, payloads) via `trace_heap_edges`. None of
+//! visits GC-heap `RuntimeObjectRecord` fields (`named_slots`, `inline_named_slots`,
+//! prototype, elements, `private_slots`, payloads) via `trace_heap_edges`. None of
 //! those correspond to dictionary entries, so any value reachable ONLY through a
 //! dictionary entry was silently collected.
 //!
@@ -76,6 +76,7 @@ use lyng_types::{PropertyDescriptor, PropertyKey, Value};
 /// hook traces dictionary-mode property values. If the inner object were collected,
 /// the test panics, signaling the tracing path regressed.
 #[test]
+#[allow(clippy::too_many_lines)]
 fn dictionary_global_object_value_survives_collection() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
@@ -104,8 +105,7 @@ fn dictionary_global_object_value_survives_collection() {
     // irrelevant to this (major-GC) test; survival depends only on the metadata hook.
     // We deliberately hold NO explicit GC root for this object.
     let inner_object = agent.with_heap_and_objects(|heap, objects| {
-        let root_shape = objects
-            .root_shape(&mut heap.mutator(), None, AllocationLifetime::Default);
+        let root_shape = objects.root_shape(&mut heap.mutator(), None, AllocationLifetime::Default);
         objects.alloc_object(
             &mut heap.mutator(),
             ObjectAllocation::ordinary(root_shape),
@@ -203,8 +203,7 @@ fn dictionary_global_object_value_survives_collection() {
         .expect("sentinel property should be a data property with a value");
 
     assert_eq!(
-        recovered_sentinel,
-        sentinel_value,
+        recovered_sentinel, sentinel_value,
         "surviving inner object's sentinel property should still read 0xDEAD"
     );
 
@@ -281,7 +280,7 @@ fn minor_gc_cell_backed_global_value_survives() {
     let entry_value = agent
         .cell_backed_entry(global_object, var_key)
         .and_then(|c| agent.heap().view().value_cell(c))
-        .map(|r| r.stored_value());
+        .map(lyng_gc::PrimitiveValueCellRecord::stored_value);
     assert_eq!(
         entry_value,
         Some(Value::from_smi(0x1234)),

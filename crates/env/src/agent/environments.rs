@@ -509,6 +509,9 @@ impl Agent {
         lexical_names.insert(name)
     }
 
+    /// # Panics
+    ///
+    /// Panics if the global lexical binding count exceeds `u32::MAX`.
     pub fn global_set_lexical_binding(
         &mut self,
         id: EnvironmentRef,

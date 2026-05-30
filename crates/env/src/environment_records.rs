@@ -372,7 +372,7 @@ pub enum EnvironmentMetadata {
         layout: EnvironmentLayoutId,
         lexical_names: HashSet<AtomId>,
         lexical_bindings: Vec<GlobalLexicalBindingRecord>,
-        /// O(1) `name -> index-into-`lexical_bindings`` lookup. Kept in sync
+        /// O(1) `name` -> index-into-`lexical_bindings` lookup. Kept in sync
         /// with `lexical_bindings` on every insert/update so global lexical
         /// resolution avoids the previous linear scan.
         lexical_index: HashMap<AtomId, u32>,

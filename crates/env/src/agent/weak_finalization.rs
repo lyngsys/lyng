@@ -46,11 +46,9 @@ impl Agent {
         // property values (stored in ObjectRuntime's metadata side-table, outside the
         // GC heap) are marked during the stop-the-world walk. Disjoint field borrows:
         // `heap` mutably, `objects`/`roots` shared.
-        let report = self.heap.force_collect_tracing_with_metadata(
-            &self.roots,
-            &roots,
-            &self.objects,
-        );
+        let report =
+            self.heap
+                .force_collect_tracing_with_metadata(&self.roots, &roots, &self.objects);
         // Post-mark sweep: prune dead prototype-transition entries and drop
         // invalidated watchpoint sets. Both operate purely on ObjectRuntime
         // side tables, so they live here at the Agent layer (ObjectRuntime is

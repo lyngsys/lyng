@@ -184,6 +184,8 @@ mod tests {
         assert!(flags.uses_cell_backed_dictionary());
         assert!(!ObjectFlags::empty().uses_cell_backed_dictionary());
         // Independent from the dictionary flag:
-        assert!(!ObjectFlags::CELL_BACKED_DICTIONARY.contains(ObjectFlags::NAMED_PROPERTIES_DICTIONARY));
+        assert!(
+            !ObjectFlags::CELL_BACKED_DICTIONARY.contains(ObjectFlags::NAMED_PROPERTIES_DICTIONARY)
+        );
     }
 }

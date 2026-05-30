@@ -65,7 +65,7 @@ fn global_var_write_through_cell() {
 fn many_global_lexical_bindings_resolve_correctly() {
     let mut src = String::new();
     for i in 0..50 {
-        src.push_str(&format!("let l{i} = {i};\n"));
+        writeln!(src, "let l{i} = {i};").unwrap();
     }
     // Read a spread of specific bindings (first, middle, last) and combine them
     // into a single distinct number: l0 + l25 * 100 + l49 * 10000 = 492500.

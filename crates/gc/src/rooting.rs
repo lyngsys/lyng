@@ -17,8 +17,9 @@ pub trait TraceHeapEdges {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>);
 }
 
-/// Per-object mark hook for tracing edges that live OUTSIDE the GC heap record —
-/// notably dictionary-mode property values stored in the objects layer's
+/// Per-object mark hook for tracing edges that live OUTSIDE the GC heap record.
+///
+/// Notably dictionary-mode property values stored in the objects layer's
 /// `ObjectMetadata` side-table (`crates/objects`). The GC layer cannot see
 /// `ObjectRuntime`, so the env layer supplies an implementor (`&self.objects`) that
 /// the mark loop invokes for every live object as it is processed.

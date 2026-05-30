@@ -193,7 +193,7 @@ pub struct Vm {
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
     pub(crate) tiering: Tiering,
-    /// LLInt feedback drain optimization: codes whose frames were entered
+    /// `LLInt` feedback drain optimization: codes whose frames were entered
     /// since the last `drain_llint_scalar_feedback`. Step 1 of the drain
     /// scans only these (non-executed code has `execution_count == 0` on all
     /// arith slots, so draining it is a guaranteed no-op). Cleared each drain.

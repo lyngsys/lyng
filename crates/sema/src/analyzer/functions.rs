@@ -99,8 +99,8 @@ impl Analyzer<'_> {
         let mut has_named_function_expression_scope = false;
         if let Some(name) = func_name {
             let parent_scope = self.scopes.get(func_scope).parent;
-            let is_declaration = parent_scope
-                .is_some_and(|ps| self.function_binding_scopes.contains(&(ps, name)));
+            let is_declaration =
+                parent_scope.is_some_and(|ps| self.function_binding_scopes.contains(&(ps, name)));
 
             if !is_declaration && !self.suppressed_function_name_bindings.contains(&func_id) {
                 self.declare_binding(name, DeclarationKind::FunctionName, func_scope, func_span);

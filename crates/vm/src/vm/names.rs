@@ -3,10 +3,10 @@ use super::{
     VmError, VmResult, WellKnownSymbolId,
 };
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
-use crate::vm::ic_state::GlobalCellTarget;
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
 use crate::vm::dispatch::advance_dispatch_frame;
+use crate::vm::ic_state::GlobalCellTarget;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
@@ -582,8 +582,7 @@ impl Vm {
         // COLD/miss install for a cell-backed global-object data entry. Capture
         // the cell now so subsequent hits read it live via `stored_value()`.
         if let Some(slot) = feedback_slot
-            && let Some(cell) =
-                agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
+            && let Some(cell) = agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
         {
             let current_gen = agent.global_structure_generation(global);
             self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);

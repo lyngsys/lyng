@@ -4291,10 +4291,7 @@ fn dictionary_datacell_entry_reads_through_cell() {
 
     // Allocate a ValueCell and initialise it to 42.
     let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
-    assert!(mutator.init_store_value(
-        ValueStoreTarget::ValueCell(cell),
-        Value::from_smi(42),
-    ));
+    assert!(mutator.init_store_value(ValueStoreTarget::ValueCell(cell), Value::from_smi(42),));
 
     // Insert a DataCell entry directly into the dictionary.
     let entry_attrs = attrs(true, true, true);
@@ -4356,7 +4353,10 @@ fn cell_backed_redefine_preserves_cell_identity_on_overwrite() {
         entry_attrs,
     ));
     let c0 = runtime.cell_backed_entry(object, key);
-    assert!(c0.is_some(), "first cell-backed define must allocate a cell");
+    assert!(
+        c0.is_some(),
+        "first cell-backed define must allocate a cell"
+    );
 
     // Overwrite with 7. The cell MUST be reused (same ref) and written through.
     assert!(runtime.redefine_named_property(

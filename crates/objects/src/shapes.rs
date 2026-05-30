@@ -710,7 +710,10 @@ pub enum NamedPropertyValue {
     /// [`PrimitiveValueCellRef`] rather than inline. Introduced in Task 1.1;
     /// constructed starting in Task 1.3; reads handled in Task 1.2.
     DataCell(PrimitiveValueCellRef),
-    Accessor { get: Value, set: Value },
+    Accessor {
+        get: Value,
+        set: Value,
+    },
 }
 
 impl NamedPropertyValue {

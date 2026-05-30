@@ -1,7 +1,7 @@
 use super::{
-    ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan,
-    FunctionCompiler, FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult,
-    Pattern, ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
+    ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan, FunctionCompiler,
+    FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult, Pattern,
+    ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
     WellKnownAtom,
 };
 

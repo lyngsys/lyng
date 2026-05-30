@@ -1,7 +1,7 @@
 use super::{
-    AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler,
-    FunctionId, LoweringError, LoweringResult, Opcode, PreparedReferenceTarget, ReferenceUsage,
-    ResolutionKind, SemanticBindingId, StorageClass,
+    AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler, FunctionId, LoweringError,
+    LoweringResult, Opcode, PreparedReferenceTarget, ReferenceUsage, ResolutionKind,
+    SemanticBindingId, StorageClass,
 };
 
 impl FunctionCompiler<'_, '_> {

@@ -543,7 +543,10 @@ fn global_property_load_uses_cell_ic_for_cell_backed_global() {
     );
     // The global cell IC short-circuits before the shape-based named-property
     // slow path, so that cache never transitions to Megamorphic.
-    assert_eq!(vm.named_property_cache_snapshot(installed.code(), slot), None);
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        None
+    );
     let ic = vm
         .global_cell_ic_state(installed.code(), slot)
         .expect("cell-backed global load should install a global cell IC");
@@ -590,7 +593,10 @@ fn global_property_load_uses_cell_ic_fast_path_for_cell_backed_global() {
         Value::from_smi(11)
     );
     // The cell IC short-circuits before the shape-based named-property slow path.
-    assert_eq!(vm.named_property_cache_snapshot(installed.code(), slot), None);
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), slot),
+        None
+    );
     assert!(
         vm.global_cell_ic_state(installed.code(), slot).is_some(),
         "cell-backed global load should install a global cell IC",

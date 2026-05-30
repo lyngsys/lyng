@@ -159,10 +159,9 @@ pub(super) fn collect_arrow_child_parents(
         if matches!(
             program.ast.get_function(record.function_id).kind,
             FunctionKind::Arrow | FunctionKind::AsyncArrow
-        ) {
-            if let Some(parent) = parent_functions[index] {
-                parents.insert(parent);
-            }
+        ) && let Some(parent) = parent_functions[index]
+        {
+            parents.insert(parent);
         }
     }
     parents
