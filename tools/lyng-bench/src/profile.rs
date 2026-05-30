@@ -261,6 +261,13 @@ pub(crate) mod samply {
     }
 }
 
+/// Run one sampled execution of a precompiled `unit`, returning summed
+/// dispatch counts + the sampler histogram for that run.
+///
+/// Note: `workload` is used only for its `name` in error messages —
+/// `profile_once` operates entirely on the precompiled `unit` and never reads
+/// `workload.file`, so callers may pass a sentinel `file` (e.g. `"n/a"` in
+/// tests) without triggering a file read.
 fn profile_once(
     workload: &V8Workload,
     unit: &lyng_bytecode::CompiledScriptUnit,
@@ -486,6 +493,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "slow: 2M-iter loop; run with: cargo test --release -p lyng-bench -- --ignored"]
     fn hot_opcode_dominates_the_profile() {
         // A tight arithmetic loop is dominated by a small set of opcodes; the
         // top profiled opcode should also be among the top dispatched opcodes.
