@@ -151,5 +151,14 @@ mod tests {
         let help = help_text();
         assert!(help.contains("profile"));
         assert!(help.contains("time-attribution"));
+        assert!(help.contains("samply drill-down"));
+    }
+
+    #[test]
+    fn parses_profile_suite_with_no_args() {
+        assert_eq!(
+            parse_command(&args(&["lyng-bench", "profile"])).unwrap(),
+            Command::Profile(vec![])
+        );
     }
 }
