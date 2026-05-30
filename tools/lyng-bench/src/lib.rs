@@ -29,5 +29,6 @@ pub fn run(args: &[String]) -> Result<(), String> {
         cli::Command::AsmDiff(command_args) => asm_diff::run(&command_args),
         cli::Command::Microbench(command_args) => microbench::run(&command_args),
         cli::Command::CaptureLlint(command_args) => capture_llint::run(&command_args),
+        cli::Command::Profile(command_args) => profile::run(&command_args),
     }
 }
