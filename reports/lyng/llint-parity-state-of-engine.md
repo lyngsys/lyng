@@ -62,6 +62,9 @@ Optimize general engine mechanisms that move Lyng toward LLInt behavior:
 - Improve object and value layouts when they remove structural extra loads from
   ordinary LLInt hit paths.
 - Preserve ECMA-262 correctness and Test262 evidence while optimizing.
+- Use `lyng-bench profile --filter <Workload>` for time attribution (which
+  opcode/path actually costs wall-time), not just dispatch counts. Treat its
+  ranked table as the first read before optimizing a workload.
 
 ## Current Evidence Files
 
@@ -72,3 +75,6 @@ Optimize general engine mechanisms that move Lyng toward LLInt behavior:
   terminology and remaining Rust-probe audit.
 - [`v8-raytrace-profile-2026-05-23.md`](v8-raytrace-profile-2026-05-23.md):
   property-heavy workload profile.
+- [`v8-raytrace-profile-2026-05-30.md`](v8-raytrace-profile-2026-05-30.md):
+  time-attribution profile (opcode x fast/slow path) from the in-process
+  sampling profiler (`lyng-bench profile`).

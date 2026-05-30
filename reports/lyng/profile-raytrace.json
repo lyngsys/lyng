@@ -1,0 +1,537 @@
+{
+  "interval_us": 200,
+  "samples": 5,
+  "schema": "lyng-bench/profile/v1",
+  "workloads": [
+    {
+      "name": "RayTrace",
+      "non_opcode_samples": 1,
+      "rows": [
+        {
+          "dispatches": 14052027,
+          "opcode": "Construct",
+          "samples": 60010,
+          "samples_per_mdispatch": 4270.558261808065,
+          "slow_samples": 59980,
+          "slow_share_pct": 99.95000833194467,
+          "time_share_pct": 41.92516208361279
+        },
+        {
+          "dispatches": 21021347,
+          "opcode": "Call2",
+          "samples": 18774,
+          "samples_per_mdispatch": 893.0921505648521,
+          "slow_samples": 18747,
+          "slow_share_pct": 99.856184084372,
+          "time_share_pct": 13.11619718309859
+        },
+        {
+          "dispatches": 28378339,
+          "opcode": "ReturnUndefined",
+          "samples": 17639,
+          "samples_per_mdispatch": 621.5656244010617,
+          "slow_samples": 17567,
+          "slow_share_pct": 99.59181359487499,
+          "time_share_pct": 12.323245025709815
+        },
+        {
+          "dispatches": 202222292,
+          "opcode": "GetNamedProperty",
+          "samples": 13279,
+          "samples_per_mdispatch": 65.66536195722675,
+          "slow_samples": 9030,
+          "slow_share_pct": 68.0021085925145,
+          "time_share_pct": 9.277190923317685
+        },
+        {
+          "dispatches": 49713950,
+          "opcode": "AssignNamedProperty",
+          "samples": 12197,
+          "samples_per_mdispatch": 245.34361079737178,
+          "slow_samples": 10628,
+          "slow_share_pct": 87.13618102812167,
+          "time_share_pct": 8.521266487815783
+        },
+        {
+          "dispatches": 22412715,
+          "opcode": "LoadGlobal",
+          "samples": 3457,
+          "samples_per_mdispatch": 154.24280369424233,
+          "slow_samples": 111,
+          "slow_share_pct": 3.210876482499277,
+          "time_share_pct": 2.4151855577911916
+        },
+        {
+          "dispatches": 6091645,
+          "opcode": "Call1",
+          "samples": 2384,
+          "samples_per_mdispatch": 391.35570112834876,
+          "slow_samples": 2367,
+          "slow_share_pct": 99.28691275167785,
+          "time_share_pct": 1.6655488486474401
+        },
+        {
+          "dispatches": 67901823,
+          "opcode": "JumpIfFalse8",
+          "samples": 2273,
+          "samples_per_mdispatch": 33.47480081646704,
+          "slow_samples": 1997,
+          "slow_share_pct": 87.85745710514739,
+          "time_share_pct": 1.588000223563604
+        },
+        {
+          "dispatches": 15601490,
+          "opcode": "Return",
+          "samples": 1949,
+          "samples_per_mdispatch": 124.92396559559376,
+          "slow_samples": 1922,
+          "slow_share_pct": 98.61467419189329,
+          "time_share_pct": 1.3616420746702436
+        },
+        {
+          "dispatches": 27269012,
+          "opcode": "Mul",
+          "samples": 1908,
+          "samples_per_mdispatch": 69.9695317160739,
+          "slow_samples": 1806,
+          "slow_share_pct": 94.65408805031447,
+          "time_share_pct": 1.3329979879275655
+        },
+        {
+          "dispatches": 15733913,
+          "opcode": "Add",
+          "samples": 1287,
+          "samples_per_mdispatch": 81.79783376201458,
+          "slow_samples": 1200,
+          "slow_share_pct": 93.24009324009323,
+          "time_share_pct": 0.8991448692152917
+        },
+        {
+          "dispatches": 14051965,
+          "opcode": "LoadEnvSlot",
+          "samples": 1170,
+          "samples_per_mdispatch": 83.26237647190268,
+          "slow_samples": 1126,
+          "slow_share_pct": 96.23931623931624,
+          "time_share_pct": 0.8174044265593561
+        },
+        {
+          "dispatches": 2774082,
+          "opcode": "Call0",
+          "samples": 975,
+          "samples_per_mdispatch": 351.467620639909,
+          "slow_samples": 969,
+          "slow_share_pct": 99.38461538461539,
+          "time_share_pct": 0.6811703554661301
+        },
+        {
+          "dispatches": 11246511,
+          "opcode": "Sub",
+          "samples": 821,
+          "samples_per_mdispatch": 73.00041764063539,
+          "slow_samples": 758,
+          "slow_share_pct": 92.32643118148599,
+          "time_share_pct": 0.5735803711155824
+        },
+        {
+          "dispatches": 7544249,
+          "opcode": "Wide",
+          "samples": 692,
+          "samples_per_mdispatch": 91.72549845584365,
+          "slow_samples": 677,
+          "slow_share_pct": 97.83236994219652,
+          "time_share_pct": 0.4834562933154482
+        },
+        {
+          "dispatches": 1377619,
+          "opcode": "Call3",
+          "samples": 535,
+          "samples_per_mdispatch": 388.3512059575253,
+          "slow_samples": 535,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.3737704001788509
+        },
+        {
+          "dispatches": 1370068,
+          "opcode": "TailCall",
+          "samples": 463,
+          "samples_per_mdispatch": 337.9394307435835,
+          "slow_samples": 461,
+          "slow_share_pct": 99.56803455723542,
+          "time_share_pct": 0.32346858931365974
+        },
+        {
+          "dispatches": 908204,
+          "opcode": "Call",
+          "samples": 369,
+          "samples_per_mdispatch": 406.2963827510119,
+          "slow_samples": 367,
+          "slow_share_pct": 99.45799457994579,
+          "time_share_pct": 0.2577967806841046
+        },
+        {
+          "dispatches": 104552534,
+          "opcode": "LoadThis",
+          "samples": 313,
+          "samples_per_mdispatch": 2.993710319828308,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.21867315001117818
+        },
+        {
+          "dispatches": 4551074,
+          "opcode": "Div",
+          "samples": 309,
+          "samples_per_mdispatch": 67.89606145714177,
+          "slow_samples": 302,
+          "slow_share_pct": 97.73462783171522,
+          "time_share_pct": 0.215878604963112
+        },
+        {
+          "dispatches": 2431453,
+          "opcode": "GetKeyedProperty",
+          "samples": 275,
+          "samples_per_mdispatch": 113.10109634033643,
+          "slow_samples": 271,
+          "slow_share_pct": 98.54545454545455,
+          "time_share_pct": 0.1921249720545495
+        },
+        {
+          "dispatches": 3327686,
+          "opcode": "GreaterThan",
+          "samples": 237,
+          "samples_per_mdispatch": 71.22066204563772,
+          "slow_samples": 227,
+          "slow_share_pct": 95.78059071729957,
+          "time_share_pct": 0.16557679409792087
+        },
+        {
+          "dispatches": 3960987,
+          "opcode": "LessThan",
+          "samples": 163,
+          "samples_per_mdispatch": 41.151359497014255,
+          "slow_samples": 159,
+          "slow_share_pct": 97.54601226993866,
+          "time_share_pct": 0.11387771070869661
+        },
+        {
+          "dispatches": 36571478,
+          "opcode": "Move",
+          "samples": 159,
+          "samples_per_mdispatch": 4.347650373878792,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.11108316566063045
+        },
+        {
+          "dispatches": 53473659,
+          "opcode": "LoadLocal0",
+          "samples": 153,
+          "samples_per_mdispatch": 2.8612218213831224,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.1068913480885312
+        },
+        {
+          "dispatches": 5540021,
+          "opcode": "Star7",
+          "samples": 147,
+          "samples_per_mdispatch": 26.534195447995593,
+          "slow_samples": 137,
+          "slow_share_pct": 93.19727891156462,
+          "time_share_pct": 0.10269953051643194
+        },
+        {
+          "dispatches": 22722700,
+          "opcode": "Jump8",
+          "samples": 127,
+          "samples_per_mdispatch": 5.589124531855809,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.08872680527610105
+        },
+        {
+          "dispatches": 5282807,
+          "opcode": "LdaZero",
+          "samples": 116,
+          "samples_per_mdispatch": 21.958023452304808,
+          "slow_samples": 103,
+          "slow_share_pct": 88.79310344827587,
+          "time_share_pct": 0.08104180639391907
+        },
+        {
+          "dispatches": 1354198,
+          "opcode": "Negate",
+          "samples": 112,
+          "samples_per_mdispatch": 82.70577862321463,
+          "slow_samples": 101,
+          "slow_share_pct": 90.17857142857143,
+          "time_share_pct": 0.0782472613458529
+        },
+        {
+          "dispatches": 32509327,
+          "opcode": "LoadZero",
+          "samples": 109,
+          "samples_per_mdispatch": 3.352883927741722,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.07615135255980326
+        },
+        {
+          "dispatches": 36547239,
+          "opcode": "LoadLocal1",
+          "samples": 83,
+          "samples_per_mdispatch": 2.2710333877752027,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.057986809747373136
+        },
+        {
+          "dispatches": 2408102,
+          "opcode": "Equal",
+          "samples": 81,
+          "samples_per_mdispatch": 33.636448954404756,
+          "slow_samples": 52,
+          "slow_share_pct": 64.19753086419753,
+          "time_share_pct": 0.05658953722334004
+        },
+        {
+          "dispatches": 16348913,
+          "opcode": "LoadTrue",
+          "samples": 80,
+          "samples_per_mdispatch": 4.893291682450081,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.05589090096132349
+        },
+        {
+          "dispatches": 19353774,
+          "opcode": "LoadLocal2",
+          "samples": 71,
+          "samples_per_mdispatch": 3.6685351394513543,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.0496031746031746
+        },
+        {
+          "dispatches": 6955640,
+          "opcode": "JumpIfFalse",
+          "samples": 53,
+          "samples_per_mdispatch": 7.619715798977521,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.03702772188687682
+        },
+        {
+          "dispatches": 594176,
+          "opcode": "LessEqual",
+          "samples": 47,
+          "samples_per_mdispatch": 79.10114174924601,
+          "slow_samples": 46,
+          "slow_share_pct": 97.87234042553192,
+          "time_share_pct": 0.03283590431477755
+        },
+        {
+          "dispatches": 246448,
+          "opcode": "ModSmi",
+          "samples": 43,
+          "samples_per_mdispatch": 174.47899759787055,
+          "slow_samples": 39,
+          "slow_share_pct": 90.69767441860465,
+          "time_share_pct": 0.030041359266711382
+        },
+        {
+          "dispatches": 453650,
+          "opcode": "GreaterEqual",
+          "samples": 42,
+          "samples_per_mdispatch": 92.58238730298689,
+          "slow_samples": 41,
+          "slow_share_pct": 97.61904761904762,
+          "time_share_pct": 0.029342723004694836
+        },
+        {
+          "dispatches": 2723392,
+          "opcode": "Increment",
+          "samples": 34,
+          "samples_per_mdispatch": 12.484431179940309,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.023753632908562486
+        },
+        {
+          "dispatches": 702665,
+          "opcode": "LoadSmi",
+          "samples": 29,
+          "samples_per_mdispatch": 41.271445140998914,
+          "slow_samples": 25,
+          "slow_share_pct": 86.20689655172413,
+          "time_share_pct": 0.020260451598479768
+        },
+        {
+          "dispatches": 8814575,
+          "opcode": "LoadFalse",
+          "samples": 27,
+          "samples_per_mdispatch": 3.063108544654734,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.01886317907444668
+        },
+        {
+          "dispatches": 4451,
+          "opcode": "AssignGlobal",
+          "samples": 23,
+          "samples_per_mdispatch": 5167.378117277016,
+          "slow_samples": 23,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.016068634026380507
+        },
+        {
+          "dispatches": 949088,
+          "opcode": "Star6",
+          "samples": 22,
+          "samples_per_mdispatch": 23.180147678613572,
+          "slow_samples": 22,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.01536999776436396
+        },
+        {
+          "dispatches": 362920,
+          "opcode": "MulSmi",
+          "samples": 17,
+          "samples_per_mdispatch": 46.842279290201695,
+          "slow_samples": 17,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.011876816454281243
+        },
+        {
+          "dispatches": 2221036,
+          "opcode": "StrictEqual",
+          "samples": 15,
+          "samples_per_mdispatch": 6.75360507438871,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.010479543930248155
+        },
+        {
+          "dispatches": 2517652,
+          "opcode": "Jump",
+          "samples": 14,
+          "samples_per_mdispatch": 5.560736749955911,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.009780907668231613
+        },
+        {
+          "dispatches": 168800,
+          "opcode": "SubSmi",
+          "samples": 12,
+          "samples_per_mdispatch": 71.09004739336493,
+          "slow_samples": 11,
+          "slow_share_pct": 91.66666666666666,
+          "time_share_pct": 0.008383635144198525
+        },
+        {
+          "dispatches": 221,
+          "opcode": "CreateForIn",
+          "samples": 6,
+          "samples_per_mdispatch": 27149.321266968323,
+          "slow_samples": 6,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.0041918175720992625
+        },
+        {
+          "dispatches": 2757639,
+          "opcode": "JumpIfTrue8",
+          "samples": 6,
+          "samples_per_mdispatch": 2.1757742764734616,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.0041918175720992625
+        },
+        {
+          "dispatches": 365,
+          "opcode": "CreateClosure",
+          "samples": 5,
+          "samples_per_mdispatch": 13698.630136986301,
+          "slow_samples": 5,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.0034931813100827183
+        },
+        {
+          "dispatches": 338866,
+          "opcode": "Ldar",
+          "samples": 5,
+          "samples_per_mdispatch": 14.755094934280807,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.0034931813100827183
+        },
+        {
+          "dispatches": 1944,
+          "opcode": "AssignKeyedProperty",
+          "samples": 4,
+          "samples_per_mdispatch": 2057.61316872428,
+          "slow_samples": 4,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.002794545048066175
+        },
+        {
+          "dispatches": 4003,
+          "opcode": "DefineNamedProperty",
+          "samples": 4,
+          "samples_per_mdispatch": 999.2505620784412,
+          "slow_samples": 4,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.002794545048066175
+        },
+        {
+          "dispatches": 238008,
+          "opcode": "AddSmi",
+          "samples": 3,
+          "samples_per_mdispatch": 12.604618332156903,
+          "slow_samples": 1,
+          "slow_share_pct": 33.33333333333333,
+          "time_share_pct": 0.0020959087860496313
+        },
+        {
+          "dispatches": 2165,
+          "opcode": "AdvanceForIn",
+          "samples": 3,
+          "samples_per_mdispatch": 1385.6812933025406,
+          "slow_samples": 3,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.0020959087860496313
+        },
+        {
+          "dispatches": 1551905,
+          "opcode": "LoadOne",
+          "samples": 2,
+          "samples_per_mdispatch": 1.2887386792361646,
+          "slow_samples": 0,
+          "slow_share_pct": 0.0,
+          "time_share_pct": 0.0013972725240330875
+        },
+        {
+          "dispatches": 462,
+          "opcode": "CreateObject",
+          "samples": 1,
+          "samples_per_mdispatch": 2164.5021645021643,
+          "slow_samples": 1,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.0006986362620165438
+        },
+        {
+          "dispatches": 435,
+          "opcode": "SetFunctionName",
+          "samples": 1,
+          "samples_per_mdispatch": 2298.8505747126437,
+          "slow_samples": 1,
+          "slow_share_pct": 100.0,
+          "time_share_pct": 0.0006986362620165438
+        }
+      ],
+      "total_dispatches": 893286932,
+      "total_samples": 143136
+    }
+  ]
+}
