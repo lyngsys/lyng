@@ -556,7 +556,7 @@ impl PrimitiveHeap {
     }
 
     #[inline]
-    pub(crate) fn value_cell_ptrs_slice(&self) -> &[*const PrimitiveValueCellRecord] {
+    pub(crate) fn value_cell_ptr_table_slice(&self) -> &[*const PrimitiveValueCellRecord] {
         &self.value_cell_ptrs
     }
 
@@ -576,12 +576,15 @@ impl PrimitiveHeap {
         id: PrimitiveValueCellRef,
     ) -> Option<PrimitiveValueCellRecord> {
         let record = self.value_cells.free(id)?;
-        // Mirror `object_slot_ptrs` free handling (`free_object_slots_in`): null the
-        // table entry by index so no dangling pointer survives the freed cell. (The
-        // young-gen `value_cells.sweep_young` reclaim path does not null, exactly as
-        // `objects.sweep_young` does not null `object_record_ptrs` — its reclaim
-        // closure receives the record, not the ref. Stale entries there stay valid
-        // memory inside their `SlotPage` and are republished on reallocation.)
+        // Unlike `object_record_ptrs` (not nulled on free — stale entries stay valid
+        // SlotPage memory, overwritten on realloc), `value_cell_ptrs` is nulled eagerly
+        // on free (the `object_slot_ptrs` / `free_object_slots_in` pattern), so a consumer
+        // can treat a null entry as "no live cell". NOTE: the young-gen sweep path
+        // (`value_cells.sweep_young`, ~line 1556) does NOT call this — its closure gets the
+        // record, not the ref — so stale non-null entries survive a minor GC and are
+        // overwritten on reallocation, exactly as `object_record_ptrs` behaves under young
+        // sweep. (Safe for global cells: they are allocated LongLived/tenured, so a bound
+        // global's cell is never young-swept.)
         if let Some(ptr) = self.value_cell_ptrs.get_mut(id.get() as usize) {
             *ptr = std::ptr::null();
         }

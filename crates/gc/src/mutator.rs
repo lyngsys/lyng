@@ -217,7 +217,7 @@ impl<'a> PrimitiveHeapView<'a> {
     #[must_use]
     #[inline]
     pub fn value_cell_ptr_table(self) -> &'a [*const PrimitiveValueCellRecord] {
-        self.heap.value_cell_ptrs_slice()
+        self.heap.value_cell_ptr_table_slice()
     }
 
     #[inline]
