@@ -196,6 +196,11 @@ pub(super) struct ConstructCacheEntry {
     pub(super) constructor_shape: ShapeId,
     pub(super) realm: Option<RealmRef>,
     pub(super) created_shape: Option<ShapeId>,
+    /// The resolved `[[Prototype]]` of the freshly-created instance, read
+    /// from the created object's header. This is exactly the prototype
+    /// installed by `create_construct_this` (including the `Object.prototype`
+    /// fallback when the constructor's `.prototype` is not an object).
+    pub(super) prototype: Option<ObjectRef>,
 }
 
 impl ConstructCacheEntry {
@@ -214,11 +219,13 @@ impl ConstructCacheEntry {
             .function_data(constructor)
             .and_then(lyng_objects::FunctionObjectData::realm);
         let created_shape = Self::created_shape(agent, created);
+        let prototype = Self::created_prototype(agent, created);
         Some(Self {
             constructor,
             constructor_shape,
             realm,
             created_shape,
+            prototype,
         })
     }
 
@@ -229,6 +236,16 @@ impl ConstructCacheEntry {
                 .objects()
                 .object_header(agent.heap().view(), object)
                 .map(lyng_objects::ObjectHeader::shape)
+        })
+    }
+
+    #[inline]
+    fn created_prototype(agent: &Agent, created: Option<ObjectRef>) -> Option<ObjectRef> {
+        created.and_then(|object| {
+            agent
+                .objects()
+                .object_header(agent.heap().view(), object)
+                .and_then(lyng_objects::ObjectHeader::prototype)
         })
     }
 }
@@ -1540,6 +1557,7 @@ impl Vm {
                         realm: entry.realm,
                         builtin: entry.builtin,
                         created_shape: None,
+                        prototype: None,
                     });
                 }
                 out
@@ -1600,6 +1618,7 @@ impl Vm {
                         realm: entry.realm,
                         builtin: None,
                         created_shape: entry.created_shape,
+                        prototype: entry.prototype,
                     });
                 }
                 out
