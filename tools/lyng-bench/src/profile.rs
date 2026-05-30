@@ -249,15 +249,53 @@ fn profile_workload(
     })
 }
 
-// Replaced with the real implementation in Task 6.
+/// Function-level drill-down via the external `samply` profiler. Writes the
+/// generated harness to a temp script and records `lyng --shell <script>`.
+/// This is the microscope for splitting a single slow handler's internals;
+/// the in-process sampler above is the default opcode-level signal.
 pub(crate) mod samply {
     use super::{Options, V8Workload};
+    use std::io::Write as _;
+    use std::process::Command;
+
     pub(crate) fn capture(
-        _workload: &V8Workload,
-        _harness: &str,
-        _options: &Options,
+        workload: &V8Workload,
+        harness: &str,
+        options: &Options,
     ) -> Result<(), String> {
-        Err("samply capture not yet implemented".to_string())
+        let script_path = std::env::temp_dir().join(format!("lyng-profile-{}.js", workload.name));
+        let mut file = std::fs::File::create(&script_path)
+            .map_err(|e| format!("failed to write samply script: {e}"))?;
+        file.write_all(harness.as_bytes())
+            .map_err(|e| format!("failed to write samply script: {e}"))?;
+        let out_path = format!("reports/lyng/samply-{}.json.gz", workload.name);
+
+        let result = Command::new("samply")
+            .arg("record")
+            .arg("--save-only")
+            .arg("-o")
+            .arg(&out_path)
+            .arg("--")
+            .arg(&options.lyng_bin)
+            .arg("--shell")
+            .arg(&script_path)
+            .status();
+
+        match result {
+            Ok(status) if status.success() => {
+                println!(
+                    "  samply: {} profile saved to {out_path} (open with `samply load {out_path}`)",
+                    workload.name
+                );
+                Ok(())
+            }
+            Ok(status) => Err(format!("samply exited with {status} for {}", workload.name)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(
+                "samply not found on PATH. Install with `cargo install samply`, or omit --samply."
+                    .to_string(),
+            ),
+            Err(error) => Err(format!("failed to launch samply: {error}")),
+        }
     }
 }
 
@@ -490,6 +528,21 @@ mod tests {
     #[test]
     fn zero_samples_is_rejected() {
         assert!(parse_options(&args(&["--samples", "0"])).is_err());
+    }
+
+    #[test]
+    fn samply_capture_reports_error_gracefully() {
+        // Force a deterministic failure regardless of whether `samply` is
+        // installed: a bogus lyng-bin makes samply exit nonzero, and if samply
+        // is absent we get a NotFound error. Either way: Err, never a panic.
+        let options = Options {
+            samply: true,
+            lyng_bin: "/nonexistent/lyng-binary-xyz".to_string(),
+            ..Options::default()
+        };
+        let workload = V8Workload::new("Probe", "n/a");
+        let result = super::samply::capture(&workload, "1;", &options);
+        assert!(result.is_err());
     }
 
     #[test]
