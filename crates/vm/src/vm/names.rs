@@ -7,6 +7,7 @@ use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
 use crate::vm::call::RejectingNativeRegistry;
 use crate::vm::dispatch::advance_dispatch_frame;
 use crate::vm::ic_state::GlobalCellTarget;
+use crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
@@ -730,8 +731,12 @@ impl Vm {
                 .metadata_table(frame.code())
                 .map(|table| table.property(slot.get()))
                 .map(|meta| (meta.mode, meta.generation, meta.handler_bits))
-            && meta_mode == crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD
-            && let Some(global_env) = agent.realm(frame.realm()).map(|realm| realm.global_env())
+            && meta_mode == LLINT_IC_MODE_GLOBAL_CELL_LOAD
+            && let Some(global_env) = agent
+                .heap()
+                .view()
+                .realm(frame.realm())
+                .and_then(|realm| realm.global_env())
             && meta_generation == agent.global_structure_generation(global_env)
             && let Some(cell) = PrimitiveValueCellRef::from_raw(meta_handler_bits as u32)
             && let Some(record) = agent.heap().view().value_cell(cell)
