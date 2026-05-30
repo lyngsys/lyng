@@ -198,16 +198,6 @@ pub struct Vm {
     /// slow-path-return choke point (`translate_outcome`), so any structural bump during
     /// a slow path is reflected before asm dispatch resumes.
     pub(crate) dsl_global_ic_generation: u32,
-    /// The executing realm's global environment, cached at run entry so the mirror
-    /// refresh is a Vec index (no env-chain walk). `None` until the first run sets it.
-    ///
-    /// LIMITATION (addressed in Task 8): single-slot cache. A nested cross-realm
-    /// entry (direct-eval / module eval in a different realm) overwrites this with the
-    /// inner realm's env, so the outer run's mirror then tracks the wrong realm's
-    /// generation. Safe today (nothing reads the mirror yet); Task 8 makes it
-    /// realm-correct (re-prime from the active frame's realm, or save/restore around
-    /// nested entry).
-    dsl_global_env: Option<EnvironmentRef>,
     pub(crate) tiering: Tiering,
     /// `LLInt` feedback drain optimization: codes whose frames were entered
     /// since the last `drain_llint_scalar_feedback`. Step 1 of the drain
@@ -611,7 +601,6 @@ impl Vm {
             global_cell_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
             dsl_global_ic_generation: 0,
-            dsl_global_env: None,
             tiering: Tiering::disabled(),
             executed_codes: Vec::new(),
             code_executed_stamp: Vec::new(),
@@ -1036,25 +1025,24 @@ impl Vm {
         self.dsl_global_ic_generation
     }
 
-    /// Cache the executing realm's global env and prime the baseline generation.
+    /// Prime the baseline generation from the executing realm's global env.
     /// Called at top-level run entry AFTER global declaration instantiation, so any
     /// agent-side bumps from instantiation are already captured in the baseline.
     /// Dispatch-time bumps (delete/defineProperty on the global) are covered by the
     /// `translate_outcome` slow-path choke point.
     #[inline]
     pub(crate) fn prime_global_ic_generation(&mut self, agent: &Agent, global_env: EnvironmentRef) {
-        self.dsl_global_env = Some(global_env);
         self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
     }
 
     /// Refresh the mirror from the realm of the currently-executing frame, so a
     /// cross-realm mode-7 hit compares against the correct realm's generation.
     ///
-    /// `prime_global_ic_generation` caches `dsl_global_env` for the realm that was
-    /// active at `Vm::run` entry. A cross-realm call (`$262.createRealm` → invoke a function whose
+    /// `prime_global_ic_generation` sets the baseline from the realm that was active
+    /// at `Vm::run` entry. A cross-realm call (`$262.createRealm` → invoke a function whose
     /// `[[Realm]]` differs) egresses through `translate_outcome` with the callee
     /// frame active; deriving the global env from that frame's realm re-primes the
-    /// cached env + generation to the executing realm before its first opcode runs.
+    /// generation to the executing realm before its first opcode runs.
     /// No-op (mirror left as-is) if the realm has no resolvable global env.
     #[inline]
     pub(crate) fn refresh_global_ic_generation_for_realm(
@@ -1068,7 +1056,6 @@ impl Vm {
             .realm(realm)
             .and_then(|r| r.global_env())
         {
-            self.dsl_global_env = Some(global_env);
             self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
         }
     }

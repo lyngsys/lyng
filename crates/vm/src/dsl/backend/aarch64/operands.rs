@@ -217,4 +217,18 @@ mod tests {
             "signed i24 decode must not use the 32-bit Ax overread form: {asm}",
         );
     }
+
+    #[test]
+    fn decode_abx_feedback_slot_reads_byte_4() {
+        let asm = decode_abx_feedback_slot!(11);
+
+        // The narrow IC-shaped Abx encoding is
+        // `[opcode, a, bx_lo, bx_hi, slot_lo, slot_hi]` (opcode + a + bx = 4
+        // bytes), so the trailing u16 feedback slot lives at byte offset 4.
+        // Pin that offset here: a future Abx layout change must update this.
+        assert!(
+            asm.contains("ldrh   w11, [x19, #4]"),
+            "Abx feedback slot must be read as a u16 from [PC + 4]: {asm}",
+        );
+    }
 }
