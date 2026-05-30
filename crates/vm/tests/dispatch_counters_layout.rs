@@ -8,7 +8,7 @@
 
 #![cfg(feature = "diagnostic-counters")]
 
-use std::mem::{offset_of, size_of};
+use std::mem::{align_of, offset_of, size_of};
 
 use lyng_vm::DispatchCounters;
 
@@ -27,4 +27,7 @@ fn dispatch_counters_field_offsets_are_stable() {
     // The asm publish stores to [counter_base, #6144]; pin it here so a
     // struct re-order can't silently break it.
     assert_eq!(offset_of!(DispatchCounters, current_opcode), 6144);
+    // The `new()` SAFETY argument relies on 8-byte alignment matching the
+    // backing `Box<[u64]>`; pin it so a layout change can't break that.
+    assert_eq!(align_of::<DispatchCounters>(), 8);
 }

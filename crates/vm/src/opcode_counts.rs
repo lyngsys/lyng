@@ -185,6 +185,7 @@ pub fn decode_current_opcode(raw: u64) -> Option<(Opcode, bool)> {
         return None;
     }
     let in_slow = raw & CURRENT_OPCODE_SLOW_BIT != 0;
+    // `raw & 0xFF` is always 0..=255, so this conversion never fails.
     let byte = u8::try_from(raw & 0xFF).ok()?;
     Opcode::from_byte(byte).map(|opcode| (opcode, in_slow))
 }
@@ -205,8 +206,8 @@ impl DispatchCounters {
     pub fn new() -> Box<Self> {
         // 3 * 256 count slots + 1 current_opcode cell. Allocate via a
         // zeroed Vec<u64> -> Box conversion to avoid a 6 KB stack copy.
-        // SAFETY: `Box<[u64; 3 * 256 + 1]>` has identical layout to
-        // `Box<DispatchCounters>`: both are #[repr(C)] contiguous
+        // SAFETY: A `Box<[u64]>` of exactly 3 * 256 + 1 elements has identical
+        // heap layout to `Box<DispatchCounters>`: both are #[repr(C)] contiguous
         // 6152-byte, 8-byte-aligned allocations (AtomicU64 has the same
         // size/align as u64). Verified in tests/dispatch_counters_layout.rs.
         let zeros: Vec<u64> = vec![0; 3 * 256 + 1];
@@ -451,5 +452,12 @@ mod current_opcode_tests {
         let op = Opcode::from_byte(0).expect("opcode 0 exists");
         let raw = u64::from(op as u8) | CURRENT_OPCODE_SLOW_BIT;
         assert_eq!(decode_current_opcode(raw), Some((op, true)));
+    }
+
+    #[test]
+    fn unknown_byte_decodes_to_none() {
+        // A byte with no opcode discriminant must not panic the sampler.
+        // (Pick a byte that Opcode::from_byte rejects; 0xFF is unused today.)
+        assert_eq!(decode_current_opcode(0xFF), None);
     }
 }
