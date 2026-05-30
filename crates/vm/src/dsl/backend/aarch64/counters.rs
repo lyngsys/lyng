@@ -28,6 +28,13 @@
 //!     str  xT, [xS, #<bank_offset + op*8>]           ; store back
 //! ```
 //!
+//! Additionally, both increment macros (`inc_dispatch_counter!` and
+//! `inc_slow_semantic_counter!`) publish the live opcode byte to the
+//! `current_opcode` cell at offset 6144 off the `DispatchCounters` base
+//! (fast lane = plain opcode byte, slow lane = opcode byte `+ 256`,
+//! i.e. with the 0x100 slow-lane bit set). This is consumed by the
+//! sampling profiler thread via a relaxed atomic load.
+//!
 //! ## Scratch-register convention per bank (DSL-1 Phase 1.B.0 Task 5)
 //!
 //! - **Dispatch bank** (`inc_dispatch_counter!`) uses `x9, x10`. Emitted
@@ -69,6 +76,13 @@ macro_rules! inc_dispatch_counter {
             "str    x10, [x9, #",
             stringify!($opcode_byte),
             " * 8]\n",
+            // Publish the live opcode (fast lane: no slow bit) into the
+            // current_opcode cell at offset 6144. x9 still holds the
+            // DispatchCounters pointer; x10 is free after the store-back.
+            "mov    x10, #",
+            stringify!($opcode_byte),
+            "\n",
+            "str    x10, [x9, #6144]\n",
         )
     };
 }
@@ -92,6 +106,13 @@ macro_rules! inc_slow_semantic_counter {
             "str    x17, [x16, #",
             stringify!($opcode_byte),
             " * 8 + 2048]\n",
+            // Re-publish the live opcode with the slow-lane bit (0x100) so
+            // samples taken while the semantic slow path runs are attributed
+            // to this opcode's slow lane. x16 = DispatchCounters ptr, x17 free.
+            "mov    x17, #",
+            stringify!($opcode_byte),
+            " + 256\n",
+            "str    x17, [x16, #6144]\n",
         )
     };
 }

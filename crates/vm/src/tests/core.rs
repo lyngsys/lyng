@@ -302,6 +302,59 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
 
 #[cfg(feature = "diagnostic-counters")]
 #[test]
+fn current_opcode_cell_is_published_after_a_run() {
+    use std::sync::atomic::Ordering;
+    // Build + run a tiny bytecode unit, then assert the asm dispatch prologue
+    // published at least one opcode (cell moved off the idle sentinel). This
+    // proves the `str [x9, #6144]` fired.
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(17).unwrap(),
+        BytecodeFunctionKind::Script,
+    );
+    builder
+        .alloc_registers(3)
+        .expect("test bytecode registers should allocate");
+    builder
+        .emit_abx(Opcode::LoadOne, 0, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::AddSmi, 1, 0, 41)
+        .expect("test bytecode should build");
+    builder
+        .emit_abc(Opcode::Move, 2, 1, 0)
+        .expect("test bytecode should build");
+    builder
+        .emit_ax(Opcode::Return, 2)
+        .expect("test bytecode should build");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledScriptUnit::new(SourceId::new(17), function.id(), vec![function]);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+    assert_eq!(result, Value::from_smi(42));
+
+    let raw = vm
+        .opcode_counters()
+        .dispatch_banks()
+        .current_opcode_cell()
+        .load(Ordering::Relaxed);
+    assert_ne!(
+        raw,
+        crate::opcode_counts::CURRENT_OPCODE_IDLE,
+        "asm prologue should have published an opcode"
+    );
+}
+
+#[cfg(feature = "diagnostic-counters")]
+#[test]
 fn evaluate_builder_with_opcode_counters_redirects_asm_writes_to_external_store() {
     use lyng_vm::OpcodeCounters;
 
