@@ -192,6 +192,12 @@ pub struct Vm {
     /// `crate::dsl::reg_convention`. Non-zero means a same-thread
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
+    /// Mirror of the executing realm's `global_structure_generation`, read by the asm
+    /// `LoadGlobal` mode-7 hit via `[x22, #VM_GLOBAL_IC_GENERATION_OFFSET]`. MUST equal
+    /// the live env generation at every mode-7 hit: refreshed at run entry and at the
+    /// slow-path-return choke point (`translate_outcome`), so any structural bump during
+    /// a slow path is reflected before asm dispatch resumes.
+    pub(crate) dsl_global_ic_generation: u32,
     pub(crate) tiering: Tiering,
     /// `LLInt` feedback drain optimization: codes whose frames were entered
     /// since the last `drain_llint_scalar_feedback`. Step 1 of the drain
@@ -594,6 +600,7 @@ impl Vm {
             keyed_property_ic_states: Vec::new(),
             global_cell_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
+            dsl_global_ic_generation: 0,
             tiering: Tiering::disabled(),
             executed_codes: Vec::new(),
             code_executed_stamp: Vec::new(),
@@ -699,7 +706,6 @@ impl Vm {
 
     /// Phase C: returns the `MetadataTable` for `code`, or `None` if the
     /// code has not been installed yet.
-    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 1.4")]
     pub fn metadata_table(&self, code: CodeRef) -> Option<&MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get(idx).and_then(|t| t.as_ref())
@@ -707,7 +713,6 @@ impl Vm {
 
     /// Phase C: returns a mutable reference to the `MetadataTable` for `code`,
     /// or `None` if the code has not been installed yet.
-    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 2.x")]
     pub(crate) fn metadata_table_mut(&mut self, code: CodeRef) -> Option<&mut MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get_mut(idx).and_then(|t| t.as_mut())
@@ -1007,6 +1012,52 @@ impl Vm {
     #[inline]
     pub(crate) const fn debug_poll_enabled(&self) -> bool {
         self.debugger.poll_enabled()
+    }
+
+    /// Current value of the asm-read global-IC generation mirror. Used by
+    /// tests to assert coherence with the agent's live generation. (The asm
+    /// mode-7 hit reads the field directly via `VM_GLOBAL_IC_GENERATION_OFFSET`,
+    /// not through this accessor — hence `cfg(test)` until a non-test reader, if
+    /// any, appears.)
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn dsl_global_ic_generation(&self) -> u32 {
+        self.dsl_global_ic_generation
+    }
+
+    /// Prime the baseline generation from the executing realm's global env.
+    /// Called at top-level run entry AFTER global declaration instantiation, so any
+    /// agent-side bumps from instantiation are already captured in the baseline.
+    /// Dispatch-time bumps (delete/defineProperty on the global) are covered by the
+    /// `translate_outcome` slow-path choke point.
+    #[inline]
+    pub(crate) fn prime_global_ic_generation(&mut self, agent: &Agent, global_env: EnvironmentRef) {
+        self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
+    }
+
+    /// Refresh the mirror from the realm of the currently-executing frame, so a
+    /// cross-realm mode-7 hit compares against the correct realm's generation.
+    ///
+    /// `prime_global_ic_generation` sets the baseline from the realm that was active
+    /// at `Vm::run` entry. A cross-realm call (`$262.createRealm` → invoke a function whose
+    /// `[[Realm]]` differs) egresses through `translate_outcome` with the callee
+    /// frame active; deriving the global env from that frame's realm re-primes the
+    /// generation to the executing realm before its first opcode runs.
+    /// No-op (mirror left as-is) if the realm has no resolvable global env.
+    #[inline]
+    pub(crate) fn refresh_global_ic_generation_for_realm(
+        &mut self,
+        agent: &Agent,
+        realm: RealmRef,
+    ) {
+        if let Some(global_env) = agent
+            .heap()
+            .view()
+            .realm(realm)
+            .and_then(|r| r.global_env())
+        {
+            self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
+        }
     }
 
     #[inline]
@@ -1641,6 +1692,15 @@ impl Vm {
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
+
+        // Prime the global-IC generation mirror (read by the asm `LoadGlobal`
+        // mode-7 hit) before dispatch begins. Cache the executing realm's global
+        // env so the slow-path-egress refresh is a Vec index, and set the
+        // baseline generation — which already reflects any declaration-time bumps
+        // from `instantiate_global_script` above. Cheap, not on the asm hot path.
+        if let Some(realm_record) = agent.realm(realm) {
+            self.prime_global_ic_generation(agent, realm_record.global_env());
+        }
 
         let result = self.run(agent, host, registry);
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {

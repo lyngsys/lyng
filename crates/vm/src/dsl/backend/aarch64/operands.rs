@@ -95,6 +95,20 @@ macro_rules! decode_abc_slot {
     };
 }
 
+/// Read the trailing 16-bit feedback slot id of an IC-shaped `Abx`
+/// instruction (`LoadGlobal` / `StoreGlobal` / `AssignGlobal`) into
+/// `w{$dst}`. The narrow encoding is
+/// `[opcode, a, bx_lo, bx_hi, slot_lo, slot_hi]`, so the slot lives at
+/// `[PC + 4]` — the same offset `decode_abc_slot!` reads. Used by the
+/// `op_load_global` mode-7 asm fast read, whose `Abx` decode prologue
+/// only surfaces `a`/`bx`.
+#[macro_export]
+macro_rules! decode_abx_feedback_slot {
+    ($dst:tt) => {
+        concat!("ldrh   w", stringify!($dst), ", [x19, #4]\n",)
+    };
+}
+
 /// Decode `[byte, u16]` — a byte operand followed by a 16-bit operand.
 #[macro_export]
 macro_rules! decode_abx {
@@ -201,6 +215,20 @@ mod tests {
         assert!(
             !asm.contains("ldr    w9, [x19, #1]"),
             "signed i24 decode must not use the 32-bit Ax overread form: {asm}",
+        );
+    }
+
+    #[test]
+    fn decode_abx_feedback_slot_reads_byte_4() {
+        let asm = decode_abx_feedback_slot!(11);
+
+        // The narrow IC-shaped Abx encoding is
+        // `[opcode, a, bx_lo, bx_hi, slot_lo, slot_hi]` (opcode + a + bx = 4
+        // bytes), so the trailing u16 feedback slot lives at byte offset 4.
+        // Pin that offset here: a future Abx layout change must update this.
+        assert!(
+            asm.contains("ldrh   w11, [x19, #4]"),
+            "Abx feedback slot must be read as a u16 from [PC + 4]: {asm}",
         );
     }
 }

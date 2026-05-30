@@ -55,6 +55,12 @@ pub struct LlIntState {
     pub rust_context: *mut LlIntRustContextOpaque,
     pub prefix: u8,
     pub _pad2: [u8; 7],
+    /// Base of the value-cell pointer table (`PrimitiveValueCellRef` →
+    /// record ptr), for the asm mode-7 GlobalCellLoad hit (Task 8).
+    /// Mirrors `object_slots_base`. Populated at trampoline entry from
+    /// `agent.heap().view().value_cell_ptr_table_base()`. Appended at the
+    /// end of the record so existing field offsets stay stable.
+    pub value_cells_base: *const *const lyng_gc::PrimitiveValueCellRecord,
 }
 
 /// Rust-only per-call context the asm trampoline cannot observe
@@ -179,7 +185,26 @@ mod tests {
         assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
         assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
         assert_eq!(r::LLINT_STATE_PREFIX, 80);
-        assert_eq!(core::mem::size_of::<LlIntState>(), 88);
+        // Appended after the scalar block + trailing padding (Task 7):
+        // the value-cell table base for the asm mode-7 GlobalCellLoad hit.
+        assert_eq!(r::LLINT_STATE_VALUE_CELLS_BASE, 88);
+        assert_eq!(core::mem::size_of::<LlIntState>(), 96);
+    }
+
+    #[test]
+    fn value_cells_base_offset_is_pinned() {
+        assert_eq!(
+            core::mem::offset_of!(LlIntState, value_cells_base),
+            r::LLINT_STATE_VALUE_CELLS_BASE
+        );
+    }
+
+    #[test]
+    fn vm_global_ic_generation_offset_is_pinned() {
+        assert_eq!(
+            core::mem::offset_of!(crate::vm::Vm, dsl_global_ic_generation),
+            r::VM_GLOBAL_IC_GENERATION_OFFSET
+        );
     }
 
     #[test]

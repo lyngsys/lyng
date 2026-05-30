@@ -2016,6 +2016,23 @@ impl Vm {
         meta.execution_count = execution_count;
     }
 
+    /// Project a resolved global cell load into asm-readable `PropertyMetadata`
+    /// (`mode 7 = GlobalCellLoad`). `cell_ref_raw` is `PrimitiveValueCellRef::get()`;
+    /// `generation` is the global-IC generation captured at resolution (compared
+    /// against the live Vm mirror on the asm hit). `aux_bits` is unused (0) for mode 7.
+    pub(super) const fn project_global_cell_load_into_meta(
+        cell_ref_raw: u32,
+        generation: u32,
+        execution_count: u32,
+        meta: &mut PropertyMetadata,
+    ) {
+        meta.mode = crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD;
+        meta.generation = generation;
+        meta.handler_bits = cell_ref_raw as u64;
+        meta.aux_bits = 0;
+        meta.execution_count = execution_count;
+    }
+
     /// Project the write-side cache state into `PropertyMetadata`. Called
     /// from the assign opcode's slow-path install when the slot is a
     /// Store-purpose IC site. Writes mode = `LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE`
@@ -3006,5 +3023,31 @@ mod tests {
         assert_eq!(meta.aux_bits, 0);
         assert_eq!(meta.generation, 5);
         assert_eq!(meta.execution_count, 7);
+    }
+}
+
+#[cfg(test)]
+mod global_cell_projection_tests {
+    use super::*;
+    use crate::vm::metadata_table::{PropertyMetadata, LLINT_IC_MODE_GLOBAL_CELL_LOAD};
+
+    #[test]
+    fn project_global_cell_load_writes_mode_7_handler_and_generation() {
+        // Start with dirty (non-zero) fields so the test catches a projection
+        // that zeroes instead of writing (and that aux_bits is actively cleared).
+        let mut meta = PropertyMetadata {
+            mode: 99,
+            handler_bits: 0xdead_beef,
+            aux_bits: 0xcafe,
+            generation: 77,
+            execution_count: 88,
+            ..PropertyMetadata::default()
+        };
+        Vm::project_global_cell_load_into_meta(9, 3, 11, &mut meta);
+        assert_eq!(meta.mode, LLINT_IC_MODE_GLOBAL_CELL_LOAD);
+        assert_eq!(meta.handler_bits, 9); // cell ref raw
+        assert_eq!(meta.generation, 3); // captured generation
+        assert_eq!(meta.execution_count, 11);
+        assert_eq!(meta.aux_bits, 0);
     }
 }

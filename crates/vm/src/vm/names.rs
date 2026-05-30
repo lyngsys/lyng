@@ -5,13 +5,12 @@ use super::{
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
-use crate::vm::dispatch::advance_dispatch_frame;
 use crate::vm::ic_state::GlobalCellTarget;
 use crate::vm::property_access::VmProxyBridge;
 use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
 };
-use lyng_gc::ValueStoreTarget;
+use lyng_gc::{PrimitiveValueCellRef, ValueStoreTarget};
 use lyng_host::HostHooks;
 #[cfg(test)]
 use lyng_host::NoopHostHooks;
@@ -581,11 +580,34 @@ impl Vm {
 
         // COLD/miss install for a cell-backed global-object data entry. Capture
         // the cell now so subsequent hits read it live via `stored_value()`.
+        // Defer the mode-7 metadata projection until after the named-property
+        // slow-path observation below (which projects mode 1-4/0 into the SAME
+        // slot); the Cell projection must have the final say so the asm hit
+        // sees mode 7. ONLY for the Cell target — EnvSlot resolutions never set
+        // mode 7, so the asm bails to the cold path.
+        let mut resolved_cell: Option<(FeedbackSlotId, PrimitiveValueCellRef, u32)> = None;
         if let Some(slot) = feedback_slot
             && let Some(cell) = agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
         {
             let current_gen = agent.global_structure_generation(global);
             self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);
+            // Load-bearing invariant: the deferred mode-7 projection below is
+            // only reached because none of the named-property hit paths
+            // (own-data / polymorphic / proto-data / chain, lines below) can
+            // fire for a cell-backed (dictionary) global —
+            // `plan_named_property_cache_entry` returns `None` for dictionary
+            // receivers, so no named handler is ever installed for a global
+            // site. If a named hit DID fire while `resolved_cell.is_some()` it
+            // would early-return before the projection, leaving the cell IC
+            // installed but the metadata stuck on a named mode (asm would never
+            // hit mode 7). Assert no named own-data handler exists for this site.
+            debug_assert!(
+                self.named_property_own_data_handler(code, feedback_slot)
+                    .is_none(),
+                "cell-backed global also produced a named handler; deferred \
+                 mode-7 projection would be skipped on an early named hit."
+            );
+            resolved_cell = Some((slot, cell, current_gen));
         }
         // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
@@ -657,104 +679,36 @@ impl Vm {
             name,
             lyng_objects::NamedPropertyCachePurpose::Load,
         );
-        Ok(value)
-    }
-
-    pub(crate) fn try_load_global_rust_probe_for_dsl(
-        &mut self,
-        agent: &Agent,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        target: u16,
-        atom_operand: u32,
-        feedback_slot: Option<FeedbackSlotId>,
-    ) -> bool {
-        let Ok(name) = self.read_atom_constant(frame.code(), atom_operand) else {
-            return false;
-        };
-        let Ok(global) = Self::find_global_environment_ref(agent, frame.variable_env()) else {
-            return false;
-        };
-        // Phase 3 global cell IC FAST PATH (probe variant). Only the `Cell`
-        // target is served here — `EnvSlot` needs the mutable-agent TDZ check
-        // and falls through to the semantic `load_global_with_feedback`. The
-        // generation check guards against stale (freed) cells.
-        if let Some(slot) = feedback_slot
-            && let Some(ic) = self.global_cell_ic_state(frame.code(), slot)
-            && ic.structure_gen == agent.global_structure_generation(global)
-            && let GlobalCellTarget::Cell(cell) = ic.target
-            && let Some(record) = agent.heap().view().value_cell(cell)
-        {
-            let value = record.stored_value();
-            self.write_register(frame.registers(), target, value);
-            advance_dispatch_frame(frame, instruction_len);
-            return true;
-        }
-
-        if Self::lookup_global_lexical_binding_ref(agent, global, name).is_some() {
-            return false;
-        }
-        let Some(global_object) = agent.global_environment_object(global) else {
-            return false;
-        };
-
-        if let Some(handler) = self.named_property_own_data_handler(frame.code(), feedback_slot) {
-            let view = agent.heap().view();
-            if let Some(record) = view.object_ref(global_object)
-                && record.shape() == handler.receiver_shape()
-            {
-                let cached_value = match handler.slot_location() {
-                    SlotLocation::Inline(index) => record.inline_named_slot(index as usize),
-                    SlotLocation::OutOfLine(offset) => record
-                        .named_slots()
-                        .and_then(|slots| view.object_slots(slots))
-                        .and_then(|slots| slots.get(offset as usize).copied()),
-                };
-                if let Some(value) = cached_value {
-                    if let Some(slot) = feedback_slot {
-                        self.record_named_property_cache_hit(frame.code(), slot);
-                    }
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return true;
-                }
+        // Project mode-7 metadata for a resolved Cell target AFTER the
+        // named-property slow-path observation, so it overrides any mode 1-4/0
+        // that observation wrote into the same slot and the asm hit (Task 8)
+        // serves the global cell load inline. The execution_count source mirrors
+        // `named_property_install_slow_path` (reads `PropertyIcState`); the
+        // metadata access (`metadata_table_mut` / `property_mut`) matches it.
+        if let Some((slot, cell, current_gen)) = resolved_cell {
+            // SAFETY INVARIANT: `cell` is a cell-backed global entry's value cell,
+            // which is always allocated `AllocationLifetime::LongLived` (tenured)
+            // at `objects/.../named_properties.rs`. The asm mode-7 hit derefs this
+            // cell via the `value_cells_base` table guarded only by the generation
+            // compare; tenuring is what guarantees a bound global's cell is never
+            // young-swept out from under a live mode-7 site (a minor GC neither
+            // bumps the generation nor nulls the table entry). If a future path
+            // ever cell-backs a global with a non-tenured cell, that invariant
+            // breaks. Regression tripwire: `minor_gc_cell_backed_global_value_survives`.
+            let execution_count = self
+                .property_ic_state(code, slot)
+                .map_or(0, |state| state.execution_count);
+            if let Some(table) = self.metadata_table_mut(code) {
+                let meta = table.property_mut(slot.get());
+                Self::project_global_cell_load_into_meta(
+                    cell.get(),
+                    current_gen,
+                    execution_count,
+                    meta,
+                );
             }
         }
-
-        if let Some(value) = self.try_named_property_polymorphic_own_data_load(
-            agent,
-            frame.code(),
-            feedback_slot,
-            global_object,
-        ) {
-            self.write_register(frame.registers(), target, value);
-            advance_dispatch_frame(frame, instruction_len);
-            return true;
-        }
-
-        if let Some(value) = self.try_named_property_proto_data_load(
-            agent,
-            frame.code(),
-            feedback_slot,
-            global_object,
-        ) {
-            self.write_register(frame.registers(), target, value);
-            advance_dispatch_frame(frame, instruction_len);
-            return true;
-        }
-
-        if let Some(value) = self.try_named_property_load_inline_cache_hit(
-            agent,
-            frame.code(),
-            feedback_slot,
-            global_object,
-        ) {
-            self.write_register(frame.registers(), target, value);
-            advance_dispatch_frame(frame, instruction_len);
-            return true;
-        }
-
-        false
+        Ok(value)
     }
 
     #[expect(

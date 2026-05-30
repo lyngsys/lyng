@@ -60,8 +60,9 @@ pub use crate::vm::metadata_table::arith::{
     ARITH_METADATA_STRIDE_SHIFT,
 };
 pub use crate::vm::metadata_table::property::{
-    PROPERTY_METADATA_AUX_BITS_OFFSET, PROPERTY_METADATA_HANDLER_BITS_OFFSET,
-    PROPERTY_METADATA_MODE_OFFSET, PROPERTY_METADATA_STRIDE_SHIFT,
+    PROPERTY_METADATA_AUX_BITS_OFFSET, PROPERTY_METADATA_GENERATION_OFFSET,
+    PROPERTY_METADATA_HANDLER_BITS_OFFSET, PROPERTY_METADATA_MODE_OFFSET,
+    PROPERTY_METADATA_STRIDE_SHIFT,
 };
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_slots_base);
@@ -71,6 +72,11 @@ pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_s
 pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
 pub const LLINT_STATE_FRAME_THIS_VALUE: usize = offset_of!(LlIntState, frame_this_value);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
+// Task 7: value-cell pointer table base, for the asm mode-7
+// GlobalCellLoad hit (Task 8). Mirrors LLINT_STATE_OBJECT_SLOTS_BASE.
+// Populated at trampoline entry (entry.rs::run_via_dsl) from
+// `agent.heap().view().value_cell_ptr_table_base()`.
+pub const LLINT_STATE_VALUE_CELLS_BASE: usize = offset_of!(LlIntState, value_cells_base);
 
 // VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
 // added in DSL-0c to give `poll_safepoint!` a known-zero byte to
@@ -83,6 +89,12 @@ pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
 // bridge never reads through these in DSL-0c; they're declared here
 // so backend macros can name them.
 pub const VM_POLL_PENDING_OFFSET: usize = offset_of!(crate::vm::Vm, dsl_poll_pending);
+// Task 7: byte offset (within `Vm`) of the `dsl_global_ic_generation`
+// u32 mirror (Task 4). The asm mode-7 GlobalCellLoad hit (Task 8) reads
+// it via `[x22, #VM_GLOBAL_IC_GENERATION_OFFSET]` to validate a cached
+// global IC against the live generation. Mirrors VM_POLL_PENDING_OFFSET.
+pub const VM_GLOBAL_IC_GENERATION_OFFSET: usize =
+    offset_of!(crate::vm::Vm, dsl_global_ic_generation);
 pub const VM_OPCODE_COUNTER_OFFSET: usize = 0;
 pub const VM_HEAP_POOL_OFFSET: usize = 0;
 

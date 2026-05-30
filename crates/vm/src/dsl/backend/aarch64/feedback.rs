@@ -73,6 +73,86 @@ macro_rules! branch_named_own_inline_mode {
     };
 }
 
+/// Branch to `$label` unless the metadata-table property entry is a
+/// `GlobalCellLoad` header (mode == 7 — `LLINT_IC_MODE_GLOBAL_CELL_LOAD`).
+/// The packed `handler_bits` carries the 1-based `PrimitiveValueCellRef`
+/// raw u32 in its low 32 bits; `generation` carries the global-IC
+/// generation captured at install. Used by `op_load_global`'s mode-7
+/// asm fast read.
+///
+/// Scratch: x16 (AAPCS64 IP0).
+#[macro_export]
+macro_rules! branch_global_cell_mode {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldrb   w16, [x",
+            stringify!($entry),
+            ", {feedback_mode}]\n",
+            "cmp    w16, #7\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// Branch to `$label` when the cached `metadata.generation` no longer
+/// matches the live `Vm::dsl_global_ic_generation` mirror (x22 = Vm). A
+/// global structural mutation (delete/defineProperty/sloppy-create) bumps
+/// the agent generation, which `translate_outcome` mirrors into the Vm on
+/// every slow egress; a mismatch means the cached cell ref is stale and the
+/// hit must bail to the cold path for re-resolution.
+///
+/// Scratch: x16, x17 (AAPCS64 IP0/IP1).
+#[macro_export]
+macro_rules! branch_global_cell_generation_mismatch {
+    ($entry:tt, $label:tt) => {
+        concat!(
+            "ldr    w16, [x",
+            stringify!($entry),
+            ", {feedback_generation}]\n",
+            "ldr    w17, [x22, {vm_global_ic_gen}]\n",
+            "cmp    w16, w17\n",
+            "b.ne   ",
+            stringify!($label),
+            "\n",
+        )
+    };
+}
+
+/// Load the global cell's stored value into `x{$dst}`. `handler_bits` (low
+/// 32 bits of the metadata entry) is the 1-based `PrimitiveValueCellRef`;
+/// the value-cell pointer table base lives in `LlIntState` (x24 = STATE).
+/// `table[ref]` is a `*const PrimitiveValueCellRecord` (8-byte stride →
+/// `lsl #3`); the stored value sits at `{cell_stored_value}` (= 0) within
+/// the record. A null table entry (freed/republished cell) branches to
+/// `$label` so the cold path re-resolves.
+///
+/// Scratch: x16, x17 (AAPCS64 IP0/IP1).
+#[macro_export]
+macro_rules! load_global_cell_value_or_branch {
+    ($entry:tt => $dst:tt, $label:tt) => {
+        concat!(
+            // (0) handler_bits low 32 bits = 1-based cell ref (zero-extended).
+            "ldr    w16, [x",
+            stringify!($entry),
+            ", {feedback_named_handler_bits}]\n",
+            // (1) value-cell pointer table base from LlIntState (x24).
+            "ldr    x17, [x24, {state_value_cells}]\n",
+            // (2) table[ref] = *const PrimitiveValueCellRecord (8-byte stride).
+            "ldr    x16, [x17, x16, lsl #3]\n",
+            // (3) null entry (freed cell) -> bail to cold path.
+            "cbz    x16, ",
+            stringify!($label),
+            "\n",
+            // (4) load the stored value at record + {cell_stored_value}.
+            "ldr    x",
+            stringify!($dst),
+            ", [x16, {cell_stored_value}]\n",
+        )
+    };
+}
+
 /// Branch to `$label` unless the flat feedback entry is a named
 /// monomorphic one-hop `PrototypeData` inline-slot load header.
 #[macro_export]

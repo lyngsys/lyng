@@ -149,6 +149,32 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         reason = "outcome translation is one state machine over all egress modes; splitting would hide the shared refresh/exit invariants"
     )]
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
+        // Re-sync the asm-read global-IC generation mirror on EVERY slow-stub
+        // egress, before asm dispatch can resume. A global structural mutation
+        // (`delete globalThis.x`, `Object.defineProperty(globalThis, ...)`, sloppy
+        // global creation) runs inside a slow path and bumps the agent's
+        // `global_structure_generation`; the asm `LoadGlobal` mode-7 hit guards a
+        // cached value-cell ref on `metadata.generation == this mirror`, so the
+        // mirror MUST be current before the next possible hit. Refreshing here —
+        // the single choke point all slow returns pass through before asm resumes
+        // — covers all four bump sites uniformly. Cheap: one Vec index + store on
+        // the cached global env (no env-chain walk), only on the cold path. We
+        // refresh on all outcomes (incl. Exit) rather than only the
+        // dispatch-resuming Continue/Refresh arms, so no bump path can slip
+        // through — correctness over saving one branch.
+        if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
+            // Derive the env from the ACTIVE frame's realm, not the cached
+            // entry-realm env: a cross-realm Call egresses here with the callee
+            // frame already pushed onto `vm.frames()`, so re-priming from that
+            // frame's realm makes the mirror track the realm whose code is about
+            // to resume — a mode-7 hit then compares against the correct realm's
+            // generation. No active frame (program exit) → leave the mirror as-is.
+            if let Some(realm) = rust.dispatch.vm.frames().last().map(|f| f.realm()) {
+                rust.dispatch
+                    .vm
+                    .refresh_global_ic_generation_for_realm(rust.dispatch.agent, realm);
+            }
+        }
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
                 // Epoch check — mirrors α's `run_trampoline` loop body
@@ -222,6 +248,12 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
                         rust.dispatch.agent.heap().view().object_slots_ptr_table();
+                    let value_cells_base = rust
+                        .dispatch
+                        .agent
+                        .heap()
+                        .view()
+                        .value_cell_ptr_table_base();
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
@@ -236,6 +268,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
+                        (**state).value_cells_base = value_cells_base;
                     }
                     rust.dispatch.refresh_dsl_poll_pending();
                 }
@@ -312,6 +345,12 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
                         rust.dispatch.agent.heap().view().object_slots_ptr_table();
+                    let value_cells_base = rust
+                        .dispatch
+                        .agent
+                        .heap()
+                        .view()
+                        .value_cell_ptr_table_base();
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.
@@ -340,6 +379,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         (**state).frame_metadata_table_base = mt_base;
                         (**state).object_records_base = object_records_base;
                         (**state).object_slots_base = object_slots_base;
+                        (**state).value_cells_base = value_cells_base;
                         // Phase 1.B.1: refresh the new fields.
                         (**state).frame_const_base = const_base;
                         (**state).frame_this_value = this_value;

@@ -22,6 +22,12 @@ pub struct PropertyMetadata {
 /// `op_assign_named_property` fast path.
 pub const LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE: u8 = 5;
 
+/// Asm IC mode: global cell load. `handler_bits` = the `PrimitiveValueCellRef`
+/// raw u32; `generation` = the global-IC generation captured at install. The asm
+/// hit loads the cell value when `generation` matches the live Vm mirror. Mode 6
+/// is reserved for a future GlobalCellConstant (constant-fold) mode.
+pub const LLINT_IC_MODE_GLOBAL_CELL_LOAD: u8 = 7;
+
 pub const PROPERTY_METADATA_STRIDE: usize = std::mem::size_of::<PropertyMetadata>();
 /// `log2(PROPERTY_METADATA_STRIDE)` — used by asm to scale an in-kind index
 /// to a byte offset within the Property run.
@@ -31,6 +37,11 @@ pub const PROPERTY_METADATA_STRIDE_SHIFT: u32 = 5; // log2(32)
 pub const PROPERTY_METADATA_MODE_OFFSET: usize = offset_of!(PropertyMetadata, mode);
 #[allow(dead_code)]
 pub const PROPERTY_METADATA_GENERATION_OFFSET: usize = offset_of!(PropertyMetadata, generation);
+// The asm mode-7 GlobalCellLoad hit reads `metadata.generation` at this offset
+// (via the `{feedback_generation}` binding, which tracks `offset_of!`). Pin the
+// conceptual value so a field reorder surfaces as a visible, reviewed change
+// rather than a silent asm-offset shift.
+const _: () = assert!(PROPERTY_METADATA_GENERATION_OFFSET == 4);
 #[allow(dead_code)]
 pub const PROPERTY_METADATA_HANDLER_BITS_OFFSET: usize = offset_of!(PropertyMetadata, handler_bits);
 #[allow(dead_code)]

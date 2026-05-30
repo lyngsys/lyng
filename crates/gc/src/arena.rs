@@ -36,6 +36,11 @@ pub struct PrimitiveHeap {
     bigints: SlotArena<PrimitiveBigIntRecord, BigIntRef>,
     bigint_payloads: SideAllocator,
     value_cells: SlotArena<PrimitiveValueCellRecord, PrimitiveValueCellRef>,
+    /// Stable `*const PrimitiveValueCellRecord` per `PrimitiveValueCellRef` (1-based;
+    /// entry 0 unused), mirroring `object_record_ptrs`. The asm mode-7 GlobalCellLoad
+    /// hit indexes this with a cached cell ref to reach the record without calling
+    /// the mutator. Populated on alloc, nulled on free.
+    value_cell_ptrs: Vec<*const PrimitiveValueCellRecord>,
     objects: SlotArena<RuntimeObjectRecord, ObjectRef>,
     object_record_ptrs: Vec<*const RuntimeObjectRecord>,
     object_slot_ptrs: Vec<*const Value>,
@@ -532,11 +537,27 @@ impl PrimitiveHeap {
             std::mem::size_of::<PrimitiveValueCellRecord>(),
             lifetime,
         );
-        self.value_cells.allocate(
+        let id = self.value_cells.allocate(
             PrimitiveValueCellRecord::new(Value::empty_internal_slot(), None),
             lifetime,
             generation,
-        )
+        );
+        let index = id.get() as usize;
+        if self.value_cell_ptrs.len() <= index {
+            self.value_cell_ptrs.resize(index + 1, std::ptr::null());
+        }
+        self.value_cell_ptrs[index] = self.value_cells.get_ptr(id).unwrap_or(std::ptr::null());
+        id
+    }
+
+    #[inline]
+    pub(crate) const fn value_cell_ptr_table(&self) -> *const *const PrimitiveValueCellRecord {
+        self.value_cell_ptrs.as_ptr()
+    }
+
+    #[inline]
+    pub(crate) fn value_cell_ptr_table_slice(&self) -> &[*const PrimitiveValueCellRecord] {
+        &self.value_cell_ptrs
     }
 
     #[inline]
@@ -554,7 +575,20 @@ impl PrimitiveHeap {
         &mut self,
         id: PrimitiveValueCellRef,
     ) -> Option<PrimitiveValueCellRecord> {
-        self.value_cells.free(id)
+        let record = self.value_cells.free(id)?;
+        // Unlike `object_record_ptrs` (not nulled on free — stale entries stay valid
+        // SlotPage memory, overwritten on realloc), `value_cell_ptrs` is nulled eagerly
+        // on free (the `object_slot_ptrs` / `free_object_slots_in` pattern), so a consumer
+        // can treat a null entry as "no live cell". NOTE: the young-gen sweep path
+        // (`value_cells.sweep_young`, ~line 1556) does NOT call this — its closure gets the
+        // record, not the ref — so stale non-null entries survive a minor GC and are
+        // overwritten on reallocation, exactly as `object_record_ptrs` behaves under young
+        // sweep. (Safe for global cells: they are allocated LongLived/tenured, so a bound
+        // global's cell is never young-swept.)
+        if let Some(ptr) = self.value_cell_ptrs.get_mut(id.get() as usize) {
+            *ptr = std::ptr::null();
+        }
+        Some(record)
     }
 
     #[inline]
@@ -684,7 +718,9 @@ impl PrimitiveHeap {
             self.function_payloads.free(function_payload);
         }
         if let Some(ordinary_payload) = record.ordinary_payload() {
-            self.value_cells.free(ordinary_payload);
+            // Route through `free_value_cell` so the value-cell pointer table entry is
+            // nulled alongside the freed cell (mirrors the slot-table null on free).
+            self.free_value_cell(ordinary_payload);
         }
         Some(record)
     }
@@ -1583,6 +1619,7 @@ impl Default for PrimitiveHeap {
             bigints: SlotArena::default(),
             bigint_payloads: SideAllocator::default(),
             value_cells: SlotArena::default(),
+            value_cell_ptrs: Vec::new(),
             objects: SlotArena::default(),
             object_record_ptrs: Vec::new(),
             object_slot_ptrs: Vec::new(),

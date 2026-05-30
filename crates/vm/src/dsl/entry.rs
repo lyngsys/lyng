@@ -102,6 +102,9 @@ pub(crate) fn run_via_dsl(
     let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
     let object_records_base = agent.heap().view().object_record_ptr_table();
     let object_slots_base = agent.heap().view().object_slots_ptr_table();
+    // Task 7: value-cell pointer table base for the asm mode-7
+    // GlobalCellLoad hit (Task 8). Mirrors the object-table bases above.
+    let value_cells_base = agent.heap().view().value_cell_ptr_table_base();
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
@@ -144,6 +147,7 @@ pub(crate) fn run_via_dsl(
         rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
         prefix: 0,
         _pad2: [0; 7],
+        value_cells_base,
     };
 
     // SAFETY: `state` is a valid mutable pointer to a stack-local

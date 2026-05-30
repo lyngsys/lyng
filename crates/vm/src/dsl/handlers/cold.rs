@@ -39,15 +39,17 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    add_smi_overflow, bit_and_smi, branch, branch_if_internal_kind, branch_if_nullish_kind,
+    add_smi_overflow, bit_and_smi, branch, branch_global_cell_generation_mismatch,
+    branch_global_cell_mode, branch_if_internal_kind, branch_if_nullish_kind,
     branch_if_object_kind, branch_if_string_or_bigint_kind, branch_named_own_inline_mode,
     branch_named_own_inline_write_mode, branch_named_own_outline_mode,
     branch_named_own_polymorphic_mode, branch_named_proto_inline_mode, branch_nonzero,
     branch_raw_equal_strict_result, branch_value_references_heap, call_rust_probe, call_slow,
     check_object_ref, check_smi, cmp_branch_eq, cmp_branch_ne, dec_smi_overflow, decode_a,
-    decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_ax, dispatch, dispatch_after_slow,
-    dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc, load_constant, load_feedback_site,
-    load_local_fixed, load_named_aux_bits, load_named_handler_bits, load_named_handler_shape,
+    decode_ab, decode_abc, decode_abc_slot, decode_abx, decode_abx_feedback_slot, decode_ax,
+    dispatch, dispatch_after_slow, dispatch_probe_hit_no_refresh, inc_smi_overflow, load_acc,
+    load_constant, load_feedback_site, load_global_cell_value_or_branch, load_local_fixed,
+    load_named_aux_bits, load_named_handler_bits, load_named_handler_shape,
     load_named_inline_slot_index_or_branch, load_named_inline_writable_slot_index_or_branch,
     load_named_outline_slot_index_or_branch, load_named_target_shape,
     load_object_record_from_state_or_branch, load_outline_slot, load_record_inline_slot,
@@ -476,67 +478,25 @@ pub extern "C" fn op_assign_env_slot_slow_rs(
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_load_global_dsl, opcode_byte = 14, layout = Abx, length = 6, |a, bx| {
-        call_rust_probe!(op_load_global_rust_probe_rs, args = [a, bx]);
-        branch_nonzero!(0, .slow);
-        dispatch_probe_hit_no_refresh!();
+        // Mode-7 GlobalCellLoad fast read. The cold path
+        // (`load_global_with_feedback` → mode-7 projection) installs the
+        // cell ref + captured global-IC generation into this slot's
+        // PropertyMetadata; the asm hit serves the load inline, skipping
+        // the probe CALL entirely. The `Abx` decode prologue surfaces
+        // `a`/`bx` only, so read the trailing feedback slot id from
+        // [PC + 4] directly.
+        decode_abx_feedback_slot!(t1);
+        load_feedback_site!(t1 => t0);
+        branch_global_cell_mode!(t0, .slow);
+        branch_global_cell_generation_mismatch!(t0, .slow);
+        load_global_cell_value_or_branch!(t0 => t2, .slow);
+        store_reg!(a, t2);
+        dispatch!();
         .slow:
-        // The Rust probe can clobber caller-saved operand registers.
         decode_abx!(a, bx);
         call_slow!(op_load_global_slow_rs, args = [a, bx]);
         dispatch_after_slow!();
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-#[allow(unused_variables)]
-#[unsafe(no_mangle)]
-pub extern "C" fn op_load_global_rust_probe_rs(
-    state: *mut crate::dsl::llint_state::LlIntState,
-    a: u32,
-    bx: u32,
-) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: `state` is the live trampoline state pointer supplied by
-    // the asm bridge for the duration of this helper call.
-    let rust_context = unsafe {
-        &mut *(*state)
-            .rust_context
-            .cast::<crate::dsl::llint_state::LlIntRustContext<'_>>()
-    };
-    let dispatch = &mut rust_context.dispatch;
-    // Keep the Rust frame snapshot aligned with the asm PC before
-    // invoking the VM-side IC helper. This mirrors `sync_from_asm`
-    // without constructing the full slow-path wrapper.
-    let entry_pc = unsafe { (*state).frame_pc_offset };
-    dispatch.frame.set_instruction_offset(entry_pc);
-    let feedback_slot = {
-        let bytes = dispatch.installed.function().instruction_bytes();
-        let offset = (entry_pc + 4) as usize;
-        let lo = u32::from(bytes.get(offset).copied().unwrap_or(0));
-        let hi = u32::from(bytes.get(offset + 1).copied().unwrap_or(0));
-        lyng_types::FeedbackSlotId::from_raw(lo | (hi << 8))
-    };
-    let hit = dispatch.vm.try_load_global_rust_probe_for_dsl(
-        dispatch.agent,
-        &mut dispatch.frame,
-        6,
-        a as u16,
-        bx,
-        feedback_slot,
-    );
-    if hit {
-        let next_pc = dispatch.frame.instruction_offset();
-        // SAFETY: same live-state guarantee as above. Probe hits use
-        // the no-refresh dispatch contract, so only the PC mirror is
-        // updated for later slow paths; pinned REGS/FV stay live.
-        unsafe {
-            (*state).frame_pc_offset = next_pc;
-        }
-        return crate::dsl::slow_path::SlowPathReturn {
-            tag: crate::dsl::slow_path::SlowPathTag::Continue as u64,
-            payload: u64::from(next_pc),
-        };
-    }
-    crate::dsl::slow_path::SlowPathReturn { tag: 1, payload: 0 }
 }
 
 #[cfg(target_arch = "aarch64")]

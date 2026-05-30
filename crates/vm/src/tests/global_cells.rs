@@ -127,8 +127,9 @@ fn global_lexical_tdz_preserved() {
 
 use crate::vm::ic_state::GlobalCellTarget;
 
-/// Helper: the feedback slot of the (first) `NamedPropertyLoad` site in the
-/// script entry function — the `LoadGlobal` site for the trailing global read.
+/// Helper: the feedback slot of the last (trailing) `NamedPropertyLoad` site in
+/// the script entry function — the `LoadGlobal` site for the trailing global
+/// read (the `.rev().find(...)` walk returns the last site).
 fn entry_named_load_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
     let entry = unit.function(unit.entry()).unwrap();
     entry
@@ -166,6 +167,58 @@ fn load_global_var_hits_cell_ic() {
         matches!(ic.target, GlobalCellTarget::Cell(_)),
         "global `var` should cache a Cell target, got {:?}",
         ic.target
+    );
+}
+
+/// Task 5: when the cold path resolves a `LoadGlobal` site to a `Cell` target it
+/// must project mode-7 metadata into the site's `PropertyMetadata` so a future
+/// asm hit can serve the load inline. `var g = 7; g; g` resolves the trailing
+/// load to a Cell; the load site's metadata must carry mode 7, a non-zero cell
+/// ref in `handler_bits`, and the live (captured) generation.
+#[test]
+fn cold_path_cell_resolution_projects_mode_7_metadata() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD;
+
+    let unit = compile_test_unit(7205, "var g = 7; g; g");
+    let slot = entry_named_load_slot(&unit);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(7));
+
+    // The cold-path resolution must have cached a Cell target...
+    let ic = vm
+        .global_cell_ic_state(installed.code(), slot)
+        .expect("global cell IC should be installed for the var load site");
+    assert!(
+        matches!(ic.target, GlobalCellTarget::Cell(_)),
+        "global `var` should cache a Cell target, got {:?}",
+        ic.target
+    );
+
+    // ...and projected mode-7 metadata into the load site.
+    let meta = *vm
+        .metadata_table(installed.code())
+        .expect("metadata table should be installed for the script code")
+        .property(slot.get());
+    assert_eq!(
+        meta.mode, LLINT_IC_MODE_GLOBAL_CELL_LOAD,
+        "Cell resolution must project mode 7 into the load site metadata"
+    );
+    assert_ne!(meta.handler_bits, 0, "cell ref must be projected");
+    assert_eq!(
+        meta.generation,
+        vm.dsl_global_ic_generation(),
+        "captured generation must equal the live mirror (no structural change)"
     );
 }
 
@@ -353,5 +406,286 @@ fn delete_of_cell_backed_global_bumps_structure_generation() {
             .cell_backed_entry(global_object, PropertyKey::from_atom(x_name))
             .is_none(),
         "the cell-backed entry should be gone after delete"
+    );
+}
+
+/// Task 4: the Vm-side global-IC generation mirror must equal the live agent
+/// generation after a script that triggers a structural global bump. Here a
+/// sloppy global creation + `delete x` both bump the generation through the
+/// slow path; after the run the mirror (refreshed at the slow-path choke point
+/// and re-primed at every run entry) must match.
+#[test]
+fn vm_global_ic_generation_mirror_tracks_structural_bumps() {
+    let unit = compile_test_unit(7300, "var g = 1; delete globalThis.g; g = 2; g");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        agent.global_structure_generation(global_env),
+        "after a structural-bumping script the mirror must equal the live generation"
+    );
+    // And the bump actually happened (the mirror is not coherent by being a
+    // trivial 0 == 0 — the generation moved off its initial value).
+    assert!(
+        agent.global_structure_generation(global_env) > 0,
+        "the delete should have bumped the live generation above the baseline"
+    );
+}
+
+/// Task 4 BACKSTOP: runtime `Object.defineProperty(globalThis, ...)` AND
+/// `delete globalThis.x` performed mid-dispatch (inside the executed script,
+/// from a function body that runs after earlier reads) must keep the mirror
+/// coherent with the live generation through the slow-path choke point, and
+/// reads must return the correct post-mutation values. This is the whole point:
+/// a stale-low mirror at an asm mode-7 hit would dereference a freed/reused
+/// value cell.
+#[test]
+fn mirror_stays_coherent_across_runtime_define_and_delete() {
+    let unit = compile_test_unit(
+        7301,
+        "
+        var g = 5;
+        var r0 = g;                         // read 5
+        Object.defineProperty(globalThis, 'g', { value: 6, writable: true, configurable: true });
+        var r1 = g;                         // must read 6
+        delete globalThis.g;
+        g = 7;                              // recreate sloppy global
+        var r2 = g;                         // must read 7
+        r0 * 100 + r1 * 10 + r2             // 5*100 + 6*10 + 7 = 567
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .expect("runtime define/delete script should complete");
+
+    // Reads observed the correct values across the define + delete + recreate.
+    assert_eq!(
+        result,
+        Value::from_smi(567),
+        "reads must observe 5 -> 6 (defineProperty) -> 7 (delete + recreate)"
+    );
+    // The mirror is coherent with the live generation after the run — the
+    // slow-path choke point re-synced it after each structural mutation.
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        agent.global_structure_generation(global_env),
+        "mirror must equal the live generation after runtime define + delete"
+    );
+}
+
+/// Task 4: the mirror is primed at run entry, so after a run that pre-declares
+/// several globals (whose instantiation bumps the structure generation) the
+/// mirror equals the live generation — and crucially is NOT left at 0.
+#[test]
+fn baseline_global_ic_generation_primed_at_entry() {
+    let mut src = String::new();
+    for i in 0..8 {
+        writeln!(src, "var v{i} = {i};").unwrap();
+    }
+    src.push_str("v0 + v7");
+    let unit = compile_test_unit(7302, &src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let live = agent.global_structure_generation(global_env);
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        live,
+        "the mirror must be primed at run entry to the live generation"
+    );
+    assert!(
+        live > 0,
+        "pre-declared globals should have bumped the generation during instantiation, \
+         so the primed baseline is non-zero (proving priming actually ran)"
+    );
+}
+
+/// Task 6 GUARD: serving a mode-7 (cell-backed) global read via the probe's thin
+/// fast path must remain correct across:
+///  - a plain warmed read (fast read returns the value),
+///  - a reassignment with no structural change (generation unchanged → the live
+///    cell read reflects the new value),
+///  - a structural change (delete + re-`var`) that bumps the generation, so the
+///    fast read MUST bail and re-resolve rather than serve a stale cell.
+///
+/// Encodes each read into the script result: `a` (=5) read after warming, `b`
+/// (=6) read after a plain reassignment, `c` (=7) read after delete+recreate.
+/// `a*100 + b*10 + c == 567` proves all three reads observed the correct live
+/// value. Passes on the pre-refactor code too (it is a correctness guard).
+#[test]
+fn mode_7_fast_read_returns_correct_value_through_mutation_and_invalidation() {
+    let src = "var g = 5; g; var a = g;\n\
+               g = 6; var b = g;\n\
+               delete globalThis.g; var g = 7; var c = g;\n\
+               a * 100 + b * 10 + c";
+    let unit = compile_test_unit(7303, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        result,
+        Value::from_smi(567),
+        "mode-7 reads must be live across reassignment (5->6, no gen bump) and \
+         re-resolve after a structural delete+recreate (gen bump → 7), not serve a stale cell"
+    );
+}
+
+/// Task 8 ASM STALENESS (a, delete+recreate): warm a mode-7 site through a
+/// function called twice, then `delete globalThis.g` + recreate the global
+/// with a NEW value. The asm hit's generation guard must bail on the bump and
+/// re-resolve, so the post-recreate read observes the new value — never the
+/// stale (freed) cell. Distinct from the trailing-load variant above by
+/// driving the warm reads through a called function (the canonical mode-7
+/// warming shape).
+#[test]
+fn asm_mode_7_bails_on_delete_recreate() {
+    let src = "var g = 11; function r(){ return g; } var w0 = r(); r();\n\
+               delete globalThis.g; var g = 22; var w1 = r();\n\
+               w0 * 1000 + w1";
+    let unit = compile_test_unit(7310, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    // w0 == 11 (warmed read), w1 == 22 (after delete+recreate, re-resolved).
+    assert_eq!(
+        result,
+        Value::from_smi(11_022),
+        "after delete+recreate the warmed asm mode-7 site must re-resolve to the new value, not serve a stale cell"
+    );
+}
+
+/// Task 8 ASM STALENESS (b, data→accessor): warm a mode-7 data-cell site, then
+/// `Object.defineProperty(globalThis, 'g', { get() {...} })` to convert the
+/// data global into an accessor. This bumps the structure generation, so the
+/// next read MUST bail out of the cached cell and invoke the getter — returning
+/// the getter's value, not the stale data cell's value.
+#[test]
+fn asm_mode_7_bails_on_data_to_accessor_redefine() {
+    let src = "var g = 5; function r(){ return g; } var w0 = r(); r();\n\
+               Object.defineProperty(globalThis, 'g', { get() { return 99; }, configurable: true });\n\
+               var w1 = r();\n\
+               w0 * 1000 + w1";
+    let unit = compile_test_unit(7311, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    // w0 == 5 (warmed data read), w1 == 99 (getter result after data→accessor).
+    assert_eq!(
+        result,
+        Value::from_smi(5_099),
+        "data→accessor redefine must invalidate the cached cell so the read invokes the getter (99), not the stale data value"
+    );
+}
+
+/// Task 8 ASM STALENESS (c, let-shadow): warm a mode-7 site reading a `var`
+/// global from one unit, then evaluate a second unit that declares a global
+/// `let` of the same name (shadowing the object property). Installing a global
+/// lexical binding that shadows the cell-backed property bumps the structure
+/// generation, so a subsequent read from a third unit must re-resolve to the
+/// lexical binding's value rather than serve the stale data cell.
+#[test]
+fn asm_mode_7_bails_on_global_let_shadow() {
+    let warm = compile_test_unit(7312, "var s = 1; s; s");
+    let shadow = compile_test_unit(7313, "let s = 2;");
+    let read = compile_test_unit(7314, "s");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+
+    // Warm: `var s = 1` then two reads install + warm the mode-7 site.
+    let warm_installed = vm.install_script(agent, realm.id(), &warm).unwrap();
+    let warm_result = vm
+        .evaluate_installed(
+            agent,
+            warm_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+    assert_eq!(
+        warm_result,
+        Value::from_smi(1),
+        "warmed var read should see 1"
+    );
+
+    // Shadow: a global `let s = 2` shadows the var/property binding (gen bump).
+    vm.evaluate_script(agent, realm, &shadow).run().unwrap();
+
+    // Read from a fresh unit: must resolve to the lexical binding (2), not the
+    // stale data cell (1).
+    let read_installed = vm.install_script(agent, realm.id(), &read).unwrap();
+    let read_result = vm
+        .evaluate_installed(
+            agent,
+            read_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        read_result,
+        Value::from_smi(2),
+        "after a global `let` shadows the var binding, the read must re-resolve to the lexical value (2), not the stale cell (1)"
     );
 }
