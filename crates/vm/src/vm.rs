@@ -717,7 +717,6 @@ impl Vm {
 
     /// Phase C: returns the `MetadataTable` for `code`, or `None` if the
     /// code has not been installed yet.
-    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 1.4")]
     pub fn metadata_table(&self, code: CodeRef) -> Option<&MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get(idx).and_then(|t| t.as_ref())
@@ -725,7 +724,6 @@ impl Vm {
 
     /// Phase C: returns a mutable reference to the `MetadataTable` for `code`,
     /// or `None` if the code has not been installed yet.
-    #[allow(dead_code, reason = "Phase C accessor surface; consumed from Task 2.x")]
     pub(crate) fn metadata_table_mut(&mut self, code: CodeRef) -> Option<&mut MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get_mut(idx).and_then(|t| t.as_mut())

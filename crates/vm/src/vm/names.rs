@@ -592,6 +592,22 @@ impl Vm {
         {
             let current_gen = agent.global_structure_generation(global);
             self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);
+            // Load-bearing invariant: the deferred mode-7 projection below is
+            // only reached because none of the named-property hit paths
+            // (own-data / polymorphic / proto-data / chain, lines below) can
+            // fire for a cell-backed (dictionary) global —
+            // `plan_named_property_cache_entry` returns `None` for dictionary
+            // receivers, so no named handler is ever installed for a global
+            // site. If a named hit DID fire while `resolved_cell.is_some()` it
+            // would early-return before the projection, leaving the cell IC
+            // installed but the metadata stuck on a named mode (asm would never
+            // hit mode 7). Assert no named own-data handler exists for this site.
+            debug_assert!(
+                self.named_property_own_data_handler(code, feedback_slot)
+                    .is_none(),
+                "cell-backed global also produced a named handler; deferred \
+                 mode-7 projection would be skipped on an early named hit."
+            );
             resolved_cell = Some((slot, cell, current_gen));
         }
         // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):

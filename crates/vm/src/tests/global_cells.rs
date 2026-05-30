@@ -127,8 +127,9 @@ fn global_lexical_tdz_preserved() {
 
 use crate::vm::ic_state::GlobalCellTarget;
 
-/// Helper: the feedback slot of the (first) `NamedPropertyLoad` site in the
-/// script entry function — the `LoadGlobal` site for the trailing global read.
+/// Helper: the feedback slot of the last (trailing) `NamedPropertyLoad` site in
+/// the script entry function — the `LoadGlobal` site for the trailing global
+/// read (the `.rev().find(...)` walk returns the last site).
 fn entry_named_load_slot(unit: &CompiledScriptUnit) -> FeedbackSlotId {
     let entry = unit.function(unit.entry()).unwrap();
     entry
