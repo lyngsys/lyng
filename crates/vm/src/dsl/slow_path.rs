@@ -149,6 +149,24 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         reason = "outcome translation is one state machine over all egress modes; splitting would hide the shared refresh/exit invariants"
     )]
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
+        // Re-sync the asm-read global-IC generation mirror on EVERY slow-stub
+        // egress, before asm dispatch can resume. A global structural mutation
+        // (`delete globalThis.x`, `Object.defineProperty(globalThis, ...)`, sloppy
+        // global creation) runs inside a slow path and bumps the agent's
+        // `global_structure_generation`; the asm `LoadGlobal` mode-7 hit guards a
+        // cached value-cell ref on `metadata.generation == this mirror`, so the
+        // mirror MUST be current before the next possible hit. Refreshing here —
+        // the single choke point all slow returns pass through before asm resumes
+        // — covers all four bump sites uniformly. Cheap: one Vec index + store on
+        // the cached global env (no env-chain walk), only on the cold path. We
+        // refresh on all outcomes (incl. Exit) rather than only the
+        // dispatch-resuming Continue/Refresh arms, so no bump path can slip
+        // through — correctness over saving one branch.
+        if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
+            rust.dispatch
+                .vm
+                .refresh_global_ic_generation(rust.dispatch.agent);
+        }
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
                 // Epoch check — mirrors α's `run_trampoline` loop body

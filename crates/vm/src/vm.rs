@@ -192,6 +192,15 @@ pub struct Vm {
     /// `crate::dsl::reg_convention`. Non-zero means a same-thread
     /// incremental-mark step or debugger pause is pending.
     pub(crate) dsl_poll_pending: u8,
+    /// Mirror of the executing realm's `global_structure_generation`, read by the asm
+    /// `LoadGlobal` mode-7 hit via `[x22, #VM_GLOBAL_IC_GENERATION_OFFSET]`. MUST equal
+    /// the live env generation at every mode-7 hit: refreshed at run entry and at the
+    /// slow-path-return choke point (`translate_outcome`), so any structural bump during
+    /// a slow path is reflected before asm dispatch resumes.
+    pub(crate) dsl_global_ic_generation: u32,
+    /// The executing realm's global environment, cached at run entry so the mirror
+    /// refresh is a Vec index (no env-chain walk). `None` until the first run sets it.
+    dsl_global_env: Option<EnvironmentRef>,
     pub(crate) tiering: Tiering,
     /// `LLInt` feedback drain optimization: codes whose frames were entered
     /// since the last `drain_llint_scalar_feedback`. Step 1 of the drain
@@ -594,6 +603,8 @@ impl Vm {
             keyed_property_ic_states: Vec::new(),
             global_cell_ic_states: HashMap::new(),
             dsl_poll_pending: 0,
+            dsl_global_ic_generation: 0,
+            dsl_global_env: None,
             tiering: Tiering::disabled(),
             executed_codes: Vec::new(),
             code_executed_stamp: Vec::new(),
@@ -1007,6 +1018,32 @@ impl Vm {
     #[inline]
     pub(crate) const fn debug_poll_enabled(&self) -> bool {
         self.debugger.poll_enabled()
+    }
+
+    /// Current value of the asm-read global-IC generation mirror. Used by
+    /// tests to assert coherence with the agent's live generation. (The asm
+    /// mode-7 hit reads the field directly via `VM_GLOBAL_IC_GENERATION_OFFSET`,
+    /// not through this accessor — hence `cfg(test)` until a non-test reader, if
+    /// any, appears.)
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn dsl_global_ic_generation(&self) -> u32 {
+        self.dsl_global_ic_generation
+    }
+
+    /// Refresh the mirror from the agent's live generation for the cached global env.
+    /// No-op if the global env isn't cached yet. Cheap: one Vec index + store.
+    #[inline]
+    pub(crate) fn refresh_global_ic_generation(&mut self, agent: &Agent) {
+        if let Some(env) = self.dsl_global_env {
+            self.dsl_global_ic_generation = agent.global_structure_generation(env);
+        }
+    }
+
+    /// Cache the executing realm's global env and set the baseline generation.
+    pub(crate) fn prime_global_ic_generation(&mut self, agent: &Agent, global_env: EnvironmentRef) {
+        self.dsl_global_env = Some(global_env);
+        self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
     }
 
     #[inline]
@@ -1641,6 +1678,15 @@ impl Vm {
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
+
+        // Prime the global-IC generation mirror (read by the asm `LoadGlobal`
+        // mode-7 hit) before dispatch begins. Cache the executing realm's global
+        // env so the slow-path-egress refresh is a Vec index, and set the
+        // baseline generation — which already reflects any declaration-time bumps
+        // from `instantiate_global_script` above. Cheap, not on the asm hot path.
+        if let Some(realm_record) = agent.realm(realm) {
+            self.prime_global_ic_generation(agent, realm_record.global_env());
+        }
 
         let result = self.run(agent, host, registry);
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {

@@ -355,3 +355,122 @@ fn delete_of_cell_backed_global_bumps_structure_generation() {
         "the cell-backed entry should be gone after delete"
     );
 }
+
+/// Task 4: the Vm-side global-IC generation mirror must equal the live agent
+/// generation after a script that triggers a structural global bump. Here a
+/// sloppy global creation + `delete x` both bump the generation through the
+/// slow path; after the run the mirror (refreshed at the slow-path choke point
+/// and re-primed at every run entry) must match.
+#[test]
+fn vm_global_ic_generation_mirror_tracks_structural_bumps() {
+    let unit = compile_test_unit(7300, "var g = 1; delete globalThis.g; g = 2; g");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        agent.global_structure_generation(global_env),
+        "after a structural-bumping script the mirror must equal the live generation"
+    );
+    // And the bump actually happened (the mirror is not coherent by being a
+    // trivial 0 == 0 — the generation moved off its initial value).
+    assert!(
+        agent.global_structure_generation(global_env) > 0,
+        "the delete should have bumped the live generation above the baseline"
+    );
+}
+
+/// Task 4 BACKSTOP: runtime `Object.defineProperty(globalThis, ...)` AND
+/// `delete globalThis.x` performed mid-dispatch (inside the executed script,
+/// from a function body that runs after earlier reads) must keep the mirror
+/// coherent with the live generation through the slow-path choke point, and
+/// reads must return the correct post-mutation values. This is the whole point:
+/// a stale-low mirror at an asm mode-7 hit would dereference a freed/reused
+/// value cell.
+#[test]
+fn mirror_stays_coherent_across_runtime_define_and_delete() {
+    let unit = compile_test_unit(
+        7301,
+        "
+        var g = 5;
+        var r0 = g;                         // read 5
+        Object.defineProperty(globalThis, 'g', { value: 6, writable: true, configurable: true });
+        var r1 = g;                         // must read 6
+        delete globalThis.g;
+        g = 7;                              // recreate sloppy global
+        var r2 = g;                         // must read 7
+        r0 * 100 + r1 * 10 + r2             // 5*100 + 6*10 + 7 = 567
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .expect("runtime define/delete script should complete");
+
+    // Reads observed the correct values across the define + delete + recreate.
+    assert_eq!(
+        result,
+        Value::from_smi(567),
+        "reads must observe 5 -> 6 (defineProperty) -> 7 (delete + recreate)"
+    );
+    // The mirror is coherent with the live generation after the run — the
+    // slow-path choke point re-synced it after each structural mutation.
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        agent.global_structure_generation(global_env),
+        "mirror must equal the live generation after runtime define + delete"
+    );
+}
+
+/// Task 4: the mirror is primed at run entry, so after a run that pre-declares
+/// several globals (whose instantiation bumps the structure generation) the
+/// mirror equals the live generation — and crucially is NOT left at 0.
+#[test]
+fn baseline_global_ic_generation_primed_at_entry() {
+    let mut src = String::new();
+    for i in 0..8 {
+        writeln!(src, "var v{i} = {i};").unwrap();
+    }
+    src.push_str("v0 + v7");
+    let unit = compile_test_unit(7302, &src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let live = agent.global_structure_generation(global_env);
+    assert_eq!(
+        vm.dsl_global_ic_generation(),
+        live,
+        "the mirror must be primed at run entry to the live generation"
+    );
+    assert!(
+        live > 0,
+        "pre-declared globals should have bumped the generation during instantiation, \
+         so the primed baseline is non-zero (proving priming actually ran)"
+    );
+}
