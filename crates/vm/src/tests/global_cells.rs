@@ -169,6 +169,58 @@ fn load_global_var_hits_cell_ic() {
     );
 }
 
+/// Task 5: when the cold path resolves a `LoadGlobal` site to a `Cell` target it
+/// must project mode-7 metadata into the site's `PropertyMetadata` so a future
+/// asm hit can serve the load inline. `var g = 7; g; g` resolves the trailing
+/// load to a Cell; the load site's metadata must carry mode 7, a non-zero cell
+/// ref in `handler_bits`, and the live (captured) generation.
+#[test]
+fn cold_path_cell_resolution_projects_mode_7_metadata() {
+    use crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD;
+
+    let unit = compile_test_unit(7205, "var g = 7; g; g");
+    let slot = entry_named_load_slot(&unit);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(7));
+
+    // The cold-path resolution must have cached a Cell target...
+    let ic = vm
+        .global_cell_ic_state(installed.code(), slot)
+        .expect("global cell IC should be installed for the var load site");
+    assert!(
+        matches!(ic.target, GlobalCellTarget::Cell(_)),
+        "global `var` should cache a Cell target, got {:?}",
+        ic.target
+    );
+
+    // ...and projected mode-7 metadata into the load site.
+    let meta = *vm
+        .metadata_table(installed.code())
+        .expect("metadata table should be installed for the script code")
+        .property(slot.get());
+    assert_eq!(
+        meta.mode, LLINT_IC_MODE_GLOBAL_CELL_LOAD,
+        "Cell resolution must project mode 7 into the load site metadata"
+    );
+    assert_ne!(meta.handler_bits, 0, "cell ref must be projected");
+    assert_eq!(
+        meta.generation,
+        vm.dsl_global_ic_generation(),
+        "captured generation must equal the live mirror (no structural change)"
+    );
+}
+
 /// A global lexical binding read from a *different* compilation unit lowers to
 /// `LoadGlobal` (cross-unit references resolve as `ResolutionKind::Global`), so
 /// the cell IC should cache an `EnvSlot` target. (Same-unit lexical reads lower

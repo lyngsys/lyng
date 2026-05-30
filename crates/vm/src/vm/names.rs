@@ -11,7 +11,7 @@ use crate::vm::property_access::VmProxyBridge;
 use lyng_env::{
     EnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord, ObjectEnvironmentRecord,
 };
-use lyng_gc::ValueStoreTarget;
+use lyng_gc::{PrimitiveValueCellRef, ValueStoreTarget};
 use lyng_host::HostHooks;
 #[cfg(test)]
 use lyng_host::NoopHostHooks;
@@ -581,11 +581,18 @@ impl Vm {
 
         // COLD/miss install for a cell-backed global-object data entry. Capture
         // the cell now so subsequent hits read it live via `stored_value()`.
+        // Defer the mode-7 metadata projection until after the named-property
+        // slow-path observation below (which projects mode 1-4/0 into the SAME
+        // slot); the Cell projection must have the final say so the asm hit
+        // sees mode 7. ONLY for the Cell target — EnvSlot resolutions never set
+        // mode 7, so the asm bails to the cold path.
+        let mut resolved_cell: Option<(FeedbackSlotId, PrimitiveValueCellRef, u32)> = None;
         if let Some(slot) = feedback_slot
             && let Some(cell) = agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
         {
             let current_gen = agent.global_structure_generation(global);
             self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);
+            resolved_cell = Some((slot, cell, current_gen));
         }
         // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):
         // packed-handler load, shape compare, epoch compare, slot read. Bypasses
@@ -657,6 +664,26 @@ impl Vm {
             name,
             lyng_objects::NamedPropertyCachePurpose::Load,
         );
+        // Project mode-7 metadata for a resolved Cell target AFTER the
+        // named-property slow-path observation, so it overrides any mode 1-4/0
+        // that observation wrote into the same slot and the asm hit (Task 8)
+        // serves the global cell load inline. The execution_count source mirrors
+        // `named_property_install_slow_path` (reads `PropertyIcState`); the
+        // metadata access (`metadata_table_mut` / `property_mut`) matches it.
+        if let Some((slot, cell, current_gen)) = resolved_cell {
+            let execution_count = self
+                .property_ic_state(code, slot)
+                .map_or(0, |state| state.execution_count);
+            if let Some(table) = self.metadata_table_mut(code) {
+                let meta = table.property_mut(slot.get());
+                Self::project_global_cell_load_into_meta(
+                    cell.get(),
+                    current_gen,
+                    execution_count,
+                    meta,
+                );
+            }
+        }
         Ok(value)
     }
 
