@@ -4612,6 +4612,126 @@ fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
     );
 }
 
+// Companion to the test above, but for the `Object.defineProperty` write path
+// rather than a plain assignment. `Object.defineProperty(F, 'prototype', ...)`
+// funnels through `Agent::define_own_property` (with the Vm as `vm_dispatch`),
+// so this test specifically exercises the `define_own_property` fire site — the
+// assignment site is never reached here. Without it, removing the
+// `define_own_property` fire leaves all other tests green (the behavior guards
+// pass via the slow path regardless).
+
+#[test]
+fn defining_function_prototype_clears_registered_construct_ic_slot() {
+    // Script 1: warm up the construct IC for F's `new` site and return F.
+    let warmup = compile_test_unit(
+        70_020,
+        r"
+            function F() {}
+            for (var i = 0; i < 4; i = i + 1) {
+                new F();
+            }
+            F;
+        ",
+    );
+    let construct_slot = warmup
+        .function(warmup.entry())
+        .expect("entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Construct)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a construct site for `new F()`");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let warmup_installed = vm.install_script(agent, realm.id(), &warmup).unwrap();
+
+    let f_value = vm
+        .evaluate_installed(
+            agent,
+            warmup_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+    let f = f_value
+        .as_object_ref()
+        .expect("script should return the constructor F");
+
+    let code = warmup_installed.code();
+    let status = vm
+        .construct_status(code, construct_slot)
+        .expect("entry code should expose a construct status");
+    assert_eq!(
+        status.state,
+        FeedbackInlineCacheState::Monomorphic,
+        "construct IC should be monomorphic after warming up `new F()`",
+    );
+    assert!(
+        status.callee.is_some(),
+        "monomorphic construct IC must expose a cached constructor entry",
+    );
+    let generation = status.generation;
+
+    // Manually register a ConstructIcClear watchpoint on F's per-constructor set.
+    agent
+        .objects_mut()
+        .construct_prototype_watchpoint_mut(f)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::ConstructIcClear {
+                code,
+                slot: construct_slot,
+                generation,
+            },
+        })
+        .expect("register on fresh per-constructor set must succeed");
+
+    // Script 2 on the SAME realm/global env: redefine F.prototype through
+    // `Object.defineProperty` (NOT a plain assignment). The value-write keeps
+    // F's shape stable, so this exercises the `define_own_property` fire site.
+    let redefine = compile_test_unit(
+        70_021,
+        r"Object.defineProperty(F, 'prototype', { value: {}, writable: true, configurable: false });",
+    );
+    let redefine_installed = vm.install_script(agent, realm.id(), &redefine).unwrap();
+    vm.evaluate_installed(
+        agent,
+        redefine_installed,
+        realm.global_env(),
+        realm.global_env(),
+    )
+    .run()
+    .unwrap();
+
+    // The watchpoint must have fired and eagerly cleared the construct IC slot.
+    let cleared = vm
+        .construct_status(code, construct_slot)
+        .expect("construct status should still project after clear");
+    assert_eq!(
+        cleared.state,
+        FeedbackInlineCacheState::Uninitialized,
+        "Object.defineProperty on F.prototype must eager-clear the construct IC slot",
+    );
+    assert!(
+        cleared.callee.is_none() && cleared.entries.is_empty(),
+        "cleared construct IC slot must drop its cached constructor entry",
+    );
+
+    // The per-constructor watchpoint set must now be Invalidated (drained).
+    assert_eq!(
+        agent
+            .objects()
+            .construct_prototype_watchpoint_inspect(f)
+            .expect("set entry must still exist after fire")
+            .state(),
+        WatchpointState::Invalidated,
+        "the per-constructor watchpoint set must be Invalidated after firing",
+    );
+}
+
 // -----------------------------------------------------------------------------
 // asm monomorphic-write fast path intercepts hot loop writes
 // -----------------------------------------------------------------------------

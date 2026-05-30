@@ -393,7 +393,13 @@ impl Agent {
         // here (proxy-chain assignments / `Reflect.set`). The plain non-proxy
         // assignment slow path stores via the objects-layer define and fires
         // separately at its VM dispatch site.
-        self.fire_construct_prototype_watchpoint_if_function_prototype(id, key, vm_dispatch);
+        //
+        // Gated on `Ok(true)` (the define actually applied) for consistency with
+        // the global-structure-generation bump below: a rejected/no-op define
+        // touching the `prototype` key must not spuriously drain the watchpoint.
+        if matches!(result, Ok(true)) {
+            self.fire_construct_prototype_watchpoint_if_function_prototype(id, key, vm_dispatch);
+        }
         // A `[[DefineOwnProperty]]` on a realm's global object can change a
         // binding's kind (data <-> accessor) or replace its backing cell —
         // structural changes that must invalidate any per-site global cell IC.
