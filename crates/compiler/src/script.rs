@@ -81,8 +81,8 @@ mod tests;
 pub use function::compile_script;
 
 use activation::{
-    build_function_activation_plan, collect_arguments_owners, parent_function_for,
-    FunctionActivationPlan, ParameterBindingIndex,
+    build_function_activation_plan, collect_arguments_owners, collect_arrow_child_parents,
+    parent_function_for, FunctionActivationPlan, ParameterBindingIndex,
 };
 use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
 pub use state::CompilationState;

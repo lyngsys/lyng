@@ -59,6 +59,9 @@ impl Analyzer<'_> {
 
         self.scopes.get_mut(scope).bindings.push(id);
         self.scope_binding_names.insert(key, id);
+        if kind == DeclarationKind::Function {
+            self.function_binding_scopes.insert(key);
+        }
         id
     }
 

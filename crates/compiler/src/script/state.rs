@@ -1,6 +1,7 @@
 use super::{
     build_function_activation_plan, checked_u32_index, collect_arguments_owners,
-    parent_function_for, ArgumentsMode, AtomId, AtomTable, BuiltinFunctionId, BytecodeBuilder,
+    collect_arrow_child_parents, parent_function_for, ArgumentsMode, AtomId, AtomTable,
+    BuiltinFunctionId, BytecodeBuilder,
     BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId,
     CompiledAtom, Decl, DeclId, DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit,
     FunctionActivationPlan, FunctionId, FunctionKind, FunctionSemaId, HashMap, HashSet,
@@ -188,6 +189,7 @@ impl<'a> CompilationState<'a> {
             })
             .collect::<LoweringResult<Vec<_>>>()?;
         let arguments_owners = collect_arguments_owners(program, sema, &parent_functions);
+        let arrow_child_parents = collect_arrow_child_parents(program, sema, &parent_functions);
         let parameter_bindings = ParameterBindingIndex::build(sema);
         let activation_plans = sema
             .function_table
@@ -197,12 +199,11 @@ impl<'a> CompilationState<'a> {
             .map(|(index, record)| {
                 build_function_activation_plan(
                     program,
-                    sema,
                     FunctionSemaId::new(checked_u32_index(index)),
                     record,
                     &arguments_owners,
-                    &parent_functions,
                     &parameter_bindings,
+                    &arrow_child_parents,
                 )
             })
             .collect::<Vec<_>>();

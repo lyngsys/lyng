@@ -80,6 +80,11 @@ pub struct Analyzer<'a> {
     /// O(1) name-to-binding lookup per scope, avoiding O(n) linear scans
     /// in `declare_binding` and `declare_var_binding`.
     scope_binding_names: HashMap<(ScopeId, AtomId), SemanticBindingId>,
+    /// `(scope, name)` pairs for every `Function`-kind binding declared.
+    /// Lets `walk_function` decide declaration-vs-expression in O(1) instead of
+    /// scanning the parent scope's binding list (O(n) per function → O(n^2) for
+    /// declaration-heavy scripts).
+    function_binding_scopes: HashSet<(ScopeId, AtomId)>,
 }
 
 #[derive(Clone, Copy)]
@@ -144,6 +149,7 @@ impl<'a> Analyzer<'a> {
             diagnostics: DiagnosticList::new(),
             suppressed_function_name_bindings: HashSet::new(),
             scope_binding_names: HashMap::new(),
+            function_binding_scopes: HashSet::new(),
             ctx: WalkContext {
                 current_scope: global_scope,
                 current_function: None,
@@ -191,6 +197,7 @@ impl<'a> Analyzer<'a> {
             diagnostics: DiagnosticList::new(),
             suppressed_function_name_bindings: HashSet::new(),
             scope_binding_names: HashMap::new(),
+            function_binding_scopes: HashSet::new(),
             ctx: WalkContext {
                 current_scope: module_scope,
                 current_function: None,

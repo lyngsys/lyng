@@ -143,23 +143,29 @@ fn nearest_non_arrow_owner_for(
     None
 }
 
-fn has_direct_arrow_child_for(
+/// Set of functions that have at least one direct arrow-function child.
+///
+/// Built once per program (one pass over the function table) so
+/// `build_function_activation_plan` can answer "does this function have a
+/// direct arrow child?" in O(1); the previous per-function `.any()` scan made
+/// activation-plan construction O(N^2) in the function count.
+pub(super) fn collect_arrow_child_parents(
     program: ProgramSource<'_>,
     sema: ProgramSemaView<'_>,
     parent_functions: &[Option<FunctionSemaId>],
-    parent: FunctionSemaId,
-) -> bool {
-    sema.function_table
-        .as_slice()
-        .iter()
-        .enumerate()
-        .any(|(index, record)| {
-            parent_functions[index] == Some(parent)
-                && matches!(
-                    program.ast.get_function(record.function_id).kind,
-                    FunctionKind::Arrow | FunctionKind::AsyncArrow
-                )
-        })
+) -> HashSet<FunctionSemaId> {
+    let mut parents = HashSet::new();
+    for (index, record) in sema.function_table.as_slice().iter().enumerate() {
+        if matches!(
+            program.ast.get_function(record.function_id).kind,
+            FunctionKind::Arrow | FunctionKind::AsyncArrow
+        ) {
+            if let Some(parent) = parent_functions[index] {
+                parents.insert(parent);
+            }
+        }
+    }
+    parents
 }
 
 fn resolved_arguments_binding_shadows_owner(
@@ -281,12 +287,11 @@ impl ParameterBindingIndex {
 
 pub(super) fn build_function_activation_plan(
     program: ProgramSource<'_>,
-    sema: ProgramSemaView<'_>,
     sema_id: FunctionSemaId,
     record: &lyng_sema::FunctionSemaRecord,
     arguments_owners: &HashSet<FunctionSemaId>,
-    parent_functions: &[Option<FunctionSemaId>],
     parameter_bindings: &ParameterBindingIndex,
+    arrow_child_parents: &HashSet<FunctionSemaId>,
 ) -> FunctionActivationPlan {
     let ast_function = program.ast.get_function(record.function_id).clone();
     let has_parameter_expressions = function_has_parameter_expressions(program.ast, &ast_function);
@@ -338,6 +343,6 @@ pub(super) fn build_function_activation_plan(
             || record.has_with
             || arguments_mode != ArgumentsMode::None
             || ast_function.params.rest.is_some()
-            || has_direct_arrow_child_for(program, sema, parent_functions, sema_id),
+            || arrow_child_parents.contains(&sema_id),
     }
 }
