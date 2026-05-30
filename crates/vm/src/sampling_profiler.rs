@@ -14,6 +14,10 @@
 //! joins the sampler thread; `Drop` is a safety net that also signals + joins
 //! if `stop` was not called. Construct the profiler AFTER the counters and
 //! drop it BEFORE them (natural lexical scope order in the bench driver).
+//!
+//! Because the sampler sleeps for `interval` after each observation, `stop`
+//! (and `Drop`) may block for up to one `interval` while the thread wakes to
+//! observe the stop flag.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -55,6 +59,7 @@ impl SampleHistogram {
 
     /// Merge another histogram into this one (used to sum across samples).
     pub fn merge(&mut self, other: &Self) {
+        debug_assert_eq!(self.fast.len(), other.fast.len());
         for index in 0..self.fast.len() {
             self.fast[index] = self.fast[index].saturating_add(other.fast[index]);
             self.slow[index] = self.slow[index].saturating_add(other.slow[index]);
@@ -117,10 +122,16 @@ pub struct SamplingProfiler {
 impl SamplingProfiler {
     /// Start sampling `cell` every `interval`.
     ///
-    /// See the module-level safety contract: `cell` must outlive the profiler,
-    /// and the profiler must be stopped/dropped before the cell is freed.
+    /// # Safety
+    /// `cell` must remain valid (not moved or freed) until `stop()` returns or
+    /// this profiler is dropped. The sampler thread reads `cell` through a raw
+    /// pointer that outlives the borrow. See the module-level safety contract.
     #[must_use]
-    pub fn start(cell: &AtomicU64, interval: Duration) -> Self {
+    pub unsafe fn start(cell: &AtomicU64, interval: Duration) -> Self {
+        debug_assert!(
+            interval > Duration::ZERO,
+            "zero interval would spin; pass >= 1µs"
+        );
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
         let ptr = CellPtr(cell as *const AtomicU64);
@@ -181,11 +192,14 @@ mod tests {
 
     fn sample_constant_cell(value: u64) -> SampleHistogram {
         let cell = AtomicU64::new(value);
-        let profiler = SamplingProfiler::start(&cell, Duration::from_millis(1));
+        // SAFETY: `cell` lives on this stack frame and is kept alive (via the
+        // black_box below) until after `stop()` joins the sampler thread.
+        let profiler = unsafe { SamplingProfiler::start(&cell, Duration::from_millis(1)) };
         // Let the sampler take several ticks against a constant cell.
         std::thread::sleep(Duration::from_millis(40));
         let hist = profiler.stop();
-        // Keep `cell` alive until after stop() joined the thread.
+        // black_box must come AFTER stop() to stop the optimizer from sinking
+        // cell's drop before the thread join.
         std::hint::black_box(&cell);
         hist
     }
