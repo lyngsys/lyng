@@ -4408,3 +4408,74 @@ fn cell_backed_redefine_preserves_cell_identity_on_overwrite() {
         "non-cell-backed object must store a plain Data entry"
     );
 }
+
+// T9 — per-constructor .prototype watchpoint fires and returns ConstructIcClear observer
+#[test]
+fn construct_prototype_watchpoint_fires_and_collects_observer() {
+    use crate::watchpoint::{ShapeInvalidationObserver, Watchpoint, WatchpointState};
+    use lyng_types::FeedbackSlotId;
+    let mut heap = PrimitiveHeap::new();
+    let mut runtime = ObjectRuntime::new();
+    let mut mutator = heap.mutator();
+
+    // Allocate a shape and an object to serve as the constructor.
+    let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
+    let ctor = runtime.alloc_object(
+        &mut mutator,
+        ObjectAllocation::ordinary(shape),
+        AllocationLifetime::Default,
+    );
+
+    // Construct a CodeRef and FeedbackSlotId the same way existing tests do.
+    let code = CodeRef::from_raw(7).expect("non-zero");
+    let slot = FeedbackSlotId::from_raw(3).expect("non-zero");
+    let generation: u32 = 1;
+
+    // Register a ConstructIcClear watchpoint on the per-constructor set.
+    runtime
+        .construct_prototype_watchpoint_mut(ctor)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::ConstructIcClear {
+                code,
+                slot,
+                generation,
+            },
+        })
+        .expect("register on fresh set must succeed");
+
+    // The set must now be Watched.
+    assert_eq!(
+        runtime
+            .construct_prototype_watchpoint_inspect(ctor)
+            .expect("set must exist")
+            .state(),
+        WatchpointState::Watched,
+    );
+
+    // Fire: take_fired_construct_prototype_watchpoints drains the set.
+    let fired = runtime.take_fired_construct_prototype_watchpoints(ctor);
+
+    // Must return exactly the ConstructIcClear observer we registered.
+    assert_eq!(fired.len(), 1);
+    assert!(
+        matches!(
+            &fired[0],
+            Watchpoint::ShapeInvalidation {
+                observer: ShapeInvalidationObserver::ConstructIcClear {
+                    generation: g,
+                    ..
+                },
+            } if *g == generation
+        ),
+        "fired watchpoint must be ConstructIcClear with matching generation"
+    );
+
+    // The set must now be Invalidated.
+    assert_eq!(
+        runtime
+            .construct_prototype_watchpoint_inspect(ctor)
+            .expect("set entry must still exist after fire")
+            .state(),
+        WatchpointState::Invalidated,
+    );
+}

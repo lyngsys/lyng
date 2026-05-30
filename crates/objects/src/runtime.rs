@@ -58,6 +58,7 @@ pub struct ObjectRuntime {
     pub(crate) root_shapes: HashMap<RootShapeKey, ShapeId>,
     pub(crate) next_private_brand_raw: u32,
     pub(crate) watchpoint_sets: HashMap<ShapeId, WatchpointSet>,
+    pub(crate) construct_prototype_watchpoints: HashMap<ObjectRef, WatchpointSet>,
     pub(crate) shapes_with_proto_transitions: HashSet<ShapeId>,
     /// Side-buffer for the test-only `Recording` watchpoint observer. Always
     /// present (cross-crate test visibility); production code never constructs
@@ -1283,6 +1284,8 @@ impl ObjectRuntime {
     /// state. Called post-GC or after a shape invalidation sweep.
     pub fn sweep_invalidated_watchpoint_sets(&mut self) {
         self.watchpoint_sets.retain(|_, set| !set.is_invalidated());
+        self.construct_prototype_watchpoints
+            .retain(|_, set| !set.is_invalidated());
     }
 
     /// Called by the post-mark GC sweep. For every shape that has a populated
@@ -1324,6 +1327,38 @@ impl ObjectRuntime {
     /// cross-crate tests in `lyng-env`) to assert post-fire state.
     pub fn watchpoint_sets_inspect(&self, shape: ShapeId) -> Option<&WatchpointSet> {
         self.watchpoint_sets.get(&shape)
+    }
+
+    /// Returns a mutable reference to the per-constructor `WatchpointSet`,
+    /// lazily creating an empty set on the first access.
+    pub fn construct_prototype_watchpoint_mut(&mut self, ctor: ObjectRef) -> &mut WatchpointSet {
+        self.construct_prototype_watchpoints
+            .entry(ctor)
+            .or_default()
+    }
+
+    /// Read-only accessor for a constructor's per-prototype `WatchpointSet`.
+    pub fn construct_prototype_watchpoint_inspect(
+        &self,
+        ctor: ObjectRef,
+    ) -> Option<&WatchpointSet> {
+        self.construct_prototype_watchpoints.get(&ctor)
+    }
+
+    /// Drains and returns the watchpoint list for the given constructor's
+    /// per-prototype set, marking it `Invalidated`. Returns an empty `Vec`
+    /// when no set exists or the set is already `Invalidated`.
+    ///
+    /// The VM/agent calls this and dispatches the returned `ConstructIcClear`
+    /// observers in Task 3.
+    pub fn take_fired_construct_prototype_watchpoints(
+        &mut self,
+        ctor: ObjectRef,
+    ) -> Vec<Watchpoint> {
+        self.construct_prototype_watchpoints
+            .get_mut(&ctor)
+            .and_then(WatchpointSet::drain_for_fire)
+            .unwrap_or_default()
     }
 
     /// Drain all tokens accumulated into `recording_watchpoint_fires`. Primarily
