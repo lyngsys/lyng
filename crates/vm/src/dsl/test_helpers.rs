@@ -266,6 +266,9 @@ impl DslHarness {
             rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
             prefix: 0,
             _pad2: [0; 7],
+            // Task 7: harness doesn't exercise the value-cell table base;
+            // a null placeholder is safe (nothing under test reads it).
+            value_cells_base: core::ptr::null(),
         };
 
         // SAFETY: `state` lives on this stack frame for the duration
