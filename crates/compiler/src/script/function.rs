@@ -52,6 +52,13 @@ fn derive_global_script_instantiation_plan(
     let mut lexical_bindings = Vec::new();
     let mut function_names = Vec::new();
     let mut var_names = Vec::new();
+    // Dedup by interned `AtomId` rather than by resolved string. Names are
+    // interned, so equal strings share an `AtomId`; this keeps the plan O(N) in
+    // the number of global declarations instead of O(N^2) (one linear scan per
+    // declaration), while preserving insertion order.
+    let mut seen_functions = HashSet::new();
+    let mut seen_vars = HashSet::new();
+    let mut seen_lexical = HashSet::new();
 
     for &binding_id in &global_scope.bindings {
         let binding = sema.binding_table.get(binding_id);
@@ -60,12 +67,20 @@ fn derive_global_script_instantiation_plan(
         }
         match binding.kind {
             DeclarationKind::Function => {
-                push_unique_name(&mut function_names, atoms.resolve(binding.name));
+                if seen_functions.insert(binding.name) {
+                    function_names.push(atoms.resolve(binding.name).to_owned().into_boxed_str());
+                }
             }
-            DeclarationKind::Var => push_unique_name(&mut var_names, atoms.resolve(binding.name)),
+            DeclarationKind::Var => {
+                if seen_vars.insert(binding.name) {
+                    var_names.push(atoms.resolve(binding.name).to_owned().into_boxed_str());
+                }
+            }
             kind if kind.is_lexical() => {
                 let name = atoms.resolve(binding.name);
-                push_unique_name(&mut lexical_names, name);
+                if seen_lexical.insert(binding.name) {
+                    lexical_names.push(name.to_owned().into_boxed_str());
+                }
                 lexical_bindings.push(GlobalLexicalBindingPlan::new(
                     name,
                     compilation.runtime_slot_for_binding(binding_id)?,
@@ -83,15 +98,8 @@ fn derive_global_script_instantiation_plan(
     ))
 }
 
-fn push_unique_name(names: &mut Vec<Box<str>>, name: &str) {
-    if !names.iter().any(|candidate| candidate.as_ref() == name) {
-        names.push(name.to_owned().into_boxed_str());
-    }
-}
-
 impl<'a, 'b> FunctionCompiler<'a, 'b> {
     pub(super) fn for_root(state: &'b mut CompilationState<'a>, entry: BytecodeFunctionId) -> Self {
-        let binding_count = state.sema.binding_table.len();
         let root_needs_environment = state.root_needs_environment();
         let root_kind = match state.program.kind {
             ProgramRootKind::Script => BytecodeFunctionKind::Script,
@@ -106,7 +114,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         builder.set_needs_environment(root_needs_environment);
         builder.set_environment_bindings(state.root_environment_bindings().to_vec());
         let root_scope = ScopeId::new(0);
-        let scope_count = state.sema.scope_table.len();
 
         Self {
             state,
@@ -115,8 +122,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             current_function_ast: None,
             current_scope: root_scope,
             body_scope: root_scope,
-            scope_child_cursors: vec![0; scope_count],
-            local_registers: vec![None; binding_count],
+            scope_child_cursors: HashMap::new(),
+            local_registers: HashMap::new(),
             atom_constants: HashMap::new(),
             float_constants: HashMap::new(),
             builtin_constants: HashMap::new(),
@@ -157,7 +164,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         sema_id: FunctionSemaId,
         id: BytecodeFunctionId,
     ) -> LoweringResult<Self> {
-        let binding_count = state.sema.binding_table.len();
         let function_record = state
             .sema
             .function_table
@@ -231,7 +237,6 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             .param_scope
             .unwrap_or(function_record.scope_root);
         let body_scope = function_record.scope_root;
-        let scope_count = state.sema.scope_table.len();
         let in_class_field_initializer =
             state.class_field_initializer_functions.contains(&function);
         let active_direct_eval_scopes = state
@@ -247,8 +252,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             current_function_ast: Some(function),
             current_scope,
             body_scope,
-            scope_child_cursors: vec![0; scope_count],
-            local_registers: vec![None; binding_count],
+            scope_child_cursors: HashMap::new(),
+            local_registers: HashMap::new(),
             atom_constants: HashMap::new(),
             float_constants: HashMap::new(),
             builtin_constants: HashMap::new(),
@@ -402,7 +407,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 && self.binding(binding_id)?.storage_class == StorageClass::FrameLocal
                 && activation.arguments_mode != ArgumentsMode::Mapped
             {
-                self.local_registers[binding_id.raw() as usize] = Some(register);
+                self.local_registers.insert(binding_id, register);
             }
         }
 

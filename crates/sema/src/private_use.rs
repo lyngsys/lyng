@@ -1,5 +1,7 @@
 //! Resolved private-name uses keyed by expression site.
 
+use std::collections::HashMap;
+
 use lyng_ast::ExprId;
 use lyng_common::AtomId;
 
@@ -52,9 +54,15 @@ impl PrivateUseRecord {
 }
 
 /// Table of resolved private-name uses.
+///
+/// `by_expr` indexes `records` by `expr` so `for_expr` is O(1); the bytecode
+/// lowerer calls it once per private-name reference, so a linear scan would
+/// make compilation O(N^2) in the number of references. Each private-name node
+/// produces at most one record, so the mapping is a bijection.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PrivateUseTable {
     records: Vec<PrivateUseRecord>,
+    by_expr: HashMap<ExprId, usize>,
 }
 
 impl PrivateUseTable {
@@ -65,12 +73,14 @@ impl PrivateUseTable {
 
     #[inline]
     pub fn alloc(&mut self, record: PrivateUseRecord) {
+        self.by_expr.insert(record.expr(), self.records.len());
         self.records.push(record);
     }
 
     #[inline]
     pub fn for_expr(&self, expr: ExprId) -> Option<&PrivateUseRecord> {
-        self.records.iter().find(|record| record.expr() == expr)
+        let index = *self.by_expr.get(&expr)?;
+        Some(&self.records[index])
     }
 
     #[inline]

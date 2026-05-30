@@ -234,24 +234,49 @@ pub(super) fn collect_arguments_owners(
     owners
 }
 
-fn find_parameter_binding_for_plan(
-    sema: ProgramSemaView<'_>,
-    owner: FunctionSemaId,
-    name: AtomId,
-    used: &HashSet<SemanticBindingId>,
-) -> Option<SemanticBindingId> {
-    sema.binding_table
-        .as_slice()
-        .iter()
-        .enumerate()
-        .find_map(|(index, binding)| {
-            let id = SemanticBindingId::new(checked_u32_index(index));
-            (binding.kind == DeclarationKind::Parameter
-                && binding.name == name
-                && sema.scope_table.get(binding.scope).owning_function == Some(owner)
-                && !used.contains(&id))
-            .then_some(id)
-        })
+/// Index of parameter bindings keyed by `(owning function, name)`.
+///
+/// Built once per program so `build_function_activation_plan` can resolve each
+/// parameter in O(1) instead of scanning the whole binding table per parameter
+/// (which made activation-plan construction O(N^2) in the program's binding
+/// count). Binding ids are stored in ascending binding-table order, so picking
+/// the first not-yet-used id reproduces the original linear scan's choice when
+/// a function repeats a parameter name.
+pub(super) struct ParameterBindingIndex {
+    by_owner_name: HashMap<(FunctionSemaId, AtomId), Vec<SemanticBindingId>>,
+}
+
+impl ParameterBindingIndex {
+    pub(super) fn build(sema: ProgramSemaView<'_>) -> Self {
+        let mut by_owner_name: HashMap<(FunctionSemaId, AtomId), Vec<SemanticBindingId>> =
+            HashMap::new();
+        for (index, binding) in sema.binding_table.as_slice().iter().enumerate() {
+            if binding.kind != DeclarationKind::Parameter {
+                continue;
+            }
+            let Some(owner) = sema.scope_table.get(binding.scope).owning_function else {
+                continue;
+            };
+            by_owner_name
+                .entry((owner, binding.name))
+                .or_default()
+                .push(SemanticBindingId::new(checked_u32_index(index)));
+        }
+        Self { by_owner_name }
+    }
+
+    fn find(
+        &self,
+        owner: FunctionSemaId,
+        name: AtomId,
+        used: &HashSet<SemanticBindingId>,
+    ) -> Option<SemanticBindingId> {
+        self.by_owner_name
+            .get(&(owner, name))?
+            .iter()
+            .copied()
+            .find(|id| !used.contains(id))
+    }
 }
 
 pub(super) fn build_function_activation_plan(
@@ -261,6 +286,7 @@ pub(super) fn build_function_activation_plan(
     record: &lyng_sema::FunctionSemaRecord,
     arguments_owners: &HashSet<FunctionSemaId>,
     parent_functions: &[Option<FunctionSemaId>],
+    parameter_bindings: &ParameterBindingIndex,
 ) -> FunctionActivationPlan {
     let ast_function = program.ast.get_function(record.function_id).clone();
     let has_parameter_expressions = function_has_parameter_expressions(program.ast, &ast_function);
@@ -288,8 +314,7 @@ pub(super) fn build_function_activation_plan(
         let Pattern::Identifier { name, .. } = program.ast.get_pattern(pattern).clone() else {
             continue;
         };
-        if let Some(binding) = find_parameter_binding_for_plan(sema, sema_id, name, &used_bindings)
-        {
+        if let Some(binding) = parameter_bindings.find(sema_id, name, &used_bindings) {
             used_bindings.insert(binding);
             parameter_ordinals.insert(binding, u16::try_from(ordinal).unwrap_or(u16::MAX));
         }
@@ -299,7 +324,7 @@ pub(super) fn build_function_activation_plan(
         let Pattern::Identifier { name, .. } = program.ast.get_pattern(pattern).clone() else {
             return None;
         };
-        find_parameter_binding_for_plan(sema, sema_id, name, &used_bindings)
+        parameter_bindings.find(sema_id, name, &used_bindings)
     });
 
     FunctionActivationPlan {

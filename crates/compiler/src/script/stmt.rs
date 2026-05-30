@@ -44,7 +44,8 @@ impl FunctionCompiler<'_, '_> {
             .clone();
         let cursor = self
             .scope_child_cursors
-            .get_mut(self.current_scope.raw() as usize)?;
+            .entry(self.current_scope)
+            .or_insert(0);
         while *cursor < children.len() {
             let scope_id = children[*cursor];
             *cursor += 1;
@@ -63,9 +64,11 @@ impl FunctionCompiler<'_, '_> {
             .get(self.current_scope)
             .children
             .clone();
-        let mut cursor = *self
+        let mut cursor = self
             .scope_child_cursors
-            .get(self.current_scope.raw() as usize)?;
+            .get(&self.current_scope)
+            .copied()
+            .unwrap_or(0);
         while cursor < children.len() {
             let scope_id = children[cursor];
             cursor += 1;

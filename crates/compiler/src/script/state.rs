@@ -4,8 +4,9 @@ use super::{
     BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId,
     CompiledAtom, Decl, DeclId, DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit,
     FunctionActivationPlan, FunctionId, FunctionKind, FunctionSemaId, HashMap, HashSet,
-    LoweringError, LoweringResult, NonZeroU32, Pattern, ProgramRootKind, ProgramSemaView,
-    ProgramSource, ScopeId, ScopeKind, SemanticBindingId, Span, Stmt, StorageClass, WellKnownAtom,
+    LoweringError, LoweringResult, NonZeroU32, ParameterBindingIndex, Pattern, ProgramRootKind,
+    ProgramSemaView, ProgramSource, ScopeId, ScopeKind, SemanticBindingId, Span, Stmt,
+    StorageClass, WellKnownAtom,
 };
 
 struct ComputedEnvironmentLayouts {
@@ -124,6 +125,11 @@ pub struct CompilationState<'a> {
     pub(super) seen_atoms: HashSet<AtomId>,
     pub(super) functions: Vec<BytecodeFunction>,
     pub(super) ast_to_sema: HashMap<FunctionId, FunctionSemaId>,
+    // All binding ids sharing a given name, in ascending-id order. The named
+    // binding lookups (`find_named_binding*`) filter this small per-name list by
+    // scope/owner/kind instead of scanning the whole binding table, which made
+    // those lookups O(N) each and compilation O(N^2) for declaration-heavy code.
+    pub(super) binding_ids_by_name: HashMap<AtomId, Vec<SemanticBindingId>>,
     pub(super) parent_functions: Vec<Option<FunctionSemaId>>,
     pub(super) arguments_owners: HashSet<FunctionSemaId>,
     pub(super) activation_plans: Vec<FunctionActivationPlan>,
@@ -160,6 +166,13 @@ impl<'a> CompilationState<'a> {
                 )
             })
             .collect::<HashMap<_, _>>();
+        let mut binding_ids_by_name: HashMap<AtomId, Vec<SemanticBindingId>> = HashMap::new();
+        for (index, binding) in sema.binding_table.as_slice().iter().enumerate() {
+            binding_ids_by_name
+                .entry(binding.name)
+                .or_default()
+                .push(SemanticBindingId::new(checked_u32_index(index)));
+        }
         let parent_functions = sema
             .function_table
             .as_slice()
@@ -175,6 +188,7 @@ impl<'a> CompilationState<'a> {
             })
             .collect::<LoweringResult<Vec<_>>>()?;
         let arguments_owners = collect_arguments_owners(program, sema, &parent_functions);
+        let parameter_bindings = ParameterBindingIndex::build(sema);
         let activation_plans = sema
             .function_table
             .as_slice()
@@ -188,6 +202,7 @@ impl<'a> CompilationState<'a> {
                     record,
                     &arguments_owners,
                     &parent_functions,
+                    &parameter_bindings,
                 )
             })
             .collect::<Vec<_>>();
@@ -216,6 +231,7 @@ impl<'a> CompilationState<'a> {
             seen_atoms: HashSet::new(),
             functions: Vec::new(),
             ast_to_sema,
+            binding_ids_by_name,
             parent_functions,
             arguments_owners,
             activation_plans,
@@ -1451,8 +1467,11 @@ pub(super) struct FunctionCompiler<'a, 'b> {
     pub(super) current_function_ast: Option<FunctionId>,
     pub(super) current_scope: ScopeId,
     pub(super) body_scope: ScopeId,
-    pub(super) scope_child_cursors: Vec<usize>,
-    pub(super) local_registers: Vec<Option<u16>>,
+    // Keyed by global `ScopeId`/`SemanticBindingId` but sparse — only the scopes
+    // and bindings this function touches get entries. Dense program-sized `Vec`s
+    // here made compiling a program O(functions * program size), i.e. O(N^2).
+    pub(super) scope_child_cursors: HashMap<ScopeId, usize>,
+    pub(super) local_registers: HashMap<SemanticBindingId, u16>,
     pub(super) atom_constants: HashMap<AtomId, u32>,
     pub(super) float_constants: HashMap<u64, u32>,
     pub(super) builtin_constants: HashMap<BuiltinFunctionId, u32>,

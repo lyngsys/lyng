@@ -1,5 +1,5 @@
 use super::{
-    checked_u32_index, ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan,
+    ArgumentsMode, AtomId, DeclarationKind, ExprId, FunctionActivationPlan,
     FunctionCompiler, FunctionId, FunctionKind, FunctionSemaId, LoweringError, LoweringResult,
     Pattern, ResolutionKind, ScopeId, ScopeKind, SemanticBindingId, StorageClass, UseSiteRecord,
     WellKnownAtom,
@@ -48,19 +48,11 @@ impl FunctionCompiler<'_, '_> {
         name: AtomId,
         expected_kind: DeclarationKind,
     ) -> LoweringResult<SemanticBindingId> {
-        let mut matches = self
-            .state
-            .sema
-            .binding_table
-            .as_slice()
-            .iter()
-            .enumerate()
-            .filter_map(|(index, binding)| {
-                (binding.name == name
-                    && Self::declaration_kind_matches(binding.kind, expected_kind)
-                    && self.binding_belongs_to_current_function(binding.scope))
-                .then_some(SemanticBindingId::new(checked_u32_index(index)))
-            });
+        let mut matches = self.bindings_named(name).iter().copied().filter(|&id| {
+            let binding = self.state.sema.binding_table.get(id);
+            Self::declaration_kind_matches(binding.kind, expected_kind)
+                && self.binding_belongs_to_current_function(binding.scope)
+        });
 
         let Some(first) = matches.next() else {
             return Err(LoweringError::MissingDeclarationBinding { name });
@@ -71,25 +63,27 @@ impl FunctionCompiler<'_, '_> {
         Ok(first)
     }
 
+    /// Binding ids that share `name`, in ascending-id order. Empty slice when the
+    /// name has no bindings. Backs the `find_named_binding*` lookups so they scan
+    /// only same-named bindings instead of the whole table.
+    pub(super) fn bindings_named(&self, name: AtomId) -> &[SemanticBindingId] {
+        self.state
+            .binding_ids_by_name
+            .get(&name)
+            .map_or(&[], Vec::as_slice)
+    }
+
     pub(super) fn find_named_binding_in_scope(
         &self,
         name: AtomId,
         expected_kind: DeclarationKind,
         scope: ScopeId,
     ) -> Option<SemanticBindingId> {
-        self.state
-            .sema
-            .binding_table
-            .as_slice()
-            .iter()
-            .enumerate()
-            .rev()
-            .find_map(|(index, binding)| {
-                (binding.name == name
-                    && Self::declaration_kind_matches(binding.kind, expected_kind)
-                    && binding.scope == scope)
-                    .then_some(SemanticBindingId::new(checked_u32_index(index)))
-            })
+        // Highest-id match, mirroring the original reversed full-table scan.
+        self.bindings_named(name).iter().rev().copied().find(|&id| {
+            let binding = self.state.sema.binding_table.get(id);
+            Self::declaration_kind_matches(binding.kind, expected_kind) && binding.scope == scope
+        })
     }
 
     pub(super) fn nearest_var_scope(&self) -> ScopeId {
@@ -139,23 +133,17 @@ impl FunctionCompiler<'_, '_> {
         name: AtomId,
         expected_kind: DeclarationKind,
     ) -> Option<SemanticBindingId> {
-        self.state
-            .sema
-            .binding_table
-            .as_slice()
+        // Deepest (max scope id) match; on ties `max_by_key` keeps the last,
+        // i.e. the highest binding id, matching the original full-table scan.
+        self.bindings_named(name)
             .iter()
-            .enumerate()
-            .filter_map(|(index, binding)| {
-                (Self::declaration_kind_matches(binding.kind, expected_kind)
-                    && binding.name == name
-                    && self.binding_belongs_to_owner(binding.scope, self.current_function))
-                .then_some((
-                    SemanticBindingId::new(checked_u32_index(index)),
-                    binding.scope.raw(),
-                ))
+            .copied()
+            .filter(|&id| {
+                let binding = self.state.sema.binding_table.get(id);
+                Self::declaration_kind_matches(binding.kind, expected_kind)
+                    && self.binding_belongs_to_owner(binding.scope, self.current_function)
             })
-            .max_by_key(|(_, scope)| *scope)
-            .map(|(binding, _)| binding)
+            .max_by_key(|&id| self.state.sema.binding_table.get(id).scope.raw())
     }
 
     pub(super) fn binding_belongs_to_current_function(&self, scope: ScopeId) -> bool {
@@ -295,12 +283,12 @@ impl FunctionCompiler<'_, '_> {
         &mut self,
         binding: SemanticBindingId,
     ) -> LoweringResult<u16> {
-        if let Some(register) = self.local_registers[binding.raw() as usize] {
+        if let Some(register) = self.local_registers.get(&binding).copied() {
             return Ok(register);
         }
 
         let register = self.alloc_temp()?;
-        self.local_registers[binding.raw() as usize] = Some(register);
+        self.local_registers.insert(binding, register);
         Ok(register)
     }
 

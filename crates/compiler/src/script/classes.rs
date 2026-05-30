@@ -1393,11 +1393,9 @@ impl FunctionCompiler<'_, '_> {
             return Ok((id, builder.finish()?));
         }
 
-        let binding_count = self.state.sema.binding_table.len();
         let current_function = self.current_function;
         let function = {
             let state = &mut *self.state;
-            let scope_count = state.sema.scope_table.len();
             let mut synthetic = FunctionCompiler {
                 state,
                 builder,
@@ -1405,8 +1403,8 @@ impl FunctionCompiler<'_, '_> {
                 current_function_ast: None,
                 current_scope: self.current_scope,
                 body_scope: self.body_scope,
-                scope_child_cursors: vec![0; scope_count],
-                local_registers: vec![None; binding_count],
+                scope_child_cursors: HashMap::new(),
+                local_registers: HashMap::new(),
                 atom_constants: HashMap::new(),
                 float_constants: HashMap::new(),
                 builtin_constants: HashMap::new(),

@@ -82,7 +82,7 @@ pub use function::compile_script;
 
 use activation::{
     build_function_activation_plan, collect_arguments_owners, parent_function_for,
-    FunctionActivationPlan,
+    FunctionActivationPlan, ParameterBindingIndex,
 };
 use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
 pub use state::CompilationState;

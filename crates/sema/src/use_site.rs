@@ -1,5 +1,7 @@
 //! Use-site resolution: tracks every identifier reference and its resolution.
 
+use std::collections::HashMap;
+
 use lyng_ast::ExprId;
 use lyng_common::AtomId;
 
@@ -37,21 +39,34 @@ pub struct UseSiteRecord {
 }
 
 /// The use-site table: indexed by `UseSiteId`.
+///
+/// `by_expr` mirrors the records whose `expr` is `Some`, giving `for_expr`
+/// O(1) lookup. The bytecode lowerer calls `for_expr` once per identifier
+/// reference, so a linear scan here makes compilation O(N^2) in the number of
+/// references; the index keeps it linear. Each identifier node produces at most
+/// one record (see `record_use`), so the mapping is a bijection. Post-analysis
+/// mutators (`as_mut_slice`) only rewrite resolution fields, never `expr`, so
+/// the index stays valid.
 #[derive(Clone, Debug, Default)]
 pub struct UseSiteTable {
     records: Vec<UseSiteRecord>,
+    by_expr: HashMap<ExprId, UseSiteId>,
 }
 
 impl UseSiteTable {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             records: Vec::new(),
+            by_expr: HashMap::new(),
         }
     }
 
     /// Allocates a new use-site record and returns its ID.
     pub fn alloc(&mut self, record: UseSiteRecord) -> UseSiteId {
         let id = UseSiteId::new(self.records.len() as u32);
+        if let Some(expr) = record.expr {
+            self.by_expr.insert(expr, id);
+        }
         self.records.push(record);
         id
     }
@@ -64,7 +79,8 @@ impl UseSiteTable {
 
     #[inline]
     pub fn for_expr(&self, expr: ExprId) -> Option<&UseSiteRecord> {
-        self.records.iter().find(|record| record.expr == Some(expr))
+        let id = *self.by_expr.get(&expr)?;
+        Some(&self.records[id.raw() as usize])
     }
 
     /// Returns the number of use sites.

@@ -1,5 +1,5 @@
 use super::{
-    checked_u32_index, AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler,
+    AssignOp, AtomId, DeclarationKind, Expr, ExprId, FunctionCompiler,
     FunctionId, LoweringError, LoweringResult, Opcode, PreparedReferenceTarget, ReferenceUsage,
     ResolutionKind, SemanticBindingId, StorageClass,
 };
@@ -39,19 +39,13 @@ impl FunctionCompiler<'_, '_> {
             .get(&function)
             .copied()
             .ok_or(LoweringError::MissingFunctionRecord { function })?;
-        Ok(self
-            .state
-            .sema
-            .binding_table
-            .as_slice()
-            .iter()
-            .enumerate()
-            .find_map(|(index, binding)| {
-                (binding.kind == DeclarationKind::FunctionName
-                    && binding.name == name
-                    && self.binding_belongs_to_owner(binding.scope, Some(sema_id)))
-                .then_some(SemanticBindingId::new(checked_u32_index(index)))
-            }))
+        // Lowest-id match, mirroring the original ascending full-table scan, but
+        // over only the same-named bindings (see `bindings_named`).
+        Ok(self.bindings_named(name).iter().copied().find(|&id| {
+            let binding = self.state.sema.binding_table.get(id);
+            binding.kind == DeclarationKind::FunctionName
+                && self.binding_belongs_to_owner(binding.scope, Some(sema_id))
+        }))
     }
 
     pub(super) fn lower_identifier(
