@@ -57,6 +57,20 @@ pub(crate) struct V8Workload {
     pub reference_us: u64,
 }
 
+impl V8Workload {
+    /// Construct a workload for cross-module reuse (e.g. the profile driver's
+    /// synthetic micro-workloads). The reference µs/iteration is irrelevant for
+    /// the profiler, which never computes a V8 score, so it defaults to zero.
+    #[cfg(test)]
+    pub(crate) const fn new(name: &'static str, file: &'static str) -> Self {
+        Self {
+            name,
+            file,
+            reference_us: 0,
+        }
+    }
+}
+
 pub(crate) const V8_WORKLOADS: &[V8Workload] = &[
     V8Workload {
         name: "Richards",
@@ -361,7 +375,7 @@ fn take_string_arg<'a>(
         .ok_or_else(|| format!("{flag} requires a value"))
 }
 
-fn default_v8_root() -> String {
+pub(crate) fn default_v8_root() -> String {
     "testdata/js-benchmarks/v8-v7".to_string()
 }
 
@@ -404,7 +418,7 @@ pub fn help_text() -> String {
     .join("\n")
 }
 
-fn ensure_path_exists(path: &str, what: &str) -> Result<(), String> {
+pub(crate) fn ensure_path_exists(path: &str, what: &str) -> Result<(), String> {
     if Path::new(path).exists() {
         Ok(())
     } else {
@@ -412,7 +426,7 @@ fn ensure_path_exists(path: &str, what: &str) -> Result<(), String> {
     }
 }
 
-fn read_file(path: &Path) -> Result<String, String> {
+pub(crate) fn read_file(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|error| format!("failed to read {}: {error}", path.display()))
 }
 
@@ -684,7 +698,7 @@ fn render_json(options: &Options, reports: &[WorkloadReport]) -> Value {
     })
 }
 
-fn write_output(path: &str, contents: &str) -> Result<(), String> {
+pub(crate) fn write_output(path: &str, contents: &str) -> Result<(), String> {
     if let Some(parent) = Path::new(path).parent()
         && !parent.as_os_str().is_empty()
     {
@@ -725,7 +739,7 @@ fn print_summary(reports: &[WorkloadReport]) {
 /// and the score is irrelevant for opcode-count measurement). If a benchmark
 /// reports a `NotifyError`, the harness re-throws so the driver surfaces it
 /// instead of silently swallowing it under the counted suite run.
-fn build_count_harness(base_js: &str, benchmark_js: &str) -> String {
+pub(crate) fn build_count_harness(base_js: &str, benchmark_js: &str) -> String {
     let mut source = String::with_capacity(base_js.len() + benchmark_js.len() + 256);
     source.push_str("var print = function () {};\n");
     source.push_str(base_js);

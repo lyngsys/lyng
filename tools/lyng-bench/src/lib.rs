@@ -5,6 +5,7 @@ pub mod compare;
 pub mod density;
 pub mod hot_opcodes;
 pub mod microbench;
+pub mod profile;
 pub mod runtime;
 pub mod test262;
 pub mod v8suite;
