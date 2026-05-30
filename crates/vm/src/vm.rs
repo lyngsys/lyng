@@ -1036,15 +1036,6 @@ impl Vm {
         self.dsl_global_ic_generation
     }
 
-    /// Refresh the mirror from the agent's live generation for the cached global env.
-    /// No-op if the global env isn't cached yet. Cheap: one Vec index + store.
-    #[inline]
-    pub(crate) fn refresh_global_ic_generation(&mut self, agent: &Agent) {
-        if let Some(env) = self.dsl_global_env {
-            self.dsl_global_ic_generation = agent.global_structure_generation(env);
-        }
-    }
-
     /// Cache the executing realm's global env and prime the baseline generation.
     /// Called at top-level run entry AFTER global declaration instantiation, so any
     /// agent-side bumps from instantiation are already captured in the baseline.
@@ -1054,6 +1045,32 @@ impl Vm {
     pub(crate) fn prime_global_ic_generation(&mut self, agent: &Agent, global_env: EnvironmentRef) {
         self.dsl_global_env = Some(global_env);
         self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
+    }
+
+    /// Refresh the mirror from the realm of the currently-executing frame, so a
+    /// cross-realm mode-7 hit compares against the correct realm's generation.
+    ///
+    /// `prime_global_ic_generation` caches `dsl_global_env` for the realm that was
+    /// active at `Vm::run` entry. A cross-realm call (`$262.createRealm` → invoke a function whose
+    /// `[[Realm]]` differs) egresses through `translate_outcome` with the callee
+    /// frame active; deriving the global env from that frame's realm re-primes the
+    /// cached env + generation to the executing realm before its first opcode runs.
+    /// No-op (mirror left as-is) if the realm has no resolvable global env.
+    #[inline]
+    pub(crate) fn refresh_global_ic_generation_for_realm(
+        &mut self,
+        agent: &Agent,
+        realm: RealmRef,
+    ) {
+        if let Some(global_env) = agent
+            .heap()
+            .view()
+            .realm(realm)
+            .and_then(|r| r.global_env())
+        {
+            self.dsl_global_env = Some(global_env);
+            self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
+        }
     }
 
     #[inline]

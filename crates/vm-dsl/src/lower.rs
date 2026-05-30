@@ -263,7 +263,7 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
             // backend macros the body uses. Asm comments are stripped
             // by the assembler — this is free at runtime.
             ::core::arch::naked_asm!(
-                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} arith_obs={arith_metadata_observed_bits_offset} arith_cnt={arith_metadata_exec_count_offset} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
+                "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_gen={feedback_generation} vm_gic={vm_global_ic_gen} state_value_cells={state_value_cells} cell_stored={cell_stored_value} arith_obs={arith_metadata_observed_bits_offset} arith_cnt={arith_metadata_exec_count_offset} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
                 length = const #length as u32,
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
@@ -282,6 +282,21 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 feedback_mode = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_MODE_OFFSET,
                 feedback_named_handler_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_HANDLER_BITS_OFFSET,
                 feedback_named_aux_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_AUX_BITS_OFFSET,
+                // Task 8: byte offset of `PropertyMetadata::generation` (u32),
+                // read by `branch_global_cell_generation_mismatch!` to compare a
+                // mode-7 cell hit's captured generation against the live mirror.
+                feedback_generation = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_GENERATION_OFFSET,
+                // Task 8: byte offset (within `Vm`) of the `dsl_global_ic_generation`
+                // u32 mirror, read by `branch_global_cell_generation_mismatch!` via x22.
+                vm_global_ic_gen = const ::lyng_vm::dsl::reg_convention::VM_GLOBAL_IC_GENERATION_OFFSET,
+                // Task 8: byte offset (within `LlIntState`) of the value-cell
+                // pointer table base, read by `load_global_cell_value_or_branch!`
+                // via x24 to resolve a 1-based cell ref to its record pointer.
+                state_value_cells = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_VALUE_CELLS_BASE,
+                // Task 8: byte offset of the stored value within a
+                // `PrimitiveValueCellRecord` (= 0), read by
+                // `load_global_cell_value_or_branch!`.
+                cell_stored_value = const ::lyng_gc::PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET,
                 // Phase C precomputed-offset optimization: `load_feedback_site!` and
                 // `record_*!` macros now resolve slots via the slot_to_entry_offset
                 // table at buffer[0..N*4]. Only the field-level offsets are needed.
@@ -825,13 +840,14 @@ mod tests {
 
     #[test]
     fn rust_probe_shim_name_is_collected() {
-        let tokens: TokenStream =
-            syn::parse_str("call_rust_probe!(op_load_global_rust_probe_rs, args = [a, bx])")
-                .expect("parse call_rust_probe!");
+        let tokens: TokenStream = syn::parse_str(
+            "call_rust_probe!(op_assign_named_property_rust_probe_rs, args = [a, b, c, slot])",
+        )
+        .expect("parse call_rust_probe!");
         let mut names = BTreeSet::new();
         collect_shim_names(&tokens, &mut names);
         assert!(
-            names.contains("op_load_global_rust_probe_rs"),
+            names.contains("op_assign_named_property_rust_probe_rs"),
             "call_rust_probe! bridge shims must be emitted as naked_asm named symbols. Got: {names:?}",
         );
     }

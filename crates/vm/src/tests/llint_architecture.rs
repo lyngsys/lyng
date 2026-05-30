@@ -29,9 +29,12 @@ fn llint_rust_probes_are_explicitly_enumerated() {
     let cold_handlers = include_str!("../dsl/handlers/cold.rs");
     let probe_call_count = cold_handlers.matches("call_rust_probe!(").count();
 
+    // LoadGlobal previously used a Rust probe for its mode-7 cell read; Task 8
+    // replaced it with an inline asm fast read (branch_global_cell_mode! etc.),
+    // so it no longer appears here.
     assert!(
-        cold_handlers.contains("call_rust_probe!(op_load_global_rust_probe_rs"),
-        "LoadGlobal is an explicit temporary Rust probe until its LLInt IC layout exists"
+        !cold_handlers.contains("call_rust_probe!(op_load_global_rust_probe_rs"),
+        "LoadGlobal mode-7 cell load is now an inline asm fast path, not a Rust probe"
     );
     assert!(
         cold_handlers.contains("call_rust_probe!(op_assign_named_property_rust_probe_rs"),
@@ -41,8 +44,8 @@ fn llint_rust_probes_are_explicitly_enumerated() {
     // probe handles writable monomorphic OwnData stores; the strict-only
     // TypeError stays in the slow path).
     assert_eq!(
-        probe_call_count, 3,
-        "Rust probe bridges are not LLInt fast paths; only LoadGlobal, AssignNamedProperty, and StrictAssignNamedProperty are currently allowed"
+        probe_call_count, 2,
+        "Rust probe bridges are not LLInt fast paths; only AssignNamedProperty and StrictAssignNamedProperty are currently allowed"
     );
 }
 
@@ -52,8 +55,8 @@ fn llint_rust_probe_hits_use_no_refresh_dispatch() {
 
     assert_eq!(
         cold_handlers.matches("dispatch_probe_hit_no_refresh!();").count(),
-        3,
-        "LoadGlobal, AssignNamedProperty, and StrictAssignNamedProperty probe hits must use the documented no-refresh dispatch form"
+        2,
+        "AssignNamedProperty and StrictAssignNamedProperty probe hits must use the documented no-refresh dispatch form (LoadGlobal is now an inline asm cell read)"
     );
     assert!(
         !cold_handlers.contains("dispatch_from_payload!();"),

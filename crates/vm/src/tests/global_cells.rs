@@ -566,3 +566,126 @@ fn mode_7_fast_read_returns_correct_value_through_mutation_and_invalidation() {
          re-resolve after a structural delete+recreate (gen bump → 7), not serve a stale cell"
     );
 }
+
+/// Task 8 ASM STALENESS (a, delete+recreate): warm a mode-7 site through a
+/// function called twice, then `delete globalThis.g` + recreate the global
+/// with a NEW value. The asm hit's generation guard must bail on the bump and
+/// re-resolve, so the post-recreate read observes the new value — never the
+/// stale (freed) cell. Distinct from the trailing-load variant above by
+/// driving the warm reads through a called function (the canonical mode-7
+/// warming shape).
+#[test]
+fn asm_mode_7_bails_on_delete_recreate() {
+    let src = "var g = 11; function r(){ return g; } var w0 = r(); r();\n\
+               delete globalThis.g; var g = 22; var w1 = r();\n\
+               w0 * 1000 + w1";
+    let unit = compile_test_unit(7310, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    // w0 == 11 (warmed read), w1 == 22 (after delete+recreate, re-resolved).
+    assert_eq!(
+        result,
+        Value::from_smi(11_022),
+        "after delete+recreate the warmed asm mode-7 site must re-resolve to the new value, not serve a stale cell"
+    );
+}
+
+/// Task 8 ASM STALENESS (b, data→accessor): warm a mode-7 data-cell site, then
+/// `Object.defineProperty(globalThis, 'g', { get() {...} })` to convert the
+/// data global into an accessor. This bumps the structure generation, so the
+/// next read MUST bail out of the cached cell and invoke the getter — returning
+/// the getter's value, not the stale data cell's value.
+#[test]
+fn asm_mode_7_bails_on_data_to_accessor_redefine() {
+    let src = "var g = 5; function r(){ return g; } var w0 = r(); r();\n\
+               Object.defineProperty(globalThis, 'g', { get() { return 99; }, configurable: true });\n\
+               var w1 = r();\n\
+               w0 * 1000 + w1";
+    let unit = compile_test_unit(7311, src);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    // w0 == 5 (warmed data read), w1 == 99 (getter result after data→accessor).
+    assert_eq!(
+        result,
+        Value::from_smi(5_099),
+        "data→accessor redefine must invalidate the cached cell so the read invokes the getter (99), not the stale data value"
+    );
+}
+
+/// Task 8 ASM STALENESS (c, let-shadow): warm a mode-7 site reading a `var`
+/// global from one unit, then evaluate a second unit that declares a global
+/// `let` of the same name (shadowing the object property). Installing a global
+/// lexical binding that shadows the cell-backed property bumps the structure
+/// generation, so a subsequent read from a third unit must re-resolve to the
+/// lexical binding's value rather than serve the stale data cell.
+#[test]
+fn asm_mode_7_bails_on_global_let_shadow() {
+    let warm = compile_test_unit(7312, "var s = 1; s; s");
+    let shadow = compile_test_unit(7313, "let s = 2;");
+    let read = compile_test_unit(7314, "s");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    let mut vm = Vm::new();
+
+    // Warm: `var s = 1` then two reads install + warm the mode-7 site.
+    let warm_installed = vm.install_script(agent, realm.id(), &warm).unwrap();
+    let warm_result = vm
+        .evaluate_installed(
+            agent,
+            warm_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+    assert_eq!(
+        warm_result,
+        Value::from_smi(1),
+        "warmed var read should see 1"
+    );
+
+    // Shadow: a global `let s = 2` shadows the var/property binding (gen bump).
+    vm.evaluate_script(agent, realm, &shadow).run().unwrap();
+
+    // Read from a fresh unit: must resolve to the lexical binding (2), not the
+    // stale data cell (1).
+    let read_installed = vm.install_script(agent, realm.id(), &read).unwrap();
+    let read_result = vm
+        .evaluate_installed(
+            agent,
+            read_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+
+    assert_eq!(
+        read_result,
+        Value::from_smi(2),
+        "after a global `let` shadows the var binding, the read must re-resolve to the lexical value (2), not the stale cell (1)"
+    );
+}

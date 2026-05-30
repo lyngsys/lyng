@@ -163,9 +163,17 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         // dispatch-resuming Continue/Refresh arms, so no bump path can slip
         // through — correctness over saving one branch.
         if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
-            rust.dispatch
-                .vm
-                .refresh_global_ic_generation(rust.dispatch.agent);
+            // Derive the env from the ACTIVE frame's realm, not the cached
+            // entry-realm env: a cross-realm Call egresses here with the callee
+            // frame already pushed onto `vm.frames()`, so re-priming from that
+            // frame's realm makes the mirror track the realm whose code is about
+            // to resume — a mode-7 hit then compares against the correct realm's
+            // generation. No active frame (program exit) → leave the mirror as-is.
+            if let Some(realm) = rust.dispatch.vm.frames().last().map(|f| f.realm()) {
+                rust.dispatch
+                    .vm
+                    .refresh_global_ic_generation_for_realm(rust.dispatch.agent, realm);
+            }
         }
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
@@ -240,8 +248,12 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
                         rust.dispatch.agent.heap().view().object_slots_ptr_table();
-                    let value_cells_base =
-                        rust.dispatch.agent.heap().view().value_cell_ptr_table_base();
+                    let value_cells_base = rust
+                        .dispatch
+                        .agent
+                        .heap()
+                        .view()
+                        .value_cell_ptr_table_base();
                     // SAFETY: state is valid by from_raw's contract;
                     // we hold a unique borrow through `self`. Mirror
                     // the new PC back into `state.frame_pc_offset` so
@@ -333,8 +345,12 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         rust.dispatch.agent.heap().view().object_record_ptr_table();
                     let object_slots_base =
                         rust.dispatch.agent.heap().view().object_slots_ptr_table();
-                    let value_cells_base =
-                        rust.dispatch.agent.heap().view().value_cell_ptr_table_base();
+                    let value_cells_base = rust
+                        .dispatch
+                        .agent
+                        .heap()
+                        .view()
+                        .value_cell_ptr_table_base();
                     // Phase 1.B.1: derive the new fields for the
                     // active frame. Identical chain to the entry shim
                     // in entry.rs::run_via_dsl. See spec §3.4.

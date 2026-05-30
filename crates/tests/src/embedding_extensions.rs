@@ -634,3 +634,63 @@ fn indirect_eval_uses_eval_functions_realm() {
 
     assert_eq!(result, "undefined:23");
 }
+
+/// Cross-realm mode-7 staleness guard (Task 8 / global-cell asm load).
+///
+/// The asm `LoadGlobal` mode-7 cell hit compares the site's captured
+/// generation against the `Vm::dsl_global_ic_generation` mirror. That mirror
+/// must track the EXECUTING realm, not just the entry realm
+/// (`refresh_global_ic_generation_for_realm`, refreshed from the active
+/// frame's realm at every slow egress). If it tracked only realm A, a warmed
+/// mode-7 site running in realm B could compare B's site against A's
+/// generation and serve a stale (or freed) cell after B mutates its own
+/// global.
+///
+/// Here realm A warms its own global `g` (advancing A's generation and warming
+/// an A-side mode-7 site); then realm B's code (`childGlobal.embedding.evalScript`,
+/// which runs with B's global env) declares `g`, warms it through a function
+/// called twice (→ mode-7 site installed in B), then structurally mutates B's
+/// `g` (delete + recreate, bumping B's generation) and reads it again. The
+/// post-mutation read must observe the NEW value — proving B's hit re-resolved
+/// against B's own generation rather than serving a cell validated by A's.
+#[test]
+fn cross_realm_mode_7_reads_track_executing_realm_generation() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        // Realm A: warm a cell-backed global so A's generation + mode-7 site
+        // are established. (The mirror starts tracking A.)
+        var g = 100;
+        function readA() { return g; }
+        readA(); readA();           // warm A's mode-7 site
+
+        let childGlobal = embedding.createRealm();
+
+        // Realm B: run a full script in B's realm. B declares its OWN `g`,
+        // warms a mode-7 site (readB called twice), reassigns (no gen bump,
+        // must be seen live), then structurally mutates (delete + recreate,
+        // bumping B's generation) and reads again.
+        let bResult = childGlobal.embedding.evalScript(`
+            var g = 5;
+            function readB() { return g; }
+            var warm = readB(); readB();        // warm B's mode-7 site, read 5
+            g = 6;
+            var afterAssign = readB();           // no gen bump -> live read 6
+            delete globalThis.g;
+            var g = 7;                            // recreate -> gen bump in B
+            var afterRecreate = readB();          // must re-resolve -> 7
+            warm * 100 + afterAssign * 10 + afterRecreate;   // 5*100 + 6*10 + 7 = 567
+        `);
+
+        // Realm A's own global is untouched by B's mutations.
+        let aResult = readA();                   // still 100
+
+        String(bResult) + ":" + String(aResult);
+        "#,
+        Some(&provider),
+    );
+
+    // B observed 567 across its own assign + delete/recreate (no stale read
+    // against A's generation); A's global is unchanged at 100.
+    assert_eq!(result, "567:100");
+}

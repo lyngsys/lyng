@@ -95,6 +95,20 @@ macro_rules! decode_abc_slot {
     };
 }
 
+/// Read the trailing 16-bit feedback slot id of an IC-shaped `Abx`
+/// instruction (`LoadGlobal` / `StoreGlobal` / `AssignGlobal`) into
+/// `w{$dst}`. The narrow encoding is
+/// `[opcode, a, bx_lo, bx_hi, slot_lo, slot_hi]`, so the slot lives at
+/// `[PC + 4]` — the same offset `decode_abc_slot!` reads. Used by the
+/// `op_load_global` mode-7 asm fast read, whose `Abx` decode prologue
+/// only surfaces `a`/`bx`.
+#[macro_export]
+macro_rules! decode_abx_feedback_slot {
+    ($dst:tt) => {
+        concat!("ldrh   w", stringify!($dst), ", [x19, #4]\n",)
+    };
+}
+
 /// Decode `[byte, u16]` — a byte operand followed by a 16-bit operand.
 #[macro_export]
 macro_rules! decode_abx {
