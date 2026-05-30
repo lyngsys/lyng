@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use lyng_bytecode::{Opcode, OPCODE_COUNT};
 
@@ -151,6 +152,9 @@ impl Default for OpcodeCounters {
 /// - `slow_semantic[op]`   — bumped at `call_slow!` invocation site
 /// - `slow_safepoint[op]`  — bumped at `poll_safepoint!` pending branch
 ///
+/// Followed by a single `current_opcode` `AtomicU64` cell (offset 6144)
+/// publishing the live opcode for the sampling profiler.
+///
 /// Indexed by raw opcode byte (`opcode as u8`). 256 entries reserves
 /// space for the full byte range even though Lyng uses ~157 opcodes,
 /// to keep offset math cheap (compile-time bank offsets are 0, 2048,
@@ -159,35 +163,65 @@ impl Default for OpcodeCounters {
 /// Box-allocated so the Vm pointer stays stable across struct moves
 /// (Vm itself isn't pinned; the asm-side `[VM, #offset]` access reads
 /// the pointer first, then indexes into the heap-allocated array).
+/// Sentinel stored in `DispatchCounters::current_opcode` when no opcode
+/// has been dispatched yet (set at construction and on `reset`). Samples
+/// that observe this value are attributed to the "non-opcode / native"
+/// bucket rather than to any opcode.
+pub const CURRENT_OPCODE_IDLE: u64 = u64::MAX;
+
+/// Bit OR-ed into the published opcode byte to mark "currently in this
+/// opcode's slow (semantic) path". Opcodes occupy bits 0..=7 (values
+/// 0..=255), so bit 8 is a free lane flag.
+pub const CURRENT_OPCODE_SLOW_BIT: u64 = 0x100;
+
+/// Decode a raw `current_opcode` cell value into `(opcode, in_slow_path)`.
+///
+/// Returns `None` for the idle sentinel or any byte that is not a known
+/// opcode discriminant (defensive — a torn or stale read should not panic
+/// the sampler).
+#[must_use]
+pub fn decode_current_opcode(raw: u64) -> Option<(Opcode, bool)> {
+    if raw == CURRENT_OPCODE_IDLE {
+        return None;
+    }
+    let in_slow = raw & CURRENT_OPCODE_SLOW_BIT != 0;
+    let byte = u8::try_from(raw & 0xFF).ok()?;
+    Opcode::from_byte(byte).map(|opcode| (opcode, in_slow))
+}
+
 #[repr(C)]
 pub struct DispatchCounters {
     pub dispatch: [u64; 256],
     pub slow_semantic: [u64; 256],
     pub slow_safepoint: [u64; 256],
+    /// Live opcode published by the asm dispatch prologue (fast lane) and
+    /// the slow-semantic counter site (slow lane, `| CURRENT_OPCODE_SLOW_BIT`).
+    /// Read concurrently by the sampling profiler, hence `AtomicU64` rather
+    /// than a plain `u64` like the count banks above. At offset 6144.
+    pub current_opcode: AtomicU64,
 }
 
 impl DispatchCounters {
     pub fn new() -> Box<Self> {
-        // `Box::new(Self { ... })` with a 6 KB struct literal would
-        // build the struct on the stack first, then copy to the heap.
-        // In debug builds that's a 6 KB stack frame which is fine here,
-        // but allocate via a zeroed Vec → Box conversion to keep the
-        // hot path cheap and predictable across opt levels.
-        let zeros: Vec<u64> = vec![0; 3 * 256];
+        // 3 * 256 count slots + 1 current_opcode cell. Allocate via a
+        // zeroed Vec<u64> -> Box conversion to avoid a 6 KB stack copy.
+        // SAFETY: `Box<[u64; 3 * 256 + 1]>` has identical layout to
+        // `Box<DispatchCounters>`: both are #[repr(C)] contiguous
+        // 6152-byte, 8-byte-aligned allocations (AtomicU64 has the same
+        // size/align as u64). Verified in tests/dispatch_counters_layout.rs.
+        let zeros: Vec<u64> = vec![0; 3 * 256 + 1];
         let boxed_slice: Box<[u64]> = zeros.into_boxed_slice();
-        // SAFETY: `Box<[u64; 3 * 256]>` has identical layout to
-        // `Box<DispatchCounters>` because both are `#[repr(C)]`-ish
-        // contiguous 6144-byte allocations with 8-byte alignment.
-        // We verify size + offsets in
-        // `tests/dispatch_counters_layout.rs`.
         let raw: *mut u64 = Box::into_raw(boxed_slice).cast::<u64>();
-        unsafe { Box::from_raw(raw.cast::<Self>()) }
+        let mut counters = unsafe { Box::from_raw(raw.cast::<Self>()) };
+        counters.current_opcode = AtomicU64::new(CURRENT_OPCODE_IDLE);
+        counters
     }
 
     pub fn reset(&mut self) {
         self.dispatch.fill(0);
         self.slow_semantic.fill(0);
         self.slow_safepoint.fill(0);
+        self.current_opcode.store(CURRENT_OPCODE_IDLE, Ordering::Relaxed);
     }
 
     /// Snapshot the dispatch bank into an `OpcodeDispatchCounts`.
@@ -202,6 +236,14 @@ impl DispatchCounters {
     pub const fn slow_safepoint_count(&self, opcode: Opcode) -> u64 {
         self.slow_safepoint[opcode as u8 as usize]
     }
+
+    /// Borrow the live `current_opcode` cell. The sampling profiler turns
+    /// this into a raw pointer; the cell stays at a stable heap address for
+    /// the lifetime of the owning `DispatchCounters` box.
+    #[must_use]
+    pub const fn current_opcode_cell(&self) -> &AtomicU64 {
+        &self.current_opcode
+    }
 }
 
 impl Default for DispatchCounters {
@@ -210,6 +252,7 @@ impl Default for DispatchCounters {
             dispatch: [0; 256],
             slow_semantic: [0; 256],
             slow_safepoint: [0; 256],
+            current_opcode: AtomicU64::new(CURRENT_OPCODE_IDLE),
         }
     }
 }
@@ -383,5 +426,30 @@ impl CallArgumentCopyCounts {
     #[inline]
     pub const fn frame_copies(self) -> u64 {
         self.frame_copies
+    }
+}
+
+#[cfg(test)]
+mod current_opcode_tests {
+    use super::{decode_current_opcode, CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT};
+    use lyng_bytecode::Opcode;
+
+    #[test]
+    fn idle_sentinel_decodes_to_none() {
+        assert_eq!(decode_current_opcode(CURRENT_OPCODE_IDLE), None);
+    }
+
+    #[test]
+    fn fast_lane_decodes_to_opcode_without_slow_flag() {
+        let op = Opcode::from_byte(0).expect("opcode 0 exists");
+        let raw = u64::from(op as u8);
+        assert_eq!(decode_current_opcode(raw), Some((op, false)));
+    }
+
+    #[test]
+    fn slow_bit_decodes_to_slow_lane() {
+        let op = Opcode::from_byte(0).expect("opcode 0 exists");
+        let raw = u64::from(op as u8) | CURRENT_OPCODE_SLOW_BIT;
+        assert_eq!(decode_current_opcode(raw), Some((op, true)));
     }
 }
