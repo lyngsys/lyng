@@ -3033,7 +3033,16 @@ mod global_cell_projection_tests {
 
     #[test]
     fn project_global_cell_load_writes_mode_7_handler_and_generation() {
-        let mut meta = PropertyMetadata::default();
+        // Start with dirty (non-zero) fields so the test catches a projection
+        // that zeroes instead of writing (and that aux_bits is actively cleared).
+        let mut meta = PropertyMetadata {
+            mode: 99,
+            handler_bits: 0xdead_beef,
+            aux_bits: 0xcafe,
+            generation: 77,
+            execution_count: 88,
+            ..PropertyMetadata::default()
+        };
         Vm::project_global_cell_load_into_meta(9, 3, 11, &mut meta);
         assert_eq!(meta.mode, LLINT_IC_MODE_GLOBAL_CELL_LOAD);
         assert_eq!(meta.handler_bits, 9); // cell ref raw
