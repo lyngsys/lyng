@@ -9,6 +9,7 @@ pub enum Command {
     AsmDiff(Vec<String>),
     Microbench(Vec<String>),
     CaptureLlint(Vec<String>),
+    Profile(Vec<String>),
 }
 
 /// Parse the top-level benchmark suite selector.
@@ -28,6 +29,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
         Some("asm-diff") => Ok(Command::AsmDiff(args[2..].to_vec())),
         Some("microbench") => Ok(Command::Microbench(args[2..].to_vec())),
         Some("capture-llint") => Ok(Command::CaptureLlint(args[2..].to_vec())),
+        Some("profile") => Ok(Command::Profile(args[2..].to_vec())),
         Some(other) => Err(format!(
             "Unknown benchmark suite: {other}\n\n{}",
             help_text()
@@ -38,7 +40,7 @@ pub fn parse_command(args: &[String]) -> Result<Command, String> {
 #[must_use]
 pub fn help_text() -> String {
     [
-        "Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint] [suite-options]",
+        "Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint|profile] [suite-options]",
         "",
         "Suites:",
         "  runtime       Lyng JS runtime, frontend, and memory benchmark report",
@@ -50,6 +52,8 @@ pub fn help_text() -> String {
         "  asm-diff      Capture, normalize, and diff handler asm against baselines",
         "  microbench    Per-opcode ns/dispatch with confidence interval (R-0 Phase 4)",
         "  capture-llint Extract JSC LLInt handler asm or offlineasm source (R-0 Phase 5)",
+        "  profile       VM-internal time-attribution profile (opcode x fast/slow",
+        "                path) with optional samply drill-down",
         "",
         "Run `lyng-bench <suite> --help` for suite-specific options.",
     ]
@@ -105,7 +109,7 @@ mod tests {
     #[test]
     fn top_level_help_lists_external_engine_compare_suite() {
         let help = help_text();
-        assert!(help.contains("Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint]"));
+        assert!(help.contains("Usage: lyng-bench [runtime|density|test262|compare|v8suite|asm-diff|microbench|capture-llint|profile]"));
         assert!(help.contains("test262"));
         assert!(help.contains("Test262 performance diagnostics for agents"));
         assert!(help.contains("compare"));
@@ -131,6 +135,30 @@ mod tests {
         assert_eq!(
             parse_command(&args(&["lyng-bench", "v8suite"])).unwrap(),
             Command::V8Suite(vec![])
+        );
+    }
+
+    #[test]
+    fn parses_profile_suite_with_passthrough_args() {
+        assert_eq!(
+            parse_command(&args(&["lyng-bench", "profile", "--filter", "RayTrace"])).unwrap(),
+            Command::Profile(vec!["--filter".to_string(), "RayTrace".to_string()])
+        );
+    }
+
+    #[test]
+    fn top_level_help_lists_profile_suite() {
+        let help = help_text();
+        assert!(help.contains("profile"));
+        assert!(help.contains("time-attribution"));
+        assert!(help.contains("samply drill-down"));
+    }
+
+    #[test]
+    fn parses_profile_suite_with_no_args() {
+        assert_eq!(
+            parse_command(&args(&["lyng-bench", "profile"])).unwrap(),
+            Command::Profile(vec![])
         );
     }
 }

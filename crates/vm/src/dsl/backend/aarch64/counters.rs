@@ -28,6 +28,21 @@
 //!     str  xT, [xS, #<bank_offset + op*8>]           ; store back
 //! ```
 //!
+//! Additionally, both increment macros (`inc_dispatch_counter!` and
+//! `inc_slow_semantic_counter!`) publish the live opcode byte to the
+//! `current_opcode` cell at offset 6144 off the `DispatchCounters` base
+//! (fast lane = plain opcode byte, slow lane = opcode byte `+ 256`,
+//! i.e. with the 0x100 slow-lane bit set). This is consumed by the
+//! sampling profiler thread via a relaxed atomic load.
+//!
+//! Note that `inc_slow_safepoint_counter!` does NOT publish to the
+//! `current_opcode` cell. A sample taken while a safepoint slow path
+//! runs is therefore attributed to the fast lane of the last dispatched
+//! opcode (whatever the dispatch prologue last published). This is
+//! intentional: safepoints are rare and this is a bench-only profiler,
+//! so the small attribution gap is not worth an extra publish store on
+//! that path.
+//!
 //! ## Scratch-register convention per bank (DSL-1 Phase 1.B.0 Task 5)
 //!
 //! - **Dispatch bank** (`inc_dispatch_counter!`) uses `x9, x10`. Emitted
@@ -69,6 +84,14 @@ macro_rules! inc_dispatch_counter {
             "str    x10, [x9, #",
             stringify!($opcode_byte),
             " * 8]\n",
+            // Publish the live opcode (fast lane: no slow bit) into the
+            // current_opcode cell at offset 6144. x9 still holds the
+            // DispatchCounters pointer (it is not written between its `ldr`
+            // above and this publish store); x10 is free after the store-back.
+            "mov    x10, #",
+            stringify!($opcode_byte),
+            "\n",
+            "str    x10, [x9, #6144]\n",
         )
     };
 }
@@ -92,6 +115,15 @@ macro_rules! inc_slow_semantic_counter {
             "str    x17, [x16, #",
             stringify!($opcode_byte),
             " * 8 + 2048]\n",
+            // Re-publish the live opcode with the slow-lane bit (= CURRENT_OPCODE_SLOW_BIT
+            // = 0x100 = 256) so samples during the semantic slow path attribute to this
+            // opcode's slow lane. x16 = DispatchCounters ptr, x17 free.
+            // NOTE: if CURRENT_OPCODE_SLOW_BIT changes in opcode_counts.rs, update this
+            // literal (and the module doc comment above) to match — not test-enforced.
+            "mov    x17, #",
+            stringify!($opcode_byte),
+            " + 256\n",
+            "str    x17, [x16, #6144]\n",
         )
     };
 }

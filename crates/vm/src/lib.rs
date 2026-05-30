@@ -32,6 +32,8 @@ mod name_refs;
 #[cfg(feature = "diagnostic-counters")]
 mod opcode_counts;
 #[cfg(feature = "diagnostic-counters")]
+mod sampling_profiler;
+#[cfg(feature = "diagnostic-counters")]
 mod slow_path_counts;
 pub(crate) mod vm;
 
@@ -49,9 +51,11 @@ pub use frame::{
 pub use installed::InstalledCode;
 #[cfg(feature = "diagnostic-counters")]
 pub use opcode_counts::{
-    CallArgumentCopyCounts, DispatchCounters, OpcodeCounters, OpcodeDispatchCount,
-    OpcodeDispatchCounts,
+    decode_current_opcode, CallArgumentCopyCounts, DispatchCounters, OpcodeCounters,
+    OpcodeDispatchCount, OpcodeDispatchCounts, CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT,
 };
+#[cfg(feature = "diagnostic-counters")]
+pub use sampling_profiler::{SampleHistogram, SamplingProfiler};
 #[cfg(feature = "diagnostic-counters")]
 pub use slow_path_counts::SlowPathCounts;
 pub use vm::{
