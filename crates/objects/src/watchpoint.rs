@@ -55,7 +55,9 @@ pub enum ShapeInvalidationObserver {
     },
 }
 
-/// Dispatch interface for `ShapeInvalidationObserver::AdaptiveProtoLoad` fires.
+/// Dispatch interface for `ShapeInvalidationObserver` fires — `AdaptiveProtoLoad`
+/// and `AdaptiveOwnWrite` (named IC slot clear) and `ConstructIcClear`
+/// (construct IC slot clear).
 ///
 /// Defined in `lyng-objects` so that `lyng-env` (which cannot depend on
 /// `lyng-vm`) can accept a `&mut dyn AdaptiveProtoLoadDispatch` parameter in

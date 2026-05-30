@@ -2210,3 +2210,54 @@ fn phase6_default_derived_constructors_do_not_iterate_rest_arguments_for_super()
 
     assert_eq!(result, Value::from_smi(5));
 }
+
+// Behavior regression guards for the construct fast-path `.prototype`
+// invalidation (Task 3, eager-clear model). These pass via the slow path today
+// and MUST keep passing after Task 7 wires the construct fast path: they prove
+// each `.prototype` write path produces the correct prototype for subsequent
+// `new`. Each script does few writes and stays below the IC warmup threshold,
+// so the assignment runs through the real slow store (which fires the
+// construct watchpoint at the VM dispatch site).
+
+#[test]
+fn reassigning_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        F.prototype = { tag: 'first' };
+        let a = new F();
+        F.prototype = { tag: 'second' };
+        let b = new F();
+        Object.getPrototypeOf(a).tag + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "first,second");
+}
+
+#[test]
+fn define_property_on_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        let a = new F();
+        Object.defineProperty(F, 'prototype', { value: { tag: 'redef' }, writable: true, configurable: false });
+        let b = new F();
+        (Object.getPrototypeOf(a) === Object.getPrototypeOf(b)) + '';
+    ",
+    );
+    assert_eq!(r, "false");
+}
+
+#[test]
+fn reflect_set_on_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        let a = new F();
+        Reflect.set(F, 'prototype', { tag: 'via-reflect' });
+        let b = new F();
+        Object.getPrototypeOf(b).tag + ',' + (Object.getPrototypeOf(a) === Object.getPrototypeOf(b));
+    ",
+    );
+    assert_eq!(r, "via-reflect,false");
+}

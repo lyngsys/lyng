@@ -847,6 +847,47 @@ impl Vm {
             .as_ref()
     }
 
+    /// Construct fast-path invalidation (eager clear). Clears the `Construct`
+    /// IC slot at `(code, slot)` — its `CallIcState` in `construct_ic_states`,
+    /// its `ConstructCacheStorage` entry, and the asm-readable `CallMetadata` —
+    /// iff the slot's current generation matches `expected_generation`.
+    ///
+    /// Mirrors [`Self::clear_ic_slot_if_generation_matches`] but operates on the
+    /// construct slabs. The construct slot's generation lives on the
+    /// `CallMetadata` entry inside `MetadataTable` (there is no generation field
+    /// on `CallIcState`); read it the same way [`Self::construct_status`] does.
+    /// A generation mismatch means the watchpoint is stale (the slot was
+    /// re-cached since registration) and is silently dropped.
+    pub(crate) fn clear_construct_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        expected_generation: u32,
+    ) {
+        let current_generation = self
+            .metadata_table(code)
+            .map(|table| table.call(slot.get()).generation);
+        if current_generation != Some(expected_generation) {
+            // Either the code is gone, the slot was never installed, or the
+            // generation has moved on since registration — stale watchpoint.
+            return;
+        }
+        // Clear the Rust-side state-machine entry; the next slow-path Construct
+        // visit re-inserts a fresh default.
+        let slot_zero = (slot.get() - 1) as usize;
+        if let Some(Some(slab)) = self.construct_ic_states.get_mut(code_index(code))
+            && let Some(entry) = slab.get_mut(slot_zero)
+        {
+            *entry = None;
+        }
+        // Drop the cached constructor/prototype data for this site.
+        self.construct_cache_entries.remove(&(code, slot));
+        // Zero the asm-readable CallMetadata entry (mode/generation/callee_bits).
+        if let Some(table) = self.metadata_table_mut(code) {
+            *table.call_mut(slot.get()) = metadata_table::call::CallMetadata::default();
+        }
+    }
+
     /// Phase D.4.1: post-mark GC sweep. Drops the `CallIcState` slab for code
     /// that is no longer live (both Call and Construct tables).
     #[allow(
@@ -1920,6 +1961,15 @@ impl AdaptiveProtoLoadDispatch for Vm {
         let state = self.property_ic_state_or_default_mut(code, slot);
         state.generation = state.generation.wrapping_add(1);
         state.generation
+    }
+
+    fn clear_construct_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    ) {
+        Self::clear_construct_ic_slot_if_generation_matches(self, code, slot, generation);
     }
 }
 

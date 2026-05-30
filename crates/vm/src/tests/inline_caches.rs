@@ -4485,6 +4485,134 @@ fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
 }
 
 // -----------------------------------------------------------------------------
+// Construct IC eager-clear: reassigning F.prototype clears a registered
+// per-constructor construct IC slot (Task 3, EAGER-CLEAR invalidation model).
+// -----------------------------------------------------------------------------
+//
+// Mirrors `adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition`
+// for setup style, but for the per-constructor `.prototype` watchpoint path.
+// A `.prototype` reassignment overwrites an existing own data slot WITHOUT a
+// shape change, so the shape-keyed watchpoints cannot observe it; the construct
+// IC is invalidated at the write site instead. Task 7 will register the
+// watchpoint in the fast path — this test registers it manually to prove the
+// invalidation wiring fires and clears the slot.
+
+#[test]
+fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
+    // Script 1: warm up the construct IC for F's `new` site and return F so the
+    // test gets the constructor's ObjectRef. The loop crosses the allocation
+    // threshold (= 2) and records a monomorphic construct cache entry.
+    let warmup = compile_test_unit(
+        70_010,
+        r"
+            function F() {}
+            for (var i = 0; i < 4; i = i + 1) {
+                new F();
+            }
+            F;
+        ",
+    );
+    let construct_slot = warmup
+        .function(warmup.entry())
+        .expect("entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Construct)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a construct site for `new F()`");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let warmup_installed = vm.install_script(agent, realm.id(), &warmup).unwrap();
+
+    let f_value = vm
+        .evaluate_installed(
+            agent,
+            warmup_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+    let f = f_value
+        .as_object_ref()
+        .expect("script should return the constructor F");
+
+    // Confirm the construct IC slot is populated (monomorphic) and read its
+    // generation — that's the `(code, slot, generation)` Task 7's fast path
+    // would register a ConstructIcClear watchpoint with.
+    let code = warmup_installed.code();
+    let status = vm
+        .construct_status(code, construct_slot)
+        .expect("entry code should expose a construct status");
+    assert_eq!(
+        status.state,
+        FeedbackInlineCacheState::Monomorphic,
+        "construct IC should be monomorphic after warming up `new F()`",
+    );
+    assert!(
+        status.callee.is_some(),
+        "monomorphic construct IC must expose a cached constructor entry",
+    );
+    let generation = status.generation;
+
+    // Manually register a ConstructIcClear watchpoint on F's per-constructor
+    // set, matching the populated slot (simulating Task 7's fast path).
+    agent
+        .objects_mut()
+        .construct_prototype_watchpoint_mut(f)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::ConstructIcClear {
+                code,
+                slot: construct_slot,
+                generation,
+            },
+        })
+        .expect("register on fresh per-constructor set must succeed");
+
+    // Script 2 on the SAME realm/global env: reassign F.prototype through the
+    // real assignment write path (`F.prototype = {}`). This code is cold, so it
+    // takes the slow store and must fire the construct `.prototype` watchpoint.
+    let reassign = compile_test_unit(70_011, "F.prototype = {};");
+    let reassign_installed = vm.install_script(agent, realm.id(), &reassign).unwrap();
+    vm.evaluate_installed(
+        agent,
+        reassign_installed,
+        realm.global_env(),
+        realm.global_env(),
+    )
+    .run()
+    .unwrap();
+
+    // The watchpoint must have fired and eagerly cleared the construct IC slot.
+    let cleared = vm
+        .construct_status(code, construct_slot)
+        .expect("construct status should still project after clear");
+    assert_eq!(
+        cleared.state,
+        FeedbackInlineCacheState::Uninitialized,
+        "reassigning F.prototype must eager-clear the construct IC slot (state -> Uninitialized)",
+    );
+    assert!(
+        cleared.callee.is_none() && cleared.entries.is_empty(),
+        "cleared construct IC slot must drop its cached constructor entry",
+    );
+
+    // The per-constructor watchpoint set must now be Invalidated (drained).
+    assert_eq!(
+        agent
+            .objects()
+            .construct_prototype_watchpoint_inspect(f)
+            .expect("set entry must still exist after fire")
+            .state(),
+        WatchpointState::Invalidated,
+        "the per-constructor watchpoint set must be Invalidated after firing",
+    );
+}
+
+// -----------------------------------------------------------------------------
 // asm monomorphic-write fast path intercepts hot loop writes
 // -----------------------------------------------------------------------------
 //
