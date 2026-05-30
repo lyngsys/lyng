@@ -200,6 +200,13 @@ pub struct Vm {
     pub(crate) dsl_global_ic_generation: u32,
     /// The executing realm's global environment, cached at run entry so the mirror
     /// refresh is a Vec index (no env-chain walk). `None` until the first run sets it.
+    ///
+    /// LIMITATION (addressed in Task 8): single-slot cache. A nested cross-realm
+    /// entry (direct-eval / module eval in a different realm) overwrites this with the
+    /// inner realm's env, so the outer run's mirror then tracks the wrong realm's
+    /// generation. Safe today (nothing reads the mirror yet); Task 8 makes it
+    /// realm-correct (re-prime from the active frame's realm, or save/restore around
+    /// nested entry).
     dsl_global_env: Option<EnvironmentRef>,
     pub(crate) tiering: Tiering,
     /// `LLInt` feedback drain optimization: codes whose frames were entered
@@ -1040,7 +1047,12 @@ impl Vm {
         }
     }
 
-    /// Cache the executing realm's global env and set the baseline generation.
+    /// Cache the executing realm's global env and prime the baseline generation.
+    /// Called at top-level run entry AFTER global declaration instantiation, so any
+    /// agent-side bumps from instantiation are already captured in the baseline.
+    /// Dispatch-time bumps (delete/defineProperty on the global) are covered by the
+    /// `translate_outcome` slow-path choke point.
+    #[inline]
     pub(crate) fn prime_global_ic_generation(&mut self, agent: &Agent, global_env: EnvironmentRef) {
         self.dsl_global_env = Some(global_env);
         self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
