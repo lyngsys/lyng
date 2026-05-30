@@ -686,6 +686,15 @@ impl Vm {
         // `named_property_install_slow_path` (reads `PropertyIcState`); the
         // metadata access (`metadata_table_mut` / `property_mut`) matches it.
         if let Some((slot, cell, current_gen)) = resolved_cell {
+            // SAFETY INVARIANT: `cell` is a cell-backed global entry's value cell,
+            // which is always allocated `AllocationLifetime::LongLived` (tenured)
+            // at `objects/.../named_properties.rs`. The asm mode-7 hit derefs this
+            // cell via the `value_cells_base` table guarded only by the generation
+            // compare; tenuring is what guarantees a bound global's cell is never
+            // young-swept out from under a live mode-7 site (a minor GC neither
+            // bumps the generation nor nulls the table entry). If a future path
+            // ever cell-backs a global with a non-tenured cell, that invariant
+            // breaks. Regression tripwire: `minor_gc_cell_backed_global_value_survives`.
             let execution_count = self
                 .property_ic_state(code, slot)
                 .map_or(0, |state| state.execution_count);

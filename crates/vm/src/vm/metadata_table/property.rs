@@ -37,6 +37,11 @@ pub const PROPERTY_METADATA_STRIDE_SHIFT: u32 = 5; // log2(32)
 pub const PROPERTY_METADATA_MODE_OFFSET: usize = offset_of!(PropertyMetadata, mode);
 #[allow(dead_code)]
 pub const PROPERTY_METADATA_GENERATION_OFFSET: usize = offset_of!(PropertyMetadata, generation);
+// The asm mode-7 GlobalCellLoad hit reads `metadata.generation` at this offset
+// (via the `{feedback_generation}` binding, which tracks `offset_of!`). Pin the
+// conceptual value so a field reorder surfaces as a visible, reviewed change
+// rather than a silent asm-offset shift.
+const _: () = assert!(PROPERTY_METADATA_GENERATION_OFFSET == 4);
 #[allow(dead_code)]
 pub const PROPERTY_METADATA_HANDLER_BITS_OFFSET: usize = offset_of!(PropertyMetadata, handler_bits);
 #[allow(dead_code)]
