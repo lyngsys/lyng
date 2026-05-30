@@ -205,6 +205,21 @@ impl<'a> PrimitiveHeapView<'a> {
         self.heap.object_record_ptr_table()
     }
 
+    /// Raw base of the value-cell pointer table (mirrors `object_record_ptr_table`).
+    /// The asm GlobalCellLoad fast path indexes this with a cached cell ref.
+    #[inline]
+    pub const fn value_cell_ptr_table_base(self) -> *const *const PrimitiveValueCellRecord {
+        self.heap.value_cell_ptr_table()
+    }
+
+    /// Value-cell pointer table as a slice (1-based refs; entry 0 unused), mirroring
+    /// `object_record_ptrs`. Entries are non-null for live cells and null for freed ones.
+    #[must_use]
+    #[inline]
+    pub fn value_cell_ptr_table(self) -> &'a [*const PrimitiveValueCellRecord] {
+        self.heap.value_cell_ptrs_slice()
+    }
+
     #[inline]
     pub const fn object_slots_ptr_table(self) -> *const *const Value {
         self.heap.object_slots_ptr_table()
@@ -1437,6 +1452,79 @@ mod tests {
         let record = view.value_cell(cell).unwrap();
         assert_eq!(record.stored_value(), Value::from_string_ref(string_b));
         assert_eq!(record.linked_string(), Some(string_b));
+    }
+
+    #[test]
+    fn value_cell_ptr_table_resolves_live_cell_to_its_record() {
+        let mut heap = PrimitiveHeap::new();
+        let cell = {
+            let mut mutator = heap.mutator();
+            let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
+            assert!(mutator.init_store_value(
+                ValueStoreTarget::ValueCell(cell),
+                Value::from_smi(42),
+            ));
+            cell
+        };
+
+        let view = heap.view();
+        let table = view.value_cell_ptr_table();
+        // 1-based ref; entry 0 unused, mirroring `object_record_ptrs`.
+        let ptr = table[cell.get() as usize];
+        assert!(!ptr.is_null());
+        // SAFETY: `cell` is live; `ptr` was just published by alloc and points at the
+        // record's stable address inside its `SlotPage` — the same address
+        // `value_cell(cell)` reads.
+        let record = unsafe { &*ptr };
+        assert_eq!(record.stored_value(), Value::from_smi(42));
+        assert_eq!(
+            record.stored_value(),
+            view.value_cell(cell).unwrap().stored_value(),
+        );
+    }
+
+    #[test]
+    fn value_cell_ptr_table_nulls_freed_cell_and_republishes_on_reuse() {
+        let mut heap = PrimitiveHeap::new();
+        // Allocate (unrooted) and stash its ref/index.
+        let cell = {
+            let mut mutator = heap.mutator();
+            let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
+            assert!(mutator.init_store_value(
+                ValueStoreTarget::ValueCell(cell),
+                Value::from_smi(7),
+            ));
+            cell
+        };
+        let index = cell.get() as usize;
+        assert!(!heap.view().value_cell_ptr_table()[index].is_null());
+
+        // Collect with no roots: the cell is unreachable and is reclaimed through the
+        // `free_value_cell` path, which nulls its table entry (no dangling pointer).
+        let roots = PrimitiveRoots::new();
+        let stats = heap.collect(&roots);
+        assert_eq!(stats.value_cells_reclaimed, 1);
+        assert!(
+            heap.view().value_cell_ptr_table()[index].is_null(),
+            "freed cell's table entry must be nulled, mirroring object_slot_ptrs free",
+        );
+
+        // Reallocating reuses the slot and republishes a fresh, non-null pointer.
+        let reused = {
+            let mut mutator = heap.mutator();
+            let reused = mutator.alloc_value_cell(AllocationLifetime::Default);
+            assert!(mutator.init_store_value(
+                ValueStoreTarget::ValueCell(reused),
+                Value::from_smi(9),
+            ));
+            reused
+        };
+        assert_eq!(reused, cell);
+        let view = heap.view();
+        let ptr = view.value_cell_ptr_table()[index];
+        assert!(!ptr.is_null());
+        // SAFETY: `reused` is live; `ptr` was just republished by alloc.
+        assert_eq!(unsafe { &*ptr }.stored_value(), Value::from_smi(9));
     }
 
     #[test]
