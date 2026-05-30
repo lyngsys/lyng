@@ -1460,10 +1460,9 @@ mod tests {
         let cell = {
             let mut mutator = heap.mutator();
             let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
-            assert!(mutator.init_store_value(
-                ValueStoreTarget::ValueCell(cell),
-                Value::from_smi(42),
-            ));
+            assert!(
+                mutator.init_store_value(ValueStoreTarget::ValueCell(cell), Value::from_smi(42),)
+            );
             cell
         };
 
@@ -1490,10 +1489,9 @@ mod tests {
         let cell = {
             let mut mutator = heap.mutator();
             let cell = mutator.alloc_value_cell(AllocationLifetime::Default);
-            assert!(mutator.init_store_value(
-                ValueStoreTarget::ValueCell(cell),
-                Value::from_smi(7),
-            ));
+            assert!(
+                mutator.init_store_value(ValueStoreTarget::ValueCell(cell), Value::from_smi(7),)
+            );
             cell
         };
         let index = cell.get() as usize;
@@ -1513,10 +1511,9 @@ mod tests {
         let reused = {
             let mut mutator = heap.mutator();
             let reused = mutator.alloc_value_cell(AllocationLifetime::Default);
-            assert!(mutator.init_store_value(
-                ValueStoreTarget::ValueCell(reused),
-                Value::from_smi(9),
-            ));
+            assert!(
+                mutator.init_store_value(ValueStoreTarget::ValueCell(reused), Value::from_smi(9),)
+            );
             reused
         };
         assert_eq!(reused, cell);
