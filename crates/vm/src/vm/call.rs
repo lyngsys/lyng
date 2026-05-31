@@ -497,8 +497,9 @@ impl Vm {
     }
 
     /// Returns `Some(code)` when `callee_object` is an ordinary bytecode
-    /// constructor for which the Construct fast path can seed the callee frame
-    /// directly from the caller's register window and reuse a cached prototype.
+    /// constructor eligible for the direct register-window Construct entry that
+    /// seeds the callee frame directly from the caller's register window and
+    /// reuses a cached prototype.
     ///
     /// Returns `None` (forcing the slow `construct_value` path) for: bound
     /// functions, proxies, derived class constructors (which need TDZ `this` +
@@ -605,6 +606,9 @@ impl Vm {
             this_value,
             caller_arg_base,
             arg_count,
+            None,
+            None,
+            false,
         )?;
         self.observe_call_target(agent, frame.code(), feedback_slot, callee_object);
         Ok(())

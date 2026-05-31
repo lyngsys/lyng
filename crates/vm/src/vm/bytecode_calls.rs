@@ -377,7 +377,7 @@ impl Vm {
     /// must take [`enter_bytecode_call`] instead.
     #[expect(
         clippy::too_many_arguments,
-        reason = "VM helper threads interpreter and call-site state explicitly to mirror the slow-path entry"
+        reason = "VM helper threads interpreter and call-site state explicitly to mirror the slow-path entry; construct params added for direct register-window construct entry"
     )]
     pub(super) fn enter_bytecode_call_from_caller_registers(
         &mut self,
@@ -388,9 +388,12 @@ impl Vm {
         this_value: Value,
         caller_arg_base: u32,
         arg_count: u16,
+        new_target: Option<ObjectRef>,
+        construct_this: Option<ObjectRef>,
+        construct_call: bool,
     ) -> VmResult<()> {
         let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
+            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, new_target)?;
         debug_assert_eq!(prepared.arguments_mode, ArgumentsMode::None);
         debug_assert!(!prepared.has_rest_parameter);
         let register_base = u32::try_from(self.register_stack_top())
@@ -402,6 +405,8 @@ impl Vm {
             arg_count,
             register_base,
             Some(result_register),
+            construct_this,
+            construct_call,
         )
     }
 
@@ -411,6 +416,10 @@ impl Vm {
     /// safe when the prepared call has `arguments_mode == None` and no
     /// rest parameter, since `initialize_activation_objects` would
     /// otherwise need a materialized slice.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter and call-site state explicitly to mirror the slow-path entry; construct params added for direct register-window construct entry"
+    )]
     fn install_prepared_bytecode_call_from_registers(
         &mut self,
         agent: &mut Agent,
@@ -419,6 +428,8 @@ impl Vm {
         arg_count: u16,
         register_base: u32,
         return_register: Option<u16>,
+        construct_this: Option<ObjectRef>,
+        construct_call: bool,
     ) -> VmResult<()> {
         if self.frames.len() >= MAX_BYTECODE_CALL_DEPTH {
             return Err(VmError::Abrupt(errors::throw_range_error(agent)));
@@ -460,9 +471,18 @@ impl Vm {
         )
         .with_this_value(prepared.this_value)
         .with_parameter_initializer_end_offset(prepared.parameter_initializer_end_offset)
+        .with_construct_this(construct_this)
         .with_new_target(prepared.new_target)
         .with_callee(Some(prepared.callee))
-        .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
+        .with_flags(
+            FrameFlags::entry()
+                .with_flag(FrameFlags::suspendable(), true)
+                .with_flag(FrameFlags::construct(), construct_call)
+                .with_flag(
+                    FrameFlags::derived_construct(),
+                    construct_call && prepared.derived_class_constructor,
+                ),
+        );
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
@@ -1066,5 +1086,114 @@ mod tests {
         let result = vm.run(agent, &NoopHostHooks, &mut registry);
 
         assert_eq!(result, Ok(Value::undefined()));
+    }
+
+    #[test]
+    fn register_window_entry_threads_construct_params_into_frame() {
+        // Build a minimal bytecode function that does nothing (no arguments,
+        // no environment) — we only care that the pushed FrameRecord has the
+        // correct this_value, new_target, and construct flag.
+        let function = BytecodeBuilder::new(
+            BytecodeFunctionId::from_raw(21).unwrap(),
+            BytecodeFunctionKind::Function,
+        )
+        .finish()
+        .expect("test bytecode should build");
+        let unit = CompiledFunctionUnit::new(SourceId::new(94), function.id(), vec![function]);
+
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist after boot");
+        let global_env = realm.global_env();
+        let root_shape = realm
+            .root_shape()
+            .expect("default realm should expose a root shape");
+
+        let mut vm = Vm::new();
+        let installed = vm
+            .install_function(agent, realm.id(), &unit)
+            .expect("function unit should install");
+
+        // The callee doubles as new_target (matching real construct semantics).
+        let callee = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::function(root_shape).with_cold_data(ObjectColdData::Function(
+                    FunctionObjectData::bytecode(realm.id(), global_env, installed.code()),
+                )),
+                AllocationLifetime::Default,
+            )
+        });
+
+        // A plain object that represents the freshly-allocated construct_this.
+        let construct_this_obj = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            )
+        });
+
+        // Seed a minimal caller frame with one register slot so
+        // caller_arg_base is valid and lies before the callee frame.
+        let caller_frame = FrameRecord::new(
+            installed.code(),
+            0,
+            RegisterWindow::new(0, 1),
+            None,
+            realm.id(),
+            global_env,
+            global_env,
+            ExecutionContextKind::Function,
+        );
+        vm.register_stack.resize(1, Value::undefined());
+        vm.register_stack_top = vm.register_stack.len();
+        agent.push_execution_context(ExecutionContext::script(
+            realm.id(),
+            realm.global_env(),
+            realm.global_env(),
+        ));
+        vm.frames.push(caller_frame);
+
+        vm.enter_bytecode_call_from_caller_registers(
+            agent,
+            &caller_frame,
+            0,
+            callee,
+            Value::from_object_ref(construct_this_obj),
+            // caller_arg_base points past the single register in the caller window
+            1,
+            0,
+            Some(callee),
+            Some(construct_this_obj),
+            true,
+        )
+        .expect("register-window construct entry should succeed");
+
+        let frame = *vm.frames.last().expect("entry should push a callee frame");
+
+        assert_eq!(
+            frame.this_value(),
+            Value::from_object_ref(construct_this_obj),
+            "callee frame this_value must equal construct_this object"
+        );
+        assert_eq!(
+            frame.new_target(),
+            Some(callee),
+            "callee frame new_target must equal the callee (new_target param)"
+        );
+        assert!(
+            frame.flags().contains(FrameFlags::construct()),
+            "callee frame must have the construct flag set"
+        );
+        assert_eq!(
+            frame.construct_this(),
+            Some(construct_this_obj),
+            "callee frame construct_this must equal the allocated object"
+        );
     }
 }
