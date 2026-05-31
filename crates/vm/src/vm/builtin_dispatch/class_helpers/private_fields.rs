@@ -28,11 +28,7 @@ impl Vm {
             .objects()
             .function_data(function)
             .and_then(lyng_objects::FunctionObjectData::private_env)
-            .or_else(|| {
-                agent
-                    .current_execution_context()
-                    .and_then(lyng_env::ExecutionContext::private_env)
-            });
+            .or_else(|| self.frame().and_then(|frame| frame.private_env()));
         let installs_private_names = arguments
             .get(3)
             .copied()
@@ -112,7 +108,7 @@ impl Vm {
         class_depth: u32,
     ) -> ObjectRef {
         if let Some(class_key) =
-            Self::private_context_from_private_env(agent, descriptor_index, class_depth)
+            Self::private_context_from_private_env(agent, caller, descriptor_index, class_depth)
         {
             return class_key;
         }
@@ -164,12 +160,11 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn private_context_from_private_env(
         agent: &Agent,
+        caller: &FrameRecord,
         descriptor_index: u32,
         class_depth: u32,
     ) -> Option<ObjectRef> {
-        let mut current = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::private_env);
+        let mut current = caller.private_env();
         let mut remaining = class_depth;
 
         while let Some(environment) = current {

@@ -266,9 +266,7 @@ impl Vm {
         self.reserve_register_window(register_base, register_len);
         self.copy_arguments_into_frame(register_base, prepared.parameter_count, arguments);
 
-        let script_or_module_referrer = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+        let script_or_module_referrer = self.current_referrer();
         let context = ExecutionContext::bytecode(
             prepared.realm,
             prepared.code,
@@ -450,9 +448,7 @@ impl Vm {
             arg_count,
         );
 
-        let script_or_module_referrer = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+        let script_or_module_referrer = self.current_referrer();
         let context = ExecutionContext::bytecode(
             prepared.realm,
             prepared.code,

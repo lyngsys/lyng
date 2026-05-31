@@ -589,7 +589,7 @@ pub fn op_assign_captured_name_semantic(
 // =====================================================================
 // Frame-state loads — LoadThis / LoadCallee / LoadNewTarget
 //
-// `LoadThis` resolves the current execution context's `this_state`. The
+// `LoadThis` resolves the live frame's `this_state`. The
 // `Uninitialized` arm throws a ReferenceError; `Lexical` walks the
 // lexical environment via `Vm::resolve_this_binding`. `LoadCallee` and
 // `LoadNewTarget` are pure frame reads — no atom, no feedback, no
@@ -603,10 +603,7 @@ pub fn op_load_this_semantic(
     let inner = state.dispatch_state();
     let load_this = {
         let DispatchState { agent, frame, .. } = &mut *inner;
-        let this_state = agent.current_execution_context().map_or_else(
-            || ThisState::Value(frame.this_value()),
-            lyng_env::ExecutionContext::this_state,
-        );
+        let this_state = frame.this_state();
         match this_state {
             ThisState::Value(value) => Ok(value),
             ThisState::Uninitialized => Err(VmError::Abrupt(errors::throw_reference_error(agent))),

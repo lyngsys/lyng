@@ -165,9 +165,7 @@ impl Vm {
         let binding_status = record.map_or_else(
             || {
                 if caller.construct_this().is_some()
-                    || agent
-                        .current_execution_context()
-                        .is_some_and(|context| context.this_state() != ThisState::Uninitialized)
+                    || caller.this_state() != ThisState::Uninitialized
                 {
                     lyng_env::ThisBindingStatus::Initialized
                 } else {

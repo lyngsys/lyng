@@ -1648,9 +1648,6 @@ impl Vm {
         frame: &FrameRecord,
         instruction_offset: u32,
     ) -> VmResult<SuspendedExecutionRef> {
-        let context = agent
-            .current_execution_context()
-            .ok_or_else(|| VmError::MissingEnvironment(frame.lexical_env()))?;
         let register_base =
             usize::try_from(frame.registers().base()).expect("register base should fit usize");
         let register_end =
@@ -1690,9 +1687,9 @@ impl Vm {
                     instruction_offset,
                     frame.lexical_env(),
                     frame.variable_env(),
-                    context.private_env(),
+                    frame.private_env(),
                     frame.this_value(),
-                    encode_this_state_kind(context.this_state()),
+                    encode_this_state_kind(frame.this_state()),
                     frame.construct_this(),
                     frame.new_target(),
                     frame.callee(),
@@ -1720,7 +1717,7 @@ impl Vm {
             async_generator_frame_state: self
                 .async_generator_frame_states
                 .remove(&frame.registers().base()),
-            script_or_module_referrer: context.script_or_module_referrer(),
+            script_or_module_referrer: self.current_referrer(),
         };
         if !side_state.iterator_states.is_empty()
             || !side_state.for_in_states.is_empty()

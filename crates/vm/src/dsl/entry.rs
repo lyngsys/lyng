@@ -99,7 +99,7 @@ pub(crate) fn run_via_dsl(
     // active execution context's ThisState into either the real
     // Value or Value::uninitialized_lexical() sentinel.
     // See spec §3.3.
-    let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(agent, &frame);
+    let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(&frame);
     let object_records_base = agent.heap().view().object_record_ptr_table();
     let object_slots_base = agent.heap().view().object_slots_ptr_table();
     // Task 7: value-cell pointer table base for the asm mode-7

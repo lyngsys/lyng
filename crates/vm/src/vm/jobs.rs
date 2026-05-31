@@ -562,8 +562,8 @@ impl Vm {
         capability: Option<PromiseCapabilityId>,
     ) -> VmResult<()> {
         let script_or_module_referrer = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+            .running_context()
+            .and_then(lyng_env::RunningContext::referrer);
         let fulfill_reaction = agent.alloc_promise_reaction(
             PromiseReactionRecord::new(PromiseReactionKind::Fulfill, on_fulfilled, capability)
                 .with_script_or_module_referrer(script_or_module_referrer),

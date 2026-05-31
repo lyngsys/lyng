@@ -159,9 +159,7 @@ impl Vm {
         } else {
             None
         };
-        let private_env = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::private_env);
+        let private_env = frame.private_env();
         let environment = if child.captures().is_empty() {
             let lexical_env = frame.lexical_env();
             if matches!(
@@ -1293,7 +1291,8 @@ mod tests {
             global_env,
             global_env,
             ExecutionContextKind::Function,
-        );
+        )
+        .with_private_env(Some(private_env));
         agent.push_execution_context(
             ExecutionContext::bytecode(realm.id(), installed.code(), global_env, global_env)
                 .with_private_env(Some(private_env)),

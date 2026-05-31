@@ -139,8 +139,8 @@ pub(crate) const fn resolve_this_state_to_mirror(
     }
 }
 
-/// Top-level helper: derives the mirror from an `Agent` + a
-/// `FrameRecord`. Mirrors the read path in
+/// Top-level helper: derives the mirror from the live `FrameRecord`.
+/// Mirrors the read path in
 /// `crates/vm/src/vm/semantics/names.rs` so the pre-resolution
 /// matches `op_load_this` semantics exactly.
 ///
@@ -149,13 +149,8 @@ pub(crate) const fn resolve_this_state_to_mirror(
 /// - `crate::dsl::slow_path::LlIntDispatchState::translate_outcome`
 ///   (Refresh arm)
 #[inline]
-pub(crate) fn resolve_initial_this_value(
-    agent: &lyng_env::Agent,
-    frame: &crate::FrameRecord,
-) -> Value {
-    let this_state = agent
-        .current_execution_context()
-        .map(lyng_env::ExecutionContext::this_state);
+pub(crate) fn resolve_initial_this_value(frame: &crate::FrameRecord) -> Value {
+    let this_state = Some(frame.this_state());
     let fallback = frame.this_value();
     resolve_this_state_to_mirror(this_state, fallback)
 }
