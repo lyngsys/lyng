@@ -1340,12 +1340,13 @@ impl Vm {
         self.for_in_states.len()
     }
 
-    pub(crate) fn push_referrer_scope(&mut self, base_depth: usize, referrer: Option<lyng_common::AtomId>) {
+    /// Record a new referrer establishment starting at `base_depth` frames deep.
+    pub(crate) fn push_referrer_scope(&mut self, base_depth: usize, referrer: Option<AtomId>) {
         self.referrer_scopes.push(ReferrerScope { base_depth, referrer });
     }
 
-    /// Drop every establishment scope whose base frame has unwound (i.e. whose
-    /// `base_depth >= target_frame_depth`).
+    /// Drop all scopes established at frame depth ≥ `target_frame_depth` (those
+    /// frames are being exited).
     pub(crate) fn unwind_referrer_scopes_to(&mut self, target_frame_depth: usize) {
         while self
             .referrer_scopes
@@ -1357,7 +1358,7 @@ impl Vm {
     }
 
     /// The referrer of the current establishment (the nearest one toward the base).
-    pub(crate) fn current_referrer(&self) -> Option<lyng_common::AtomId> {
+    pub(crate) fn current_referrer(&self) -> Option<AtomId> {
         self.referrer_scopes.last().and_then(|scope| scope.referrer)
     }
 
@@ -1763,6 +1764,11 @@ impl Vm {
         let prior_register_len = usize::try_from(register_base)
             .expect("register stack base should fit into usize for truncation");
         let prior_context_depth = agent.execution_contexts().len();
+        // Mirror the entry context's referrer onto the parallel side-stack. The
+        // establishing frame sits at `prior_frame_depth`, so this scope unwinds
+        // exactly when that frame does (see the unwind loop below). Reading off
+        // the finalized context keeps script and module branches in lockstep.
+        self.push_referrer_scope(prior_frame_depth, context.script_or_module_referrer());
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
@@ -1799,6 +1805,7 @@ impl Vm {
             self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
             self.release_register_window(leaked.registers().base());
         }
+        self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();

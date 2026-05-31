@@ -37,6 +37,10 @@ impl Vm {
             self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
             self.release_register_window(leaked.registers().base());
         }
+        // Internal calls inherit the referrer rather than establishing one, so
+        // no scope is pushed here; this only cleans up scopes established by any
+        // frames we just unwound (harmless no-op when none exist above baseline).
+        self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();

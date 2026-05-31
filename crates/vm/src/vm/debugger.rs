@@ -197,6 +197,21 @@ impl<'a> VmDebugPauseContext<'a> {
     fn frame_at(&self, frame_index: usize) -> Option<FrameRecord> {
         self.vm.frames().iter().rev().nth(frame_index).copied()
     }
+
+    /// The referrer reported by the parallel `Vm` side-stack and the one carried
+    /// by the authoritative current execution context. The SP-0a referrer
+    /// migration requires these to stay equal at every live point.
+    #[cfg(test)]
+    pub(crate) fn referrer_parity(
+        &self,
+    ) -> (Option<lyng_common::AtomId>, Option<lyng_common::AtomId>) {
+        let side_stack = self.vm.current_referrer();
+        let context = self
+            .agent
+            .current_execution_context()
+            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+        (side_stack, context)
+    }
 }
 
 /// Caller-owned bundle of `(hook, state)` that drives the VM debug poll.

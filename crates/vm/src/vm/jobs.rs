@@ -129,6 +129,11 @@ impl Vm {
             | RuntimeJobPayload::AtomicsWaitAsyncTimeout { .. }
             | RuntimeJobPayload::FinalizationCleanup { .. } => None,
         };
+        // Mirror the job context's referrer onto the parallel side-stack. No
+        // job frame exists yet (Task 12 adds one), so the establishment sits at
+        // the current frame depth and unwinds before the context is popped below.
+        let job_base_depth = self.frames.len();
+        self.push_referrer_scope(job_base_depth, script_or_module_referrer);
         agent.push_execution_context(
             lyng_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)
                 .with_script_or_module_referrer(script_or_module_referrer),
@@ -190,6 +195,7 @@ impl Vm {
                 registry_object,
             ),
         };
+        self.unwind_referrer_scopes_to(job_base_depth);
         let _ = agent.pop_execution_context();
         agent.clear_kept_objects();
         result

@@ -76,6 +76,57 @@ fn debugger_pauses_at_requested_loop_header_and_reads_frame_state() {
     );
 }
 
+/// `(side-stack referrer, execution-context referrer)` captured at a pause.
+type ReferrerParity = (Option<AtomId>, Option<AtomId>);
+
+#[derive(Clone)]
+struct ReferrerProbeHook {
+    parity: Rc<RefCell<Vec<ReferrerParity>>>,
+}
+
+impl VmDebugHook for ReferrerProbeHook {
+    fn on_pause(&mut self, context: VmDebugPauseContext<'_>) -> VmDebugCommand {
+        self.parity.borrow_mut().push(context.referrer_parity());
+        VmDebugCommand::Resume
+    }
+}
+
+#[test]
+fn current_referrer_matches_context_after_entry() {
+    // Drive a script entry with a known `script_or_module_referrer`, pause at a
+    // live mid-execution safepoint, and assert the parallel `Vm` side-stack
+    // reports the same referrer the authoritative execution context carries.
+    let (unit, loop_offset) = inspector_fixture_unit();
+    let parity = Rc::new(RefCell::new(Vec::new()));
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let referrer = agent.atoms_mut().intern_collectible("entry-referrer.js");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut debugger = VmDebugger::new(ReferrerProbeHook {
+        parity: Rc::clone(&parity),
+    });
+    debugger.request_pause_at(installed.code(), loop_offset);
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_referrer(referrer)
+        .with_debugger(&mut debugger)
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(41));
+    let parity = parity.borrow();
+    assert_eq!(parity.len(), 1, "expected exactly one mid-execution pause");
+    let (side_stack, context) = parity[0];
+    // The side-stack must mirror the context exactly (the SP-0a invariant)...
+    assert_eq!(side_stack, context);
+    // ...and must actually carry the established referrer (not a both-None pass).
+    assert_eq!(side_stack, Some(referrer));
+}
+
 #[test]
 fn debugger_step_commands_pause_at_frame_depth_boundaries() {
     assert_step_command(

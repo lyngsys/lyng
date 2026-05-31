@@ -787,6 +787,9 @@ impl Vm {
         debug_assert_eq!(active, *frame);
         self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
+        // The generator's establishment scope is removed while suspended; the
+        // referrer is already saved in side-state and re-established at restore.
+        self.unwind_referrer_scopes_to(self.frames.len());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorYield {
@@ -811,6 +814,9 @@ impl Vm {
         debug_assert_eq!(active, *frame);
         self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
+        // The generator's establishment scope is removed while suspended; the
+        // referrer is already saved in side-state and re-established at restore.
+        self.unwind_referrer_scopes_to(self.frames.len());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorStart { suspended })
@@ -1590,10 +1596,16 @@ impl Vm {
         .with_resume(resume_kind, resume_value);
         frame.set_instruction_offset(record.instruction_offset());
 
+        // Re-establish the suspend-time referrer (saved in side-state, given to
+        // the rebuilt context above) rather than inheriting the resume-time
+        // stack's. The restored frame sits at `restore_frame_depth`, so the
+        // scope unwinds when that frame next suspends or returns.
+        let restore_frame_depth = self.frames.len();
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();
+        self.push_referrer_scope(restore_frame_depth, script_or_module_referrer);
         self.request_dispatch_frame_check();
 
         if let Some(side_state) = side_state {
