@@ -198,22 +198,12 @@ impl<'a> VmDebugPauseContext<'a> {
         self.vm.frames().iter().rev().nth(frame_index).copied()
     }
 
-    /// The referrer reported by the parallel `Vm` side-stack and the one carried
-    /// by the authoritative current execution context. The SP-0a referrer
-    /// migration requires these to stay equal at every live point.
-    ///
-    /// Test-only scaffolding; production readers of `current_referrer` arrive
-    /// with the reader-migration tasks.
+    /// The referrer reported by the parallel `Vm` side-stack at the current live
+    /// pause. The SP-0a referrer migration made this side-stack the single
+    /// source of truth for the establishment referrer.
     #[cfg(test)]
-    pub(crate) fn referrer_parity(
-        &self,
-    ) -> (Option<lyng_common::AtomId>, Option<lyng_common::AtomId>) {
-        let side_stack = self.vm.current_referrer();
-        let context = self
-            .agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
-        (side_stack, context)
+    pub(crate) fn current_referrer(&self) -> Option<lyng_common::AtomId> {
+        self.vm.current_referrer()
     }
 
     /// The Agent's ambient `running_context` snapshot alongside the values the

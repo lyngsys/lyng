@@ -309,7 +309,7 @@ mod tests {
     }
 
     /// Proves that `current_realm` (and therefore `throw_type_error`) follows
-    /// `running_context`, not `current_execution_context` / the default realm.
+    /// the `running_context` scalar, not the default realm.
     ///
     /// We create a second realm with its own distinct `type_error_prototype`,
     /// set `agent.running_context` to point at that realm, and assert that the

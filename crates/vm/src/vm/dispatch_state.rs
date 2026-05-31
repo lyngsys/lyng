@@ -137,13 +137,6 @@ impl<'vm> DispatchState<'vm> {
         self.vm.refresh_dsl_poll_pending_for_agent(self.agent);
     }
 
-    /// Pop the agent's top execution context. Mirror of the
-    /// `let _ = agent.pop_execution_context();` line in the legacy match.
-    #[inline]
-    pub(crate) fn pop_execution_context(&mut self) {
-        let _ = self.agent.pop_execution_context();
-    }
-
     /// Wrap `Vm::finish_frame` with the split borrow of `vm` and `agent` that
     /// the borrow checker requires through `&mut DispatchState`.
     #[inline]

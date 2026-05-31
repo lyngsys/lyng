@@ -232,7 +232,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     assert_eq!(result, Value::from_smi(41));
     assert!(vm.frames().is_empty());
     assert!(vm.register_stack().is_empty());
-    assert!(agent.current_execution_context().is_none());
+    assert!(agent.running_context().is_none());
 }
 
 #[cfg(feature = "diagnostic-counters")]
@@ -2425,7 +2425,7 @@ fn function_call_builtin_rebinds_nested_targets_without_frame_leaks() {
     assert_eq!(result, Value::from_smi(19));
     assert!(vm.frames().is_empty());
     assert!(vm.register_stack().is_empty());
-    assert!(agent.current_execution_context().is_none());
+    assert!(agent.running_context().is_none());
 }
 
 #[test]

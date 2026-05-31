@@ -3,16 +3,12 @@
 use lyng_ast::FunctionId;
 use lyng_common::AtomId;
 use lyng_compiler::{derive_environment_layout_plan, EnvironmentLayoutPlanError};
-use lyng_env::{
-    EnvironmentLayoutKind, ExecutableId, ExecutionContext, ExecutionContextKind, Intrinsics,
-    JobQueueKind, Runtime, ThisState,
-};
+use lyng_env::{EnvironmentLayoutKind, Intrinsics, JobQueueKind, Runtime};
 use lyng_host::NoopHostHooks;
 use lyng_sema::{
     BindingRecord, BindingTable, DeclarationKind, FunctionSemaId, FunctionSemaRecord,
     FunctionSemaTable, ScopeKind, ScopeRecord, ScopeTable, StorageClass,
 };
-use lyng_types::{CodeRef, Value};
 
 #[test]
 fn runtime_topology_boots_through_public_env_surface() {
@@ -21,13 +17,6 @@ fn runtime_topology_boots_through_public_env_surface() {
         .root_agent()
         .default_realm()
         .expect("runtime should expose a default realm");
-    let context = ExecutionContext::bytecode(
-        default_realm.id(),
-        CodeRef::from_raw(17).unwrap(),
-        default_realm.global_env(),
-        default_realm.global_env(),
-    )
-    .with_this_state(ThisState::Value(Value::undefined()));
     let intrinsics = Intrinsics::new().with_object_prototype(Some(default_realm.global_object()));
 
     assert_eq!(runtime.root_cluster().agent_count(), 1);
@@ -37,12 +26,6 @@ fn runtime_topology_boots_through_public_env_surface() {
     );
     assert_eq!(runtime.root_agent().realm_refs(), &[default_realm.id()]);
     assert!(default_realm.is_default());
-    assert_eq!(context.kind(), ExecutionContextKind::Function);
-    assert_eq!(
-        context.executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(17).unwrap())
-    );
-    assert_eq!(context.this_state(), ThisState::Value(Value::undefined()));
     assert_eq!(
         intrinsics.object_prototype(),
         Some(default_realm.global_object())

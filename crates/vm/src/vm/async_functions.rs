@@ -41,7 +41,6 @@ impl Vm {
                 .or_else(|| agent.module_key_for_environment(frame.lexical_env()))
         });
         let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
         let prior_register_len =
             usize::try_from(resumed_frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -50,12 +49,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
 
         match result {
             Ok(_) => {
@@ -83,7 +77,6 @@ impl Vm {
         let capability = Self::create_intrinsic_promise_capability(agent, prepared.realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let prior_frame_depth = self.frames.len();
-        let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack_top();
         let register_base =
             u32::try_from(prior_register_len).expect("register stack length should fit u32");
@@ -105,12 +98,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
         let _ = self.async_frame_states.remove(&register_base);
 
         let realm_record = agent
@@ -215,7 +203,6 @@ impl Vm {
             .map(|frame| frame.registers().base())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
         let prior_register_len =
             usize::try_from(async_frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -224,12 +211,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
         let _ = self.async_frame_states.remove(&async_frame_base);
 
         match result {
@@ -356,7 +338,6 @@ impl Vm {
         self.request_dispatch_frame_check();
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
-        let _ = agent.pop_execution_context();
         self.refresh_running_context(agent);
         Self::enqueue_await_resume(agent, promise, suspended)?;
         Err(VmError::AsyncSuspend)

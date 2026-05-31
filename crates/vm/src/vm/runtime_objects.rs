@@ -1237,7 +1237,7 @@ mod tests {
     };
     use lyng_common::SourceId;
     use lyng_env::{
-        EnvironmentLayout, EnvironmentLayoutKind, ExecutionContext, ExecutionContextKind, Runtime,
+        EnvironmentLayout, EnvironmentLayoutKind, ExecutionContextKind, Runtime,
     };
     use lyng_host::NoopHostHooks;
     use lyng_ops::object;
@@ -1293,10 +1293,6 @@ mod tests {
             ExecutionContextKind::Function,
         )
         .with_private_env(Some(private_env));
-        agent.push_execution_context(
-            ExecutionContext::bytecode(realm.id(), installed.code(), global_env, global_env)
-                .with_private_env(Some(private_env)),
-        );
 
         let closure = vm
             .create_closure(agent, &frame, 0)

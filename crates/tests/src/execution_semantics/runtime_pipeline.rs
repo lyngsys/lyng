@@ -7,7 +7,7 @@ use lyng_bytecode::{
 };
 use lyng_common::{AtomTable, SourceId, WellKnownAtom};
 use lyng_compiler::{compile_module, compile_script};
-use lyng_env::{ExecutionContext, ExecutionContextKind, ModuleStatus, Runtime};
+use lyng_env::{ExecutionContextKind, ModuleStatus, Runtime};
 use lyng_host::{ModuleKey, NoopHostHooks};
 use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{analyze_module, analyze_script};
@@ -15,13 +15,7 @@ use lyng_types::{CodeRef, EnvironmentRef, RealmRef, Value};
 use lyng_vm::{seed_registers, FrameRecord, RegisterWindow, Vm};
 
 #[test]
-fn runtime_context_and_frame_records_seed_register_windows() {
-    let context = ExecutionContext::bytecode(
-        RealmRef::from_raw(1).unwrap(),
-        CodeRef::from_raw(2).unwrap(),
-        EnvironmentRef::from_raw(3).unwrap(),
-        EnvironmentRef::from_raw(3).unwrap(),
-    );
+fn runtime_frame_records_seed_register_windows() {
     let frame = FrameRecord::new(
         CodeRef::from_raw(2).unwrap(),
         4,
@@ -34,7 +28,7 @@ fn runtime_context_and_frame_records_seed_register_windows() {
     );
     let registers = seed_registers(frame.registers());
 
-    assert_eq!(context.kind(), ExecutionContextKind::Function);
+    assert_eq!(frame.kind(), ExecutionContextKind::Function);
     assert_eq!(frame.instruction_offset(), 4);
     assert_eq!(registers.len(), 2);
 }
@@ -83,7 +77,7 @@ fn vm_installs_and_executes_hand_authored_bytecode() {
     assert_eq!(result, Value::from_smi(12));
     assert!(vm.frames().is_empty());
     assert!(vm.register_stack().is_empty());
-    assert!(agent.current_execution_context().is_none());
+    assert!(agent.running_context().is_none());
 }
 
 #[test]

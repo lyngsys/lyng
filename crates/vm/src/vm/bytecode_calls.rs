@@ -1,6 +1,6 @@
 use super::activation_objects::ActivationObjectInit;
 use super::{
-    Agent, AllocationLifetime, ArgumentsMode, CodeRef, EnvironmentRef, ExecutionContext,
+    Agent, AllocationLifetime, ArgumentsMode, CodeRef, EnvironmentRef, ExecutionContextKind,
     FrameFlags, FrameRecord, HostHooks, ObjectAllocation, ObjectRef, RealmRef, RegisterWindow,
     ThisBindingStatus, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
     WellKnownAtom,
@@ -266,17 +266,6 @@ impl Vm {
         self.reserve_register_window(register_base, register_len);
         self.copy_arguments_into_frame(register_base, prepared.parameter_count, arguments);
 
-        let script_or_module_referrer = self.current_referrer();
-        let context = ExecutionContext::bytecode(
-            prepared.realm,
-            prepared.code,
-            prepared.lexical_env,
-            prepared.variable_env,
-        )
-        .with_private_env(prepared.private_env)
-        .with_this_state(prepared.execution_this_state)
-        .with_script_or_module_referrer(script_or_module_referrer)
-        .with_new_target(prepared.new_target);
         if let Err(error) = self.initialize_activation_objects(
             agent,
             ActivationObjectInit {
@@ -302,7 +291,7 @@ impl Vm {
             prepared.realm,
             prepared.lexical_env,
             prepared.variable_env,
-            context.kind(),
+            ExecutionContextKind::Function,
         )
         .with_this_value(prepared.this_value)
         .with_this_state(prepared.execution_this_state)
@@ -320,7 +309,6 @@ impl Vm {
                     construct_call && prepared.derived_class_constructor,
                 ),
         );
-        agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.refresh_running_context(agent);
@@ -347,7 +335,6 @@ impl Vm {
             .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
         self.release_register_stack_to(register_base);
         let _ = self.current_exception.take();
-        let _ = agent.pop_execution_context();
         self.refresh_running_context(agent);
         Ok(())
     }
@@ -448,17 +435,6 @@ impl Vm {
             arg_count,
         );
 
-        let script_or_module_referrer = self.current_referrer();
-        let context = ExecutionContext::bytecode(
-            prepared.realm,
-            prepared.code,
-            prepared.lexical_env,
-            prepared.variable_env,
-        )
-        .with_private_env(prepared.private_env)
-        .with_this_state(prepared.execution_this_state)
-        .with_script_or_module_referrer(script_or_module_referrer)
-        .with_new_target(prepared.new_target);
         let frame = FrameRecord::new(
             prepared.code,
             0,
@@ -467,7 +443,7 @@ impl Vm {
             prepared.realm,
             prepared.lexical_env,
             prepared.variable_env,
-            context.kind(),
+            ExecutionContextKind::Function,
         )
         .with_this_value(prepared.this_value)
         .with_this_state(prepared.execution_this_state)
@@ -485,7 +461,6 @@ impl Vm {
                     construct_call && prepared.derived_class_constructor,
                 ),
         );
-        agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.refresh_running_context(agent);
@@ -754,7 +729,7 @@ mod tests {
     use lyng_types::eval_builtin;
 
     #[test]
-    fn prepared_bytecode_call_threads_private_env_into_execution_context() {
+    fn prepared_bytecode_call_threads_private_env_into_frame() {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
         let realm = agent
@@ -816,17 +791,15 @@ mod tests {
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
 
-        assert_eq!(
-            agent
-                .current_execution_context()
-                .expect("installed call should push an execution context")
-                .private_env(),
-            Some(private_env)
-        );
+        let frame = *vm
+            .frames
+            .last()
+            .expect("installed call should leave one active frame");
+        assert_eq!(frame.private_env(), Some(private_env));
     }
 
     #[test]
-    fn prepared_bytecode_call_frame_mirrors_context_this_state_and_private_env() {
+    fn prepared_bytecode_call_frame_carries_prepared_this_state_and_private_env() {
         let mut runtime = Runtime::new(NoopHostHooks);
         let agent = runtime.root_agent_mut();
         let realm = agent
@@ -884,6 +857,10 @@ mod tests {
         let prepared = vm
             .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
+        // Capture the prepared values before install; the installed frame must
+        // carry these directly (the frame is now the single source of truth).
+        let expected_this_state = prepared.execution_this_state;
+        let expected_private_env = prepared.private_env;
         vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
             .expect("bytecode call should install");
 
@@ -891,14 +868,11 @@ mod tests {
             .frames
             .last()
             .expect("prepared call should leave one active frame");
-        let context = agent
-            .current_execution_context()
-            .expect("installed call should push an execution context");
 
-        // The execution context is still authoritative; the frame must now carry
-        // the same this_state / private_env that the context does.
-        assert_eq!(frame.this_state(), context.this_state());
-        assert_eq!(frame.private_env(), context.private_env());
+        // The frame is authoritative; it must carry the prepared this_state /
+        // private_env directly.
+        assert_eq!(frame.this_state(), expected_this_state);
+        assert_eq!(frame.private_env(), expected_private_env);
         assert_eq!(frame.private_env(), Some(private_env));
     }
 
@@ -1149,11 +1123,6 @@ mod tests {
         );
         vm.register_stack.resize(4, Value::undefined());
         vm.register_stack_top = vm.register_stack.len();
-        agent.push_execution_context(ExecutionContext::script(
-            realm.id(),
-            realm.global_env(),
-            realm.global_env(),
-        ));
         vm.frames.push(caller);
 
         let prepared = vm
@@ -1232,11 +1201,6 @@ mod tests {
         );
         vm.register_stack.resize(1, Value::undefined());
         vm.register_stack_top = vm.register_stack.len();
-        agent.push_execution_context(ExecutionContext::script(
-            realm.id(),
-            realm.global_env(),
-            realm.global_env(),
-        ));
         vm.frames.push(caller_frame);
 
         vm.enter_bytecode_call_from_caller_registers(

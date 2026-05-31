@@ -2,13 +2,13 @@ use super::bytecode_calls::PreparedBytecodeCall;
 use super::dispatch::advance_dispatch_frame;
 use super::runtime_objects::VmIteratorBridge;
 use super::{
-    Agent, AsyncGeneratorFrameState, AsyncGeneratorRequest, ExecutionContext, FrameFlags,
-    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef, RegisterWindow,
-    SuspendedExecutionSideState, Vm, VmError, VmResult,
+    Agent, AsyncGeneratorFrameState, AsyncGeneratorRequest, FrameFlags, FrameRecord, HostHooks,
+    NativeFunctionRegistry, ObjectRef, RealmRef, RegisterWindow, SuspendedExecutionSideState, Vm,
+    VmError, VmResult,
 };
 use crate::frame::GeneratorResumeKind;
 use lyng_common::WellKnownAtom;
-use lyng_env::{ExecutableId, ExecutionContextKind, ThisState};
+use lyng_env::{ExecutionContextKind, ThisState};
 use lyng_gc::{AllocationLifetime, RuntimeSuspendedExecutionRecord};
 use lyng_objects::{GeneratorState, ObjectAllocation, ObjectColdData, OrdinaryObjectData};
 use lyng_ops::{errors, iterator, iterator::IteratorOpsContext, object};
@@ -55,7 +55,6 @@ impl Vm {
             .installed_function(prepared.code)
             .is_some_and(|function| function.flags().async_function());
         let prior_frame_depth = self.frames.len();
-        let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack_top();
         self.install_prepared_bytecode_call(
             agent,
@@ -71,12 +70,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
 
         match result {
             Err(VmError::GeneratorStart { suspended }) => {
@@ -720,7 +714,6 @@ impl Vm {
             self.async_generator_frame_states.insert(frame_base, state);
         }
         let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_context_depth = agent.execution_contexts().len().saturating_sub(1);
         let prior_register_len =
             usize::try_from(frame_base).expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
@@ -729,12 +722,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
         let _ = self.async_generator_frame_states.remove(&frame_base);
 
         match result {
@@ -792,7 +780,6 @@ impl Vm {
         let suspend_frame_depth = self.frames.len();
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
-        let _ = agent.pop_execution_context();
         self.refresh_running_context(agent);
         Err(VmError::GeneratorYield {
             value: yielded_value,
@@ -821,7 +808,6 @@ impl Vm {
         let suspend_frame_depth = self.frames.len();
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
-        let _ = agent.pop_execution_context();
         self.refresh_running_context(agent);
         Err(VmError::GeneratorStart { suspended })
     }
@@ -1562,20 +1548,6 @@ impl Vm {
 
         let context_kind = decode_execution_context_kind(record.context_kind_raw())
             .unwrap_or(ExecutionContextKind::Function);
-        let context = ExecutionContext::new(
-            context_kind,
-            record.realm(),
-            ExecutableId::Bytecode(record.code()),
-            record.lexical_env(),
-            record.variable_env(),
-        )
-        .with_private_env(record.private_env())
-        .with_this_state(decode_this_state(
-            record.this_state_kind(),
-            record.this_value(),
-        ))
-        .with_script_or_module_referrer(script_or_module_referrer)
-        .with_new_target(record.new_target());
         let mut frame = FrameRecord::new(
             record.code(),
             0,
@@ -1605,7 +1577,6 @@ impl Vm {
         // stack's. The restored frame sits at `restore_frame_depth`, so the
         // scope unwinds when that frame next suspends or returns.
         let restore_frame_depth = self.frames.len();
-        agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.note_frame_depth();

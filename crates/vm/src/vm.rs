@@ -13,7 +13,7 @@ use lyng_common::{AtomId, SourceId, WellKnownAtom};
 use lyng_compiler::dynamic::DynamicFunctionCacheKey;
 use lyng_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
-    EnvironmentSlotFlags, ExecutionContext, ModuleRecord, ModuleStatus, RealmRecord,
+    EnvironmentSlotFlags, ExecutionContextKind, ModuleRecord, ModuleStatus, RealmRecord,
     ThisBindingStatus, ThisState,
 };
 use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
@@ -1743,22 +1743,19 @@ impl Vm {
         } else {
             ThisState::Value(this_value)
         };
-        let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
-            .with_private_env(entry_private_env)
-            .with_this_state(entry_this_state)
-            .with_new_target(new_target)
-            .with_script_or_module_referrer(script_or_module_referrer);
-        let context = if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
-            let module_referrer = agent
-                .module_key_for_environment(lexical_env)
-                .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-            ExecutionContext::module(realm, lexical_env, variable_env)
-                .with_private_env(entry_private_env)
-                .with_this_state(entry_this_state)
-                .with_script_or_module_referrer(module_referrer)
-        } else {
-            context
-        };
+        // Derive the frame kind and establishment referrer directly (no longer
+        // routed through an ExecutionContext). Module entries advertise the
+        // `Module` kind and re-intern their module key as the referrer; every
+        // other entry is a `Function` carrying the inherited referrer.
+        let (frame_kind, frame_referrer) =
+            if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
+                let module_referrer = agent
+                    .module_key_for_environment(lexical_env)
+                    .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+                (ExecutionContextKind::Module, module_referrer)
+            } else {
+                (ExecutionContextKind::Function, script_or_module_referrer)
+            };
         let frame = FrameRecord::new(
             code,
             entry_offset,
@@ -1767,7 +1764,7 @@ impl Vm {
             realm,
             lexical_env,
             variable_env,
-            context.kind(),
+            frame_kind,
         )
         .with_this_value(this_value)
         .with_this_state(entry_this_state)
@@ -1778,13 +1775,11 @@ impl Vm {
         let prior_frame_depth = self.frames.len();
         let prior_register_len = usize::try_from(register_base)
             .expect("register stack base should fit into usize for truncation");
-        let prior_context_depth = agent.execution_contexts().len();
-        // Mirror the entry context's referrer onto the parallel side-stack. The
+        // Record the entry's referrer on the parallel side-stack. The
         // establishing frame sits at `prior_frame_depth`, so this scope unwinds
-        // exactly when that frame does (see the unwind loop below). Reading off
-        // the finalized context keeps script and module branches in lockstep.
-        self.push_referrer_scope(prior_frame_depth, context.script_or_module_referrer());
-        agent.push_execution_context(context);
+        // exactly when that frame does (see the unwind loop below). The derived
+        // `frame_referrer` keeps script and module branches in lockstep.
+        self.push_referrer_scope(prior_frame_depth, frame_referrer);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
         self.refresh_running_context(agent);
@@ -1823,9 +1818,6 @@ impl Vm {
         }
         self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
-        while agent.execution_contexts().len() > prior_context_depth {
-            let _ = agent.pop_execution_context();
-        }
         self.refresh_running_context(agent);
 
         result

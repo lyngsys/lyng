@@ -16,7 +16,6 @@ impl Vm {
         &mut self,
         agent: &mut Agent,
         prior_frame_depth: usize,
-        prior_context_depth: usize,
         prior_register_len: usize,
     ) -> VmResult<()> {
         while self.frames.len() > prior_frame_depth {
@@ -43,9 +42,6 @@ impl Vm {
         // only when none were pushed.
         self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
-        while agent.execution_contexts().len() > prior_context_depth {
-            let _ = agent.pop_execution_context();
-        }
         self.refresh_running_context(agent);
         Ok(())
     }
@@ -110,7 +106,6 @@ impl Vm {
         }
 
         let prior_frame_depth = self.frames.len();
-        let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack_top();
         let prepared =
             self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
@@ -147,12 +142,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
 
         result
     }
@@ -223,7 +213,6 @@ impl Vm {
         }
 
         let prior_frame_depth = self.frames.len();
-        let prior_context_depth = agent.execution_contexts().len();
         let prior_register_len = self.register_stack_top();
         let derived_construct = Self::bytecode_entry(agent, callee)
             .and_then(|code| self.installed_function(code))
@@ -264,12 +253,7 @@ impl Vm {
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
             let _ = self.internal_completion_targets.pop();
         }
-        self.cleanup_internal_completion(
-            agent,
-            prior_frame_depth,
-            prior_context_depth,
-            prior_register_len,
-        )?;
+        self.cleanup_internal_completion(agent, prior_frame_depth, prior_register_len)?;
 
         result?
             .as_object_ref()
