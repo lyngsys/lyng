@@ -110,8 +110,6 @@ impl Vm {
             .or_else(|| agent.default_realm_id())
             .ok_or(VmError::MissingDefaultRealm)?;
         let realm_record = agent.realm(realm).ok_or(VmError::MissingRootShape(realm))?;
-        let lexical_env = realm_record.global_env();
-        let variable_env = realm_record.global_env();
         let script_or_module_referrer = match job.payload() {
             RuntimeJobPayload::PromiseReaction { reaction, .. } => agent
                 .promise_reaction(reaction)
@@ -129,20 +127,18 @@ impl Vm {
             | RuntimeJobPayload::AtomicsWaitAsyncTimeout { .. }
             | RuntimeJobPayload::FinalizationCleanup { .. } => None,
         };
-        // Mirror the job context's referrer onto the parallel side-stack, and
-        // give the job a real root frame so the establishment sits one frame
-        // BELOW any inner call. Without the frame, an inner `call_to_completion`
-        // (e.g. a promise-reaction handler) shares `job_base_depth` and its
+        // Mirror the job's referrer onto the parallel side-stack, and give the
+        // job a real root frame so the establishment sits one frame BELOW any
+        // inner call. Without the frame, an inner `call_to_completion` (e.g. a
+        // promise-reaction handler) shares `job_base_depth` and its
         // `unwind_referrer_scopes_to(job_base_depth)` would pop the job scope
         // mid-job, breaking `current_referrer` parity for the rest of the job.
-        // The job `ExecutionContext` push stays (readers still need it until the
-        // reader-migration tasks); this only adds the frame.
+        // The job `ExecutionContext` is gone: the root frame carries the realm +
+        // global envs (GC-traced) and the running_context scalar is refreshed
+        // from it, so all migrated readers see the job's realm/referrer without a
+        // dedicated context push.
         let job_base_depth = self.frames.len();
         self.push_referrer_scope(job_base_depth, script_or_module_referrer);
-        agent.push_execution_context(
-            lyng_env::ExecutionContext::job(realm, job.executable(), lexical_env, variable_env)
-                .with_script_or_module_referrer(script_or_module_referrer),
-        );
         // Passive root frame: nothing dispatches it (every `self.run` site pushes
         // its own callee frame first). Inner calls now start at depth D+1, so
         // their unwind baselines no longer reach the job scope at depth D.
@@ -215,7 +211,6 @@ impl Vm {
         }
         debug_assert_eq!(self.frames.len(), job_base_depth);
         self.unwind_referrer_scopes_to(job_base_depth);
-        let _ = agent.pop_execution_context();
         self.refresh_running_context(agent);
         agent.clear_kept_objects();
         result
