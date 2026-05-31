@@ -2261,3 +2261,68 @@ fn reflect_set_on_function_prototype_observed_by_construct() {
     );
     assert_eq!(r, "via-reflect,false");
 }
+
+// ── Construct fast path (Task 7) ─────────────────────────────────────────────
+
+#[test]
+fn construct_fast_path_produces_correct_instances() {
+    let r = compile_and_run_string(
+        r"
+        function Vec(x, y) { this.x = x; this.y = y; }
+        let s = 0;
+        for (let i = 0; i < 1000; i++) { let v = new Vec(i, i + 1); s += v.x + v.y; }
+        s + '';
+    ",
+    );
+    assert_eq!(r, "1000000");
+}
+
+#[test]
+fn construct_fast_path_honors_single_prototype_reassignment() {
+    let r = compile_and_run_string(
+        r"
+        function F(){}
+        for (let i=0;i<50;i++){ new F(); }   // warm the construct IC + arm watchpoint
+        let a = new F();
+        F.prototype = { tag: 'new' };
+        let b = new F();
+        (Object.getPrototypeOf(a) === Object.getPrototypeOf(b)) + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "false,new");
+}
+
+#[test]
+fn construct_fast_path_honors_repeated_prototype_reassignment() {
+    let r = compile_and_run_string(
+        r"
+        function F(){}
+        for (let i=0;i<50;i++){ new F(); }
+        F.prototype = { tag: 'A' };
+        let a = new F();
+        for (let i=0;i<50;i++){ new F(); }   // re-warm + re-arm
+        F.prototype = { tag: 'B' };
+        let b = new F();
+        Object.getPrototypeOf(a).tag + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "A,B");
+}
+
+#[test]
+fn construct_fast_path_excluded_callees_fall_back_correctly() {
+    let r = compile_and_run_string(
+        r"
+        function Base(v){ this.v = v; }
+        class Derived extends Base { constructor(v){ super(v); this.d = v*2; } }
+        let bound = Base.bind(null);
+        let p = new Proxy(Base, {});
+        let a = new Derived(3);
+        let b = new bound(7);     // bound -> slow
+        let c = new p(9);         // proxy -> slow
+        let d = new Base(...[4]); // spread -> slow
+        a.v+','+a.d+','+b.v+','+c.v+','+d.v;
+    ",
+    );
+    assert_eq!(r, "3,6,7,9,4");
+}

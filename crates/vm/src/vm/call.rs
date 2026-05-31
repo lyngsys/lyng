@@ -1,7 +1,8 @@
 use super::dispatch::advance_dispatch_frame;
+use super::feedback::InlineCacheState;
 use super::{
-    Agent, ArgumentsMode, CallRange, CodeRef, FrameFlags, FrameRecord, HostHooks,
-    NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm, VmResult,
+    Agent, AllocationLifetime, ArgumentsMode, CallRange, CodeRef, FrameFlags, FrameRecord,
+    HostHooks, NativeFunctionRegistry, ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmResult,
 };
 use crate::vm::property_access::VmProxyBridge;
 use crate::VmError;
@@ -505,7 +506,6 @@ impl Vm {
     /// functions, proxies, derived class constructors (which need TDZ `this` +
     /// `super()` setup), generator/async bodies (not constructible), and any
     /// function needing an `arguments` object or a rest parameter.
-    #[allow(dead_code, reason = "wired into construct_value in Task 7")]
     #[inline]
     pub(crate) fn ordinary_bytecode_construct_eligibility(
         &self,
@@ -614,6 +614,110 @@ impl Vm {
         Ok(())
     }
 
+    /// Construct counterpart of
+    /// [`Self::invoke_bytecode_call_from_caller_arg_window`]. Seeds the callee
+    /// frame directly from the caller's contiguous argument window (no
+    /// `argument_scratch` Vec) and threads the construct parameters into the
+    /// register-window entry: `new_target = Some(callee)`,
+    /// `construct_this = Some(construct_this)`, `construct_call = true`, and the
+    /// callee's `this` bound to the pre-allocated `construct_this`.
+    ///
+    /// Callers MUST have verified eligibility via
+    /// [`Self::ordinary_bytecode_construct_eligibility`] and resolved
+    /// `construct_this` from a valid monomorphic construct IC entry first.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
+    )]
+    #[inline]
+    pub(in crate::vm) fn invoke_bytecode_construct_from_caller_arg_window(
+        &mut self,
+        agent: &mut Agent,
+        frame_depth: usize,
+        frame: &mut FrameRecord,
+        instruction_len: u32,
+        feedback_slot: Option<FeedbackSlotId>,
+        result_register: u16,
+        callee_object: ObjectRef,
+        construct_this: ObjectRef,
+        caller_arg_base_local: u16,
+        arg_count: u16,
+    ) -> VmResult<()> {
+        let caller_arg_base = frame
+            .registers()
+            .base()
+            .checked_add(u32::from(caller_arg_base_local))
+            .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        advance_dispatch_frame(frame, instruction_len);
+        self.sync_dispatch_frame(frame_depth, *frame);
+        self.enter_bytecode_call_from_caller_registers(
+            agent,
+            frame,
+            result_register,
+            callee_object,
+            Value::from_object_ref(construct_this),
+            caller_arg_base,
+            arg_count,
+            Some(callee_object),
+            Some(construct_this),
+            true,
+        )?;
+        // Parity with the slow construct path, which observes the bytecode
+        // callee with its freshly-created `this` BEFORE entering. Keeps the
+        // monomorphic entry fresh (refreshing the cached created-shape /
+        // prototype) and re-arms the per-constructor `.prototype` watchpoint
+        // after a prior eager-clear.
+        self.observe_construct_target(
+            agent,
+            frame.code(),
+            feedback_slot,
+            callee_object,
+            Some(construct_this),
+        );
+        Ok(())
+    }
+
+    /// Reads the monomorphic construct IC entry for `(code, slot)` and returns
+    /// the cached `[[Prototype]]` for `callee` — but ONLY when the entry is a
+    /// genuine cache hit: the slot is monomorphic, the cached constructor is
+    /// exactly `callee`, and `callee`'s current shape still matches the cached
+    /// `constructor_shape`. The outer `Option` is hit/miss; the inner is the
+    /// (possibly `None` for a null-prototype instance) prototype object.
+    ///
+    /// Mirrors the construct IC indexing in `observe_construct_target` /
+    /// `construct_status`. A `None` `slot` is always a miss.
+    ///
+    /// No per-construct prototype re-validation is performed — correctness
+    /// rests on the eager-clear invariant (see `construct_value`'s direct
+    /// construct branch).
+    #[inline]
+    fn monomorphic_construct_prototype(
+        &self,
+        agent: &Agent,
+        code: CodeRef,
+        slot: Option<FeedbackSlotId>,
+        callee: ObjectRef,
+    ) -> Option<Option<ObjectRef>> {
+        let slot = slot?;
+        let state = self.construct_ic_state(code, slot)?;
+        if state.cache_state != InlineCacheState::Monomorphic {
+            return None;
+        }
+        let storage = self.construct_cache_entries.get(&(code, slot))?;
+        let entry = storage.entries[0]?;
+        if entry.constructor != callee {
+            return None;
+        }
+        let current_shape = agent
+            .objects()
+            .object_header(agent.heap().view(), callee)?
+            .shape();
+        if entry.constructor_shape != current_shape {
+            return None;
+        }
+        Some(entry.prototype)
+    }
+
     #[expect(
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
@@ -693,6 +797,52 @@ impl Vm {
         spread_mask: Option<u64>,
     ) -> VmResult<()> {
         let callee_value = self.read_register(frame.registers(), callee_register);
+
+        // Monomorphic Construct direct branch. Mirrors `call_value`'s branch to
+        // `invoke_bytecode_call_from_caller_arg_window`: when the construct IC
+        // holds a monomorphic entry for an ordinary bytecode constructor whose
+        // shape still matches, the resolved `[[Prototype]]` is cached on the IC
+        // entry, so we can allocate `this` directly (no `.prototype` GET) and
+        // seed the callee frame straight from the caller's argument window.
+        //
+        // Validity rests entirely on eager-clear: the per-constructor
+        // `.prototype` watchpoint (armed at cache time in
+        // `observe_construct_target`) clears this IC entry the moment
+        // `F.prototype` is reassigned, so a readable entry always carries a
+        // current prototype.
+        if spread_mask.is_none()
+            && let Some(callee) = callee_value.as_object_ref()
+            && self
+                .ordinary_bytecode_construct_eligibility(agent, callee)
+                .is_some()
+            && let Some(cached_prototype) =
+                self.monomorphic_construct_prototype(agent, frame.code(), feedback_slot, callee)
+        {
+            let root_shape = agent
+                .realm(frame.realm())
+                .and_then(|realm| realm.root_shape())
+                .ok_or(VmError::MissingRootShape(frame.realm()))?;
+            let construct_this = agent.with_heap_and_objects(|heap, objects| {
+                objects.alloc_object(
+                    &mut heap.mutator(),
+                    ObjectAllocation::ordinary(root_shape).with_prototype(cached_prototype),
+                    AllocationLifetime::Default,
+                )
+            });
+            return self.invoke_bytecode_construct_from_caller_arg_window(
+                agent,
+                frame_depth,
+                frame,
+                instruction_len,
+                feedback_slot,
+                result_register,
+                callee,
+                construct_this,
+                arguments.argument_base(),
+                arguments.argument_count(),
+            );
+        }
+
         let mut collected_arguments = std::mem::take(&mut self.argument_scratch);
         collected_arguments.clear();
         let result = (|| {

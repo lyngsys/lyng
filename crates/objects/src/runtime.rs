@@ -1313,6 +1313,20 @@ impl ObjectRuntime {
         }
     }
 
+    /// Called by the post-mark GC sweep. Drops per-constructor `.prototype`
+    /// `WatchpointSet` entries whose constructor `ObjectRef` is no longer live
+    /// (as determined by `is_marked`). Mirrors
+    /// [`Self::prune_dead_prototype_transitions`]: the construct IC fast path
+    /// keys these sets by constructor object, so a collected constructor would
+    /// otherwise leak its set indefinitely.
+    pub fn prune_dead_construct_prototype_watchpoints(
+        &mut self,
+        is_marked: impl Fn(ObjectRef) -> bool,
+    ) {
+        self.construct_prototype_watchpoints
+            .retain(|ctor, _| is_marked(*ctor));
+    }
+
     /// Returns `true` if `shape`'s `prototype_transitions` table has an entry
     /// for the given `key`. Intended for use in cross-crate tests (e.g. in
     /// `lyng-env`) that need to assert table presence without accessing the
@@ -1335,6 +1349,28 @@ impl ObjectRuntime {
         self.construct_prototype_watchpoints
             .entry(ctor)
             .or_default()
+    }
+
+    /// Registers `watchpoint` on `ctor`'s per-constructor `.prototype`
+    /// `WatchpointSet`, re-arming the set first if it is `Invalidated`.
+    ///
+    /// A `WatchpointSet` that has already fired stays permanently
+    /// `Invalidated` and rejects `register` (returns `Err(Invalidated)`).
+    /// The construct IC re-caches a constructor after a `.prototype` write
+    /// has fired (and invalidated) its set; to let the re-cached entry re-arm
+    /// the watchpoint, replace any `Invalidated` set with a fresh `Watched`-able
+    /// one before registering. Registering on a `Cleared`/`Watched` set just
+    /// appends, so this is a no-op reset in the common (first-arm) case.
+    pub fn arm_construct_prototype_watchpoint(&mut self, ctor: ObjectRef, watchpoint: Watchpoint) {
+        let set = self
+            .construct_prototype_watchpoints
+            .entry(ctor)
+            .or_default();
+        if set.is_invalidated() {
+            *set = WatchpointSet::new();
+        }
+        // A freshly-`new`'d or `Cleared`/`Watched` set never rejects `register`.
+        let _ = set.register(watchpoint);
     }
 
     /// Read-only accessor for a constructor's per-prototype `WatchpointSet`.

@@ -4691,14 +4691,27 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
     );
     let generation = status.generation;
 
+    // Task 7 arms the per-constructor `.prototype` watchpoint AT CACHE TIME, so
+    // warming the construct IC above already registered a `ConstructIcClear`
+    // watchpoint on F's set (no manual registration needed). Confirm it.
+    let _ = generation;
+    assert_eq!(
+        agent
+            .objects()
+            .construct_prototype_watchpoint_inspect(f)
+            .expect("construct warming must arm F's per-constructor watchpoint set")
+            .state(),
+        WatchpointState::Watched,
+        "warming the construct IC must arm the per-constructor `.prototype` watchpoint",
+    );
+
     // Script 2 on the SAME realm/global env: a HOT loop of `F.prototype = {}`
-    // with NO `new F()` (so nothing re-populates the construct IC). The loop
-    // crosses the allocation threshold (= 2) within this run, so its OWN store
-    // site warms and — absent the exclusion — installs an `OwnData` store IC.
-    // No construct watchpoint is registered yet, so these writes fire against
-    // F's empty per-constructor set and leave the construct IC (from script 1)
-    // populated. The purpose of this run is purely to WARM/install the store
-    // IC so the *re-run* below performs a genuinely hot first write.
+    // with NO `new F()`. The loop crosses the allocation threshold (= 2) within
+    // this run, so its OWN store site warms and — absent the exclusion — would
+    // install an `OwnData` store IC. The watchpoint is now armed, so the FIRST
+    // write fires it (eager-clearing the construct IC + invalidating the set).
+    // The purpose of this run is to WARM/install the store IC so the *re-run*
+    // below performs a genuinely hot first write.
     let store_warm = compile_test_unit(
         70_031,
         r"
@@ -4733,31 +4746,15 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
     .run()
     .unwrap();
 
-    // The construct IC must still be Monomorphic after the warming run (no
-    // watchpoint was registered, so nothing cleared it).
+    // The cache-time-armed watchpoint fired on the FIRST `.prototype` write of
+    // the warming run, eager-clearing the construct IC slot.
     assert_eq!(
         vm.construct_status(code, construct_slot)
             .expect("construct status")
             .state,
-        FeedbackInlineCacheState::Monomorphic,
-        "construct IC must survive the store-IC warming run (no watchpoint yet)",
+        FeedbackInlineCacheState::Uninitialized,
+        "the cache-time-armed watchpoint must clear the construct IC on the warming write",
     );
-
-    // NOW register the ConstructIcClear watchpoint on F's per-constructor set,
-    // matching the populated construct slot (simulating Task 7's fast path).
-    // From here on, a write that reaches the firing slow store must clear the
-    // construct IC and Invalidate the set.
-    agent
-        .objects_mut()
-        .construct_prototype_watchpoint_mut(f)
-        .register(Watchpoint::ShapeInvalidation {
-            observer: ShapeInvalidationObserver::ConstructIcClear {
-                code,
-                slot: construct_slot,
-                generation,
-            },
-        })
-        .expect("register on fresh per-constructor set must succeed");
 
     // The `F.prototype` store site for script 2 must NOT hold a usable OwnData
     // store entry: the plan-stage exclusion returns `Ok(None)`, so the
@@ -4776,10 +4773,60 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
          (exclusion forces slow store), got {store_snapshot:?}",
     );
 
+    // RE-WARM the construct IC against the SAME (still-global) `F`: the warming
+    // write above already fired and invalidated F's per-constructor set, so a
+    // fresh `new F()` loop must re-populate a construct slot AND re-arm a fresh
+    // watchpoint set on the SAME `f` (Task 7's re-arm-after-invalidation path).
+    // This script does NOT redeclare `F` — it references the existing global —
+    // so `new F()` still constructs the original `f`. We track this script's own
+    // construct slot for the final clear assertions.
+    let rewarm = compile_test_unit(
+        70_033,
+        r"
+            for (var i = 0; i < 4; i = i + 1) {
+                new F();
+            }
+        ",
+    );
+    let rewarm_construct_slot = rewarm
+        .function(rewarm.entry())
+        .expect("entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Construct)
+        .map(|descriptor| descriptor.slot())
+        .expect("re-warm script should contain a construct site for `new F()`");
+    let rewarm_installed = vm.install_script(agent, realm.id(), &rewarm).unwrap();
+    let rewarm_code = rewarm_installed.code();
+    vm.evaluate_installed(
+        agent,
+        rewarm_installed,
+        realm.global_env(),
+        realm.global_env(),
+    )
+    .run()
+    .unwrap();
+    assert_eq!(
+        vm.construct_status(rewarm_code, rewarm_construct_slot)
+            .expect("construct status")
+            .state,
+        FeedbackInlineCacheState::Monomorphic,
+        "re-running `new F()` must re-populate a construct IC slot",
+    );
+    assert_eq!(
+        agent
+            .objects()
+            .construct_prototype_watchpoint_inspect(f)
+            .expect("re-warm must re-create F's per-constructor watchpoint set")
+            .state(),
+        WatchpointState::Watched,
+        "re-warming must RE-ARM the per-constructor watchpoint after prior invalidation",
+    );
+
     // Re-run the SAME installed store unit. The store site is already warm/
     // installed (without the fix), so its FIRST `F.prototype = {}` write is a
     // genuinely HOT write: without the exclusion it takes the in-place fast
-    // write and never reaches the slow store, so the just-registered watchpoint
+    // write and never reaches the slow store, so the re-armed watchpoint
     // is never fired (the bug). With the exclusion the write hits the slow store
     // and fires the construct `.prototype` watchpoint.
     vm.evaluate_installed(
@@ -4791,14 +4838,15 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
     .run()
     .unwrap();
 
-    // The warm write fired the watchpoint and eagerly cleared the construct IC.
+    // The warm write fired the re-armed watchpoint and eagerly cleared the
+    // re-warmed construct IC slot.
     let cleared = vm
-        .construct_status(code, construct_slot)
+        .construct_status(rewarm_code, rewarm_construct_slot)
         .expect("construct status should still project after clear");
     assert_eq!(
         cleared.state,
         FeedbackInlineCacheState::Uninitialized,
-        "a HOT `F.prototype = {{}}` write must still eager-clear the construct IC slot",
+        "a HOT `F.prototype = {{}}` write must still eager-clear the re-warmed construct IC slot",
     );
     assert!(
         cleared.callee.is_none() && cleared.entries.is_empty(),

@@ -512,7 +512,7 @@ impl Vm {
     #[inline]
     pub(super) fn observe_construct_target(
         &mut self,
-        agent: &Agent,
+        agent: &mut Agent,
         code: CodeRef,
         slot: Option<FeedbackSlotId>,
         constructor: ObjectRef,
@@ -538,6 +538,7 @@ impl Vm {
             .expect("construct_ic_states slab must be allocated at install");
         let construct_state = slab[slot_zero].get_or_insert_with(CallIcState::default);
         construct_state.execution_count = construct_state.execution_count.saturating_add(1);
+        let pre_state = construct_state.cache_state;
         let cache_storage = construct_cache_entries
             .entry((code, slot))
             .or_insert_with(|| Box::new(ConstructCacheStorage::default()));
@@ -555,6 +556,50 @@ impl Vm {
             let meta = table.call_mut(slot.get());
             meta.mode = ic_mode_from_cache_state(ic_state.cache_state);
             meta.execution_count = ic_state.execution_count;
+        }
+        // Arm the per-constructor `.prototype` watchpoint AT CACHE TIME.
+        //
+        // The construct direct path reads `entry.prototype` with no
+        // per-construct validity check, relying on eager-clear (this watchpoint
+        // firing) to remove the entry when `.prototype` is reassigned. A
+        // readable entry must therefore never exist without a live
+        // `ConstructIcClear` watchpoint. Arming here — not lazily on the first
+        // direct read — closes the window in which a `.prototype` write between
+        // caching and the first direct read would otherwise go unobserved.
+        //
+        // Armed only on the transition edge INTO monomorphic (`pre_state` was
+        // anything else): that single edge covers both first-install
+        // (Uninitialized -> Monomorphic) and re-arm after a `.prototype` fire
+        // cleared the slot (the fire leaves the slot Uninitialized + the set
+        // Invalidated; the next construction re-installs Monomorphic and
+        // `arm_construct_prototype_watchpoint` resets the Invalidated set to a
+        // fresh one before registering). The steady-state monomorphic refresh
+        // (Monomorphic -> Monomorphic) takes no action, so we don't accumulate
+        // duplicate watchpoints across a warm loop.
+        //
+        // Restricted to constructors the direct path is actually willing to
+        // read (`ordinary_bytecode_construct_eligibility`): polymorphic/
+        // megamorphic sites and ineligible constructors never reach the direct
+        // read.
+        if matches!(ic_state.cache_state, InlineCacheState::Monomorphic)
+            && !matches!(pre_state, InlineCacheState::Monomorphic)
+            && self
+                .ordinary_bytecode_construct_eligibility(agent, constructor)
+                .is_some()
+        {
+            let generation = self
+                .metadata_table(code)
+                .map_or(0, |table| table.call(slot.get()).generation);
+            agent.objects_mut().arm_construct_prototype_watchpoint(
+                constructor,
+                Watchpoint::ShapeInvalidation {
+                    observer: ShapeInvalidationObserver::ConstructIcClear {
+                        code,
+                        slot,
+                        generation,
+                    },
+                },
+            );
         }
     }
 
