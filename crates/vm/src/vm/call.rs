@@ -496,6 +496,39 @@ impl Vm {
         Some(code)
     }
 
+    /// Returns `Some(code)` when `callee_object` is an ordinary bytecode
+    /// constructor for which the Construct fast path can seed the callee frame
+    /// directly from the caller's register window and reuse a cached prototype.
+    ///
+    /// Returns `None` (forcing the slow `construct_value` path) for: bound
+    /// functions, proxies, derived class constructors (which need TDZ `this` +
+    /// `super()` setup), generator/async bodies (not constructible), and any
+    /// function needing an `arguments` object or a rest parameter.
+    #[allow(dead_code, reason = "wired into construct_value in Task 7")]
+    #[inline]
+    pub(crate) fn ordinary_bytecode_construct_eligibility(
+        &self,
+        agent: &Agent,
+        callee_object: ObjectRef,
+    ) -> Option<CodeRef> {
+        if Self::bound_function_record(agent, callee_object).is_some() {
+            return None;
+        }
+        if agent.objects().is_proxy_object(callee_object) {
+            return None;
+        }
+        let code = Self::bytecode_entry(agent, callee_object)?;
+        let function = self.installed_function(code)?;
+        let flags = function.flags();
+        if flags.generator() || flags.async_function() || flags.derived_class_constructor() {
+            return None;
+        }
+        if function.arguments_mode() != ArgumentsMode::None || function.has_rest_parameter() {
+            return None;
+        }
+        Some(code)
+    }
+
     #[expect(
         clippy::too_many_arguments,
         reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
