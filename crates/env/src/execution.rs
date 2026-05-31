@@ -248,10 +248,12 @@ impl RunningContext {
     pub const fn new(realm: RealmRef, referrer: Option<AtomId>) -> Self {
         Self { realm, referrer }
     }
+
     #[inline]
     pub const fn realm(self) -> RealmRef {
         self.realm
     }
+
     #[inline]
     pub const fn referrer(self) -> Option<AtomId> {
         self.referrer

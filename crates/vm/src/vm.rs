@@ -133,6 +133,9 @@ struct ReferrerScope {
 pub struct Vm {
     register_stack: Vec<Value>,
     register_stack_top: usize,
+    /// Active call-frame stack. INVARIANT: after any push/pop that changes the
+    /// top frame, call [`Self::refresh_running_context`] so the Agent's
+    /// running_context scalar stays in sync with the active frame.
     frames: Vec<FrameRecord>,
     referrer_scopes: Vec<ReferrerScope>,
     dispatch_frame_check_epoch: u32,
