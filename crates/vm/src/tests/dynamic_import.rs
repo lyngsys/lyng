@@ -1403,3 +1403,64 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
             attributes: Vec::new(),
         })));
 }
+
+#[test]
+fn dynamic_import_preserves_generator_referrer_after_resume() {
+    // A sync generator (function*) that suspends via `yield` then runs
+    // `import()` must resolve against the generator's own referrer — the one
+    // active when the generator was called — not the referrer of whatever code
+    // calls `.next()` to resume it.  This exercises the distinct
+    // `suspend_current_generator_frame` / `suspend_generator_start` suspend
+    // path (not the async-function path covered by
+    // `dynamic_import_preserves_script_referrer_after_async_resume`).
+    let unit = compile_test_unit(
+        270,
+        r"
+            (function() {
+                var g = (function*() {
+                    yield;
+                    return import('./dep.mjs');
+                })();
+                g.next();
+                g.next();
+            })();
+        ",
+    );
+    let host = TestHost::new();
+    let script_referrer = ModuleKey::new("/tmp/main.js");
+    let module_key = ModuleKey::new("/tmp/dep.mjs");
+    host.define_module_source(
+        "./dep.mjs",
+        LoadedModuleSource::new(module_key.clone(), "/tmp/dep.mjs", "export default 23;"),
+    );
+    host.define_import_meta(
+        module_key,
+        ImportMetaProperties::new(vec![ImportMetaProperty {
+            key: "url".into(),
+            value: ImportMetaValue::String("file:///tmp/dep.mjs".into()),
+        }]),
+    );
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+
+    vm.evaluate_script(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .with_referrer(&script_referrer)
+        .run()
+        .expect("generator dynamic import should evaluate");
+
+    assert!(
+        host.snapshot()
+            .calls
+            .contains(&HostCall::LoadModule(ModuleSourceRequest {
+                specifier: "./dep.mjs".into(),
+                referrer: Some(script_referrer),
+                attributes: Vec::new(),
+            })),
+        "dynamic import inside generator after resume should carry the generator's referrer"
+    );
+}

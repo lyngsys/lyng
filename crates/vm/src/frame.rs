@@ -1,4 +1,4 @@
-use lyng_env::ExecutionContextKind;
+use lyng_env::{ExecutionContextKind, ThisState};
 use lyng_types::{CodeRef, EnvironmentRef, ObjectRef, RealmRef, Value};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
@@ -134,6 +134,7 @@ pub struct FrameMetadata {
     return_register: Option<u16>,
     realm: RealmRef,
     variable_env: EnvironmentRef,
+    private_env: Option<EnvironmentRef>,
     new_target: Option<ObjectRef>,
     callee: Option<ObjectRef>,
     kind: ExecutionContextKind,
@@ -171,6 +172,11 @@ impl FrameMetadata {
     }
 
     #[inline]
+    pub const fn private_env(&self) -> Option<EnvironmentRef> {
+        self.private_env
+    }
+
+    #[inline]
     pub const fn new_target(&self) -> Option<ObjectRef> {
         self.new_target
     }
@@ -201,6 +207,7 @@ pub struct FrameState {
     instruction_offset: u32,
     lexical_env: EnvironmentRef,
     this_value: Value,
+    this_state: ThisState,
     construct_this: Option<ObjectRef>,
     tail_caller: Option<ObjectRef>,
     tail_caller_strict: bool,
@@ -225,6 +232,11 @@ impl FrameState {
     #[inline]
     pub const fn this_value(&self) -> Value {
         self.this_value
+    }
+
+    #[inline]
+    pub const fn this_state(&self) -> ThisState {
+        self.this_state
     }
 
     #[inline]
@@ -302,6 +314,7 @@ impl FrameRecord {
                 return_register,
                 realm,
                 variable_env,
+                private_env: None,
                 new_target: None,
                 callee: None,
                 kind,
@@ -310,6 +323,7 @@ impl FrameRecord {
                 instruction_offset,
                 lexical_env,
                 this_value: Value::undefined(),
+                this_state: ThisState::Uninitialized,
                 construct_this: None,
                 tail_caller: None,
                 tail_caller_strict: false,
@@ -329,6 +343,12 @@ impl FrameRecord {
     }
 
     #[inline]
+    pub const fn with_this_state(mut self, this_state: ThisState) -> Self {
+        self.state.this_state = this_state;
+        self
+    }
+
+    #[inline]
     pub const fn with_new_target(mut self, new_target: Option<ObjectRef>) -> Self {
         self.metadata.new_target = new_target;
         self
@@ -343,6 +363,12 @@ impl FrameRecord {
     #[inline]
     pub const fn with_callee(mut self, callee: Option<ObjectRef>) -> Self {
         self.metadata.callee = callee;
+        self
+    }
+
+    #[inline]
+    pub const fn with_private_env(mut self, private_env: Option<EnvironmentRef>) -> Self {
+        self.metadata.private_env = private_env;
         self
     }
 
@@ -466,6 +492,11 @@ impl FrameRecord {
     }
 
     #[inline]
+    pub const fn private_env(&self) -> Option<EnvironmentRef> {
+        self.metadata.private_env
+    }
+
+    #[inline]
     pub const fn this_value(&self) -> Value {
         self.state.this_value
     }
@@ -473,6 +504,16 @@ impl FrameRecord {
     #[inline]
     pub(crate) const fn set_this_value(&mut self, this_value: Value) {
         self.state.this_value = this_value;
+    }
+
+    #[inline]
+    pub const fn this_state(&self) -> ThisState {
+        self.state.this_state
+    }
+
+    #[inline]
+    pub(crate) const fn set_this_state(&mut self, this_state: ThisState) {
+        self.state.this_state = this_state;
     }
 
     #[inline]
@@ -604,6 +645,55 @@ mod tests {
         assert_eq!(frame.lexical_env(), replacement_env);
         assert_eq!(frame.flags(), FrameFlags::entry());
         assert!(!frame.resume_active());
+    }
+
+    #[test]
+    fn frame_round_trips_this_state() {
+        use lyng_env::ThisState;
+        let code = CodeRef::new(id(1));
+        let lexical_env = EnvironmentRef::new(id(2));
+        let variable_env = EnvironmentRef::new(id(3));
+        let realm = RealmRef::new(id(5));
+        let registers = RegisterWindow::new(0, 1);
+        let frame = FrameRecord::new(
+            code,
+            0,
+            registers,
+            None,
+            realm,
+            lexical_env,
+            variable_env,
+            ExecutionContextKind::Function,
+        )
+        .with_this_state(ThisState::Lexical);
+        assert_eq!(frame.this_state(), ThisState::Lexical);
+        let mut frame = frame;
+        frame.set_this_state(ThisState::Uninitialized);
+        assert_eq!(frame.this_state(), ThisState::Uninitialized);
+    }
+
+    #[test]
+    fn frame_round_trips_private_env() {
+        let code = CodeRef::new(id(1));
+        let lexical_env = EnvironmentRef::new(id(2));
+        let variable_env = EnvironmentRef::new(id(3));
+        let private_env = EnvironmentRef::new(id(6));
+        let realm = RealmRef::new(id(5));
+        let registers = RegisterWindow::new(0, 1);
+        let frame = FrameRecord::new(
+            code,
+            0,
+            registers,
+            None,
+            realm,
+            lexical_env,
+            variable_env,
+            ExecutionContextKind::Function,
+        );
+        assert_eq!(frame.private_env(), None, "fresh frame has no private_env");
+        let frame = frame.with_private_env(Some(private_env));
+        assert_eq!(frame.private_env(), Some(private_env));
+        assert_eq!(frame.metadata().private_env(), Some(private_env));
     }
 
     #[test]

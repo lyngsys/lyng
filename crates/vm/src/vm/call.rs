@@ -281,7 +281,6 @@ impl Vm {
                     self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
                 let generator =
                     self.instantiate_generator_call(agent, host, registry, prepared, arguments)?;
-                let _ = agent.pop_execution_context();
                 return self.finish_frame(agent, Value::from_object_ref(generator));
             }
             if self
@@ -292,7 +291,6 @@ impl Vm {
                     self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
                 let promise = self
                     .instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
-                let _ = agent.pop_execution_context();
                 return self.finish_frame(agent, Value::from_object_ref(promise));
             }
             self.recycle_tail_bytecode_call(agent, frame, callee, this_value, arguments)?;
@@ -319,7 +317,6 @@ impl Vm {
         } else {
             object::call(agent, callee, this_value, arguments, registry).map_err(VmError::Abrupt)?
         };
-        let _ = agent.pop_execution_context();
         self.finish_frame(agent, result)
     }
 

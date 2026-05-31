@@ -295,6 +295,7 @@ fn trace_frame_record(frame: &FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
     frame.realm().trace_heap_edges(tracer);
     frame.lexical_env().trace_heap_edges(tracer);
     frame.variable_env().trace_heap_edges(tracer);
+    frame.private_env().trace_heap_edges(tracer);
     frame.this_value().trace_heap_edges(tracer);
     frame.construct_this().trace_heap_edges(tracer);
     frame.new_target().trace_heap_edges(tracer);

@@ -152,19 +152,12 @@ impl Vm {
             .objects()
             .function_data(function)
             .and_then(lyng_objects::FunctionObjectData::environment)
-            .or_else(|| {
-                agent
-                    .current_execution_context()
-                    .map(lyng_env::ExecutionContext::lexical_env)
-            })
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+            .unwrap_or_else(|| caller.lexical_env());
         let layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
             EnvironmentLayoutKind::Function,
             true,
         ));
-        let new_target = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::new_target);
+        let new_target = caller.new_target();
         let env = agent
             .alloc_function_environment(
                 Some(outer),

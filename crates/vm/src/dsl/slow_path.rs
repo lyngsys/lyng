@@ -367,10 +367,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     // Phase 1.B.1: refresh the `this` mirror. Captures
                     // super() mutations and any other slow-path
                     // changes to frame.this_value().
-                    let this_value = crate::dsl::llint_state::resolve_initial_this_value(
-                        rust.dispatch.agent,
-                        &active_frame,
-                    );
+                    let this_value =
+                        crate::dsl::llint_state::resolve_initial_this_value(&active_frame);
                     // SAFETY: state is valid by from_raw's contract.
                     unsafe {
                         (**state).frame_pc_offset = active_frame.instruction_offset();

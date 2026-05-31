@@ -22,8 +22,8 @@ pub enum ErrorKind {
 
 fn current_realm(agent: &Agent) -> Option<RealmRecord> {
     let realm = agent
-        .current_execution_context()
-        .map(lyng_env::ExecutionContext::realm)
+        .running_context()
+        .map(lyng_env::RunningContext::realm)
         .or_else(|| agent.default_realm_id())?;
     agent.realm(realm)
 }
@@ -306,5 +306,80 @@ mod tests {
         assert_ne!(first, second);
         assert!(first.as_object_ref().is_some());
         assert!(second.as_object_ref().is_some());
+    }
+
+    /// Proves that `current_realm` (and therefore `throw_type_error`) follows
+    /// the `running_context` scalar, not the default realm.
+    ///
+    /// We create a second realm with its own distinct `type_error_prototype`,
+    /// set `agent.running_context` to point at that realm, and assert that the
+    /// thrown error's prototype is the SECOND realm's type-error prototype — not
+    /// the default realm's.
+    #[test]
+    fn current_realm_follows_running_context() {
+        use lyng_env::RunningContext;
+
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+
+        // Set up the DEFAULT realm's error prototypes so the test has a valid
+        // baseline to compare against.
+        install_test_error_prototypes(agent);
+        let default_realm = agent.default_realm().expect("default realm");
+        let default_type_error_prototype = default_realm
+            .intrinsics()
+            .type_error_prototype()
+            .expect("default realm type_error_prototype must be set");
+
+        // --- Create a SECOND realm shell with its own root shape + prototypes ---
+        let second_realm_id = agent.create_default_realm_shell(AllocationLifetime::Default);
+        assert_ne!(second_realm_id, default_realm.id(), "should be a distinct realm");
+
+        let second_realm = agent.realm(second_realm_id).expect("second realm record");
+        let root_shape = second_realm.root_shape().expect("second realm root shape");
+
+        let (second_type_error_prototype,) = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            let second_type_error_prototype = objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::ordinary(root_shape),
+                AllocationLifetime::Default,
+            );
+            (second_type_error_prototype,)
+        });
+
+        // Wire the second realm's intrinsics with its unique type_error_prototype.
+        let second_intrinsics = second_realm
+            .intrinsics()
+            .with_type_error_prototype(Some(second_type_error_prototype));
+        assert!(agent.set_realm_intrinsics(second_realm_id, second_intrinsics));
+
+        // --- Point running_context at the second realm ---
+        agent.set_running_context(Some(RunningContext::new(second_realm_id, None)));
+
+        // --- throw_type_error must use the SECOND realm ---
+        let thrown = throw_type_error(agent)
+            .thrown_value()
+            .expect("type error should carry a value");
+        let object = thrown
+            .as_object_ref()
+            .expect("type error should throw an object");
+
+        let actual_proto = agent
+            .objects()
+            .object_header(agent.heap().view(), object)
+            .unwrap()
+            .prototype();
+
+        assert_eq!(
+            actual_proto,
+            Some(second_type_error_prototype),
+            "error prototype should come from the second realm (running_context), not the default"
+        );
+        assert_ne!(
+            actual_proto,
+            Some(default_type_error_prototype),
+            "error prototype must NOT be the default realm's type_error_prototype"
+        );
     }
 }

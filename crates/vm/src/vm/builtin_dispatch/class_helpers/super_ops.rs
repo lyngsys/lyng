@@ -165,9 +165,7 @@ impl Vm {
         let binding_status = record.map_or_else(
             || {
                 if caller.construct_this().is_some()
-                    || agent
-                        .current_execution_context()
-                        .is_some_and(|context| context.this_state() != ThisState::Uninitialized)
+                    || caller.this_state() != ThisState::Uninitialized
                 {
                     lyng_env::ThisBindingStatus::Initialized
                 } else {
@@ -217,15 +215,22 @@ impl Vm {
                 lyng_env::ThisBindingStatus::Initialized,
                 this_value,
             );
-            if !agent.set_execution_context_this_state_for_lexical_env(
-                function_env,
-                ThisState::Value(this_value),
-            ) {
-                let _ =
-                    agent.set_current_execution_context_this_state(ThisState::Value(this_value));
+            let mut updated = false;
+            for frame in self
+                .frames
+                .iter_mut()
+                .filter(|frame| frame.lexical_env() == function_env)
+            {
+                frame.set_this_state(ThisState::Value(this_value));
+                updated = true;
             }
-        } else {
-            let _ = agent.set_current_execution_context_this_state(ThisState::Value(this_value));
+            if !updated {
+                if let Some(frame) = self.frames.last_mut() {
+                    frame.set_this_state(ThisState::Value(this_value));
+                }
+            }
+        } else if let Some(frame) = self.frames.last_mut() {
+            frame.set_this_state(ThisState::Value(this_value));
         }
         let frame_index = self
             .frames
@@ -254,6 +259,7 @@ impl Vm {
         };
         frame.set_this_value(this_value);
         frame.set_construct_this(Some(this_object));
+        frame.set_this_state(ThisState::Value(this_value));
         Ok(this_value)
     }
 

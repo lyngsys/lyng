@@ -13,7 +13,7 @@ use lyng_common::{AtomId, SourceId, WellKnownAtom};
 use lyng_compiler::dynamic::DynamicFunctionCacheKey;
 use lyng_env::{
     Agent, EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
-    EnvironmentSlotFlags, ExecutionContext, ModuleRecord, ModuleStatus, RealmRecord,
+    EnvironmentSlotFlags, ExecutionContextKind, ModuleRecord, ModuleStatus, RealmRecord,
     ThisBindingStatus, ThisState,
 };
 use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
@@ -119,11 +119,25 @@ struct NoopVmEvaluationObserver;
 
 impl VmEvaluationObserver for NoopVmEvaluationObserver {}
 
+/// One referrer-establishment scope on the `Vm` side-stack. `base_depth` is the
+/// frame depth at which the establishing frame sits; the scope covers all frames
+/// at depth >= `base_depth` until that frame unwinds. `referrer` is the seed
+/// (None is a valid establishment — e.g. a script with no host referrer).
+#[derive(Clone, Copy, Debug)]
+struct ReferrerScope {
+    base_depth: usize,
+    referrer: Option<lyng_common::AtomId>,
+}
+
 #[derive(Default)]
 pub struct Vm {
     register_stack: Vec<Value>,
     register_stack_top: usize,
+    /// Active call-frame stack. INVARIANT: after any push/pop that changes the
+    /// top frame, call [`Self::refresh_running_context`] so the Agent's
+    /// running_context scalar stays in sync with the active frame.
     frames: Vec<FrameRecord>,
+    referrer_scopes: Vec<ReferrerScope>,
     dispatch_frame_check_epoch: u32,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
@@ -580,6 +594,7 @@ impl Vm {
             register_stack: Vec::new(),
             register_stack_top: 0,
             frames: Vec::new(),
+            referrer_scopes: Vec::new(),
             dispatch_frame_check_epoch: 0,
             installed: Vec::new(),
             current_exception: None,
@@ -1328,6 +1343,38 @@ impl Vm {
         self.for_in_states.len()
     }
 
+    /// Record a new referrer establishment starting at `base_depth` frames deep.
+    pub(crate) fn push_referrer_scope(&mut self, base_depth: usize, referrer: Option<AtomId>) {
+        self.referrer_scopes.push(ReferrerScope { base_depth, referrer });
+    }
+
+    /// Drop all scopes established at frame depth ≥ `target_frame_depth` (those
+    /// frames are being exited).
+    pub(crate) fn unwind_referrer_scopes_to(&mut self, target_frame_depth: usize) {
+        while self
+            .referrer_scopes
+            .last()
+            .is_some_and(|scope| scope.base_depth >= target_frame_depth)
+        {
+            self.referrer_scopes.pop();
+        }
+    }
+
+    /// The referrer of the current establishment (the nearest one toward the
+    /// base); the single source of truth for the script/module referrer.
+    pub(crate) fn current_referrer(&self) -> Option<AtomId> {
+        self.referrer_scopes.last().and_then(|scope| scope.referrer)
+    }
+
+    /// Refresh the Agent's ambient running-context from the active frame. Called
+    /// at every frame transition (the former context push/pop sites).
+    pub(crate) fn refresh_running_context(&self, agent: &mut Agent) {
+        let running = self
+            .frame()
+            .map(|frame| lyng_env::RunningContext::new(frame.realm(), self.current_referrer()));
+        agent.set_running_context(running);
+    }
+
     #[inline]
     pub fn installed_function(&self, code: CodeRef) -> Option<&BytecodeFunction> {
         Some(&self.installed.get(code_index(code))?.as_ref()?.function)
@@ -1689,26 +1736,24 @@ impl Vm {
             u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
         self.reserve_register_window(register_base, register_len);
 
-        let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
-            .with_private_env(entry_private_env)
-            .with_this_state(if entry_lexical_this {
-                ThisState::Lexical
-            } else {
-                ThisState::Value(this_value)
-            })
-            .with_new_target(new_target)
-            .with_script_or_module_referrer(script_or_module_referrer);
-        let context = if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
-            let module_referrer = agent
-                .module_key_for_environment(lexical_env)
-                .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-            ExecutionContext::module(realm, lexical_env, variable_env)
-                .with_private_env(entry_private_env)
-                .with_this_state(ThisState::Value(this_value))
-                .with_script_or_module_referrer(module_referrer)
+        let entry_this_state = if entry_lexical_this {
+            ThisState::Lexical
         } else {
-            context
+            ThisState::Value(this_value)
         };
+        // Derive the frame kind and establishment referrer directly (no longer
+        // routed through an ExecutionContext). Module entries advertise the
+        // `Module` kind and re-intern their module key as the referrer; every
+        // other entry is a `Function` carrying the inherited referrer.
+        let (frame_kind, frame_referrer) =
+            if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
+                let module_referrer = agent
+                    .module_key_for_environment(lexical_env)
+                    .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
+                (ExecutionContextKind::Module, module_referrer)
+            } else {
+                (ExecutionContextKind::Function, script_or_module_referrer)
+            };
         let frame = FrameRecord::new(
             code,
             entry_offset,
@@ -1717,19 +1762,25 @@ impl Vm {
             realm,
             lexical_env,
             variable_env,
-            context.kind(),
+            frame_kind,
         )
         .with_this_value(this_value)
+        .with_this_state(entry_this_state)
+        .with_private_env(entry_private_env)
         .with_new_target(new_target)
         .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
 
         let prior_frame_depth = self.frames.len();
         let prior_register_len = usize::try_from(register_base)
             .expect("register stack base should fit into usize for truncation");
-        let prior_context_depth = agent.execution_contexts().len();
-        agent.push_execution_context(context);
+        // Record the entry's referrer on the parallel side-stack. The
+        // establishing frame sits at `prior_frame_depth`, so this scope unwinds
+        // exactly when that frame does (see the unwind loop below). The derived
+        // `frame_referrer` keeps script and module branches in lockstep.
+        self.push_referrer_scope(prior_frame_depth, frame_referrer);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
+        self.refresh_running_context(agent);
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
@@ -1763,10 +1814,9 @@ impl Vm {
             self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
             self.release_register_window(leaked.registers().base());
         }
+        self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
-        while agent.execution_contexts().len() > prior_context_depth {
-            let _ = agent.pop_execution_context();
-        }
+        self.refresh_running_context(agent);
 
         result
     }
@@ -2011,5 +2061,24 @@ fn prune_dead_code_ic_slab_by_installed<T>(
         if !live {
             *slot = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn referrer_scopes_walk_returns_nearest_establishment() {
+        let mut vm = Vm::new();
+        assert_eq!(vm.current_referrer(), None);
+        let a = AtomId::from_raw(10);
+        vm.push_referrer_scope(0, Some(a));
+        assert_eq!(vm.current_referrer(), Some(a));
+        let b = AtomId::from_raw(20);
+        vm.push_referrer_scope(2, Some(b));
+        assert_eq!(vm.current_referrer(), Some(b));
+        vm.unwind_referrer_scopes_to(1); // drops the depth-2 scope
+        assert_eq!(vm.current_referrer(), Some(a));
     }
 }

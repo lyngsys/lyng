@@ -159,9 +159,7 @@ impl Vm {
         } else {
             None
         };
-        let private_env = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::private_env);
+        let private_env = frame.private_env();
         let environment = if child.captures().is_empty() {
             let lexical_env = frame.lexical_env();
             if matches!(
@@ -1239,7 +1237,7 @@ mod tests {
     };
     use lyng_common::SourceId;
     use lyng_env::{
-        EnvironmentLayout, EnvironmentLayoutKind, ExecutionContext, ExecutionContextKind, Runtime,
+        EnvironmentLayout, EnvironmentLayoutKind, ExecutionContextKind, Runtime,
     };
     use lyng_host::NoopHostHooks;
     use lyng_ops::object;
@@ -1293,11 +1291,8 @@ mod tests {
             global_env,
             global_env,
             ExecutionContextKind::Function,
-        );
-        agent.push_execution_context(
-            ExecutionContext::bytecode(realm.id(), installed.code(), global_env, global_env)
-                .with_private_env(Some(private_env)),
-        );
+        )
+        .with_private_env(Some(private_env));
 
         let closure = vm
             .create_closure(agent, &frame, 0)

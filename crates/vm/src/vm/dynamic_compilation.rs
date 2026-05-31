@@ -658,9 +658,8 @@ impl Vm {
         agent: &Agent,
         caller: FrameRecord,
     ) -> Option<lyng_types::EnvironmentRef> {
-        agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::private_env)
+        caller
+            .private_env()
             .or_else(|| {
                 caller.callee().and_then(|callee| {
                     agent
@@ -676,10 +675,8 @@ impl Vm {
         lexical_env: lyng_types::EnvironmentRef,
         caller: FrameRecord,
     ) -> VmResult<(Value, Option<ObjectRef>)> {
-        if let Some(context) = agent.current_execution_context()
-            && let ThisState::Value(value) = context.this_state()
-        {
-            return Ok((value, context.new_target()));
+        if let ThisState::Value(value) = caller.this_state() {
+            return Ok((value, caller.new_target()));
         }
         Self::lexical_call_state(agent, lexical_env, &caller)
     }

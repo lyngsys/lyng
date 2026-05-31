@@ -76,6 +76,131 @@ fn debugger_pauses_at_requested_loop_header_and_reads_frame_state() {
     );
 }
 
+#[derive(Clone)]
+struct ReferrerProbeHook {
+    referrers: Rc<RefCell<Vec<Option<AtomId>>>>,
+}
+
+impl VmDebugHook for ReferrerProbeHook {
+    fn on_pause(&mut self, context: VmDebugPauseContext<'_>) -> VmDebugCommand {
+        self.referrers.borrow_mut().push(context.current_referrer());
+        VmDebugCommand::Resume
+    }
+}
+
+#[test]
+fn current_referrer_carries_established_referrer_after_entry() {
+    // Drive a script entry with a known `script_or_module_referrer`, pause at a
+    // live mid-execution safepoint, and assert the parallel `Vm` side-stack
+    // (now the single source of truth) carries the established referrer.
+    let (unit, loop_offset) = inspector_fixture_unit();
+    let referrers = Rc::new(RefCell::new(Vec::new()));
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let referrer = agent.atoms_mut().intern_collectible("entry-referrer.js");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut debugger = VmDebugger::new(ReferrerProbeHook {
+        referrers: Rc::clone(&referrers),
+    });
+    debugger.request_pause_at(installed.code(), loop_offset);
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_referrer(referrer)
+        .with_debugger(&mut debugger)
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(41));
+    let referrers = referrers.borrow();
+    assert_eq!(referrers.len(), 1, "expected exactly one mid-execution pause");
+    // The side-stack must carry the established referrer (not a None pass).
+    assert_eq!(referrers[0], Some(referrer));
+}
+
+/// `(scalar realm, scalar referrer, frame realm, frame referrer, frame_count)`
+/// captured at a live pause, used to assert the Agent `running_context` scalar
+/// tracks the active frame.
+type RunningContextSample = (
+    Option<lyng_types::RealmRef>,
+    Option<AtomId>,
+    Option<lyng_types::RealmRef>,
+    Option<AtomId>,
+    usize,
+);
+
+#[derive(Clone)]
+struct RunningContextProbeHook {
+    samples: Rc<RefCell<Vec<RunningContextSample>>>,
+}
+
+impl VmDebugHook for RunningContextProbeHook {
+    fn on_pause(&mut self, context: VmDebugPauseContext<'_>) -> VmDebugCommand {
+        let parity = context.running_context_parity();
+        self.samples.borrow_mut().push((
+            parity.scalar.map(|rc| rc.realm()),
+            parity.scalar.and_then(|rc| rc.referrer()),
+            parity.frame_realm,
+            parity.frame_referrer,
+            context.frames().len(),
+        ));
+        VmDebugCommand::Resume
+    }
+}
+
+#[test]
+fn running_context_tracks_active_frame_and_reverts_after_entry() {
+    // Drive a script entry with a known referrer, pause mid-execution, and
+    // assert the Agent's ambient `running_context` scalar matches the active
+    // frame (realm + referrer). After the entry returns and the frame stack is
+    // empty, the scalar must revert to None.
+    let (unit, loop_offset) = inspector_fixture_unit();
+    let samples = Rc::new(RefCell::new(Vec::new()));
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let referrer = agent.atoms_mut().intern_collectible("running-context.js");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let mut debugger = VmDebugger::new(RunningContextProbeHook {
+        samples: Rc::clone(&samples),
+    });
+    debugger.request_pause_at(installed.code(), loop_offset);
+
+    // The scalar starts empty (no frame is active before entry).
+    assert!(agent.running_context().is_none());
+
+    let result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .with_referrer(referrer)
+        .with_debugger(&mut debugger)
+        .run()
+        .unwrap();
+
+    assert_eq!(result, Value::from_smi(41));
+
+    let samples = samples.borrow();
+    assert_eq!(samples.len(), 1, "expected exactly one mid-execution pause");
+    let (scalar_realm, scalar_referrer, frame_realm, frame_referrer, frame_count) = samples[0];
+    assert_eq!(frame_count, 1, "paused inside the script entry frame");
+    // The scalar must mirror the active frame exactly (the SP-0a invariant)...
+    assert_eq!(scalar_realm, frame_realm);
+    assert_eq!(scalar_referrer, frame_referrer);
+    // ...and must carry the live frame's realm/referrer (not a None pass).
+    assert_eq!(scalar_realm, Some(realm.id()));
+    assert_eq!(scalar_referrer, Some(referrer));
+
+    // After the entry unwinds, the frame stack is empty and the scalar reverts.
+    assert!(
+        agent.running_context().is_none(),
+        "running_context should revert to None once the entry frame is popped"
+    );
+}
+
 #[test]
 fn debugger_step_commands_pause_at_frame_depth_boundaries() {
     assert_step_command(

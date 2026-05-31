@@ -510,7 +510,6 @@ fn phase3_environment_chain_shadowing_and_realm_state_flow_across_crates() {
         .alloc_declarative_environment(Some(object_env), block_layout, AllocationLifetime::Default)
         .expect("block environment should allocate");
     assert!(agent.init_environment_slot(block_env, 0, Value::from_smi(30)));
-    agent.push_script_context(default_realm.id(), block_env, global_env);
 
     assert_eq!(
         lookup_binding(&runtime, block_env, SHADOW_ATOM),
@@ -550,9 +549,6 @@ fn phase3_environment_chain_shadowing_and_realm_state_flow_across_crates() {
     let object_record = agent
         .object_environment(object_env)
         .expect("object environment should be queryable");
-    let current_context = agent
-        .current_execution_context()
-        .expect("script context should be visible");
 
     assert_eq!(realm.intrinsics(), intrinsics);
     assert_eq!(
@@ -566,9 +562,6 @@ fn phase3_environment_chain_shadowing_and_realm_state_flow_across_crates() {
     assert_eq!(global_record.var_names().len(), 1);
     assert_eq!(object_record.binding_object(), binding_object);
     assert!(object_record.with_environment());
-    assert_eq!(current_context.realm(), default_realm.id());
-    assert_eq!(current_context.lexical_env(), block_env);
-    assert_eq!(current_context.variable_env(), global_env);
 }
 
 #[test]

@@ -282,7 +282,6 @@ fn op_return_finish_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     inner.sync_active_frame();
-    inner.pop_execution_context();
     match inner.finish_active_frame(value) {
         Ok(Some(result)) => SemanticOutcome::ExitDone { value: result },
         Ok(None) => SemanticOutcome::Refresh,

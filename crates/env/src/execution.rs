@@ -28,163 +28,27 @@ pub enum ExecutionContextKind {
 }
 
 /// Current `this` state tracked by one execution context.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ThisState {
     Lexical,
     Uninitialized,
     Value(Value),
 }
 
-/// Cold execution-context record owned by `lyng_env`.
+/// The single ambient running-context snapshot (realm + script/module referrer),
+/// the analog of JSC's `vm.topCallFrame`-derived realm. Refreshed by the VM from
+/// the active frame; the only ambient execution state after ExecutionContext is
+/// removed. Not a stack.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ExecutionContext {
+pub struct RunningContext {
     realm: RealmRef,
-    executable: ExecutableId,
-    lexical_env: EnvironmentRef,
-    variable_env: EnvironmentRef,
-    private_env: Option<EnvironmentRef>,
-    script_or_module_referrer: Option<AtomId>,
-    this_state: ThisState,
-    new_target: Option<ObjectRef>,
-    kind: ExecutionContextKind,
+    referrer: Option<AtomId>,
 }
 
-impl ExecutionContext {
+impl RunningContext {
     #[inline]
-    pub const fn new(
-        kind: ExecutionContextKind,
-        realm: RealmRef,
-        executable: ExecutableId,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self {
-            realm,
-            executable,
-            lexical_env,
-            variable_env,
-            private_env: None,
-            script_or_module_referrer: None,
-            this_state: ThisState::Uninitialized,
-            new_target: None,
-            kind,
-        }
-    }
-
-    #[inline]
-    pub const fn script(
-        realm: RealmRef,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Script,
-            realm,
-            ExecutableId::Script,
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn module(
-        realm: RealmRef,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Module,
-            realm,
-            ExecutableId::Module,
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn builtin(
-        realm: RealmRef,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Builtin,
-            realm,
-            ExecutableId::Builtin,
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn eval(
-        realm: RealmRef,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Eval,
-            realm,
-            ExecutableId::Script,
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn job(
-        realm: RealmRef,
-        executable: ExecutableId,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Job,
-            realm,
-            executable,
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn bytecode(
-        realm: RealmRef,
-        code: CodeRef,
-        lexical_env: EnvironmentRef,
-        variable_env: EnvironmentRef,
-    ) -> Self {
-        Self::new(
-            ExecutionContextKind::Function,
-            realm,
-            ExecutableId::Bytecode(code),
-            lexical_env,
-            variable_env,
-        )
-    }
-
-    #[inline]
-    pub const fn with_private_env(mut self, private_env: Option<EnvironmentRef>) -> Self {
-        self.private_env = private_env;
-        self
-    }
-
-    #[inline]
-    pub const fn with_script_or_module_referrer(mut self, referrer: Option<AtomId>) -> Self {
-        self.script_or_module_referrer = referrer;
-        self
-    }
-
-    #[inline]
-    pub const fn with_this_state(mut self, this_state: ThisState) -> Self {
-        self.this_state = this_state;
-        self
-    }
-
-    #[inline]
-    pub const fn with_new_target(mut self, new_target: Option<ObjectRef>) -> Self {
-        self.new_target = new_target;
-        self
+    pub const fn new(realm: RealmRef, referrer: Option<AtomId>) -> Self {
+        Self { realm, referrer }
     }
 
     #[inline]
@@ -193,43 +57,16 @@ impl ExecutionContext {
     }
 
     #[inline]
-    pub const fn executable(self) -> ExecutableId {
-        self.executable
+    pub const fn referrer(self) -> Option<AtomId> {
+        self.referrer
     }
+}
 
-    #[inline]
-    pub const fn lexical_env(self) -> EnvironmentRef {
-        self.lexical_env
-    }
-
-    #[inline]
-    pub const fn variable_env(self) -> EnvironmentRef {
-        self.variable_env
-    }
-
-    #[inline]
-    pub const fn private_env(self) -> Option<EnvironmentRef> {
-        self.private_env
-    }
-
-    #[inline]
-    pub const fn script_or_module_referrer(self) -> Option<AtomId> {
-        self.script_or_module_referrer
-    }
-
-    #[inline]
-    pub const fn this_state(self) -> ThisState {
-        self.this_state
-    }
-
-    #[inline]
-    pub const fn new_target(self) -> Option<ObjectRef> {
-        self.new_target
-    }
-
-    #[inline]
-    pub const fn kind(self) -> ExecutionContextKind {
-        self.kind
+impl TraceHeapEdges for RunningContext {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.realm.trace_heap_edges(tracer);
+        // referrer is an interned AtomId owned (rooted) by the atom table, so it
+        // needs no separate trace edge here.
     }
 }
 
@@ -339,18 +176,6 @@ impl TraceHeapEdges for ThisState {
         if let Self::Value(value) = self {
             value.trace_heap_edges(tracer);
         }
-    }
-}
-
-impl TraceHeapEdges for ExecutionContext {
-    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        self.realm.trace_heap_edges(tracer);
-        self.executable.trace_heap_edges(tracer);
-        self.lexical_env.trace_heap_edges(tracer);
-        self.variable_env.trace_heap_edges(tracer);
-        self.private_env.trace_heap_edges(tracer);
-        self.this_state.trace_heap_edges(tracer);
-        self.new_target.trace_heap_edges(tracer);
     }
 }
 

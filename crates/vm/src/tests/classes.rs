@@ -209,6 +209,39 @@ fn arrow_super_calls_in_finally_initialize_the_enclosing_derived_constructor() {
 }
 
 #[test]
+fn arrow_defined_before_super_sees_initialized_this_after_super() {
+    let unit = compile_test_unit(
+        238,
+        r#"
+            class Base {
+                constructor() {
+                    this.base = true;
+                }
+            }
+            class Derived extends Base {
+                constructor() {
+                    const f = () => this;
+                    super();
+                    return f();
+                }
+            }
+            var instance = new Derived();
+            typeof instance === "object"
+                && instance.base === true
+                && instance instanceof Derived;
+        "#,
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
+
+    assert_eq!(result, Value::from_bool(true));
+}
+
+#[test]
 fn class_declaration_heritage_self_reference_throws_reference_error() {
     let unit = compile_test_unit(
         226,

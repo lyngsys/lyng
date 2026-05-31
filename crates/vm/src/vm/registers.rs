@@ -99,6 +99,7 @@ impl Vm {
         result: Value,
     ) -> VmResult<Option<Value>> {
         let frame = self.frames.pop().expect("return requires one active frame");
+        self.refresh_running_context(agent);
         self.request_dispatch_frame_check();
         self.close_loop_iteration_frames(self.frames.len());
         self.close_with_environment_frames(self.frames.len());

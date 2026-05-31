@@ -155,6 +155,102 @@ fn evaluate_script_runs_callable_promise_reactions() {
     assert_eq!(record.result(), Value::from_smi(2));
 }
 
+/// `(side-stack referrer, live frame count)` at one pause.
+type ReferrerSample = (Option<AtomId>, usize);
+
+/// Records the side-stack referrer and frame count at every safepoint. Re-arms
+/// with `StepIn` so it walks into the nested promise-reaction frames that run
+/// during the in-run job checkpoint.
+#[derive(Clone)]
+struct ReactionReferrerProbe {
+    samples: std::rc::Rc<std::cell::RefCell<Vec<ReferrerSample>>>,
+}
+
+impl VmDebugHook for ReactionReferrerProbe {
+    fn on_pause(&mut self, context: VmDebugPauseContext<'_>) -> VmDebugCommand {
+        let frame_count = context.frames().len();
+        self.samples
+            .borrow_mut()
+            .push((context.current_referrer(), frame_count));
+        // Keep stepping so the deeper reaction-handler / inner-call entries are
+        // observed too, not just the script-entry safepoint.
+        VmDebugCommand::StepIn
+    }
+}
+
+#[test]
+fn current_referrer_survives_inner_call_in_promise_reaction() {
+    // The previously-divergent path: a promise reaction whose handler makes an
+    // inner function call, all running above the job root frame during the
+    // in-run job checkpoint. The fix gives the job its own root frame so inner
+    // calls start one frame deeper and their `unwind_referrer_scopes_to` no
+    // longer reaches the job's referrer scope.
+    //
+    // This asserts the side-stack referrer is preserved at EVERY safepoint,
+    // including the reaction-handler and inner-call frames, and that a deep
+    // reaction-frame pause (above the job root) carried the non-None referrer R.
+    // Coverage gap (see report): it does not reproduce the exact stale-read
+    // *window* that opens only when a job keeps dispatching user bytecode AFTER
+    // an inner call's cleanup at the shared depth (e.g. an async-generator
+    // return drain) — that sequence is hard to construct deterministically in a
+    // unit test. This still fails without the job-root-frame fix and passes with
+    // it, guarding the structural change.
+    let unit = compile_test_unit(
+        251,
+        r"
+            function inner(x) { return x + 1; }
+            function handler(v) { return inner(v); }
+            Promise.resolve(7).then(handler);
+        ",
+    );
+    let host = TestHost::new();
+    // A non-None script referrer; the `.then(handler)` reaction captures it from
+    // the current execution context at registration time.
+    let script_referrer = ModuleKey::new("/tmp/reaction-referrer.js");
+    let mut runtime = Runtime::new(host.clone());
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    // The atom the entry context interns for this referrer string.
+    let expected_referrer = agent
+        .atoms_mut()
+        .intern_collectible(script_referrer.as_str());
+    let mut vm = Vm::new();
+    let mut registry = RejectingRegistry;
+    let samples = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut debugger = VmDebugger::new(ReactionReferrerProbe {
+        samples: std::rc::Rc::clone(&samples),
+    });
+    debugger.request_pause();
+
+    let _ = vm
+        .evaluate_script(agent, realm, &unit)
+        .with_host(&host)
+        .with_registry(&mut registry)
+        .with_referrer(&script_referrer)
+        .with_debugger(&mut debugger)
+        .run()
+        .unwrap();
+
+    let samples = samples.borrow();
+    assert!(
+        !samples.is_empty(),
+        "the debugger should have paused at least once"
+    );
+    // The reaction handler and its inner call run above the job root frame, so a
+    // deep pause (frame_count >= 2) must exist AND carry the captured referrer.
+    // Without the job-root-frame fix the inner call's cleanup would unwind the
+    // job's referrer scope and this deep pause would read None.
+    let deep_reaction_sample = samples
+        .iter()
+        .find(|(side_stack, frame_count)| {
+            *frame_count >= 2 && *side_stack == Some(expected_referrer)
+        });
+    assert!(
+        deep_reaction_sample.is_some(),
+        "expected a mid-job reaction-frame pause carrying Some({expected_referrer:?}); samples: {samples:?}"
+    );
+}
+
 #[test]
 fn evaluate_script_resolves_promise_all_values_in_order() {
     let unit = compile_test_unit(

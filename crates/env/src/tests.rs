@@ -87,7 +87,7 @@ fn runtime_boots_root_cluster_and_thread_affine_root_agent() {
         runtime.root_agent().queued_job_count(JobQueueKind::Script),
         0
     );
-    assert!(runtime.root_agent().execution_contexts().is_empty());
+    assert!(runtime.root_agent().running_context().is_none());
     assert_eq!(runtime.root_agent().realm_refs(), &[default_realm.id()]);
     assert_eq!(
         runtime.root_agent().default_realm_id(),
@@ -222,7 +222,7 @@ fn regexp_legacy_static_state_records_matches_as_lazy_source_ranges() {
 }
 
 #[test]
-fn agent_owns_heap_atoms_objects_realms_contexts_and_jobs() {
+fn agent_owns_heap_atoms_objects_realms_and_jobs() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let atom = agent.atoms_mut().intern_collectible("runtime-name");
@@ -239,11 +239,6 @@ fn agent_owns_heap_atoms_objects_realms_contexts_and_jobs() {
             AllocationLifetime::Default,
         )
     });
-    agent.push_script_context(
-        default_realm.id(),
-        default_realm.global_env(),
-        default_realm.global_env(),
-    );
     let job = agent.enqueue_job(
         HostJobKind::Script,
         ExecutableId::Script,
@@ -254,14 +249,6 @@ fn agent_owns_heap_atoms_objects_realms_contexts_and_jobs() {
     assert_eq!(atom, AtomId::from_raw(atom.raw()));
     assert!(object.get() > default_realm.global_object().get());
     assert_eq!(agent.realm_refs(), &[default_realm.id()]);
-    assert_eq!(
-        agent.current_execution_context(),
-        Some(ExecutionContext::script(
-            default_realm.id(),
-            default_realm.global_env(),
-            default_realm.global_env(),
-        ))
-    );
     assert_eq!(job.queue_kind(), JobQueueKind::Script);
     assert_eq!(agent.total_queued_jobs(), 1);
     assert_eq!(agent.dequeue_job(JobQueueKind::Script).unwrap(), job);
@@ -1026,88 +1013,6 @@ fn global_and_object_environment_families_keep_binding_domains_separate() {
         agent.environment(object_env),
         Some(EnvironmentRecord::Object(_))
     ));
-}
-
-#[test]
-fn execution_context_stack_tracks_script_module_builtin_job_and_bytecode_entries() {
-    let mut runtime = Runtime::new(NoopHostHooks);
-    let agent = runtime.root_agent_mut();
-    let realm = agent
-        .default_realm()
-        .expect("default realm should exist after boot");
-    let env = realm.global_env();
-    let private_layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
-        EnvironmentLayoutKind::Private,
-        true,
-    ));
-    let private_env = agent
-        .alloc_private_environment(Some(env), private_layout, AllocationLifetime::Default)
-        .expect("private environment should allocate");
-    let receiver = Value::undefined();
-    let new_target = realm.global_object();
-    let configured_bytecode =
-        ExecutionContext::bytecode(realm.id(), CodeRef::from_raw(11).unwrap(), env, env)
-            .with_private_env(Some(private_env))
-            .with_this_state(ThisState::Value(receiver))
-            .with_new_target(Some(new_target));
-
-    agent.push_script_context(realm.id(), env, env);
-    agent.push_module_context(realm.id(), env, env);
-    agent.push_builtin_context(realm.id(), env, env);
-    agent.push_job_context(realm.id(), ExecutableId::Builtin, env, env);
-    agent.push_bytecode_context(realm.id(), CodeRef::from_raw(9).unwrap(), env, env);
-
-    let contexts = agent.execution_contexts().to_vec();
-    assert_eq!(contexts.len(), 5);
-    assert_eq!(contexts[0].kind(), ExecutionContextKind::Script);
-    assert_eq!(contexts[1].kind(), ExecutionContextKind::Module);
-    assert_eq!(contexts[2].kind(), ExecutionContextKind::Builtin);
-    assert_eq!(contexts[3].kind(), ExecutionContextKind::Job);
-    assert_eq!(contexts[4].kind(), ExecutionContextKind::Function);
-    assert_eq!(
-        contexts[4].executable(),
-        ExecutableId::Bytecode(CodeRef::from_raw(9).unwrap())
-    );
-    assert_eq!(contexts[4].private_env(), None);
-    assert_eq!(contexts[4].this_state(), ThisState::Uninitialized);
-    assert_eq!(contexts[4].new_target(), None);
-    assert_eq!(agent.current_execution_context(), Some(contexts[4]));
-    assert_eq!(configured_bytecode.private_env(), Some(private_env));
-    assert_eq!(configured_bytecode.this_state(), ThisState::Value(receiver));
-    assert_eq!(configured_bytecode.new_target(), Some(new_target));
-
-    assert_eq!(agent.pop_execution_context(), Some(contexts[4]));
-    assert_eq!(agent.pop_execution_context(), Some(contexts[3]));
-    assert_eq!(agent.pop_execution_context(), Some(contexts[2]));
-    assert_eq!(agent.pop_execution_context(), Some(contexts[1]));
-    assert_eq!(agent.pop_execution_context(), Some(contexts[0]));
-    assert_eq!(agent.pop_execution_context(), None);
-}
-
-#[test]
-fn eval_execution_context_constructor_and_stack_entry_use_eval_kind() {
-    let mut runtime = Runtime::new(NoopHostHooks);
-    let agent = runtime.root_agent_mut();
-    let realm = agent
-        .default_realm()
-        .expect("default realm should exist after boot");
-    let env = realm.global_env();
-
-    let eval = ExecutionContext::eval(realm.id(), env, env)
-        .with_this_state(ThisState::Lexical)
-        .with_private_env(Some(env));
-    // The builder assertions exercise the configured local value, while the pushed stack
-    // entry intentionally checks the default eval context created by `push_eval_context`.
-    agent.push_eval_context(realm.id(), env, env);
-
-    assert_eq!(eval.kind(), ExecutionContextKind::Eval);
-    assert_eq!(eval.executable(), ExecutableId::Script);
-    assert_eq!(eval.private_env(), Some(env));
-    assert_eq!(eval.this_state(), ThisState::Lexical);
-    assert_eq!(
-        agent.current_execution_context(),
-        Some(ExecutionContext::eval(realm.id(), env, env))
-    );
 }
 
 #[test]
@@ -2105,4 +2010,14 @@ fn live_prototype_transition_entry_retained_on_gc() {
             .prototype_transition_entry_exists(s_source, PrototypeKey::Object(proto)),
         "entry for live proto should survive GC"
     );
+}
+
+#[test]
+fn running_context_round_trips() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    assert!(agent.running_context().is_none());
+    let realm = agent.default_realm_id().expect("default realm");
+    agent.set_running_context(Some(crate::RunningContext::new(realm, None)));
+    assert_eq!(agent.running_context().map(|rc| rc.realm()), Some(realm));
 }

@@ -232,7 +232,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
     assert_eq!(result, Value::from_smi(41));
     assert!(vm.frames().is_empty());
     assert!(vm.register_stack().is_empty());
-    assert!(agent.current_execution_context().is_none());
+    assert!(agent.running_context().is_none());
 }
 
 #[cfg(feature = "diagnostic-counters")]
@@ -2425,7 +2425,7 @@ fn function_call_builtin_rebinds_nested_targets_without_frame_leaks() {
     assert_eq!(result, Value::from_smi(19));
     assert!(vm.frames().is_empty());
     assert!(vm.register_stack().is_empty());
-    assert!(agent.current_execution_context().is_none());
+    assert!(agent.running_context().is_none());
 }
 
 #[test]
@@ -2609,4 +2609,95 @@ fn throw_transfers_control_to_matching_catch_handler() {
         .unwrap();
 
     assert_eq!(result, Value::from_smi(13));
+}
+
+/// SP-0a Task 4: an environment reachable ONLY through a live frame's
+/// `private_env` must survive collection. The VM traces its active frames as GC
+/// roots via `trace_frame_record` (`crates/vm/src/vm/state.rs`), invoked from the
+/// major collection path (`force_collect_with_active_roots` ->
+/// `Agent::force_collect_with_additional_roots` -> `ActiveVmRoots`). Before this
+/// task `private_env` was not among the traced frame edges, so an environment
+/// held only via `with_private_env(Some(env))` was silently reclaimed.
+///
+/// This test allocates a fresh declarative environment (Default lifetime, no
+/// outer, not otherwise rooted), stores a sentinel SMI in slot 0, builds a frame
+/// whose ONLY reference to that environment is `private_env`, drives a full
+/// collection with that frame as the active caller frame, and asserts the
+/// environment record still exists and the sentinel still reads back.
+///
+/// Note: the frame-root trace lives only on the MAJOR collection path
+/// (`force_minor_collect` takes no additional roots and does not visit
+/// `ActiveVmRoots`/frames), so this exercises `force_collect_with_active_roots`,
+/// which is the production driver that reaches `trace_frame_record`.
+#[test]
+fn major_gc_frame_private_env_survives() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+
+    // A trivial installed script gives us a real CodeRef/RealmRef and lets the
+    // frame's lexical/variable env point at the realm's global env, so the rest
+    // of `trace_frame_record`'s edges are well-formed real heap refs.
+    let unit = compile_test_unit(40_400, "0;");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Allocate a fresh declarative environment with a single mutable slot. It has
+    // no outer parent and is not installed anywhere, so the ONLY path we will give
+    // it is the frame's `private_env`.
+    let layout = agent.alloc_environment_layout(EnvironmentLayout::new(
+        EnvironmentLayoutKind::Declarative,
+        [EnvironmentBindingLayout::new(
+            // Arbitrary unused binding-name atom id; the specific value is
+            // irrelevant (its closeness to the script source id is coincidental).
+            Some(AtomId::from_raw(40_401)),
+            EnvironmentSlotFlags::mutable_lexical(),
+        )],
+        true,
+    ));
+    let private_env = agent
+        .alloc_declarative_environment(None, layout, AllocationLifetime::Default)
+        .expect("declarative environment should allocate");
+
+    // Sentinel SMI proves the surviving record is intact (and is not itself a heap
+    // ref, so survival depends purely on the env record being marked).
+    let sentinel = Value::from_smi(0x5A5A);
+    assert!(
+        agent.set_environment_slot(private_env, 0, sentinel),
+        "should be able to seed the private env slot"
+    );
+
+    // Build a frame whose ONLY reference to `private_env` is via `with_private_env`.
+    // lexical_env/variable_env intentionally point at the realm global env, never
+    // at `private_env`.
+    let caller_frame = FrameRecord::new(
+        installed.code(),
+        0,
+        RegisterWindow::new(0, 1),
+        None,
+        realm.id(),
+        realm.global_env(),
+        realm.global_env(),
+        ExecutionContextKind::Function,
+    )
+    .with_private_env(Some(private_env))
+    .with_flags(FrameFlags::entry());
+    assert_eq!(
+        caller_frame.private_env(),
+        Some(private_env),
+        "the frame must hold the env only via private_env"
+    );
+
+    // Drive a full collection with the frame as the active caller frame. This goes
+    // through `ActiveVmRoots`/`trace_frame_record`, the trace site under test.
+    let _report = vm.force_collect_with_active_roots(agent, caller_frame);
+
+    // The environment record must still exist (it was traced via the frame's
+    // private_env edge) and its sentinel slot must read back unchanged.
+    assert_eq!(
+        agent.environment_slot(private_env, 0),
+        Some(sentinel),
+        "REGRESSION: environment reachable only via frame.private_env was COLLECTED — \
+         `trace_frame_record` must trace `frame.private_env()` as a GC root"
+    );
 }
