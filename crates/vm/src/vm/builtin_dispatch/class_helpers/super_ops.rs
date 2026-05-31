@@ -215,15 +215,22 @@ impl Vm {
                 lyng_env::ThisBindingStatus::Initialized,
                 this_value,
             );
-            if !agent.set_execution_context_this_state_for_lexical_env(
-                function_env,
-                ThisState::Value(this_value),
-            ) {
-                let _ =
-                    agent.set_current_execution_context_this_state(ThisState::Value(this_value));
+            let mut updated = false;
+            for frame in self
+                .frames
+                .iter_mut()
+                .filter(|frame| frame.lexical_env() == function_env)
+            {
+                frame.set_this_state(ThisState::Value(this_value));
+                updated = true;
             }
-        } else {
-            let _ = agent.set_current_execution_context_this_state(ThisState::Value(this_value));
+            if !updated {
+                if let Some(frame) = self.frames.last_mut() {
+                    frame.set_this_state(ThisState::Value(this_value));
+                }
+            }
+        } else if let Some(frame) = self.frames.last_mut() {
+            frame.set_this_state(ThisState::Value(this_value));
         }
         let frame_index = self
             .frames
