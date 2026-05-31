@@ -65,8 +65,8 @@ impl RunningContext {
 impl TraceHeapEdges for RunningContext {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
         self.realm.trace_heap_edges(tracer);
-        // referrer is an interned AtomId; ExecutionContext did not trace
-        // script_or_module_referrer either, so we match that.
+        // referrer is an interned AtomId owned (rooted) by the atom table, so it
+        // needs no separate trace edge here.
     }
 }
 

@@ -1360,10 +1360,8 @@ impl Vm {
         }
     }
 
-    /// The referrer of the current establishment (the nearest one toward the base).
-    ///
-    /// Currently exercised only by tests; production readers arrive with the
-    /// reader-migration tasks.
+    /// The referrer of the current establishment (the nearest one toward the
+    /// base); the single source of truth for the script/module referrer.
     pub(crate) fn current_referrer(&self) -> Option<AtomId> {
         self.referrer_scopes.last().and_then(|scope| scope.referrer)
     }

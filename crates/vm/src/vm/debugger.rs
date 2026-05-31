@@ -210,8 +210,8 @@ impl<'a> VmDebugPauseContext<'a> {
     /// VM would recompute from the active frame. SP-0a requires the scalar to
     /// track the frame at every live point; this exposes both for a test.
     ///
-    /// Test-only scaffolding; production readers of `running_context` arrive
-    /// with the reader-migration tasks.
+    /// Test-only: exposes parity between the `running_context` scalar and the
+    /// frame-derived values for regression coverage.
     #[cfg(test)]
     pub(crate) fn running_context_parity(&self) -> RunningContextParity {
         RunningContextParity {

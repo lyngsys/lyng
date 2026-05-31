@@ -222,7 +222,7 @@ fn regexp_legacy_static_state_records_matches_as_lazy_source_ranges() {
 }
 
 #[test]
-fn agent_owns_heap_atoms_objects_realms_contexts_and_jobs() {
+fn agent_owns_heap_atoms_objects_realms_and_jobs() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let atom = agent.atoms_mut().intern_collectible("runtime-name");
