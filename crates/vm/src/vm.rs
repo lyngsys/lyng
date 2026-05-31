@@ -1720,6 +1720,12 @@ impl Vm {
             context.kind(),
         )
         .with_this_value(this_value)
+        .with_this_state(if entry_lexical_this {
+            ThisState::Lexical
+        } else {
+            ThisState::Value(this_value)
+        })
+        .with_private_env(entry_private_env)
         .with_new_target(new_target)
         .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
 

@@ -1577,6 +1577,11 @@ impl Vm {
             context_kind,
         )
         .with_this_value(record.this_value())
+        .with_this_state(decode_this_state(
+            record.this_state_kind(),
+            record.this_value(),
+        ))
+        .with_private_env(record.private_env())
         .with_construct_this(record.construct_this())
         .with_new_target(record.new_target())
         .with_callee(record.callee())

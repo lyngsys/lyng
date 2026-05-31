@@ -254,6 +254,7 @@ impl Vm {
         };
         frame.set_this_value(this_value);
         frame.set_construct_this(Some(this_object));
+        frame.set_this_state(ThisState::Value(this_value));
         Ok(this_value)
     }
 

@@ -307,6 +307,8 @@ impl Vm {
             context.kind(),
         )
         .with_this_value(prepared.this_value)
+        .with_this_state(prepared.execution_this_state)
+        .with_private_env(prepared.private_env)
         .with_parameter_initializer_end_offset(prepared.parameter_initializer_end_offset)
         .with_construct_this(construct_this)
         .with_new_target(prepared.new_target)
@@ -470,6 +472,8 @@ impl Vm {
             context.kind(),
         )
         .with_this_value(prepared.this_value)
+        .with_this_state(prepared.execution_this_state)
+        .with_private_env(prepared.private_env)
         .with_parameter_initializer_end_offset(prepared.parameter_initializer_end_offset)
         .with_construct_this(construct_this)
         .with_new_target(prepared.new_target)
@@ -820,6 +824,83 @@ mod tests {
                 .private_env(),
             Some(private_env)
         );
+    }
+
+    #[test]
+    fn prepared_bytecode_call_frame_mirrors_context_this_state_and_private_env() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist after boot");
+        let global_env = realm.global_env();
+        let root_shape = realm
+            .root_shape()
+            .expect("default realm should expose a root shape");
+        let private_layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
+            EnvironmentLayoutKind::Private,
+            true,
+        ));
+        let private_env = agent
+            .alloc_private_environment(
+                Some(global_env),
+                private_layout,
+                AllocationLifetime::Default,
+            )
+            .expect("private environment should allocate");
+
+        let function = BytecodeBuilder::new(
+            BytecodeFunctionId::from_raw(13).unwrap(),
+            BytecodeFunctionKind::Function,
+        )
+        .finish()
+        .expect("test bytecode should build");
+        let unit = CompiledFunctionUnit::new(SourceId::new(94), function.id(), vec![function]);
+        let mut vm = Vm::new();
+        let installed = vm
+            .install_function(agent, realm.id(), &unit)
+            .expect("function unit should install");
+        let callee = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::function(root_shape).with_cold_data(ObjectColdData::Function(
+                    FunctionObjectData::bytecode(realm.id(), global_env, installed.code())
+                        .with_private_env(Some(private_env)),
+                )),
+                AllocationLifetime::Default,
+            )
+        });
+        let caller_frame = FrameRecord::new(
+            installed.code(),
+            0,
+            RegisterWindow::new(0, 0),
+            None,
+            realm.id(),
+            global_env,
+            global_env,
+            ExecutionContextKind::Function,
+        );
+
+        let prepared = vm
+            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
+            .expect("bytecode call should prepare");
+        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+            .expect("bytecode call should install");
+
+        let frame = *vm
+            .frames
+            .last()
+            .expect("prepared call should leave one active frame");
+        let context = agent
+            .current_execution_context()
+            .expect("installed call should push an execution context");
+
+        // The execution context is still authoritative; the frame must now carry
+        // the same this_state / private_env that the context does.
+        assert_eq!(frame.this_state(), context.this_state());
+        assert_eq!(frame.private_env(), context.private_env());
+        assert_eq!(frame.private_env(), Some(private_env));
     }
 
     #[test]
