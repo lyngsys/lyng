@@ -4612,6 +4612,266 @@ fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
     );
 }
 
+// -----------------------------------------------------------------------------
+// Construct IC eager-clear survives a HOT `F.prototype = X` store site.
+// -----------------------------------------------------------------------------
+//
+// A function's `prototype` is a writable own data slot, so a hot
+// `F.prototype = {}` site would otherwise install a store IC and perform an
+// in-place write that BYPASSES the slow store — the only site that fires the
+// per-constructor construct `.prototype` watchpoint (eager-clear). Two fast
+// store paths derive from the planned `OwnData` store entry: the asm
+// inline-write handler (mode 5) and the Rust `try_store` `OwnData` cache. The
+// plan-stage exclusion suppresses BOTH by returning `Ok(None)` for the
+// function `prototype` slot, forcing every write back onto the firing slow
+// store. This test warms the store site so the asserted write is HOT, then
+// asserts the construct IC is still eager-cleared.
+//
+// Companion to `reassigning_function_prototype_clears_registered_construct_ic_slot`
+// (which exercises only the COLD slow-store path). Without the exclusion this
+// test FAILS: the warm write bypasses the fire and the per-constructor set
+// stays `Watched` (never `Invalidated`).
+
+#[test]
+fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
+    // Script 1: warm up the construct IC for F's `new` site (loop crosses the
+    // allocation threshold = 2) and return F. Identical in spirit to the
+    // cold-store companion test.
+    let warmup = compile_test_unit(
+        70_030,
+        r"
+            function F() {}
+            for (var i = 0; i < 4; i = i + 1) {
+                new F();
+            }
+            F;
+        ",
+    );
+    let construct_slot = warmup
+        .function(warmup.entry())
+        .expect("entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| descriptor.kind() == FeedbackSiteKind::Construct)
+        .map(|descriptor| descriptor.slot())
+        .expect("entry script should contain a construct site for `new F()`");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let warmup_installed = vm.install_script(agent, realm.id(), &warmup).unwrap();
+
+    let f_value = vm
+        .evaluate_installed(
+            agent,
+            warmup_installed,
+            realm.global_env(),
+            realm.global_env(),
+        )
+        .run()
+        .unwrap();
+    let f = f_value
+        .as_object_ref()
+        .expect("script should return the constructor F");
+
+    // The construct IC must be monomorphic after warming up `new F()`.
+    let code = warmup_installed.code();
+    let status = vm
+        .construct_status(code, construct_slot)
+        .expect("entry code should expose a construct status");
+    assert_eq!(
+        status.state,
+        FeedbackInlineCacheState::Monomorphic,
+        "construct IC should be monomorphic after warming up `new F()`",
+    );
+    assert!(
+        status.callee.is_some(),
+        "monomorphic construct IC must expose a cached constructor entry",
+    );
+    let generation = status.generation;
+
+    // Script 2 on the SAME realm/global env: a HOT loop of `F.prototype = {}`
+    // with NO `new F()` (so nothing re-populates the construct IC). The loop
+    // crosses the allocation threshold (= 2) within this run, so its OWN store
+    // site warms and — absent the exclusion — installs an `OwnData` store IC.
+    // No construct watchpoint is registered yet, so these writes fire against
+    // F's empty per-constructor set and leave the construct IC (from script 1)
+    // populated. The purpose of this run is purely to WARM/install the store
+    // IC so the *re-run* below performs a genuinely hot first write.
+    let store_warm = compile_test_unit(
+        70_031,
+        r"
+            for (var i = 0; i < 8; i = i + 1) {
+                F.prototype = {};
+            }
+        ",
+    );
+    // Several `NamedPropertyStore` sites exist in this script; select the one
+    // whose name atom is `prototype` (the `F.prototype = {}` store) by matching
+    // the site metadata against the compiled-unit atom.
+    let prototype_atom = unit_atom(&store_warm, "prototype");
+    let store_slot = store_warm
+        .function(store_warm.entry())
+        .expect("entry function")
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyStore
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(prototype_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("script should contain a named-store site for `F.prototype = {}`");
+    let store_installed = vm.install_script(agent, realm.id(), &store_warm).unwrap();
+    let store_code = store_installed.code();
+    vm.evaluate_installed(
+        agent,
+        store_installed,
+        realm.global_env(),
+        realm.global_env(),
+    )
+    .run()
+    .unwrap();
+
+    // The construct IC must still be Monomorphic after the warming run (no
+    // watchpoint was registered, so nothing cleared it).
+    assert_eq!(
+        vm.construct_status(code, construct_slot)
+            .expect("construct status")
+            .state,
+        FeedbackInlineCacheState::Monomorphic,
+        "construct IC must survive the store-IC warming run (no watchpoint yet)",
+    );
+
+    // NOW register the ConstructIcClear watchpoint on F's per-constructor set,
+    // matching the populated construct slot (simulating Task 7's fast path).
+    // From here on, a write that reaches the firing slow store must clear the
+    // construct IC and Invalidate the set.
+    agent
+        .objects_mut()
+        .construct_prototype_watchpoint_mut(f)
+        .register(Watchpoint::ShapeInvalidation {
+            observer: ShapeInvalidationObserver::ConstructIcClear {
+                code,
+                slot: construct_slot,
+                generation,
+            },
+        })
+        .expect("register on fresh per-constructor set must succeed");
+
+    // The `F.prototype` store site for script 2 must NOT hold a usable OwnData
+    // store entry: the plan-stage exclusion returns `Ok(None)`, so the
+    // slow-path observer promotes the slot to a no-entry Megamorphic state
+    // (entry_count 0, no cached path) instead of installing the bypassing
+    // `Monomorphic/OwnData` entry. Both the asm inline-write handler and the
+    // Rust `try_store` need that OwnData entry to service a write, so its
+    // absence forces every write onto the firing slow store. WITHOUT the fix
+    // this snapshot is `Some(("Monomorphic", 1, Some(OwnData)))` — the very
+    // state that makes the next (re-run) write take the in-place fast write
+    // and bypass the slow store.
+    let store_snapshot = vm.named_property_cache_snapshot(store_code, store_slot);
+    assert!(
+        store_snapshot.is_none_or(|(_, entry_count, path)| entry_count == 0 && path.is_none()),
+        "function `.prototype` store site must NOT install a usable OwnData store entry \
+         (exclusion forces slow store), got {store_snapshot:?}",
+    );
+
+    // Re-run the SAME installed store unit. The store site is already warm/
+    // installed (without the fix), so its FIRST `F.prototype = {}` write is a
+    // genuinely HOT write: without the exclusion it takes the in-place fast
+    // write and never reaches the slow store, so the just-registered watchpoint
+    // is never fired (the bug). With the exclusion the write hits the slow store
+    // and fires the construct `.prototype` watchpoint.
+    vm.evaluate_installed(
+        agent,
+        store_installed,
+        realm.global_env(),
+        realm.global_env(),
+    )
+    .run()
+    .unwrap();
+
+    // The warm write fired the watchpoint and eagerly cleared the construct IC.
+    let cleared = vm
+        .construct_status(code, construct_slot)
+        .expect("construct status should still project after clear");
+    assert_eq!(
+        cleared.state,
+        FeedbackInlineCacheState::Uninitialized,
+        "a HOT `F.prototype = {{}}` write must still eager-clear the construct IC slot",
+    );
+    assert!(
+        cleared.callee.is_none() && cleared.entries.is_empty(),
+        "cleared construct IC slot must drop its cached constructor entry",
+    );
+
+    // The per-constructor watchpoint set must be Invalidated (drained) — proof
+    // the warm write reached the firing slow store rather than the in-place
+    // fast write that bypasses it.
+    assert_eq!(
+        agent
+            .objects()
+            .construct_prototype_watchpoint_inspect(f)
+            .expect("set entry must still exist after fire")
+            .state(),
+        WatchpointState::Invalidated,
+        "the per-constructor watchpoint set must be Invalidated after the warm write fires",
+    );
+}
+
+// -----------------------------------------------------------------------------
+// Reads-still-cache guard for the function `.prototype` store exclusion.
+// -----------------------------------------------------------------------------
+//
+// The store-IC exclusion is gated on `NamedPropertyCachePurpose::Store` only.
+// A LOAD of `F.prototype` must still install its `OwnData` load IC — the
+// exclusion must not regress reads. A function's `prototype` is an own data
+// property, so a warm `F.prototype;` read site caches as Monomorphic/OwnData.
+
+#[test]
+fn reading_function_prototype_still_caches_load_ic() {
+    let unit = compile_test_unit(
+        70_032,
+        r"
+            function F() {}
+            F.prototype;
+            F.prototype;
+        ",
+    );
+    let entry = unit.function(unit.entry()).expect("entry function");
+    let prototype_atom = unit_atom(&unit, "prototype");
+    let load_slot = entry
+        .feedback_sites()
+        .iter()
+        .find(|descriptor| {
+            descriptor.kind() == FeedbackSiteKind::NamedPropertyLoad
+                && descriptor.metadata() == FeedbackSiteMetadata::NamedProperty(prototype_atom)
+        })
+        .map(|descriptor| descriptor.slot())
+        .expect("script should contain a named-load site for `F.prototype`");
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Two runs: the first crosses the allocation threshold, the second installs
+    // the load IC entry.
+    for _ in 0..2 {
+        vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+            .run()
+            .unwrap();
+    }
+
+    assert_eq!(
+        vm.named_property_cache_snapshot(installed.code(), load_slot),
+        Some(("Monomorphic", 1, Some(NamedPropertyCachePath::OwnData))),
+        "reading `F.prototype` must still install a Monomorphic/OwnData load IC \
+         (the store exclusion must not regress reads)",
+    );
+}
+
 // Companion to the test above, but for the `Object.defineProperty` write path
 // rather than a plain assignment. `Object.defineProperty(F, 'prototype', ...)`
 // funnels through `Agent::define_own_property` (with the Vm as `vm_dispatch`),
