@@ -119,11 +119,22 @@ struct NoopVmEvaluationObserver;
 
 impl VmEvaluationObserver for NoopVmEvaluationObserver {}
 
+/// One referrer-establishment scope on the `Vm` side-stack. `base_depth` is the
+/// frame depth at which the establishing frame sits; the scope covers all frames
+/// at depth >= `base_depth` until that frame unwinds. `referrer` is the seed
+/// (None is a valid establishment — e.g. a script with no host referrer).
+#[derive(Clone, Copy, Debug)]
+struct ReferrerScope {
+    base_depth: usize,
+    referrer: Option<lyng_common::AtomId>,
+}
+
 #[derive(Default)]
 pub struct Vm {
     register_stack: Vec<Value>,
     register_stack_top: usize,
     frames: Vec<FrameRecord>,
+    referrer_scopes: Vec<ReferrerScope>,
     dispatch_frame_check_epoch: u32,
     installed: Vec<Option<Arc<InstalledFunction>>>,
     current_exception: Option<Value>,
@@ -580,6 +591,7 @@ impl Vm {
             register_stack: Vec::new(),
             register_stack_top: 0,
             frames: Vec::new(),
+            referrer_scopes: Vec::new(),
             dispatch_frame_check_epoch: 0,
             installed: Vec::new(),
             current_exception: None,
@@ -1328,6 +1340,27 @@ impl Vm {
         self.for_in_states.len()
     }
 
+    pub(crate) fn push_referrer_scope(&mut self, base_depth: usize, referrer: Option<lyng_common::AtomId>) {
+        self.referrer_scopes.push(ReferrerScope { base_depth, referrer });
+    }
+
+    /// Drop every establishment scope whose base frame has unwound (i.e. whose
+    /// `base_depth >= target_frame_depth`).
+    pub(crate) fn unwind_referrer_scopes_to(&mut self, target_frame_depth: usize) {
+        while self
+            .referrer_scopes
+            .last()
+            .is_some_and(|scope| scope.base_depth >= target_frame_depth)
+        {
+            self.referrer_scopes.pop();
+        }
+    }
+
+    /// The referrer of the current establishment (the nearest one toward the base).
+    pub(crate) fn current_referrer(&self) -> Option<lyng_common::AtomId> {
+        self.referrer_scopes.last().and_then(|scope| scope.referrer)
+    }
+
     #[inline]
     pub fn installed_function(&self, code: CodeRef) -> Option<&BytecodeFunction> {
         Some(&self.installed.get(code_index(code))?.as_ref()?.function)
@@ -2014,5 +2047,24 @@ fn prune_dead_code_ic_slab_by_installed<T>(
         if !live {
             *slot = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn referrer_scopes_walk_returns_nearest_establishment() {
+        let mut vm = Vm::new();
+        assert_eq!(vm.current_referrer(), None);
+        let a = AtomId::from_raw(10);
+        vm.push_referrer_scope(0, Some(a));
+        assert_eq!(vm.current_referrer(), Some(a));
+        let b = AtomId::from_raw(20);
+        vm.push_referrer_scope(2, Some(b));
+        assert_eq!(vm.current_referrer(), Some(b));
+        vm.unwind_referrer_scopes_to(1); // drops the depth-2 scope
+        assert_eq!(vm.current_referrer(), Some(a));
     }
 }
