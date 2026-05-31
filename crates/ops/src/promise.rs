@@ -36,8 +36,8 @@ pub fn create_promise_reaction(
     capability: Option<lyng_env::PromiseCapabilityId>,
 ) -> lyng_env::PromiseReactionId {
     let script_or_module_referrer = agent
-        .current_execution_context()
-        .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+        .running_context()
+        .and_then(lyng_env::RunningContext::referrer);
     agent.alloc_promise_reaction(
         PromiseReactionRecord::new(kind, handler, capability)
             .with_script_or_module_referrer(script_or_module_referrer),
