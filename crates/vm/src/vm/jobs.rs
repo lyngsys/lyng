@@ -147,6 +147,7 @@ impl Vm {
         // its own callee frame first). Inner calls now start at depth D+1, so
         // their unwind baselines no longer reach the job scope at depth D.
         self.frames.push(self.synthetic_job_caller_frame(&realm_record));
+        self.refresh_running_context(agent);
         let result = match job.payload() {
             RuntimeJobPayload::Executable => {
                 self.execute_executable_job(agent, host, registry, job, &realm_record)
@@ -215,6 +216,7 @@ impl Vm {
         debug_assert_eq!(self.frames.len(), job_base_depth);
         self.unwind_referrer_scopes_to(job_base_depth);
         let _ = agent.pop_execution_context();
+        self.refresh_running_context(agent);
         agent.clear_kept_objects();
         result
     }

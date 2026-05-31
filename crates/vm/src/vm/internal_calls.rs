@@ -46,6 +46,7 @@ impl Vm {
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();
         }
+        self.refresh_running_context(agent);
         Ok(())
     }
 

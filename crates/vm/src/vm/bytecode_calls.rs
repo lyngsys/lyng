@@ -325,6 +325,7 @@ impl Vm {
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
+        self.refresh_running_context(agent);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
         self.request_dispatch_frame_check();
@@ -349,6 +350,7 @@ impl Vm {
         self.release_register_stack_to(register_base);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
+        self.refresh_running_context(agent);
         Ok(())
     }
 
@@ -490,6 +492,7 @@ impl Vm {
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
+        self.refresh_running_context(agent);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
         self.request_dispatch_frame_check();

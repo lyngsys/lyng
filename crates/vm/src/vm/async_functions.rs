@@ -357,6 +357,7 @@ impl Vm {
         self.release_register_window(frame.registers().base());
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
+        self.refresh_running_context(agent);
         Self::enqueue_await_resume(agent, promise, suspended)?;
         Err(VmError::AsyncSuspend)
     }

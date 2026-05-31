@@ -233,6 +233,39 @@ impl ExecutionContext {
     }
 }
 
+/// The single ambient running-context snapshot (realm + script/module referrer),
+/// the analog of JSC's `vm.topCallFrame`-derived realm. Refreshed by the VM from
+/// the active frame; the only ambient execution state after ExecutionContext is
+/// removed. Not a stack.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RunningContext {
+    realm: RealmRef,
+    referrer: Option<AtomId>,
+}
+
+impl RunningContext {
+    #[inline]
+    pub const fn new(realm: RealmRef, referrer: Option<AtomId>) -> Self {
+        Self { realm, referrer }
+    }
+    #[inline]
+    pub const fn realm(self) -> RealmRef {
+        self.realm
+    }
+    #[inline]
+    pub const fn referrer(self) -> Option<AtomId> {
+        self.referrer
+    }
+}
+
+impl TraceHeapEdges for RunningContext {
+    fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
+        self.realm.trace_heap_edges(tracer);
+        // referrer is an interned AtomId; ExecutionContext did not trace
+        // script_or_module_referrer either, so we match that.
+    }
+}
+
 /// Read-only view over one realm record and its typed intrinsic table.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RealmRecord {

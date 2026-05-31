@@ -2,7 +2,7 @@ use super::{
     AgentId, AgentJobQueues, AllocationLifetime, AtomTable, BootstrapAtoms, EnvironmentLayout,
     EnvironmentMetadata, ExecutionContext, GlobalSymbolRegistry, HostAgentId, HostThreadId,
     Intrinsics, ModuleRecord, ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata,
-    RealmRef, RegExpLegacyStaticState, WellKnownSymbols,
+    RealmRef, RegExpLegacyStaticState, RunningContext, WellKnownSymbols,
 };
 use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
@@ -40,6 +40,7 @@ struct AgentCollectionSnapshot {
     realms: Vec<RealmRef>,
     intrinsics: Vec<Intrinsics>,
     execution_contexts: Vec<ExecutionContext>,
+    running_context: Option<RunningContext>,
     modules: Vec<ModuleRecord>,
     regexp_legacy_static_states: Vec<RegExpLegacyStaticState>,
     promise_tables: super::AgentPromiseTables,
@@ -63,6 +64,7 @@ impl AgentCollectionSnapshot {
                 .filter_map(|metadata| metadata.as_ref().map(|metadata| metadata.intrinsics))
                 .collect(),
             execution_contexts: agent.execution_contexts.clone(),
+            running_context: agent.running_context,
             modules: agent.modules.values().cloned().collect(),
             regexp_legacy_static_states: agent
                 .realm_metadata
@@ -96,6 +98,9 @@ impl TraceHeapEdges for AgentCollectionSnapshot {
         }
         for context in &self.execution_contexts {
             context.trace_heap_edges(tracer);
+        }
+        if let Some(running_context) = &self.running_context {
+            running_context.trace_heap_edges(tracer);
         }
         self.promise_tables.trace_heap_edges(tracer);
         self.disposal_tables.trace_heap_edges(tracer);
@@ -169,6 +174,7 @@ pub struct Agent {
     realm_metadata: Vec<Option<RealmMetadata>>,
     default_realm: Option<RealmRef>,
     execution_contexts: Vec<ExecutionContext>,
+    running_context: Option<RunningContext>,
     modules: BTreeMap<ModuleKey, ModuleRecord>,
     promise_tables: super::AgentPromiseTables,
     disposal_tables: super::AgentDisposalTables,
@@ -212,6 +218,7 @@ impl Agent {
             realm_metadata: Vec::new(),
             default_realm: None,
             execution_contexts: Vec::new(),
+            running_context: None,
             modules: BTreeMap::new(),
             promise_tables: super::AgentPromiseTables::default(),
             disposal_tables: super::AgentDisposalTables::default(),
@@ -233,6 +240,16 @@ impl Agent {
     #[inline]
     pub const fn id(&self) -> AgentId {
         self.id
+    }
+
+    #[inline]
+    pub const fn running_context(&self) -> Option<RunningContext> {
+        self.running_context
+    }
+
+    #[inline]
+    pub fn set_running_context(&mut self, running_context: Option<RunningContext>) {
+        self.running_context = running_context;
     }
 
     #[inline]

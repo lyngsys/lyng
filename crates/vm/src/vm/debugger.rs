@@ -215,6 +215,30 @@ impl<'a> VmDebugPauseContext<'a> {
             .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
         (side_stack, context)
     }
+
+    /// The Agent's ambient `running_context` snapshot alongside the values the
+    /// VM would recompute from the active frame. SP-0a requires the scalar to
+    /// track the frame at every live point; this exposes both for a test.
+    ///
+    /// Test-only scaffolding; production readers of `running_context` arrive
+    /// with the reader-migration tasks.
+    #[cfg(test)]
+    pub(crate) fn running_context_parity(&self) -> RunningContextParity {
+        RunningContextParity {
+            scalar: self.agent.running_context(),
+            frame_realm: self.vm.frame().map(|frame| frame.realm()),
+            frame_referrer: self.vm.current_referrer(),
+        }
+    }
+}
+
+/// The Agent `running_context` scalar paired with the values the VM recomputes
+/// from the active frame, captured at a single live pause for a parity test.
+#[cfg(test)]
+pub(crate) struct RunningContextParity {
+    pub(crate) scalar: Option<lyng_env::RunningContext>,
+    pub(crate) frame_realm: Option<lyng_types::RealmRef>,
+    pub(crate) frame_referrer: Option<lyng_common::AtomId>,
 }
 
 /// Caller-owned bundle of `(hook, state)` that drives the VM debug poll.

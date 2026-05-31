@@ -2106,3 +2106,13 @@ fn live_prototype_transition_entry_retained_on_gc() {
         "entry for live proto should survive GC"
     );
 }
+
+#[test]
+fn running_context_round_trips() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    assert!(agent.running_context().is_none());
+    let realm = agent.default_realm_id().expect("default realm");
+    agent.set_running_context(Some(crate::RunningContext::new(realm, None)));
+    assert_eq!(agent.running_context().map(|rc| rc.realm()), Some(realm));
+}

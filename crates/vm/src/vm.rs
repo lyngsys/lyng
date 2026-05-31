@@ -1365,6 +1365,15 @@ impl Vm {
         self.referrer_scopes.last().and_then(|scope| scope.referrer)
     }
 
+    /// Refresh the Agent's ambient running-context from the active frame. Called
+    /// at every frame transition (the former context push/pop sites).
+    pub(crate) fn refresh_running_context(&self, agent: &mut Agent) {
+        let running = self
+            .frame()
+            .map(|frame| lyng_env::RunningContext::new(frame.realm(), self.current_referrer()));
+        agent.set_running_context(running);
+    }
+
     #[inline]
     pub fn installed_function(&self, code: CodeRef) -> Option<&BytecodeFunction> {
         Some(&self.installed.get(code_index(code))?.as_ref()?.function)
@@ -1775,6 +1784,7 @@ impl Vm {
         agent.push_execution_context(context);
         self.note_executed_code(frame.code());
         self.frames.push(frame);
+        self.refresh_running_context(agent);
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
@@ -1813,6 +1823,7 @@ impl Vm {
         while agent.execution_contexts().len() > prior_context_depth {
             let _ = agent.pop_execution_context();
         }
+        self.refresh_running_context(agent);
 
         result
     }

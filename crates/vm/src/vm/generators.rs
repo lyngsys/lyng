@@ -793,6 +793,7 @@ impl Vm {
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
+        self.refresh_running_context(agent);
         Err(VmError::GeneratorYield {
             value: yielded_value,
             suspended,
@@ -821,6 +822,7 @@ impl Vm {
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
+        self.refresh_running_context(agent);
         Err(VmError::GeneratorStart { suspended })
     }
 
@@ -1608,6 +1610,7 @@ impl Vm {
         self.frames.push(frame);
         self.note_frame_depth();
         self.push_referrer_scope(restore_frame_depth, script_or_module_referrer);
+        self.refresh_running_context(agent);
         self.request_dispatch_frame_check();
 
         if let Some(side_state) = side_state {
