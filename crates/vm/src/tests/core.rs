@@ -2630,7 +2630,7 @@ fn throw_transfers_control_to_matching_catch_handler() {
 /// `ActiveVmRoots`/frames), so this exercises `force_collect_with_active_roots`,
 /// which is the production driver that reaches `trace_frame_record`.
 #[test]
-fn minor_gc_frame_private_env_survives() {
+fn major_gc_frame_private_env_survives() {
     let mut runtime = Runtime::new(NoopHostHooks);
     let agent = runtime.root_agent_mut();
     let realm = agent.default_realm().expect("default realm should exist");
@@ -2648,6 +2648,8 @@ fn minor_gc_frame_private_env_survives() {
     let layout = agent.alloc_environment_layout(EnvironmentLayout::new(
         EnvironmentLayoutKind::Declarative,
         [EnvironmentBindingLayout::new(
+            // Arbitrary unused binding-name atom id; the specific value is
+            // irrelevant (its closeness to the script source id is coincidental).
             Some(AtomId::from_raw(40_401)),
             EnvironmentSlotFlags::mutable_lexical(),
         )],
