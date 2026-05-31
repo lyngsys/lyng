@@ -134,6 +134,7 @@ pub struct FrameMetadata {
     return_register: Option<u16>,
     realm: RealmRef,
     variable_env: EnvironmentRef,
+    private_env: Option<EnvironmentRef>,
     new_target: Option<ObjectRef>,
     callee: Option<ObjectRef>,
     kind: ExecutionContextKind,
@@ -168,6 +169,11 @@ impl FrameMetadata {
     #[inline]
     pub const fn variable_env(&self) -> EnvironmentRef {
         self.variable_env
+    }
+
+    #[inline]
+    pub const fn private_env(&self) -> Option<EnvironmentRef> {
+        self.private_env
     }
 
     #[inline]
@@ -308,6 +314,7 @@ impl FrameRecord {
                 return_register,
                 realm,
                 variable_env,
+                private_env: None,
                 new_target: None,
                 callee: None,
                 kind,
@@ -356,6 +363,12 @@ impl FrameRecord {
     #[inline]
     pub const fn with_callee(mut self, callee: Option<ObjectRef>) -> Self {
         self.metadata.callee = callee;
+        self
+    }
+
+    #[inline]
+    pub const fn with_private_env(mut self, private_env: Option<EnvironmentRef>) -> Self {
+        self.metadata.private_env = private_env;
         self
     }
 
@@ -476,6 +489,11 @@ impl FrameRecord {
     #[inline]
     pub const fn variable_env(&self) -> EnvironmentRef {
         self.metadata.variable_env
+    }
+
+    #[inline]
+    pub const fn private_env(&self) -> Option<EnvironmentRef> {
+        self.metadata.private_env
     }
 
     #[inline]
@@ -652,6 +670,30 @@ mod tests {
         let mut frame = frame;
         frame.set_this_state(ThisState::Uninitialized);
         assert_eq!(frame.this_state(), ThisState::Uninitialized);
+    }
+
+    #[test]
+    fn frame_round_trips_private_env() {
+        let code = CodeRef::new(id(1));
+        let lexical_env = EnvironmentRef::new(id(2));
+        let variable_env = EnvironmentRef::new(id(3));
+        let private_env = EnvironmentRef::new(id(6));
+        let realm = RealmRef::new(id(5));
+        let registers = RegisterWindow::new(0, 1);
+        let frame = FrameRecord::new(
+            code,
+            0,
+            registers,
+            None,
+            realm,
+            lexical_env,
+            variable_env,
+            ExecutionContextKind::Function,
+        );
+        assert_eq!(frame.private_env(), None, "fresh frame has no private_env");
+        let frame = frame.with_private_env(Some(private_env));
+        assert_eq!(frame.private_env(), Some(private_env));
+        assert_eq!(frame.metadata().private_env(), Some(private_env));
     }
 
     #[test]
