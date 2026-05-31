@@ -1005,7 +1005,20 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-## Task 12: Push a synthetic job root frame; stop pushing the job context
+## Task 12: Stop pushing the job context (job frame already pushed)
+
+> **Reorder note (execution):** The spec review of Task 6 found that the job
+> referrer scope had no distinct frame depth, so `call_to_completion` inside a
+> promise-reaction job popped it early — breaking `current_referrer` parity on a
+> reachable, non-`None` path. The fix (the synthetic job root frame **push**) was
+> therefore **pulled forward into Task 6** (commit `2157e791`), additively — the
+> job `ExecutionContext` push was kept. This task is now **reduced** to: drop that
+> now-redundant `push_execution_context(job)`/`pop_execution_context` pair (safe
+> only after the readers migrate in Tasks 8–11) and add `refresh_running_context`
+> at the job-frame push/pop. Steps below are written as the original combined task;
+> skip the frame-push step (already done) and apply only the context-drop + refresh.
+
+### Original combined task (frame-push portion already landed in Task 6):
 
 **Files:**
 - Modify: `crates/vm/src/vm/jobs.rs` (`execute_runtime_job` ~101-196; `synthetic_job_caller_frame` ~728-740)
