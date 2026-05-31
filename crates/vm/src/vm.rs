@@ -1689,13 +1689,14 @@ impl Vm {
             u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
         self.reserve_register_window(register_base, register_len);
 
+        let entry_this_state = if entry_lexical_this {
+            ThisState::Lexical
+        } else {
+            ThisState::Value(this_value)
+        };
         let context = ExecutionContext::bytecode(realm, code, lexical_env, variable_env)
             .with_private_env(entry_private_env)
-            .with_this_state(if entry_lexical_this {
-                ThisState::Lexical
-            } else {
-                ThisState::Value(this_value)
-            })
+            .with_this_state(entry_this_state)
             .with_new_target(new_target)
             .with_script_or_module_referrer(script_or_module_referrer);
         let context = if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
@@ -1704,7 +1705,7 @@ impl Vm {
                 .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
             ExecutionContext::module(realm, lexical_env, variable_env)
                 .with_private_env(entry_private_env)
-                .with_this_state(ThisState::Value(this_value))
+                .with_this_state(entry_this_state)
                 .with_script_or_module_referrer(module_referrer)
         } else {
             context
@@ -1720,11 +1721,7 @@ impl Vm {
             context.kind(),
         )
         .with_this_value(this_value)
-        .with_this_state(if entry_lexical_this {
-            ThisState::Lexical
-        } else {
-            ThisState::Value(this_value)
-        })
+        .with_this_state(entry_this_state)
         .with_private_env(entry_private_env)
         .with_new_target(new_target)
         .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
