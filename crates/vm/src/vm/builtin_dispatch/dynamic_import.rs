@@ -292,8 +292,8 @@ impl Vm {
 
     pub(crate) fn active_script_or_module_referrer(agent: &Agent) -> Option<ModuleKey> {
         agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer)
+            .running_context()
+            .and_then(lyng_env::RunningContext::referrer)
             .map(|atom| ModuleKey::new(agent.atoms().resolve(atom).to_owned().into_boxed_str()))
     }
 
@@ -305,8 +305,8 @@ impl Vm {
         rejected: bool,
     ) {
         let script_or_module_referrer = agent
-            .current_execution_context()
-            .and_then(lyng_env::ExecutionContext::script_or_module_referrer);
+            .running_context()
+            .and_then(lyng_env::RunningContext::referrer);
         let _ = agent.enqueue_job_with_payload(
             lyng_host::HostJobKind::Promise,
             lyng_env::ExecutableId::Builtin,
