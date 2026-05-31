@@ -2310,6 +2310,20 @@ fn construct_fast_path_honors_repeated_prototype_reassignment() {
 }
 
 #[test]
+fn construct_fast_path_returned_object_overrides_this() {
+    let r = compile_and_run_string(
+        r"
+        function F() { this.x = 1; return { y: 2 }; }
+        let last;
+        for (let i = 0; i < 100; i++) { last = new F(); }
+        // returned object wins: has y, not x
+        (last.y + '') + ',' + (last.x === undefined);
+    ",
+    );
+    assert_eq!(r, "2,true");
+}
+
+#[test]
 fn construct_fast_path_excluded_callees_fall_back_correctly() {
     let r = compile_and_run_string(
         r"
