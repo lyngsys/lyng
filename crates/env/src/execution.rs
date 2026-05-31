@@ -28,7 +28,7 @@ pub enum ExecutionContextKind {
 }
 
 /// Current `this` state tracked by one execution context.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ThisState {
     Lexical,
     Uninitialized,
