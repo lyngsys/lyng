@@ -58,6 +58,7 @@ pub struct ObjectRuntime {
     pub(crate) root_shapes: HashMap<RootShapeKey, ShapeId>,
     pub(crate) next_private_brand_raw: u32,
     pub(crate) watchpoint_sets: HashMap<ShapeId, WatchpointSet>,
+    pub(crate) construct_prototype_watchpoints: HashMap<ObjectRef, WatchpointSet>,
     pub(crate) shapes_with_proto_transitions: HashSet<ShapeId>,
     /// Side-buffer for the test-only `Recording` watchpoint observer. Always
     /// present (cross-crate test visibility); production code never constructs
@@ -1283,6 +1284,8 @@ impl ObjectRuntime {
     /// state. Called post-GC or after a shape invalidation sweep.
     pub fn sweep_invalidated_watchpoint_sets(&mut self) {
         self.watchpoint_sets.retain(|_, set| !set.is_invalidated());
+        self.construct_prototype_watchpoints
+            .retain(|_, set| !set.is_invalidated());
     }
 
     /// Called by the post-mark GC sweep. For every shape that has a populated
@@ -1310,6 +1313,20 @@ impl ObjectRuntime {
         }
     }
 
+    /// Called by the post-mark GC sweep. Drops per-constructor `.prototype`
+    /// `WatchpointSet` entries whose constructor `ObjectRef` is no longer live
+    /// (as determined by `is_marked`). Mirrors
+    /// [`Self::prune_dead_prototype_transitions`]: the construct IC fast path
+    /// keys these sets by constructor object, so a collected constructor would
+    /// otherwise leak its set indefinitely.
+    pub fn prune_dead_construct_prototype_watchpoints(
+        &mut self,
+        is_marked: impl Fn(ObjectRef) -> bool,
+    ) {
+        self.construct_prototype_watchpoints
+            .retain(|ctor, _| is_marked(*ctor));
+    }
+
     /// Returns `true` if `shape`'s `prototype_transitions` table has an entry
     /// for the given `key`. Intended for use in cross-crate tests (e.g. in
     /// `lyng-env`) that need to assert table presence without accessing the
@@ -1324,6 +1341,60 @@ impl ObjectRuntime {
     /// cross-crate tests in `lyng-env`) to assert post-fire state.
     pub fn watchpoint_sets_inspect(&self, shape: ShapeId) -> Option<&WatchpointSet> {
         self.watchpoint_sets.get(&shape)
+    }
+
+    /// Returns a mutable reference to the per-constructor `WatchpointSet`,
+    /// lazily creating an empty set on the first access.
+    pub fn construct_prototype_watchpoint_mut(&mut self, ctor: ObjectRef) -> &mut WatchpointSet {
+        self.construct_prototype_watchpoints
+            .entry(ctor)
+            .or_default()
+    }
+
+    /// Registers `watchpoint` on `ctor`'s per-constructor `.prototype`
+    /// `WatchpointSet`, re-arming the set first if it is `Invalidated`.
+    ///
+    /// A `WatchpointSet` that has already fired stays permanently
+    /// `Invalidated` and rejects `register` (returns `Err(Invalidated)`).
+    /// The construct IC re-caches a constructor after a `.prototype` write
+    /// has fired (and invalidated) its set; to let the re-cached entry re-arm
+    /// the watchpoint, replace any `Invalidated` set with a fresh `Watched`-able
+    /// one before registering. Registering on a `Cleared`/`Watched` set just
+    /// appends, so this is a no-op reset in the common (first-arm) case.
+    pub fn arm_construct_prototype_watchpoint(&mut self, ctor: ObjectRef, watchpoint: Watchpoint) {
+        let set = self
+            .construct_prototype_watchpoints
+            .entry(ctor)
+            .or_default();
+        if set.is_invalidated() {
+            *set = WatchpointSet::new();
+        }
+        // A freshly-`new`'d or `Cleared`/`Watched` set never rejects `register`.
+        let _ = set.register(watchpoint);
+    }
+
+    /// Read-only accessor for a constructor's per-prototype `WatchpointSet`.
+    pub fn construct_prototype_watchpoint_inspect(
+        &self,
+        ctor: ObjectRef,
+    ) -> Option<&WatchpointSet> {
+        self.construct_prototype_watchpoints.get(&ctor)
+    }
+
+    /// Drains and returns the watchpoint list for the given constructor's
+    /// per-prototype set, marking it `Invalidated`. Returns an empty `Vec`
+    /// when no set exists or the set is already `Invalidated`.
+    ///
+    /// The VM/agent calls this and dispatches the returned `ConstructIcClear`
+    /// observers in Task 3.
+    pub fn take_fired_construct_prototype_watchpoints(
+        &mut self,
+        ctor: ObjectRef,
+    ) -> Vec<Watchpoint> {
+        self.construct_prototype_watchpoints
+            .get_mut(&ctor)
+            .and_then(WatchpointSet::drain_for_fire)
+            .unwrap_or_default()
     }
 
     /// Drain all tokens accumulated into `recording_watchpoint_fires`. Primarily

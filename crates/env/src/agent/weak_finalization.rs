@@ -63,6 +63,13 @@ impl Agent {
             let heap = &self.heap;
             self.objects
                 .prune_dead_prototype_transitions(|obj| heap.view().object(obj).is_some());
+            // Per-constructor `.prototype` watchpoint sets (construct IC fast
+            // path) are keyed by constructor object; drop sets whose
+            // constructor has been collected.
+            self.objects
+                .prune_dead_construct_prototype_watchpoints(|obj| {
+                    heap.view().object(obj).is_some()
+                });
         }
         self.objects.sweep_invalidated_watchpoint_sets();
         self.enqueue_pending_finalization_cleanup_jobs();

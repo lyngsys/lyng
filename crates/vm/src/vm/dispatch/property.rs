@@ -496,13 +496,31 @@ impl Vm {
                 }
             }
             let set_result = if Self::prototype_chain_has_proxy(agent, object) {
+                // Proxy-chain assignment funnels existing-own-data writes through
+                // `Agent::define_own_property` (with this Vm as `vm_dispatch`), so
+                // the construct `.prototype` watchpoint is fired there.
                 self.set_property_on_value(agent, host, registry, frame, receiver, key, value)
             } else {
+                // Non-proxy assignment stores in place via the objects-layer
+                // define, which carries no `vm_dispatch` and fires no watchpoints.
+                // Reassigning a function's `prototype` own slot is a same-shape
+                // value write the shape-keyed watchpoints cannot observe, so fire
+                // the per-constructor construct `.prototype` watchpoint here, at
+                // the VM dispatch site where this Vm is available as the
+                // dispatcher. The gate inside the helper keeps non-`prototype`
+                // writes free of any added cost.
                 let set_result =
                     object::ordinary_set(agent, object, key, value, AllocationLifetime::Default)
                         .map_err(VmError::Abrupt);
                 match set_result {
-                    Ok(result) => Ok(result),
+                    Ok(result) => {
+                        if result {
+                            agent.fire_construct_prototype_watchpoint_if_function_prototype(
+                                object, key, self,
+                            );
+                        }
+                        Ok(result)
+                    }
                     Err(VmError::Abrupt(_)) => self
                         .set_property_on_value(agent, host, registry, frame, receiver, key, value),
                     Err(error) => Err(error),

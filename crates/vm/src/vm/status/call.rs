@@ -24,6 +24,10 @@ pub struct CalleeSummary {
     /// time the IC observed this constructor. `None` for Call sites and
     /// for Construct sites that haven't yet seen a created object.
     pub created_shape: Option<ShapeId>,
+    /// For Construct: the resolved `[[Prototype]]` of the freshly-created
+    /// instance (i.e. the value installed by `create_construct_this`,
+    /// including the `Object.prototype` fallback). `None` for Call sites.
+    pub prototype: Option<ObjectRef>,
 }
 
 /// Status projection for one `Call` IC slot.

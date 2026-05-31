@@ -2210,3 +2210,133 @@ fn phase6_default_derived_constructors_do_not_iterate_rest_arguments_for_super()
 
     assert_eq!(result, Value::from_smi(5));
 }
+
+// Behavior regression guards for the construct fast-path `.prototype`
+// invalidation (Task 3, eager-clear model). These pass via the slow path today
+// and MUST keep passing after Task 7 wires the construct fast path: they prove
+// each `.prototype` write path produces the correct prototype for subsequent
+// `new`. Each script does few writes and stays below the IC warmup threshold,
+// so the assignment runs through the real slow store (which fires the
+// construct watchpoint at the VM dispatch site).
+
+#[test]
+fn reassigning_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        F.prototype = { tag: 'first' };
+        let a = new F();
+        F.prototype = { tag: 'second' };
+        let b = new F();
+        Object.getPrototypeOf(a).tag + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "first,second");
+}
+
+#[test]
+fn define_property_on_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        let a = new F();
+        Object.defineProperty(F, 'prototype', { value: { tag: 'redef' }, writable: true, configurable: false });
+        let b = new F();
+        (Object.getPrototypeOf(a) === Object.getPrototypeOf(b)) + '';
+    ",
+    );
+    assert_eq!(r, "false");
+}
+
+#[test]
+fn reflect_set_on_function_prototype_observed_by_construct() {
+    let r = compile_and_run_string(
+        r"
+        function F() {}
+        let a = new F();
+        Reflect.set(F, 'prototype', { tag: 'via-reflect' });
+        let b = new F();
+        Object.getPrototypeOf(b).tag + ',' + (Object.getPrototypeOf(a) === Object.getPrototypeOf(b));
+    ",
+    );
+    assert_eq!(r, "via-reflect,false");
+}
+
+// ── Construct fast path (Task 7) ─────────────────────────────────────────────
+
+#[test]
+fn construct_fast_path_produces_correct_instances() {
+    let r = compile_and_run_string(
+        r"
+        function Vec(x, y) { this.x = x; this.y = y; }
+        let s = 0;
+        for (let i = 0; i < 1000; i++) { let v = new Vec(i, i + 1); s += v.x + v.y; }
+        s + '';
+    ",
+    );
+    assert_eq!(r, "1000000");
+}
+
+#[test]
+fn construct_fast_path_honors_single_prototype_reassignment() {
+    let r = compile_and_run_string(
+        r"
+        function F(){}
+        for (let i=0;i<50;i++){ new F(); }   // warm the construct IC + arm watchpoint
+        let a = new F();
+        F.prototype = { tag: 'new' };
+        let b = new F();
+        (Object.getPrototypeOf(a) === Object.getPrototypeOf(b)) + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "false,new");
+}
+
+#[test]
+fn construct_fast_path_honors_repeated_prototype_reassignment() {
+    let r = compile_and_run_string(
+        r"
+        function F(){}
+        for (let i=0;i<50;i++){ new F(); }
+        F.prototype = { tag: 'A' };
+        let a = new F();
+        for (let i=0;i<50;i++){ new F(); }   // re-warm + re-arm
+        F.prototype = { tag: 'B' };
+        let b = new F();
+        Object.getPrototypeOf(a).tag + ',' + Object.getPrototypeOf(b).tag;
+    ",
+    );
+    assert_eq!(r, "A,B");
+}
+
+#[test]
+fn construct_fast_path_returned_object_overrides_this() {
+    let r = compile_and_run_string(
+        r"
+        function F() { this.x = 1; return { y: 2 }; }
+        let last;
+        for (let i = 0; i < 100; i++) { last = new F(); }
+        // returned object wins: has y, not x
+        (last.y + '') + ',' + (last.x === undefined);
+    ",
+    );
+    assert_eq!(r, "2,true");
+}
+
+#[test]
+fn construct_fast_path_excluded_callees_fall_back_correctly() {
+    let r = compile_and_run_string(
+        r"
+        function Base(v){ this.v = v; }
+        class Derived extends Base { constructor(v){ super(v); this.d = v*2; } }
+        let bound = Base.bind(null);
+        let p = new Proxy(Base, {});
+        let a = new Derived(3);
+        let b = new bound(7);     // bound -> slow
+        let c = new p(9);         // proxy -> slow
+        let d = new Base(...[4]); // spread -> slow
+        a.v+','+a.d+','+b.v+','+c.v+','+d.v;
+    ",
+    );
+    assert_eq!(r, "3,6,7,9,4");
+}

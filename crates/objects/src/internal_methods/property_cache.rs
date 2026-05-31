@@ -30,6 +30,22 @@ impl ObjectRuntime {
         {
             return Ok(None);
         }
+        // A function's `prototype` is a writable own data slot, so a hot
+        // `F.prototype = X` site would otherwise install a store IC (both the
+        // Rust `OwnData` store-cache and the asm inline-write handler derive
+        // from this planned entry) and perform an in-place write that bypasses
+        // the slow store. The slow store is where the construct-IC
+        // `.prototype` watchpoint fires (eager-clear invalidation), so a cached
+        // store would leave the construct IC stale. Exclude the function
+        // `prototype` slot from store ICs to force every `F.prototype = X`
+        // through the firing slow store. LOADS still cache normally — this is
+        // gated on `Store` purpose only.
+        if matches!(purpose, NamedPropertyCachePurpose::Store)
+            && receiver_header.kind() == ObjectKind::Function
+            && key.as_atom() == Some(WellKnownAtom::prototype.id())
+        {
+            return Ok(None);
+        }
         let mut dependencies = [None; PROPERTY_CACHE_MAX_DEPENDENCIES];
         let mut dependency_count = 0u8;
         if !Self::push_property_cache_dependency(

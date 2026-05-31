@@ -43,9 +43,21 @@ pub enum ShapeInvalidationObserver {
         slot: FeedbackSlotId,
         generation: u32,
     },
+    /// Clears the construct IC slot at `(code, slot)` if its generation still
+    /// matches `generation`. Registered by the construct fast path on a
+    /// per-constructor watchpoint set; fired when that constructor's
+    /// `.prototype` own slot is reassigned (a same-shape value write that the
+    /// shape-keyed watchpoints cannot observe).
+    ConstructIcClear {
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    },
 }
 
-/// Dispatch interface for `ShapeInvalidationObserver::AdaptiveProtoLoad` fires.
+/// Dispatch interface for `ShapeInvalidationObserver` fires — `AdaptiveProtoLoad`
+/// and `AdaptiveOwnWrite` (named IC slot clear) and `ConstructIcClear`
+/// (construct IC slot clear).
 ///
 /// Defined in `lyng-objects` so that `lyng-env` (which cannot depend on
 /// `lyng-vm`) can accept a `&mut dyn AdaptiveProtoLoadDispatch` parameter in
@@ -68,6 +80,16 @@ pub trait AdaptiveProtoLoadDispatch {
     /// the watchpoints carry the post-install generation. Returns `0` when
     /// the slot is absent or is not a `NamedProperty` site.
     fn bump_generation_for_install(&mut self, code: CodeRef, slot: FeedbackSlotId) -> u32;
+
+    /// Called when a `ConstructIcClear` watchpoint fires. Clears the construct
+    /// IC slot identified by `(code, slot)` if its current generation matches
+    /// `generation`. Stale watchpoints (generation mismatch) are dropped.
+    fn clear_construct_ic_slot_if_generation_matches(
+        &mut self,
+        code: CodeRef,
+        slot: FeedbackSlotId,
+        generation: u32,
+    );
 }
 
 /// No-op `AdaptiveProtoLoadDispatch` for call sites that have no `Vm`
@@ -95,6 +117,15 @@ impl AdaptiveProtoLoadDispatch for NoopAdaptiveProtoLoadDispatch {
         // intrinsically don't install proto-cache ICs.
         0
     }
+
+    fn clear_construct_ic_slot_if_generation_matches(
+        &mut self,
+        _code: CodeRef,
+        _slot: FeedbackSlotId,
+        _generation: u32,
+    ) {
+        // Intentionally empty: no construct IC slot to clear in non-Vm contexts.
+    }
 }
 
 impl ShapeInvalidationObserver {
@@ -105,11 +136,13 @@ impl ShapeInvalidationObserver {
     pub(crate) fn fire_into(&self, sink: &mut Vec<u64>) {
         match self {
             Self::Recording { token } => sink.push(*token),
-            // AdaptiveProtoLoad and AdaptiveOwnWrite are production observers;
-            // in tests they should not be dispatched through this sink. The
-            // Agent-layer dispatcher routes them to
+            // AdaptiveProtoLoad, AdaptiveOwnWrite, and ConstructIcClear are
+            // production observers; in tests they should not be dispatched
+            // through this sink. The Agent-layer dispatcher routes them to
             // Vm::clear_ic_slot_if_generation_matches.
-            Self::AdaptiveProtoLoad { .. } | Self::AdaptiveOwnWrite { .. } => {}
+            Self::AdaptiveProtoLoad { .. }
+            | Self::AdaptiveOwnWrite { .. }
+            | Self::ConstructIcClear { .. } => {}
         }
     }
 }

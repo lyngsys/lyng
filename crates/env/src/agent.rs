@@ -384,6 +384,22 @@ impl Agent {
         if let Some(old) = old_shape {
             self.fire_watchpoints_for_shape(old, vm_dispatch);
         }
+        // Construct fast-path invalidation (eager clear): reassigning a
+        // function's `prototype` own data slot overwrites the slot in place
+        // WITHOUT changing the object's shape, so the shape-keyed watchpoints
+        // above cannot observe it. `[[DefineOwnProperty]]` is the unified choke
+        // point for `Object.defineProperty`/`Reflect.defineProperty` and for
+        // `[[Set]]` on an existing own data property when it funnels through
+        // here (proxy-chain assignments / `Reflect.set`). The plain non-proxy
+        // assignment slow path stores via the objects-layer define and fires
+        // separately at its VM dispatch site.
+        //
+        // Gated on `Ok(true)` (the define actually applied) for consistency with
+        // the global-structure-generation bump below: a rejected/no-op define
+        // touching the `prototype` key must not spuriously drain the watchpoint.
+        if matches!(result, Ok(true)) {
+            self.fire_construct_prototype_watchpoint_if_function_prototype(id, key, vm_dispatch);
+        }
         // A `[[DefineOwnProperty]]` on a realm's global object can change a
         // binding's kind (data <-> accessor) or replace its backing cell —
         // structural changes that must invalidate any per-site global cell IC.
@@ -589,6 +605,100 @@ impl Agent {
                         generation,
                     } => {
                         vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
+                    }
+                    ShapeInvalidationObserver::ConstructIcClear {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        // Construct-prototype watchpoints are registered on per-constructor sets
+                        // (keyed by ObjectRef), not shape-keyed sets, so this arm is not expected
+                        // to fire from the shape path; route it correctly for soundness regardless.
+                        vm_dispatch
+                            .clear_construct_ic_slot_if_generation_matches(code, slot, generation);
+                    }
+                },
+            }
+        }
+    }
+
+    /// Gated entry for the construct fast-path eager-clear: if `key` is the
+    /// `prototype` atom and `id` is a function with a live per-constructor
+    /// watchpoint set, fire it. The gate keeps the common case (any non-
+    /// `prototype` write, or a `prototype` write on a function without a
+    /// registered construct IC) to a key compare + a function-data lookup with
+    /// no watchpoint drain. Shared by `define_own_property` and the VM's
+    /// non-proxy assignment slow store, which reach the in-place write through
+    /// different object-layer paths.
+    pub fn fire_construct_prototype_watchpoint_if_function_prototype(
+        &mut self,
+        id: ObjectRef,
+        key: PropertyKey,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
+    ) {
+        if key != PropertyKey::from_atom(lyng_common::WellKnownAtom::prototype.id()) {
+            return;
+        }
+        if self.objects().function_data(id).is_none() {
+            return;
+        }
+        let has_live_watchpoint = self
+            .objects()
+            .construct_prototype_watchpoint_inspect(id)
+            .is_some_and(|set| !set.is_invalidated());
+        if !has_live_watchpoint {
+            return;
+        }
+        self.fire_construct_prototype_watchpoint(id, vm_dispatch);
+    }
+
+    /// Construct fast-path invalidation: drains and dispatches the per-constructor
+    /// `.prototype` watchpoint set for `ctor`, routing each fired
+    /// `ConstructIcClear` observer to `vm_dispatch` so the construct IC slot is
+    /// eagerly cleared. Called from the `.prototype` write choke points when a
+    /// function's `prototype` own slot is reassigned (a same-shape value write
+    /// the shape-keyed watchpoints cannot observe).
+    ///
+    /// Keyed by constructor (`ObjectRef`) rather than by shape: mirrors
+    /// [`Self::fire_watchpoints_for_shape`] but drains via
+    /// `take_fired_construct_prototype_watchpoints`. Only `ConstructIcClear`
+    /// observers are expected on a per-constructor set; the other arms are
+    /// handled defensively to keep the match exhaustive and sound.
+    pub fn fire_construct_prototype_watchpoint(
+        &mut self,
+        ctor: ObjectRef,
+        vm_dispatch: &mut dyn AdaptiveProtoLoadDispatch,
+    ) {
+        let fired = self
+            .objects
+            .take_fired_construct_prototype_watchpoints(ctor);
+        for wp in fired {
+            match wp {
+                Watchpoint::ShapeInvalidation { observer } => match observer {
+                    ShapeInvalidationObserver::ConstructIcClear {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        vm_dispatch
+                            .clear_construct_ic_slot_if_generation_matches(code, slot, generation);
+                    }
+                    // Not expected on a per-constructor set, but route soundly
+                    // if one ever lands here (mirrors fire_watchpoints_for_shape).
+                    ShapeInvalidationObserver::AdaptiveProtoLoad {
+                        code,
+                        slot,
+                        generation,
+                    }
+                    | ShapeInvalidationObserver::AdaptiveOwnWrite {
+                        code,
+                        slot,
+                        generation,
+                    } => {
+                        vm_dispatch.clear_ic_slot_if_generation_matches(code, slot, generation);
+                    }
+                    ShapeInvalidationObserver::Recording { token } => {
+                        self.objects.push_recording_fire(token);
                     }
                 },
             }

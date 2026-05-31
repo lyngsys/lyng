@@ -1,5 +1,58 @@
 use super::support::*;
 
+// Helper: compile, install, and evaluate a script that returns a function
+// value; extract the callee `ObjectRef` so eligibility tests can call the
+// predicate directly without going through the interpreter.
+fn eval_returns_function(source_id: u32, source: &str) -> (Runtime, Vm, ObjectRef) {
+    let unit = compile_test_unit(source_id, source);
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+    let value = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .expect("script should complete without error");
+    let callee = value
+        .as_object_ref()
+        .expect("script should return a function object");
+    (runtime, vm, callee)
+}
+
+#[test]
+fn ordinary_bytecode_construct_eligibility_accepts_plain_constructor() {
+    let (mut runtime, vm, callee) = eval_returns_function(80_001, "function F() {} F;");
+    let agent = runtime.root_agent_mut();
+    assert!(
+        vm.ordinary_bytecode_construct_eligibility(agent, callee)
+            .is_some(),
+        "plain bytecode constructor should be eligible"
+    );
+}
+
+#[test]
+fn ordinary_bytecode_construct_eligibility_rejects_rest_parameter() {
+    let (mut runtime, vm, callee) = eval_returns_function(80_002, "function G(...a) {} G;");
+    let agent = runtime.root_agent_mut();
+    assert!(
+        vm.ordinary_bytecode_construct_eligibility(agent, callee)
+            .is_none(),
+        "function with rest parameter should be ineligible"
+    );
+}
+
+#[test]
+fn ordinary_bytecode_construct_eligibility_rejects_bound_function() {
+    let (mut runtime, vm, callee) = eval_returns_function(80_003, "function F() {} F.bind(null);");
+    let agent = runtime.root_agent_mut();
+    assert!(
+        vm.ordinary_bytecode_construct_eligibility(agent, callee)
+            .is_none(),
+        "bound function should be ineligible"
+    );
+}
+
 // DSL-0c: the `debug_deopt_assertion_reports_register_window_mismatch`
 // test was removed when the α dispatch loop was replaced by the asm
 // substrate. The α `translate_outcome_to_step` ran

@@ -1526,6 +1526,72 @@ fn c6_metadata_table_released_when_code_is_pruned_dead() {
     );
 }
 
+#[test]
+fn construct_cache_entry_records_resolved_prototype() {
+    // Script defines a plain constructor F and constructs it several times in
+    // a loop through the same call site. The IC warms up and records a
+    // monomorphic ConstructCacheEntry. The script returns the last created
+    // instance so the test can read its [[Prototype]] from the agent and verify
+    // the cached prototype matches.
+    let unit = compile_test_unit(
+        104,
+        r"
+            function F() { this.x = 1; }
+            var last;
+            for (var i = 0; i < 4; i = i + 1) {
+                last = new F();
+            }
+            last;
+        ",
+    );
+    let construct_slot = first_construct_slot(&unit);
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
+
+    // Run once; the loop body executes new F() four times from the same call
+    // site, crossing the allocation threshold (= 2) and recording a monomorphic
+    // ConstructCacheEntry.
+    let last_result = vm
+        .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+        .run()
+        .unwrap();
+
+    let status = vm
+        .construct_status(installed.code(), construct_slot)
+        .expect("entry code should expose a construct status");
+
+    assert_eq!(
+        status.state(),
+        FeedbackInlineCacheState::Monomorphic,
+        "IC should be monomorphic after looping through the same constructor"
+    );
+    assert_eq!(status.entries.len(), 1);
+
+    let entry = &status.entries[0];
+    assert!(
+        entry.prototype.is_some(),
+        "ConstructCacheEntry must record the resolved [[Prototype]]"
+    );
+
+    // Verify the cached prototype equals the [[Prototype]] of a freshly
+    // constructed instance by reading the header of the returned object.
+    let instance = last_result
+        .as_object_ref()
+        .expect("script should return the last new F() instance");
+    let instance_proto = agent
+        .with_heap_and_objects(|heap, _| heap.view().object(instance).unwrap().prototype())
+        .expect("F instance should have a [[Prototype]]");
+    assert_eq!(
+        entry.prototype,
+        Some(instance_proto),
+        "cached prototype must equal the [[Prototype]] of a freshly constructed instance"
+    );
+}
+
 // C6b: GC sweep retains MetadataTable entries for live code objects.
 //
 // Mirror of C6: `prune_dead_code_metadata_tables` with an `is_live` predicate
