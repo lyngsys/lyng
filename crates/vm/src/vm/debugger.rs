@@ -201,6 +201,9 @@ impl<'a> VmDebugPauseContext<'a> {
     /// The referrer reported by the parallel `Vm` side-stack and the one carried
     /// by the authoritative current execution context. The SP-0a referrer
     /// migration requires these to stay equal at every live point.
+    ///
+    /// Test-only scaffolding; production readers of `current_referrer` arrive
+    /// with the reader-migration tasks.
     #[cfg(test)]
     pub(crate) fn referrer_parity(
         &self,

@@ -204,9 +204,11 @@ impl Vm {
                 registry_object,
             ),
         };
-        // Pop the job root frame (and defensively any frames an executor left
-        // above baseline) back to where we started. The root carries a zero-width
-        // register window, so a bare pop leaks nothing.
+        // Pop the job root frame back to where we started. Defensive: only the
+        // synthetic job root frame (zero-width register window) should remain
+        // here, so a bare pop leaks nothing. A real callee frame above baseline
+        // would be a bug and would need full `cleanup_internal_completion`
+        // handling (register windows, iterator/for-in state, mapped arguments).
         while self.frames.len() > job_base_depth {
             let _ = self.frames.pop();
         }

@@ -38,8 +38,9 @@ impl Vm {
             self.release_register_window(leaked.registers().base());
         }
         // Internal calls inherit the referrer rather than establishing one, so
-        // no scope is pushed here; this only cleans up scopes established by any
-        // frames we just unwound (harmless no-op when none exist above baseline).
+        // no scope is pushed here. Unwind any referrer scopes established by
+        // frames above `prior_frame_depth` (e.g. a re-entrant entry frame); no-op
+        // only when none were pushed.
         self.unwind_referrer_scopes_to(prior_frame_depth);
         self.release_register_stack_to(prior_register_len);
         while agent.execution_contexts().len() > prior_context_depth {

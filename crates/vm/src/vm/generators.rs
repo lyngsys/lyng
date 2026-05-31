@@ -789,7 +789,8 @@ impl Vm {
         self.release_register_window(frame.registers().base());
         // The generator's establishment scope is removed while suspended; the
         // referrer is already saved in side-state and re-established at restore.
-        self.unwind_referrer_scopes_to(self.frames.len());
+        let suspend_frame_depth = self.frames.len();
+        self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorYield {
@@ -816,7 +817,8 @@ impl Vm {
         self.release_register_window(frame.registers().base());
         // The generator's establishment scope is removed while suspended; the
         // referrer is already saved in side-state and re-established at restore.
-        self.unwind_referrer_scopes_to(self.frames.len());
+        let suspend_frame_depth = self.frames.len();
+        self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         let _ = agent.pop_execution_context();
         Err(VmError::GeneratorStart { suspended })
