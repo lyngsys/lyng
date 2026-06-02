@@ -21,8 +21,8 @@ use lyng_sema::{
     SemanticBindingId, StorageClass, UseSiteRecord,
 };
 use lyng_types::{
-    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin, bigint_builtin,
-    create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
+    BuiltinFunctionId, add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    bigint_builtin, create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
     dispose_scope_async_builtin, dispose_scope_builtin, eval_builtin,
     internal_bind_function_private_env_builtin, internal_construct_super_builtin,
     internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
@@ -36,7 +36,7 @@ use lyng_types::{
     internal_set_function_home_object_builtin, internal_super_base_builtin,
     internal_super_constructor_builtin, internal_super_property_get_builtin,
     internal_super_property_set_builtin, internal_template_to_string_builtin,
-    object_set_prototype_of_builtin, reference_error_builtin, BuiltinFunctionId,
+    object_set_prototype_of_builtin, reference_error_builtin,
 };
 
 use crate::checked_u32_index;
@@ -81,8 +81,8 @@ mod tests;
 pub use function::compile_script;
 
 use activation::{
-    build_function_activation_plan, collect_arguments_owners, collect_arrow_child_parents,
-    parent_function_for, FunctionActivationPlan, ParameterBindingIndex,
+    FunctionActivationPlan, ParameterBindingIndex, build_function_activation_plan,
+    collect_arguments_owners, collect_arrow_child_parents, parent_function_for,
 };
 use reference_targets::{PreparedReferenceTarget, ReferenceUsage};
 pub use state::CompilationState;

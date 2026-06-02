@@ -22,12 +22,12 @@ use lyng_host::NoopHostHooks;
 use lyng_parser::parse_script;
 use lyng_sema::analyze_script;
 use lyng_vm::{OpcodeDispatchCounts, SampleHistogram, SamplingProfiler, Vm};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::hint::black_box;
 
 use crate::v8suite::{
-    build_count_harness, default_v8_root, ensure_path_exists, read_file, write_output, V8Workload,
-    V8_WORKLOADS,
+    V8_WORKLOADS, V8Workload, build_count_harness, default_v8_root, ensure_path_exists, read_file,
+    write_output,
 };
 
 const DEFAULT_INTERVAL_US: u64 = 200;
@@ -99,7 +99,7 @@ pub(crate) fn parse_options(args: &[String]) -> Result<Options, String> {
                 return Err(format!(
                     "unknown profile option: {other}\n\n{}",
                     help_text()
-                ))
+                ));
             }
         }
     }
@@ -262,11 +262,7 @@ pub(crate) mod samply {
     use super::{Options, V8Workload};
     use std::process::Command;
 
-    pub(crate) fn capture(
-        workload: &V8Workload,
-        harness: &str,
-        options: &Options,
-    ) -> Result<(), String> {
+    pub fn capture(workload: &V8Workload, harness: &str, options: &Options) -> Result<(), String> {
         let script_path = std::env::temp_dir().join(format!(
             "lyng-profile-{}-{}.js",
             workload.name,

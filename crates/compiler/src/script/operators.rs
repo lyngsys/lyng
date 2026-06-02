@@ -1,6 +1,6 @@
 use super::{
-    internal_instance_of_builtin, BinaryOp, BuiltinFunctionId, Expr, ExprId, FunctionCompiler,
-    LoweringResult, Opcode, ResolutionKind, SafepointKind,
+    BinaryOp, BuiltinFunctionId, Expr, ExprId, FunctionCompiler, LoweringResult, Opcode,
+    ResolutionKind, SafepointKind, internal_instance_of_builtin,
 };
 
 impl FunctionCompiler<'_, '_> {

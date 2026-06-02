@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use lyng_builtins::{
-    bootstrap_realm, BootstrapArtifacts, BootstrapMode, BootstrapRequest, BuiltinCache,
+    BootstrapArtifacts, BootstrapMode, BootstrapRequest, BuiltinCache, bootstrap_realm,
 };
 use lyng_bytecode::{
     ArgumentsMode, BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionId, CallRange,
@@ -31,7 +31,7 @@ use crate::extensions::{RealmExtensionInstallation, SharedRealmExtensionProvider
 use crate::name_refs::CapturedNameReferenceTable;
 #[cfg(feature = "diagnostic-counters")]
 use crate::opcode_counts::OpcodeCounters;
-use crate::{FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
+use crate::{CallerContext, FrameFlags, FrameRecord, InstalledCode, RegisterWindow, VmError};
 
 mod activation_objects;
 mod async_functions;
@@ -66,6 +66,15 @@ pub mod status;
 mod tiering;
 mod values;
 mod with_env;
+
+// Compile-time guard: the arena slack above the soft limit must be large enough
+// to accommodate the RangeError throw path's own frame + a minimal window.
+// `HEADER_SLOTS` (7) + 256 is a conservative floor; `ARENA_SLACK_SLOTS` (4096)
+// comfortably exceeds it. Evaluated at compile time so no runtime cost.
+const _: () = assert!(
+    crate::frame_arena::ARENA_SLACK_SLOTS >= crate::frame_header::HEADER_SLOTS + 256,
+    "arena slack must leave room for the RangeError throw path's own frame + window",
+);
 
 use call::RejectingNativeRegistry;
 use feedback::{
@@ -119,24 +128,40 @@ struct NoopVmEvaluationObserver;
 
 impl VmEvaluationObserver for NoopVmEvaluationObserver {}
 
-/// One referrer-establishment scope on the `Vm` side-stack. `base_depth` is the
-/// frame depth at which the establishing frame sits; the scope covers all frames
-/// at depth >= `base_depth` until that frame unwinds. `referrer` is the seed
-/// (None is a valid establishment — e.g. a script with no host referrer).
+/// One establishment scope on the `Vm` side-stack. `base_depth` is the frame
+/// depth at which the establishing frame sits; the scope covers all frames at
+/// depth >= `base_depth` until that frame unwinds. `referrer` is the seed (None
+/// is valid — e.g. a script with no host referrer). `realm` is the establishing
+/// root's realm; callee-less root frames recover their realm from the covering
+/// scope here. Function frames derive their realm from the callee instead.
 #[derive(Clone, Copy, Debug)]
 struct ReferrerScope {
     base_depth: usize,
+    realm: RealmRef,
     referrer: Option<lyng_common::AtomId>,
 }
 
 #[derive(Default)]
 pub struct Vm {
-    register_stack: Vec<Value>,
-    register_stack_top: usize,
-    /// Active call-frame stack. INVARIANT: after any push/pop that changes the
-    /// top frame, call [`Self::refresh_running_context`] so the Agent's
-    /// running_context scalar stays in sync with the active frame.
-    frames: Vec<FrameRecord>,
+    /// Never-reallocated value backing for register windows. A window's base offset
+    /// is the running register cursor (`arena.top()`); because the storage never
+    /// moves, a pointer into it stays valid across every push.
+    arena: crate::frame_arena::FrameArena,
+    /// Call frame register (cfr) of the active frame: the arena slot offset of its
+    /// `[FrameHeader][window]` run. `u32::MAX` means no active frame.
+    current_cfr: u32,
+    /// Depth-indexed cold per-activation state (handler cursor, tail linkage,
+    /// generator resume). Seeded on every frame push; the top frame's slot lives
+    /// at `frame_depth - 1`.
+    frame_cold: crate::frame_cold::FrameColdTable,
+    /// Number of currently-active frames (0 == empty). The per-frame
+    /// [`crate::frame_header::FrameHeader`] overlay + the depth-keyed
+    /// [`crate::frame_cold::FrameColdTable`] + the `current_cfr`/`caller_cfr`
+    /// chain are the sole frame source. Incremented in
+    /// [`Self::push_frame_with_header`], decremented in [`Self::pop_frame_depth`].
+    /// INVARIANT: after any push/pop, call [`Self::refresh_running_context`] to
+    /// keep the Agent's `running_context` in sync with the active frame.
+    frame_depth: usize,
     referrer_scopes: Vec<ReferrerScope>,
     dispatch_frame_check_epoch: u32,
     installed: Vec<Option<Arc<InstalledFunction>>>,
@@ -147,57 +172,42 @@ pub struct Vm {
     atom_texts: HashMap<AtomId, Box<str>>,
     preferred_atoms_by_text: HashMap<Box<str>, AtomId>,
     source_texts: HashMap<SourceId, Arc<str>>,
-    /// Spec 2 Phase B: out-of-line polymorphic IC entries (indices `POLY_LIMIT..8`).
-    /// Vec-indexed (Phase D.4.3): outer `Vec` keyed by `code_index(code)`,
-    /// inner `Box<[..]>` keyed by zero-based slot. Lazy: monomorphic and
-    /// ≤`POLY_LIMIT` polymorphic slots have a `None` entry. Cleared on
-    /// `AdaptiveProtoLoad` fire and on code GC.
+    /// Out-of-line polymorphic IC entries (indices `POLY_LIMIT..8`). Outer `Vec`
+    /// keyed by `code_index(code)`, inner `Box<[..]>` keyed by zero-based slot.
+    /// Lazy; cleared on `AdaptiveProtoLoad` fire and on code GC.
     pub(crate) polymorphic_chains: Vec<Option<Box<[Option<PolymorphicChain>]>>>,
-    /// Phase D.4.1: Rust-only IC state machine for `NamedProperty` slots.
-    /// Outer `Vec` is indexed by `code_index(code)`; inner `Box<[..]>` is
-    /// indexed by zero-based slot (`slot.get() - 1`). Entries are allocated
-    /// eagerly in `store_installed` (same shape as `metadata_tables`), per-slot
-    /// entries are populated lazily on first slow-path install. Outer slot is
-    /// cleared on code GC via the inline retain in
-    /// `force_collect_with_active_roots` (and `prune_dead_code_property_ic_states`
-    /// for ad-hoc callers). The asm-readable bits live on `PropertyMetadata`
-    /// inside `MetadataTable`; this table holds the remaining Rust-only fields.
+    /// Rust-only IC state machine for `NamedProperty` slots. Outer `Vec` indexed
+    /// by `code_index(code)`; inner `Box<[..]>` by zero-based slot. Entries
+    /// allocated eagerly at install, populated lazily. The asm-readable bits live
+    /// on `PropertyMetadata` inside `MetadataTable`; this table holds Rust-only
+    /// fields. Cleared on code GC.
     pub(crate) property_ic_states: Vec<Option<Box<[Option<PropertyIcState>]>>>,
-    /// Phase D.4.1: Rust-only IC state machine for `Call` slots. Same shape as
-    /// `property_ic_states`. The asm-readable bits live on `CallMetadata`
-    /// inside `MetadataTable`; this table holds the Rust-only state.
+    /// Rust-only IC state machine for `Call` slots. Same shape as
+    /// `property_ic_states`. Asm-readable bits live on `CallMetadata`.
     pub(crate) call_ic_states: Vec<Option<Box<[Option<CallIcState>]>>>,
-    /// Phase D.4.1: Rust-only IC state machine for `Construct` slots. Same
-    /// shape as `call_ic_states`; the kind distinction is implicit in which
-    /// table the entry lives in.
+    /// Rust-only IC state machine for `Construct` slots. Same shape as
+    /// `call_ic_states`.
     pub(crate) construct_ic_states: Vec<Option<Box<[Option<CallIcState>]>>>,
-    /// Phase D.2.4: per-slot Call cache entries (actual callee/builtin data).
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    /// Per-slot Call cache entries (callee/builtin data). Keyed by
+    /// `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) call_cache_entries: HashMap<(CodeRef, FeedbackSlotId), Box<CallCacheStorage>>,
-    /// Phase D.2.4: per-slot Construct cache entries.
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    /// Per-slot Construct cache entries. Keyed by `(CodeRef, FeedbackSlotId)`.
+    /// Lazy; pruned on code GC.
     pub(in crate::vm) construct_cache_entries:
         HashMap<(CodeRef, FeedbackSlotId), Box<ConstructCacheStorage>>,
-    /// Phase D.2.4: per-slot `KeyedProperty` named-atom cache entries.
-    /// Keyed by `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
+    /// Per-slot `KeyedProperty` named-atom cache entries. Keyed by
+    /// `(CodeRef, FeedbackSlotId)`. Lazy; pruned on code GC.
     pub(in crate::vm) keyed_property_named_entries:
         HashMap<(CodeRef, FeedbackSlotId), KeyedPropertyNamedEntries>,
-    /// Phase D.4.1: Rust-only IC state machine for `KeyedProperty` slots. Same
-    /// shape as `property_ic_states`. The asm-readable bits live on
-    /// `KeyedPropertyMetadata` inside `MetadataTable`; this table holds the
-    /// Rust-only state (family, entries, sidecars).
+    /// Rust-only IC state machine for `KeyedProperty` slots. Same shape as
+    /// `property_ic_states`. Asm-readable bits live on `KeyedPropertyMetadata`.
     pub(crate) keyed_property_ic_states: Vec<Option<Box<[Option<KeyedPropertyIcState>]>>>,
-    /// Phase 3 (global property cells): per-site global cell IC, keyed by
-    /// `(CodeRef, FeedbackSlotId)`. Caches where a `LoadGlobal` resolves so
-    /// repeated reads skip name resolution. Lazy; correctness is guarded by the
-    /// `structure_gen` stored in each entry against the live
-    /// `global_structure_generation`, so stale entries (including ones for dead
-    /// code) are inert — they re-resolve on the next gen mismatch.
+    /// Per-site global cell IC. Caches `LoadGlobal` resolution to skip name
+    /// lookup on repeats. Stale entries are inert (they re-resolve on generation
+    /// mismatch); lazy; keyed by `(CodeRef, FeedbackSlotId)`.
     pub(crate) global_cell_ic_states: HashMap<(CodeRef, FeedbackSlotId), GlobalCellIcState>,
-    /// Phase C: per-code-object IC metadata buffer keyed by `code_index(code_ref)`.
-    /// `None` for code that has not yet been installed (or was installed
-    /// before Phase C landed). Allocated eagerly alongside the flat
-    /// storage in `store_installed`; never grown thereafter.
+    /// Per-code-object IC metadata buffer keyed by `code_index(code_ref)`. `None`
+    /// for uninstalled code. Allocated eagerly at install; never grown thereafter.
     pub(crate) metadata_tables: Vec<Option<MetadataTable>>,
     /// Safepoint poll-pending byte read by `poll_safepoint!` (warm
     /// `op_loop_header` / backward jumps). The asm reads
@@ -591,9 +601,10 @@ impl Vm {
     #[inline]
     pub fn new() -> Self {
         Self {
-            register_stack: Vec::new(),
-            register_stack_top: 0,
-            frames: Vec::new(),
+            arena: crate::frame_arena::FrameArena::new(),
+            current_cfr: u32::MAX,
+            frame_cold: crate::frame_cold::FrameColdTable::new(),
+            frame_depth: 0,
             referrer_scopes: Vec::new(),
             dispatch_frame_check_epoch: 0,
             installed: Vec::new(),
@@ -684,14 +695,12 @@ impl Vm {
     }
 
     /// Returns a mutable reference to the polymorphic chain for `(code, slot)`,
-    /// lazily creating an empty chain on first access. The slow-path installer
-    /// reaches into `self.polymorphic_chains` directly via a split-borrow
-    /// alongside `property_ic_states`; this helper is the documented public
-    /// surface for callers that hold an exclusive `&mut Vm` and don't need
-    /// to borrow another field at the same time.
+    /// lazily creating an empty chain on first access. The install path uses a
+    /// split-borrow directly; this helper is for callers holding an exclusive
+    /// `&mut Vm`.
     #[allow(
         dead_code,
-        reason = "Spec 2 Phase B accessor surface; install path uses split-borrow"
+        reason = "install path uses split-borrow; this surface is for non-split callers"
     )]
     #[inline]
     pub(crate) fn polymorphic_chain_mut(
@@ -719,41 +728,30 @@ impl Vm {
         }
     }
 
-    /// Phase C: returns the `MetadataTable` for `code`, or `None` if the
-    /// code has not been installed yet.
     pub fn metadata_table(&self, code: CodeRef) -> Option<&MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get(idx).and_then(|t| t.as_ref())
     }
 
-    /// Phase C: returns a mutable reference to the `MetadataTable` for `code`,
-    /// or `None` if the code has not been installed yet.
     pub(crate) fn metadata_table_mut(&mut self, code: CodeRef) -> Option<&mut MetadataTable> {
         let idx = code_index(code);
         self.metadata_tables.get_mut(idx).and_then(|t| t.as_mut())
     }
 
-    /// Spec 2 Phase B: post-mark GC sweep. Drops polymorphic chain entries
-    /// for code that is no longer live. Mirrors
-    /// `ObjectRuntime::prune_dead_prototype_transitions` from Spec 1.
-    ///
-    /// The actual call site uses an inline split-borrow retain in
-    /// `force_collect_with_active_roots`; this method is the documented
-    /// accessor surface for future callers that already hold `&mut Vm`.
+    /// Post-mark GC sweep. Drops polymorphic chain entries for dead code.
+    /// The GC call site uses an inline split-borrow retain in
+    /// `force_collect_with_active_roots`; this method is for callers that
+    /// already hold `&mut Vm`.
     #[allow(
         dead_code,
-        reason = "Spec 2 Phase B sweep surface; call site uses inline split-borrow retain in force_collect_with_active_roots"
+        reason = "GC call site uses inline split-borrow; this surface is for other callers"
     )]
     pub(crate) fn prune_dead_code_polymorphic_chains(&mut self, is_live: impl Fn(CodeRef) -> bool) {
         prune_dead_code_ic_slab(&mut self.polymorphic_chains, is_live);
     }
 
-    /// Phase D.4.1: returns the `PropertyIcState` for `(code, slot)` if any.
-    /// Hot path: two index dereferences instead of a `HashMap` probe.
-    #[allow(
-        dead_code,
-        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
-    )]
+    /// Returns the `PropertyIcState` for `(code, slot)` if any.
+    #[allow(dead_code, reason = "consumed from tests and feedback callers")]
     #[inline]
     pub(crate) fn property_ic_state(
         &self,
@@ -768,9 +766,9 @@ impl Vm {
             .as_ref()
     }
 
-    /// Phase D.4.1: returns a mutable reference to the `PropertyIcState` for
-    /// `(code, slot)` if any. Returns `None` if the code is uninstalled, the
-    /// slot is out of range, or the slot is cold.
+    /// Returns a mutable reference to the `PropertyIcState` for `(code, slot)`
+    /// if any. Returns `None` if the code is uninstalled, the slot is out of
+    /// range, or the slot is cold.
     #[inline]
     pub(crate) fn property_ic_state_mut(
         &mut self,
@@ -785,9 +783,9 @@ impl Vm {
             .as_mut()
     }
 
-    /// Phase D.4.1: returns a mutable reference to the `PropertyIcState` for
-    /// `(code, slot)`, lazily inserting a default state on first access. The
-    /// outer vec slot must have been allocated by `store_installed`.
+    /// Returns a mutable reference to the `PropertyIcState` for `(code, slot)`,
+    /// lazily inserting a default on first access. The outer vec slot must have
+    /// been allocated by `store_installed`.
     #[inline]
     pub(crate) fn property_ic_state_or_default_mut(
         &mut self,
@@ -802,8 +800,7 @@ impl Vm {
         slots[slot_zero].get_or_insert_with(PropertyIcState::default)
     }
 
-    /// Phase D.4.1: clears the per-slot entry. Used when a watchpoint fires
-    /// (`AdaptiveProtoLoad`) or the IC is otherwise invalidated.
+    /// Clears the per-slot entry on watchpoint fire or IC invalidation.
     #[inline]
     pub(crate) fn clear_property_ic_state(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let slot_zero = (slot.get() - 1) as usize;
@@ -814,21 +811,17 @@ impl Vm {
         }
     }
 
-    /// Phase D.4.1: post-mark GC sweep. Drops the `PropertyIcState` slab for
-    /// code that is no longer live. Mirrors `prune_dead_code_metadata_tables`.
+    /// Post-mark GC sweep. Drops the `PropertyIcState` slab for dead code.
     #[allow(
         dead_code,
-        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_polymorphic_chains"
+        reason = "sweep surface; call site wired alongside prune_dead_code_polymorphic_chains"
     )]
     pub(crate) fn prune_dead_code_property_ic_states(&mut self, is_live: impl Fn(CodeRef) -> bool) {
         prune_dead_code_ic_slab(&mut self.property_ic_states, is_live);
     }
 
-    /// Phase D.4.1: returns the `CallIcState` for a `Call` slot `(code, slot)`.
-    #[allow(
-        dead_code,
-        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
-    )]
+    /// Returns the `CallIcState` for a `Call` slot `(code, slot)`.
+    #[allow(dead_code, reason = "consumed from tests and feedback callers")]
     #[inline]
     pub(crate) fn call_ic_state(
         &self,
@@ -843,11 +836,8 @@ impl Vm {
             .as_ref()
     }
 
-    /// Phase D.4.1: returns the `CallIcState` for a `Construct` slot `(code, slot)`.
-    #[allow(
-        dead_code,
-        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
-    )]
+    /// Returns the `CallIcState` for a `Construct` slot `(code, slot)`.
+    #[allow(dead_code, reason = "consumed from tests and feedback callers")]
     #[inline]
     pub(crate) fn construct_ic_state(
         &self,
@@ -903,22 +893,19 @@ impl Vm {
         }
     }
 
-    /// Phase D.4.1: post-mark GC sweep. Drops the `CallIcState` slab for code
-    /// that is no longer live (both Call and Construct tables).
+    /// Post-mark GC sweep. Drops `CallIcState` slabs for dead code (both Call
+    /// and Construct tables).
     #[allow(
         dead_code,
-        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_property_ic_states"
+        reason = "sweep surface; call site wired alongside prune_dead_code_property_ic_states"
     )]
     pub(crate) fn prune_dead_code_call_ic_states(&mut self, is_live: impl Fn(CodeRef) -> bool) {
         prune_dead_code_ic_slab(&mut self.call_ic_states, &is_live);
         prune_dead_code_ic_slab(&mut self.construct_ic_states, is_live);
     }
 
-    /// Phase D.4.1: returns the `KeyedPropertyIcState` for `(code, slot)` if any.
-    #[allow(
-        dead_code,
-        reason = "Phase D.4.1 accessor surface; consumed from tests and feedback callers"
-    )]
+    /// Returns the `KeyedPropertyIcState` for `(code, slot)` if any.
+    #[allow(dead_code, reason = "consumed from tests and feedback callers")]
     #[inline]
     pub(crate) fn keyed_property_ic_state(
         &self,
@@ -933,7 +920,7 @@ impl Vm {
             .as_ref()
     }
 
-    /// Phase D.4.1: lazily inserts and returns a mutable reference to the
+    /// Lazily inserts and returns a mutable reference to the
     /// `KeyedPropertyIcState` for `(code, slot)`.
     #[inline]
     pub(crate) fn keyed_property_ic_state_or_default_mut(
@@ -949,7 +936,7 @@ impl Vm {
         slots[slot_zero].get_or_insert_with(KeyedPropertyIcState::default)
     }
 
-    /// Phase D.4.1: clears the per-slot keyed entry. Used on watchpoint fire.
+    /// Clears the per-slot keyed entry on watchpoint fire.
     #[inline]
     pub(crate) fn clear_keyed_property_ic_state(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let slot_zero = (slot.get() - 1) as usize;
@@ -960,11 +947,10 @@ impl Vm {
         }
     }
 
-    /// Phase D.4.1: post-mark GC sweep. Drops the `KeyedPropertyIcState` slab
-    /// for code that is no longer live.
+    /// Post-mark GC sweep. Drops the `KeyedPropertyIcState` slab for dead code.
     #[allow(
         dead_code,
-        reason = "Phase D.4.1 sweep surface; call site wired alongside prune_dead_code_call_ic_states"
+        reason = "sweep surface; call site wired alongside prune_dead_code_call_ic_states"
     )]
     pub(crate) fn prune_dead_code_keyed_property_ic_states(
         &mut self,
@@ -973,15 +959,9 @@ impl Vm {
         prune_dead_code_ic_slab(&mut self.keyed_property_ic_states, is_live);
     }
 
-    /// Phase C Task 4.5: post-mark GC sweep. Drops `MetadataTable` entries
-    /// for code objects that are no longer live. Mirrors
-    /// `prune_dead_code_polymorphic_chains` (Phase B) for the `metadata_tables`
-    /// vec. The vec is indexed by `code_index(code_ref) = code_ref.get() - 1`,
-    /// so index `i` corresponds to `CodeRef::from_raw(i as u32 + 1)`.
-    #[allow(
-        dead_code,
-        reason = "Phase C Task 4.5 sweep surface; called from tests and GC sweep site"
-    )]
+    /// Post-mark GC sweep. Drops `MetadataTable` entries for dead code.
+    /// The vec is indexed by `code_index(code_ref) = code_ref.get() - 1`.
+    #[allow(dead_code, reason = "called from tests and the GC sweep site")]
     pub(crate) fn prune_dead_code_metadata_tables(&mut self, is_live: impl Fn(CodeRef) -> bool) {
         for (index, slot) in self.metadata_tables.iter_mut().enumerate() {
             if slot.is_none() {
@@ -1077,7 +1057,7 @@ impl Vm {
     /// any, appears.)
     #[cfg(test)]
     #[inline]
-    pub(crate) fn dsl_global_ic_generation(&self) -> u32 {
+    pub(crate) const fn dsl_global_ic_generation(&self) -> u32 {
         self.dsl_global_ic_generation
     }
 
@@ -1110,7 +1090,7 @@ impl Vm {
             .heap()
             .view()
             .realm(realm)
-            .and_then(|r| r.global_env())
+            .and_then(lyng_gc::RuntimeRealmRecord::global_env)
         {
             self.dsl_global_ic_generation = agent.global_structure_generation(global_env);
         }
@@ -1124,7 +1104,7 @@ impl Vm {
         let Some(frame) = self.frame() else {
             return;
         };
-        let safepoint = VmDebugSafepoint::new(kind, &frame, self.frames.len());
+        let safepoint = VmDebugSafepoint::new(kind, &frame, self.frame_depth);
         let Some(reason) = self.debugger.consume_pause(safepoint) else {
             return;
         };
@@ -1139,76 +1119,141 @@ impl Vm {
         self.refresh_dsl_poll_pending();
     }
 
+    /// The live (used-prefix) register slots.
+    ///
+    /// Returns only the used prefix of the arena, never the full fixed box.
+    ///
+    /// NOTE: this is the WHOLESALE prefix — it interleaves the packed-int
+    /// [`crate::frame_header::FrameHeader`] slots (6 of the 7 are NOT valid
+    /// `Value`s) with each frame's window. It MUST NOT be traced as `Value`s by
+    /// GC; the GC uses a per-frame window walk plus a typed header-ref walk.
+    /// Remaining callers use it only to test arena emptiness.
     #[inline]
-    pub fn register_stack(&self) -> &[Value] {
-        &self.register_stack[..self.register_stack_top]
+    pub fn live_register_slots(&self) -> &[Value] {
+        &self.arena.slots()[..self.arena.top()]
     }
 
+    /// Raw view of the frame arena's value slots, used by the GC per-frame window
+    /// walk to trace exactly `[cfr+HEADER_SLOTS .. +frame_window_len(cfr)]` for
+    /// each live frame (never the interleaved header slots). Indexing past a live
+    /// frame's window or into a header overlay reads packed ints, not `Value`s, so
+    /// callers must bound their reads with [`Self::frame_window_len`].
     #[inline]
-    pub fn frames(&self) -> &[FrameRecord] {
-        &self.frames
+    pub(crate) fn arena_slots(&self) -> &[Value] {
+        self.arena.slots()
     }
 
+    /// Materialize every live frame (outermost-first) by reconstructing each
+    /// from its arena header overlay + cold slot + geometry. Walks the
+    /// `current_cfr`/`caller_cfr` chain and reverses so index 0 is the root.
+    /// Allocates; not on any hot path. The reconstructed `instruction_offset`
+    /// comes from `saved_pc` (the parked PC), which for the active top frame
+    /// may lag the live dispatch snapshot until the next sync.
+    #[inline]
+    pub fn frames(&self) -> Vec<FrameRecord> {
+        let depth = self.frame_depth;
+        let mut frames: Vec<FrameRecord> = self
+            .frame_cfrs()
+            .enumerate()
+            .map(|(rev_index, cfr)| {
+                // `frame_cfrs` yields innermost-first; depth-1 is the top frame.
+                let frame_index = depth - 1 - rev_index;
+                self.reconstruct_frame_from_header(cfr, frame_index)
+            })
+            .collect();
+        frames.reverse();
+        frames
+    }
+
+    /// The active (top) frame, reconstructed from its header overlay, cold slot,
+    /// and geometry, or `None` when no frame is active.
     #[inline]
     pub fn frame(&self) -> Option<FrameRecord> {
-        self.frames.last().copied()
+        let cfr = self.current_cfr_opt()?;
+        Some(self.reconstruct_frame_from_header(cfr, self.frame_depth - 1))
     }
 
     #[inline]
     pub(super) const fn register_stack_top(&self) -> usize {
-        self.register_stack_top
+        self.arena.top()
     }
 
     #[inline]
     pub(super) fn release_register_stack_to(&mut self, top: usize) {
         debug_assert!(
-            top <= self.register_stack_top,
+            top <= self.arena.top(),
             "register stack cursor should only move back during cleanup"
         );
-        debug_assert!(
-            top <= self.register_stack.len(),
-            "register stack cursor should stay inside backing storage"
-        );
-        self.register_stack_top = top;
-    }
-
-    #[inline]
-    pub(super) fn release_register_window(&mut self, register_base: u32) {
-        let Ok(top) = usize::try_from(register_base) else {
-            debug_assert!(false, "register stack base should fit into usize");
+        let Ok(top) = u32::try_from(top) else {
+            debug_assert!(false, "register stack cursor should fit into u32");
             return;
         };
-        self.release_register_stack_to(top);
+        self.arena.release_to(top);
     }
 
     #[cfg(test)]
     #[inline]
-    pub(crate) const fn register_stack_storage_len_for_tests(&self) -> usize {
-        self.register_stack.len()
+    pub(crate) fn register_stack_storage_len_for_tests(&self) -> usize {
+        self.arena.slots().len()
     }
 
-    /// DSL-0c: raw mutable pointer to the start of the register-stack
-    /// storage, used by [`crate::dsl::entry::run_via_dsl`] to compute
-    /// the active frame's `REGS` pin (`*mut Value` at
-    /// `register_stack.as_mut_ptr().add(frame.registers().base())`).
+    /// Test-only: seed the register arena's used prefix with `values` and set
+    /// the cursor to `values.len()`.
+    #[cfg(test)]
+    pub(crate) fn seed_register_stack_for_tests(&mut self, values: &[Value]) {
+        self.arena.slots_mut()[..values.len()].copy_from_slice(values);
+        self.arena.set_top(values.len());
+    }
+
+    /// Test-only: push a synthetic caller/root frame through the real reservation
+    /// path so it carries a header and a window base ≥ `HEADER_SLOTS` in the
+    /// arena — matching the layout every production push produces. `build`
+    /// receives the reserved window and returns the `FrameRecord` to install.
+    /// The reserved window slots are zeroed; `seed_window` overwrites the prefix.
+    /// Returns the window base.
+    #[cfg(test)]
+    pub(crate) fn push_test_root_frame(
+        &mut self,
+        agent: &mut Agent,
+        register_len: u16,
+        seed_window: &[Value],
+        build: impl FnOnce(RegisterWindow) -> FrameRecord,
+    ) -> u32 {
+        let (cfr, register_base) = self
+            .reserve_frame(agent, register_len)
+            .expect("test frame reservation should fit the arena");
+        let start = register_base as usize;
+        self.arena.slots_mut()[start..start + seed_window.len()].copy_from_slice(seed_window);
+        let frame = build(RegisterWindow::new(register_base, register_len));
+        // Seed an establishment scope so `realm_of` can recover the realm for
+        // callee-less roots (the common case for test helpers).
+        let depth = self.frame_depth;
+        let realm = frame
+            .callee()
+            .and_then(|callee| agent.objects().function_data(callee))
+            .and_then(lyng_objects::FunctionObjectData::realm)
+            .or_else(|| agent.default_realm_id())
+            .expect("test root frame must resolve a realm");
+        self.push_referrer_scope(depth, realm, None);
+        self.push_frame_with_header(cfr, frame);
+        register_base
+    }
+
+    /// Raw mutable pointer to the start of the register-stack storage, used by
+    /// [`crate::dsl::entry::run_via_dsl`] to compute the active frame's `REGS`
+    /// pin. The arena never reallocates, so this base pointer stays stable
+    /// across nested calls within a single trampoline invocation.
     ///
-    /// Callers must respect Rust's aliasing rules — the returned
-    /// pointer aliases the `Vec`'s backing buffer; concurrent
-    /// reborrows of `&mut self.register_stack` would be UB. The
-    /// trampoline's contract is that the pointer is only used while
-    /// `run_via_dsl` holds `&mut Vm`, and the buffer is not grown
-    /// during a single trampoline invocation (window reservation
-    /// happens before entry, release happens after return).
+    /// Callers must respect Rust's aliasing rules — the returned pointer
+    /// aliases the arena's backing buffer; concurrent reborrows of
+    /// `&mut self.arena` would be UB.
     #[inline]
-    pub(crate) const fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
-        self.register_stack.as_mut_ptr()
+    pub(crate) fn register_stack_storage_mut_ptr(&mut self) -> *mut Value {
+        self.arena.base_mut_ptr()
     }
 
-    /// DSL-0c: crate-visible accessor for the dispatch frame-check
-    /// epoch used by [`crate::dsl::entry::run_via_dsl`] when seeding
-    /// the entry `DispatchState`. The α path reads the same value
-    /// through `Vm::dispatch_frame_check_epoch` which is
-    /// `pub(in crate::vm)`-scoped.
+    /// Crate-visible accessor for the dispatch frame-check epoch, used by
+    /// [`crate::dsl::entry::run_via_dsl`] when seeding the entry `DispatchState`.
     #[inline]
     pub(crate) const fn dispatch_frame_check_epoch_for_dsl(&self) -> u32 {
         self.dispatch_frame_check_epoch
@@ -1217,6 +1262,21 @@ impl Vm {
     #[cfg(test)]
     pub(crate) const fn string_code_units_scratch_capacity(&self) -> usize {
         self.string_code_units_scratch.capacity()
+    }
+
+    /// Test-only: overwrite a single raw arena slot with a verbatim bit pattern,
+    /// bypassing typed header setters. Used to plant non-Value patterns in header
+    /// slots for GC mistrace tests.
+    #[cfg(test)]
+    pub(crate) fn write_arena_slot_for_tests(&mut self, slot: u32, value: Value) {
+        self.arena.slots_mut()[slot as usize] = value;
+    }
+
+    /// Test-only: read a single raw arena slot (the verbatim bits, NOT a typed
+    /// header field). Pairs with [`Self::write_arena_slot_for_tests`].
+    #[cfg(test)]
+    pub(crate) fn arena_slot_for_tests(&self, slot: u32) -> Value {
+        self.arena.slots()[slot as usize]
     }
 
     #[cfg(test)]
@@ -1250,31 +1310,377 @@ impl Vm {
         layout
     }
 
+    /// `cfr` (call frame register) of a frame: the arena slot offset of its
+    /// `[FrameHeader][window]` run. The header occupies `[cfr .. cfr +
+    /// HEADER_SLOTS)` and the register window starts at `cfr + HEADER_SLOTS`, so
+    /// the cfr is the window base shifted back by the header. Release sites
+    /// reclaim to this offset (not the window base) so the header slots are
+    /// freed too.
     #[inline]
-    fn reserve_register_window(&mut self, register_base: u32, register_len: u16) {
-        let Ok(start) = usize::try_from(register_base) else {
-            debug_assert!(false, "register stack base should fit into usize");
-            return;
-        };
-        debug_assert_eq!(self.register_stack_top, start);
-        let Some(end) = start.checked_add(usize::from(register_len)) else {
-            debug_assert!(false, "register window end should fit into usize");
-            return;
-        };
-        // `release_register_stack_to` only moves the cursor; it does not
-        // truncate the Vec. So `register_stack.len()` can sit anywhere in
-        // `[start..]` with stale values from past frames in `[start..len)`.
-        // Reset that range to `undefined` before extending so a re-entered
-        // window starts clean — callers (especially the direct call path)
-        // may not rewrite every slot.
-        if self.register_stack.len() > start {
-            let reset_end = end.min(self.register_stack.len());
-            self.register_stack[start..reset_end].fill(Value::undefined());
+    pub(crate) const fn cfr_of(frame: &FrameRecord) -> u32 {
+        frame.registers().base() - crate::frame_header::HEADER_SLOTS as u32
+    }
+
+    /// Register-window length for a frame *running this bytecode `code`*
+    /// (entry/call/generator/module frames). Returns `register_count() +
+    /// hidden_register_count()` of `code`'s installed function — the exact value
+    /// `reserve_frame` is handed for those push sites (the generator-restore site
+    /// round-trips the saved window, which is that same span). The two counts are
+    /// immutable per installed code.
+    ///
+    /// NOT valid for the synthetic job-root frame: it reserves a 0-width window
+    /// (`reserve_frame(agent, 0)`) yet borrows a non-matching, non-zero-register
+    /// `CodeRef` from `job_caller_code()`, so `window_len_for(its code) > 0` while
+    /// its real window is 0. Callers walking a cfr chain (e.g. the GC trace) must
+    /// use [`Self::frame_window_len`], which special-cases the job root.
+    ///
+    /// Panics if `code` is not installed (a live frame's `code` always is).
+    #[inline]
+    pub(crate) fn window_len_for(&self, code: lyng_types::CodeRef) -> u16 {
+        let function = self
+            .installed_function(code)
+            .expect("window_len_for: frame code must be installed");
+        function
+            .register_count()
+            .checked_add(function.hidden_register_count())
+            .expect("frame register span should fit within u16")
+    }
+
+    /// Register-window length of the live frame at `cfr` — exact for every frame,
+    /// including the synthetic job root (reserved 0-width despite borrowing a
+    /// non-zero-register code). Use this (not `window_len_for(code)` directly) when
+    /// bounding a frame's window during a cfr-chain walk (e.g. the GC trace).
+    ///
+    /// Audit of the 5 push sites confirms Job is the sole special case: entry
+    /// (`vm.rs`) and the two bytecode-call installs (`bytecode_calls.rs`) all
+    /// reserve `register_count + hidden_register_count`; the generator/async
+    /// restore reserves the saved window, which is that same span for the
+    /// suspended code. Only the job root reserves a 0-width window under a
+    /// mismatched code.
+    #[inline]
+    pub(crate) fn frame_window_len(&self, cfr: u32) -> u16 {
+        let header = self.frame_header(cfr);
+        if header.kind() == lyng_env::ExecutionContextKind::Job {
+            0
+        } else {
+            self.window_len_for(header.code())
         }
-        if self.register_stack.len() < end {
-            self.register_stack.resize(end, Value::undefined());
+    }
+
+    /// Shared, immutable view of the header overlay at `cfr`.
+    ///
+    /// SAFETY: `cfr` is a valid frame base reserved with `HEADER_SLOTS + window`
+    /// slots via [`Self::reserve_frame`]; [`crate::frame_header::FrameHeader`] is
+    /// `repr(C)` POD sized to `HEADER_SLOTS * size_of::<Value>()`, so the cast
+    /// over the arena slots is sound and stays in-bounds. The `&self` receiver
+    /// ties the returned reference to the VM borrow, so the borrow checker
+    /// guarantees no other live borrow of the arena slots aliases this header.
+    #[inline]
+    pub(crate) fn frame_header(&self, cfr: u32) -> &crate::frame_header::FrameHeader {
+        debug_assert!(
+            (cfr as usize) + crate::frame_header::HEADER_SLOTS <= self.arena.slots().len(),
+            "frame header overlay must stay within the arena",
+        );
+        let ptr = self.arena.slots().as_ptr();
+        unsafe {
+            &*ptr
+                .add(cfr as usize)
+                .cast::<crate::frame_header::FrameHeader>()
         }
-        self.register_stack_top = end;
+    }
+
+    /// Mutable view of the header overlay at `cfr`. Same safety contract as
+    /// [`Self::frame_header`]; the `&mut self` receiver ties the returned
+    /// reference to the VM borrow, so the borrow checker guarantees no other
+    /// live borrow of the arena slots aliases this header.
+    #[inline]
+    pub(crate) fn frame_header_mut(&mut self, cfr: u32) -> &mut crate::frame_header::FrameHeader {
+        let len = self.arena.slots().len();
+        debug_assert!(
+            (cfr as usize) + crate::frame_header::HEADER_SLOTS <= len,
+            "frame header overlay must stay within the arena",
+        );
+        let ptr = self.arena.slots_mut().as_mut_ptr();
+        unsafe {
+            &mut *ptr
+                .add(cfr as usize)
+                .cast::<crate::frame_header::FrameHeader>()
+        }
+    }
+
+    /// The active frame's header overlay, or `None` when no frame is active.
+    #[allow(dead_code, reason = "used by the header-mirror test")]
+    #[inline]
+    pub(crate) fn current_frame_header(&self) -> Option<&crate::frame_header::FrameHeader> {
+        (self.current_cfr != u32::MAX).then(|| self.frame_header(self.current_cfr))
+    }
+
+    /// The active frame's cfr (slot offset of its header), or `None` when no frame is active.
+    #[allow(dead_code, reason = "used by the frame_depth_and_caller_walk test")]
+    #[inline]
+    pub(crate) fn current_cfr_opt(&self) -> Option<u32> {
+        (self.current_cfr != u32::MAX).then_some(self.current_cfr)
+    }
+
+    /// Returns `(code, saved_pc)` from the active frame's header overlay, or `None`
+    /// when no frame is active. Used by the property-access chain to populate
+    /// `VmProxyBridge.caller_code`/`caller_pc` from bridge-internal helpers
+    /// (e.g. `VmToPrimitiveBridge`) that don't have direct access to the frame params.
+    #[inline]
+    pub(crate) fn current_code_and_pc(&self) -> Option<(CodeRef, u32)> {
+        let cfr = self.current_cfr_opt()?;
+        let h = self.frame_header(cfr);
+        Some((h.code(), h.saved_pc()))
+    }
+
+    /// Depth of the active frame stack (0 == empty).
+    #[inline]
+    pub(crate) const fn frame_depth(&self) -> usize {
+        self.frame_depth
+    }
+
+    /// Mutable cold state of the current frame, or `None` when no frame is active.
+    #[inline]
+    pub(crate) fn current_cold_mut(&mut self) -> Option<&mut crate::frame_cold::FrameColdState> {
+        self.current_cfr_opt()?;
+        let depth = self.frame_depth() - 1;
+        Some(self.frame_cold.get_mut(depth))
+    }
+
+    /// The cold-state slots backing every currently-live frame (depth order).
+    #[inline]
+    pub(crate) fn frame_cold_live_slots(&self) -> &[crate::frame_cold::FrameColdState] {
+        self.frame_cold.live_slots(self.frame_depth())
+    }
+
+    /// Slot offsets (cfr) of every live frame, innermost first.
+    pub(crate) fn frame_cfrs(&self) -> impl Iterator<Item = u32> + '_ {
+        let mut next = self.current_cfr_opt();
+        std::iter::from_fn(move || {
+            let cfr = next?;
+            next = self.frame_header(cfr).caller_cfr();
+            Some(cfr)
+        })
+    }
+
+    /// Rebuild a full [`FrameRecord`] for the live frame at `cfr` entirely from
+    /// its arena-resident state: the header overlay, the cold side-table slot at
+    /// `depth`, and the derived register-window geometry.
+    ///
+    /// `instruction_offset` is sourced from `saved_pc` (the parked PC). This is
+    /// called exclusively at frame-switch boundaries (return / call / catch /
+    /// dispatch-entry), never on a same-frame opcode step — the same-frame
+    /// `Continue` arm advances the live snapshot PC locally without touching
+    /// `saved_pc`. `FrameRecord` does not carry `realm`; derive it via
+    /// [`Self::realm_of`] / [`Self::frame_record_realm`].
+    pub(crate) fn reconstruct_frame_from_header(&self, cfr: u32, depth: usize) -> FrameRecord {
+        let header = *self.frame_header(cfr);
+        let window = RegisterWindow::new(
+            cfr + crate::frame_header::HEADER_SLOTS as u32,
+            self.frame_window_len(cfr),
+        );
+        let mut frame = FrameRecord::new(
+            header.code(),
+            header.saved_pc(),
+            window,
+            header.return_register(),
+            header.lexical_env(),
+            header.variable_env(),
+            header.kind(),
+        )
+        .with_this_state(header.this_state())
+        .with_this_value(header.this_value())
+        .with_construct_this(header.construct_this())
+        .with_new_target(header.new_target())
+        .with_callee(header.callee())
+        .with_private_env(header.private_env())
+        .with_flags(crate::frame::FrameFlags::from_raw(header.flags_bits()));
+        // `handler_cursor`, `tail_caller`(+strict), `resume_*` come from the cold
+        // slot; `parameter_initializer_end_offset` is restored separately (metadata,
+        // not part of `apply_cold`).
+        let cold = self.frame_cold.get(depth);
+        frame.apply_cold(cold);
+        frame.set_parameter_initializer_end_offset(cold.parameter_initializer_end_offset);
+        frame
+    }
+
+    /// Reserve `[header][window]` for a new frame at the current arena top.
+    /// Returns `(cfr, window_base)` where `window_base = cfr + HEADER_SLOTS`.
+    /// A run crossing the soft limit is rejected with a `RangeError` (the slack
+    /// above the soft limit is reserved for the throw path). This is the single
+    /// rejection point on every reservation path (entry, bytecode calls,
+    /// generator resume, job root).
+    #[inline]
+    fn reserve_frame(&mut self, agent: &mut Agent, register_len: u16) -> VmResult<(u32, u32)> {
+        let slots = crate::frame_header::HEADER_SLOTS + usize::from(register_len);
+        let cfr = self
+            .arena
+            .bump(slots)
+            .ok_or_else(|| VmError::Abrupt(lyng_ops::errors::throw_range_error(agent)))?;
+        // `bump` does not clear slots on reuse; zero the window region so a
+        // re-entered frame sees `undefined` for slots its callee may not rewrite.
+        // (The header overlay is fully written by `write_header_from_record`.)
+        let window_base = cfr + crate::frame_header::HEADER_SLOTS as u32;
+        let start = window_base as usize;
+        let end = start + usize::from(register_len);
+        self.arena.slots_mut()[start..end].fill(lyng_types::Value::undefined());
+        Ok((cfr, window_base))
+    }
+
+    /// Mirror `record` into the arena header overlay at `cfr` and seed the
+    /// cold-table slot at `depth`. Called on every frame push; `caller_cfr` is
+    /// the chain link to the frame below (`None` for a root frame).
+    fn write_header_from_record(
+        &mut self,
+        cfr: u32,
+        caller_cfr: Option<u32>,
+        depth: usize,
+        record: &FrameRecord,
+    ) {
+        self.frame_cold.reset_at(depth);
+        {
+            let cold = self.frame_cold.get_mut(depth);
+            cold.handler_cursor = record.handler_cursor();
+            cold.tail_caller = record.tail_caller();
+            cold.tail_caller_strict = record.tail_caller_strict();
+            cold.resume_kind = record.resume_kind();
+            cold.resume_value = record.resume_value();
+            cold.resume_active = record.resume_active();
+            cold.parameter_initializer_end_offset = record.parameter_initializer_end_offset();
+        }
+        let h = self.frame_header_mut(cfr);
+        *h = crate::frame_header::FrameHeader::zeroed();
+        h.set_caller_cfr(caller_cfr);
+        h.set_saved_pc(record.instruction_offset());
+        h.set_code(record.code());
+        h.set_callee(record.callee());
+        h.set_this(record.this_state(), record.this_value());
+        h.set_return_register(record.return_register());
+        h.set_variable_env(record.variable_env());
+        h.set_lexical_env(record.lexical_env());
+        h.set_private_env(record.private_env());
+        h.set_new_target(record.new_target());
+        h.set_construct_this(record.construct_this());
+        // The arg_count ABI slot is reserved for the asm path's real argument count;
+        // seed 0 until the asm path writes it. No reader consumes it yet.
+        h.set_arg_count(0);
+        h.set_flags_bits(record.flags().raw());
+        h.set_kind_raw(record.kind() as u8);
+    }
+
+    /// Common push tail: mirror `frame` into the arena header overlay, bump the
+    /// frame depth, and advance `current_cfr`. `cfr` must come from the
+    /// [`Self::reserve_frame`] that allocated `frame.registers()`.
+    #[inline]
+    fn push_frame_with_header(&mut self, cfr: u32, frame: FrameRecord) {
+        let depth = self.frame_depth;
+        let caller_cfr = (self.current_cfr != u32::MAX).then_some(self.current_cfr);
+        debug_assert_eq!(
+            Self::cfr_of(&frame),
+            cfr,
+            "frame window base must sit HEADER_SLOTS above its cfr"
+        );
+        self.write_header_from_record(cfr, caller_cfr, depth, &frame);
+        self.frame_depth = depth + 1;
+        self.current_cfr = cfr;
+        #[cfg(debug_assertions)]
+        self.debug_assert_cfr_chain_invariant();
+    }
+
+    /// Verify `current_cfr`/`frame_depth` consistency and `caller_cfr` chain
+    /// well-formedness after every push or release (debug-only).
+    ///
+    /// Invariants:
+    /// 1. `current_cfr == u32::MAX` iff `frame_depth == 0`.
+    /// 2. The caller-chain walks from `current_cfr` to `None` in exactly
+    ///    `frame_depth` steps, with each successive cfr strictly less than
+    ///    the one above it.
+    #[cfg(debug_assertions)]
+    fn debug_assert_cfr_chain_invariant(&self) {
+        debug_assert_eq!(
+            self.current_cfr == u32::MAX,
+            self.frame_depth == 0,
+            "current_cfr must be u32::MAX iff frame_depth is 0 \
+             (current_cfr={}, frame_depth={})",
+            self.current_cfr,
+            self.frame_depth,
+        );
+        if self.frame_depth == 0 {
+            return;
+        }
+        let mut steps = 0usize;
+        let mut prev_cfr = self.current_cfr;
+        let mut next = self.frame_header(self.current_cfr).caller_cfr();
+        steps += 1;
+        while let Some(caller) = next {
+            debug_assert!(
+                caller < prev_cfr,
+                "caller_cfr must be strictly less than its callee's cfr \
+                 (caller={caller}, callee={prev_cfr}): chain is corrupt"
+            );
+            prev_cfr = caller;
+            next = self.frame_header(caller).caller_cfr();
+            steps += 1;
+            debug_assert!(
+                steps <= self.frame_depth,
+                "caller_cfr chain is longer than frame_depth={} (cycle or stale link)",
+                self.frame_depth
+            );
+        }
+        debug_assert_eq!(
+            steps, self.frame_depth,
+            "caller_cfr chain length ({steps}) must equal frame_depth ({})",
+            self.frame_depth
+        );
+    }
+
+    /// Decrement the maintained frame depth. Used at pop sites that already hold
+    /// the live snapshot (tail-frame teardown, generator/async suspend). Does NOT
+    /// release the arena run or restore `current_cfr` — that is done by
+    /// [`Self::release_frame_to_caller`] after any reads on the still-mapped run.
+    /// Pop sites that must rebuild the record from the arena use
+    /// [`Self::pop_current_frame`] instead.
+    #[inline]
+    fn pop_frame_depth(&mut self) {
+        debug_assert!(self.frame_depth > 0, "pop requires one active frame");
+        self.frame_depth = self.frame_depth.saturating_sub(1);
+    }
+
+    /// Reconstruct the active (top) frame from its header overlay + cold slot +
+    /// geometry, then decrement the maintained frame depth. Used at pop sites that
+    /// need the popped frame's fields (window cleanup, return-register write,
+    /// mapped-arguments finalization). After this returns, `current_cfr` still
+    /// points at the popped frame (its run stays mapped) until
+    /// [`Self::release_frame_to_caller`] reclaims it.
+    #[inline]
+    fn pop_current_frame(&mut self) -> FrameRecord {
+        debug_assert!(
+            self.current_cfr != u32::MAX && self.frame_depth > 0,
+            "pop requires one active frame"
+        );
+        let depth = self.frame_depth - 1;
+        let frame = self.reconstruct_frame_from_header(self.current_cfr, depth);
+        self.frame_depth = depth;
+        frame
+    }
+
+    /// Release a just-popped frame's arena run (header + window) and restore
+    /// `current_cfr` to the caller's cfr (or `u32::MAX` when the stack empties).
+    /// Depth must have been decremented by [`Self::pop_frame_depth`] or
+    /// [`Self::pop_current_frame`] before calling this.
+    #[inline]
+    fn release_frame_to_caller(&mut self, popped_cfr: u32) {
+        self.current_cfr = self
+            .frame_header(popped_cfr)
+            .caller_cfr()
+            .unwrap_or(u32::MAX);
+        self.arena.release_to(popped_cfr);
+        // Note: `referrer_scopes` may still be non-empty at this point (the caller
+        // will call `unwind_referrer_scopes_to` separately). Only the cfr/depth
+        // chain is checked here; the establishment side-stack is verified by
+        // `unwind_referrer_scopes_to` when it unwinds all the way to depth 0.
+        #[cfg(debug_assertions)]
+        self.debug_assert_cfr_chain_invariant();
     }
 
     #[inline]
@@ -1291,15 +1697,10 @@ impl Vm {
             vm: self,
             caller_frame: &caller_frame,
         });
-        // Phase D.4.1/D.4.3: prune IC side-table slabs for code that is no
-        // longer installed. Each slab is a Vec keyed by code_index; the slab
-        // entry is set to None when the code is dead so the inner Box<[..]>
-        // is freed. Liveness predicate: a CodeRef is live iff its slot in
-        // `self.installed` is `Some(_)` — i.e., it was installed and has not
-        // been evicted by dynamic_function_cache cleanup or otherwise
-        // uninstalled. Mirrors the post-mark sweep in
-        // Agent::force_collect_with_additional_roots for ObjectRuntime's
-        // prototype-transition table.
+        // Prune IC side-table slabs for code that is no longer installed. Each
+        // slab is a Vec keyed by code_index; the entry is set to None (freeing
+        // the inner Box) when the code is dead. A CodeRef is live iff its slot
+        // in `self.installed` is `Some(_)`.
         let installed = &self.installed;
         prune_dead_code_ic_slab_by_installed(&mut self.polymorphic_chains, installed);
         prune_dead_code_ic_slab_by_installed(&mut self.property_ic_states, installed);
@@ -1327,7 +1728,7 @@ impl Vm {
     fn note_frame_depth(&mut self) {
         #[cfg(test)]
         {
-            self.peak_frame_depth = self.peak_frame_depth.max(self.frames.len());
+            self.peak_frame_depth = self.peak_frame_depth.max(self.frame_depth);
         }
     }
 
@@ -1343,9 +1744,20 @@ impl Vm {
         self.for_in_states.len()
     }
 
-    /// Record a new referrer establishment starting at `base_depth` frames deep.
-    pub(crate) fn push_referrer_scope(&mut self, base_depth: usize, referrer: Option<AtomId>) {
-        self.referrer_scopes.push(ReferrerScope { base_depth, referrer });
+    /// Record a new establishment starting at `base_depth` frames deep. `realm`
+    /// is the establishing root's realm (consulted only by callee-less roots; see
+    /// [`Self::establishment_realm_covering`]).
+    pub(crate) fn push_referrer_scope(
+        &mut self,
+        base_depth: usize,
+        realm: RealmRef,
+        referrer: Option<AtomId>,
+    ) {
+        self.referrer_scopes.push(ReferrerScope {
+            base_depth,
+            realm,
+            referrer,
+        });
     }
 
     /// Drop all scopes established at frame depth ≥ `target_frame_depth` (those
@@ -1358,6 +1770,16 @@ impl Vm {
         {
             self.referrer_scopes.pop();
         }
+        // When all frames are gone the establishment side-stack must also be empty.
+        // Checked here rather than in the low-level primitives because
+        // `release_frame_to_caller` and `unwind_referrer_scopes_to` are called
+        // together at the exit of every entry/job root.
+        debug_assert!(
+            target_frame_depth > 0 || self.referrer_scopes.is_empty(),
+            "establishment side-stack must be empty when frame_depth reaches 0 \
+             ({} scope(s) remain)",
+            self.referrer_scopes.len(),
+        );
     }
 
     /// The referrer of the current establishment (the nearest one toward the
@@ -1366,12 +1788,199 @@ impl Vm {
         self.referrer_scopes.last().and_then(|scope| scope.referrer)
     }
 
+    /// Every realm captured on the establishment side-stack (root realms). GC must
+    /// trace these so a root realm reachable only through a callee-less root frame
+    /// stays rooted; function-frame realms are reachable via the callee instead.
+    pub(in crate::vm) fn establishment_realms(&self) -> impl Iterator<Item = RealmRef> + '_ {
+        self.referrer_scopes.iter().map(|scope| scope.realm)
+    }
+
+    /// The realm of the establishment covering frame `depth`: the top scope whose
+    /// `base_depth <= depth`. Mirrors [`Self::current_referrer`]'s nearest-toward-
+    /// base walk, but is depth-relative so a callee-less root at any depth recovers
+    /// the realm pushed for the establishment that actually owns it (rather than a
+    /// deeper scope that has not yet unwound). Returns `None` when no scope covers
+    /// the depth (no active establishment).
+    pub(crate) fn establishment_realm_covering(&self, depth: usize) -> Option<RealmRef> {
+        self.referrer_scopes
+            .iter()
+            .rev()
+            .find(|scope| scope.base_depth <= depth)
+            .map(|scope| scope.realm)
+    }
+
+    /// 0-based depth of the frame at `cfr` (number of callers below it), found by
+    /// walking the caller chain. The top frame is at `frame_depth() - 1`.
+    pub(crate) fn depth_of(&self, cfr: u32) -> usize {
+        let mut depth = 0usize;
+        let mut caller = self.frame_header(cfr).caller_cfr();
+        while let Some(c) = caller {
+            depth += 1;
+            caller = self.frame_header(c).caller_cfr();
+        }
+        depth
+    }
+
+    /// Realm of the frame at `cfr`. Function frames derive from the callee's
+    /// `[[Realm]]`; callee-less roots read the covering establishment scope.
+    ///
+    /// [`Self::frame_record_realm`] is the `FrameRecord`-snapshot variant; the
+    /// two differ only in the callee-less fallback source (this reads the
+    /// establishment scope; the snapshot variant reads the ambient
+    /// running-context realm).
+    #[allow(
+        clippy::collapsible_if,
+        reason = "nested let bindings read clearer than a let-chain given the multi-line .and_then inner; the crate uses no `&& let` chains today"
+    )]
+    pub(crate) fn realm_of(&self, agent: &Agent, cfr: u32) -> RealmRef {
+        let header = self.frame_header(cfr);
+        if let Some(callee) = header.callee() {
+            if let Some(realm) = agent
+                .objects()
+                .function_data(callee)
+                .and_then(lyng_objects::FunctionObjectData::realm)
+            {
+                return realm;
+            }
+        }
+        self.establishment_realm_covering(self.depth_of(cfr))
+            .expect("a live frame must be covered by an establishment scope")
+    }
+
+    /// Realm of the current frame, or `None` when no frame is active.
+    pub(crate) fn current_realm_of(&self, agent: &Agent) -> Option<RealmRef> {
+        self.current_cfr_opt().map(|cfr| self.realm_of(agent, cfr))
+    }
+
+    /// Realm represented by a `FrameRecord` snapshot of the current frame.
+    /// Function-frame snapshots derive from the callee's `[[Realm]]`; callee-less
+    /// roots fall back to the ambient running-context realm. An associated
+    /// function (no `&self`) so static helpers without a `Vm` borrow can call it.
+    ///
+    /// [`Self::realm_of`] is the live-cfr variant; it uses the covering
+    /// establishment scope as its callee-less fallback instead.
+    #[allow(
+        clippy::collapsible_if,
+        reason = "nested let bindings read clearer than a let-chain given the multi-line .and_then inner; the crate uses no `&& let` chains today"
+    )]
+    pub(crate) fn frame_record_realm(agent: &Agent, frame: &FrameRecord) -> RealmRef {
+        if let Some(callee) = frame.callee() {
+            if let Some(realm) = agent
+                .objects()
+                .function_data(callee)
+                .and_then(lyng_objects::FunctionObjectData::realm)
+            {
+                return realm;
+            }
+        }
+        if let Some(running) = agent.running_context() {
+            return running.realm();
+        }
+        // Production never reaches here: a callee-less frame used as a realm source
+        // is always the *current* frame, whose running_context was refreshed at the
+        // push (or a pushed root, covered by the establishment side-stack). Only
+        // unit tests that invoke a helper with a hand-built `FrameRecord` outside an
+        // active dispatch (no pushed frame, so no running_context) land here; fall
+        // back to the agent's default realm — the realm every such test frame is
+        // built against. Gated to test builds so a production miss stays a loud bug.
+        #[cfg(test)]
+        if let Some(default_realm) = agent.default_realm_id() {
+            return default_realm;
+        }
+        panic!(
+            "frame_record_realm needs an active running context or establishment scope for a callee-less frame"
+        );
+    }
+
+    /// Extract the [`CallerContext`] (`realm/lexical_env/code/pc`) from a caller
+    /// `FrameRecord`. Synthetic-safe: reads only struct fields and
+    /// [`Self::frame_record_realm`], so it is valid on a synthetic
+    /// `RegisterWindow::new(0, 0)` frame. Extract into a local before any
+    /// `&mut agent` argument to avoid a double borrow.
+    #[inline]
+    pub(crate) fn caller_context_from_record(agent: &Agent, frame: &FrameRecord) -> CallerContext {
+        CallerContext {
+            realm: Self::frame_record_realm(agent, frame),
+            lexical_env: frame.lexical_env(),
+            code: frame.code(),
+            pc: frame.instruction_offset(),
+        }
+    }
+
+    /// [`CallerContext`] from a real arena-backed caller frame identified by a
+    /// [`crate::frame::FrameView`]. MUST NOT be used on a synthetic frame
+    /// (`realm_of`/`frame_header` underflow on a zero-cfr). For a real active
+    /// frame this agrees with `caller_context_from_record` field-for-field.
+    #[inline]
+    pub(crate) fn caller_context_from_view(
+        &self,
+        agent: &Agent,
+        view: crate::frame::FrameView,
+    ) -> CallerContext {
+        CallerContext {
+            realm: self.realm_of(agent, view.cfr()),
+            lexical_env: self.frame_header(view.cfr()).lexical_env(),
+            code: view.code(),
+            pc: view.instruction_offset(),
+        }
+    }
+
+    /// Build a [`FrameRecord`] from the overlay fields for the frame identified by
+    /// `view`. Cold fields (`handler_cursor`, `tail_caller`, `resume_*`,
+    /// `parameter_initializer_end_offset`) are left at zero defaults, which is safe
+    /// because all callee sites that consume this record read only overlay fields.
+    #[inline]
+    pub(super) fn frame_record_for_view(&self, view: crate::frame::FrameView) -> FrameRecord {
+        let h = self.frame_header(view.cfr());
+        FrameRecord::new(
+            view.code(),
+            view.instruction_offset(),
+            view.registers(),
+            h.return_register(),
+            h.lexical_env(),
+            h.variable_env(),
+            h.kind(),
+        )
+        .with_callee(h.callee())
+        .with_new_target(h.new_target())
+        .with_flags(crate::frame::FrameFlags::from_raw(h.flags_bits()))
+        .with_this_state(h.this_state())
+        .with_this_value(h.this_value())
+        .with_construct_this(h.construct_this())
+        .with_private_env(h.private_env())
+    }
+
     /// Refresh the Agent's ambient running-context from the active frame. Called
-    /// at every frame transition (the former context push/pop sites).
+    /// at every frame transition.
     pub(crate) fn refresh_running_context(&self, agent: &mut Agent) {
         let running = self
-            .frame()
-            .map(|frame| lyng_env::RunningContext::new(frame.realm(), self.current_referrer()));
+            .current_realm_of(agent)
+            .map(|realm| lyng_env::RunningContext::new(realm, self.current_referrer()));
+        agent.set_running_context(running);
+        // `current_cfr` is authoritative here (unlike
+        // `refresh_running_context_to_caller`, which derives from the caller while
+        // `current_cfr` still points at the just-popped frame).
+        debug_assert_eq!(
+            agent.running_context().map(lyng_env::RunningContext::realm),
+            self.current_cfr_opt().map(|cfr| self.realm_of(agent, cfr)),
+            "running_context realm must equal the realm derived from the current frame"
+        );
+    }
+
+    /// Refresh the running-context from the *caller* of `popped`.
+    ///
+    /// The return path and construct/return finalization must observe the caller's
+    /// realm (per spec [[Construct]] step 13c / `GetThisBinding`). At that point
+    /// `current_cfr` still points at the just-popped frame (its run stays mapped
+    /// until [`Self::release_frame_to_caller`]), so plain
+    /// [`Self::refresh_running_context`] would derive the popped frame's realm.
+    /// Reading the caller cfr explicitly restores the correct cross-realm behavior
+    /// without disturbing `current_cfr`.
+    pub(crate) fn refresh_running_context_to_caller(&self, agent: &mut Agent, popped_cfr: u32) {
+        let caller_cfr = self.frame_header(popped_cfr).caller_cfr();
+        let running = caller_cfr
+            .map(|cfr| self.realm_of(agent, cfr))
+            .map(|realm| lyng_env::RunningContext::new(realm, self.current_referrer()));
         agent.set_running_context(running);
     }
 
@@ -1732,19 +2341,19 @@ impl Vm {
             .register_count()
             .checked_add(function.hidden_register_count())
             .expect("frame register span should fit within u16");
-        let register_base =
-            u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
-        self.reserve_register_window(register_base, register_len);
+        // Snapshot the arena cursor (== this frame's cfr) before reserving, so
+        // the post-run reset reclaims the whole `[header][window]` run.
+        let prior_register_top = self.register_stack_top();
+        let (cfr, register_base) = self.reserve_frame(agent, register_len)?;
 
         let entry_this_state = if entry_lexical_this {
             ThisState::Lexical
         } else {
             ThisState::Value(this_value)
         };
-        // Derive the frame kind and establishment referrer directly (no longer
-        // routed through an ExecutionContext). Module entries advertise the
-        // `Module` kind and re-intern their module key as the referrer; every
-        // other entry is a `Function` carrying the inherited referrer.
+        // Module entries advertise the `Module` kind and re-intern their module
+        // key as the referrer; every other entry is a `Function` carrying the
+        // inherited referrer.
         let (frame_kind, frame_referrer) =
             if function.kind() == lyng_bytecode::BytecodeFunctionKind::Module {
                 let module_referrer = agent
@@ -1759,7 +2368,6 @@ impl Vm {
             entry_offset,
             RegisterWindow::new(register_base, register_len),
             None,
-            realm,
             lexical_env,
             variable_env,
             frame_kind,
@@ -1770,16 +2378,16 @@ impl Vm {
         .with_new_target(new_target)
         .with_flags(FrameFlags::entry().with_flag(FrameFlags::suspendable(), true));
 
-        let prior_frame_depth = self.frames.len();
-        let prior_register_len = usize::try_from(register_base)
-            .expect("register stack base should fit into usize for truncation");
-        // Record the entry's referrer on the parallel side-stack. The
+        let prior_frame_depth = self.frame_depth();
+        // Record the entry's realm + referrer on the parallel side-stack. The
         // establishing frame sits at `prior_frame_depth`, so this scope unwinds
         // exactly when that frame does (see the unwind loop below). The derived
-        // `frame_referrer` keeps script and module branches in lockstep.
-        self.push_referrer_scope(prior_frame_depth, frame_referrer);
+        // `frame_referrer` keeps script and module branches in lockstep; `realm`
+        // is the root's realm (this entry frame is callee-less, so `realm_of`
+        // recovers it from this scope rather than a callee).
+        self.push_referrer_scope(prior_frame_depth, realm, frame_referrer);
         self.note_executed_code(frame.code());
-        self.frames.push(frame);
+        self.push_frame_with_header(cfr, frame);
         self.refresh_running_context(agent);
         self.note_frame_depth();
         self.internal_completion_targets.push(prior_frame_depth);
@@ -1799,23 +2407,26 @@ impl Vm {
             let _ = self.internal_completion_targets.pop();
         }
 
-        while self.frames.len() > prior_frame_depth {
-            let leaked = self
-                .frames
-                .pop()
-                .expect("frame count should be greater than baseline");
-            self.close_loop_iteration_frames(self.frames.len());
-            self.close_with_environment_frames(self.frames.len());
-            self.close_direct_eval_frames(self.frames.len());
+        while self.frame_depth() > prior_frame_depth {
+            // Reconstruct the leaked top frame from its header overlay + cold slot
+            // (this also decrements the maintained depth); its run stays mapped at
+            // `current_cfr` until `release_frame_to_caller` below.
+            let leaked = self.pop_current_frame();
+            self.close_loop_iteration_frames(self.frame_depth());
+            self.close_with_environment_frames(self.frame_depth());
+            self.close_direct_eval_frames(self.frame_depth());
             self.for_in_states.clear_window(leaked.registers());
             self.iterator_states.clear_window(leaked.registers());
             self.captured_name_references
                 .clear_window(leaked.registers());
-            self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
-            self.release_register_window(leaked.registers().base());
+            // `lexical_env` is authoritative in the overlay; read before the
+            // arena run is released.
+            let lexical_env = self.frame_header(Self::cfr_of(&leaked)).lexical_env();
+            self.finalize_mapped_arguments(agent, lexical_env)?;
+            self.release_frame_to_caller(Self::cfr_of(&leaked));
         }
         self.unwind_referrer_scopes_to(prior_frame_depth);
-        self.release_register_stack_to(prior_register_len);
+        self.release_register_stack_to(prior_register_top);
         self.refresh_running_context(agent);
 
         result
@@ -1961,16 +2572,8 @@ impl Vm {
         }
     }
 
-    /// DSL-0c: sole dispatch entrypoint, routing through
-    /// `crate::dsl::entry::run_via_dsl` (asm-DSL trampoline).
-    ///
-    /// Pulls the active frame + installed function (sub-8 invariant),
-    /// then hands off to the DSL entry shim. `Vm::run` (in
-    /// `vm/dispatch.rs`) calls this. DSL-0c (Task C5) deleted the
-    /// α trampoline (`run_via_trampoline`, `run_trampoline`,
-    /// `still_active`); `DISPATCH_TABLE` + `dispatch_handlers/`
-    /// survive specifically for the wide-form prefix bridge in
-    /// `crate::dsl::handlers::warm::op_prefix_via_alpha`.
+    /// Sole dispatch entrypoint, routing through the asm-DSL trampoline
+    /// `crate::dsl::entry::run_via_dsl`. Called by `Vm::run` in `vm/dispatch.rs`.
     pub(crate) fn run_via_dsl(
         &mut self,
         agent: &mut Agent,
@@ -1978,12 +2581,16 @@ impl Vm {
         registry: &mut dyn NativeFunctionRegistry,
     ) -> VmResult<Value> {
         self.refresh_dsl_poll_pending_for_agent(agent);
-        let frame = self
-            .frames
-            .last()
-            .copied()
+        // Reconstruct the just-pushed active frame (dispatch-entry frame switch;
+        // loading the parked `saved_pc` as the entry PC is correct).
+        let cfr = self
+            .current_cfr_opt()
             .expect("evaluation should install one active frame");
-        let code = frame.code();
+        let frame = self.reconstruct_frame_from_header(cfr, self.frame_depth() - 1);
+        let code = self
+            .current_frame_header()
+            .expect("a live frame must have an overlaid header at current_cfr")
+            .code();
         let installed = self
             .installed
             .get(crate::vm::code_index_for_dsl(code))
@@ -2005,9 +2612,7 @@ impl AdaptiveProtoLoadDispatch for Vm {
     }
 
     fn bump_generation_for_install(&mut self, code: CodeRef, slot: FeedbackSlotId) -> u32 {
-        // Phase D.2.4: generation now lives on PropertyIcState. Lazily insert a
-        // default entry if absent (first slow-path visit for this slot), then
-        // bump and return the new generation.
+        // Lazily insert a default entry on first visit, then bump the generation.
         let state = self.property_ic_state_or_default_mut(code, slot);
         state.generation = state.generation.wrapping_add(1);
         state.generation
@@ -2023,9 +2628,8 @@ impl AdaptiveProtoLoadDispatch for Vm {
     }
 }
 
-/// Phase D.4.1: free `Option<Box<[Option<T>]>>` slabs whose code is no longer
-/// live. Walks the outer Vec by `code_index` and clears slabs whose
-/// `CodeRef` predicate returns `false`.
+/// Free `Option<Box<[Option<T>]>>` slabs for dead code. Walks the outer Vec by
+/// `code_index` and clears slabs whose `CodeRef` predicate returns `false`.
 fn prune_dead_code_ic_slab<T>(
     slab: &mut [Option<Box<[Option<T>]>>],
     is_live: impl Fn(CodeRef) -> bool,
@@ -2046,9 +2650,8 @@ fn prune_dead_code_ic_slab<T>(
     }
 }
 
-/// Phase D.4.1: variant of `prune_dead_code_ic_slab` that checks liveness via
-/// the `installed` vector — a code is live iff its `installed[code_index]` is
-/// `Some(_)`. Used from the GC sweep where we already hold `&self.installed`.
+/// Variant of `prune_dead_code_ic_slab` that checks liveness via the `installed`
+/// vector. A code is live iff `installed[code_index]` is `Some(_)`.
 fn prune_dead_code_ic_slab_by_installed<T>(
     slab: &mut [Option<Box<[Option<T>]>>],
     installed: &[Option<std::sync::Arc<install::InstalledFunction>>],
@@ -2067,18 +2670,348 @@ fn prune_dead_code_ic_slab_by_installed<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lyng_bytecode::{BytecodeBuilder, BytecodeFunctionKind};
+    use lyng_env::Runtime;
+    use lyng_host::NoopHostHooks;
+    use lyng_objects::{FunctionObjectData, ObjectColdData};
 
     #[test]
     fn referrer_scopes_walk_returns_nearest_establishment() {
         let mut vm = Vm::new();
+        let realm_a = RealmRef::from_raw(1).unwrap();
+        let realm_b = RealmRef::from_raw(2).unwrap();
         assert_eq!(vm.current_referrer(), None);
+        assert_eq!(vm.establishment_realm_covering(0), None);
         let a = AtomId::from_raw(10);
-        vm.push_referrer_scope(0, Some(a));
+        vm.push_referrer_scope(0, realm_a, Some(a));
         assert_eq!(vm.current_referrer(), Some(a));
+        // A scope at base_depth 0 covers every depth at or above it.
+        assert_eq!(vm.establishment_realm_covering(0), Some(realm_a));
+        assert_eq!(vm.establishment_realm_covering(5), Some(realm_a));
         let b = AtomId::from_raw(20);
-        vm.push_referrer_scope(2, Some(b));
+        vm.push_referrer_scope(2, realm_b, Some(b));
         assert_eq!(vm.current_referrer(), Some(b));
+        // Depth-relative: a frame below the depth-2 establishment still sees the
+        // depth-0 scope's realm; one at/above depth 2 sees the newer scope.
+        assert_eq!(vm.establishment_realm_covering(1), Some(realm_a));
+        assert_eq!(vm.establishment_realm_covering(2), Some(realm_b));
+        assert_eq!(vm.establishment_realm_covering(3), Some(realm_b));
         vm.unwind_referrer_scopes_to(1); // drops the depth-2 scope
         assert_eq!(vm.current_referrer(), Some(a));
+        assert_eq!(vm.establishment_realm_covering(3), Some(realm_a));
+    }
+
+    /// Verify the arena `FrameHeader` overlaid at `current_cfr` mirrors the
+    /// `FrameRecord` for a real frame pushed through the install path.
+    #[test]
+    fn arena_header_overlay_mirrors_the_record_at_entry() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist after boot");
+        let global_env = realm.global_env();
+        let root_shape = realm
+            .root_shape()
+            .expect("default realm should expose a root shape");
+
+        // A trivial bytecode function (no parameters, no environment).
+        let function = BytecodeBuilder::new(
+            BytecodeFunctionId::from_raw(31).unwrap(),
+            BytecodeFunctionKind::Function,
+        )
+        .finish()
+        .expect("test bytecode should build");
+        let unit = CompiledFunctionUnit::new(SourceId::new(131), function.id(), vec![function]);
+
+        let mut vm = Vm::new();
+        let installed = vm
+            .install_function(agent, realm.id(), &unit)
+            .expect("function unit should install");
+        let callee = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::function(root_shape).with_cold_data(ObjectColdData::Function(
+                    FunctionObjectData::bytecode(realm.id(), global_env, installed.code()),
+                )),
+                AllocationLifetime::Default,
+            )
+        });
+
+        // Seed a caller frame (through the real reservation path) so the caller's
+        // lexical_env is available and `current_realm_of` resolves the active realm.
+        vm.push_test_root_frame(agent, 1, &[Value::undefined(); 1], |window| {
+            FrameRecord::new(
+                installed.code(),
+                0,
+                window,
+                None,
+                global_env,
+                global_env,
+                ExecutionContextKind::Function,
+            )
+        });
+        let caller_frame = vm.frame().expect("test root frame should be active");
+
+        let prepared = vm
+            .prepare_bytecode_call(
+                agent,
+                caller_frame.lexical_env(),
+                callee,
+                Value::undefined(),
+                None,
+            )
+            .expect("bytecode call should prepare");
+        vm.install_prepared_bytecode_call(agent, prepared, &[], Some(0), None, false)
+            .expect("bytecode call should install");
+
+        let record = vm.frame().expect("install should push a callee frame");
+        let header = vm
+            .current_frame_header()
+            .expect("a live frame must have an overlaid header at current_cfr");
+
+        assert_eq!(header.code(), record.code(), "header code mirrors record");
+        // `window_len_for` derives the same register-window length the push path
+        // reserved straight from the frame's code (no record needed).
+        assert_eq!(
+            vm.window_len_for(record.code()),
+            record.registers().len(),
+            "window_len_for(code) equals the reserved window length",
+        );
+        assert_eq!(
+            header.callee(),
+            record.callee(),
+            "header callee mirrors record"
+        );
+        assert_eq!(
+            header.variable_env(),
+            record.variable_env(),
+            "header variable_env mirrors record"
+        );
+        assert_eq!(
+            header.lexical_env(),
+            record.lexical_env(),
+            "header lexical_env mirrors record"
+        );
+        assert_eq!(
+            header.this_value(),
+            record.this_value(),
+            "header this_value mirrors record"
+        );
+        assert_eq!(
+            header.this_state(),
+            record.this_state(),
+            "header this_state mirrors record"
+        );
+        // The cfr/window invariant: window base sits HEADER_SLOTS above the cfr.
+        assert_eq!(
+            Vm::cfr_of(&record),
+            vm.current_cfr,
+            "current_cfr equals the active frame's cfr (window base - HEADER_SLOTS)"
+        );
+
+        // Cold-slot depth convention: the top frame's cold state lives at
+        // `frame_depth() - 1` and was seeded from the record on push.
+        let top_depth = vm.frame_depth() - 1;
+        let cold = vm.frame_cold.get(top_depth);
+        assert_eq!(
+            cold.handler_cursor,
+            record.handler_cursor(),
+            "cold handler_cursor seeded from record at the top frame's depth"
+        );
+        assert_eq!(
+            cold.parameter_initializer_end_offset,
+            record.parameter_initializer_end_offset(),
+            "cold parameter_initializer_end_offset seeded from record at the top frame's depth"
+        );
+
+        // The callee's caller_cfr chains down to the test root frame's cfr.
+        assert_eq!(
+            header.caller_cfr(),
+            Some(0),
+            "callee caller_cfr points at the root frame reserved at arena base 0"
+        );
+    }
+
+    /// `frame_window_len(cfr)` must be exact for every live frame. For a normal
+    /// bytecode frame it equals `window_len_for(code)`. For the synthetic job-root
+    /// frame — which reserves a 0-width window yet borrows a non-zero-register
+    /// `CodeRef` — it must report 0, not `window_len_for(its code)`. Without the
+    /// Job special-case the GC arena walk would over-trace header slots as Values.
+    #[test]
+    fn frame_window_len_is_zero_for_the_job_root_despite_borrowed_code() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist after boot");
+        let global_env = realm.global_env();
+
+        // A function with a non-zero register window (3 visible registers): this is
+        // the code the job root will borrow, so `window_len_for(it) > 0`.
+        let mut builder = BytecodeBuilder::new(
+            BytecodeFunctionId::from_raw(51).unwrap(),
+            BytecodeFunctionKind::Function,
+        );
+        builder
+            .try_alloc_registers(3)
+            .expect("three registers should allocate");
+        let function = builder.finish().expect("test bytecode should build");
+        let unit = CompiledFunctionUnit::new(SourceId::new(151), function.id(), vec![function]);
+
+        let mut vm = Vm::new();
+        let installed = vm
+            .install_function(agent, realm.id(), &unit)
+            .expect("function unit should install");
+        assert_eq!(
+            vm.window_len_for(installed.code()),
+            3,
+            "the borrowed code has a 3-register window",
+        );
+
+        // A normal bytecode frame running that code. `frame_window_len` equals both
+        // `window_len_for(code)` and the reserved window length.
+        let base_cfr = {
+            let base_window =
+                vm.push_test_root_frame(agent, 3, &[Value::undefined(); 3], |window| {
+                    FrameRecord::new(
+                        installed.code(),
+                        0,
+                        window,
+                        None,
+                        global_env,
+                        global_env,
+                        ExecutionContextKind::Function,
+                    )
+                });
+            base_window - crate::frame_header::HEADER_SLOTS as u32
+        };
+        let base_record = vm.frame().expect("base frame should be active");
+        assert_eq!(
+            vm.frame_window_len(base_cfr),
+            vm.window_len_for(base_record.code()),
+            "normal frame: frame_window_len equals window_len_for(code)",
+        );
+        assert_eq!(
+            vm.frame_window_len(base_cfr),
+            base_record.registers().len(),
+            "normal frame: frame_window_len equals the reserved window",
+        );
+
+        // Push a synthetic job-root frame the same way `run_microtask_job` does:
+        // reserve a 0-width window, then build the frame via
+        // `synthetic_job_caller_frame` (which borrows the live frame's code).
+        let (job_cfr, job_window_base) = vm
+            .reserve_frame(agent, 0)
+            .expect("job-root reservation should fit");
+        let job_root = vm
+            .synthetic_job_caller_frame(&realm)
+            .with_register_window(RegisterWindow::new(job_window_base, 0));
+        assert_eq!(
+            job_root.kind(),
+            ExecutionContextKind::Job,
+            "synthetic job caller is a Job-kind frame",
+        );
+        // The job root borrowed the base frame's non-zero-register code.
+        assert_eq!(
+            vm.window_len_for(job_root.code()),
+            3,
+            "job root borrows a 3-register code, so window_len_for(code) is 3, NOT 0",
+        );
+        vm.push_frame_with_header(job_cfr, job_root);
+
+        // The fix: bounded by the ACTUAL reserved window (0), not the borrowed code.
+        assert_eq!(
+            vm.frame_window_len(job_cfr),
+            0,
+            "job-root frame_window_len must be 0 despite its 3-register borrowed code",
+        );
+        // The header decodes back to the Job kind that drives the special-case.
+        assert_eq!(
+            vm.frame_header(job_cfr).kind(),
+            ExecutionContextKind::Job,
+            "job-root header kind decodes to Job",
+        );
+    }
+
+    /// `frame_depth()` tracks nesting and the `caller_cfr` chain bottoms out at
+    /// the root frame.
+    #[test]
+    fn frame_depth_and_caller_walk_track_nested_calls() {
+        let mut runtime = Runtime::new(NoopHostHooks);
+        let agent = runtime.root_agent_mut();
+        let realm = agent
+            .default_realm()
+            .expect("default realm should exist after boot");
+        let global_env = realm.global_env();
+        let root_shape = realm
+            .root_shape()
+            .expect("default realm should expose a root shape");
+
+        let function = BytecodeBuilder::new(
+            BytecodeFunctionId::from_raw(41).unwrap(),
+            BytecodeFunctionKind::Function,
+        )
+        .finish()
+        .expect("test bytecode should build");
+        let unit = CompiledFunctionUnit::new(SourceId::new(141), function.id(), vec![function]);
+
+        let mut vm = Vm::new();
+        let installed = vm
+            .install_function(agent, realm.id(), &unit)
+            .expect("function unit should install");
+        let callee = agent.with_heap_and_objects(|heap, objects| {
+            let mut mutator = heap.mutator();
+            objects.alloc_object(
+                &mut mutator,
+                ObjectAllocation::function(root_shape).with_cold_data(ObjectColdData::Function(
+                    FunctionObjectData::bytecode(realm.id(), global_env, installed.code()),
+                )),
+                AllocationLifetime::Default,
+            )
+        });
+
+        // Push root frame (depth 1).
+        vm.push_test_root_frame(agent, 1, &[Value::undefined(); 1], |window| {
+            FrameRecord::new(
+                installed.code(),
+                0,
+                window,
+                None,
+                global_env,
+                global_env,
+                ExecutionContextKind::Function,
+            )
+        });
+        assert_eq!(vm.frame_depth(), 1, "root frame pushed: depth == 1");
+
+        // Push callee frame (depth 2).
+        let caller_frame = vm.frame().expect("root frame should be active");
+        let prepared = vm
+            .prepare_bytecode_call(
+                agent,
+                caller_frame.lexical_env(),
+                callee,
+                Value::undefined(),
+                None,
+            )
+            .expect("bytecode call should prepare");
+        vm.install_prepared_bytecode_call(agent, prepared, &[], Some(0), None, false)
+            .expect("bytecode call should install");
+
+        assert!(vm.frame_depth() >= 2, "callee pushed: depth >= 2");
+
+        // Walk the caller_cfr chain from current_cfr_opt; expect exactly one step to root.
+        let mut cfr = vm.current_cfr_opt().expect("a live frame must exist");
+        let mut steps = 0usize;
+        while let Some(caller) = vm.frame_header(cfr).caller_cfr() {
+            cfr = caller;
+            steps += 1;
+        }
+        assert!(
+            steps >= 1,
+            "caller chain must bottom out at the root (>= 1 step)"
+        );
     }
 }

@@ -6,12 +6,11 @@
 //! - [`values`]   — NaN-tag checks and tag manipulation.
 //! - [`objects`]  — `ObjectRecord` access via `ObjectRef` handles.
 //! - [`arithmetic`] — SMI arithmetic + bitwise.
-//! - [`constants`] — Phase 1.B.1 indexed load from `frame_const_base`.
+//! - [`constants`] — indexed load from `frame_const_base`.
 //! - [`control`]  — dispatch, branches, slow-path bridge, prefix.
 //! - [`feedback`] — IC-site lookups + observed-type recording.
-//! - [`frame`]    — Phase 1.B.1 fixed-offset `LlIntState` Value loads.
-//! - [`locals`]   — Phase 1.B.3 fixed-immediate-index register-window
-//!   load/store (`load_local_fixed!` / `store_local_fixed!`).
+//! - [`frame`]    — fixed-offset `LlIntState` Value loads.
+//! - [`locals`]   — fixed-immediate-index register-window load/store.
 //! - [`safepoint`] — interrupt-poll macro.
 //! - [`memory`]   — raw load/store fragments referenced by other macros.
 //! - [`counters`] — feature-gated opcode counters.
@@ -32,15 +31,10 @@ pub mod safepoint;
 pub mod values;
 
 /// Top-level body builder invoked by the proc-macro. Concatenates the
-/// operand-decode prologue, the body fragments, and the dispatch
-/// trailer into a single `core::arch::naked_asm!` block.
-///
-/// This macro is a thin shim today. The real heavy lifting lives in
-/// the proc-macro lowerer (`lyng-vm-dsl::lower`), which builds the
-/// `concat!`-composed asm template *and* supplies the named bindings
-/// (`{length}`, `{shim}`, `{state_pc}`, etc.). Backend macros emit
-/// fragments with literal `{name}` placeholders; the lowerer's
-/// `naked_asm!` invocation resolves them. See plan §4 + Task B20.
+/// operand-decode prologue, body fragments, and dispatch trailer into a
+/// single `core::arch::naked_asm!` block. The proc-macro lowerer
+/// (`lyng-vm-dsl::lower`) supplies the named bindings (`{length}`,
+/// `{shim}`, `{state_pc}`, etc.) that backend macros reference by name.
 #[macro_export]
 macro_rules! __llint_handler_body {
     (
@@ -54,7 +48,7 @@ macro_rules! __llint_handler_body {
         //   2. Body fragments.
         //   3. Dispatch trailer (auto-appended if not present in body).
         ::core::arch::naked_asm!(
-            // Prologue placeholder; replaced per layout in Task B22.
+            // Prologue placeholder; replaced per layout by the lowerer.
             "// prologue: layout = ", stringify!($layout),
             // Body fragments (each DSL op produces a string literal):
             $($body)*

@@ -21,7 +21,7 @@
 //! transition + watchpoint-probe overhead without any dictionary-transition
 //! branch.
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use lyng_common::AtomId;
 use lyng_env::Runtime;
 use lyng_gc::AllocationLifetime;

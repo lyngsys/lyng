@@ -289,30 +289,34 @@ mod tests {
             descriptor.set_writable(true);
             descriptor.set_enumerable(true);
             descriptor.set_configurable(true);
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    global_object,
-                    PropertyKey::from_atom(GLOBAL_VAR),
-                    descriptor,
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        global_object,
+                        PropertyKey::from_atom(GLOBAL_VAR),
+                        descriptor,
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
 
             let mut binding = lyng_types::PropertyDescriptor::new();
             binding.set_value(Value::from_smi(30));
             binding.set_writable(true);
             binding.set_enumerable(true);
             binding.set_configurable(true);
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    binding_object,
-                    PropertyKey::from_atom(OBJECT_NAME),
-                    binding,
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        binding_object,
+                        PropertyKey::from_atom(OBJECT_NAME),
+                        binding,
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
         });
 
         let object_env = agent.alloc_object_environment(

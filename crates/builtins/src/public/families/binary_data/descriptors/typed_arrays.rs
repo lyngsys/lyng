@@ -4,15 +4,15 @@ use crate::{
 };
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_types::{
-    array_species_getter_builtin, array_to_string_builtin, typed_array_at_builtin,
-    typed_array_copy_within_builtin, typed_array_every_builtin, typed_array_fill_builtin,
-    typed_array_filter_builtin, typed_array_find_builtin, typed_array_find_index_builtin,
-    typed_array_find_last_builtin, typed_array_find_last_index_builtin,
-    typed_array_for_each_builtin, typed_array_from_builtin, typed_array_includes_builtin,
-    typed_array_index_of_builtin, typed_array_join_builtin, typed_array_last_index_of_builtin,
-    typed_array_map_builtin, typed_array_of_builtin, typed_array_reduce_builtin,
-    typed_array_reduce_right_builtin, typed_array_reverse_builtin, typed_array_some_builtin,
-    typed_array_sort_builtin, typed_array_to_locale_string_builtin,
+    ObjectRef, Value, WellKnownSymbolId, array_species_getter_builtin, array_to_string_builtin,
+    typed_array_at_builtin, typed_array_copy_within_builtin, typed_array_every_builtin,
+    typed_array_fill_builtin, typed_array_filter_builtin, typed_array_find_builtin,
+    typed_array_find_index_builtin, typed_array_find_last_builtin,
+    typed_array_find_last_index_builtin, typed_array_for_each_builtin, typed_array_from_builtin,
+    typed_array_includes_builtin, typed_array_index_of_builtin, typed_array_join_builtin,
+    typed_array_last_index_of_builtin, typed_array_map_builtin, typed_array_of_builtin,
+    typed_array_reduce_builtin, typed_array_reduce_right_builtin, typed_array_reverse_builtin,
+    typed_array_some_builtin, typed_array_sort_builtin, typed_array_to_locale_string_builtin,
     typed_array_to_reversed_builtin, typed_array_to_sorted_builtin,
     typed_array_to_string_tag_getter_builtin, typed_array_with_builtin,
     uint8_array_buffer_getter_builtin, uint8_array_byte_length_getter_builtin,
@@ -21,7 +21,7 @@ use lyng_types::{
     uint8_array_length_getter_builtin, uint8_array_set_builtin,
     uint8_array_set_from_base64_builtin, uint8_array_set_from_hex_builtin,
     uint8_array_slice_builtin, uint8_array_subarray_builtin, uint8_array_to_base64_builtin,
-    uint8_array_to_hex_builtin, uint8_array_values_builtin, ObjectRef, Value, WellKnownSymbolId,
+    uint8_array_to_hex_builtin, uint8_array_values_builtin,
 };
 
 pub(super) struct TypedArrayDescriptorAtoms {

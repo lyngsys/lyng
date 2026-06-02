@@ -4,27 +4,27 @@
 )]
 
 use super::{
-    code_index,
+    Agent, AtomId, CodeRef, ObjectRef, RealmRef, Value, Vm, code_index,
     status::{
         ArithStatus, CallStatus, CalleeSummary, ComparisonStatus, ConstructStatus,
         KeyedPropertyDenseStatusEntry, KeyedPropertyNamedStatusEntry, KeyedPropertyStatus,
         MetadataTableFootprint, NamedPropertyStatus, NamedPropertyStatusEntry,
     },
-    Agent, AtomId, CodeRef, ObjectRef, RealmRef, Value, Vm,
 };
 use crate::vm::ic_state::{
-    keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
     CallIcState, GlobalCellIcState, GlobalCellTarget, KeyedPropertyIcState, PropertyIcState,
+    keyed_property::{KeyedIcDenseEntry, KeyedIcFamily, KeyedIcNamedEntry},
 };
 pub use crate::vm::metadata_table::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
-use crate::vm::metadata_table::{MetadataKind, PropertyMetadata, METADATA_KIND_COUNT};
+use crate::vm::metadata_table::{METADATA_KIND_COUNT, MetadataKind, PropertyMetadata};
 use lyng_bytecode::FeedbackSiteKind;
 use lyng_gc::ValueStoreTarget;
 use lyng_objects::{
     FunctionEntryIdentity, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
     NamedPropertyCachePurpose, NamedPropertyHandler, NamedPropertyInlineWriteHandler,
-    NamedPropertyProtoHandler, ObjectFlags, ObjectHeader, ObjectKind, PrimitiveWrapperKind,
-    ShapeInvalidationObserver, SlotLocation, Watchpoint, PROPERTY_CACHE_MAX_DEPENDENCIES,
+    NamedPropertyProtoHandler, ObjectFlags, ObjectHeader, ObjectKind,
+    PROPERTY_CACHE_MAX_DEPENDENCIES, PrimitiveWrapperKind, ShapeInvalidationObserver, SlotLocation,
+    Watchpoint,
 };
 use lyng_types::{BuiltinFunctionId, FeedbackSlotId, PropertyKey, ShapeId};
 use std::cmp::Ordering;
@@ -37,14 +37,11 @@ const FEEDBACK_ALLOCATION_THRESHOLD: u16 = 2;
 const POLYMORPHIC_PROPERTY_CACHE_LIMIT: usize = 8;
 const POLYMORPHIC_CALL_CACHE_LIMIT: usize = 8;
 
-/// Phase 3f polymorphic IC cache-hit sidecar capacity. The first `POLY_LIMIT`
-/// `entries` are mirrored into a flat `[NamedPropertyHandler; POLY_LIMIT]`
-/// array on the feedback site so the inline check can walk shapes 2..N
-/// without entering the binary-search slow chain. Entries beyond
-/// `POLY_LIMIT` (up to `POLYMORPHIC_PROPERTY_CACHE_LIMIT`) still live in
-/// `entries` and are reached via the slow path; mega-poly transition is
-/// unchanged. Value chosen by bench evidence on V8 v7 — see
-/// `reports/lyng/phase-3f-bench.md`.
+/// Polymorphic IC inline-sidecar capacity. The first `POLY_LIMIT` entries are
+/// mirrored into a flat `[NamedPropertyHandler; POLY_LIMIT]` so the inline
+/// check can walk shapes 2..N without the binary-search slow chain. Entries
+/// beyond `POLY_LIMIT` (up to `POLYMORPHIC_PROPERTY_CACHE_LIMIT`) live in
+/// `entries` and fall to the slow path.
 pub(in crate::vm) const POLY_LIMIT: usize = 2;
 
 #[inline]
@@ -260,10 +257,7 @@ pub(super) struct KeyedNamedPropertyCacheEntry {
 
 // ── Per-code-object call/construct cache storage ──────────────────────────────
 
-/// Per-code-object Call/Construct cache entries. Stored alongside the
-/// `CallIcState` side-table in `Vm::call_cache_entries` /
-/// `Vm::construct_cache_entries`. Phase D.2.4 makes these the sole source of
-/// truth for IC cache-hit resolution.
+/// Per-code-object Call cache entries.
 #[derive(Clone, Debug, Default)]
 pub(super) struct CallCacheStorage {
     pub(super) entries: [Option<CallCacheEntry>; POLYMORPHIC_CALL_CACHE_LIMIT],
@@ -359,17 +353,10 @@ impl Vm {
     }
 
     pub(in crate::vm) fn drain_llint_scalar_feedback(&mut self) {
-        // Phase C.4: x21 now holds the MetadataTable base. Arith IC sites write
-        // directly to ArithMetadata.{observed_bits, execution_count}. Drain those
-        // from metadata_tables instead of feedback_flat_storage.
-        //
-        // Step 1: collect (code, slot) pairs for all Arith-kind slots, so that the
-        // immutable `installed` borrow can be dropped before we mutate the tables.
-        //
-        // Scan ONLY code executed since the last drain. Code that did not run
-        // has `execution_count == 0` on every arith slot, so draining it is a
-        // guaranteed no-op — skipping it avoids an O(total feedback slots
-        // program-wide) scan on every (frequently re-entrant) `Vm::run`.
+        // Collect (code, slot) pairs for Arith-kind slots so the immutable
+        // `installed` borrow is dropped before mutating tables. Scans only
+        // code executed since the last drain to avoid an O(program-wide slots)
+        // scan on every `Vm::run`.
         let mut arith_slots: Vec<(CodeRef, FeedbackSlotId)> = Vec::new();
         // Take the list so we can clear it and avoid borrowing `self` immutably
         // while we mutate the tables in Step 2.
@@ -385,12 +372,10 @@ impl Vm {
                 }
             }
         }
-        // Bump the dedup generation so prior-cycle stamps no longer match and
-        // codes re-queue via `note_executed_code` on their next frame entry.
-        // (`executed` is dropped here; `executed_codes` is now empty.)
+        // Bump generation so prior stamps don't match; codes re-queue on next entry.
         self.drain_generation = self.drain_generation.wrapping_add(1);
 
-        // Step 2: for each Arith slot, drain ArithMetadata and collect pending updates.
+        // Drain ArithMetadata and collect pending updates.
         let mut pending = Vec::new();
         for (code, slot) in arith_slots {
             let Some(table) = self.metadata_table_mut(code) else {
@@ -606,9 +591,8 @@ impl Vm {
     // ── Named property observation ────────────────────────────────────────────
 
     /// Read the bit-packed monomorphic `OwnData` IC handler for one feedback
-    /// slot. Returns `None` when the slot is absent, the site isn't a
-    /// named-property site, or the cache is in any state other than
-    /// monomorphic-OwnData. Phase 3 IC cache hit path entry point.
+    /// slot. Returns `None` when absent, non-named-property, or not
+    /// monomorphic-OwnData.
     #[inline(always)]
     pub(super) fn named_property_own_data_handler(
         &self,
@@ -623,8 +607,7 @@ impl Vm {
         }
     }
 
-    /// Read the bit-packed one-hop `PrototypeData` IC handler for one
-    /// feedback slot. Phase 3e IC cache path entry point.
+    /// Read the bit-packed one-hop `PrototypeData` IC handler for one feedback slot.
     #[inline(always)]
     pub(super) fn named_property_proto_data_handler(
         &self,
@@ -639,21 +622,8 @@ impl Vm {
         }
     }
 
-    /// Side-effect helper for the inlined IC cache hit path: increment the
-    /// per-site execution counter and emit a tier feedback event.
-    ///
-    /// Only updates the execution count when the `PropertyIcState` already
-    /// exists (i.e. the slow path has previously initialized this slot and
-    /// the code has crossed the allocation threshold). A `None` result from
-    /// `get_mut` means the slot was never through the slow path; we skip
-    /// the update to match the old `FeedbackVector::site_mut` gate.
-    ///
-    /// Phase D.4.2: the `PropertyMetadata` mirror-write was removed from the
-    /// hot path. `meta.execution_count` is not read by anything in production
-    /// (it was test-only), and `meta.mode` is restored exclusively at
-    /// install time (`named_property_install_slow_path`) and on demand from
-    /// `refresh_named_property_metadata_if_stale` — see the doc-comment
-    /// there for the C4 invariant.
+    /// Increment the per-site execution counter and emit a tier feedback event.
+    /// No-op when the slot has never been through the slow path.
     #[inline(always)]
     pub(super) fn record_named_property_cache_hit(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         let Some(state) = self.property_ic_state_mut(code, slot) else {
@@ -664,20 +634,12 @@ impl Vm {
         self.tiering.observe_feedback_event(code);
     }
 
-    /// Restore `PropertyMetadata.mode` from `PropertyIcState` if the asm-visible
-    /// mode byte has been zeroed while the Rust-side state still describes a
-    /// live IC entry.
+    /// Restore `PropertyMetadata.mode` from `PropertyIcState` when asm has
+    /// zeroed the mode byte while Rust-side state still describes a live entry.
     ///
-    /// Called from `execute_get_named_property_opcode` (the slow-path entry
-    /// reachable from the asm `op_get_named_property_dsl` `.slow:` branch).
-    /// Asm reads `meta.mode` to pick an inline IC handler; when asm reads
-    /// `mode == 0` it falls into Rust, and we need to repaint `meta` so the
-    /// next asm execution can take the inline IC route again. This is the C4
-    /// invariant (verified by the `c4_asm_ic_*_reads_from_metadata_table`
-    /// test): `mode = 0` on entry → mode must be non-zero on exit.
-    ///
-    /// The fast common case (mode already non-zero) is a single byte load +
-    /// taken-not-taken branch.
+    /// Invariant: `mode == 0` on entry → `mode != 0` on exit so the next asm
+    /// execution can take the inline IC route. Fast common case is a single
+    /// byte load + branch.
     #[inline]
     pub(super) fn refresh_named_property_metadata_if_stale(
         &mut self,
@@ -707,7 +669,6 @@ impl Vm {
         }
     }
 
-    /// Phase 3d named-keyed cache handler lookup.
     #[inline(always)]
     pub(super) fn keyed_property_named_own_data_handler(
         &self,
@@ -725,7 +686,6 @@ impl Vm {
         }
     }
 
-    /// Phase 3e named-keyed proto cache handler lookup.
     #[inline(always)]
     pub(super) fn keyed_property_named_proto_data_handler(
         &self,
@@ -743,7 +703,6 @@ impl Vm {
         }
     }
 
-    /// Phase 3d dense-keyed cache handler lookup.
     #[inline(always)]
     pub(super) fn keyed_property_dense_index_handler(
         &self,
@@ -758,7 +717,6 @@ impl Vm {
         }
     }
 
-    /// Phase 3f polymorphic-OwnData IC lookup.
     #[inline(always)]
     pub(super) fn named_property_polymorphic_own_data_handler(
         &self,
@@ -777,7 +735,6 @@ impl Vm {
         None
     }
 
-    /// Phase 3f polymorphic-OwnData keyed-named IC cache-hit lookup.
     #[inline(always)]
     pub(super) fn keyed_property_named_polymorphic_own_data_handler(
         &self,
@@ -801,7 +758,6 @@ impl Vm {
         None
     }
 
-    /// Phase 3f polymorphic dense-index keyed IC cache-hit lookup.
     #[inline(always)]
     pub(super) fn keyed_property_dense_polymorphic_handlers(
         &self,
@@ -831,10 +787,6 @@ impl Vm {
         let state = self.property_ic_state(code, slot)?;
         let chain = self.polymorphic_chain(code, slot);
         let value = state.try_load(agent, chain, receiver)?;
-        // Phase D.4.2: the PropertyMetadata mirror-write was removed from the
-        // hot path. `meta.execution_count` is not read by anything in
-        // production, and `meta.mode` is restored at install time or via
-        // `refresh_named_property_metadata_if_stale` on slow-path entry.
         let state = self
             .property_ic_state_mut(code, slot)
             .expect("state exists — checked by the immutable borrow above");
@@ -914,11 +866,6 @@ impl Vm {
         plan: Option<NamedPropertyCacheEntry>,
         purpose: NamedPropertyCachePurpose,
     ) {
-        // Phase D.2.4: cleared slots are removed from the map entirely by
-        // `clear_ic_slot_if_generation_matches`. No reinit check needed here;
-        // `named_property_install_slow_path` will lazily insert a fresh entry
-        // via `entry(...).or_default()` if the map entry is absent.
-
         // PrototypeData plans need an AdaptiveProtoLoad watchpoint on every
         // prototype shape in the dependency chain so a prototype mutation
         // (set_prototype, dictionary transition, property addition) clears
@@ -1037,9 +984,7 @@ impl Vm {
         plan: Option<NamedPropertyCacheEntry>,
         purpose: NamedPropertyCachePurpose,
     ) {
-        // Split-borrow: we need &mut PropertyIcState and the per-(code,slot)
-        // polymorphic-chain entry at the same time. Project into both Vec
-        // slabs without going through accessors.
+        // Split-borrow into both Vec slabs simultaneously.
         let Self {
             property_ic_states,
             polymorphic_chains,
@@ -1056,16 +1001,11 @@ impl Vm {
             .expect("polymorphic_chains slab must be allocated at install")[slot_zero];
         Self::named_property_observe_slow_path_on_state(state, chain_slot, plan);
 
-        // Write asm-readable bits to PropertyMetadata, routing on purpose.
-        // Store slots project the write-side handler (mode = 5); Load slots use
-        // the existing load-side projection (mode = 1/2/3/4).
-        // Extract all Copy fields from `state` before releasing the split-borrow
-        // so that `self.metadata_table_mut(code)` can take `&mut self`.
+        // Extract Copy fields before releasing the split-borrow.
         let generation = state.generation;
         let execution_count = state.execution_count;
         let write_handler = state.monomorphic_own_inline_write_handler;
         let llint_header = Self::named_llint_load_header_from_state(state);
-        // Split-borrow on `state` / `chain_slot` ends here.
         if let Some(table) = self.metadata_table_mut(code) {
             let meta = table.property_mut(slot.get());
             match purpose {
@@ -1102,16 +1042,10 @@ impl Vm {
         match state.cache_state {
             InlineCacheState::Megamorphic => {}
             InlineCacheState::Uninitialized => {
-                // Note: generation is managed exclusively via
-                // `bump_generation_for_install` (called from
-                // `register_adaptive_proto_load_for_chain` before
-                // watchpoint registration). Do NOT bump it here.
-                // PrototypeData entries bump via that read-side path and
-                // would double-bump. OwnData / OwnDataTransition Store
-                // entries register AdaptiveOwnWrite watchpoints *after*
-                // install (see `register_own_write_watchpoints`) reusing
-                // the current generation so the projected metadata and the
-                // watchpoint agree; bumping here would desync them.
+                // Generation is bumped by `bump_generation_for_install` (called
+                // from `register_adaptive_proto_load_for_chain`) or by
+                // `register_own_write_watchpoints` after store install —
+                // do NOT bump here.
                 state.install_first_entry(plan);
             }
             InlineCacheState::Monomorphic | InlineCacheState::Polymorphic => {
@@ -1897,19 +1831,16 @@ impl Vm {
         code: CodeRef,
         slot: FeedbackSlotId,
     ) -> Option<u32> {
-        // For NamedProperty slots, read from PropertyIcState.
         if let Some(state) = self.property_ic_state(code, slot) {
             return Some(state.execution_count);
         }
-        // For Call slots, read from CallIcState.
         if let Some(state) = self.call_ic_state(code, slot) {
             return Some(state.execution_count);
         }
-        // For Construct slots, read from ConstructIcState.
         if let Some(state) = self.construct_ic_state(code, slot) {
             return Some(state.execution_count);
         }
-        // Arithmetic and Comparison slots have no Rust-side state (Phase D.1.0).
+        // Arithmetic and Comparison slots have no Rust-side state.
         None
     }
 
@@ -1957,9 +1888,6 @@ impl Vm {
     }
 
     /// Returns `true` iff the slot has a populated `PropertyIcState` entry.
-    ///
-    /// Phase D.2.4: cleared slots are removed from the map by
-    /// `clear_ic_slot_if_generation_matches`, so `contains_key` is sufficient.
     #[cfg(test)]
     pub(crate) fn named_property_slot_is_present(
         &self,
@@ -2830,12 +2758,9 @@ fn dense_index_receiver_is_cacheable(
 // ── vm.rs AdaptiveProtoLoadDispatch impl helpers ──────────────────────────────
 
 impl Vm {
-    /// Spec 2 Phase A: dispatched from `Agent::fire_watchpoints_for_shape` when
-    /// an `AdaptiveProtoLoad` observer fires. Clears the IC slot identified by
-    /// `(code, slot)` if its current generation matches `expected_generation`.
-    /// Phase 3 (global property cells): returns the cached global cell IC for
-    /// `(code, slot)` if any. The caller MUST verify `structure_gen` against the
-    /// live `global_structure_generation` before dereferencing the target.
+    /// Returns the cached global cell IC for `(code, slot)` if any.
+    /// The caller MUST verify `structure_gen` against the live
+    /// `global_structure_generation` before dereferencing the target.
     #[inline]
     pub(crate) fn global_cell_ic_state(
         &self,
@@ -2845,9 +2770,7 @@ impl Vm {
         self.global_cell_ic_states.get(&(code, slot)).copied()
     }
 
-    /// Phase 3 (global property cells): installs (or replaces) the cached
-    /// global resolution for `(code, slot)`. `structure_gen` is the live
-    /// `global_structure_generation` captured at resolution time.
+    /// Install or replace the cached global resolution for `(code, slot)`.
     #[inline]
     pub(crate) fn install_global_cell_ic(
         &mut self,
@@ -2860,9 +2783,9 @@ impl Vm {
             .insert((code, slot), GlobalCellIcState::new(target, structure_gen));
     }
 
-    /// Phase 3 (global property cells): drops the cached global resolution for
-    /// `(code, slot)`. The generation check is the primary invalidation guard;
-    /// this is a defensive clear wired into `clear_ic_slot_if_generation_matches`.
+    /// Drop the cached global resolution for `(code, slot)`.
+    /// The generation check is the primary invalidation guard; this is a
+    /// defensive clear wired into `clear_ic_slot_if_generation_matches`.
     #[inline]
     pub(crate) fn clear_global_cell_ic(&mut self, code: CodeRef, slot: FeedbackSlotId) {
         self.global_cell_ic_states.remove(&(code, slot));
@@ -2919,9 +2842,7 @@ impl Vm {
             InlineCacheState::Megamorphic => IcSlowPathCause::Megamorphic,
             InlineCacheState::Polymorphic => IcSlowPathCause::Polymorphic,
             InlineCacheState::Monomorphic => {
-                // Phase A.2 removed the epoch check from the asm; watchpoints now
-                // clear the slot directly. `is_cleared = true` after a slow-path
-                // visit indicates a watchpoint fire that hasn't been re-installed yet.
+                // `is_cleared = true` after a watchpoint fire that hasn't been re-installed yet.
                 if state.is_cleared {
                     return IcSlowPathCause::EpochMismatch;
                 }
@@ -2945,9 +2866,7 @@ impl Vm {
                 } else if proto_handler.is_valid() {
                     if proto_handler.receiver_shape() == receiver_shape {
                         // Receiver matched; the asm `try_proto` branch failed
-                        // on the prototype guard. Bucket as ModeMismatch (the
-                        // proto side has no separate cause in the simplified
-                        // post–Phase A taxonomy).
+                        // on the prototype guard.
                         IcSlowPathCause::ModeMismatch
                     } else {
                         IcSlowPathCause::ShapeMismatch
@@ -2965,13 +2884,13 @@ impl Vm {
 #[cfg(test)]
 mod tests {
     use super::{
-        call_feedback_builtin_is_frame_safe, DenseIndexCacheEntry, InlineCacheState,
-        KeyedPropertyNamedEntries,
+        DenseIndexCacheEntry, InlineCacheState, KeyedPropertyNamedEntries,
+        call_feedback_builtin_is_frame_safe,
     };
     use crate::vm::ic_state::keyed_property::KeyedPropertyIcState;
     use lyng_objects::ObjectFlags;
     use lyng_types::{
-        eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin, ShapeId,
+        ShapeId, eval_builtin, function_builtin, function_call_builtin, string_char_code_at_builtin,
     };
 
     #[test]
@@ -3019,8 +2938,8 @@ mod tests {
         use crate::vm::feedback::LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE;
         use crate::vm::ic_state::PropertyIcState;
         use lyng_objects::{
-            NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyInlineWriteHandler,
-            INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
+            INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
+            NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
         };
         use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
 
@@ -3094,7 +3013,7 @@ mod tests {
 #[cfg(test)]
 mod global_cell_projection_tests {
     use super::*;
-    use crate::vm::metadata_table::{PropertyMetadata, LLINT_IC_MODE_GLOBAL_CELL_LOAD};
+    use crate::vm::metadata_table::{LLINT_IC_MODE_GLOBAL_CELL_LOAD, PropertyMetadata};
 
     #[test]
     fn project_global_cell_load_writes_mode_7_handler_and_generation() {

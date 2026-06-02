@@ -36,18 +36,11 @@ pub struct LlIntState {
     pub(crate) frame_metadata_table_base: *mut u8,
     pub object_records_base: *const *const lyng_gc::RuntimeObjectRecord,
     pub object_slots_base: *const *const Value,
-    // Phase 1.B.1: asm-visible frame context. `frame_const_base`
-    // points into the active code record's pre-resolved constants
-    // array (`RuntimeCodeRecord::constants` → `CodeSlotsRef`,
-    // `&[Value]` from `heap.view().code_slots()`).
-    // `frame_this_value` is a mirror of `frame.this_value()` for
-    // `ThisState::Value(v)`, or `Value::uninitialized_lexical()` as
-    // the bail-to-slow-path sentinel for
-    // `ThisState::Uninitialized`/`Lexical`.
-    //
-    // Both fields are valid only between Refresh egress events; GC
-    // can only happen during slow-path bridges, which refresh both
-    // fields on egress. See spec §5 mirror discipline.
+    // `frame_const_base`: pointer into the code record's pre-resolved
+    // constants array. `frame_this_value`: ThisState mirror — real Value
+    // for `ThisState::Value(v)`, or `Value::uninitialized_lexical()` as
+    // the bail-to-slow-path sentinel for Uninitialized/Lexical.
+    // Both are valid between Refresh egress events (spec §5).
     pub frame_const_base: *const Value,
     pub frame_this_value: Value,
     pub frame_depth: u32,
@@ -55,27 +48,15 @@ pub struct LlIntState {
     pub rust_context: *mut LlIntRustContextOpaque,
     pub prefix: u8,
     pub _pad2: [u8; 7],
-    /// Base of the value-cell pointer table (`PrimitiveValueCellRef` →
-    /// record ptr), for the asm mode-7 GlobalCellLoad hit (Task 8).
-    /// Mirrors `object_slots_base`. Populated at trampoline entry from
-    /// `agent.heap().view().value_cell_ptr_table_base()`. Appended at the
-    /// end of the record so existing field offsets stay stable.
+    /// Value-cell pointer table base for the asm mode-7 `GlobalCellLoad` hit.
+    /// Mirrors `object_slots_base`.
     pub value_cells_base: *const *const lyng_gc::PrimitiveValueCellRecord,
 }
 
-/// Rust-only per-call context the asm trampoline cannot observe
-/// directly. The asm bridge gets to this struct through
-/// `LlIntState::rust_context` (an opaque pointer), and only via the
-/// reconstruction in `LlIntDispatchState::from_raw`.
-///
-/// DSL-0c restructure: the per-call Rust state lives inside a
-/// [`DispatchState`] held here, rather than as flat fields on the
-/// context. This lets the asm-path slow-path bridge call
-/// [`crate::dsl::slow_path::LlIntDispatchState::dispatch_state`]
-/// uniformly across α and asm — the semantic bodies under
-/// `crate::vm::semantics::` all consume `DispatchState` directly,
-/// so threading the same type through both dispatch paths keeps the
-/// single-implementation invariant intact.
+/// Rust-only per-call context the asm trampoline cannot observe directly.
+/// Reached through `LlIntState::rust_context` (an opaque pointer) via
+/// `LlIntDispatchState::from_raw`. Holds a [`DispatchState`] consumed by
+/// semantic bodies in `crate::vm::semantics::`.
 ///
 /// The lifetime `'vm` is the borrow on `Vm`/`Agent`/`HostHooks`/`Registry`
 /// taken by `crate::dsl::entry::run_via_dsl` for the duration of one
@@ -111,20 +92,12 @@ impl Default for LlIntExitSlot {
     }
 }
 
-/// Lower-level helper: maps a (`ThisState`, frame-`this`-value
-/// fallback) pair to the mirror value stored in
-/// [`LlIntState::frame_this_value`]. Pure / no side effects /
-/// trivially unit-testable.
+/// Maps a (`ThisState`, fallback) pair to the mirror value for
+/// [`LlIntState::frame_this_value`]. Pure / no side effects.
 ///
-/// Phase 1.B.1 sentinel rule:
-/// - `ThisState::Value(v)` → `v` (real `this` binding)
-/// - `ThisState::Uninitialized` → `Value::uninitialized_lexical()` (bail)
-/// - `ThisState::Lexical` → `Value::uninitialized_lexical()` (bail)
-/// - `None` (no current execution context) → fallback
-///
-/// The sentinel is observed by inline `op_load_this` handlers (landed
-/// in Phase 1.B.2); on match the handler bails to the slow path,
-/// which handles the throw / lex-env walk as appropriate.
+/// - `ThisState::Value(v)` → `v`
+/// - `ThisState::Uninitialized` | `Lexical` → `Value::uninitialized_lexical()` (bail sentinel)
+/// - `None` → fallback
 #[inline]
 pub(crate) const fn resolve_this_state_to_mirror(
     this_state: Option<lyng_env::ThisState>,
@@ -139,20 +112,22 @@ pub(crate) const fn resolve_this_state_to_mirror(
     }
 }
 
-/// Top-level helper: derives the mirror from the live `FrameRecord`.
-/// Mirrors the read path in
-/// `crates/vm/src/vm/semantics/names.rs` so the pre-resolution
-/// matches `op_load_this` semantics exactly.
-///
-/// Called from:
-/// - `crate::dsl::entry::run_via_dsl` (initial population)
-/// - `crate::dsl::slow_path::LlIntDispatchState::translate_outcome`
-///   (Refresh arm)
+/// Derives the `frame_this_value` mirror from a live `FrameRecord`.
+/// Called at trampoline entry and on Refresh egress.
 #[inline]
-pub(crate) fn resolve_initial_this_value(frame: &crate::FrameRecord) -> Value {
+pub(crate) const fn resolve_initial_this_value(frame: &crate::FrameRecord) -> Value {
     let this_state = Some(frame.this_state());
     let fallback = frame.this_value();
     resolve_this_state_to_mirror(this_state, fallback)
+}
+
+/// Derives the `frame_this_value` mirror from a [`crate::frame_header::FrameHeader`]
+/// without materializing a `FrameRecord`.
+#[inline]
+pub(crate) const fn resolve_initial_this_value_from_header(
+    h: &crate::frame_header::FrameHeader,
+) -> Value {
+    resolve_this_state_to_mirror(Some(h.this_state()), h.this_value())
 }
 
 #[cfg(test)]
@@ -164,24 +139,17 @@ mod tests {
 
     #[test]
     fn ll_int_state_offsets_stable() {
-        // Lock in the asm-DSL ABI layout. Values were determined from
-        // the first build of the `#[repr(C)]` struct above; the test
-        // catches drift across rustc versions.
+        // Lock in the asm-DSL ABI layout. Catches drift across rustc versions.
         assert_eq!(r::LLINT_STATE_FRAME_PC_OFFSET, 0);
         assert_eq!(r::LLINT_STATE_FRAME_PB_BASE, 8);
         assert_eq!(r::LLINT_STATE_FRAME_REGS_BASE, 16);
-        // Phase D.2.3: frame_fv_base removed; metadata-table base now at 24.
         assert_eq!(r::LLINT_STATE_FRAME_METADATA_TABLE_BASE, 24);
         assert_eq!(r::LLINT_STATE_OBJECT_RECORDS_BASE, 32);
         assert_eq!(r::LLINT_STATE_OBJECT_SLOTS_BASE, 40);
-        // Phase 1.B.1 plus outline-slot LLInt substrate: const/this
-        // mirrors plus the two heap pointer tables occupy four 8-byte
-        // slots before the scalar block.
         assert_eq!(r::LLINT_STATE_FRAME_CONST_BASE, 48);
         assert_eq!(r::LLINT_STATE_FRAME_THIS_VALUE, 56);
         assert_eq!(r::LLINT_STATE_PREFIX, 80);
-        // Appended after the scalar block + trailing padding (Task 7):
-        // the value-cell table base for the asm mode-7 GlobalCellLoad hit.
+        // Value-cell table base for the asm mode-7 GlobalCellLoad hit.
         assert_eq!(r::LLINT_STATE_VALUE_CELLS_BASE, 88);
         assert_eq!(core::mem::size_of::<LlIntState>(), 96);
     }

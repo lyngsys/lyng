@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     async_generator_function_builtin => super::super::ASYNC_GENERATOR_FUNCTION_RAW;

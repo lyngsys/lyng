@@ -1,6 +1,6 @@
 use super::super::{
-    range_error, string_ref_text, string_this_ref, string_value, to_string_string_ref,
-    PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, range_error, string_ref_text, string_this_ref, string_value,
+    to_string_string_ref,
 };
 use crate::BuiltinInvocation;
 use lyng_types::Value;

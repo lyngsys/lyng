@@ -1,7 +1,7 @@
 use crate::convert::{
-    bigint_equals_integral_number, bigint_view_equals_parts, encode_number, logical_type,
-    lossy_string_from_view, parse_string_to_bigint, primitive_type_error, same_logical_type,
-    string_view_to_number, LogicalType,
+    LogicalType, bigint_equals_integral_number, bigint_view_equals_parts, encode_number,
+    logical_type, lossy_string_from_view, parse_string_to_bigint, primitive_type_error,
+    same_logical_type, string_view_to_number,
 };
 use crate::pure;
 use lyng_common::AtomId;
@@ -640,9 +640,11 @@ mod tests {
                 .as_f64(),
             Some(-0.0)
         );
-        assert!(to_number(view, Value::from_string_ref(invalid))
-            .unwrap()
-            .is_nan());
+        assert!(
+            to_number(view, Value::from_string_ref(invalid))
+                .unwrap()
+                .is_nan()
+        );
         assert_eq!(
             to_numeric(view, Value::from_bigint_ref(bigint)),
             Ok(Value::from_bigint_ref(bigint))

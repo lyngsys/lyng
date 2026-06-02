@@ -1,45 +1,28 @@
-//! Arithmetic family semantic bodies (DSL-0a Task A9).
+//! Arithmetic family semantic bodies.
 //!
 //! Each `op_xxx_semantic` function implements the semantic effect of one
-//! arithmetic-family opcode. The α handler in `dispatch_handlers/arithmetic.rs`
-//! decodes operands, constructs `OpXxxArgs`, calls the semantic body, and
-//! translates the returned `SemanticOutcome` to `Step`. The DSL-0b cold-stub
-//! shim in `dsl/handlers/cold/arithmetic.rs` will reach the same functions
-//! from the asm-DSL path.
+//! arithmetic-family opcode. The handler decodes operands, constructs
+//! `OpXxxArgs`, calls the semantic body, and translates the returned
+//! `SemanticOutcome` to `Step`.
 //!
 //! Family coverage (29 opcodes):
 //! - Binary with feedback + SMI cache hit path: `Add`, `Sub`, `Mul`, `Mod`,
 //!   `BitAnd`.
 //! - SMI-immediate variants (`*Smi`): `AddSmi`, `SubSmi`, `MulSmi`, `ModSmi`,
 //!   `BitAndSmi`.
-//! - Binary delegating directly to a Vm helper: `Div`, `DivSmi`, `Exp`,
+//! - Binary delegating to a Vm helper: `Div`, `DivSmi`, `Exp`,
 //!   `BitOr`, `BitXor`, `ShiftLeft`, `ShiftRight`, `UnsignedShiftRight`,
 //!   `Equal`, `LessThan`, `LessEqual`, `GreaterThan`, `GreaterEqual`.
-//! - `StrictEqual` — like the binary-general family but the helper does not
-//!   need host/registry.
-//! - `EqualZero` — unary, never throws, just inspects a register.
-//! - Unary delegating to a Vm helper via `handle_dispatch_result`: `Negate`,
-//!   `BitNot`.
-//! - Unary increment/decrement (`Increment`, `Decrement`) — write both a
-//!   coerced numeric back to the source register and the post-update value
-//!   to the destination.
+//! - `StrictEqual` — like binary-general but the helper does not need host/registry.
+//! - `EqualZero` — unary, never throws.
+//! - Unary via `handle_dispatch_result`: `Negate`, `BitNot`.
+//! - Unary increment/decrement (`Increment`, `Decrement`) — writes a coerced
+//!   numeric back to the source register and the post-update value to the destination.
 //!
-//! ### Slow-path return mapping
-//!
-//! On the slow path, `Vm::finish_abc_value_result` already advances PC,
-//! writes the destination register, and records the feedback slot when the
-//! operation succeeds; on a caught abrupt completion it leaves PC at the
-//! new handler PC (via `transfer_to_exception_handler` + `refresh_dispatch_frame`)
-//! and bumps the dispatch-frame-check epoch. Either way the next opcode
-//! byte is at the current PC, so the semantic returns
-//! `SemanticOutcome::Continue { pc_advance: 0 }`. The trampoline's epoch
-//! check picks up the cross-frame catch on the next iteration; no inline
-//! `Refresh` is needed (matching the α behavior, which only used
-//! `dispatch_next!` after `try_step!(finish)`).
-//!
-//! We adopt option (b) from the plan: `finish_abc_value_result` stays as
-//! an α-side helper called through `DispatchState` accessors, rather than
-//! re-implementing register write + PC advance inline in each semantic.
+//! On the slow path, `Vm::finish_abc_value_result` advances PC, writes the
+//! destination register, and records the feedback slot on success, or leaves PC at
+//! the catch target on a caught abrupt completion. Either way the semantic returns
+//! `SemanticOutcome::Continue { pc_advance: 0 }`.
 
 use lyng_env::Agent;
 use lyng_host::HostHooks;
@@ -48,10 +31,10 @@ use lyng_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmResult;
+use crate::frame::FrameView;
+use crate::vm::Vm;
 use crate::vm::dispatch::arithmetic::{smi_mod_result, smi_mul_result};
 use crate::vm::dispatch_state::DispatchState;
-use crate::vm::Vm;
-use crate::FrameRecord;
 
 // =====================================================================
 // Shared shapes
@@ -71,8 +54,7 @@ pub struct OpBinaryArgs {
 /// Operands for register + i16-immediate binary opcodes (Abc layout, the
 /// `c` field is an `i16` immediate decoded via `decode_smi_immediate`).
 /// Used by `AddSmi` / `SubSmi` / `MulSmi` / `ModSmi` / `BitAndSmi`. `imm_raw` is the
-/// raw `u16` operand value; the slow helper re-decodes it for symmetry
-/// with the α handler signature.
+/// raw `u16` operand value; the slow helper re-decodes it for symmetry.
 pub struct OpBinarySmiArgs {
     pub dst: u16,
     pub lhs: u16,
@@ -82,8 +64,8 @@ pub struct OpBinarySmiArgs {
 }
 
 /// Operands for unary opcodes that delegate to a Vm helper returning
-/// `VmResult<Value>` (Negate, `BitNot`). The α path takes the Abc form with
-/// an unused `c` operand; only `dst`, `src`, and the feedback slot matter.
+/// `VmResult<Value>` (Negate, `BitNot`). Only `dst`, `src`, and the
+/// feedback slot matter; `c` is unused.
 pub struct OpUnaryArgs {
     pub dst: u16,
     pub src: u16,
@@ -109,30 +91,33 @@ pub struct OpEqualZeroArgs {
 // Internal helpers shared between semantics
 // =====================================================================
 
-/// Slow-path tail shared by every binary opcode that delegates to a Vm
-/// `execute_*` helper. Returns the `SemanticOutcome` to forward to the α
-/// handler.
-///
-/// `finish_abc_value_result` already advances PC + writes register +
-/// records feedback on success, and leaves PC at the new handler PC on
-/// catch — so the success/catch `SemanticOutcome` carries `pc_advance: 0`.
+/// Slow-path tail for binary opcodes delegating to a `Vm::execute_*` helper.
+/// `finish_abc_value_result` advances PC + writes register + records feedback
+/// on success, or rewrites PC to the catch target on caught abrupt completion;
+/// the returned `SemanticOutcome` always carries `pc_advance: 0`.
 #[inline]
 fn route_binary_result(
     state: &mut DispatchState<'_>,
     args: &OpBinaryArgs,
     result: VmResult<Value>,
 ) -> SemanticOutcome {
+    let cfr = state.cfr;
+    let code = state.code();
+    let window = state.registers();
     let DispatchState {
         vm,
         agent,
-        frame,
         frame_depth,
+        pc,
         ..
     } = state;
     let finish = vm.finish_abc_value_result(
         agent,
         *frame_depth,
-        frame,
+        cfr,
+        pc,
+        code,
+        window,
         args.instruction_len,
         args.feedback_slot,
         args.dst,
@@ -144,26 +129,31 @@ fn route_binary_result(
     }
 }
 
-/// Slow-path tail shared by the SMI-immediate variants. Identical shape
-/// to `route_binary_result` but threads the `OpBinarySmiArgs` operand
-/// types.
+/// Slow-path tail for SMI-immediate binary opcodes. Identical shape to
+/// `route_binary_result` but threads `OpBinarySmiArgs`.
 #[inline]
 fn route_binary_smi_result(
     state: &mut DispatchState<'_>,
     args: &OpBinarySmiArgs,
     result: VmResult<Value>,
 ) -> SemanticOutcome {
+    let cfr = state.cfr;
+    let code = state.code();
+    let window = state.registers();
     let DispatchState {
         vm,
         agent,
-        frame,
         frame_depth,
+        pc,
         ..
     } = state;
     let finish = vm.finish_abc_value_result(
         agent,
         *frame_depth,
-        frame,
+        cfr,
+        pc,
+        code,
+        window,
         args.instruction_len,
         args.feedback_slot,
         args.dst,
@@ -175,16 +165,14 @@ fn route_binary_smi_result(
     }
 }
 
-/// Shared body for binary opcodes that delegate to a Vm helper with the
-/// `(agent, host, registry, frame, lhs, rhs) -> VmResult<Value>`
-/// signature: Div / Exp / `BitOr` / `BitXor` / Shift* / Equal / Less* /
-/// Greater* / `DivSmi`. Mirrors `op_binary_general` in the α file.
+/// Shared body for binary opcodes that delegate to a Vm helper:
+/// Div / Exp / `BitOr` / `BitXor` / Shift* / Equal / Less* / Greater* / `DivSmi`.
 type BinaryVmOp = fn(
     &mut Vm,
     &mut Agent,
     &dyn HostHooks,
     &mut dyn NativeFunctionRegistry,
-    &FrameRecord,
+    FrameView,
     u16,
     u16,
 ) -> VmResult<Value>;
@@ -196,16 +184,16 @@ fn op_binary_general(
     op: BinaryVmOp,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        op(vm, agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        op(vm, agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -220,7 +208,7 @@ pub fn op_add_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let right = inner.vm.read_register_unchecked(registers, args.rhs);
     if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
@@ -234,16 +222,16 @@ pub fn op_add_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_add_opcode(agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        vm.execute_add_opcode(agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -254,7 +242,7 @@ pub fn op_sub_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let right = inner.vm.read_register_unchecked(registers, args.rhs);
     if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
@@ -268,16 +256,16 @@ pub fn op_sub_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_sub_opcode(agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        vm.execute_sub_opcode(agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -288,7 +276,7 @@ pub fn op_mul_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let right = inner.vm.read_register_unchecked(registers, args.rhs);
     if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
@@ -300,16 +288,16 @@ pub fn op_mul_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_mul_opcode(agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        vm.execute_mul_opcode(agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -324,7 +312,7 @@ pub fn op_add_smi_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let imm = i32::from(crate::vm::dispatch::arithmetic::decode_smi_immediate(
         args.imm_raw,
@@ -340,16 +328,16 @@ pub fn op_add_smi_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_add_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_add_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -360,7 +348,7 @@ pub fn op_sub_smi_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let imm = i32::from(crate::vm::dispatch::arithmetic::decode_smi_immediate(
         args.imm_raw,
@@ -376,16 +364,16 @@ pub fn op_sub_smi_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_sub_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_sub_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -396,7 +384,7 @@ pub fn op_mul_smi_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let imm = i32::from(crate::vm::dispatch::arithmetic::decode_smi_immediate(
         args.imm_raw,
@@ -410,16 +398,16 @@ pub fn op_mul_smi_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_mul_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_mul_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -440,16 +428,16 @@ pub fn op_div_smi_semantic(
     args: OpBinarySmiArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_div_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_div_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -471,7 +459,7 @@ pub fn op_mod_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let right = inner.vm.read_register_unchecked(registers, args.rhs);
     if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi())
@@ -483,16 +471,16 @@ pub fn op_mod_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_mod_opcode(agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        vm.execute_mod_opcode(agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -503,7 +491,7 @@ pub fn op_mod_smi_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let imm = i32::from(crate::vm::dispatch::arithmetic::decode_smi_immediate(
         args.imm_raw,
@@ -517,16 +505,16 @@ pub fn op_mod_smi_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_mod_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_mod_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -542,7 +530,7 @@ pub fn op_bit_and_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let right = inner.vm.read_register_unchecked(registers, args.rhs);
     if let (Some(l), Some(r)) = (left.as_smi(), right.as_smi()) {
@@ -554,16 +542,16 @@ pub fn op_bit_and_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_bitand_opcode(agent, *host, &mut **registry, frame, args.lhs, args.rhs)
+        vm.execute_bitand_opcode(agent, *host, &mut **registry, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -574,7 +562,7 @@ pub fn op_bit_and_smi_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let left = inner.vm.read_register_unchecked(registers, args.lhs);
     let imm = i32::from(crate::vm::dispatch::arithmetic::decode_smi_immediate(
         args.imm_raw,
@@ -588,16 +576,16 @@ pub fn op_bit_and_smi_semantic(
             pc_advance: args.instruction_len,
         };
     }
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.execute_bitand_smi_opcode(agent, *host, &mut **registry, frame, args.lhs, args.imm_raw)
+        vm.execute_bitand_smi_opcode(agent, *host, &mut **registry, view, args.lhs, args.imm_raw)
     };
     route_binary_smi_result(inner, &args, result)
 }
@@ -653,11 +641,10 @@ pub fn op_strict_equal_semantic(
     args: OpBinaryArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
-        let DispatchState {
-            vm, agent, frame, ..
-        } = &mut *inner;
-        vm.execute_strict_equal_opcode(agent, frame, args.lhs, args.rhs)
+        let DispatchState { vm, agent, .. } = &mut *inner;
+        vm.execute_strict_equal_opcode(agent, view, args.lhs, args.rhs)
     };
     route_binary_result(inner, &args, result)
 }
@@ -698,9 +685,11 @@ pub fn op_equal_zero_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
-    let value = inner.vm.execute_equal_zero_opcode(&inner.frame, args.src);
+    let value = inner
+        .vm
+        .execute_equal_zero_opcode(inner.frame_view(), args.src);
     inner.vm.record_feedback_slot(code, args.feedback_slot);
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.dst, value);
@@ -710,14 +699,7 @@ pub fn op_equal_zero_semantic(
 }
 
 // =====================================================================
-// Unary — Negate / BitNot route through `handle_dispatch_result` because
-// the Vm helpers return `VmResult<Value>` rather than driving
-// `finish_abc_value_result` themselves. On a caught abrupt completion
-// `handle_dispatch_result` returns `Ok(None)` and PC was relocated to
-// the catch target by `transfer_to_exception_handler`; we return
-// `Continue { pc_advance: 0 }` so the trampoline runs the new PC's
-// opcode next (the epoch bump triggers a frame refresh on the next
-// iteration).
+// Unary — Negate / BitNot
 // =====================================================================
 
 pub fn op_negate_semantic(
@@ -726,16 +708,16 @@ pub fn op_negate_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
+    let view = inner.frame_view();
     let negate_result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.negate_value(agent, *host, &mut **registry, frame, args.src)
+        vm.negate_value(agent, *host, &mut **registry, view, args.src)
     };
     let handled = inner.handle_dispatch_result(negate_result);
     let value = match handled {
@@ -746,7 +728,7 @@ pub fn op_negate_semantic(
         Err(error) => return SemanticOutcome::ExitError { error },
     };
     inner.vm.record_feedback_slot(code, args.feedback_slot);
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.dst, value);
@@ -761,16 +743,16 @@ pub fn op_bit_not_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
+    let view = inner.frame_view();
     let bit_not_result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.bitwise_not_value(agent, *host, &mut **registry, frame, args.src)
+        vm.bitwise_not_value(agent, *host, &mut **registry, view, args.src)
     };
     let handled = inner.handle_dispatch_result(bit_not_result);
     let value = match handled {
@@ -781,7 +763,7 @@ pub fn op_bit_not_semantic(
         Err(error) => return SemanticOutcome::ExitError { error },
     };
     inner.vm.record_feedback_slot(code, args.feedback_slot);
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.dst, value);
@@ -802,16 +784,16 @@ fn op_update_register_semantic(
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     let code = inner.code();
+    let view = inner.frame_view();
     let update_result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
             ..
         } = &mut *inner;
-        vm.update_register_value(agent, *host, &mut **registry, frame, args.src, increment)
+        vm.update_register_value(agent, *host, &mut **registry, view, args.src, increment)
     };
     let handled = inner.handle_dispatch_result(update_result);
     let (numeric, value) = match handled {
@@ -821,7 +803,7 @@ fn op_update_register_semantic(
         }
         Err(error) => return SemanticOutcome::ExitError { error },
     };
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.src, numeric);

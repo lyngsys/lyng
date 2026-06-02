@@ -1,14 +1,14 @@
 use super::{
     AllocationLifetime, ArrayBufferObjectData, DataViewObjectData, ElementMode,
-    ElementStorageMetadata, ElementStorageRef, MapObjectData, ModuleNamespaceExport,
-    ModuleNamespaceObject, NamedPropertyDictionaryEntry, NamedPropertyStorage,
-    NamedPropertyStorageMode, NamedSlotStorageRef, ObjectAllocation, ObjectColdData, ObjectFlags,
-    ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef, OrdinaryObjectData,
-    PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData, RegExpPayload,
-    RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord, SetObjectData,
-    ShapeAllocation, ShapeHandleStoreTarget, ShapeId, ShapeMetadata, ShapeProperty, ShapeRecord,
-    ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData, TemporalObjectKind,
-    TypedArrayObjectData, Value, INLINE_NAMED_SLOT_COUNT,
+    ElementStorageMetadata, ElementStorageRef, INLINE_NAMED_SLOT_COUNT, MapObjectData,
+    ModuleNamespaceExport, ModuleNamespaceObject, NamedPropertyDictionaryEntry,
+    NamedPropertyStorage, NamedPropertyStorageMode, NamedSlotStorageRef, ObjectAllocation,
+    ObjectColdData, ObjectFlags, ObjectHeader, ObjectKind, ObjectMetadata, ObjectRecord, ObjectRef,
+    OrdinaryObjectData, PrimitiveHeapView, PrimitiveMutator, PropertyKey, ProxyObjectData,
+    RegExpPayload, RegExpPayloadAccounting, RootShapeKey, RuntimeObjectRecord, RuntimeShapeRecord,
+    SetObjectData, ShapeAllocation, ShapeHandleStoreTarget, ShapeId, ShapeMetadata, ShapeProperty,
+    ShapeRecord, ShapeTransitionKey, SlotLocation, SparseElementEntry, TemporalObjectData,
+    TemporalObjectKind, TypedArrayObjectData, Value,
 };
 use crate::object_metadata::PrototypeKey;
 use crate::watchpoint::{Watchpoint, WatchpointSet};

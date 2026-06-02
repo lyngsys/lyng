@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     iterator_prototype_iterator_builtin => super::super::ITERATOR_PROTOTYPE_ITERATOR_RAW;

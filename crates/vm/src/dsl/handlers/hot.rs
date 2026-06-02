@@ -1,16 +1,9 @@
-//! Hot DSL handlers. Populated by tasks B39–B42.
+//! Hot DSL handlers — highest-frequency opcodes with inline `LLInt` bodies.
 //!
-//! Per the design (§10), hot handlers are the highest-frequency opcodes
-//! and ship with inline `LLInt` bodies. The `llint_handler!` proc-macro lowers each handler
-//! body into a single `naked_asm!` block; the backend `macro_rules!`
-//! macros (under `crates/vm/src/dsl/backend/aarch64/`) supply the
-//! asm fragments for individual DSL ops (`decode_ab!`, `load_reg!`,
-//! `dispatch!`, etc.).
-//!
-//! For DSL-0b the handler symbols exist (so the link-check passes) but
-//! they are not yet wired into `DSL_DISPATCH_TABLE` — the alpha path
-//! continues to dispatch through the legacy handlers. Phase C of the
-//! plan flips the table over.
+//! The `llint_handler!` proc-macro lowers each handler body into a single
+//! `naked_asm!` block; the backend `macro_rules!` macros under
+//! `crates/vm/src/dsl/backend/aarch64/` supply the asm fragments
+//! (`decode_ab!`, `load_reg!`, `dispatch!`, etc.).
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -20,9 +13,7 @@
     reason = "DSL hot shims receive decoded raw operand slots from LLInt assembly; explicit narrowing/sign casts reconstruct the bytecode operand widths before semantic dispatch"
 )]
 
-// Bring the AArch64 backend macros into scope so the proc-macro-emitted
-// `decode_ab!`, `load_reg!`, `store_reg!`, `dispatch!`, ... calls
-// resolve. They are `#[macro_export]`-ed at the crate root.
+// AArch64 backend macros for proc-macro-emitted asm fragments.
 #[cfg(target_arch = "aarch64")]
 use crate::{
     add_smi_overflow, branch_i32_negative, call_slow, check_smi_pair, decode_ab, decode_abc_slot,
@@ -43,20 +34,13 @@ llint_handler! {
 }
 
 // =====================================================================
-// op_add (B40) — Abc layout with feedback slot, SMI inline hit path.
+// op_add — AbcSlot layout with SMI inline hit path.
 // =====================================================================
 //
-// Hit path: check_smi_pair + 2x untag + add + tag + store_reg +
-// record_smi! + dispatch. The paired SMI guard hoists the
-// `0x7ff8_0004` comparand out of the per-operand body, emitting one
-// movz/movk pair plus two lsr/cmp/b.ne triples (8 insns total)
-// instead of two independent 5-insn `check_smi!` invocations
-// (10 insns) — a 2-insn save on every SMI add. `record_smi!` writes
-// pending scalar feedback into the LLInt flat feedback sidecar; Rust
-// drains that sidecar at explicit VM run boundaries and reconciles
-// the legacy feedback vector and tiering counters. Semantic slow
-// path: call_slow into the op_add semantic body, which performs
-// feedback recording itself.
+// Hit path: `check_smi_pair!` hoists the tag comparand out of the
+// per-operand check, saving 2 instructions vs two independent `check_smi!`
+// calls. `record_smi!` writes pending scalar feedback into the flat
+// LLInt sidecar; Rust drains it at VM run boundaries.
 
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
@@ -77,13 +61,8 @@ llint_handler! {
     }
 }
 
-/// Slow-path shim for `op_add`. The asm trampoline tail-calls this
-/// with 4 u32 operand slots after the state pointer; we adapt them to
-/// the `OpBinaryArgs` shape that `op_add_semantic` expects.
-///
-/// The `instruction_len` is hardcoded to `6` (`op_add`'s encoded length
-/// for the narrow form). When Wide / `ExtraWide` prefix decoding lands,
-/// the lowerer will need to pass the effective length too.
+/// Slow-path shim for `op_add`. Adapts 4 raw u32 operand slots to
+/// `OpBinaryArgs` and calls `op_add_semantic`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_add_slow_rs(
@@ -93,8 +72,7 @@ pub extern "C" fn op_add_slow_rs(
     rhs: u32,
     feedback_slot: u32,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
+    // SAFETY: state is valid for the duration of this call; see `from_raw` contract.
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
     let args = crate::vm::semantics::arithmetic::OpBinaryArgs {
@@ -109,15 +87,12 @@ pub extern "C" fn op_add_slow_rs(
 }
 
 // =====================================================================
-// op_jump (B41) — AxI24 layout, length = 4. Both forward and backward
-// non-pending paths apply the signed i24 delta inline; backward jumps
-// first run the cheap warm-opcode safepoint flag check.
+// op_jump — AxI24 layout, length = 4.
 // =====================================================================
-
-// `Jump` uses the AxI24 instruction form: 1 byte opcode + 3 bytes
-// sign-extended i24 delta. Backward jumps poll the VM safepoint byte
-// before jumping; when the poll is pending, the slow shim consumes the
-// poll and then applies the already-sign-extended delta.
+//
+// Forward jumps apply the signed i24 delta inline. Backward jumps poll
+// the safepoint flag first; when pending, the slow shim runs the poll
+// then applies the delta.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump, opcode_byte = 63, layout = AxI24, length = 4, |offset| {
@@ -132,8 +107,8 @@ llint_handler! {
     }
 }
 
-/// Pending-poll shim for backward `op_jump`. The `AxI24` decode prologue
-/// has already sign-extended the 24-bit delta into the low argument word.
+/// Pending-poll shim for backward `op_jump`. The `AxI24` prologue has
+/// already sign-extended the 24-bit delta.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_jump_poll_rs(
@@ -150,7 +125,7 @@ pub extern "C" fn op_jump_poll_rs(
     let instruction_offset = dispatch.current_instruction_offset();
     let target = i64::from(instruction_offset) + 4 + i64::from(delta);
     if target < 0 || target > i64::from(u32::MAX) {
-        let code = dispatch.dispatch_state().frame.code();
+        let code = dispatch.dispatch_state().code();
         return dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError {
             error: crate::error::VmError::InvalidJumpTarget {
                 code,
@@ -164,8 +139,7 @@ pub extern "C" fn op_jump_poll_rs(
 }
 
 // =====================================================================
-// op_return (B42) — Ax layout, length = 4. The 24-bit operand encodes
-// the register holding the return value. Frame-transitioning; always
+// op_return — Ax layout, length = 4. Frame-transitioning; always
 // returns Refresh / ExitDone / ExitError.
 // =====================================================================
 
@@ -177,10 +151,8 @@ llint_handler! {
     }
 }
 
-/// Slow-path shim for `op_return`. The 4-byte `decode_ax!` load reads
-/// 3 bytes of i24 register-id + 1 byte of the next opcode (or padding).
-/// Mask the low 24 bits; the result is a non-negative u16 register id
-/// in practice, so no sign-extension is needed.
+/// Slow-path shim for `op_return`. The `decode_ax!` load reads 3 bytes
+/// of i24 register-id; mask the low 24 bits to get the register id.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_return_slow_rs(
@@ -199,9 +171,8 @@ pub extern "C" fn op_return_slow_rs(
 #[cfg(target_arch = "aarch64")]
 use crate::decode_ax;
 
-/// Non-aarch64 stubs. The DSL handler family is aarch64-only in DSL-0b
-/// per design §3; on other hosts we emit placeholders so the dispatch
-/// table can still be assembled.
+/// Non-aarch64 stubs. The DSL handler family is aarch64-only; on other
+/// hosts these placeholders allow the dispatch table to link.
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe extern "C" fn op_move() -> ! {
     loop {}

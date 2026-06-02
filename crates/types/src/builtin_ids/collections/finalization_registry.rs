@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     finalization_registry_builtin => super::super::FINALIZATION_REGISTRY_RAW;

@@ -9,7 +9,7 @@ use std::borrow::Cow;
 use lyng_common::{AtomTable, DiagnosticList, SourceId, Span};
 
 use crate::literals::{LiteralTable, StringLiteral};
-use crate::token::{Token, TokenFlags, TokenKind, TokenPayload, KEYWORD_TOKEN_KIND};
+use crate::token::{KEYWORD_TOKEN_KIND, Token, TokenFlags, TokenKind, TokenPayload};
 
 /// Parser-controlled lexer mode for ambiguous productions.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1901,7 +1901,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     fn scan_dot(&mut self, start: usize, flags: TokenFlags) -> Token {
         self.advance(); // skip first `.`
-                        // Check for `...` (ellipsis)
+        // Check for `...` (ellipsis)
         if !self.at_end() && self.current() == b'.' && self.peek() == Some(b'.') {
             self.advance_n(2);
             return Token::new(TokenKind::Ellipsis, self.span(start, self.pos), flags);
@@ -2226,7 +2226,7 @@ impl<'src, 'atoms> Lexer<'src, 'atoms> {
 
     fn scan_hash(&mut self, start: usize, flags: TokenFlags) -> Token {
         self.advance(); // skip `#`
-                        // If followed by an identifier start, it's a private identifier
+        // If followed by an identifier start, it's a private identifier
         if !self.at_end() {
             let ch = self.current();
             if ch == b'_' || ch == b'$' || ch.is_ascii_alphabetic() || ch == b'\\' || ch >= 0x80 {

@@ -1,9 +1,9 @@
 use super::{
-    errors, object, Agent, AllocationLifetime, ClassPrivateElementKind, EnvironmentLayout,
-    EnvironmentLayoutKind, FrameRecord, FunctionEntryIdentity, FunctionThisMode, HostHooks,
-    NativeFunctionRegistry, ObjectRef, PropertyDescriptor, ThisBindingStatus, ThisState, Value, Vm,
-    VmError, VmResult,
+    Agent, AllocationLifetime, ClassPrivateElementKind, EnvironmentLayout, EnvironmentLayoutKind,
+    FunctionEntryIdentity, FunctionThisMode, HostHooks, NativeFunctionRegistry, ObjectRef,
+    PropertyDescriptor, ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult, errors, object,
 };
+use crate::frame::FrameView;
 
 mod private_fields;
 mod super_ops;
@@ -18,7 +18,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
         is_getter: bool,
         enumerable: bool,
@@ -34,7 +34,18 @@ impl Vm {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
 
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            key_value,
+        )?;
         if let Some(accessor) = accessor.as_object_ref() {
             Self::set_function_name_from_property_key(
                 agent,
@@ -65,7 +76,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let object = arguments
@@ -75,7 +86,18 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            key_value,
+        )?;
         if let Some(function) = value.as_object_ref() {
             Self::set_function_name_from_property_key(agent, function, key, None)?;
         }
@@ -124,8 +146,9 @@ impl Vm {
     }
 
     pub(super) fn capture_arrow_context_builtin(
+        &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let function = arguments
@@ -135,11 +158,14 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let this_value = arguments.get(1).copied().unwrap_or(Value::undefined());
         let explicit_home_object = arguments.get(2).copied().unwrap_or(Value::undefined());
+        let cfr = caller.cfr();
+        let caller_lexical_env = self.frame_header(cfr).lexical_env();
+        let caller_callee = self.frame_header(cfr).callee();
         let home_object = if explicit_home_object.is_undefined() {
             Some(Self::resolve_super_home_object(
                 agent,
-                caller.lexical_env(),
-                caller,
+                caller_lexical_env,
+                caller_callee,
             )?)
         } else {
             Some(
@@ -152,12 +178,12 @@ impl Vm {
             .objects()
             .function_data(function)
             .and_then(lyng_objects::FunctionObjectData::environment)
-            .unwrap_or_else(|| caller.lexical_env());
+            .unwrap_or(caller_lexical_env);
         let layout = agent.alloc_environment_layout(EnvironmentLayout::empty(
             EnvironmentLayoutKind::Function,
             true,
         ));
-        let new_target = caller.new_target();
+        let new_target = self.frame_header(cfr).new_target();
         let env = agent
             .alloc_function_environment(
                 Some(outer),

@@ -1,10 +1,8 @@
-//! Test 4 from design §10 DSL-0a: opcode-shaped semantic logic lives only in
-//! `crates/vm/src/vm/semantics/` and (transitionally) in
-//! `crates/vm/src/vm/dispatch_handlers/` as decode-and-call thunks.
+//! Opcode-shaped semantic logic must live only in
+//! `crates/vm/src/vm/semantics/` and `crates/vm/src/vm/dispatch_handlers/`.
 //!
-//! This test reads source files and rejects function names matching
-//! `^pub(\(.*\))?\s*fn\s+op_[a-z0-9_]+\s*\(` (i.e. `op_xxx` functions)
-//! in any module other than `semantics/` and `dispatch_handlers/`.
+//! Reads source files and rejects `op_xxx` function definitions outside those
+//! two directories.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -31,7 +29,7 @@ fn no_op_functions_outside_semantics_and_handlers() {
     let allowlist_prefixes = [
         format!("{VM_SRC}/vm/semantics/"),
         format!("{VM_SRC}/vm/dispatch_handlers/"),
-        format!("{VM_SRC}/dsl/handlers/"), // DSL-0b host
+        format!("{VM_SRC}/dsl/handlers/"),
     ];
 
     let mut offenders: Vec<(PathBuf, usize, String)> = Vec::new();
@@ -48,9 +46,7 @@ fn no_op_functions_outside_semantics_and_handlers() {
                 || trimmed.starts_with("pub(super) fn op_")
                 || trimmed.starts_with("fn op_"))
                 && trimmed.contains('(')
-                // Skip `op_xxx_slow` helper functions — they're allowed in
-                // dispatch_handlers/ today and will move to dsl/handlers/
-                // in DSL-0b.
+                // `op_xxx_slow` helpers are allowed in dispatch_handlers/ and dsl/handlers/.
                 && !trimmed.contains("_slow(")
             {
                 offenders.push((path.clone(), line_no + 1, trimmed.to_string()));

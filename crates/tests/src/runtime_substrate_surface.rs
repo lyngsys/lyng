@@ -2,7 +2,7 @@
 
 use lyng_ast::FunctionId;
 use lyng_common::AtomId;
-use lyng_compiler::{derive_environment_layout_plan, EnvironmentLayoutPlanError};
+use lyng_compiler::{EnvironmentLayoutPlanError, derive_environment_layout_plan};
 use lyng_env::{EnvironmentLayoutKind, Intrinsics, JobQueueKind, Runtime};
 use lyng_host::NoopHostHooks;
 use lyng_sema::{

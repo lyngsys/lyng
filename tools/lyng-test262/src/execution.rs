@@ -31,8 +31,8 @@ use crate::diagnostics::{Test262DiagnosticTimings, Test262RuntimeDiagnostics};
 use crate::extensions::Test262Host;
 use crate::helpers::HelperCatalog;
 use crate::metadata::{
-    effective_parse_source, has_async_flag, is_module_test, parse_metadata, NegativeExpectation,
-    TestMetadata, TestVariant,
+    NegativeExpectation, TestMetadata, TestVariant, effective_parse_source, has_async_flag,
+    is_module_test, parse_metadata,
 };
 
 pub const WORKER_RESULT_PREFIX: &str = "__lyng_test262_result__:";
@@ -1257,8 +1257,8 @@ fn negative_resolution_frontend_outcome(
                 && expected_type != "SyntaxError"
             {
                 return RunOutcome::Fail(format!(
-                        "expected resolution error of type {expected_type} but {stage} surfaced SyntaxError"
-                    ));
+                    "expected resolution error of type {expected_type} but {stage} surfaced SyntaxError"
+                ));
             }
             RunOutcome::Pass
         }
@@ -1512,17 +1512,17 @@ mod tests {
     use std::env;
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        decode_worker_request_line, decode_worker_result_line, encode_worker_request,
-        encode_worker_result, hot_test_runtime_source, run_test, ExpectedFailure,
-        ExpectedFailurePhase, PreparedTest, RunOutcome, TestExpectation, WORKER_RESULT_PREFIX,
+        ExpectedFailure, ExpectedFailurePhase, PreparedTest, RunOutcome, TestExpectation,
+        WORKER_RESULT_PREFIX, decode_worker_request_line, decode_worker_result_line,
+        encode_worker_request, encode_worker_result, hot_test_runtime_source, run_test,
     };
     use crate::helpers::HelperCatalog;
-    use crate::metadata::{parse_metadata, TestVariant};
+    use crate::metadata::{TestVariant, parse_metadata};
 
     fn make_temp_test_dir() -> PathBuf {
         static NEXT_TEMP_ID: AtomicUsize = AtomicUsize::new(0);

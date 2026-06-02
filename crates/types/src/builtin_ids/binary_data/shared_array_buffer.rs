@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     shared_array_buffer_builtin => super::super::SHARED_ARRAY_BUFFER_RAW;

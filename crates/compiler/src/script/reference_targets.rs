@@ -1,7 +1,7 @@
 use super::{
-    internal_private_field_get_builtin, internal_private_field_set_builtin, AtomId, Expr, ExprId,
-    FunctionCompiler, LoweringError, LoweringResult, ResolutionKind, SemanticBindingId, Span,
-    StorageClass,
+    AtomId, Expr, ExprId, FunctionCompiler, LoweringError, LoweringResult, ResolutionKind,
+    SemanticBindingId, Span, StorageClass, internal_private_field_get_builtin,
+    internal_private_field_set_builtin,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

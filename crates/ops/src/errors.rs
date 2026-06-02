@@ -333,7 +333,11 @@ mod tests {
 
         // --- Create a SECOND realm shell with its own root shape + prototypes ---
         let second_realm_id = agent.create_default_realm_shell(AllocationLifetime::Default);
-        assert_ne!(second_realm_id, default_realm.id(), "should be a distinct realm");
+        assert_ne!(
+            second_realm_id,
+            default_realm.id(),
+            "should be a distinct realm"
+        );
 
         let second_realm = agent.realm(second_realm_id).expect("second realm record");
         let root_shape = second_realm.root_shape().expect("second realm root shape");

@@ -153,15 +153,17 @@ mod tests {
                 ObjectAllocation::ordinary(root_shape),
                 AllocationLifetime::Default,
             );
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    prototype,
-                    shadowed_key,
-                    data_descriptor(Value::from_smi(1), true),
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        prototype,
+                        shadowed_key,
+                        data_descriptor(Value::from_smi(1), true),
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
             prototype
         });
 
@@ -172,42 +174,50 @@ mod tests {
                 ObjectAllocation::ordinary(root_shape).with_prototype(Some(prototype)),
                 AllocationLifetime::Default,
             );
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    object,
-                    own_key,
-                    data_descriptor(Value::from_smi(2), true),
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    object,
-                    shadowed_key,
-                    data_descriptor(Value::from_smi(3), false),
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    object,
-                    index_key,
-                    data_descriptor(Value::from_smi(4), true),
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
-            assert!(objects
-                .define_own_property(
-                    &mut mutator,
-                    object,
-                    symbol_key,
-                    data_descriptor(Value::from_smi(5), true),
-                    AllocationLifetime::Default,
-                )
-                .unwrap());
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        object,
+                        own_key,
+                        data_descriptor(Value::from_smi(2), true),
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        object,
+                        shadowed_key,
+                        data_descriptor(Value::from_smi(3), false),
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        object,
+                        index_key,
+                        data_descriptor(Value::from_smi(4), true),
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
+            assert!(
+                objects
+                    .define_own_property(
+                        &mut mutator,
+                        object,
+                        symbol_key,
+                        data_descriptor(Value::from_smi(5), true),
+                        AllocationLifetime::Default,
+                    )
+                    .unwrap()
+            );
             object
         });
 

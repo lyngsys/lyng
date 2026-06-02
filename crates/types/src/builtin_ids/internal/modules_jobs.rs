@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     internal_import_meta_builtin => super::super::INTERNAL_IMPORT_META_RAW;

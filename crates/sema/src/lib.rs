@@ -49,8 +49,8 @@ pub use ids::{FunctionSemaId, PrivateNameId, ScopeId, SemanticBindingId, UseSite
 pub use private_name::{PrivateNameRecord, PrivateNameTable};
 pub use private_use::{PrivateUseRecord, PrivateUseTable};
 pub use results::{
-    analyze_direct_eval_script, analyze_module, analyze_script, DirectEvalScriptAnalysisOptions,
-    ModuleSema, ProgramSemaView, ScriptSema,
+    DirectEvalScriptAnalysisOptions, ModuleSema, ProgramSemaView, ScriptSema,
+    analyze_direct_eval_script, analyze_module, analyze_script,
 };
 pub use scope::{ScopeKind, ScopeRecord, ScopeTable};
 pub use use_site::{ResolutionKind, UseSiteRecord, UseSiteTable};

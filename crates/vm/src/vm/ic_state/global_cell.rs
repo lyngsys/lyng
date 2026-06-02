@@ -1,4 +1,4 @@
-//! Per-site global cell inline cache state (Phase 3 of global property cells).
+//! Per-site global cell inline cache state.
 //!
 //! Caches, per `(code, feedback_slot)`, WHERE a `LoadGlobal` resolves so
 //! subsequent reads skip name resolution entirely. The cached target is either

@@ -27,21 +27,21 @@ pub mod property;
 
 #[allow(unused_imports)]
 pub use arith::{
-    ArithMetadata, ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
-    ARITH_METADATA_STRIDE, ARITH_METADATA_STRIDE_SHIFT,
+    ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET, ARITH_METADATA_STRIDE,
+    ARITH_METADATA_STRIDE_SHIFT, ArithMetadata,
 };
 #[allow(unused_imports)]
-pub use call::{CallMetadata, CALL_METADATA_STRIDE};
+pub use call::{CALL_METADATA_STRIDE, CallMetadata};
 #[allow(unused_imports)]
-pub use comparison::{ComparisonMetadata, COMPARISON_METADATA_STRIDE};
+pub use comparison::{COMPARISON_METADATA_STRIDE, ComparisonMetadata};
 #[allow(unused_imports)]
-pub use keyed_property::{KeyedPropertyMetadata, KEYED_PROPERTY_METADATA_STRIDE};
+pub use keyed_property::{KEYED_PROPERTY_METADATA_STRIDE, KeyedPropertyMetadata};
 #[allow(unused_imports)]
-pub use kind::{MetadataKind, METADATA_KIND_COUNT};
+pub use kind::{METADATA_KIND_COUNT, MetadataKind};
 #[allow(unused_imports)]
 pub use property::{
-    PropertyMetadata, LLINT_IC_MODE_GLOBAL_CELL_LOAD, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE,
-    PROPERTY_METADATA_STRIDE,
+    LLINT_IC_MODE_GLOBAL_CELL_LOAD, LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE, PROPERTY_METADATA_STRIDE,
+    PropertyMetadata,
 };
 
 /// Compact descriptor used by the allocator. Mirrors the shape of

@@ -1,7 +1,6 @@
 use super::{
-    alloc_string, errors, Agent, AllocationLifetime, FrameRecord, HostHooks,
-    NativeFunctionRegistry, PropertyKey, TemplateCacheKey, Value, Vm, VmError, VmResult,
-    WellKnownAtom,
+    Agent, AllocationLifetime, CallerContext, HostHooks, NativeFunctionRegistry, PropertyKey,
+    TemplateCacheKey, Value, Vm, VmError, VmResult, WellKnownAtom, alloc_string, errors,
 };
 
 impl Vm {
@@ -10,7 +9,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: CallerContext,
         value: Value,
     ) -> VmResult<Value> {
         if !value.is_object() {
@@ -25,7 +24,10 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            caller.realm,
+            caller.lexical_env,
+            caller.code,
+            caller.pc,
             object,
             Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::toString.id()),
@@ -48,7 +50,10 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            caller.realm,
+            caller.lexical_env,
+            caller.code,
+            caller.pc,
             object,
             Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::valueOf.id()),
@@ -75,7 +80,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: CallerContext,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let site = arguments
@@ -84,9 +89,10 @@ impl Vm {
             .and_then(Value::as_smi)
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let caller_realm = caller.realm;
         let key = TemplateCacheKey {
-            realm: caller.realm(),
-            code: caller.code(),
+            realm: caller_realm,
+            code: caller.code,
             site,
         };
         if let Some(template) = self.template_cache.get(&key).copied() {
@@ -94,8 +100,8 @@ impl Vm {
         }
 
         let string_count = arguments.len().saturating_sub(1) / 2;
-        let cooked = Self::create_array(agent, caller.realm(), string_count)?;
-        let raw = Self::create_array(agent, caller.realm(), string_count)?;
+        let cooked = Self::create_array(agent, caller_realm, string_count)?;
+        let raw = Self::create_array(agent, caller_realm, string_count)?;
         for index in 0..string_count {
             let cooked_value = arguments
                 .get(1 + index * 2)

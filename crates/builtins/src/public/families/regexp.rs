@@ -4,10 +4,10 @@ use super::descriptors::{
     readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, RegExpFamilyBuiltins,
-    RegExpFamilyPrototypes,
+    FamilyInstallContext, RegExpFamilyBuiltins, RegExpFamilyPrototypes,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
@@ -15,7 +15,8 @@ use crate::{
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    regexp_builtin, regexp_compile_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId, regexp_builtin,
+    regexp_compile_builtin, regexp_dot_all_getter_builtin, regexp_escape_builtin,
     regexp_exec_builtin, regexp_flags_getter_builtin, regexp_global_getter_builtin,
     regexp_has_indices_getter_builtin, regexp_ignore_case_getter_builtin,
     regexp_legacy_input_getter_builtin, regexp_legacy_input_setter_builtin,
@@ -30,8 +31,7 @@ use lyng_types::{
     regexp_string_iterator_next_builtin, regexp_symbol_match_all_builtin,
     regexp_symbol_match_builtin, regexp_symbol_replace_builtin, regexp_symbol_search_builtin,
     regexp_symbol_split_builtin, regexp_test_builtin, regexp_to_string_builtin,
-    regexp_unicode_getter_builtin, regexp_unicode_sets_getter_builtin, BuiltinFunctionId,
-    ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    regexp_unicode_getter_builtin, regexp_unicode_sets_getter_builtin,
 };
 
 pub(in crate::public) fn install_regexp_family(

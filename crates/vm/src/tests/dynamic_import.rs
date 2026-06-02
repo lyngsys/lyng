@@ -47,14 +47,15 @@ fn dynamic_import_fulfills_with_the_loaded_module_namespace() {
         ordinary_get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
         Value::from_smi(7)
     );
-    assert!(host
-        .snapshot()
-        .calls
-        .contains(&HostCall::LoadModule(ModuleSourceRequest {
-            specifier: "./dep.mjs".into(),
-            referrer: Some(script_referrer),
-            attributes: Vec::new(),
-        })));
+    assert!(
+        host.snapshot()
+            .calls
+            .contains(&HostCall::LoadModule(ModuleSourceRequest {
+                specifier: "./dep.mjs".into(),
+                referrer: Some(script_referrer),
+                attributes: Vec::new(),
+            }))
+    );
 }
 
 #[test]
@@ -182,14 +183,15 @@ fn dynamic_import_preserves_script_referrer_after_async_resume() {
         .run()
         .expect("async dynamic import should evaluate");
 
-    assert!(host
-        .snapshot()
-        .calls
-        .contains(&HostCall::LoadModule(ModuleSourceRequest {
-            specifier: "./dep.mjs".into(),
-            referrer: Some(script_referrer),
-            attributes: Vec::new(),
-        })));
+    assert!(
+        host.snapshot()
+            .calls
+            .contains(&HostCall::LoadModule(ModuleSourceRequest {
+                specifier: "./dep.mjs".into(),
+                referrer: Some(script_referrer),
+                attributes: Vec::new(),
+            }))
+    );
 }
 
 #[test]
@@ -229,14 +231,15 @@ fn dynamic_import_preserves_script_referrer_in_promise_reactions() {
         .run()
         .expect("promise reaction dynamic import should evaluate");
 
-    assert!(host
-        .snapshot()
-        .calls
-        .contains(&HostCall::LoadModule(ModuleSourceRequest {
-            specifier: "./dep.mjs".into(),
-            referrer: Some(script_referrer),
-            attributes: Vec::new(),
-        })));
+    assert!(
+        host.snapshot()
+            .calls
+            .contains(&HostCall::LoadModule(ModuleSourceRequest {
+                specifier: "./dep.mjs".into(),
+                referrer: Some(script_referrer),
+                attributes: Vec::new(),
+            }))
+    );
 }
 
 #[test]
@@ -1069,12 +1072,16 @@ fn static_import_defer_tla_module_throws_until_async_evaluation_completes() {
     )
     .expect("static import defer async graph should evaluate");
 
-    assert!(global_value(agent, &realm, "beforeDeferredAsyncReady")
-        .as_object_ref()
-        .is_some());
-    assert!(global_value(agent, &realm, "duringDeferredAsyncReady")
-        .as_object_ref()
-        .is_some());
+    assert!(
+        global_value(agent, &realm, "beforeDeferredAsyncReady")
+            .as_object_ref()
+            .is_some()
+    );
+    assert!(
+        global_value(agent, &realm, "duringDeferredAsyncReady")
+            .as_object_ref()
+            .is_some()
+    );
     assert_eq!(
         global_value(agent, &realm, "afterDeferredAsyncReadyError"),
         Value::undefined()
@@ -1394,14 +1401,15 @@ fn nested_eval_script_preserves_host_access_for_dynamic_import() {
         ordinary_get(agent, namespace, PropertyKey::from_atom(default_atom)).unwrap(),
         Value::from_smi(11)
     );
-    assert!(host
-        .snapshot()
-        .calls
-        .contains(&HostCall::LoadModule(ModuleSourceRequest {
-            specifier: "./dep.mjs".into(),
-            referrer: Some(script_referrer),
-            attributes: Vec::new(),
-        })));
+    assert!(
+        host.snapshot()
+            .calls
+            .contains(&HostCall::LoadModule(ModuleSourceRequest {
+                specifier: "./dep.mjs".into(),
+                referrer: Some(script_referrer),
+                attributes: Vec::new(),
+            }))
+    );
 }
 
 #[test]

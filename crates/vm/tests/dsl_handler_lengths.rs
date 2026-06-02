@@ -1,32 +1,23 @@
-//! DSL-0c — length-consistency guard for hand-written hot/warm handlers.
+//! Length-consistency guard for hand-written hot/warm handlers.
 //!
-//! Every `llint_handler! { op_xxx, ..., length = N, |...| { ... } }` block
-//! must declare a `length = N` that matches the canonical bytecode encoding
-//! returned by `Opcode::encoded_len()`. A mismatch advances PC by the wrong
-//! number of bytes per instruction, misaligning subsequent dispatch and
-//! eventually tripping `debug_assert!`s on garbage operand values (cf. the
-//! `op_move` `length = 3` bug fixed by the DSL-0c length correction.
+//! Every `llint_handler! { op_xxx, ..., length = N, ... }` must declare a
+//! `length = N` matching `Opcode::encoded_len()`. A mismatch advances PC by
+//! the wrong number of bytes, misaligning subsequent dispatch.
 //!
-//! The `llint_handler!` proc-macro emits a sibling
-//! `pub const OP_XXX_LENGTH: u32` next to each generated `op_xxx` function so this
-//! test can read the declared length without going through the asm
-//! body. The cold-stub family is guarded separately at codegen time —
-//! see `tools/lyng-dsl-codegen/src/main.rs`'s `main()` validator.
+//! The `llint_handler!` proc-macro emits a sibling `pub const OP_XXX_LENGTH: u32`
+//! next to each generated function so this test can read the declared length.
+//! Cold stubs are guarded separately at codegen time.
 //!
 //! ## What this catches
 //!
-//! 1. **Hand-edited drift in `hot.rs` or `warm.rs`.** Someone changes a
-//!    handler's operand decoding (`Ab` → `Abc`) but forgets to update
-//!    the `length = N` attribute.
-//! 2. **Opcode encoding changes.** `Opcode::encoded_len()` adds Move to a
-//!    new arm (say, an Mxxxx variant returning 5) without updating the
-//!    DSL handler.
+//! 1. Hand-edited drift in `hot.rs` or `warm.rs` (e.g. operand-layout change
+//!    without updating `length = N`).
+//! 2. Opcode encoding changes where `Opcode::encoded_len()` changes without
+//!    updating the DSL handler.
 //!
 //! ## What this does NOT catch
 //!
-//! - `Wide` / `ExtraWide` effective lengths (the DSL handlers handle narrow
-//!   form only — wide-form dispatch is delegated to the α path; see
-//!   `op_wide_via_alpha_rs` in `warm.rs`).
+//! - `Wide` / `ExtraWide` effective lengths (narrow form only).
 //! - Operand-decoding correctness (use `dsl_validation_*` for that).
 
 #![cfg(target_arch = "aarch64")]

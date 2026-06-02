@@ -1,9 +1,9 @@
 use super::{
-    flattened_property_lookup, ArrayBufferObjectData, DataViewObjectData, DescriptorAttributes,
-    ElementMode, GeneratorState, MapObjectData, ModuleNamespaceObject,
-    NamedPropertyDictionaryEntry, NamedPropertyStorageMode, NamedPropertyValue, ObjectColdData,
-    ObjectFlags, ObjectKind, ObjectRef, PropertyKey, RegExpPayload, SetObjectData, ShapeId,
-    ShapeProperty, ShapeTransitionKey, SparseElementEntry, TemporalObjectData,
+    ArrayBufferObjectData, DataViewObjectData, DescriptorAttributes, ElementMode, GeneratorState,
+    MapObjectData, ModuleNamespaceObject, NamedPropertyDictionaryEntry, NamedPropertyStorageMode,
+    NamedPropertyValue, ObjectColdData, ObjectFlags, ObjectKind, ObjectRef, PropertyKey,
+    RegExpPayload, SetObjectData, ShapeId, ShapeProperty, ShapeTransitionKey, SparseElementEntry,
+    TemporalObjectData, flattened_property_lookup,
 };
 use lyng_common::AtomId;
 use std::collections::HashMap;

@@ -126,17 +126,21 @@ fn regexp_named_group_reference_requires_matching_group() {
 #[test]
 fn regexp_named_group_names_accept_unicode_identifier_forms() {
     assert!(!script("/(?<狗>x)\\k<狗>/;").diagnostics.has_errors());
-    assert!(!script("/(?<\\u{72d7}>x)\\k<狗>/u;")
-        .diagnostics
-        .has_errors());
+    assert!(
+        !script("/(?<\\u{72d7}>x)\\k<狗>/u;")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]
 fn regexp_duplicate_named_groups_are_allowed_across_alternatives() {
     assert!(!script("/(?<x>a)|(?<x>b)/;").diagnostics.has_errors());
-    assert!(!script("/(?:(?<x>a)|(?<x>b))\\k<x>/;")
-        .diagnostics
-        .has_errors());
+    assert!(
+        !script("/(?:(?<x>a)|(?<x>b))\\k<x>/;")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]

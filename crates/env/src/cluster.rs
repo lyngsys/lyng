@@ -1,7 +1,7 @@
 use super::{
-    agent_index, Agent, AgentId, BackingStoreRuntime, ClusterBackingStoreHandle,
-    ClusterSharedMemoryHandle, HostAgentId, ParkedAgentRecord, RuntimeDomainAccounting,
-    SharedBackingStoreRecord, SharedMemoryRuntime, WaitLocation, WaiterKind, WaiterRecord,
+    Agent, AgentId, BackingStoreRuntime, ClusterBackingStoreHandle, ClusterSharedMemoryHandle,
+    HostAgentId, ParkedAgentRecord, RuntimeDomainAccounting, SharedBackingStoreRecord,
+    SharedMemoryRuntime, WaitLocation, WaiterKind, WaiterRecord, agent_index,
 };
 use lyng_host::HostSharedBufferId;
 use lyng_types::BackingStoreRef;

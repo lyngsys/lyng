@@ -198,25 +198,19 @@ impl<'a> VmDebugPauseContext<'a> {
         self.vm.frames().iter().rev().nth(frame_index).copied()
     }
 
-    /// The referrer reported by the parallel `Vm` side-stack at the current live
-    /// pause. The SP-0a referrer migration made this side-stack the single
-    /// source of truth for the establishment referrer.
+    /// The referrer from the `Vm` side-stack at the current live pause.
     #[cfg(test)]
     pub(crate) fn current_referrer(&self) -> Option<lyng_common::AtomId> {
         self.vm.current_referrer()
     }
 
-    /// The Agent's ambient `running_context` snapshot alongside the values the
-    /// VM would recompute from the active frame. SP-0a requires the scalar to
-    /// track the frame at every live point; this exposes both for a test.
-    ///
-    /// Test-only: exposes parity between the `running_context` scalar and the
-    /// frame-derived values for regression coverage.
+    /// Exposes the Agent's ambient `running_context` and the VM's frame-derived
+    /// values together for regression coverage (test-only).
     #[cfg(test)]
     pub(crate) fn running_context_parity(&self) -> RunningContextParity {
         RunningContextParity {
             scalar: self.agent.running_context(),
-            frame_realm: self.vm.frame().map(|frame| frame.realm()),
+            frame_realm: self.vm.current_realm_of(self.agent),
             frame_referrer: self.vm.current_referrer(),
         }
     }
@@ -225,7 +219,7 @@ impl<'a> VmDebugPauseContext<'a> {
 /// The Agent `running_context` scalar paired with the values the VM recomputes
 /// from the active frame, captured at a single live pause for a parity test.
 #[cfg(test)]
-pub(crate) struct RunningContextParity {
+pub struct RunningContextParity {
     pub(crate) scalar: Option<lyng_env::RunningContext>,
     pub(crate) frame_realm: Option<lyng_types::RealmRef>,
     pub(crate) frame_referrer: Option<lyng_common::AtomId>,

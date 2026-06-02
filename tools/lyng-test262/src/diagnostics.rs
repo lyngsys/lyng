@@ -7,11 +7,11 @@ use crate::cli::{DEFAULT_MANIFEST_PATH, DEFAULT_TIMEOUT_MS};
 use crate::execution::{self, PreparedTest};
 use crate::helpers::HelperCatalog;
 use crate::metadata::{
-    has_async_flag, is_module_test, parse_metadata, variants_for_metadata, TestMetadata,
+    TestMetadata, has_async_flag, is_module_test, parse_metadata, variants_for_metadata,
 };
 use crate::selection::{
-    category_for_test, disabled_manifest, load_manifest, relative_test_path, select_test_paths,
-    skip_decision, ExclusionManifest, ProposalStage,
+    ExclusionManifest, ProposalStage, category_for_test, disabled_manifest, load_manifest,
+    relative_test_path, select_test_paths, skip_decision,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

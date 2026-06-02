@@ -1,9 +1,4 @@
-//! Property family semantic bodies (DSL-0a Task A11).
-//!
-//! Each `op_xxx_semantic` function implements the semantic effect of one
-//! property-family opcode. The α handler in `dispatch_handlers/property.rs`
-//! decodes operands, constructs `OpXxxArgs`, calls the semantic body, and
-//! translates the returned `SemanticOutcome` to `Step`.
+//! Property family semantic bodies.
 //!
 //! Family coverage (21 opcodes):
 //! - Named property reads:  `GetNamedProperty`.
@@ -19,39 +14,11 @@
 //!   `CopyDataProperties`, `SetFunctionName`, `CheckObjectCoercible`,
 //!   `ThrowIfUninitialized`.
 //!
-//! ### IC layout preservation
-//!
-//! The IC-heavy opcodes (`GetNamedProperty`, `SetNamedProperty`,
-//! `GetKeyedProperty`, `SetKeyedProperty`) defer entirely to the existing
-//! `Vm::execute_*_opcode` helpers in `vm/dispatch/property.rs`. Those
-//! helpers carry the Phase 3a/3e/3f inline-cache cache hit paths (monomorphic
-//! handler load, polymorphic shape probe, megamorphic table), the
-//! `ToObject` coercion, the prototype-chain walk, and the feedback-slot
-//! recording. DSL-0a's job is only to lift the call site out of the α
-//! handler — DSL-1 lands the IC mode-byte refactor and DSL-0b the
-//! flat-array refactor (per design §10). No IC layout changes here.
-//!
-//! ### PC-advance convention
-//!
-//! Every `execute_*_opcode` helper advances `frame.instruction_offset()`
-//! itself on success via `advance_dispatch_frame(frame, instruction_len)`,
-//! and routes abrupt completions through `handle_dispatch_result` which
-//! either rewrites PC to the catch handler (caught) or returns
-//! `VmError::Abrupt` (escapes). Either way, on success the next opcode
-//! byte sits at the current PC — so the success semantic returns
-//! `SemanticOutcome::Continue { pc_advance: 0 }`. This mirrors the α-side
-//! pattern `try_step!(result); dispatch_next!(state);`.
-//!
-//! The exceptions are:
-//! - `CreateObject` / `CreateArray`: the helper allocates and returns the
-//!   `ObjectRef`; the semantic body writes the register and explicitly
-//!   advances by `instruction_len` (mirroring the α handler).
-//! - `SetFunctionName` / `CheckObjectCoercible` / `ThrowIfUninitialized`:
-//!   these route through `handle_dispatch_result` directly (the helper
-//!   shape doesn't include `advance_dispatch_frame`). Success →
-//!   `Continue { pc_advance: instruction_len }`; caught →
-//!   `Continue { pc_advance: 0 }`; escape → `ExitError`. Mirrors the
-//!   arithmetic unary pattern (`op_negate_semantic`).
+//! IC-heavy opcodes defer to `Vm::execute_*_opcode` helpers in
+//! `vm/dispatch/property.rs`, which carry the inline-cache hit paths and
+//! feedback-slot recording. `CreateObject` / `CreateArray` write the register
+//! and advance by `instruction_len`. `SetFunctionName`, `CheckObjectCoercible`,
+//! and `ThrowIfUninitialized` route through `handle_dispatch_result` directly.
 
 use lyng_bytecode::Opcode;
 use lyng_ops::errors;
@@ -59,8 +26,8 @@ use lyng_types::{FeedbackSlotId, Value};
 
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
-use crate::vm::dispatch_state::DispatchState;
 use crate::vm::Vm;
+use crate::vm::dispatch_state::DispatchState;
 
 // =====================================================================
 // Shared shapes
@@ -111,22 +78,14 @@ pub struct OpPropertyAbxArgs {
     pub instruction_len: u32,
 }
 
-// =====================================================================
-// Internal helper: route an `execute_*_opcode` helper's `VmResult<()>`.
-// =====================================================================
-
-/// Shared slow-path tail for every property opcode that delegates to a
-/// `Vm::execute_*_opcode` helper.
-///
-/// The helper internally advances `frame.instruction_offset()` on success
-/// and rewrites it to the catch target on a caught abrupt completion. In
-/// both cases the next opcode byte is at the current PC, so the
-/// `SemanticOutcome` carries `pc_advance: 0`.
-///
-/// This mirrors the α-side pattern `try_step!(result); dispatch_next!(state);`
-/// — option (b) from the plan (keep helpers as `Vm`-side methods, route
-/// the outcome through the wrapper).
+/// Route a `VmResult<()>` from a helper that has already advanced the frame PC
+/// on success. Either way the next opcode is at the current PC, so the outcome
+/// carries `pc_advance: 0`.
 #[inline]
+#[expect(
+    dead_code,
+    reason = "Retained for non-property opcode families that route VmResult<()> through this tail"
+)]
 fn route_execute_result(result: crate::error::VmResult<()>) -> SemanticOutcome {
     match result {
         Ok(()) => SemanticOutcome::Continue { pc_advance: 0 },
@@ -143,40 +102,41 @@ pub fn op_get_named_property_semantic(
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_get_named_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.feedback_slot,
-            args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 // =====================================================================
 // Named property writes — `SetNamedProperty`, `AssignNamedProperty`,
 // `StrictAssignNamedProperty`.
-//
-// The three opcodes share the same Abc operand decode and slow-helper
-// signature, differing only in the `semantic` Opcode threaded into the
-// helper (strict-mode + assignment + property-define semantics fan out
-// inside `execute_set_named_property_opcode`).
 // =====================================================================
 
 #[inline]
@@ -186,23 +146,20 @@ fn op_set_named_property_shared(
     semantic: Opcode,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_set_named_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.feedback_slot,
             semantic,
             args.a,
@@ -210,7 +167,13 @@ fn op_set_named_property_shared(
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
 pub fn op_set_named_property_semantic(
@@ -243,35 +206,41 @@ pub fn op_get_keyed_property_semantic(
     args: OpPropertyAccessArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_get_keyed_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.feedback_slot,
-            args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 // =====================================================================
 // Keyed property writes — `SetKeyedProperty`, `AssignKeyedProperty`,
-// `StrictAssignKeyedProperty`. Same fan-out pattern as the named writes.
+// `StrictAssignKeyedProperty`.
 // =====================================================================
 
 #[inline]
@@ -281,23 +250,20 @@ fn op_set_keyed_property_shared(
     semantic: Opcode,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_set_keyed_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.feedback_slot,
             semantic,
             args.a,
@@ -305,7 +271,13 @@ fn op_set_keyed_property_shared(
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
 pub fn op_set_keyed_property_semantic(
@@ -331,10 +303,6 @@ pub fn op_strict_assign_keyed_property_semantic(
 
 // =====================================================================
 // Define-data — `DefineNamedProperty`, `DefineKeyedProperty`.
-//
-// The define-data variants do NOT carry a feedback slot (the α handler
-// decodes with `is_profiled = false`); operands flow through the
-// non-profiled `OpPropertyAbcArgs` shape.
 // =====================================================================
 
 pub fn op_define_named_property_semantic(
@@ -342,29 +310,32 @@ pub fn op_define_named_property_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_define_named_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
 pub fn op_define_keyed_property_semantic(
@@ -372,39 +343,36 @@ pub fn op_define_keyed_property_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_define_keyed_property_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
 // =====================================================================
 // Object / array literal allocation — `CreateObject`, `CreateArray`.
-//
-// Both allocate via `Vm::create_object` / `Vm::create_array`, write the
-// resulting `ObjectRef` to register `a`, and advance by
-// `instruction_len`. `CreateArray` additionally defines the `length`
-// property when the requested capacity is non-zero (mirrors the α
-// handler precisely).
 // =====================================================================
 
 pub fn op_create_object_semantic(
@@ -412,7 +380,7 @@ pub fn op_create_object_semantic(
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let realm = inner.frame.realm();
+    let realm = inner.vm.realm_of(inner.agent, inner.cfr);
     let object = {
         let DispatchState { agent, .. } = &mut *inner;
         match Vm::create_object(agent, realm, usize::try_from(args.bx).unwrap_or(usize::MAX)) {
@@ -420,7 +388,7 @@ pub fn op_create_object_semantic(
             Err(error) => return SemanticOutcome::ExitError { error },
         }
     };
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.a, Value::from_object_ref(object));
@@ -434,7 +402,7 @@ pub fn op_create_array_semantic(
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let realm = inner.frame.realm();
+    let realm = inner.vm.realm_of(inner.agent, inner.cfr);
     let length = usize::try_from(args.bx).unwrap_or(usize::MAX);
     let object = {
         let DispatchState { agent, .. } = &mut *inner;
@@ -450,7 +418,7 @@ pub fn op_create_array_semantic(
             return SemanticOutcome::ExitError { error };
         }
     }
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register_unchecked(registers, args.a, Value::from_object_ref(object));
@@ -468,29 +436,32 @@ pub fn op_store_dense_element_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_store_dense_element_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
 pub fn op_load_dense_element_semantic(
@@ -498,29 +469,28 @@ pub fn op_load_dense_element_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
-        vm.execute_load_dense_element_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
-            args.a,
-            args.b,
-            args.c,
-        )
+        vm.execute_load_dense_element_opcode(agent, *host, &mut **registry, view, args.b, args.c)
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 // =====================================================================
@@ -534,29 +504,28 @@ pub fn op_delete_property_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
-        vm.execute_delete_property_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
-            args.a,
-            args.b,
-            args.c,
-        )
+        vm.execute_delete_property_opcode(agent, *host, &mut **registry, view, args.b, args.c)
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 pub fn op_in_semantic(
@@ -564,29 +533,28 @@ pub fn op_in_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
-        vm.execute_in_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
-            args.a,
-            args.b,
-            args.c,
-        )
+        vm.execute_in_opcode(agent, *host, &mut **registry, view, args.b, args.c)
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 pub fn op_to_property_key_semantic(
@@ -594,28 +562,28 @@ pub fn op_to_property_key_semantic(
     args: OpPropertyAbArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
-        vm.execute_to_property_key_opcode(
-            agent,
-            *host,
-            &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
-            args.a,
-            args.b,
-        )
+        vm.execute_to_property_key_opcode(agent, *host, &mut **registry, view, args.b)
     };
-    route_execute_result(result)
+    let handled = inner.handle_dispatch_result(result);
+    let value = match handled {
+        Ok(Some(v)) => v,
+        Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => return SemanticOutcome::ExitError { error },
+    };
+    let registers = inner.registers();
+    inner.vm.write_register(registers, args.a, value);
+    SemanticOutcome::Continue {
+        pc_advance: args.instruction_len,
+    }
 }
 
 pub fn op_copy_data_properties_semantic(
@@ -623,47 +591,44 @@ pub fn op_copy_data_properties_semantic(
     args: OpPropertyAbcArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
+    let view = inner.frame_view();
     let result = {
         let DispatchState {
             vm,
             agent,
             host,
             registry,
-            frame,
-            frame_depth,
             ..
         } = &mut *inner;
         vm.execute_copy_data_properties_opcode(
             agent,
             *host,
             &mut **registry,
-            *frame_depth,
-            frame,
-            args.instruction_len,
+            view,
             args.a,
             args.b,
             args.c,
         )
     };
-    route_execute_result(result)
+    match inner.handle_dispatch_result(result) {
+        Ok(Some(())) => SemanticOutcome::Continue {
+            pc_advance: args.instruction_len,
+        },
+        Ok(None) => SemanticOutcome::Continue { pc_advance: 0 },
+        Err(error) => SemanticOutcome::ExitError { error },
+    }
 }
 
-/// `SetFunctionName` does not go through an `execute_*_opcode` wrapper;
-/// the α handler routes a `Vm::set_function_name` call through
-/// `handle_dispatch_result` and advances PC explicitly. The semantic
-/// body mirrors that exactly.
 pub fn op_set_function_name_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let function = match inner.vm.object_register(&inner.frame, args.a) {
+    let function = match inner.vm.object_register(inner.frame_view(), args.a) {
         Ok(object) => object,
         Err(error) => return SemanticOutcome::ExitError { error },
     };
-    let name_value = inner
-        .vm
-        .read_register_unchecked(inner.frame.registers(), args.b);
+    let name_value = inner.vm.read_register_unchecked(inner.registers(), args.b);
     let set_result = {
         let DispatchState { agent, .. } = &mut *inner;
         Vm::set_function_name(agent, function, name_value)
@@ -678,17 +643,13 @@ pub fn op_set_function_name_semantic(
     }
 }
 
-/// `CheckObjectCoercible` — Abx-decoded; only `a` (the register holding
-/// the candidate value) is used. The α handler reads the register, calls
-/// `Vm::check_object_coercible`, and routes through `handle_dispatch_result`.
+/// `CheckObjectCoercible` — Abx-decoded; `a` is the candidate value register.
 pub fn op_check_object_coercible_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let value = inner
-        .vm
-        .read_register_unchecked(inner.frame.registers(), args.a);
+    let value = inner.vm.read_register_unchecked(inner.registers(), args.a);
     let result = {
         let DispatchState { agent, .. } = &mut *inner;
         Vm::check_object_coercible(agent, value)
@@ -703,19 +664,14 @@ pub fn op_check_object_coercible_semantic(
     }
 }
 
-/// `ThrowIfUninitialized` — Abx-decoded; raises a `ReferenceError` when the
-/// register holds the TDZ sentinel. The α handler reads, compares against
-/// `Value::uninitialized_lexical()`, constructs the abrupt completion
-/// inline, and routes through `handle_dispatch_result`. Non-TDZ values
-/// fall through to the bare advance.
+/// `ThrowIfUninitialized` — raises `ReferenceError` when the register holds the
+/// TDZ sentinel; otherwise advances PC.
 pub fn op_throw_if_uninitialized_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpPropertyAbxArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let value = inner
-        .vm
-        .read_register_unchecked(inner.frame.registers(), args.a);
+    let value = inner.vm.read_register_unchecked(inner.registers(), args.a);
     if value == Value::uninitialized_lexical() {
         let result: Result<(), VmError> = {
             let DispatchState { agent, .. } = &mut *inner;
@@ -723,14 +679,8 @@ pub fn op_throw_if_uninitialized_semantic(
         };
         let handled = inner.handle_dispatch_result(result);
         match handled {
-            // The α `if try_step!(...).is_none() { dispatch_next!(state); }`
-            // branch fires when the throw was caught — resume at the
-            // already-rewritten PC.
-            Ok(Some(())) => {
-                // Unreachable in practice: `handle_dispatch_result` on an
-                // Err input never returns `Some(())`. Treat as advance for
-                // safety and to satisfy match exhaustiveness.
-            }
+            // Unreachable: `handle_dispatch_result` on Err never returns `Some(())`.
+            Ok(Some(())) => {}
             Ok(None) => return SemanticOutcome::Continue { pc_advance: 0 },
             Err(error) => return SemanticOutcome::ExitError { error },
         }

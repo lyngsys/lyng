@@ -1,7 +1,7 @@
+use crate::CliInvocation;
 use crate::error::CliError;
 use crate::extensions::CliRealmExtension;
 use crate::host::{CliHost, CliHostSnapshot};
-use crate::CliInvocation;
 use lyng_common::{Diagnostic, Severity, SourceId, WellKnownAtom};
 use lyng_compiler::compile_script;
 use lyng_env::{Agent, Runtime};

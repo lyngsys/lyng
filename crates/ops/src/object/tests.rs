@@ -258,28 +258,32 @@ fn ordinary_only_object_helpers_delegate_to_internal_methods() {
         )
     });
 
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        key,
-        Value::from_smi(11),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            key,
+            Value::from_smi(11),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     assert!(ordinary_has_property(agent, object, key).unwrap());
     assert_eq!(
         ordinary_get(agent, object, key).unwrap(),
         Value::from_smi(11)
     );
-    assert!(ordinary_set(
-        agent,
-        object,
-        key,
-        Value::from_smi(13),
-        AllocationLifetime::Default,
-    )
-    .unwrap());
+    assert!(
+        ordinary_set(
+            agent,
+            object,
+            key,
+            Value::from_smi(13),
+            AllocationLifetime::Default,
+        )
+        .unwrap()
+    );
     assert_eq!(
         ordinary_get(agent, object, key).unwrap(),
         Value::from_smi(13)
@@ -685,12 +689,14 @@ fn primitive_wrapper_value_accepts_primitive_or_matching_wrapper() {
         ),
         Ok(Value::from_symbol_ref(symbol))
     );
-    assert!(require_primitive_wrapper_value(
-        agent,
-        Value::from_object_ref(symbol_wrapper),
-        PrimitiveWrapperKind::Boolean
-    )
-    .is_err());
+    assert!(
+        require_primitive_wrapper_value(
+            agent,
+            Value::from_object_ref(symbol_wrapper),
+            PrimitiveWrapperKind::Boolean
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -837,24 +843,28 @@ fn install_default_object_to_primitive_methods(
         );
         (to_string, value_of)
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object_prototype,
-        PropertyKey::from_atom(WellKnownAtom::toString.id()),
-        Value::from_object_ref(to_string),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
-    assert!(ordinary_create_data_property(
-        agent,
-        object_prototype,
-        PropertyKey::from_atom(WellKnownAtom::valueOf.id()),
-        Value::from_object_ref(value_of),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object_prototype,
+            PropertyKey::from_atom(WellKnownAtom::toString.id()),
+            Value::from_object_ref(to_string),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object_prototype,
+            PropertyKey::from_atom(WellKnownAtom::valueOf.id()),
+            Value::from_object_ref(value_of),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     (to_string, value_of)
 }
 
@@ -987,18 +997,22 @@ fn require_temporal_object_rejects_plain_objects_and_wrong_temporal_kind() {
         (plain, instant)
     });
 
-    assert!(require_temporal_object(
-        agent,
-        Value::from_object_ref(plain),
-        TemporalObjectKind::Instant,
-    )
-    .is_err());
-    assert!(require_temporal_object(
-        agent,
-        Value::from_object_ref(instant),
-        TemporalObjectKind::ZonedDateTime,
-    )
-    .is_err());
+    assert!(
+        require_temporal_object(
+            agent,
+            Value::from_object_ref(plain),
+            TemporalObjectKind::Instant,
+        )
+        .is_err()
+    );
+    assert!(
+        require_temporal_object(
+            agent,
+            Value::from_object_ref(instant),
+            TemporalObjectKind::ZonedDateTime,
+        )
+        .is_err()
+    );
 }
 
 // ── Regression: ordinary_set_prototype_of routes through Agent (PR 3 wiring) ──

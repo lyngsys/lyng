@@ -4,8 +4,8 @@ use lyng_builtins::BootstrapMode;
 use lyng_bytecode::{Instruction, InstructionStream, Opcode};
 use lyng_common::{AtomId, Diagnostic, WellKnownAtom};
 use lyng_compiler::{
-    compile_module, CompiledModuleUnit, ModuleImportKind as CompiledModuleImportKind,
-    ModuleRequestPhase as CompiledModuleRequestPhase,
+    CompiledModuleUnit, ModuleImportKind as CompiledModuleImportKind,
+    ModuleRequestPhase as CompiledModuleRequestPhase, compile_module,
 };
 use lyng_env::{
     Agent, ModuleBindingAlias, ModuleImportEntry, ModuleImportKind, ModuleIndirectExportEntry,
@@ -30,11 +30,11 @@ use lyng_types::{
     RealmRef, Value, WellKnownSymbolId,
 };
 
-use crate::{FrameRecord, InstalledCode, RegisterWindow, VmError};
+use crate::{InstalledCode, VmError};
 
 use super::call::RejectingNativeRegistry;
 use super::install::InstalledFunction;
-use super::{decode_env_operand, string_text_array_index, Vm};
+use super::{Vm, decode_env_operand, string_text_array_index};
 use crate::error::{ModuleLoadError, VmResult};
 use crate::extensions::SharedRealmExtensionProvider;
 
@@ -527,17 +527,8 @@ impl Vm {
             .cloned()
             .ok_or(VmError::MissingInstalledCode(code))?;
         for (slot, child_index) in Self::module_hoisted_function_initializers(&installed) {
-            let frame = FrameRecord::new(
-                code,
-                0,
-                RegisterWindow::new(0, 0),
-                None,
-                realm.id(),
-                module_env,
-                module_env,
-                lyng_env::ExecutionContextKind::Module,
-            );
-            let closure = self.create_closure(agent, &frame, child_index)?;
+            let closure =
+                self.create_closure(agent, code, module_env, None, realm.id(), child_index)?;
             Self::initialize_environment_slot(
                 agent,
                 module_env,
@@ -570,11 +561,7 @@ impl Vm {
         {
             offset = next_offset;
         }
-        if offset == start {
-            0
-        } else {
-            offset
-        }
+        if offset == start { 0 } else { offset }
     }
 
     fn module_hoisted_function_prologue_start(instructions: InstructionStream<'_>) -> u32 {

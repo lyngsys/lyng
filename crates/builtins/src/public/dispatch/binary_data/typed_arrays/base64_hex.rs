@@ -5,8 +5,8 @@ use super::super::super::{
 };
 use super::super::buffers::allocate_array_buffer_object;
 use super::super::{
-    create_data_property_or_throw, property_key_from_text, range_error, string_value, syntax_error,
-    to_boolean_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, create_data_property_or_throw, property_key_from_text,
+    range_error, string_value, syntax_error, to_boolean_for_builtin, type_error,
 };
 use super::{allocate_typed_array_object, typed_array_this_record};
 use crate::BuiltinInvocation;

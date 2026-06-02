@@ -1,10 +1,10 @@
 use super::{
+    AtomId, Expr, ExprId, FunctionCompiler, LoweringError, LoweringResult, Opcode, Property,
+    PropertyKind, ReferenceUsage, ResolutionKind, SafepointKind, Span, StorageClass, WellKnownAtom,
     internal_define_getter_property_builtin, internal_define_setter_property_builtin,
     internal_object_literal_set_prototype_builtin, internal_super_base_builtin,
     internal_super_property_get_builtin, internal_super_property_set_builtin,
-    reference_error_builtin, AtomId, Expr, ExprId, FunctionCompiler, LoweringError, LoweringResult,
-    Opcode, Property, PropertyKind, ReferenceUsage, ResolutionKind, SafepointKind, Span,
-    StorageClass, WellKnownAtom,
+    reference_error_builtin,
 };
 use lyng_types::internal_import_meta_builtin;
 

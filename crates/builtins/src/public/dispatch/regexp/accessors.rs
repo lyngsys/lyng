@@ -1,5 +1,5 @@
 use super::super::{
-    string_from_code_units, string_value, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, string_from_code_units, string_value, type_error,
 };
 use super::{boolean_property_value, current_intrinsic_regexp_prototype};
 use crate::BuiltinInvocation;

@@ -2,7 +2,7 @@
 
 use lyng_common::{AtomId, AtomTable};
 use lyng_gc::{AllocationLifetime, PrimitiveHeap, StringEncoding};
-use lyng_ops::{allocating, pure, read, PrimitiveContext};
+use lyng_ops::{PrimitiveContext, allocating, pure, read};
 use lyng_types::{
     AbruptCompletion, BigIntRef, Completion, PropertyDescriptor, PropertyKey, StringRef, SymbolRef,
     Value,
@@ -151,9 +151,11 @@ fn primitive_context_surface_is_reexported() {
         Some(PropertyKey::from_symbol(SymbolRef::from_raw(2).unwrap()))
     );
     assert_eq!(context.atoms().get(surrogate_key.as_atom().unwrap()), None);
-    assert!(context
-        .atoms()
-        .matches_utf16(surrogate_key.as_atom().unwrap(), &[0xD800]));
+    assert!(
+        context
+            .atoms()
+            .matches_utf16(surrogate_key.as_atom().unwrap(), &[0xD800])
+    );
     assert_eq!(context.heap().string_payload(bigint_text), Some(&b"-9"[..]));
     assert_eq!(
         context.heap().string(string).unwrap().cached_atom(),

@@ -4,14 +4,14 @@ use crate::{
 };
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_types::{
-    array_buffer_byte_length_getter_builtin, array_buffer_detached_getter_builtin,
-    array_buffer_is_view_builtin, array_buffer_max_byte_length_getter_builtin,
-    array_buffer_resizable_getter_builtin, array_buffer_resize_builtin, array_buffer_slice_builtin,
-    array_buffer_transfer_builtin, array_buffer_transfer_to_fixed_length_builtin,
-    array_species_getter_builtin, shared_array_buffer_byte_length_getter_builtin,
-    shared_array_buffer_grow_builtin, shared_array_buffer_growable_getter_builtin,
-    shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin, Value,
-    WellKnownSymbolId,
+    Value, WellKnownSymbolId, array_buffer_byte_length_getter_builtin,
+    array_buffer_detached_getter_builtin, array_buffer_is_view_builtin,
+    array_buffer_max_byte_length_getter_builtin, array_buffer_resizable_getter_builtin,
+    array_buffer_resize_builtin, array_buffer_slice_builtin, array_buffer_transfer_builtin,
+    array_buffer_transfer_to_fixed_length_builtin, array_species_getter_builtin,
+    shared_array_buffer_byte_length_getter_builtin, shared_array_buffer_grow_builtin,
+    shared_array_buffer_growable_getter_builtin,
+    shared_array_buffer_max_byte_length_getter_builtin, shared_array_buffer_slice_builtin,
 };
 
 pub(super) struct BufferDescriptorAtoms {

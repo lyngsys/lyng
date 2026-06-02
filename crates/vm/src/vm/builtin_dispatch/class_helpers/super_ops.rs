@@ -1,7 +1,8 @@
 use super::{
-    errors, object, Agent, FrameRecord, FunctionEntryIdentity, FunctionThisMode, HostHooks,
-    NativeFunctionRegistry, ObjectRef, ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult,
+    Agent, FunctionEntryIdentity, FunctionThisMode, HostHooks, NativeFunctionRegistry, ObjectRef,
+    ThisBindingStatus, ThisState, Value, Vm, VmError, VmResult, errors, object,
 };
+use crate::frame::{CallerContext, FrameView};
 
 #[derive(Clone, Copy, Debug)]
 struct SuperConstructContext {
@@ -50,26 +51,49 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let caller_callee = self.frame_header(caller.cfr()).callee();
         let base = if arguments.get(3).and_then(|value| value.as_bool()) == Some(true) {
             let base_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-            Self::to_object_for_value(agent, caller.realm(), base_value)?
+            Self::to_object_for_value(agent, caller_realm, base_value)?
         } else {
             let home_object = arguments
                 .get(2)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    || Self::resolve_super_home_object(agent, caller_lexical_env, caller_callee),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
-        self.get_property_from_object(agent, host, registry, caller, base, receiver, key)
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            key_value,
+        )?;
+        self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            base,
+            receiver,
+            key,
+        )
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_property_set_builtin(
@@ -77,44 +101,70 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments.first().copied().unwrap_or(Value::undefined());
         let value = arguments.get(2).copied().unwrap_or(Value::undefined());
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let caller_callee = self.frame_header(caller.cfr()).callee();
         let base = if arguments.get(4).and_then(|value| value.as_bool()) == Some(true) {
             let base_value = arguments.get(3).copied().unwrap_or(Value::undefined());
-            Self::to_object_for_value(agent, caller.realm(), base_value)?
+            Self::to_object_for_value(agent, caller_realm, base_value)?
         } else {
             let home_object = arguments
                 .get(3)
                 .and_then(|value| value.as_object_ref())
                 .map_or_else(
-                    || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                    || Self::resolve_super_home_object(agent, caller_lexical_env, caller_callee),
                     Ok,
                 )?;
             object::super_base(agent, home_object).map_err(VmError::Abrupt)?
         };
         let key_value = arguments.get(1).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
-        let updated =
-            self.set_property_on_object(agent, host, registry, caller, base, receiver, key, value)?;
-        if !updated && self.caller_is_strict(*caller) {
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            key_value,
+        )?;
+        let updated = self.set_property_on_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            base,
+            receiver,
+            key,
+            value,
+        )?;
+        if !updated && self.caller_is_strict(caller.code()) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(value)
     }
 
     pub(in crate::vm::builtin_dispatch) fn super_base_builtin(
+        &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let caller_callee = self.frame_header(caller.cfr()).callee();
         let home_object = arguments
             .first()
             .and_then(|value| value.as_object_ref())
             .map_or_else(
-                || Self::resolve_super_home_object(agent, caller.lexical_env(), caller),
+                || Self::resolve_super_home_object(agent, caller_lexical_env, caller_callee),
                 Ok,
             )?;
         let base = object::ordinary_get_prototype_of(agent, home_object)
@@ -126,7 +176,7 @@ impl Vm {
     pub(in crate::vm::builtin_dispatch) fn super_constructor_builtin(
         &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
     ) -> VmResult<Value> {
         let context = self.super_construct_context(agent, caller)?;
         let super_constructor = object::ordinary_get_prototype_of(agent, context.active_function)
@@ -138,34 +188,37 @@ impl Vm {
     fn super_construct_context(
         &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
     ) -> VmResult<SuperConstructContext> {
-        let record = Self::super_constructor_this_environment_record(agent, caller.lexical_env())?;
+        let cfr = caller.cfr();
+        let header = self.frame_header(cfr);
+        let caller_lexical_env = header.lexical_env();
+        let record = Self::super_constructor_this_environment_record(agent, caller_lexical_env)?;
         let function_env = record.map(|record| record.declarative().id());
         let active_function = record
             .map(lyng_env::FunctionEnvironmentRecord::function_object)
-            .or_else(|| caller.callee())
+            .or_else(|| self.frame_header(cfr).callee())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let derived_constructor = {
-            agent
-                .objects()
-                .function_data(active_function)
-                .and_then(|data| match data.entry() {
-                    Some(FunctionEntryIdentity::Bytecode(code)) => Some(code),
-                    _ => None,
-                })
-                .and_then(|code| self.installed_function(code))
-                .is_some_and(|function| function.flags().derived_class_constructor())
-        } || caller
-            .flags()
-            .contains(crate::FrameFlags::derived_construct());
+        let derived_constructor =
+            {
+                agent
+                    .objects()
+                    .function_data(active_function)
+                    .and_then(|data| match data.entry() {
+                        Some(FunctionEntryIdentity::Bytecode(code)) => Some(code),
+                        _ => None,
+                    })
+                    .and_then(|code| self.installed_function(code))
+                    .is_some_and(|function| function.flags().derived_class_constructor())
+            } || crate::frame::FrameFlags::from_raw(self.frame_header(cfr).flags_bits())
+                .contains(crate::FrameFlags::derived_construct());
         if !derived_constructor {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         let binding_status = record.map_or_else(
             || {
-                if caller.construct_this().is_some()
-                    || caller.this_state() != ThisState::Uninitialized
+                if self.frame_header(cfr).construct_this().is_some()
+                    || self.frame_header(cfr).this_state() != ThisState::Uninitialized
                 {
                     lyng_env::ThisBindingStatus::Initialized
                 } else {
@@ -176,7 +229,7 @@ impl Vm {
         );
         let new_target = record
             .and_then(lyng_env::FunctionEnvironmentRecord::new_target)
-            .or_else(|| caller.new_target())
+            .or_else(|| self.frame_header(cfr).new_target())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         Ok(SuperConstructContext {
             function_env,
@@ -191,16 +244,18 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         super_constructor: ObjectRef,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let context = self.super_construct_context(agent, caller)?;
+        let caller_record = self.frame_record_for_view(caller);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller_record);
         let this_object = self.construct_to_completion(
             agent,
             host,
             registry,
-            caller,
+            caller_ctx,
             super_constructor,
             arguments,
             Some(context.new_target),
@@ -215,51 +270,62 @@ impl Vm {
                 lyng_env::ThisBindingStatus::Initialized,
                 this_value,
             );
-            let mut updated = false;
-            for frame in self
-                .frames
-                .iter_mut()
-                .filter(|frame| frame.lexical_env() == function_env)
-            {
-                frame.set_this_state(ThisState::Value(this_value));
-                updated = true;
-            }
-            if !updated {
-                if let Some(frame) = self.frames.last_mut() {
-                    frame.set_this_state(ThisState::Value(this_value));
+            // Whole-stack scan: update `this_state`/`this_value` on every frame
+            // bound to `function_env`. The overlay is the source of truth for both
+            // `this_state` and `lexical_env` now, so the scan walks cfrs and reads
+            // the overlay `lexical_env`. (Collect cfrs first to avoid a borrow
+            // conflict with the `&mut` overlay writes.)
+            let matching_cfrs: Vec<u32> = self
+                .frame_cfrs()
+                .filter(|&cfr| self.frame_header(cfr).lexical_env() == function_env)
+                .collect();
+            if matching_cfrs.is_empty() {
+                if let Some(cfr) = self.current_cfr_opt() {
+                    self.frame_header_mut(cfr)
+                        .set_this(ThisState::Value(this_value), this_value);
+                }
+            } else {
+                for cfr in matching_cfrs {
+                    self.frame_header_mut(cfr)
+                        .set_this(ThisState::Value(this_value), this_value);
                 }
             }
-        } else if let Some(frame) = self.frames.last_mut() {
-            frame.set_this_state(ThisState::Value(this_value));
+        } else if let Some(cfr) = self.current_cfr_opt() {
+            self.frame_header_mut(cfr)
+                .set_this(ThisState::Value(this_value), this_value);
         }
-        let frame_index = self
-            .frames
-            .iter()
-            .rposition(|frame| frame.callee() == Some(context.active_function))
+        // Find the target frame's cfr, innermost-first (matches the old
+        // `rposition` over the deleted `frames` Vec). `callee`/`variable_env`/`code` are
+        // immutable metadata (overlay == record); `lexical_env` is read from the
+        // overlay (authoritative now). `registers().base()` derives from the cfr.
+        let target_cfr = self
+            .frame_cfrs()
+            .find(|&cfr| self.frame_header(cfr).callee() == Some(context.active_function))
             .or_else(|| {
                 context.function_env.and_then(|function_env| {
-                    self.frames.iter().rposition(|frame| {
-                        frame.lexical_env() == function_env || frame.variable_env() == function_env
+                    self.frame_cfrs().find(|&cfr| {
+                        let header = self.frame_header(cfr);
+                        header.lexical_env() == function_env
+                            || header.variable_env() == function_env
                     })
                 })
             })
             .or_else(|| {
-                self.frames.iter().rposition(|frame| {
-                    frame.code() == caller.code()
-                        && frame.registers() == caller.registers()
-                        && frame.callee() == caller.callee()
+                let caller_cfr = caller.cfr();
+                self.frame_cfrs().find(|&cfr| {
+                    let header = self.frame_header(cfr);
+                    header.code() == caller.code()
+                        && cfr == caller_cfr
+                        && header.callee() == self.frame_header(caller_cfr).callee()
                 })
             })
-            .or_else(|| self.frames.len().checked_sub(1));
-        let Some(frame_index) = frame_index else {
+            .or_else(|| self.current_cfr_opt());
+        let Some(target_cfr) = target_cfr else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
-        let Some(frame) = self.frames.get_mut(frame_index) else {
-            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
-        };
-        frame.set_this_value(this_value);
-        frame.set_construct_this(Some(this_object));
-        frame.set_this_state(ThisState::Value(this_value));
+        let header = self.frame_header_mut(target_cfr);
+        header.set_construct_this(Some(this_object));
+        header.set_this(ThisState::Value(this_value), this_value);
         Ok(this_value)
     }
 
@@ -268,7 +334,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let context = self.super_construct_context(agent, caller)?;
@@ -290,7 +356,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let Some(super_constructor_value) = arguments.first().copied() else {
@@ -314,7 +380,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let spread_source = arguments.first().copied().unwrap_or(Value::undefined());
@@ -335,16 +401,23 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let array_like = arguments.first().copied().unwrap_or(Value::undefined());
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_ctx = CallerContext {
+            realm: caller_realm,
+            lexical_env: self.frame_header(caller.cfr()).lexical_env(),
+            code: caller.code(),
+            pc: caller.instruction_offset(),
+        };
         let super_arguments = self.collect_array_like_arguments(
             agent,
             host,
             registry,
-            caller,
-            caller.realm(),
+            caller_ctx,
+            caller_realm,
             array_like,
         )?;
         self.construct_super_with_arguments(agent, host, registry, caller, &super_arguments)

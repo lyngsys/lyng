@@ -1,5 +1,7 @@
 use crate::nursery::{Nursery, NurseryDomain};
 use crate::{
+    NurseryStats, PrimitiveAllocationProfile, PrimitiveStringRecord, PrimitiveStringView,
+    StringEncoding, WeakHeapRef,
     card_table::{CardDomain, CardKey, CardTable},
     collection::{DEFAULT_COLLECTION_BUDGET_BYTES, DEFAULT_MAJOR_MARK_SLICE_BUDGET},
     concurrent_sweep::{
@@ -11,8 +13,6 @@ use crate::{
     weak::WeakMapState,
     weak::WeakRefState,
     weak::WeakSetState,
-    NurseryStats, PrimitiveAllocationProfile, PrimitiveStringRecord, PrimitiveStringView,
-    StringEncoding, WeakHeapRef,
 };
 use lyng_common::AtomId;
 use lyng_types::{
@@ -37,7 +37,7 @@ pub struct PrimitiveHeap {
     bigint_payloads: SideAllocator,
     value_cells: SlotArena<PrimitiveValueCellRecord, PrimitiveValueCellRef>,
     /// Stable `*const PrimitiveValueCellRecord` per `PrimitiveValueCellRef` (1-based;
-    /// entry 0 unused), mirroring `object_record_ptrs`. The asm mode-7 GlobalCellLoad
+    /// entry 0 unused), mirroring `object_record_ptrs`. The asm mode-7 `GlobalCellLoad`
     /// hit indexes this with a cached cell ref to reach the record without calling
     /// the mutator. Populated on alloc, nulled on free.
     value_cell_ptrs: Vec<*const PrimitiveValueCellRecord>,
@@ -1575,17 +1575,19 @@ impl PrimitiveHeap {
                 value_cells.free(ordinary_payload);
             }
         }));
-        merge!(self
-            .function_payloads
-            .sweep_young(tenuring_threshold, |_| {}));
+        merge!(
+            self.function_payloads
+                .sweep_young(tenuring_threshold, |_| {})
+        );
         merge!(self.object_slots.sweep_young(tenuring_threshold));
-        merge!(self
-            .suspended_executions
-            .sweep_young(tenuring_threshold, |record| {
-                if let Some(registers) = record.registers() {
-                    self.suspended_registers.free(registers);
-                }
-            }));
+        merge!(
+            self.suspended_executions
+                .sweep_young(tenuring_threshold, |record| {
+                    if let Some(registers) = record.registers() {
+                        self.suspended_registers.free(registers);
+                    }
+                })
+        );
         merge!(self.suspended_registers.sweep_young(tenuring_threshold));
         merge!(self.environments.sweep_young(tenuring_threshold, |record| {
             if let Some(slots) = record.slots() {

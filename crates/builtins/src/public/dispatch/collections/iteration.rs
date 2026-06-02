@@ -1,12 +1,12 @@
 use super::super::{
-    create_array_result,
+    PublicBuiltinDispatchContext, create_array_result,
     iterators::{
-        allocate_iterator_object, create_iterator_result_value, iterator_slot_value_for_builtin,
-        set_iterator_slot_value_for_builtin, ArrayIterationKind, MAP_ITERATOR_INDEX_SLOT,
-        MAP_ITERATOR_KIND_SLOT, MAP_ITERATOR_TARGET_SLOT, SET_ITERATOR_INDEX_SLOT,
-        SET_ITERATOR_KIND_SLOT, SET_ITERATOR_TARGET_SLOT,
+        ArrayIterationKind, MAP_ITERATOR_INDEX_SLOT, MAP_ITERATOR_KIND_SLOT,
+        MAP_ITERATOR_TARGET_SLOT, SET_ITERATOR_INDEX_SLOT, SET_ITERATOR_KIND_SLOT,
+        SET_ITERATOR_TARGET_SLOT, allocate_iterator_object, create_iterator_result_value,
+        iterator_slot_value_for_builtin, set_iterator_slot_value_for_builtin,
     },
-    length_value, set_property_on_object, type_error, PublicBuiltinDispatchContext,
+    length_value, set_property_on_object, type_error,
 };
 use super::{map_this_object, set_this_object};
 use crate::BuiltinInvocation;

@@ -1,7 +1,7 @@
 use super::{
+    BuiltinInvocation, BuiltinIteratorBridge, PublicBuiltinDispatchContext, Value,
     close_iterator_after_error, iterator, iterator_close_for_validation_failure,
     iterator_direct_record, iterator_this_object, map_completion, read, type_error, u64_to_value,
-    BuiltinInvocation, BuiltinIteratorBridge, PublicBuiltinDispatchContext, Value,
 };
 
 pub(super) fn iterator_reduce_builtin<Cx: PublicBuiltinDispatchContext>(

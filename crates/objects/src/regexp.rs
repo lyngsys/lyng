@@ -2524,9 +2524,11 @@ mod tests {
         assert!(ascii.find_from_code_units(&[0x41, 0x80], 0).is_none());
 
         let non_hex = RegExpPayload::compile(r"^\P{AHex}+$", "u").unwrap();
-        assert!(non_hex
-            .find_from_code_units(&[0x47, 0xD83D, 0xDE00], 0)
-            .is_some());
+        assert!(
+            non_hex
+                .find_from_code_units(&[0x47, 0xD83D, 0xDE00], 0)
+                .is_some()
+        );
         assert!(non_hex.find_from_code_units(&[0x47, 0x46], 0).is_none());
 
         let bidi = RegExpPayload::compile(r"^\p{Bidi_Control}+$", "u").unwrap();

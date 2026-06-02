@@ -1,17 +1,20 @@
-use super::{Agent, AllocationLifetime, FrameRecord, Value, Vm, VmResult, WithEnvironmentState};
+use super::{Agent, AllocationLifetime, Value, Vm, VmResult, WithEnvironmentState};
 
 impl Vm {
     pub(in crate::vm) fn push_with_environment(
         &mut self,
         agent: &mut Agent,
-        frame: &mut FrameRecord,
         value: Value,
     ) -> VmResult<()> {
-        let previous_lexical_env = frame.lexical_env();
+        let Some(cfr) = self.current_cfr_opt() else {
+            return Ok(());
+        };
+        let previous_lexical_env = self.frame_header(cfr).lexical_env();
         let outer = self
             .active_loop_iteration_environment(previous_lexical_env)
             .unwrap_or(previous_lexical_env);
-        let binding_object = Self::to_object_for_value(agent, frame.realm(), value)?;
+        let realm = self.realm_of(agent, cfr);
+        let binding_object = Self::to_object_for_value(agent, realm, value)?;
         let with_environment = agent.alloc_object_environment(
             Some(outer),
             binding_object,
@@ -19,24 +22,15 @@ impl Vm {
             AllocationLifetime::Default,
         );
         self.with_environment_states.push(WithEnvironmentState {
-            frame_depth: self.frames.len(),
+            frame_depth: self.frame_depth(),
             previous_lexical_env,
         });
-        frame.set_lexical_env(with_environment);
-        // Mirror the new lexical environment into `Vm::frames`. Without
-        // this, an LLInt fast-return that pops the callee can reload
-        // `dispatch.frame` from a stale `vm.frames` entry whose
-        // `lexical_env` still points at `previous_lexical_env`, losing
-        // the with-binding scope visible to subsequent identifier
-        // references inside the same `with` block.
-        if let Some(slot) = self.frames.last_mut() {
-            *slot = *frame;
-        }
+        self.frame_header_mut(cfr).set_lexical_env(with_environment);
         Ok(())
     }
 
-    pub(in crate::vm) fn pop_with_environment(&mut self, frame: &mut FrameRecord) {
-        let frame_depth = self.frames.len();
+    pub(in crate::vm) fn pop_with_environment(&mut self) {
+        let frame_depth = self.frame_depth();
         let Some(index) = self
             .with_environment_states
             .iter()
@@ -45,11 +39,9 @@ impl Vm {
             return;
         };
         let state = self.with_environment_states.remove(index);
-        frame.set_lexical_env(state.previous_lexical_env);
-        // See `push_with_environment` for the rationale: keep `vm.frames`
-        // in sync so a later LLInt fast-return reloads the correct env.
-        if let Some(slot) = self.frames.last_mut() {
-            *slot = *frame;
+        if let Some(cfr) = self.current_cfr_opt() {
+            self.frame_header_mut(cfr)
+                .set_lexical_env(state.previous_lexical_env);
         }
     }
 

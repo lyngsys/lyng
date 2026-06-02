@@ -415,25 +415,29 @@ fn phase3_environment_chain_shadowing_and_realm_state_flow_across_crates() {
         );
 
         let object_binding = data_descriptor(Value::from_smi(40), true, true);
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                binding_object,
-                PropertyKey::from_atom(OBJECT_ONLY_ATOM),
-                object_binding,
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    binding_object,
+                    PropertyKey::from_atom(OBJECT_ONLY_ATOM),
+                    object_binding,
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
         let global_binding = data_descriptor(Value::from_smi(90), true, true);
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                default_realm.global_object(),
-                PropertyKey::from_atom(GLOBAL_VAR_ATOM),
-                global_binding,
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    default_realm.global_object(),
+                    PropertyKey::from_atom(GLOBAL_VAR_ATOM),
+                    global_binding,
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
 
         (
             object_prototype,
@@ -600,15 +604,17 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
             ObjectAllocation::ordinary(root_shape),
             AllocationLifetime::Default,
         );
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                prototype,
-                inherited_key,
-                data_descriptor(Value::from_smi(11), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    prototype,
+                    inherited_key,
+                    data_descriptor(Value::from_smi(11), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
 
         let object = objects.alloc_object(
             &mut mutator,
@@ -620,51 +626,61 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
             .unwrap()
             .shape();
 
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                data_key,
-                data_descriptor(Value::from_smi(1), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    data_key,
+                    data_descriptor(Value::from_smi(1), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
         let shape_after_add = objects
             .object_header(mutator.view(), object)
             .unwrap()
             .shape();
         assert_ne!(shape_after_add, initial_shape);
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                deleted_key,
-                data_descriptor(Value::from_smi(2), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                index_key,
-                data_descriptor(Value::from_smi(3), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                symbol_key,
-                data_descriptor(Value::from_smi(4), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    deleted_key,
+                    data_descriptor(Value::from_smi(2), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    index_key,
+                    data_descriptor(Value::from_smi(3), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    symbol_key,
+                    data_descriptor(Value::from_smi(4), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
 
-        assert!(objects
-            .has_property(mutator.view(), object, inherited_key)
-            .unwrap());
+        assert!(
+            objects
+                .has_property(mutator.view(), object, inherited_key)
+                .unwrap()
+        );
         assert_eq!(
             objects
                 .get(
@@ -681,15 +697,17 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
         redefine.set_writable(false);
         redefine.set_enumerable(true);
         redefine.set_configurable(true);
-        assert!(objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                data_key,
-                redefine,
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    data_key,
+                    redefine,
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
         assert!(objects.delete(&mut mutator, object, deleted_key).unwrap());
 
         let replacement_prototype = objects.alloc_object(
@@ -697,20 +715,24 @@ fn phase3_object_semantics_and_native_dispatch_flow_through_public_runtime_surfa
             ObjectAllocation::ordinary(root_shape),
             AllocationLifetime::Default,
         );
-        assert!(objects
-            .set_prototype_of(&mut mutator, object, Some(replacement_prototype))
-            .unwrap());
+        assert!(
+            objects
+                .set_prototype_of(&mut mutator, object, Some(replacement_prototype))
+                .unwrap()
+        );
         assert!(objects.prevent_extensions(mutator.view(), object).unwrap());
         assert!(!objects.is_extensible(object).unwrap());
-        assert!(!objects
-            .define_own_property(
-                &mut mutator,
-                object,
-                new_key,
-                data_descriptor(Value::from_smi(99), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            !objects
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    new_key,
+                    data_descriptor(Value::from_smi(99), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
 
         let keys = objects.own_property_keys(mutator.view(), object).unwrap();
 
@@ -1018,48 +1040,70 @@ fn phase3_host_boundary_and_cluster_plumbing_compose_through_public_surfaces() {
     );
 
     let snapshot = host.snapshot();
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::LoadScript(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::LoadModule(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::Diagnostic(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::UncaughtException(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::CreateAgent(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::StartAgentThread(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::ObserveJob(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::TransferArrayBuffer(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::ShareArrayBuffer(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::ParkAgent(_))));
-    assert!(snapshot
-        .calls
-        .iter()
-        .any(|call| matches!(call, HostCall::UnparkAgent(_))));
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::LoadScript(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::LoadModule(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::Diagnostic(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::UncaughtException(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::CreateAgent(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::StartAgentThread(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::ObserveJob(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::TransferArrayBuffer(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::ShareArrayBuffer(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::ParkAgent(_)))
+    );
+    assert!(
+        snapshot
+            .calls
+            .iter()
+            .any(|call| matches!(call, HostCall::UnparkAgent(_)))
+    );
 }

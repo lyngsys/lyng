@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     temporal_plain_year_month_builtin => super::super::TEMPORAL_PLAIN_YEAR_MONTH_RAW;

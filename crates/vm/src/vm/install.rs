@@ -1,10 +1,10 @@
 use super::{
-    bytecode_index, code_index, Agent, AllocationLifetime, AtomId, BytecodeFunction,
-    BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, InstalledCode, RealmRef, Value, Vm,
-    VmError, VmResult,
+    Agent, AllocationLifetime, AtomId, BytecodeFunction, BytecodeFunctionId, CodeRef, CompiledAtom,
+    ConstantValue, InstalledCode, RealmRef, Value, Vm, VmError, VmResult, bytecode_index,
+    code_index,
 };
 use crate::vm::metadata_table::{MetadataTable, SiteDescriptor};
-use lyng_bytecode::{decode_instruction_bytes, CallRange, Instruction, Opcode, WideAbxOperands};
+use lyng_bytecode::{CallRange, Instruction, Opcode, WideAbxOperands, decode_instruction_bytes};
 use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
 };

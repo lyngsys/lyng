@@ -1,11 +1,11 @@
 use super::{
-    allocate_proxy_object, create_array_result, create_data_property_or_throw,
-    get_property_from_object_with_receiver, has_property_on_object, property_key_from_text,
-    property_key_value, proxy_define_property, proxy_delete_property, proxy_get_own_property,
-    proxy_get_prototype_of, proxy_is_extensible, proxy_own_property_keys, proxy_prevent_extensions,
-    proxy_set_prototype_of, require_constructor_object, require_object_argument,
-    require_proxy_argument_object, set_property_on_object, set_property_on_object_with_receiver,
-    type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, allocate_proxy_object, create_array_result,
+    create_data_property_or_throw, get_property_from_object_with_receiver, has_property_on_object,
+    property_key_from_text, property_key_value, proxy_define_property, proxy_delete_property,
+    proxy_get_own_property, proxy_get_prototype_of, proxy_is_extensible, proxy_own_property_keys,
+    proxy_prevent_extensions, proxy_set_prototype_of, require_constructor_object,
+    require_object_argument, require_proxy_argument_object, set_property_on_object,
+    set_property_on_object_with_receiver, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_gc::AllocationLifetime;

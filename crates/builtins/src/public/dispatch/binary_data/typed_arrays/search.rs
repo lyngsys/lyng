@@ -3,9 +3,9 @@ use super::super::super::{
     typed_array_last_index_of_builtin,
 };
 use super::super::{
-    length_value_u64, map_completion, normalize_relative_index_u64, range_error,
-    string_from_code_units, string_ref_code_units, to_integer_or_infinity_for_builtin,
-    to_string_string_ref, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, length_value_u64, map_completion, normalize_relative_index_u64,
+    range_error, string_from_code_units, string_ref_code_units, to_integer_or_infinity_for_builtin,
+    to_string_string_ref,
 };
 use super::{
     typed_array_read_element_value, typed_array_read_storage_bits,

@@ -14,8 +14,8 @@ use crate::public::{
 use lyng_env::{Agent, Intrinsics};
 use lyng_objects::{ObjectFlags, PrimitiveWrapperKind};
 use lyng_types::{
-    function_prototype_builtin, internal_throw_type_error_builtin, EnvironmentRef, ObjectRef,
-    RealmRef, ShapeId, Value,
+    EnvironmentRef, ObjectRef, RealmRef, ShapeId, Value, function_prototype_builtin,
+    internal_throw_type_error_builtin,
 };
 
 #[derive(Clone, Copy)]

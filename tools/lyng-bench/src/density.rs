@@ -6,7 +6,7 @@ use lyng_host::NoopHostHooks;
 use lyng_parser::parse_script;
 use lyng_sema::analyze_script;
 use lyng_vm::Vm;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::fmt::Write;
 use std::fs;

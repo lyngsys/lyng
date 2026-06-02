@@ -5,9 +5,9 @@
 
 use lyng_builtins::BootstrapMode;
 use lyng_bytecode::{BytecodeFunction, CompiledAtom, CompiledScriptUnit};
-use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{OPCODE_COUNT, Opcode};
 use lyng_common::{AtomTable, SourceId};
-use lyng_compiler::{compile_module, compile_script, CompiledModuleUnit};
+use lyng_compiler::{CompiledModuleUnit, compile_module, compile_script};
 use lyng_env::{ExecutableId, Runtime, RuntimePhase6Accounting as RuntimeAccounting};
 use lyng_gc::{AllocationLifetime, PrimitiveRoots, RuntimeObjectRecord, ValueStoreTarget};
 use lyng_host::{HostJobKind, HostSharedBufferId, NoopHostHooks};
@@ -15,7 +15,7 @@ use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{analyze_module, analyze_script};
 use lyng_types::{CodeRef, Value as JsValue};
 use lyng_vm::{FeedbackInlineCacheState, OpcodeDispatchCounts, SlowPathCounts, Vm};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::cmp::Ordering;
 use std::env;
 use std::fmt::Write;
@@ -1628,12 +1628,30 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
             snapshot.accounting.heap.last_major_max_mark_pause_ns,
             snapshot.accounting.heap.last_major_mark_finish_work_items,
             snapshot.accounting.heap.last_major_mark_finish_pause_ns,
-            snapshot.accounting.heap.last_major_gray_work_items_after_finish,
-            snapshot.accounting.heap.last_major_background_sweep_completed,
-            snapshot.accounting.heap.last_major_background_sweep_candidates,
-            snapshot.accounting.heap.last_major_background_sweep_reclaimed,
-            snapshot.accounting.heap.last_major_background_sweep_duration_ns,
-            snapshot.accounting.heap.last_major_background_sweep_apply_pause_ns,
+            snapshot
+                .accounting
+                .heap
+                .last_major_gray_work_items_after_finish,
+            snapshot
+                .accounting
+                .heap
+                .last_major_background_sweep_completed,
+            snapshot
+                .accounting
+                .heap
+                .last_major_background_sweep_candidates,
+            snapshot
+                .accounting
+                .heap
+                .last_major_background_sweep_reclaimed,
+            snapshot
+                .accounting
+                .heap
+                .last_major_background_sweep_duration_ns,
+            snapshot
+                .accounting
+                .heap
+                .last_major_background_sweep_apply_pause_ns,
             domain_cell(snapshot.accounting.iterator_records),
             domain_cell(snapshot.accounting.regexp_payloads),
             domain_cell(snapshot.accounting.regexp_literal_cache),
@@ -1650,48 +1668,75 @@ fn write_runtime_accounting_section(output: &mut String, snapshots: &[RuntimeSna
 fn write_watch_items_section(output: &mut String, items: &RuntimeWatchItems<'_>) {
     let _ = writeln!(output, "## Watch Items");
     output.push('\n');
-    let _ = writeln!(output, "- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
+    let _ = writeln!(
+        output,
+        "- The executable array runtime baselines now include both dense-indexed and iterator-driven rows. On this run, `array-heavy.literal-indexed-runtime` measured `{:.2}` ns/work-unit and `array-heavy.iterator-runtime` measured `{:.2}` ns/work-unit.",
         items.dense_array_runtime.throughput.median_ns_per_operation,
-        items.iterator_array_runtime.throughput.median_ns_per_operation,
+        items
+            .iterator_array_runtime
+            .throughput
+            .median_ns_per_operation,
     );
-    let _ = writeln!(output, "- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
+    let _ = writeln!(
+        output,
+        "- The iterator-driven row warmed `{}` feedback slots across `{}` live sites with `{}` template bytes, so the benchmark captures real iterator lowering and VM state rather than only the older dense-element hot path.",
         opt_usize_text(items.iterator_array_runtime.memory.feedback_slots),
         opt_usize_text(items.iterator_array_runtime.memory.live_feedback_sites),
         opt_usize_text(items.iterator_array_runtime.memory.template_bytes),
     );
-    let _ = writeln!(output, "- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
+    let _ = writeln!(
+        output,
+        "- `string-heavy.concat-runtime` remains the lower-level string/runtime proxy at `{:.2}` ns/work-unit.",
         items.string_runtime.throughput.median_ns_per_operation,
     );
-    let _ = writeln!(output, "- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
+    let _ = writeln!(
+        output,
+        "- `regexp-heavy.runtime` measured `{:.2}` ns/work-unit while exercising global iteration, sticky state, match indices, and named-capture replacement through the shared matcher path.",
         items.regexp_runtime.throughput.median_ns_per_operation,
     );
-    let _ = writeln!(output, "- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
-        items.regexp_constructor_runtime
+    let _ = writeln!(
+        output,
+        "- RegExp observability rows separate constructor compilation (`{:.2}` ns/work-unit), stable default exec/test (`{:.2}` ns/work-unit), named replacement (`{:.2}` ns/work-unit), and legacy static accessor reads (`{:.2}` ns/work-unit).",
+        items
+            .regexp_constructor_runtime
             .throughput
             .median_ns_per_operation,
-        items.regexp_stable_exec_runtime
+        items
+            .regexp_stable_exec_runtime
             .throughput
             .median_ns_per_operation,
-        items.regexp_replace_runtime.throughput.median_ns_per_operation,
-        items.regexp_legacy_static_runtime
+        items
+            .regexp_replace_runtime
+            .throughput
+            .median_ns_per_operation,
+        items
+            .regexp_legacy_static_runtime
             .throughput
             .median_ns_per_operation,
     );
-    let _ = writeln!(output, "- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
+    let _ = writeln!(
+        output,
+        "- `class-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering private fields, static blocks, and `super` dispatch on the executable runtime path.",
         items.class_runtime.throughput.median_ns_per_operation,
         opt_usize_text(items.class_runtime.memory.feedback_slots),
         opt_usize_text(items.class_runtime.memory.live_feedback_sites),
         opt_usize_text(items.class_runtime.memory.template_bytes),
     );
-    let _ = writeln!(output, "- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
+    let _ = writeln!(
+        output,
+        "- `async-heavy.frontend` remains the only frontend-only async workload in the current benchmark surface. That is now a benchmark-shape gap rather than a known lowering/runtime hole, so follow-up work should add an executable async runtime row."
     );
-    let _ = writeln!(output, "- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
+    let _ = writeln!(
+        output,
+        "- `typed-array-heavy.runtime` measured `{:.2}` ns/work-unit while warming `{}` feedback slots across `{}` live sites with `{}` template bytes, covering ArrayBuffer-backed views and DataView byte traffic on the executable runtime path.",
         items.typed_array_runtime.throughput.median_ns_per_operation,
         opt_usize_text(items.typed_array_runtime.memory.feedback_slots),
         opt_usize_text(items.typed_array_runtime.memory.live_feedback_sites),
         opt_usize_text(items.typed_array_runtime.memory.template_bytes),
     );
-    let _ = writeln!(output, "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
+    let _ = writeln!(
+        output,
+        "- The seeded accounting snapshot reports `{}` promise job and `{}` backing store so the retained runtime-accounting surface is exercised by real data. Retained RegExp payloads report as a distinct runtime domain, with payload bytes treated as a lower-bound estimate because the current regex backend does not expose all internally owned tables. Iterator-heavy evidence still lives in the executable array/iterator workload rows because iterator state is transient VM execution state rather than a retained post-run runtime record.",
         items.seeded_snapshot.accounting.promise_jobs.records,
         items.seeded_snapshot.accounting.backing_stores.records,
     );
@@ -1701,13 +1746,21 @@ fn write_watch_items_section(output: &mut String, items: &RuntimeWatchItems<'_>)
 fn write_known_gaps_section(output: &mut String) {
     let _ = writeln!(output, "## Known Gaps");
     output.push('\n');
-    let _ = writeln!(output, "- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
+    let _ = writeln!(
+        output,
+        "- This report complements the dedicated bytecode-density suite rather than replacing it. The density run remains the finer-grained instruction-shape view."
     );
-    let _ = writeln!(output, "- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
+    let _ = writeln!(
+        output,
+        "- The remaining frontend-only row does not report AST or sema heap residency. Its current memory row is limited to atom payload and the explicit absence of code-template or feedback state."
     );
-    let _ = writeln!(output, "- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
+    let _ = writeln!(
+        output,
+        "- Module-cache accounting remains a future retained-runtime domain. Post-run iterator-record rows are still zero because the current iterator state is transient to active VM execution, so the benchmarked array/iterator runtime rows are the authoritative memory/perf signal for that surface."
     );
-    let _ = writeln!(output, "- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
+    let _ = writeln!(
+        output,
+        "- RegExp payload accounting is currently a lower bound: it includes source text, retained UTF-16 source units, flag text, and the `regress::Regex` struct, but not the backend's private instruction vectors, class tables, and capture metadata allocations."
     );
 }
 
@@ -2714,7 +2767,9 @@ mod tests {
         assert!(markdown.contains("Call IC mono"));
         assert!(markdown.contains("Construct created shapes"));
         assert!(markdown.contains("## Opcode Dispatch Counts"));
-        assert!(markdown.contains("| `delta-runtime` | `15` | `AddSmi`: `12`, `LoopHeader`: `3` |"));
+        assert!(
+            markdown.contains("| `delta-runtime` | `15` | `AddSmi`: `12`, `LoopHeader`: `3` |")
+        );
         assert!(markdown.contains("| `delta-runtime` | `script.runtime` | `1` | `40` | `3` | `128` | `7` | `2` | `2` | `1` | `96` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` | Synthetic memory row. |"));
 
         let json = render_json_report(

@@ -6,7 +6,7 @@ use crate::{
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, BigIntSign};
 use lyng_objects::{
-    f64_to_float16_bits, float16_bits_to_f64, TypedArrayElementKind, TypedArrayObjectData,
+    TypedArrayElementKind, TypedArrayObjectData, f64_to_float16_bits, float16_bits_to_f64,
 };
 use lyng_types::{ObjectRef, PropertyKey, Value};
 

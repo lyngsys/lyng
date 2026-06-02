@@ -17,13 +17,13 @@ pub(super) use typed_arrays::{
 };
 
 use super::{
-    array_like_index_property_key, array_like_length_u64, arrays, create_data_property_or_throw,
-    get_property_from_object, iterable_to_values_list, iterators, length_value_u64, map_completion,
-    normalize_relative_index_u64, promises, property_key_from_text, range_error,
-    string_from_code_units, string_ref_code_units, string_value, syntax_error,
-    to_bigint_for_builtin, to_boolean_for_builtin, to_index_for_builtin,
-    to_integer_or_infinity_for_builtin, to_number_for_builtin, to_string_string_ref,
-    to_uint32_for_builtin, to_uint8_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, array_like_index_property_key, array_like_length_u64, arrays,
+    create_data_property_or_throw, get_property_from_object, iterable_to_values_list, iterators,
+    length_value_u64, map_completion, normalize_relative_index_u64, promises,
+    property_key_from_text, range_error, string_from_code_units, string_ref_code_units,
+    string_value, syntax_error, to_bigint_for_builtin, to_boolean_for_builtin,
+    to_index_for_builtin, to_integer_or_infinity_for_builtin, to_number_for_builtin,
+    to_string_string_ref, to_uint8_for_builtin, to_uint32_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_types::{BuiltinFunctionId, Value};

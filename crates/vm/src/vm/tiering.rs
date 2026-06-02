@@ -1,9 +1,8 @@
-use super::{code_index, CodeRef, Vm};
+use super::{CodeRef, Vm, code_index};
 use std::num::NonZeroU32;
 
 const TIER_READY_HOTNESS_THRESHOLD: u32 = 8;
 const FEEDBACK_EVENT_WEIGHT: u32 = 1;
-// DSL-0c C6: BACKEDGE_EVENT_WEIGHT deleted with α path's backedge accounting.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TierStatus {
@@ -78,10 +77,8 @@ pub(super) struct TieringState {
     invalidation_epoch: u32,
     native_generation: Option<NonZeroU32>,
     warmup_counter: u16,
-    /// Phase D.2.4: true once the warmup counter has crossed the allocation
-    /// threshold. Replaces `feedback_vectors.get(idx).is_some()` semantics —
-    /// `FeedbackVector` is deleted; this flag is the new "has the per-code IC
-    /// side-table been activated" marker.
+    /// True once the warmup counter has crossed the allocation threshold —
+    /// the per-code IC side-tables are active.
     allocated: bool,
 }
 
@@ -152,9 +149,6 @@ impl TieringState {
         self.observe_hotness(FEEDBACK_EVENT_WEIGHT.saturating_mul(count));
     }
 
-    // DSL-0c C6: observe_backedge_event deleted with α path's
-    // backedge accounting.
-
     #[inline]
     pub(super) const fn warmup_counter(&self) -> u16 {
         self.warmup_counter
@@ -173,15 +167,12 @@ impl TieringState {
         self.warmup_counter
     }
 
-    /// Phase D.2.4: returns `true` once the per-code IC side-tables have been
-    /// activated (warmup threshold crossed). Replaces the old
-    /// `feedback_vectors.get(idx).is_some()` check.
+    /// Returns `true` once the per-code IC side-tables have been activated.
     #[inline]
     pub(super) const fn is_allocated(&self) -> bool {
         self.allocated
     }
 
-    /// Phase D.2.4: mark this code as having its IC side-tables activated.
     #[inline]
     pub(super) const fn mark_allocated(&mut self) {
         self.allocated = true;
@@ -210,10 +201,9 @@ impl TieringState {
 /// `EvaluateScript::with_tiering` / `EvaluateInstalled::with_tiering`, then
 /// read snapshots off the caller-owned struct afterwards.
 ///
-/// The current shape is scaffolding for an eventual JSC-style tier ladder
-/// (`LLInt` → Baseline → DFG → FTL). DSL-0c (§2, §6, §10) deliberately defers
-/// the JIT and tier accounting; this struct exists so the bookkeeping can
-/// be opt-in at near-zero cost until that work lands.
+/// Scaffolding for an eventual JSC-style tier ladder (`LLInt` → Baseline → DFG →
+/// FTL). JIT tier accounting is deferred; this struct exists so the bookkeeping
+/// can be opt-in at near-zero cost until that work lands.
 pub struct Tiering {
     states: Vec<Option<TieringState>>,
     enabled: bool,
@@ -320,10 +310,6 @@ impl Tiering {
         }
     }
 
-    // DSL-0c C6: observe_backedge_event deleted with α path's
-    // backedge accounting. The interpreter has no tier-up accounting
-    // post-DSL-0c (design §6 + §10).
-
     /// Return the warmup counter for `code`, or 0 if no slot exists yet.
     /// Works on both enabled and disabled `Tiering` stores.
     #[inline]
@@ -334,8 +320,7 @@ impl Tiering {
             .map_or(0, TieringState::warmup_counter)
     }
 
-    /// Phase D.2.4: returns `true` if the IC side-tables for `code` have been
-    /// activated (warmup threshold crossed). Returns `false` for unknown codes.
+    /// Returns `true` if the IC side-tables for `code` have been activated.
     #[inline]
     pub(super) fn is_allocated(&self, code: CodeRef) -> bool {
         self.states
@@ -344,7 +329,7 @@ impl Tiering {
             .is_some_and(TieringState::is_allocated)
     }
 
-    /// Phase D.2.4: mark the IC side-tables for `code` as activated.
+    /// Mark the IC side-tables for `code` as activated.
     /// Lazily inserts a default slot if none exists.
     #[inline]
     pub(super) fn mark_allocated(&mut self, code: CodeRef) {

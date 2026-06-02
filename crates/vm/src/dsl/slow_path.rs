@@ -1,16 +1,12 @@
-//! Slow-path bridge: semantic-outcome type + per-opcode argument structs
-//! + (DSL-0b) the `LlIntDispatchState` wrapper and `SlowPathReturn` ABI.
-//!
-//! During DSL-0a only `SemanticOutcome`, the `OpXxxArgs` structs, and the
-//! transitional `LlIntDispatchState` alias are populated. The asm-facing
-//! shim layer and `SlowPathReturn`/`SlowPathTag` lands in DSL-0b.
+//! Slow-path bridge: semantic-outcome type, `LlIntDispatchState` wrapper,
+//! and `SlowPathReturn` ABI.
 
 use lyng_types::{CodeRef, FeedbackSlotId, Value};
 
 use crate::error::{VmError, VmResult};
 
-/// Logical outcome of a semantic-body invocation. The α handler maps
-/// this to `Step`; the DSL cold-stub shim maps it to `SlowPathReturn`.
+/// Logical outcome of a semantic-body invocation. Cold-stub shims map
+/// this to `SlowPathReturn`; the alpha path maps it to `Step`.
 #[derive(Debug)]
 pub enum SemanticOutcome {
     /// Dispatch continues at the post-instruction PC. `pc_advance` is
@@ -31,26 +27,17 @@ pub enum SemanticOutcome {
 use crate::dsl::llint_state::{LlIntRustContext, LlIntState};
 use crate::vm::dispatch_state::DispatchState;
 
-/// Safe wrapper around a per-frame dispatch state.
-///
-/// During DSL-0a this holds a `&mut DispatchState<'vm>` directly — the
-/// asm bridge does not exist yet, so semantic bodies reach VM state via
-/// the legacy `DispatchState` accessors re-exposed here. In DSL-0b the
-/// wrapper is also reachable through `LlIntDispatchState::from_raw`,
-/// which reconstructs it from a `*mut LlIntState` passed by the asm
-/// shim. The semantic body sees identical method signatures in both
-/// paths — that's the single-implementation invariant in action.
+/// Safe wrapper around a per-frame dispatch state. Semantic bodies see
+/// the same method signatures regardless of whether the caller is the
+/// alpha path or the asm shim path.
 pub struct LlIntDispatchState<'vm, 'borrow> {
     pub(crate) inner: LlIntDispatchInner<'vm, 'borrow>,
 }
 
 pub(crate) enum LlIntDispatchInner<'vm, 'borrow> {
-    /// Borrowed from a live `DispatchState` (alpha path, transitional).
+    /// Borrowed from a live `DispatchState` (alpha path).
     Alpha(&'borrow mut DispatchState<'vm>),
-    /// Reconstructed from a raw `*mut LlIntState` passed by the asm
-    /// trampoline + an opaque-cast `&mut LlIntRustContext<'vm>`. The
-    /// asm side never reads through `state.rust_context`; the slow-path
-    /// shim casts it back to the Rust context borrow.
+    /// Reconstructed from a `*mut LlIntState` passed by the asm trampoline.
     Asm {
         state: *mut LlIntState,
         rust: &'borrow mut LlIntRustContext<'vm>,
@@ -58,8 +45,7 @@ pub(crate) enum LlIntDispatchInner<'vm, 'borrow> {
 }
 
 impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
-    /// Construct from a live α `DispatchState`. The α handler in
-    /// `dispatch_handlers/` calls this to forward into `op_xxx_semantic`.
+    /// Construct from an alpha `DispatchState`.
     pub const fn from_alpha(state: &'borrow mut DispatchState<'vm>) -> Self {
         Self {
             inner: LlIntDispatchInner::Alpha(state),
@@ -85,11 +71,7 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         }
     }
 
-    /// Mutable access to the underlying `DispatchState`. Works on both
-    /// dispatch variants: α handlers borrow the existing
-    /// `DispatchState`; asm-path shims unpack the same shape from
-    /// `LlIntRustContext::dispatch`. Semantic bodies under
-    /// `crate::vm::semantics::` consume this uniformly.
+    /// Mutable access to the underlying `DispatchState`.
     pub const fn dispatch_state(&mut self) -> &mut DispatchState<'vm> {
         match &mut self.inner {
             LlIntDispatchInner::Alpha(state) => state,
@@ -97,79 +79,45 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         }
     }
 
-    /// Typed accessor for the current instruction offset. Works on
-    /// both α (legacy `DispatchState`) and asm-constructed dispatch
-    /// states — design §6 invariant: after [`Self::sync_from_asm`]
-    /// the asm side's `state.frame_pc_offset` and the Rust side's
-    /// `rust.dispatch.frame.instruction_offset()` are in sync, so
-    /// reading either is correct.
-    ///
-    /// Used by the DSL-0b validation cases (B32 PC-sync) and by
-    /// callers that need PC inspection without going through
-    /// `dispatch_state()`.
+    /// Current instruction offset. After `sync_from_asm`, `state.frame_pc_offset`
+    /// and `rust.dispatch.pc` are in sync so reading either is correct.
     #[inline]
     pub const fn current_instruction_offset(&self) -> u32 {
         match &self.inner {
-            LlIntDispatchInner::Alpha(state) => state.frame.instruction_offset(),
-            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.frame.instruction_offset(),
+            LlIntDispatchInner::Alpha(state) => state.pc,
+            LlIntDispatchInner::Asm { rust, .. } => rust.dispatch.pc,
         }
     }
 
-    /// Pre-slow-path sync — copy asm-side mirrors into the Rust-side
-    /// snapshot before semantic code observes the frame. See design §6.
-    ///
-    /// Idempotent on the α variant (asm mirrors do not exist there;
-    /// `rust.dispatch.frame` is already authoritative).
+    /// Copy asm-side mirrors into the Rust-side state before a semantic body
+    /// runs. Idempotent on the alpha variant.
     pub fn sync_from_asm(&mut self) {
         if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-            // SAFETY: `state` is valid by `from_raw`'s contract; we
-            // only read scalar fields here.
-            unsafe {
-                rust.dispatch
-                    .frame
-                    .set_instruction_offset((**state).frame_pc_offset);
-            }
-            // registers_base is mirrored back via the `Refresh` path
-            // in `translate_outcome`; semantic bodies read through
-            // the register window, which is still authoritative on
-            // entry (the asm side has not relocated it).
+            // Refresh the live PC from the asm-side mirror before any semantic
+            // body observes it. Header fields come straight from the overlay.
+            // SAFETY: `state` is valid by `from_raw`'s contract; scalar read.
+            rust.dispatch.pc = unsafe { (**state).frame_pc_offset };
         }
     }
 
-    /// Translate a [`SemanticOutcome`] into the asm-facing
-    /// [`SlowPathReturn`]. Used by every asm-facing cold-stub shim.
-    ///
-    /// On the α variant this is a no-op (returns `Continue, 0`) — the
-    /// alpha path uses `translate_outcome_to_step` in
-    /// `dispatch_handlers/` and never calls this translator. Hitting
-    /// the no-op branch is not an error; callers may invoke it
-    /// uniformly across both variants.
+    /// Translate a [`SemanticOutcome`] into the asm-facing [`SlowPathReturn`].
+    /// On the alpha variant the return value is unused (the alpha path reads
+    /// the outcome via `translate_outcome_to_step` instead).
     #[allow(
         clippy::too_many_lines,
         reason = "outcome translation is one state machine over all egress modes; splitting would hide the shared refresh/exit invariants"
     )]
     pub fn translate_outcome(&mut self, outcome: SemanticOutcome) -> SlowPathReturn {
-        // Re-sync the asm-read global-IC generation mirror on EVERY slow-stub
-        // egress, before asm dispatch can resume. A global structural mutation
-        // (`delete globalThis.x`, `Object.defineProperty(globalThis, ...)`, sloppy
-        // global creation) runs inside a slow path and bumps the agent's
-        // `global_structure_generation`; the asm `LoadGlobal` mode-7 hit guards a
-        // cached value-cell ref on `metadata.generation == this mirror`, so the
-        // mirror MUST be current before the next possible hit. Refreshing here —
-        // the single choke point all slow returns pass through before asm resumes
-        // — covers all four bump sites uniformly. Cheap: one Vec index + store on
-        // the cached global env (no env-chain walk), only on the cold path. We
-        // refresh on all outcomes (incl. Exit) rather than only the
-        // dispatch-resuming Continue/Refresh arms, so no bump path can slip
-        // through — correctness over saving one branch.
+        // Refresh the global-IC generation mirror on every slow-stub egress.
+        // Any global structural mutation inside a slow path bumps the agent's
+        // `global_structure_generation`; the asm `LoadGlobal` mode-7 hit guards
+        // against a stale mirror, so it must be current before asm resumes.
+        // Refreshing unconditionally here covers all bump sites at one choke point.
         if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
-            // Derive the env from the ACTIVE frame's realm, not the cached
-            // entry-realm env: a cross-realm Call egresses here with the callee
-            // frame already pushed onto `vm.frames()`, so re-priming from that
-            // frame's realm makes the mirror track the realm whose code is about
-            // to resume — a mode-7 hit then compares against the correct realm's
-            // generation. No active frame (program exit) → leave the mirror as-is.
-            if let Some(realm) = rust.dispatch.vm.frames().last().map(|f| f.realm()) {
+            // Use the active frame's realm, not the cached entry-realm: after a
+            // cross-realm Call the callee frame is already on `vm.frames()`, so
+            // the mirror must track that frame's realm's generation.
+            if let Some(realm) = rust.dispatch.vm.current_realm_of(rust.dispatch.agent) {
                 rust.dispatch
                     .vm
                     .refresh_global_ic_generation_for_realm(rust.dispatch.agent, realm);
@@ -177,66 +125,42 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
         }
         match outcome {
             SemanticOutcome::Continue { pc_advance } => {
-                // Epoch check — mirrors α's `run_trampoline` loop body
-                // (see `vm::dispatch_state::run_trampoline`). When a
-                // semantic body calls `handle_dispatch_result` and a
-                // throw was caught in a higher frame (cross-frame
-                // catch), the helper unwinds frames and bumps the
-                // dispatch-frame-check epoch via
-                // `request_dispatch_frame_check`. The caller frame's
-                // `rust.dispatch.frame` is now stale (it's still the
-                // pre-throw frame), but the active frame is whichever
-                // frame caught the throw — its PC was rewritten by
-                // `transfer_to_exception_handler`. We must promote
-                // this `Continue` into a `Refresh` so the bridge
-                // reloads PC/REGS/MT from `vm.frames().last()`.
-                //
-                // Under α, the trampoline loop does this check between
-                // every handler call. Under DSL, the asm bridge does
-                // NOT — so we do it here in the slow-path egress.
+                // Cross-frame catch check: if a throw was caught in a higher frame,
+                // `request_dispatch_frame_check` bumps the epoch. Promote `Continue`
+                // to `Refresh` so the bridge reloads PC/REGS/MT for the catch frame.
+                // (The alpha path checks this between every handler call.)
                 if let LlIntDispatchInner::Asm { state: _, rust } = &mut self.inner {
                     let vm_epoch = rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
                     if rust.dispatch.frame_check_epoch != vm_epoch
-                        && rust.dispatch.vm.frames().len() != rust.dispatch.frame_depth
+                        && rust.dispatch.vm.frame_depth() != rust.dispatch.frame_depth
                     {
-                        // Cross-frame catch — recurse into the Refresh
-                        // arm so we share the frame-reload logic.
+                        // Cross-frame catch — reload frame state via Refresh.
                         return self.translate_outcome(SemanticOutcome::Refresh);
                     }
                     rust.dispatch.frame_check_epoch = vm_epoch;
                 }
-                // REGS-pin refresh — the asm-side `x20` register pins
-                // the active frame's register-stack base. When a slow
-                // path triggers a nested call (e.g. `op_add_semantic`
-                // → ToPrimitive → valueOf bytecode) and the nested
-                // call's `reserve_register_window` reallocates the
-                // underlying `Vec<Value>`, the old base pointer in
-                // `x20` is freed — even when frame depth is unchanged
-                // after the nested call returns. Recompute REGS from
-                // the live `Vm::register_stack_storage_mut_ptr` on
-                // every Continue egress so the asm bridge picks up
-                // the post-reallocation base. PC stays sourced from
-                // `rust.dispatch.frame` so handler-local PC advances
-                // (which haven't been synced to `vm.frames`) are
-                // preserved — matching α's `still_active` policy that
-                // never clobbers PC on a same-frame epoch bump.
+                // Refresh REGS from the live storage pointer on every Continue
+                // egress so the bridge re-derives the active frame's window base
+                // after any frame-depth change. The arena never reallocates, so
+                // the pointer is stable; we recompute to pick up any window shift.
+                // PC stays sourced from `rust.dispatch.pc` (handler-local advances
+                // are not yet synced to the overlay).
                 let mut new_offset_u64: u64 = 0;
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-                    let new_offset = rust
-                        .dispatch
-                        .frame
-                        .instruction_offset()
-                        .wrapping_add(pc_advance);
+                    // Same-frame egress: source PC from the thin view, which is kept
+                    // current by all Continue-returning paths. Advance by `pc_advance`.
+                    let new_offset = rust.dispatch.pc.wrapping_add(pc_advance);
                     new_offset_u64 = u64::from(new_offset);
-                    let active_frame = rust.dispatch.frame;
+                    rust.dispatch.pc = new_offset;
                     let regs_base_ptr = {
-                        let base = active_frame.registers().base() as usize;
-                        // SAFETY: register window is reserved on the
-                        // active frame; one-past-the-end is well-defined.
+                        // Window base = cfr + HEADER_SLOTS.
+                        let base =
+                            (rust.dispatch.cfr + crate::frame_header::HEADER_SLOTS as u32) as usize;
+                        // SAFETY: window is reserved on the arena; one-past-the-end is valid.
                         unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
                     };
                     let mt_base: *mut u8 = {
-                        let index = crate::vm::code_index_for_dsl(active_frame.code());
+                        let index = crate::vm::code_index_for_dsl(rust.dispatch.code_ref);
                         rust.dispatch
                             .vm
                             .metadata_tables
@@ -254,14 +178,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                         .heap()
                         .view()
                         .value_cell_ptr_table_base();
-                    // SAFETY: state is valid by from_raw's contract;
-                    // we hold a unique borrow through `self`. Mirror
-                    // the new PC back into `state.frame_pc_offset` so
-                    // a subsequent slow-path Refresh — or the test
-                    // harness, which reads via state — sees the
-                    // authoritative value. Likewise refresh REGS/MT
-                    // so the asm bridge's next dispatch picks up any
-                    // reallocation that happened during nested calls.
+                    // SAFETY: state is valid by `from_raw`'s contract; unique borrow via `self`.
+                    // Mirror the new PC into `state.frame_pc_offset` and refresh REGS/MT.
                     unsafe {
                         (**state).frame_pc_offset = new_offset;
                         (**state).frame_regs_base = regs_base_ptr;
@@ -272,11 +190,8 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
                     }
                     rust.dispatch.refresh_dsl_poll_pending();
                 }
-                // The asm bridge's `dispatch_after_slow!` Continue
-                // arm reads the new pc_offset from `x1` (`payload`)
-                // directly to skip the memory round-trip on the
-                // Continue arm. Mirror it here for the asm side. (The
-                // α variant ignores `payload`.)
+                // `dispatch_after_slow!` reads the new PC from `payload` directly
+                // to avoid a memory round-trip on the Continue arm.
                 SlowPathReturn {
                     tag: SlowPathTag::Continue as u64,
                     payload: new_offset_u64,
@@ -284,127 +199,112 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
             }
             SemanticOutcome::Refresh => {
                 if let LlIntDispatchInner::Asm { state, rust } = &mut self.inner {
-                    // Always pull the active frame from `vm.frames().last()`
-                    // — mirrors α's `refresh_from_active_frame()`. This
-                    // covers all three Refresh callers uniformly:
-                    //   - call/return: frame stack depth changed, the new
-                    //     top frame is the callee/caller.
-                    //   - cross-frame catch: depth decreased, top frame
-                    //     was rewritten to the handler PC.
-                    //   - same-frame catch: depth unchanged, but
-                    //     `transfer_to_exception_handler` rewrote
-                    //     `vm.frames.last_mut().instruction_offset` to the
-                    //     handler target. `rust.dispatch.frame` is a
-                    //     `Copy` snapshot of the pre-throw frame and is
-                    //     stale; only `vm.frames().last()` has the
-                    //     authoritative post-catch PC.
-                    let current_depth = rust.dispatch.vm.frames().len();
-                    if let Some(active) = rust.dispatch.vm.frames().last().copied() {
-                        rust.dispatch.frame = active;
-                    }
-                    rust.dispatch.frame_depth = current_depth;
-                    // Refresh `installed` unconditionally as well — even
-                    // for same-frame catch the code identity is the same,
-                    // but `installed_for_dsl_runtime` is a cheap lookup
-                    // and matches α's `refresh_from_active_frame()`
-                    // unconditional reinstall.
-                    let installed = rust
-                        .dispatch
-                        .vm
-                        .installed_for_dsl_runtime(rust.dispatch.frame.code())
-                        .unwrap_or_else(|| rust.dispatch.installed.clone());
-                    rust.dispatch.installed = installed;
-                    // Sync the frame-check epoch — α does this in
-                    // `refresh_from_active_frame`. Keeps the DSL Refresh
-                    // path observationally identical to α.
-                    rust.dispatch.frame_check_epoch =
-                        rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
-                    let active_frame = rust.dispatch.frame;
-                    let regs_base_ptr = {
-                        let base = active_frame.registers().base() as usize;
-                        // SAFETY: register window is reserved on the
-                        // active frame; one-past-the-end is well-defined.
-                        unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
-                    };
-                    let pb_base = rust
-                        .dispatch
-                        .installed
-                        .function()
-                        .instruction_bytes()
-                        .as_ptr();
-                    let mt_base: *mut u8 = {
-                        let index = crate::vm::code_index_for_dsl(active_frame.code());
-                        rust.dispatch
+                    // Frame-switch reload: source all asm-visible fields from the
+                    // per-frame header overlay. Covers call/return (depth change),
+                    // cross-frame catch (depth decreased; saved_pc rewritten by
+                    // `transfer_to_exception_handler`), and same-frame catch
+                    // (saved_pc rewritten in place). Reading `saved_pc` here is
+                    // correct — unlike Continue which uses the live thin-view PC.
+                    let current_depth = rust.dispatch.vm.frame_depth();
+                    if let Some(cfr) = rust.dispatch.vm.current_cfr_opt() {
+                        let code = rust.dispatch.vm.frame_header(cfr).code();
+                        let regs_len = rust.dispatch.vm.frame_window_len(cfr);
+                        let saved_pc = rust.dispatch.vm.frame_header(cfr).saved_pc();
+                        let installed = rust
+                            .dispatch
                             .vm
-                            .metadata_tables
-                            .get(index)
-                            .and_then(|t| t.as_ref())
-                            .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
-                    };
-                    let object_records_base =
-                        rust.dispatch.agent.heap().view().object_record_ptr_table();
-                    let object_slots_base =
-                        rust.dispatch.agent.heap().view().object_slots_ptr_table();
-                    let value_cells_base = rust
-                        .dispatch
-                        .agent
-                        .heap()
-                        .view()
-                        .value_cell_ptr_table_base();
-                    // Phase 1.B.1: derive the new fields for the
-                    // active frame. Identical chain to the entry shim
-                    // in entry.rs::run_via_dsl. See spec §3.4.
-                    let const_base: *const lyng_types::Value = rust
-                        .dispatch
-                        .agent
-                        .heap()
-                        .view()
-                        .code(active_frame.code())
-                        .and_then(lyng_gc::RuntimeCodeRecord::constants)
-                        .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
-                        .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
-
-                    // Phase 1.B.1: refresh the `this` mirror. Captures
-                    // super() mutations and any other slow-path
-                    // changes to frame.this_value().
-                    let this_value =
-                        crate::dsl::llint_state::resolve_initial_this_value(&active_frame);
-                    // SAFETY: state is valid by from_raw's contract.
-                    unsafe {
-                        (**state).frame_pc_offset = active_frame.instruction_offset();
-                        (**state).frame_pb_base = pb_base;
-                        (**state).frame_regs_base = regs_base_ptr;
-                        (**state).frame_metadata_table_base = mt_base;
-                        (**state).object_records_base = object_records_base;
-                        (**state).object_slots_base = object_slots_base;
-                        (**state).value_cells_base = value_cells_base;
-                        // Phase 1.B.1: refresh the new fields.
-                        (**state).frame_const_base = const_base;
-                        (**state).frame_this_value = this_value;
-                    }
-                    // Phase 1.B.1: debug-only stability assertion.
-                    // The arena slot's data pointer must be stable
-                    // across the slow-path call. If this fires, the
-                    // arena moved under us — investigate before
-                    // disabling. Matches the implicit invariant
-                    // `frame_pb_base` already relies on. See spec §3.6.
-                    #[cfg(debug_assertions)]
-                    {
-                        let recomputed: *const lyng_types::Value = rust
+                            .installed_for_dsl_runtime(code)
+                            .unwrap_or_else(|| rust.dispatch.installed.clone());
+                        // Update the thin view.
+                        rust.dispatch.cfr = cfr;
+                        rust.dispatch.pc = saved_pc;
+                        rust.dispatch.code_ref = code;
+                        rust.dispatch.regs_len = regs_len;
+                        rust.dispatch.frame_depth = current_depth;
+                        rust.dispatch.installed = installed;
+                        // Sync the frame-check epoch.
+                        rust.dispatch.frame_check_epoch =
+                            rust.dispatch.vm.dispatch_frame_check_epoch_for_dsl();
+                        // Populate LlIntState mirrors from the overlay; window base = cfr + HEADER_SLOTS.
+                        let regs_base_ptr = {
+                            let base = (cfr + crate::frame_header::HEADER_SLOTS as u32) as usize;
+                            // SAFETY: window is reserved on the active frame.
+                            unsafe { rust.dispatch.vm.register_stack_storage_mut_ptr().add(base) }
+                        };
+                        let pb_base = rust
+                            .dispatch
+                            .installed
+                            .function()
+                            .instruction_bytes()
+                            .as_ptr();
+                        let mt_base: *mut u8 = {
+                            let index = crate::vm::code_index_for_dsl(code);
+                            rust.dispatch
+                                .vm
+                                .metadata_tables
+                                .get(index)
+                                .and_then(|t| t.as_ref())
+                                .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
+                        };
+                        let object_records_base =
+                            rust.dispatch.agent.heap().view().object_record_ptr_table();
+                        let object_slots_base =
+                            rust.dispatch.agent.heap().view().object_slots_ptr_table();
+                        let value_cells_base = rust
                             .dispatch
                             .agent
                             .heap()
                             .view()
-                            .code(active_frame.code())
+                            .value_cell_ptr_table_base();
+                        // Derive per-frame fields; mirrors the entry shim in entry.rs::run_via_dsl.
+                        let const_base: *const lyng_types::Value = rust
+                            .dispatch
+                            .agent
+                            .heap()
+                            .view()
+                            .code(code)
                             .and_then(lyng_gc::RuntimeCodeRecord::constants)
                             .and_then(|slots| rust.dispatch.agent.heap().view().code_slots(slots))
                             .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
-                        debug_assert_eq!(
-                            const_base, recomputed,
-                            "frame_const_base unstable across Refresh"
-                        );
+                        // Refresh the `this` mirror from the overlay.
+                        let this_value =
+                            crate::dsl::llint_state::resolve_initial_this_value_from_header(
+                                rust.dispatch.vm.frame_header(cfr),
+                            );
+                        // SAFETY: state is valid by `from_raw`'s contract.
+                        unsafe {
+                            (**state).frame_pc_offset = saved_pc;
+                            (**state).frame_pb_base = pb_base;
+                            (**state).frame_regs_base = regs_base_ptr;
+                            (**state).frame_metadata_table_base = mt_base;
+                            (**state).object_records_base = object_records_base;
+                            (**state).object_slots_base = object_slots_base;
+                            (**state).value_cells_base = value_cells_base;
+                            (**state).frame_const_base = const_base;
+                            (**state).frame_this_value = this_value;
+                        }
+                        // Debug: assert `frame_const_base` is stable across the
+                        // slow-path call. If this fires, the arena moved unexpectedly.
+                        #[cfg(debug_assertions)]
+                        {
+                            let recomputed: *const lyng_types::Value = rust
+                                .dispatch
+                                .agent
+                                .heap()
+                                .view()
+                                .code(code)
+                                .and_then(lyng_gc::RuntimeCodeRecord::constants)
+                                .and_then(|slots| {
+                                    rust.dispatch.agent.heap().view().code_slots(slots)
+                                })
+                                .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
+                            debug_assert_eq!(
+                                const_base, recomputed,
+                                "frame_const_base unstable across Refresh"
+                            );
+                        }
+                        rust.dispatch.refresh_dsl_poll_pending();
                     }
-                    rust.dispatch.refresh_dsl_poll_pending();
                 }
                 SlowPathReturn {
                     tag: SlowPathTag::Refresh as u64,
@@ -435,18 +335,16 @@ impl<'vm, 'borrow> LlIntDispatchState<'vm, 'borrow> {
     }
 }
 
-/// asm-facing return ABI for cold-stub shims. The asm bridge reads
-/// `tag` and dispatches on it (`Continue` / `Refresh` / `Exit`).
-/// `payload` is reserved for future single-word returns (e.g. a packed
-/// PC delta); DSL-0b leaves it zero.
+/// Return ABI for cold-stub shims. The asm bridge dispatches on `tag`
+/// (`Continue` / `Refresh` / `Exit`); `payload` carries the new PC
+/// offset on `Continue`.
 #[repr(C)]
 pub struct SlowPathReturn {
     pub tag: u64,
     pub payload: u64,
 }
 
-/// Tag values used by [`SlowPathReturn::tag`]. The integers are part of
-/// the asm-DSL ABI — backend code may hard-code the constants.
+/// Tag values for [`SlowPathReturn::tag`]. Part of the asm-DSL ABI.
 #[repr(u64)]
 pub enum SlowPathTag {
     Continue = 0,
@@ -535,7 +433,7 @@ impl LlIntDispatchState<'_, '_> {
     #[inline]
     pub(crate) fn decode_current_abx_operands(&mut self) -> VmResult<NoDecodeAbxOperands> {
         let inner = self.dispatch_state();
-        let pc = inner.frame.instruction_offset();
+        let pc = inner.pc();
         let code = inner.code();
         let bytes = inner
             .installed
@@ -552,7 +450,7 @@ impl LlIntDispatchState<'_, '_> {
     #[inline]
     pub(crate) fn decode_current_abc_operands(&mut self) -> VmResult<NoDecodeAbcOperands> {
         let inner = self.dispatch_state();
-        let pc = inner.frame.instruction_offset();
+        let pc = inner.pc();
         let code = inner.code();
         let bytes = inner
             .installed
@@ -569,7 +467,7 @@ impl LlIntDispatchState<'_, '_> {
     #[inline]
     pub(crate) fn decode_current_abc_slot_operands(&mut self) -> VmResult<NoDecodeAbcSlotOperands> {
         let inner = self.dispatch_state();
-        let pc = inner.frame.instruction_offset();
+        let pc = inner.pc();
         let code = inner.code();
         let bytes = inner
             .installed
@@ -584,12 +482,9 @@ impl LlIntDispatchState<'_, '_> {
     }
 }
 
-/// Generate an asm-facing cold-stub shim from a semantic body. Keeps
-/// every cold stub's wrapper to one declaration site. Emits a
-/// `#[no_mangle] pub extern "C" fn` that reconstructs an
-/// `LlIntDispatchState` from the raw `*mut LlIntState`, mirrors asm
-/// state into the Rust context, dispatches to the semantic body, and
-/// translates the outcome back into a `SlowPathReturn`.
+/// Generate an asm-facing cold-stub shim. Emits a `#[no_mangle] pub extern "C" fn`
+/// that reconstructs `LlIntDispatchState`, calls the semantic body, and
+/// translates the outcome to `SlowPathReturn`.
 ///
 /// Example:
 /// ```ignore
@@ -613,9 +508,7 @@ macro_rules! dsl_cold_shim {
             state: *mut $crate::dsl::llint_state::LlIntState,
             $($field: $field_ty),*
         ) -> $crate::dsl::slow_path::SlowPathReturn {
-            // SAFETY: `state` is a valid `*mut LlIntState` for the
-            // duration of this call; the asm bridge upholds the
-            // contract documented on `LlIntDispatchState::from_raw`.
+            // SAFETY: `state` is valid for this call; see `from_raw` contract.
             let mut dispatch = unsafe {
                 $crate::dsl::slow_path::LlIntDispatchState::from_raw(state)
             };

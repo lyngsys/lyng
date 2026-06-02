@@ -1,17 +1,18 @@
 use super::{
-    allocate_iterator_object, create_data_property_or_throw, create_iterator_result_value,
-    get_iterator_flattenable, iterator, iterator_helper_active_record, iterator_helper_counter,
+    AbruptCompletion, AtomId, BuiltinInvocation, BuiltinIteratorBridge,
+    ITERATOR_HELPER_COUNTER_SLOT, ITERATOR_HELPER_ITERATED_SLOT, ITERATOR_HELPER_NEXT_METHOD_SLOT,
+    ITERATOR_HELPER_SEQUENCE_BASE_SLOT, ITERATOR_ZIP_ALIVE_OFFSET, ITERATOR_ZIP_ITERATED_OFFSET,
+    ITERATOR_ZIP_KEY_KIND_OFFSET, ITERATOR_ZIP_KEY_PAYLOAD_OFFSET, ITERATOR_ZIP_NEXT_METHOD_OFFSET,
+    ITERATOR_ZIP_PADDING_OFFSET, ITERATOR_ZIP_RECORD_WIDTH, IteratorHelperKind,
+    IteratorZipCollectedRecord, IteratorZipKey, IteratorZipMode, ObjectRef, OrdinaryObjectData,
+    PropertyKey, PublicBuiltinDispatchContext, Value, WellKnownSymbolId, allocate_iterator_object,
+    create_data_property_or_throw, create_iterator_result_value, get_iterator_flattenable,
+    iterator, iterator_helper_active_record, iterator_helper_counter,
     iterator_helper_sequence_count, iterator_slot_value_for_builtin,
     number_to_u32_after_range_check, numbers_are_equal, property_key_from_text,
     proxy_get_own_property, proxy_get_prototype_of, proxy_own_property_keys,
     set_iterator_helper_done, set_iterator_slot_value_for_builtin, string_ref_text, type_error,
-    u64_to_value, AbruptCompletion, AtomId, BuiltinInvocation, BuiltinIteratorBridge,
-    IteratorHelperKind, IteratorZipCollectedRecord, IteratorZipKey, IteratorZipMode, ObjectRef,
-    OrdinaryObjectData, PropertyKey, PublicBuiltinDispatchContext, Value, WellKnownSymbolId,
-    ITERATOR_HELPER_COUNTER_SLOT, ITERATOR_HELPER_ITERATED_SLOT, ITERATOR_HELPER_NEXT_METHOD_SLOT,
-    ITERATOR_HELPER_SEQUENCE_BASE_SLOT, ITERATOR_ZIP_ALIVE_OFFSET, ITERATOR_ZIP_ITERATED_OFFSET,
-    ITERATOR_ZIP_KEY_KIND_OFFSET, ITERATOR_ZIP_KEY_PAYLOAD_OFFSET, ITERATOR_ZIP_NEXT_METHOD_OFFSET,
-    ITERATOR_ZIP_PADDING_OFFSET, ITERATOR_ZIP_RECORD_WIDTH,
+    u64_to_value,
 };
 
 pub(super) fn iterator_concat_builtin<Cx: PublicBuiltinDispatchContext>(

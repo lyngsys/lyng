@@ -6,3 +6,6 @@ edition.workspace = true
 [dependencies]
 lyng-common = { workspace = true }
 lyng-ast = { workspace = true }
+
+[lints]
+workspace = true

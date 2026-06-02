@@ -1,8 +1,8 @@
 use super::{
     AgentId, AgentJobQueues, AllocationLifetime, AtomTable, BootstrapAtoms, EnvironmentLayout,
-    EnvironmentMetadata, GlobalSymbolRegistry, HostAgentId, HostThreadId,
-    Intrinsics, ModuleRecord, ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata,
-    RealmRef, RegExpLegacyStaticState, RunningContext, WellKnownSymbols,
+    EnvironmentMetadata, GlobalSymbolRegistry, HostAgentId, HostThreadId, Intrinsics, ModuleRecord,
+    ObjectRuntime, PrimitiveHeap, PrimitiveRoots, RealmMetadata, RealmRef, RegExpLegacyStaticState,
+    RunningContext, WellKnownSymbols,
 };
 use lyng_gc::{ObjectHandleStoreTarget, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::ModuleKey;
@@ -240,7 +240,7 @@ impl Agent {
     }
 
     #[inline]
-    pub fn set_running_context(&mut self, running_context: Option<RunningContext>) {
+    pub const fn set_running_context(&mut self, running_context: Option<RunningContext>) {
         self.running_context = running_context;
     }
 

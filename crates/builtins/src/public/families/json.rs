@@ -3,16 +3,16 @@ use super::descriptors::{
     readonly_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, JsonFamilyBuiltins, JsonFamilyObjects,
+    FamilyInstallContext, JsonFamilyBuiltins, JsonFamilyObjects, install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::AtomId;
 use lyng_env::Agent;
 use lyng_types::{
-    json_is_raw_json_builtin, json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
-    BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId,
+    BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId, json_is_raw_json_builtin,
+    json_parse_builtin, json_raw_json_builtin, json_stringify_builtin,
 };
 
 pub(in crate::public) fn install_json_family(

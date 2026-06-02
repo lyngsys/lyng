@@ -6,7 +6,7 @@ use super::{
     RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, ShapeId, StringRef, SuspendedExecutionRef,
     SuspendedRegistersRef, SymbolRef, Value,
 };
-use crate::{card_table::CardDomain, HeapWriter};
+use crate::{HeapWriter, card_table::CardDomain};
 
 impl PrimitiveHeap {
     pub(crate) fn cache_string_hash(&mut self, id: StringRef) -> Option<u32> {

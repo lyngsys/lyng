@@ -1365,3 +1365,72 @@ fn subclassed_generator_function_constructors_preserve_generator_descriptors() {
 
     assert_eq!(result, Value::from_bool(true));
 }
+
+// Guard: local variable and `this` must survive a generator yield
+// round-trip through the arena's [header][window] layout.  If the window
+// restore skips HEADER_SLOTS, locals read back as undefined; if the overlay
+// `this_value` field isn't reseeded, the generator reads the wrong `this`.
+#[test]
+fn generator_snapshot_restore_round_trips_window_and_this() {
+    // local `a = 1` is set before yield; `a + 1` is returned after resume.
+    // If the window restore is incorrect, `a` reads as undefined → NaN, not 2.
+    let unit = compile_test_unit(
+        7401,
+        r"
+            function* g() {
+                var a = 1;
+                yield;
+                return a + 1;
+            }
+            var iter = g();
+            iter.next();            // advance past SuspendGeneratorStart, hit yield
+            iter.next().value;      // resume, run `return a + 1`, get value
+        ",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
+
+    assert_eq!(
+        result,
+        Value::from_smi(2),
+        "local `a` must survive the yield round-trip through the arena window"
+    );
+}
+
+#[test]
+fn generator_snapshot_restore_round_trips_this_value() {
+    // A generator method yields once, then reads `this.x` after resume.
+    // The overlay `this_value` must be reseeded on restore so `this` refers
+    // to the original receiver.
+    let unit = compile_test_unit(
+        7402,
+        r"
+            var obj = {
+                x: 42,
+                g: function*() {
+                    yield;
+                    return this.x;
+                }
+            };
+            var iter = obj.g();
+            iter.next();            // drive past start, reach yield
+            iter.next().value;      // resume, read this.x
+        ",
+    );
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+
+    let result = vm.evaluate_script(agent, realm, &unit).run().unwrap();
+
+    assert_eq!(
+        result,
+        Value::from_smi(42),
+        "`this` must survive the yield round-trip through the arena overlay"
+    );
+}

@@ -164,10 +164,12 @@ fn compiled_compare_form_keeps_long_binding_in_child_environment_bindings() {
         .expect("testcase function should compile as a child");
     let expected = unit_atom(&unit, "__10_4_2_1_1_1");
 
-    assert!(testcase
-        .environment_bindings()
-        .iter()
-        .any(|binding| binding.name() == Some(expected)));
+    assert!(
+        testcase
+            .environment_bindings()
+            .iter()
+            .any(|binding| binding.name() == Some(expected))
+    );
 }
 
 #[test]
@@ -1690,22 +1692,10 @@ fn evaluate_script_direct_eval_var_initializer_returns_inner_value_and_updates_o
     assert_eq!(result, Value::from_smi(11));
 }
 
-// Regression test for DSL-0c: nested call from a slow path's semantic body
-// (e.g. ToPrimitive calling valueOf from inside `op_add_semantic`) can resize
-// `Vm::register_stack`, invalidating the asm-side `REGS` pin (`x20`) of the
-// outer slow path. When the throw is then caught by the outer's same-frame
-// catch, the Continue arm previously did not refresh REGS/FV — but the
-// catch body would then run against a stale REGS pin, corrupting writes
-// (`caught = e` would write into freed memory and read as `undefined`).
-//
-// Fix: in `translate_outcome`'s Continue arm, always recompute
-// `state.frame_regs_base` / `state.frame_metadata_table_base` from the live
-// `Vm::register_stack_storage_mut_ptr` and `metadata_tables`. The
-// asm bridge's `dispatch_after_slow!` Continue path now reloads `x20` /
-// `x21` from those state fields on every slow-path egress so a nested
-// call's realloc is visible to the next dispatched handler. PC stays
-// sourced from `rust.dispatch.frame.instruction_offset()`, matching α's
-// `still_active` policy that never clobbers PC on a same-frame epoch bump.
+// A nested call from a slow path's semantic body (e.g. ToPrimitive calling
+// valueOf from inside `op_add_semantic`) must not corrupt the outer frame's
+// register state. The Continue arm must refresh REGS/FV on every slow-path
+// egress so a nested call's base re-derivation is visible to the next handler.
 #[test]
 fn caught_throw_from_to_primitive_call_propagates_value_through_register_writes() {
     let unit = compile_test_unit(

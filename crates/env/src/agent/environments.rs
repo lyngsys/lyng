@@ -1,11 +1,11 @@
 use super::Agent;
 use crate::{
-    environment_index, layout_index, DeclarativeEnvironmentRecord, EnvironmentLayout,
-    EnvironmentLayoutId, EnvironmentLayoutKind, EnvironmentMetadata, EnvironmentRecord,
-    EnvironmentRef, EnvironmentSlotsRef, FunctionEnvironmentRecord, GlobalEnvironmentRecord,
-    GlobalLexicalBindingRecord, ModuleBindingAlias, ModuleEnvironmentRecord,
-    ObjectEnvironmentRecord, ObjectHandleStoreTarget, PrivateEnvironmentRecord,
-    RuntimeEnvironmentRecord, ThisBindingStatus, ValueStoreTarget,
+    DeclarativeEnvironmentRecord, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
+    EnvironmentMetadata, EnvironmentRecord, EnvironmentRef, EnvironmentSlotsRef,
+    FunctionEnvironmentRecord, GlobalEnvironmentRecord, GlobalLexicalBindingRecord,
+    ModuleBindingAlias, ModuleEnvironmentRecord, ObjectEnvironmentRecord, ObjectHandleStoreTarget,
+    PrivateEnvironmentRecord, RuntimeEnvironmentRecord, ThisBindingStatus, ValueStoreTarget,
+    environment_index, layout_index,
 };
 use lyng_common::AtomId;
 use lyng_gc::AllocationLifetime;

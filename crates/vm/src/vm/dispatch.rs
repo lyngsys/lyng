@@ -1,32 +1,11 @@
 use super::registers::absolute_register;
 use super::{
-    Agent, CodeRef, FrameRecord, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm, VmError,
-    VmResult,
+    Agent, CodeRef, HostHooks, NativeFunctionRegistry, Opcode, Value, Vm, VmError, VmResult,
 };
 use lyng_types::{AbruptCompletion, FeedbackSlotId};
 
 pub(in crate::vm) mod arithmetic;
 pub(in crate::vm) mod property;
-
-#[inline]
-pub(in crate::vm) const fn advance_dispatch_frame(frame: &mut FrameRecord, encoded_len: u32) {
-    let next = frame
-        .instruction_offset()
-        .checked_add(encoded_len)
-        .expect("instruction offset should stay within u32");
-    frame.set_instruction_offset(next);
-}
-
-#[inline]
-pub(in crate::vm) const fn next_dispatch_instruction_offset(
-    frame: &FrameRecord,
-    encoded_len: u32,
-) -> u32 {
-    frame
-        .instruction_offset()
-        .checked_add(encoded_len)
-        .expect("instruction offset should stay within u32")
-}
 
 #[inline]
 pub(in crate::vm) fn decode_feedback_slot_operand(
@@ -186,28 +165,11 @@ fn decode_abx_operands_wide(
 }
 
 impl Vm {
+    /// Park `pc` into the overlay `saved_pc` of the frame at `cfr`.
+    /// Read back by the slow-path `Refresh` arm and `finish_frame`.
     #[inline]
-    pub(in crate::vm) fn sync_dispatch_frame(&mut self, frame_depth: usize, frame: FrameRecord) {
-        let Some(index) = frame_depth.checked_sub(1) else {
-            return;
-        };
-        if let Some(slot) = self.frames.get_mut(index) {
-            *slot = frame;
-        }
-    }
-
-    #[inline]
-    pub(in crate::vm) fn refresh_dispatch_frame(
-        &self,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-    ) {
-        let Some(index) = frame_depth.checked_sub(1) else {
-            return;
-        };
-        if let Some(stacked) = self.frames.get(index).copied() {
-            *frame = stacked;
-        }
+    pub(in crate::vm) fn park_caller_pc(&mut self, cfr: u32, pc: u32) {
+        self.frame_header_mut(cfr).set_saved_pc(pc);
     }
 
     #[inline]
@@ -224,16 +186,21 @@ impl Vm {
         &mut self,
         agent: &mut Agent,
         frame_depth: usize,
-        frame: &mut FrameRecord,
+        cfr: u32,
+        pc: u32,
         result: VmResult<T>,
     ) -> VmResult<Option<T>> {
         match result {
             Ok(value) => Ok(Some(value)),
             Err(VmError::Abrupt(AbruptCompletion::Throw(value))) => {
-                self.sync_dispatch_frame(frame_depth, *frame);
+                // Park the live PC so the handler-covering search uses the correct PC.
+                // On a caught throw, `transfer_to_exception_handler` overwrites
+                // `saved_pc` with the handler PC; the caller reloads from it.
+                if frame_depth != 0 {
+                    self.park_caller_pc(cfr, pc);
+                }
                 if self.transfer_to_exception_handler(agent, value)? {
                     self.request_dispatch_frame_check();
-                    self.refresh_dispatch_frame(frame_depth, frame);
                     Ok(None)
                 } else {
                     Err(VmError::Abrupt(AbruptCompletion::Throw(value)))
@@ -251,30 +218,29 @@ impl Vm {
         &mut self,
         agent: &mut Agent,
         frame_depth: usize,
-        frame: &mut FrameRecord,
+        cfr: u32,
+        pc: &mut u32,
+        code: CodeRef,
+        window: crate::frame::RegisterWindow,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         target_register: u16,
         result: VmResult<Value>,
     ) -> VmResult<()> {
-        let Some(value) = self.handle_dispatch_result(agent, frame_depth, frame, result)? else {
-            return Ok(());
-        };
-        self.record_feedback_slot(frame.code(), feedback_slot);
-        let target = absolute_register(frame.registers(), target_register);
-        self.register_stack[target] = value;
-        advance_dispatch_frame(frame, instruction_len);
+        if let Some(value) = self.handle_dispatch_result(agent, frame_depth, cfr, *pc, result)? {
+            self.record_feedback_slot(code, feedback_slot);
+            let target = absolute_register(window, target_register);
+            self.arena.slots_mut()[target] = value;
+            *pc = pc.wrapping_add(instruction_len);
+        } else {
+            // Same-frame caught throw: handler PC was parked in overlay `saved_pc`.
+            // Cross-frame catch is promoted to Refresh, which overwrites this value.
+            *pc = self.frame_header(cfr).saved_pc();
+        }
         Ok(())
     }
 
     /// Sole VM dispatch entry point.
-    ///
-    /// DSL-0c (Task C1) flipped this from `run_via_trampoline` (α path
-    /// using `DispatchState` + `DISPATCH_TABLE` + `dispatch_handlers/`)
-    /// to `run_via_dsl` (asm-DSL trampoline + `DSL_DISPATCH_TABLE`).
-    /// Task C5 deleted the α trampoline functions themselves; the
-    /// `dispatch_handlers/` modules + `DISPATCH_TABLE` survive only for
-    /// the wide-form prefix bridge in `dsl::handlers::warm::op_prefix_via_alpha`.
     pub(super) fn run(
         &mut self,
         agent: &mut Agent,
@@ -292,22 +258,12 @@ mod tests {
     /// Dispatch invariant: this file must contain **no** `match` expression
     /// with more than 10 arms.
     ///
-    /// The asm-DSL LLInt-style interpreter uses a handler table plus tail
-    /// dispatch instead of a legacy single-`match` interpreter. If a
-    /// regression reintroduces a wide opcode-match in this file, it would
-    /// re-grow the dispatch jump table this substrate replaced. Catch it at
-    /// the source level.
-    ///
-    /// "Wide" here means more than 10 arms in a single `match`. Small matches
-    /// (e.g., on `prefix == Opcode::ExtraWide` in wide-decode helpers,
-    /// short `match` over `AbruptCompletion`, etc.) are fine.
-    ///
-    /// DSL-0c C2 update: the only large opcode-match in the workspace now
-    /// lives in `crate::dsl::handlers::cold::dispatch_wide_form`, which the
-    /// codegen tool emits and which `dsl::handlers::warm` consults for
-    /// `Wide` / `ExtraWide` dispatch — it deliberately replaces the deleted
-    /// α `DISPATCH_TABLE` indirection with a single, code-generated match.
-    /// This file (dispatch.rs) only holds shared decoders + helpers.
+    /// The asm-DSL `LLInt` dispatcher uses a handler table + tail dispatch. A
+    /// wide opcode-`match` here would re-grow the jump table the handler table
+    /// replaced. The only large opcode-`match` lives in
+    /// `crate::dsl::handlers::cold::dispatch_wide_form` (codegen-emitted).
+    /// "Wide" means more than 10 arms; small matches on e.g. `AbruptCompletion`
+    /// or `Opcode::ExtraWide` are fine.
     #[test]
     fn dispatch_rs_contains_no_match_over_10_arms() {
         let source = include_str!("dispatch.rs");

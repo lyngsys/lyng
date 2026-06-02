@@ -1,18 +1,18 @@
-use super::dispatch::advance_dispatch_frame;
 use super::feedback::InlineCacheState;
 use super::{
-    Agent, AllocationLifetime, ArgumentsMode, CallRange, CodeRef, FrameFlags, FrameRecord,
+    Agent, AllocationLifetime, ArgumentsMode, CallRange, CallerContext, CodeRef, FrameFlags,
     HostHooks, NativeFunctionRegistry, ObjectAllocation, ObjectRef, RealmRef, Value, Vm, VmResult,
 };
-use crate::vm::property_access::VmProxyBridge;
 use crate::VmError;
+use crate::frame::FrameView;
+use crate::vm::property_access::VmProxyBridge;
 use lyng_gc::{PrimitiveMutator, RuntimeBoundFunctionRecord};
 use lyng_objects::{
     FunctionEntryIdentity, InternalMethodError, NativeCallRequest, NativeConstructRequest,
     ObjectRuntime,
 };
 use lyng_ops::{errors, object, proxy};
-use lyng_types::{function_call_builtin, FeedbackSlotId};
+use lyng_types::{FeedbackSlotId, function_call_builtin};
 
 impl Vm {
     #[expect(
@@ -24,8 +24,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -37,7 +36,6 @@ impl Vm {
             agent,
             host,
             registry,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -50,8 +48,10 @@ impl Vm {
             return Ok(());
         }
         if Self::bytecode_entry(agent, callee).is_some() {
-            advance_dispatch_frame(frame, instruction_len);
-            self.sync_dispatch_frame(frame_depth, *frame);
+            self.park_caller_pc(
+                frame.cfr(),
+                frame.instruction_offset().wrapping_add(instruction_len),
+            );
             return self.enter_bytecode_call(
                 agent,
                 host,
@@ -70,7 +70,6 @@ impl Vm {
             agent,
             host,
             registry,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -81,9 +80,19 @@ impl Vm {
         )? {
             return Ok(());
         }
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(frame.cfr(), frame.instruction_offset());
+        let __caller_realm = self.realm_of(agent, frame.cfr());
+        let __caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let __caller_code = frame.code();
+        let __caller_pc = frame.instruction_offset();
+        let __caller = CallerContext {
+            realm: __caller_realm,
+            lexical_env: __caller_lexical_env,
+            code: __caller_code,
+            pc: __caller_pc,
+        };
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, frame, callee, this_value, arguments, None,
+            agent, host, registry, __caller, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -93,7 +102,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm: __caller_realm,
+                    caller_lexical_env: __caller_lexical_env,
+                    caller_code: __caller_code,
+                    caller_pc: __caller_pc,
                 },
                 callee,
                 this_value,
@@ -102,10 +114,11 @@ impl Vm {
         } else {
             object::call(agent, callee, this_value, arguments, registry).map_err(VmError::Abrupt)?
         };
-        self.refresh_dispatch_frame(frame_depth, frame);
         self.write_register(frame.registers(), result_register, result);
-        advance_dispatch_frame(frame, instruction_len);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(
+            frame.cfr(),
+            frame.instruction_offset().wrapping_add(instruction_len),
+        );
         Ok(())
     }
 
@@ -118,8 +131,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -127,7 +139,7 @@ impl Vm {
         this_value: Value,
         collected_arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
-        let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
+        let mut callee = Self::require_callable_object(agent, callee_value)?;
         let mut effective_this = this_value;
         Self::resolve_bound_call_chain(
             agent,
@@ -135,13 +147,13 @@ impl Vm {
             &mut effective_this,
             collected_arguments,
         )?;
-        Self::reject_class_constructor_call(agent, callee, frame.realm())?;
+        let frame_realm = self.realm_of(agent, frame.cfr());
+        Self::reject_class_constructor_call(agent, callee, frame_realm)?;
 
         self.invoke_call_target(
             agent,
             host,
             registry,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -163,8 +175,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -177,15 +188,18 @@ impl Vm {
         else {
             return Ok(false);
         };
+        let caller = self.caller_context_from_view(agent, frame);
         let Some(result) = self.call_frame_safe_builtin(
-            agent, host, registry, frame, callee, entry, this_value, arguments,
+            agent, host, registry, caller, callee, entry, this_value, arguments,
         )?
         else {
             return Ok(false);
         };
         self.write_register(frame.registers(), result_register, result);
-        advance_dispatch_frame(frame, instruction_len);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(
+            frame.cfr(),
+            frame.instruction_offset().wrapping_add(instruction_len),
+        );
         Ok(true)
     }
 
@@ -198,8 +212,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -211,9 +224,10 @@ impl Vm {
             return Ok(None);
         }
 
-        let mut target = Self::require_callable_object(agent, frame, this_value)?;
+        let mut target = Self::require_callable_object(agent, this_value)?;
         let mut effective_this = arguments.first().copied().unwrap_or(Value::undefined());
         let call_arguments = arguments.get(1..).unwrap_or(&[]);
+        let frame_realm = self.realm_of(agent, frame.cfr());
         if Self::bound_function_record(agent, target).is_some() {
             let mut rebound_arguments = call_arguments.to_vec();
             Self::resolve_bound_call_chain(
@@ -222,12 +236,11 @@ impl Vm {
                 &mut effective_this,
                 &mut rebound_arguments,
             )?;
-            Self::reject_class_constructor_call(agent, target, frame.realm())?;
+            Self::reject_class_constructor_call(agent, target, frame_realm)?;
             self.invoke_call_target(
                 agent,
                 host,
                 registry,
-                frame_depth,
                 frame,
                 instruction_len,
                 feedback_slot,
@@ -239,12 +252,11 @@ impl Vm {
             return Ok(Some(()));
         }
 
-        Self::reject_class_constructor_call(agent, target, frame.realm())?;
+        Self::reject_class_constructor_call(agent, target, frame_realm)?;
         self.invoke_call_target(
             agent,
             host,
             registry,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -265,20 +277,25 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &FrameRecord,
+        frame: FrameView,
         callee: ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<Option<Value>> {
-        self.sync_dispatch_frame(frame_depth, *frame);
+        let frame_cfr = frame.cfr();
+        self.park_caller_pc(frame.cfr(), frame.instruction_offset());
         if let Some(code) = Self::bytecode_entry(agent, callee) {
             if self
                 .installed_function(code)
                 .is_some_and(|function| function.flags().generator())
             {
-                let prepared =
-                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
+                let prepared = self.prepare_bytecode_call(
+                    agent,
+                    self.frame_header(frame_cfr).lexical_env(),
+                    callee,
+                    this_value,
+                    None,
+                )?;
                 let generator =
                     self.instantiate_generator_call(agent, host, registry, prepared, arguments)?;
                 return self.finish_frame(agent, Value::from_object_ref(generator));
@@ -287,8 +304,13 @@ impl Vm {
                 .installed_function(code)
                 .is_some_and(|function| function.flags().async_function())
             {
-                let prepared =
-                    self.prepare_bytecode_call(agent, frame, callee, this_value, None)?;
+                let prepared = self.prepare_bytecode_call(
+                    agent,
+                    self.frame_header(frame_cfr).lexical_env(),
+                    callee,
+                    this_value,
+                    None,
+                )?;
                 let promise = self
                     .instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
                 return self.finish_frame(agent, Value::from_object_ref(promise));
@@ -297,8 +319,18 @@ impl Vm {
             return Ok(None);
         }
 
+        let __caller_realm = self.realm_of(agent, frame.cfr());
+        let __caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let __caller_code = frame.code();
+        let __caller_pc = frame.instruction_offset();
+        let __caller = CallerContext {
+            realm: __caller_realm,
+            lexical_env: __caller_lexical_env,
+            code: __caller_code,
+            pc: __caller_pc,
+        };
         let result = if let Some(result) = self.call_builtin(
-            agent, host, registry, frame, callee, this_value, arguments, None,
+            agent, host, registry, __caller, callee, this_value, arguments, None,
         )? {
             result
         } else if agent.objects().is_proxy_object(callee) {
@@ -308,7 +340,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm: __caller_realm,
+                    caller_lexical_env: __caller_lexical_env,
+                    caller_code: __caller_code,
+                    caller_pc: __caller_pc,
                 },
                 callee,
                 this_value,
@@ -329,8 +364,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -351,7 +385,6 @@ impl Vm {
             let this_value = self.read_register(frame.registers(), this_register);
             return self.invoke_bytecode_call_from_caller_arg_window(
                 agent,
-                frame_depth,
                 frame,
                 instruction_len,
                 feedback_slot,
@@ -380,7 +413,6 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame_depth,
                 frame,
                 instruction_len,
                 feedback_slot,
@@ -404,8 +436,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -422,7 +453,6 @@ impl Vm {
         {
             return self.call_value_small_bytecode_direct(
                 agent,
-                frame_depth,
                 frame,
                 instruction_len,
                 feedback_slot,
@@ -448,7 +478,6 @@ impl Vm {
             agent,
             host,
             registry,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -535,8 +564,7 @@ impl Vm {
     fn call_value_small_bytecode_direct(
         &mut self,
         agent: &mut Agent,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -547,7 +575,6 @@ impl Vm {
         let this_value = self.read_register(frame.registers(), call_base_register);
         self.invoke_bytecode_call_from_caller_arg_window(
             agent,
-            frame_depth,
             frame,
             instruction_len,
             feedback_slot,
@@ -564,7 +591,7 @@ impl Vm {
     /// argument base into an absolute register-stack index, advances
     /// the caller dispatch frame, and then hands off to
     /// [`Self::enter_bytecode_call_from_caller_registers`] which seeds
-    /// the callee parameter slots via `register_stack.copy_within` —
+    /// the callee parameter slots via the arena's `copy_within` —
     /// no `argument_scratch` materialization, no per-arg
     /// `read_register` loop.
     ///
@@ -578,8 +605,7 @@ impl Vm {
     pub(in crate::vm) fn invoke_bytecode_call_from_caller_arg_window(
         &mut self,
         agent: &mut Agent,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -593,8 +619,10 @@ impl Vm {
             .base()
             .checked_add(u32::from(caller_arg_base_local))
             .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        advance_dispatch_frame(frame, instruction_len);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(
+            frame.cfr(),
+            frame.instruction_offset().wrapping_add(instruction_len),
+        );
         self.enter_bytecode_call_from_caller_registers(
             agent,
             frame,
@@ -630,8 +658,7 @@ impl Vm {
     pub(in crate::vm) fn invoke_bytecode_construct_from_caller_arg_window(
         &mut self,
         agent: &mut Agent,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -645,8 +672,10 @@ impl Vm {
             .base()
             .checked_add(u32::from(caller_arg_base_local))
             .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        advance_dispatch_frame(frame, instruction_len);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(
+            frame.cfr(),
+            frame.instruction_offset().wrapping_add(instruction_len),
+        );
         self.enter_bytecode_call_from_caller_registers(
             agent,
             frame,
@@ -687,6 +716,10 @@ impl Vm {
     /// No per-construct prototype re-validation is performed — correctness
     /// rests on the eager-clear invariant (see `construct_value`'s direct
     /// construct branch).
+    #[allow(
+        clippy::option_option,
+        reason = "outer Option = a monomorphic IC entry exists; inner = its cached prototype, which may legitimately be None (null prototype)"
+    )]
     #[inline]
     fn monomorphic_construct_prototype(
         &self,
@@ -724,8 +757,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &FrameRecord,
+        frame: FrameView,
         _feedback_slot: Option<FeedbackSlotId>,
         callee_register: u16,
         this_register: u16,
@@ -746,7 +778,7 @@ impl Vm {
                 spread_mask,
                 &mut collected_arguments,
             )?;
-            let mut callee = Self::require_callable_object(agent, frame, callee_value)?;
+            let mut callee = Self::require_callable_object(agent, callee_value)?;
             let mut effective_this = this_value;
             Self::resolve_bound_call_chain(
                 agent,
@@ -754,13 +786,13 @@ impl Vm {
                 &mut effective_this,
                 &mut collected_arguments,
             )?;
-            Self::reject_class_constructor_call(agent, callee, frame.realm())?;
+            let frame_realm = self.realm_of(agent, frame.cfr());
+            Self::reject_class_constructor_call(agent, callee, frame_realm)?;
 
             self.invoke_tail_call_target(
                 agent,
                 host,
                 registry,
-                frame_depth,
                 frame,
                 callee,
                 effective_this,
@@ -784,8 +816,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         feedback_slot: Option<FeedbackSlotId>,
         result_register: u16,
@@ -815,10 +846,11 @@ impl Vm {
             && let Some(cached_prototype) =
                 self.monomorphic_construct_prototype(agent, frame.code(), feedback_slot, callee)
         {
+            let frame_realm = self.realm_of(agent, frame.cfr());
             let root_shape = agent
-                .realm(frame.realm())
+                .realm(frame_realm)
                 .and_then(|realm| realm.root_shape())
-                .ok_or(VmError::MissingRootShape(frame.realm()))?;
+                .ok_or(VmError::MissingRootShape(frame_realm))?;
             let construct_this = agent.with_heap_and_objects(|heap, objects| {
                 objects.alloc_object(
                     &mut heap.mutator(),
@@ -828,7 +860,6 @@ impl Vm {
             });
             return self.invoke_bytecode_construct_from_caller_arg_window(
                 agent,
-                frame_depth,
                 frame,
                 instruction_len,
                 feedback_slot,
@@ -867,14 +898,21 @@ impl Vm {
             }
 
             if agent.objects().is_proxy_object(callee) {
-                self.sync_dispatch_frame(frame_depth, *frame);
+                self.park_caller_pc(frame.cfr(), frame.instruction_offset());
+                let __caller_realm = self.realm_of(agent, frame.cfr());
+                let __caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+                let __caller_code = frame.code();
+                let __caller_pc = frame.instruction_offset();
                 let result = proxy::construct(
                     &mut VmProxyBridge {
                         vm: self,
                         agent,
                         host,
                         registry,
-                        frame,
+                        caller_realm: __caller_realm,
+                        caller_lexical_env: __caller_lexical_env,
+                        caller_code: __caller_code,
+                        caller_pc: __caller_pc,
                     },
                     callee,
                     &collected_arguments,
@@ -887,14 +925,15 @@ impl Vm {
                     callee,
                     Some(result),
                 );
-                self.refresh_dispatch_frame(frame_depth, frame);
                 self.write_register(
                     frame.registers(),
                     result_register,
                     Value::from_object_ref(result),
                 );
-                advance_dispatch_frame(frame, instruction_len);
-                self.sync_dispatch_frame(frame_depth, *frame);
+                self.park_caller_pc(
+                    frame.cfr(),
+                    frame.instruction_offset().wrapping_add(instruction_len),
+                );
                 return Ok(());
             }
 
@@ -905,12 +944,13 @@ impl Vm {
                 let construct_this = if derived_construct {
                     None
                 } else {
+                    let caller = self.caller_context_from_view(agent, frame);
                     Some(self.create_construct_this(
                         agent,
                         host,
                         registry,
-                        frame,
-                        frame.realm(),
+                        caller,
+                        caller.realm,
                         new_target,
                     )?)
                 };
@@ -922,8 +962,10 @@ impl Vm {
                     callee,
                     construct_this,
                 );
-                advance_dispatch_frame(frame, instruction_len);
-                self.sync_dispatch_frame(frame_depth, *frame);
+                self.park_caller_pc(
+                    frame.cfr(),
+                    frame.instruction_offset().wrapping_add(instruction_len),
+                );
                 return self.enter_bytecode_call(
                     agent,
                     host,
@@ -938,7 +980,8 @@ impl Vm {
                 );
             }
 
-            self.sync_dispatch_frame(frame_depth, *frame);
+            self.park_caller_pc(frame.cfr(), frame.instruction_offset());
+            let caller = self.caller_context_from_view(agent, frame);
             let result = if Self::builtin_entry(agent, callee).is_some()
                 && !agent.objects().is_constructor(callee)
             {
@@ -947,7 +990,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller,
                 callee,
                 Value::undefined(),
                 &collected_arguments,
@@ -966,15 +1009,16 @@ impl Vm {
                 )
                 .map_err(VmError::Abrupt)?
             };
-            self.refresh_dispatch_frame(frame_depth, frame);
             self.observe_construct_target(agent, frame.code(), feedback_slot, callee, Some(result));
             self.write_register(
                 frame.registers(),
                 result_register,
                 Value::from_object_ref(result),
             );
-            advance_dispatch_frame(frame, instruction_len);
-            self.sync_dispatch_frame(frame_depth, *frame);
+            self.park_caller_pc(
+                frame.cfr(),
+                frame.instruction_offset().wrapping_add(instruction_len),
+            );
             Ok(())
         })();
         self.argument_scratch = collected_arguments;
@@ -1071,7 +1115,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         range: CallRange,
         spread_mask: Option<u64>,
         arguments: &mut Vec<Value>,
@@ -1098,7 +1142,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         value: Value,
         arguments: &mut Vec<Value>,
     ) -> VmResult<()> {
@@ -1108,21 +1152,21 @@ impl Vm {
 
 pub(super) fn finalize_frame_result(
     agent: &mut Agent,
-    frame: &FrameRecord,
+    flags: FrameFlags,
+    this_value: Value,
+    construct_this: Option<ObjectRef>,
     result: Value,
 ) -> VmResult<Value> {
-    if frame.flags().contains(FrameFlags::construct()) && result.as_object_ref().is_none() {
-        if frame.flags().contains(FrameFlags::derived_construct()) {
+    if flags.contains(FrameFlags::construct()) && result.as_object_ref().is_none() {
+        if flags.contains(FrameFlags::derived_construct()) {
             if !result.is_undefined() {
                 return Err(VmError::Abrupt(errors::throw_type_error(agent)));
             }
-            if frame.construct_this().is_none() {
+            if construct_this.is_none() {
                 return Err(VmError::Abrupt(errors::throw_reference_error(agent)));
             }
         }
-        return Ok(frame
-            .construct_this()
-            .map_or_else(|| frame.this_value(), Value::from_object_ref));
+        return Ok(construct_this.map_or(this_value, Value::from_object_ref));
     }
     Ok(result)
 }
@@ -1153,11 +1197,11 @@ impl NativeFunctionRegistry for RejectingNativeRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FrameRecord, InstalledCode, RegisterWindow};
+    use crate::InstalledCode;
     use lyng_bytecode::CompiledScriptUnit;
     use lyng_common::{AtomId, AtomTable, SourceId};
     use lyng_compiler::compile_script;
-    use lyng_env::{ExecutionContextKind, Runtime};
+    use lyng_env::Runtime;
     use lyng_host::NoopHostHooks;
     use lyng_objects::FunctionEntryIdentity;
     use lyng_ops::object::ordinary_get;
@@ -1248,16 +1292,10 @@ mod tests {
             .installed_function(getter_code)
             .expect("getter bytecode should stay installed")
             .id();
-        let frame = FrameRecord::new(
-            installed.code(),
-            0,
-            RegisterWindow::new(0, 0),
-            None,
-            realm.id(),
-            realm.global_env(),
-            realm.global_env(),
-            ExecutionContextKind::Script,
-        );
+        let caller_realm = realm.id();
+        let caller_lexical_env = realm.global_env();
+        let caller_code = installed.code();
+        let caller_pc = 0u32;
         let mut registry = RejectingNativeRegistry;
 
         let direct = vm
@@ -1276,7 +1314,10 @@ mod tests {
                 agent,
                 &lyng_host::NoopHostHooks,
                 &mut registry,
-                &frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
                 Value::from_object_ref(object),
                 PropertyKey::Index(1),
             )

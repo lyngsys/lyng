@@ -12,7 +12,7 @@ pub(super) use iteration::dispatch_typed_array_iteration_builtin;
 pub(super) use mutation::dispatch_typed_array_mutation_builtin;
 pub(super) use search::dispatch_typed_array_search_builtin;
 
-use super::{length_value_u64, range_error, type_error, PublicBuiltinDispatchContext};
+use super::{PublicBuiltinDispatchContext, length_value_u64, range_error, type_error};
 use crate::public::dispatch::BuiltinToPrimitiveBridge;
 use lyng_common::WellKnownAtom;
 use lyng_env::Agent;

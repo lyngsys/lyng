@@ -17,8 +17,8 @@ mod diagnostic;
 mod source;
 
 pub use atom::{
-    AtomCollection, AtomId, AtomLifetime, AtomSweepStats, AtomTable, WellKnownAtom,
-    WELL_KNOWN_ATOMS,
+    AtomCollection, AtomId, AtomLifetime, AtomSweepStats, AtomTable, WELL_KNOWN_ATOMS,
+    WellKnownAtom,
 };
 pub use diagnostic::{Diagnostic, DiagnosticList, Severity};
 pub use source::{SourceId, Span, TextOffset, TextRange};

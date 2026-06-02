@@ -6,7 +6,7 @@ use lyng_bytecode::CompiledScriptUnit;
 use lyng_common::{AtomId, AtomTable, SourceId};
 use lyng_parser::{parse_script, parse_script_with_initial_strict};
 use lyng_sema::{
-    analyze_direct_eval_script, analyze_script, DirectEvalScriptAnalysisOptions, ScriptSema,
+    DirectEvalScriptAnalysisOptions, ScriptSema, analyze_direct_eval_script, analyze_script,
 };
 use lyng_types::RealmRef;
 

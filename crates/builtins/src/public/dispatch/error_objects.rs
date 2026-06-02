@@ -1,7 +1,7 @@
 use super::{
-    create_array_from_values, define_data_property_with_attrs, has_property_on_object,
-    iterable_to_values_list, map_completion, property_key_from_text, string_value, type_error,
-    PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, create_array_from_values, define_data_property_with_attrs,
+    has_property_on_object, iterable_to_values_list, map_completion, property_key_from_text,
+    string_value, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_common::WellKnownAtom;

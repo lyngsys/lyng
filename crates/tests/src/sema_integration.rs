@@ -4,8 +4,8 @@
 use lyng_common::{AtomTable, SourceId};
 use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{
-    analyze_module, analyze_script, ClassPrivateElementKind, DeclarationKind, ResolutionKind,
-    ScopeId, ScopeKind, StorageClass,
+    ClassPrivateElementKind, DeclarationKind, ResolutionKind, ScopeId, ScopeKind, StorageClass,
+    analyze_module, analyze_script,
 };
 
 fn sid() -> SourceId {

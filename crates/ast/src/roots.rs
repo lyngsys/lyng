@@ -6,8 +6,8 @@
 
 use lyng_common::DiagnosticList;
 
-use crate::ids::{ModuleId, ScriptId};
 use crate::Ast;
+use crate::ids::{ModuleId, ScriptId};
 
 /// The result of parsing a script.
 pub struct ParsedScript {

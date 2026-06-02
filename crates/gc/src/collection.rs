@@ -1,10 +1,11 @@
 use crate::rooting::{PrimitiveMajorMarkMetrics, TraceObjectMetadataEdges};
 use crate::{
-    card_table::CardDomain, nursery::PrimitiveAllocationProfile, PrimitiveBigIntRecord,
-    PrimitiveCollectionStats, PrimitiveDomainStats, PrimitiveHeap, PrimitiveRoots,
-    PrimitiveStringRecord, PrimitiveSymbolRecord, PrimitiveValueCellRecord, RuntimeCodeRecord,
-    RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord,
-    RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, TraceHeapEdges, PRIMITIVE_SLOTS_PER_PAGE,
+    PRIMITIVE_SLOTS_PER_PAGE, PrimitiveBigIntRecord, PrimitiveCollectionStats,
+    PrimitiveDomainStats, PrimitiveHeap, PrimitiveRoots, PrimitiveStringRecord,
+    PrimitiveSymbolRecord, PrimitiveValueCellRecord, RuntimeCodeRecord, RuntimeEnvironmentRecord,
+    RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord,
+    RuntimeSuspendedExecutionRecord, TraceHeapEdges, card_table::CardDomain,
+    nursery::PrimitiveAllocationProfile,
 };
 use std::mem::size_of;
 

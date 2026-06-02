@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     abstract_module_source_builtin => super::super::ABSTRACT_MODULE_SOURCE_RAW;

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use crate::helpers::HelperCatalog;
-use crate::metadata::{is_module_test, TestMetadata};
+use crate::metadata::{TestMetadata, is_module_test};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProposalStage {
@@ -466,9 +466,9 @@ mod tests {
     use crate::metadata::parse_metadata;
 
     use super::{
-        category_for_test, disabled_manifest, load_manifest, manifest_matches_pattern,
-        parse_manifest_line, skip_decision, ExclusionKind, ExclusionRule, ProposalStage,
-        SkipDecision,
+        ExclusionKind, ExclusionRule, ProposalStage, SkipDecision, category_for_test,
+        disabled_manifest, load_manifest, manifest_matches_pattern, parse_manifest_line,
+        skip_decision,
     };
 
     fn workspace_root() -> PathBuf {

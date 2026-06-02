@@ -1,9 +1,10 @@
 use super::{
-    close_iterator_after_error, create_array_from_values, create_data_property_or_throw,
-    define_data_property_with_attrs, map_completion, promise_all_resolve_element_builtin,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext, close_iterator_after_error,
+    create_array_from_values, create_data_property_or_throw, define_data_property_with_attrs,
+    map_completion, promise_all_resolve_element_builtin,
     promise_all_settled_reject_element_builtin, promise_all_settled_resolve_element_builtin,
     promise_any_reject_element_builtin, property_key_from_text, require_constructor_object,
-    string_value, type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    string_value, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_common::WellKnownAtom;

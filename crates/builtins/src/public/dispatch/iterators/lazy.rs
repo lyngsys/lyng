@@ -1,4 +1,8 @@
 use super::{
+    BuiltinInvocation, BuiltinIteratorBridge, ITERATOR_HELPER_COUNTER_SLOT,
+    ITERATOR_HELPER_INNER_ITERATED_SLOT, ITERATOR_HELPER_INNER_NEXT_METHOD_SLOT,
+    ITERATOR_HELPER_KIND_SLOT, ITERATOR_HELPER_NEXT_METHOD_SLOT, ITERATOR_HELPER_PARAM_SLOT,
+    IteratorHelperKind, ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, Value,
     allocate_iterator_object, clear_iterator_helper_inner, close_iterator_after_error,
     create_iterator_result_value, get_iterator_flattenable, iterator,
     iterator_close_for_validation_failure, iterator_helper_concat_next,
@@ -9,11 +13,7 @@ use super::{
     iterator_slot_value_for_builtin, iterator_this_object, map_completion, number_value,
     property_key_from_text, range_error, read, set_iterator_helper_done, set_iterator_helper_limit,
     set_iterator_helper_running, set_iterator_slot_value_for_builtin, to_number_for_builtin,
-    type_error, u64_to_value, BuiltinInvocation, BuiltinIteratorBridge, IteratorHelperKind,
-    ObjectRef, OrdinaryObjectData, PublicBuiltinDispatchContext, Value,
-    ITERATOR_HELPER_COUNTER_SLOT, ITERATOR_HELPER_INNER_ITERATED_SLOT,
-    ITERATOR_HELPER_INNER_NEXT_METHOD_SLOT, ITERATOR_HELPER_KIND_SLOT,
-    ITERATOR_HELPER_NEXT_METHOD_SLOT, ITERATOR_HELPER_PARAM_SLOT,
+    type_error, u64_to_value,
 };
 
 pub(super) fn iterator_map_builtin<Cx: PublicBuiltinDispatchContext>(

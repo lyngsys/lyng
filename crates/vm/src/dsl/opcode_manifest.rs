@@ -1,9 +1,8 @@
-//! Single-implementation invariant manifest per design §10.
+//! Single-implementation invariant manifest.
 //!
-//! `OPCODES` enumerates every `Opcode` variant exactly once with the
-//! resolvable symbol names for its semantic body and (post-DSL-0b) its
-//! DSL handler. Seven structural tests use this manifest to verify the
-//! invariant — see the `manifest_tests` module.
+//! `OPCODES` enumerates every `Opcode` variant with its semantic body
+//! and DSL handler symbol names. Structural tests verify exhaustive
+//! coverage and symbol resolution.
 
 use lyng_bytecode::Opcode;
 
@@ -11,13 +10,11 @@ use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpcodeCategory {
-    /// Full DSL body with inline fast paths (5 opcodes from DSL-0b plus
-    /// 25 more in DSL-1).
+    /// Inline fast paths for the highest-frequency opcodes.
     Hot,
-    /// Full DSL body that includes a safepoint poll on its backedge
-    /// (loop header + backward-jump variants + prefix opcodes).
+    /// Backedge safepoint poll or prefix decode.
     Warm,
-    /// Three-line DSL stub delegating to a slow-path Rust shim.
+    /// `call_slow!`-only stub delegating to a slow-path Rust shim.
     Cold,
 }
 
@@ -29,13 +26,10 @@ pub struct OpcodeEntry {
     pub category: OpcodeCategory,
 }
 
-/// The single source of truth for the single-implementation invariant.
-///
-/// Tests A6 / A19 / C9 / C10 / C11 walk this slice to verify exhaustive
-/// coverage and symbol resolution. Adding an `Opcode` variant without
-/// extending this slice fails Test 1 (exhaustive coverage).
+/// Every opcode variant exactly once. Adding an `Opcode` variant without
+/// extending this slice fails the exhaustive-coverage test.
 pub const OPCODES: &[OpcodeEntry] = &[
-    // Task A8 — loads family (35 opcodes).
+    // loads family (35 opcodes).
     OpcodeEntry {
         opcode: Opcode::Move,
         semantic_symbol: "lyng_vm::vm::semantics::loads::op_move_semantic",
@@ -258,7 +252,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_store_local_3_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A9 — arithmetic family (29 opcodes).
+    // arithmetic family (29 opcodes).
     OpcodeEntry {
         opcode: Opcode::Add,
         semantic_symbol: "lyng_vm::vm::semantics::arithmetic::op_add_semantic",
@@ -433,9 +427,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_greater_equal_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A10 — control_flow family (10 opcodes). `Jump` and `Return` are
-    // upgraded to `Hot` in DSL-0b tasks B41 / B42; `LoopHeader` to `Warm` in
-    // B43. DSL-0a registers all ten as `Cold`.
+    // control_flow family (10 opcodes).
     OpcodeEntry {
         opcode: Opcode::Jump,
         semantic_symbol: "lyng_vm::vm::semantics::control_flow::op_jump_semantic",
@@ -496,7 +488,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_nop_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A11 — property family (21 opcodes).
+    // property family (21 opcodes).
     OpcodeEntry {
         opcode: Opcode::GetNamedProperty,
         semantic_symbol: "lyng_vm::vm::semantics::property::op_get_named_property_semantic",
@@ -517,8 +509,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
     },
     OpcodeEntry {
         opcode: Opcode::StrictAssignNamedProperty,
-        semantic_symbol:
-            "lyng_vm::vm::semantics::property::op_strict_assign_named_property_semantic",
+        semantic_symbol: "lyng_vm::vm::semantics::property::op_strict_assign_named_property_semantic",
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_strict_assign_named_property_dsl",
         category: OpcodeCategory::Cold,
     },
@@ -542,8 +533,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
     },
     OpcodeEntry {
         opcode: Opcode::StrictAssignKeyedProperty,
-        semantic_symbol:
-            "lyng_vm::vm::semantics::property::op_strict_assign_keyed_property_semantic",
+        semantic_symbol: "lyng_vm::vm::semantics::property::op_strict_assign_keyed_property_semantic",
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_strict_assign_keyed_property_dsl",
         category: OpcodeCategory::Cold,
     },
@@ -625,7 +615,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_throw_if_uninitialized_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A12 — names family (17 opcodes).
+    // names family (17 opcodes).
     OpcodeEntry {
         opcode: Opcode::LoadGlobal,
         semantic_symbol: "lyng_vm::vm::semantics::names::op_load_global_semantic",
@@ -728,7 +718,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_load_new_target_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A13 — scope family (10 opcodes).
+    // scope family (10 opcodes).
     OpcodeEntry {
         opcode: Opcode::LoadEnvSlot,
         semantic_symbol: "lyng_vm::vm::semantics::scope::op_load_env_slot_semantic",
@@ -789,9 +779,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_type_of_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A14 — calls family (8 opcodes; `CallMethod` is not in the
-    // `dispatch_handlers/mod.rs` re-export list and remains an
-    // `op_unimplemented` stub for now).
+    // calls family (8 opcodes).
     OpcodeEntry {
         opcode: Opcode::Call0,
         semantic_symbol: "lyng_vm::vm::semantics::calls::op_call0_semantic",
@@ -840,7 +828,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_create_closure_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A15 — iterators family (6 opcodes).
+    // iterators family (6 opcodes).
     OpcodeEntry {
         opcode: Opcode::CreateForIn,
         semantic_symbol: "lyng_vm::vm::semantics::iterators::op_create_for_in_semantic",
@@ -877,7 +865,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_close_iterator_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A16 — generators / async family (6 opcodes).
+    // generators / async family (6 opcodes).
     OpcodeEntry {
         opcode: Opcode::SuspendGeneratorStart,
         semantic_symbol: "lyng_vm::vm::semantics::generators::op_suspend_generator_start_semantic",
@@ -914,7 +902,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_load_resume_value_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A17 — exceptions family (4 opcodes).
+    // exceptions family (4 opcodes).
     OpcodeEntry {
         opcode: Opcode::Throw,
         semantic_symbol: "lyng_vm::vm::semantics::exceptions::op_throw_semantic",
@@ -939,10 +927,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::cold::op_load_exception_dsl",
         category: OpcodeCategory::Cold,
     },
-    // Task A18 — prefix family (2 opcodes). Promoted to `Warm` in DSL-0b
-    // because their dispatch tail is "same-PC, peek next byte" — the
-    // safepoint-poll-friendly tier-up site lives on the semantic
-    // opcode they prefix, not on the prefix itself.
+    // prefix family (2 opcodes — Warm).
     OpcodeEntry {
         opcode: Opcode::Wide,
         semantic_symbol: "lyng_vm::vm::semantics::prefix::op_wide_semantic",
@@ -955,12 +940,7 @@ pub const OPCODES: &[OpcodeEntry] = &[
         dsl_handler_symbol: "lyng_vm::dsl::handlers::warm::op_extra_wide",
         category: OpcodeCategory::Warm,
     },
-    // Task A18 — misc / orphan opcodes (2). Today these route through
-    // `op_unimplemented` in the dispatch table; their semantic bodies
-    // are stubs that return `ExitError { UnsupportedOpcode }` to
-    // preserve the manifest invariant. When real handlers land, the
-    // stubs are replaced in place and `build_dispatch_table` is
-    // updated to install the α handler — no manifest change required.
+    // misc / orphan opcodes (2). Semantic stubs return `UnsupportedOpcode`.
     OpcodeEntry {
         opcode: Opcode::InstanceOf,
         semantic_symbol: "lyng_vm::vm::semantics::misc::op_instance_of_semantic",
@@ -975,43 +955,30 @@ pub const OPCODES: &[OpcodeEntry] = &[
     },
 ];
 
-/// Type-erased semantic function pointer. Each opcode has a unique
-/// concrete signature but the linker-resolution test only needs to
-/// know the pointer is non-null.
-///
-/// Wrapped in a `#[repr(transparent)]` newtype so the `SEMANTIC_FN_PTRS`
-/// slice can be a `&'static [_]` — raw `*const ()` is not `Sync`, but
-/// function-pointer addresses are inherently thread-safe to read (they
-/// point at immutable code).
+/// Type-erased semantic function pointer. The linker-resolution test checks
+/// `is_null()`. Wrapped in a `#[repr(transparent)]` newtype so the slice is
+/// `Sync` (raw `*const ()` is not, but immutable code pointers are).
 #[repr(transparent)]
 #[derive(Clone, Copy)]
 pub struct SemanticFnPtr(pub *const ());
 
-// SAFETY: `SemanticFnPtr` only ever holds the address of a real Rust
-// function from this crate. The pointer is read-only (immutable code
-// segment) and never dereferenced — Test 2 only checks `is_null()`. No
-// shared mutable state is exposed.
+// SAFETY: holds the address of a real Rust function; read-only, never
+// dereferenced. No shared mutable state.
 unsafe impl Sync for SemanticFnPtr {}
 
 impl SemanticFnPtr {
-    /// Returns `true` if the wrapped pointer is null. The
-    /// linker-resolution test asserts this is always `false` for every
-    /// entry in `SEMANTIC_FN_PTRS`.
+    /// Returns `true` if the wrapped pointer is null.
     #[inline]
     pub const fn is_null(self) -> bool {
         self.0.is_null()
     }
 }
 
-/// Parallel slice to `OPCODES` holding the type-erased function pointer
-/// for each `op_xxx_semantic`. Maintained by family-extraction tasks
-/// (A8–A18) — adding an `OpcodeEntry` without adding the corresponding
-/// fn-ptr fails the length-equality assertion in Test 2.
-///
-/// SAFETY: each pointer is derived from a real Rust function via `as
-/// *const ()`; the linker resolves it at build time.
+/// Parallel slice to `OPCODES` with type-erased function pointers for each
+/// `op_xxx_semantic`. Adding an `OpcodeEntry` without adding the fn-ptr fails
+/// the length-equality test.
 pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
-    // Task A8 — loads family (35 opcodes).
+    // loads family (35 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::loads::op_move_semantic
             as fn(
@@ -1271,7 +1238,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::loads::OpStoreLocalArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A9 — arithmetic family (29 opcodes).
+    // arithmetic family (29 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::arithmetic::op_add_semantic
             as fn(
@@ -1475,7 +1442,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::arithmetic::OpBinaryArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A10 — control_flow family (10 opcodes).
+    // control_flow family (10 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::control_flow::op_jump_semantic
             as fn(
@@ -1546,7 +1513,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::control_flow::OpNopArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A11 — property family (21 opcodes).
+    // property family (21 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::property::op_get_named_property_semantic
             as fn(
@@ -1694,7 +1661,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::property::OpPropertyAbxArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A12 — names family (17 opcodes).
+    // names family (17 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::names::op_load_global_semantic
             as fn(
@@ -1814,7 +1781,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::names::OpAtomArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A13 — scope family (10 opcodes).
+    // scope family (10 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::scope::op_load_env_slot_semantic
             as fn(
@@ -1885,7 +1852,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::scope::OpScopeAxArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A14 — calls family (8 opcodes).
+    // calls family (8 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::calls::op_call0_semantic
             as fn(
@@ -1942,7 +1909,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::calls::OpCreateClosureArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A15 — iterators family (6 opcodes).
+    // iterators family (6 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::iterators::op_create_for_in_semantic
             as fn(
@@ -1985,7 +1952,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::iterators::OpIteratorAbxArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A16 — generators / async family (6 opcodes).
+    // generators / async family (6 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::generators::op_suspend_generator_start_semantic
             as fn(
@@ -2028,7 +1995,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::generators::OpGeneratorsAxArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A17 — exceptions family (4 opcodes).
+    // exceptions family (4 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::exceptions::op_throw_semantic
             as fn(
@@ -2057,7 +2024,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::exceptions::OpExceptionsAxArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A18 — prefix family (2 opcodes).
+    // prefix family (2 opcodes).
     SemanticFnPtr(
         crate::vm::semantics::prefix::op_wide_semantic
             as fn(
@@ -2072,7 +2039,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
                 crate::vm::semantics::prefix::OpPrefixArgs,
             ) -> SemanticOutcome as *const (),
     ),
-    // Task A18 — misc / orphan opcodes (2).
+    // misc / orphan opcodes (2).
     SemanticFnPtr(
         crate::vm::semantics::misc::op_instance_of_semantic
             as fn(
@@ -2089,7 +2056,7 @@ pub static SEMANTIC_FN_PTRS: &[SemanticFnPtr] = &[
     ),
 ];
 
-/// Subset filter for the `DSL_DISPATCH_TABLE` assembly in DSL-0b.
+/// Filter `OPCODES` by category.
 pub fn by_category(category: OpcodeCategory) -> impl Iterator<Item = &'static OpcodeEntry> {
     OPCODES
         .iter()
@@ -2099,11 +2066,10 @@ pub fn by_category(category: OpcodeCategory) -> impl Iterator<Item = &'static Op
 #[cfg(test)]
 mod manifest_tests {
     use super::*;
-    use lyng_bytecode::{Opcode, OPCODE_COUNT};
+    use lyng_bytecode::{OPCODE_COUNT, Opcode};
     use std::collections::HashSet;
 
-    /// Test 1 from design §10 DSL-0a: every `Opcode` variant appears in
-    /// `OPCODES` exactly once.
+    /// Every `Opcode` variant appears in `OPCODES` exactly once.
     #[test]
     fn opcodes_manifest_is_exhaustive() {
         let count = OPCODE_COUNT as usize;
@@ -2143,13 +2109,9 @@ mod manifest_tests {
         }
     }
 
-    /// Test 2 from design §10 DSL-0a: every `OpcodeEntry.semantic_symbol`
-    /// names a real Rust function — the parallel `SEMANTIC_FN_PTRS` slice
-    /// holds the linker-resolved function pointer for each opcode in the
-    /// same order. Adding an entry to `OPCODES` without extending the
-    /// fn-ptr slice fails the length-equality assertion; renaming or
-    /// removing a referenced semantic function fails the build before
-    /// the test runs.
+    /// Every `OpcodeEntry.semantic_symbol` names a real Rust function.
+    /// `SEMANTIC_FN_PTRS` holds the linker-resolved pointer for each entry
+    /// in the same order.
     #[test]
     fn semantic_fn_ptrs_resolve() {
         assert_eq!(

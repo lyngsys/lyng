@@ -25,8 +25,8 @@ pub use builder::{
     BytecodeOperandKind,
 };
 pub use decoder::{
-    decode_instruction_bytes, decode_instruction_stream, decode_instruction_word, DecodeError,
-    DecodedInstructionStream, InvalidInstructionWord,
+    DecodeError, DecodedInstructionStream, InvalidInstructionWord, decode_instruction_bytes,
+    decode_instruction_stream, decode_instruction_word,
 };
 pub use disassembler::{disassemble, disassemble_instruction};
 pub use function::{
@@ -35,7 +35,7 @@ pub use function::{
     GlobalLexicalBindingPlan, GlobalScriptInstantiationPlan, InstructionStream,
 };
 pub use ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-pub use instruction::{Instruction, INSTRUCTION_WIDTH};
+pub use instruction::{INSTRUCTION_WIDTH, Instruction};
 pub use metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CallRange, CaptureDescriptor,
     CaptureSource, ConstantValue, DeoptFrameValue, DeoptSnapshot, DeoptValueSource,
@@ -44,4 +44,4 @@ pub use metadata::{
     LoopIterationEnvironmentSite, RuntimeStateCapture, SafepointDescriptor, SafepointKind,
     SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands,
 };
-pub use opcode::{Opcode, OPCODE_COUNT};
+pub use opcode::{OPCODE_COUNT, Opcode};

@@ -12,3 +12,6 @@ lyng-objects = { workspace = true }
 lyng-host = { workspace = true }
 
 [dev-dependencies]
+
+[lints]
+workspace = true

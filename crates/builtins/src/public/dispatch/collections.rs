@@ -1,10 +1,10 @@
 mod iteration;
 
 use super::{
+    BuiltinIteratorBridge, MAX_SAFE_INTEGER_U64, PublicBuiltinDispatchContext,
     close_iterator_after_error, create_array_from_values, get_property_from_object,
     iterators::ArrayIterationKind, length_u64_as_number, length_value_u64, map_completion,
-    property_key_from_text, to_number_for_builtin, type_error, BuiltinIteratorBridge,
-    PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
+    property_key_from_text, to_number_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use iteration::{
@@ -539,11 +539,7 @@ fn weak_map_store_value<Cx: PublicBuiltinDispatchContext>(
     let stored = cx
         .agent()
         .with_heap_and_objects(|heap, _| heap.mutator().weak_map_set(object, key, value));
-    if stored {
-        Ok(())
-    } else {
-        Err(type_error(cx))
-    }
+    if stored { Ok(()) } else { Err(type_error(cx)) }
 }
 
 fn weak_set_add_value<Cx: PublicBuiltinDispatchContext>(

@@ -1,5 +1,5 @@
 use crate::script::{CompilationState, ProgramRootKind, ProgramSource};
-use crate::{checked_u32_index, LoweringResult};
+use crate::{LoweringResult, checked_u32_index};
 use lyng_ast::{
     Decl, ExportDefaultDecl, ExportKind, ImportAttribute, ImportSpecifier, ParsedModule, Pattern,
     Stmt,
@@ -1240,10 +1240,11 @@ mod tests {
         let unit = compile_module(&parsed, &sema, &mut atoms).unwrap();
 
         assert!(unit.has_import_meta());
-        assert!(unit
-            .local_exports()
-            .iter()
-            .any(|entry| unit.atom_text(entry.export_name()) == Some("same")));
+        assert!(
+            unit.local_exports()
+                .iter()
+                .any(|entry| unit.atom_text(entry.export_name()) == Some("same"))
+        );
         assert!(unit.function(unit.entry()).is_some());
     }
 
@@ -1269,14 +1270,16 @@ mod tests {
 
         let unit = compile_module(&parsed, &sema, &mut atoms).unwrap();
 
-        assert!(unit
-            .local_exports()
-            .iter()
-            .any(|entry| unit.atom_text(entry.export_name()) == Some("f")));
-        assert!(unit
-            .local_exports()
-            .iter()
-            .any(|entry| unit.atom_text(entry.export_name()) == Some("default")));
+        assert!(
+            unit.local_exports()
+                .iter()
+                .any(|entry| unit.atom_text(entry.export_name()) == Some("f"))
+        );
+        assert!(
+            unit.local_exports()
+                .iter()
+                .any(|entry| unit.atom_text(entry.export_name()) == Some("default"))
+        );
     }
 
     #[test]

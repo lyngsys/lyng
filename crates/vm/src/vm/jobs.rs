@@ -10,8 +10,8 @@ use lyng_env::{
 use lyng_host::{HostError, HostHooks, HostJobPhase, JobObservation, WaitLocation};
 use lyng_ops::{errors, iterator, object, promise as promise_ops};
 use lyng_types::{
-    promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion, ObjectRef,
-    PropertyKey, Value,
+    AbruptCompletion, ObjectRef, PropertyKey, Value, promise_reject_function_builtin,
+    promise_resolve_function_builtin,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -137,12 +137,23 @@ impl Vm {
         // global envs (GC-traced) and the running_context scalar is refreshed
         // from it, so all migrated readers see the job's realm/referrer without a
         // dedicated context push.
-        let job_base_depth = self.frames.len();
-        self.push_referrer_scope(job_base_depth, script_or_module_referrer);
+        //
+        // Reserve the arena slot BEFORE pushing the referrer scope so that a
+        // `reserve_frame` error propagates via `?` without leaking the scope.
+        let job_base_depth = self.frame_depth();
         // Passive root frame: nothing dispatches it (every `self.run` site pushes
         // its own callee frame first). Inner calls now start at depth D+1, so
-        // their unwind baselines no longer reach the job scope at depth D.
-        self.frames.push(self.synthetic_job_caller_frame(&realm_record));
+        // their unwind baselines no longer reach the job scope at depth D. The
+        // root carries only a header (zero-width window), but it still lives in
+        // the arena so `current_cfr`/`caller_cfr` stay consistent for inner
+        // frames; capture the arena top so the final unwind reclaims the header.
+        let job_prior_register_top = self.register_stack_top();
+        let (job_cfr, job_window_base) = self.reserve_frame(agent, 0)?;
+        self.push_referrer_scope(job_base_depth, realm, script_or_module_referrer);
+        let job_root = self
+            .synthetic_job_caller_frame(&realm_record)
+            .with_register_window(RegisterWindow::new(job_window_base, 0));
+        self.push_frame_with_header(job_cfr, job_root);
         self.refresh_running_context(agent);
         let result = match job.payload() {
             RuntimeJobPayload::Executable => {
@@ -203,13 +214,19 @@ impl Vm {
         };
         // Pop the job root frame back to where we started. Defensive: only the
         // synthetic job root frame (zero-width register window) should remain
-        // here, so a bare pop leaks nothing. A real callee frame above baseline
-        // would be a bug and would need full `cleanup_internal_completion`
-        // handling (register windows, iterator/for-in state, mapped arguments).
-        while self.frames.len() > job_base_depth {
-            let _ = self.frames.pop();
+        // here, so this releases its header and restores `current_cfr`. A real
+        // callee frame above baseline would be a bug and would need full
+        // `cleanup_internal_completion` handling (register windows, iterator/
+        // for-in state, mapped arguments); `release_frame_to_caller` still keeps
+        // the arena cursor and cfr chain consistent.
+        while self.frame_depth() > job_base_depth {
+            let popped = self.pop_current_frame();
+            self.release_frame_to_caller(Self::cfr_of(&popped));
         }
-        debug_assert_eq!(self.frames.len(), job_base_depth);
+        debug_assert_eq!(self.frame_depth(), job_base_depth);
+        // Reclaim the job root's `[header]` run and any defensive slack down to
+        // the arena top captured before the root was reserved.
+        self.release_register_stack_to(job_prior_register_top);
         self.unwind_referrer_scopes_to(job_base_depth);
         self.refresh_running_context(agent);
         agent.clear_kept_objects();
@@ -344,12 +361,13 @@ impl Vm {
                 let caller = self.synthetic_job_caller_frame(realm);
                 let mut record =
                     iterator::IteratorRecord::new_async_from_sync(iterator, next_method);
+                let iter_caller = Self::caller_context_from_record(agent, &caller);
                 let mut bridge = VmIteratorBridge {
                     vm: self,
                     agent,
                     host,
                     registry,
-                    frame: &caller,
+                    caller: iter_caller,
                 };
                 let completion = AbruptCompletion::throw(argument);
                 match iterator::iterator_close::<_, ()>(&mut bridge, &mut record, Err(completion)) {
@@ -400,11 +418,12 @@ impl Vm {
             }
             PromiseReactionHandler::Callable(handler) => {
                 let caller = self.synthetic_job_caller_frame(realm);
+                let caller_ctx = Self::caller_context_from_record(agent, &caller);
                 match self.call_to_completion(
                     agent,
                     host,
                     registry,
-                    &caller,
+                    caller_ctx,
                     handler,
                     Value::undefined(),
                     &[argument],
@@ -447,13 +466,14 @@ impl Vm {
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let holdings = agent.take_finalization_cleanup_holdings(registry_object);
         let caller = self.synthetic_job_caller_frame(realm);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller);
         let mut result = Ok(());
         for holding in holdings {
             if let Err(error) = self.call_to_completion(
                 agent,
                 host,
                 registry,
-                &caller,
+                caller_ctx,
                 cleanup_callback,
                 Value::undefined(),
                 &[holding],
@@ -486,11 +506,12 @@ impl Vm {
         argument: Value,
     ) -> VmResult<PromiseReactionOutcome> {
         let caller = self.synthetic_job_caller_frame(realm);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller);
         let result = match self.call_to_completion(
             agent,
             host,
             registry,
-            &caller,
+            caller_ctx,
             on_finally,
             Value::undefined(),
             &[],
@@ -511,11 +532,12 @@ impl Vm {
             .filter(|object| agent.objects().is_callable(*object))
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let caller = self.synthetic_job_caller_frame(realm);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller);
         let promise = match self.call_to_completion(
             agent,
             host,
             registry,
-            &caller,
+            caller_ctx,
             resolve,
             Value::from_object_ref(constructor),
             &[result],
@@ -634,11 +656,12 @@ impl Vm {
         }
         .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let caller = self.synthetic_job_caller_frame(realm);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller);
         let _ = self.call_to_completion(
             agent,
             host,
             registry,
-            &caller,
+            caller_ctx,
             function,
             Value::undefined(),
             &[value],
@@ -663,11 +686,12 @@ impl Vm {
         let (resolve, reject) =
             Self::create_promise_job_resolving_functions(agent, realm, promise)?;
         let caller = self.synthetic_job_caller_frame(realm);
+        let caller_ctx = Self::caller_context_from_record(agent, &caller);
         match self.call_to_completion(
             agent,
             host,
             registry,
-            &caller,
+            caller_ctx,
             then,
             Value::from_object_ref(thenable),
             &[
@@ -678,11 +702,12 @@ impl Vm {
             Ok(_) => Ok(()),
             Err(VmError::Abrupt(completion)) => {
                 let caller = self.synthetic_job_caller_frame(realm);
+                let caller_ctx = Self::caller_context_from_record(agent, &caller);
                 let _ = self.call_to_completion(
                     agent,
                     host,
                     registry,
-                    &caller,
+                    caller_ctx,
                     reject,
                     Value::undefined(),
                     &[completion.thrown_value().unwrap_or(Value::undefined())],
@@ -752,7 +777,6 @@ impl Vm {
             0,
             RegisterWindow::new(0, 0),
             None,
-            realm.id(),
             realm.global_env(),
             realm.global_env(),
             lyng_env::ExecutionContextKind::Job,
@@ -761,8 +785,8 @@ impl Vm {
     }
 
     fn job_caller_code(&self) -> CodeRef {
-        self.frame()
-            .map(|frame| frame.code())
+        self.current_frame_header()
+            .map(super::super::frame_header::FrameHeader::code)
             .or_else(|| {
                 self.installed
                     .iter()

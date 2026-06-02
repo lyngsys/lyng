@@ -1,7 +1,7 @@
 use super::super::{
-    argument_to_number, close_iterator_after_error, number_to_i32_after_range_check,
-    number_to_u64_after_range_check, number_value, numbers_are_equal, to_uint32_for_builtin,
-    type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext, argument_to_number,
+    close_iterator_after_error, number_to_i32_after_range_check, number_to_u64_after_range_check,
+    number_value, numbers_are_equal, to_uint32_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_ops::iterator;
@@ -680,11 +680,7 @@ fn round_to_float16(number: f64) -> f64 {
         candidate.min(MAX_FINITE)
     };
 
-    if negative {
-        -rounded
-    } else {
-        rounded
-    }
+    if negative { -rounded } else { rounded }
 }
 
 fn round_ties_to_even(value: f64) -> f64 {
@@ -746,11 +742,7 @@ fn math_sum_precise_numbers(numbers: &[f64]) -> f64 {
     }
 
     let result = math_precise_finite_sum(&finite);
-    if result == 0.0 {
-        0.0
-    } else {
-        result
-    }
+    if result == 0.0 { 0.0 } else { result }
 }
 
 fn math_precise_finite_sum(numbers: &[f64]) -> f64 {
@@ -863,11 +855,7 @@ impl MathExactSum {
             round_normal_magnitude_to_f64(&self.limbs, bit_len, highest_exponent)
         };
 
-        if self.sign < 0 {
-            -magnitude
-        } else {
-            magnitude
-        }
+        if self.sign < 0 { -magnitude } else { magnitude }
     }
 }
 

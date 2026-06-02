@@ -1,5 +1,5 @@
 use super::{
-    array_like_length,
+    BuiltinIteratorBridge, PublicBuiltinDispatchContext, array_like_length,
     binary_data::{typed_array_is_out_of_bounds, typed_array_validated_object_and_record},
     close_iterator_after_error, create_array_from_values, create_array_result,
     create_data_property_or_throw, define_data_property_with_attrs, get_property_from_object,
@@ -13,7 +13,7 @@ use super::{
     property_key_from_text, proxy_get_own_property, proxy_get_prototype_of,
     proxy_own_property_keys, range_error, set_property_on_object, string_from_code_units,
     string_ref_code_units, string_ref_text, string_this_ref, string_value, to_number_for_builtin,
-    type_error, BuiltinIteratorBridge, PublicBuiltinDispatchContext,
+    type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_common::{AtomId, WellKnownAtom};
@@ -122,27 +122,27 @@ use eager::{
     iterator_reduce_builtin, iterator_some_builtin, iterator_to_array_builtin,
 };
 use helper_state::{
-    clear_iterator_helper_inner, get_iterator_flattenable, iterator_helper_active_record,
-    iterator_helper_counter, iterator_helper_done, iterator_helper_inner_record,
-    iterator_helper_iterated_object, iterator_helper_limit, iterator_helper_record,
-    iterator_helper_running, iterator_helper_sequence_count, iterator_helper_this_object,
-    set_iterator_helper_done, set_iterator_helper_limit, set_iterator_helper_running, u64_to_value,
-    IteratorHelperKind, IteratorZipCollectedRecord, IteratorZipKey, IteratorZipMode,
     ITERATOR_HELPER_COUNTER_SLOT, ITERATOR_HELPER_INNER_ITERATED_SLOT,
     ITERATOR_HELPER_INNER_NEXT_METHOD_SLOT, ITERATOR_HELPER_ITERATED_SLOT,
     ITERATOR_HELPER_KIND_SLOT, ITERATOR_HELPER_NEXT_METHOD_SLOT, ITERATOR_HELPER_PARAM_SLOT,
     ITERATOR_HELPER_SEQUENCE_BASE_SLOT, ITERATOR_ZIP_ALIVE_OFFSET, ITERATOR_ZIP_ITERATED_OFFSET,
     ITERATOR_ZIP_KEY_KIND_OFFSET, ITERATOR_ZIP_KEY_PAYLOAD_OFFSET, ITERATOR_ZIP_NEXT_METHOD_OFFSET,
-    ITERATOR_ZIP_PADDING_OFFSET, ITERATOR_ZIP_RECORD_WIDTH,
+    ITERATOR_ZIP_PADDING_OFFSET, ITERATOR_ZIP_RECORD_WIDTH, IteratorHelperKind,
+    IteratorZipCollectedRecord, IteratorZipKey, IteratorZipMode, clear_iterator_helper_inner,
+    get_iterator_flattenable, iterator_helper_active_record, iterator_helper_counter,
+    iterator_helper_done, iterator_helper_inner_record, iterator_helper_iterated_object,
+    iterator_helper_limit, iterator_helper_record, iterator_helper_running,
+    iterator_helper_sequence_count, iterator_helper_this_object, set_iterator_helper_done,
+    set_iterator_helper_limit, set_iterator_helper_running, u64_to_value,
 };
 use indexed::iterator_prototype_iterator_value;
 pub(super) use indexed::{
+    ArrayIterationKind, MAP_ITERATOR_INDEX_SLOT, MAP_ITERATOR_KIND_SLOT, MAP_ITERATOR_TARGET_SLOT,
+    SET_ITERATOR_INDEX_SLOT, SET_ITERATOR_KIND_SLOT, SET_ITERATOR_TARGET_SLOT,
     allocate_iterator_object, array_iterator_factory_builtin, array_iterator_next_builtin,
     create_iterator_result_value, iterator_slot_value_for_builtin,
     set_iterator_slot_value_for_builtin, string_iterator_builtin, string_iterator_next_builtin,
-    typed_array_iterator_factory_builtin, ArrayIterationKind, MAP_ITERATOR_INDEX_SLOT,
-    MAP_ITERATOR_KIND_SLOT, MAP_ITERATOR_TARGET_SLOT, SET_ITERATOR_INDEX_SLOT,
-    SET_ITERATOR_KIND_SLOT, SET_ITERATOR_TARGET_SLOT,
+    typed_array_iterator_factory_builtin,
 };
 use lazy::{
     iterator_drop_builtin, iterator_filter_builtin, iterator_flat_map_builtin,

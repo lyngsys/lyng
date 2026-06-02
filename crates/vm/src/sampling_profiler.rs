@@ -19,12 +19,12 @@
 //! (and `Drop`) may block for up to one `interval` while the thread wakes to
 //! observe the stop flag.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{OPCODE_COUNT, Opcode};
 
 use crate::opcode_counts::decode_current_opcode;
 
@@ -97,7 +97,7 @@ impl SampleHistogram {
         self.non_opcode
     }
 
-    /// Total samples taken (sum of all lanes + non_opcode).
+    /// Total samples taken (sum of all lanes + `non_opcode`).
     #[must_use]
     pub const fn total(&self) -> u64 {
         self.total
@@ -140,7 +140,7 @@ impl SamplingProfiler {
         );
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
-        let ptr = CellPtr(cell as *const AtomicU64);
+        let ptr = CellPtr(std::ptr::from_ref::<AtomicU64>(cell));
         let handle = std::thread::spawn(move || {
             let cell_ptr = ptr; // move the Send wrapper into the thread
             let mut hist = SampleHistogram::zeroed();
@@ -175,8 +175,9 @@ impl SamplingProfiler {
         self.stop.store(true, Ordering::Release);
         self.handle
             .take()
-            .map(|handle| handle.join().unwrap_or_else(|_| SampleHistogram::zeroed()))
-            .unwrap_or_else(SampleHistogram::zeroed)
+            .map_or_else(SampleHistogram::zeroed, |handle| {
+                handle.join().unwrap_or_else(|_| SampleHistogram::zeroed())
+            })
     }
 }
 

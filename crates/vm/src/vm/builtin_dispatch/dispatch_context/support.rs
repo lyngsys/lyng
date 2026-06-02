@@ -1,7 +1,7 @@
 use super::{
-    alloc_code_unit_string, errors, object, object_to_string_builtin, read, to_f64_number,
     AbruptCompletion, Agent, HostErrorKind, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
     Value, Vm, VmBuiltinDispatch, VmError, VmProxyBridge, VmResult, WellKnownAtom,
+    alloc_code_unit_string, errors, object, object_to_string_builtin, read, to_f64_number,
 };
 
 impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
@@ -28,7 +28,7 @@ impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, self.caller_frame, value)
+        Vm::require_callable_object(self.agent, value)
     }
 
     fn call_to_completion(
@@ -41,7 +41,7 @@ impl object::ToPrimitiveContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller,
             callee_object,
             this_value,
             arguments,
@@ -84,7 +84,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
+            self.caller.lexical_env,
+            self.caller.code,
+            self.caller.pc,
             receiver,
             key,
         )
@@ -109,7 +112,10 @@ impl VmBuiltinDispatch<'_, '_, '_> {
                 agent: self.agent,
                 host: self.host,
                 registry: self.registry,
-                frame: self.caller_frame,
+                caller_realm: self.caller.realm,
+                caller_lexical_env: self.caller.lexical_env,
+                caller_code: self.caller.code,
+                caller_pc: self.caller.pc,
             },
             object,
             key,
@@ -381,13 +387,8 @@ impl VmBuiltinDispatch<'_, '_, '_> {
             return Ok(PropertyKey::from_symbol(symbol));
         }
         let primitive = object::to_primitive(self, value, object::ToPrimitiveHint::String)?;
-        self.vm.value_to_property_key(
-            self.agent,
-            self.caller_frame,
-            self.caller_frame.code(),
-            self.caller_frame.instruction_offset(),
-            primitive,
-        )
+        self.vm
+            .value_to_property_key(self.agent, self.caller.code, self.caller.pc, primitive)
     }
 
     fn engine_array_to_string_fallback_value(&mut self, object: ObjectRef) -> VmResult<Value> {

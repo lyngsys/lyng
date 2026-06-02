@@ -53,15 +53,11 @@ fn ordinary_bytecode_construct_eligibility_rejects_bound_function() {
     );
 }
 
-// DSL-0c: the `debug_deopt_assertion_reports_register_window_mismatch`
-// test was removed when the α dispatch loop was replaced by the asm
-// substrate. The α `translate_outcome_to_step` ran
-// `assert_deopt_safepoint_state` between every Continue/Refresh; the
-// DSL fast path (warm `op_loop_header`) dispatches without going
-// through the slow shim when no safepoint poll is pending, so the
-// assertion never fires for the malformed register-window fixture.
-// Coverage for safepoint metadata addressing is preserved by
-// `vm_addresses_metadata_by_code_and_instruction_offset` below.
+// The `debug_deopt_assertion_reports_register_window_mismatch` test was
+// removed: the warm `op_loop_header` dispatches without going through the
+// slow shim when no safepoint poll is pending, so the assertion never fires
+// for the malformed register-window fixture. Safepoint metadata addressing
+// is covered by `vm_addresses_metadata_by_code_and_instruction_offset`.
 
 #[test]
 fn vm_addresses_metadata_by_code_and_instruction_offset() {
@@ -127,11 +123,13 @@ fn vm_addresses_metadata_by_code_and_instruction_offset() {
     );
     assert_eq!(loop_runtime.kind(), SafepointKind::LoopBackedge);
     assert!(exception_runtime.captures_exception_state());
-    assert!(exception_snapshot
-        .values()
-        .contains(&DeoptValueSource::FrameValue(
-            DeoptFrameValue::ExceptionValue,
-        )));
+    assert!(
+        exception_snapshot
+            .values()
+            .contains(&DeoptValueSource::FrameValue(
+                DeoptFrameValue::ExceptionValue,
+            ))
+    );
 }
 
 #[test]

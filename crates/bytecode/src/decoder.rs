@@ -1,4 +1,4 @@
-use crate::{metadata::CallRange, Instruction, Opcode};
+use crate::{Instruction, Opcode, metadata::CallRange};
 use lyng_types::FeedbackSlotId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

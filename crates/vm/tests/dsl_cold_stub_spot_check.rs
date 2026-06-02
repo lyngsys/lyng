@@ -1,39 +1,22 @@
-//! DSL-0b B48 — spot-check 10 representative cold stubs.
+//! Spot-check 10 representative cold stubs.
 //!
-//! After B46 (codegen tool) and B47 (cold.rs + `DSL_DISPATCH_TABLE`),
-//! 140 cold opcodes have a generated `op_xxx_dsl` handler symbol and a
-//! matching `op_xxx_slow_rs` Rust shim. This file asserts at link time
-//! that 10 representative stubs (one per family / cross-cut) exist
-//! and are reachable from `DSL_DISPATCH_TABLE`.
-//!
-//! Runtime invocation is **deferred to Phase C** (after C1 flips
-//! `Vm::run` over to the asm trampoline). The trampoline is still a
-//! `naked_asm!("ret")` stub; calling a cold handler before that flip
-//! would either crash or no-op since the trampoline's `STATE`
-//! register isn't established. The `dsl_validation_*` tests follow
-//! the same deferral pattern (see B30–B38).
+//! Asserts at link time that 10 representative `op_xxx_dsl` handler symbols
+//! (one per family / cross-cut) exist and are reachable from
+//! `DSL_DISPATCH_TABLE`.
 //!
 //! ## What each test catches
 //!
-//! 1. **Symbol existence.** If the codegen forgot to emit a stub, the
-//!    `cold::op_xxx_dsl` reference fails to link. Taking the address
-//!    forces linker resolution.
-//! 2. **Dispatch table wiring.** The slot at `DSL_DISPATCH_TABLE[op as
-//!    u8]` must point at the same function pointer as the direct
-//!    symbol reference — i.e. the table's entry is the generated
-//!    stub, not `unimplemented_dsl_handler`.
+//! 1. **Symbol existence.** If codegen forgot to emit a stub, the
+//!    `cold::op_xxx_dsl` reference fails to link.
+//! 2. **Dispatch table wiring.** The table slot must point at the same
+//!    function pointer as the direct symbol reference.
 
 #[cfg(target_arch = "aarch64")]
 use lyng_bytecode::Opcode;
 #[cfg(target_arch = "aarch64")]
-use lyng_vm::dsl::handlers::{cold, DslHandler, DSL_DISPATCH_TABLE};
+use lyng_vm::dsl::handlers::{DSL_DISPATCH_TABLE, DslHandler, cold};
 
-/// Shared assertion body used by each per-opcode test below. Takes
-/// the opcode + its directly-referenced handler symbol and verifies:
-///
-/// 1. The symbol's address is non-null (link-time).
-/// 2. The dispatch-table slot for that opcode resolves to the same
-///    function pointer (i.e. routing is intact).
+/// Asserts a cold stub is non-null and matches the dispatch-table entry.
 #[cfg(target_arch = "aarch64")]
 fn check_cold_stub(op: Opcode, handler: DslHandler) {
     let from_symbol = handler as *const ();
@@ -50,11 +33,7 @@ fn check_cold_stub(op: Opcode, handler: DslHandler) {
     );
 }
 
-// =====================================================================
-// 10 representative cold opcodes — one per family / cross-cut. Each is
-// its own `#[test]` so the integration-test runner reports 10 distinct
-// pass/fail lines, matching the plan's expected test count.
-// =====================================================================
+// 10 representative cold opcodes — one per family / cross-cut.
 
 #[cfg(target_arch = "aarch64")]
 #[test]

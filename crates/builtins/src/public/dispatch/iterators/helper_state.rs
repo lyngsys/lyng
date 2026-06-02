@@ -1,8 +1,8 @@
 use super::{
-    iterator, iterator_slot_value_for_builtin, length_value_u64, number_value,
-    property_key_from_text, set_iterator_slot_value_for_builtin, type_error, ArrayIterationKind,
-    AtomId, ObjectRef, OrdinaryObjectData, PropertyKey, PublicBuiltinDispatchContext, Value,
-    WellKnownSymbolId,
+    ArrayIterationKind, AtomId, ObjectRef, OrdinaryObjectData, PropertyKey,
+    PublicBuiltinDispatchContext, Value, WellKnownSymbolId, iterator,
+    iterator_slot_value_for_builtin, length_value_u64, number_value, property_key_from_text,
+    set_iterator_slot_value_for_builtin, type_error,
 };
 
 pub(super) const ITERATOR_HELPER_ITERATED_SLOT: u32 = 0;

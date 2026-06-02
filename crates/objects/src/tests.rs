@@ -50,15 +50,17 @@ fn engine_array(
     descriptor.set_writable(writable);
     descriptor.set_enumerable(false);
     descriptor.set_configurable(false);
-    assert!(runtime
-        .define_own_property(
-            mutator,
-            object,
-            PropertyKey::from_atom(WellKnownAtom::length.id()),
-            descriptor,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                mutator,
+                object,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+                descriptor,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     object
 }
 
@@ -219,15 +221,17 @@ fn named_property_cache_entries_track_shape_and_prototype_dependencies() {
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            prototype,
-            key,
-            data_descriptor(Value::from_smi(11), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                prototype,
+                key,
+                data_descriptor(Value::from_smi(11), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let object = runtime.alloc_object(
         &mut mutator,
@@ -259,9 +263,11 @@ fn named_property_cache_entries_track_shape_and_prototype_dependencies() {
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .set_prototype_of(&mut mutator, object, Some(replacement))
-        .unwrap());
+    assert!(
+        runtime
+            .set_prototype_of(&mut mutator, object, Some(replacement))
+            .unwrap()
+    );
     assert_eq!(
         runtime
             .load_from_named_property_cache(mutator.view(), object, cache)
@@ -629,46 +635,56 @@ fn module_namespace_objects_read_live_bindings_and_reject_mutation() {
         Value::from_smi(7)
     );
 
-    assert!(!runtime
-        .set(
-            &mut mutator,
-            namespace,
-            PropertyKey::from_atom(export_a),
-            Value::from_smi(11),
-            Value::from_object_ref(namespace),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(!runtime
-        .delete(&mut mutator, namespace, PropertyKey::from_atom(export_a))
-        .unwrap());
+    assert!(
+        !runtime
+            .set(
+                &mut mutator,
+                namespace,
+                PropertyKey::from_atom(export_a),
+                Value::from_smi(11),
+                Value::from_object_ref(namespace),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        !runtime
+            .delete(&mut mutator, namespace, PropertyKey::from_atom(export_a))
+            .unwrap()
+    );
 
     let mut incompatible = PropertyDescriptor::new();
     incompatible.set_value(Value::from_smi(5));
     incompatible.set_writable(true);
     incompatible.set_enumerable(true);
     incompatible.set_configurable(false);
-    assert!(!runtime
-        .define_own_property(
-            &mut mutator,
-            namespace,
-            PropertyKey::from_atom(export_a),
-            incompatible,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        !runtime
+            .define_own_property(
+                &mut mutator,
+                namespace,
+                PropertyKey::from_atom(export_a),
+                incompatible,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
-    assert!(runtime
-        .set_prototype_of(&mut mutator, namespace, None)
-        .unwrap());
+    assert!(
+        runtime
+            .set_prototype_of(&mut mutator, namespace, None)
+            .unwrap()
+    );
     let other = runtime.alloc_object(
         &mut mutator,
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(!runtime
-        .set_prototype_of(&mut mutator, namespace, Some(other))
-        .unwrap());
+    assert!(
+        !runtime
+            .set_prototype_of(&mut mutator, namespace, Some(other))
+            .unwrap()
+    );
 }
 
 #[test]
@@ -683,15 +699,17 @@ fn named_property_store_cache_misses_after_dictionary_transition_changes_shape()
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            key,
-            data_descriptor(Value::from_smi(1), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                data_descriptor(Value::from_smi(1), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let cache = runtime
         .plan_named_property_cache_entry(
@@ -718,15 +736,17 @@ fn named_property_store_cache_misses_after_dictionary_transition_changes_shape()
     redefine.set_writable(false);
     redefine.set_enumerable(true);
     redefine.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            key,
-            redefine,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                redefine,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     assert_eq!(
         runtime.named_property_storage_mode(object),
         Some(NamedPropertyStorageMode::Dictionary)
@@ -818,15 +838,17 @@ fn named_property_transition_store_cache_plans_shadowing_writable_data_property(
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            prototype,
-            key,
-            data_descriptor(Value::from_smi(7), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                prototype,
+                key,
+                data_descriptor(Value::from_smi(7), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     let object = runtime.alloc_object(
         &mut mutator,
         ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
@@ -867,16 +889,18 @@ fn named_property_transition_store_cache_rejects_inherited_non_writable_data() {
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            prototype,
-            key,
-            // writable = false → not shadowable.
-            data_descriptor(Value::from_smi(7), false, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                prototype,
+                key,
+                // writable = false → not shadowable.
+                data_descriptor(Value::from_smi(7), false, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     let object = runtime.alloc_object(
         &mut mutator,
         ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
@@ -937,24 +961,28 @@ fn string_exotic_properties_surface_length_indices_and_extra_keys() {
 
     let extra_index = PropertyKey::Index(5);
     let extra_name = PropertyKey::from_atom(AtomId::from_raw(950));
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            wrapper,
-            extra_index,
-            data_descriptor(Value::from_smi(99), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            wrapper,
-            extra_name,
-            data_descriptor(Value::from_smi(7), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                wrapper,
+                extra_index,
+                data_descriptor(Value::from_smi(99), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                wrapper,
+                extra_name,
+                data_descriptor(Value::from_smi(7), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let length = runtime
         .get_own_property(
@@ -1045,49 +1073,59 @@ fn string_exotic_properties_reject_incompatible_redefinition_and_deletion() {
             )
             .unwrap(),
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            wrapper,
-            PropertyKey::Index(0),
-            same_index,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                wrapper,
+                PropertyKey::Index(0),
+                same_index,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut incompatible_index = PropertyDescriptor::new();
     incompatible_index.set_value(Value::from_smi(1));
-    assert!(!runtime
-        .define_own_property(
-            &mut mutator,
-            wrapper,
-            PropertyKey::Index(0),
-            incompatible_index,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        !runtime
+            .define_own_property(
+                &mut mutator,
+                wrapper,
+                PropertyKey::Index(0),
+                incompatible_index,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut incompatible_length = PropertyDescriptor::new();
     incompatible_length.set_writable(true);
-    assert!(!runtime
-        .define_own_property(
-            &mut mutator,
-            wrapper,
-            PropertyKey::from_atom(WellKnownAtom::length.id()),
-            incompatible_length,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(!runtime
-        .delete(&mut mutator, wrapper, PropertyKey::Index(1))
-        .unwrap());
-    assert!(!runtime
-        .delete(
-            &mut mutator,
-            wrapper,
-            PropertyKey::from_atom(WellKnownAtom::length.id())
-        )
-        .unwrap());
+    assert!(
+        !runtime
+            .define_own_property(
+                &mut mutator,
+                wrapper,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+                incompatible_length,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        !runtime
+            .delete(&mut mutator, wrapper, PropertyKey::Index(1))
+            .unwrap()
+    );
+    assert!(
+        !runtime
+            .delete(
+                &mut mutator,
+                wrapper,
+                PropertyKey::from_atom(WellKnownAtom::length.id())
+            )
+            .unwrap()
+    );
 }
 
 #[test]
@@ -1257,24 +1295,28 @@ fn named_property_load_cache_reads_current_receiver_for_same_shaped_own_data_obj
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            first,
-            key,
-            data_descriptor(Value::from_smi(11), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            second,
-            key,
-            data_descriptor(Value::from_smi(22), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                first,
+                key,
+                data_descriptor(Value::from_smi(11), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                second,
+                key,
+                data_descriptor(Value::from_smi(22), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let cache = runtime
         .plan_named_property_cache_entry(
@@ -1312,24 +1354,28 @@ fn named_property_load_cache_rejects_same_shaped_receivers_with_different_protot
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            first_prototype,
-            key,
-            data_descriptor(Value::from_smi(11), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            second_prototype,
-            key,
-            data_descriptor(Value::from_smi(22), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                first_prototype,
+                key,
+                data_descriptor(Value::from_smi(11), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                second_prototype,
+                key,
+                data_descriptor(Value::from_smi(22), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let first = runtime.alloc_object(
         &mut mutator,
@@ -1374,15 +1420,17 @@ fn direct_named_data_property_probe_reads_data_and_rejects_accessors() {
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            prototype,
-            key,
-            data_descriptor(Value::from_smi(31), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                prototype,
+                key,
+                data_descriptor(Value::from_smi(31), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     let object = runtime.alloc_object(
         &mut mutator,
         ObjectAllocation::ordinary(root).with_prototype(Some(prototype)),
@@ -1407,15 +1455,17 @@ fn direct_named_data_property_probe_reads_data_and_rejects_accessors() {
     accessor.set_setter(Value::undefined());
     accessor.set_enumerable(true);
     accessor.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            prototype,
-            accessor_key,
-            accessor,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                prototype,
+                accessor_key,
+                accessor,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime.try_direct_get_named_data_property(mutator.view(), object, accessor_key),
@@ -1727,17 +1777,19 @@ fn repeated_named_property_definitions_transition_large_objects_to_dictionary_mo
         descriptor.set_writable(true);
         descriptor.set_enumerable(true);
         descriptor.set_configurable(raw % 2 == 0);
-        assert!(runtime
-            .define_own_property(
-                &mut mutator,
-                object,
-                PropertyKey::from_atom(AtomId::from_raw(
-                    u32::try_from(raw + 1).expect("test atom id fits u32"),
-                )),
-                descriptor,
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            runtime
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(
+                        u32::try_from(raw + 1).expect("test atom id fits u32"),
+                    )),
+                    descriptor,
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
     }
 
     assert_eq!(
@@ -1907,15 +1959,17 @@ fn proxy_internal_methods_forward_until_revocation() {
         AllocationLifetime::Default,
     );
     let key = PropertyKey::from_atom(AtomId::from_raw(81));
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            target,
-            key,
-            data_descriptor(Value::from_smi(7), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                target,
+                key,
+                data_descriptor(Value::from_smi(7), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     let proxy = runtime.alloc_object(
         &mut mutator,
         ObjectAllocation::proxy(shape, ProxyObjectData::new(target, handler, false, false))
@@ -2016,25 +2070,29 @@ fn ordinary_named_property_addition_chains_remain_shape_stable_before_cap() {
 
     for raw in 1..=4 {
         let key = PropertyKey::from_atom(AtomId::from_raw(raw));
-        assert!(runtime
-            .define_own_property(
-                &mut mutator,
-                object,
-                key,
-                data_descriptor(Value::from_smi(i32::try_from(raw).unwrap()), true, true),
-                AllocationLifetime::Default,
-            )
-            .unwrap());
+        assert!(
+            runtime
+                .define_own_property(
+                    &mut mutator,
+                    object,
+                    key,
+                    data_descriptor(Value::from_smi(i32::try_from(raw).unwrap()), true, true),
+                    AllocationLifetime::Default,
+                )
+                .unwrap()
+        );
         assert!(runtime.note_named_property_addition(&mut mutator, object));
         assert_eq!(
             runtime.named_property_storage_mode(object),
             Some(NamedPropertyStorageMode::ShapeStable)
         );
-        assert!(!runtime
-            .object_header(mutator.view(), object)
-            .unwrap()
-            .flags()
-            .uses_named_property_dictionary());
+        assert!(
+            !runtime
+                .object_header(mutator.view(), object)
+                .unwrap()
+                .flags()
+                .uses_named_property_dictionary()
+        );
     }
 
     assert_eq!(
@@ -2115,15 +2173,17 @@ fn deleting_shape_stable_named_property_uses_dictionary_storage() {
         AllocationLifetime::Default,
     );
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            key,
-            data_descriptor(Value::from_smi(5), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                data_descriptor(Value::from_smi(5), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     assert!(runtime.delete_named_property(&mut mutator, object, key));
 
     assert_eq!(
@@ -2131,10 +2191,12 @@ fn deleting_shape_stable_named_property_uses_dictionary_storage() {
         Some(NamedPropertyStorageMode::Dictionary)
     );
     assert_eq!(runtime.named_property_dictionary_entry(object, key), None);
-    assert!(runtime
-        .own_property_keys(mutator.view(), object)
-        .unwrap()
-        .is_empty());
+    assert!(
+        runtime
+            .own_property_keys(mutator.view(), object)
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -2150,26 +2212,30 @@ fn redefining_shape_stable_named_property_uses_dictionary_storage() {
         AllocationLifetime::Default,
     );
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            key,
-            data_descriptor(Value::from_smi(6), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                data_descriptor(Value::from_smi(6), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     let mut redefine = PropertyDescriptor::new();
     redefine.set_enumerable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            key,
-            redefine,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                key,
+                redefine,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let entry = runtime
         .named_property_dictionary_entry(object, key)
@@ -2331,15 +2397,17 @@ fn direct_own_index_queries_cover_dense_sparse_holes_and_accessors() {
     accessor.set_getter(Value::from_object_ref(callable_placeholder));
     accessor.set_enumerable(true);
     accessor.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(64),
-            accessor,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(64),
+                accessor,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime
@@ -2377,15 +2445,17 @@ fn sparse_index_accessors_preserve_getter_and_setter_payloads() {
     accessor.set_setter(Value::from_object_ref(callable_placeholder));
     accessor.set_enumerable(true);
     accessor.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(1),
-            accessor,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(1),
+                accessor,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime.get(
@@ -2445,29 +2515,33 @@ fn sparse_index_accessors_merge_sequential_getter_and_setter_updates() {
     getter_only.set_getter(Value::from_object_ref(getter));
     getter_only.set_enumerable(true);
     getter_only.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(1),
-            getter_only,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(1),
+                getter_only,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut setter_only = PropertyDescriptor::new();
     setter_only.set_setter(Value::from_object_ref(setter));
     setter_only.set_enumerable(true);
     setter_only.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(1),
-            setter_only,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(1),
+                setter_only,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime.sparse_element(object, 1).unwrap(),
@@ -2532,15 +2606,17 @@ fn engine_array_index_definitions_extend_length() {
     let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let array = engine_array(&mut runtime, &mut mutator, shape, 1, true);
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(2),
-            data_descriptor(Value::from_smi(9), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(2),
+                data_descriptor(Value::from_smi(9), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let length = array_length_descriptor(&runtime, mutator.view(), array);
     assert_eq!(length.value(), Some(Value::from_smi(3)));
@@ -2687,15 +2763,17 @@ fn engine_array_non_writable_length_blocks_extensions() {
     let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let array = engine_array(&mut runtime, &mut mutator, shape, 1, false);
 
-    assert!(!runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(1),
-            data_descriptor(Value::from_smi(7), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        !runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(1),
+                data_descriptor(Value::from_smi(7), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let length = array_length_descriptor(&runtime, mutator.view(), array);
     assert_eq!(length.value(), Some(Value::from_smi(1)));
@@ -2716,43 +2794,49 @@ fn engine_array_length_shrink_rolls_back_after_delete_failure() {
     let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let array = engine_array(&mut runtime, &mut mutator, shape, 4, true);
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(3),
-            data_descriptor(Value::from_smi(30), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(3),
+                data_descriptor(Value::from_smi(30), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut locked_tail = PropertyDescriptor::new();
     locked_tail.set_value(Value::from_smi(20));
     locked_tail.set_writable(true);
     locked_tail.set_enumerable(true);
     locked_tail.set_configurable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(2),
-            locked_tail,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(2),
+                locked_tail,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut shrink = PropertyDescriptor::new();
     shrink.set_value(Value::from_smi(1));
     shrink.set_writable(false);
-    assert!(!runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::from_atom(WellKnownAtom::length.id()),
-            shrink,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        !runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+                shrink,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let length = array_length_descriptor(&runtime, mutator.view(), array);
     assert_eq!(length.value(), Some(Value::from_smi(3)));
@@ -2779,54 +2863,64 @@ fn engine_array_length_shrink_deletes_sparse_tail_indices_without_scanning_holes
     let shape = runtime.root_shape(&mut mutator, None, AllocationLifetime::Default);
     let array = engine_array(&mut runtime, &mut mutator, shape, 3, true);
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(0),
-            data_descriptor(Value::from_smi(0), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(1),
-            data_descriptor(Value::from_smi(1), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(2),
-            data_descriptor(Value::from_smi(2), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::Index(u32::MAX - 1),
-            data_descriptor(Value::from_f64(f64::from(u32::MAX - 1)), true, true),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(0),
+                data_descriptor(Value::from_smi(0), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(1),
+                data_descriptor(Value::from_smi(1), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(2),
+                data_descriptor(Value::from_smi(2), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::Index(u32::MAX - 1),
+                data_descriptor(Value::from_f64(f64::from(u32::MAX - 1)), true, true),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut shrink = PropertyDescriptor::new();
     shrink.set_value(Value::from_smi(2));
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            array,
-            PropertyKey::from_atom(WellKnownAtom::length.id()),
-            shrink,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                array,
+                PropertyKey::from_atom(WellKnownAtom::length.id()),
+                shrink,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let length = array_length_descriptor(&runtime, mutator.view(), array);
     assert_eq!(length.value(), Some(Value::from_smi(2)));
@@ -2900,13 +2994,15 @@ fn ordinary_internal_methods_cover_prototype_extensibility_and_set_receiver_path
         runtime.get_prototype_of(mutator.view(), object).unwrap(),
         Some(prototype)
     );
-    assert!(runtime
-        .has_property(
-            mutator.view(),
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(30))
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .has_property(
+                mutator.view(),
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30))
+            )
+            .unwrap()
+    );
     assert_eq!(
         runtime
             .get(
@@ -2919,16 +3015,18 @@ fn ordinary_internal_methods_cover_prototype_extensibility_and_set_receiver_path
         Value::from_smi(11)
     );
 
-    assert!(runtime
-        .set(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(30)),
-            Value::from_smi(19),
-            Value::from_object_ref(object),
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .set(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(30)),
+                Value::from_smi(19),
+                Value::from_object_ref(object),
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     assert_eq!(
         runtime
             .get_own_property(
@@ -2961,9 +3059,11 @@ fn ordinary_internal_methods_cover_prototype_extensibility_and_set_receiver_path
         ObjectAllocation::ordinary(root),
         AllocationLifetime::Default,
     );
-    assert!(!runtime
-        .set_prototype_of(&mut mutator, object, Some(other_proto))
-        .unwrap());
+    assert!(
+        !runtime
+            .set_prototype_of(&mut mutator, object, Some(other_proto))
+            .unwrap()
+    );
     assert_eq!(
         runtime.get_prototype_of(mutator.view(), object).unwrap(),
         Some(prototype)
@@ -2987,15 +3087,17 @@ fn define_own_property_uses_shape_transitions_and_dictionary_fallback() {
     create.set_writable(true);
     create.set_enumerable(true);
     create.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(40)),
-            create,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(40)),
+                create,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime.named_property_storage_mode(object),
@@ -3016,15 +3118,17 @@ fn define_own_property_uses_shape_transitions_and_dictionary_fallback() {
 
     let mut redefine = PropertyDescriptor::new();
     redefine.set_enumerable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(40)),
-            redefine,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(40)),
+                redefine,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let descriptor = runtime
         .get_own_property(
@@ -3073,18 +3177,22 @@ fn integrity_summary_flags_track_non_extensible_objects() {
     writable_desc.set_writable(true);
     writable_desc.set_enumerable(true);
     writable_desc.set_configurable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            writable,
-            PropertyKey::from_atom(AtomId::from_raw(140)),
-            writable_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .prevent_extensions(mutator.view(), writable)
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                writable,
+                PropertyKey::from_atom(AtomId::from_raw(140)),
+                writable_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .prevent_extensions(mutator.view(), writable)
+            .unwrap()
+    );
     let writable_flags = runtime
         .object_header(mutator.view(), writable)
         .unwrap()
@@ -3102,15 +3210,17 @@ fn integrity_summary_flags_track_non_extensible_objects() {
     frozen_desc.set_writable(false);
     frozen_desc.set_enumerable(true);
     frozen_desc.set_configurable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            frozen,
-            PropertyKey::from_atom(AtomId::from_raw(141)),
-            frozen_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                frozen,
+                PropertyKey::from_atom(AtomId::from_raw(141)),
+                frozen_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     assert!(runtime.prevent_extensions(mutator.view(), frozen).unwrap());
     let frozen_flags = runtime
         .object_header(mutator.view(), frozen)
@@ -3137,49 +3247,57 @@ fn own_property_keys_order_indices_then_strings_then_symbols() {
     string_desc.set_writable(true);
     string_desc.set_enumerable(true);
     string_desc.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(50)),
-            string_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(50)),
+                string_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     let mut symbol_desc = PropertyDescriptor::new();
     symbol_desc.set_value(Value::from_smi(2));
     symbol_desc.set_writable(true);
     symbol_desc.set_enumerable(true);
     symbol_desc.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_symbol(SymbolRef::from_raw(9).unwrap()),
-            symbol_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_symbol(SymbolRef::from_raw(9).unwrap()),
+                symbol_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(2),
-            string_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::Index(0),
-            string_desc,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(2),
+                string_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::Index(0),
+                string_desc,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
 
     assert_eq!(
         runtime.own_property_keys(mutator.view(), object).unwrap(),
@@ -3276,37 +3394,43 @@ fn delete_respects_non_configurable_properties_and_accessors_defer_calls() {
     locked.set_writable(true);
     locked.set_enumerable(true);
     locked.set_configurable(false);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(60)),
-            locked,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
-    assert!(!runtime
-        .delete(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(60))
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(60)),
+                locked,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
+    assert!(
+        !runtime
+            .delete(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(60))
+            )
+            .unwrap()
+    );
 
     let mut accessor = PropertyDescriptor::new();
     accessor.set_getter(Value::from_object_ref(callable_placeholder));
     accessor.set_setter(Value::from_object_ref(callable_placeholder));
     accessor.set_enumerable(true);
     accessor.set_configurable(true);
-    assert!(runtime
-        .define_own_property(
-            &mut mutator,
-            object,
-            PropertyKey::from_atom(AtomId::from_raw(61)),
-            accessor,
-            AllocationLifetime::Default,
-        )
-        .unwrap());
+    assert!(
+        runtime
+            .define_own_property(
+                &mut mutator,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(61)),
+                accessor,
+                AllocationLifetime::Default,
+            )
+            .unwrap()
+    );
     assert_eq!(
         runtime.get(
             mutator.view(),
@@ -3353,11 +3477,13 @@ fn leaf_shape_free_removes_canonical_transition_entry() {
             .inline_len(),
         0
     );
-    assert!(!runtime
-        .shape_metadata(root)
-        .unwrap()
-        .transitions
-        .contains_key(&transition));
+    assert!(
+        !runtime
+            .shape_metadata(root)
+            .unwrap()
+            .transitions
+            .contains_key(&transition)
+    );
     let recreated = runtime
         .transition_shape(&mut mutator, root, transition, AllocationLifetime::Default)
         .unwrap();
@@ -3729,16 +3855,20 @@ fn private_field_layout_allocates_brand_storage_for_instance_and_static_fields()
         runtime.private_field_get(mutator.view(), instance, prototype, instance_descriptor),
         Ok(Value::from_smi(9))
     );
-    assert!(mutator
-        .view()
-        .object(instance)
-        .and_then(RuntimeObjectRecord::private_slots)
-        .is_some());
-    assert!(mutator
-        .view()
-        .object(class_object)
-        .and_then(RuntimeObjectRecord::private_slots)
-        .is_some());
+    assert!(
+        mutator
+            .view()
+            .object(instance)
+            .and_then(RuntimeObjectRecord::private_slots)
+            .is_some()
+    );
+    assert!(
+        mutator
+            .view()
+            .object(class_object)
+            .and_then(RuntimeObjectRecord::private_slots)
+            .is_some()
+    );
 }
 
 #[test]

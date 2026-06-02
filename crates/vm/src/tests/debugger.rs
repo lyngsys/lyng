@@ -90,9 +90,9 @@ impl VmDebugHook for ReferrerProbeHook {
 
 #[test]
 fn current_referrer_carries_established_referrer_after_entry() {
-    // Drive a script entry with a known `script_or_module_referrer`, pause at a
-    // live mid-execution safepoint, and assert the parallel `Vm` side-stack
-    // (now the single source of truth) carries the established referrer.
+    // Drive a script entry with a known referrer, pause at a live
+    // mid-execution safepoint, and assert the Vm side-stack carries
+    // the established referrer.
     let (unit, loop_offset) = inspector_fixture_unit();
     let referrers = Rc::new(RefCell::new(Vec::new()));
 
@@ -116,7 +116,11 @@ fn current_referrer_carries_established_referrer_after_entry() {
 
     assert_eq!(result, Value::from_smi(41));
     let referrers = referrers.borrow();
-    assert_eq!(referrers.len(), 1, "expected exactly one mid-execution pause");
+    assert_eq!(
+        referrers.len(),
+        1,
+        "expected exactly one mid-execution pause"
+    );
     // The side-stack must carry the established referrer (not a None pass).
     assert_eq!(referrers[0], Some(referrer));
 }
@@ -141,8 +145,8 @@ impl VmDebugHook for RunningContextProbeHook {
     fn on_pause(&mut self, context: VmDebugPauseContext<'_>) -> VmDebugCommand {
         let parity = context.running_context_parity();
         self.samples.borrow_mut().push((
-            parity.scalar.map(|rc| rc.realm()),
-            parity.scalar.and_then(|rc| rc.referrer()),
+            parity.scalar.map(lyng_env::RunningContext::realm),
+            parity.scalar.and_then(lyng_env::RunningContext::referrer),
             parity.frame_realm,
             parity.frame_referrer,
             context.frames().len(),
@@ -155,8 +159,7 @@ impl VmDebugHook for RunningContextProbeHook {
 fn running_context_tracks_active_frame_and_reverts_after_entry() {
     // Drive a script entry with a known referrer, pause mid-execution, and
     // assert the Agent's ambient `running_context` scalar matches the active
-    // frame (realm + referrer). After the entry returns and the frame stack is
-    // empty, the scalar must revert to None.
+    // frame. After entry returns the scalar must revert to None.
     let (unit, loop_offset) = inspector_fixture_unit();
     let samples = Rc::new(RefCell::new(Vec::new()));
 
@@ -187,7 +190,7 @@ fn running_context_tracks_active_frame_and_reverts_after_entry() {
     assert_eq!(samples.len(), 1, "expected exactly one mid-execution pause");
     let (scalar_realm, scalar_referrer, frame_realm, frame_referrer, frame_count) = samples[0];
     assert_eq!(frame_count, 1, "paused inside the script entry frame");
-    // The scalar must mirror the active frame exactly (the SP-0a invariant)...
+    // The scalar must mirror the active frame exactly...
     assert_eq!(scalar_realm, frame_realm);
     assert_eq!(scalar_referrer, frame_referrer);
     // ...and must carry the live frame's realm/referrer (not a None pass).

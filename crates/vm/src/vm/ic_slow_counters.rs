@@ -15,7 +15,6 @@
 //! decided to bail to Rust.
 
 use crate::vm::Vm;
-use crate::FrameRecord;
 use lyng_env::Agent;
 use lyng_types::{CodeRef, FeedbackSlotId};
 use std::fmt::Write as _;
@@ -289,7 +288,7 @@ impl Vm {
     pub(crate) fn record_ic_slow_entry(
         &mut self,
         agent: &Agent,
-        frame: &FrameRecord,
+        frame: crate::frame::FrameView,
         slot: u32,
         receiver_register: u16,
         kind: IcSlowPathKind,

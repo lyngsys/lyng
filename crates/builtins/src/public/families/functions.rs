@@ -4,22 +4,21 @@ use super::descriptors::{
     readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, FunctionFamilyBuiltins,
-    FunctionFamilyPrototypes,
+    FamilyInstallContext, FunctionFamilyBuiltins, FunctionFamilyPrototypes,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    async_function_builtin, async_generator_function_builtin, async_generator_next_builtin,
-    async_generator_return_builtin, async_generator_throw_builtin, function_apply_builtin,
-    function_bind_builtin, function_builtin, function_call_builtin, function_prototype_builtin,
-    function_symbol_has_instance_builtin, function_to_string_builtin, generator_function_builtin,
-    generator_next_builtin, generator_return_builtin, generator_throw_builtin,
-    internal_throw_type_error_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
-    WellKnownSymbolId,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId, async_function_builtin,
+    async_generator_function_builtin, async_generator_next_builtin, async_generator_return_builtin,
+    async_generator_throw_builtin, function_apply_builtin, function_bind_builtin, function_builtin,
+    function_call_builtin, function_prototype_builtin, function_symbol_has_instance_builtin,
+    function_to_string_builtin, generator_function_builtin, generator_next_builtin,
+    generator_return_builtin, generator_throw_builtin, internal_throw_type_error_builtin,
 };
 
 #[allow(clippy::too_many_lines)]

@@ -2,10 +2,10 @@
 
 use lyng_common::{AtomId, AtomLifetime, AtomTable};
 use lyng_gc::{
-    AllocationLifetime, AtomGcSweep, BigIntSign, PrimitiveAtomMetadata, PrimitiveCollectionTrigger,
-    PrimitiveHeap, PrimitiveRoots, PrimitiveStringRecord, PrimitiveSymbolClass, StringEncoding,
-    StringHandleStoreTarget, SymbolFlags, TraceAtomEdges, ValueStoreTarget,
-    PRIMITIVE_SLOTS_PER_PAGE,
+    AllocationLifetime, AtomGcSweep, BigIntSign, PRIMITIVE_SLOTS_PER_PAGE, PrimitiveAtomMetadata,
+    PrimitiveCollectionTrigger, PrimitiveHeap, PrimitiveRoots, PrimitiveStringRecord,
+    PrimitiveSymbolClass, StringEncoding, StringHandleStoreTarget, SymbolFlags, TraceAtomEdges,
+    ValueStoreTarget,
 };
 use lyng_types::Value;
 
@@ -438,10 +438,12 @@ fn symbol_identity_stays_handle_based_even_with_matching_descriptions() {
         assert_eq!(stats.trace.symbols_marked, 3);
         assert_eq!(stats.trace.strings_marked, 2);
         assert_ne!(left_symbol_view.identity(), right_symbol_view.identity());
-        assert!(left_symbol_view
-            .description_view()
-            .unwrap()
-            .equals(right_symbol_view.description_view().unwrap()));
+        assert!(
+            left_symbol_view
+                .description_view()
+                .unwrap()
+                .equals(right_symbol_view.description_view().unwrap())
+        );
         assert!(left_symbol_view.is_ordinary());
         assert!(well_known_view.is_well_known());
     }

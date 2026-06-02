@@ -12,7 +12,7 @@
 //! only as the **enable flag** on `OpcodeCounters`, so
 //! `slow_path_counts()` can return `None` when tracking is disabled.
 
-use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{OPCODE_COUNT, Opcode};
 
 const OPCODE_COUNT_LEN: usize = OPCODE_COUNT as usize;
 
@@ -51,9 +51,7 @@ pub struct SlowPathCounts {
 
 impl SlowPathCounts {
     /// Build a `SlowPathCounts` from the `slow_semantic` / `slow_safepoint`
-    /// banks of a `DispatchCounters` struct. Used by `Vm::slow_path_counts`
-    /// to surface the asm-driven counter banks behind the same interface
-    /// the bench and tests already consume (DSL-1 Phase 1.B.0 Task 5).
+    /// banks of a `DispatchCounters` struct.
     #[must_use]
     pub fn from_dispatch_arrays(semantic: &[u64; 256], safepoint: &[u64; 256]) -> Self {
         Self {

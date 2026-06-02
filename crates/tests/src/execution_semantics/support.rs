@@ -13,12 +13,13 @@ use lyng_objects::{
 use lyng_ops::object::ordinary_create_data_property;
 use lyng_parser::parse_script;
 use lyng_sema::analyze_script;
-pub(super) use lyng_types::{
-    internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
-    internal_object_has_own_property_builtin, internal_object_to_string_builtin,
-    internal_string_index_of_builtin, internal_string_replace_builtin, Value,
-};
 use lyng_types::{BuiltinFunctionId, ObjectRef, PropertyKey};
+pub(super) use lyng_types::{
+    Value, internal_array_index_of_builtin, internal_array_pop_builtin,
+    internal_array_push_builtin, internal_object_has_own_property_builtin,
+    internal_object_to_string_builtin, internal_string_index_of_builtin,
+    internal_string_replace_builtin,
+};
 use lyng_vm::Vm;
 
 pub(super) fn compile_unit(source: &str, atoms: &mut AtomTable) -> CompiledScriptUnit {
@@ -151,15 +152,17 @@ pub(super) fn install_native_global(
     });
     let name = agent.atoms_mut().intern_collectible(name);
 
-    assert!(ordinary_create_data_property(
-        agent,
-        realm.global_object(),
-        PropertyKey::from_atom(name),
-        Value::from_object_ref(function_object),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .expect("native global should install"));
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            realm.global_object(),
+            PropertyKey::from_atom(name),
+            Value::from_object_ref(function_object),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .expect("native global should install")
+    );
     function_object
 }
 

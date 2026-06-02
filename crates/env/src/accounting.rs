@@ -244,15 +244,19 @@ mod tests {
             .root_cluster_mut()
             .register_shared_backing_store(root, 4096)
             .expect("shared backing store should allocate");
-        assert!(runtime
-            .root_cluster_mut()
-            .cache_shared_backing_store_handle(
-                shared_store,
-                HostSharedBufferId::from_raw(7).unwrap()
-            ));
-        assert!(runtime
-            .root_cluster_mut()
-            .share_shared_backing_store(shared_store, worker));
+        assert!(
+            runtime
+                .root_cluster_mut()
+                .cache_shared_backing_store_handle(
+                    shared_store,
+                    HostSharedBufferId::from_raw(7).unwrap()
+                )
+        );
+        assert!(
+            runtime
+                .root_cluster_mut()
+                .share_shared_backing_store(shared_store, worker)
+        );
         runtime
             .enqueue_job(
                 root,

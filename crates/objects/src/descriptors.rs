@@ -1,7 +1,7 @@
 use super::{
-    DescriptorAttributes, InternalMethodError, InternalMethodResult, NamedPropertyValue, ObjectRef,
-    ObjectRuntime, ShapeProperty, ShapePropertyKind, SlotLocation, Value,
-    MIN_DENSE_ELEMENT_CAPACITY, SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
+    DescriptorAttributes, InternalMethodError, InternalMethodResult, MIN_DENSE_ELEMENT_CAPACITY,
+    NamedPropertyValue, ObjectRef, ObjectRuntime, SMALL_SHAPE_INLINE_PROPERTY_LIMIT, ShapeProperty,
+    ShapePropertyKind, SlotLocation, Value,
 };
 use lyng_gc::{PrimitiveHeapView, PrimitiveMutator, ValueStoreTarget};
 use lyng_types::{PropertyDescriptor, PropertyKey};
@@ -74,7 +74,9 @@ pub fn descriptor_from_payload(
             // `Data` value by `descriptor_from_cell_payload` before reaching this helper.
             // Callers that build descriptors directly (shape-stable slot reads, pre-deref
             // construction) only ever pass `Data` or `Accessor`.
-            unreachable!("DataCell must be dereferenced via descriptor_from_cell_payload before descriptor_from_payload")
+            unreachable!(
+                "DataCell must be dereferenced via descriptor_from_cell_payload before descriptor_from_payload"
+            )
         }
         NamedPropertyValue::Accessor { get, set } => {
             descriptor.set_getter(get);
@@ -358,7 +360,9 @@ pub fn write_named_payload(
             // which never hold cells. Cell-backed dictionary entries are routed and written
             // through their `ValueCell` in `redefine_named_property`, not here, and are read
             // back via `descriptor_from_cell_payload` rather than this slot path.
-            unreachable!("DataCell entries are written through their ValueCell in redefine_named_property, never into shape slots")
+            unreachable!(
+                "DataCell entries are written through their ValueCell in redefine_named_property, never into shape slots"
+            )
         }
         NamedPropertyValue::Accessor { get, set } => {
             let setter_target = match primary_target {

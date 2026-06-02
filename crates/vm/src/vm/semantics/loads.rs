@@ -1,33 +1,10 @@
-//! Loads + register-window moves family semantic bodies (DSL-0a Task A8).
+//! Loads + register-window moves family semantic bodies.
 //!
-//! Each `op_xxx_semantic` function implements the semantic effect of one
-//! loads-family opcode. The α handler in `dispatch_handlers/loads.rs`
-//! decodes operands, constructs `OpXxxArgs`, calls the semantic body, and
-//! translates the returned `SemanticOutcome` to `Step`. The DSL-0b cold-stub
-//! shim in `dsl/handlers/cold/loads.rs` will reach the same functions from
-//! the asm-DSL path.
-//!
-//! Family coverage (35 opcodes):
-//! - `Move`
-//! - Lda* (constant): `LdaUndefined`, `LdaNull`, `LdaTrue`, `LdaFalse`,
-//!   `LdaZero`, `LdaOne` — write fixed value to register 0.
-//! - Load* (Abx, constant): `LoadUndefined`, `LoadNull`, `LoadTrue`,
-//!   `LoadFalse`, `LoadZero`, `LoadOne`, `LoadUninitializedLexical` — write
-//!   fixed value to explicit register `a`.
-//! - `Star0`..`Star7` — copy register 0 to a fixed-index register.
-//! - Lda* (with operand): `LdaSmi8`, `LdaConst8`, `Ldar`.
-//! - Load* (with operand, Abx): `LoadSmi`, `LoadSmi8`, `LoadConst`,
-//!   `LoadConst8`.
-//! - `LoadLocal0..3`, `StoreLocal0..3` — fixed-local-index ↔ explicit
-//!   register.
-//!
-//! Accumulator-producing handlers (those whose α form uses
-//! `dispatch_next_with_value!` for V8 Ignition's Star-fusion peephole) return
-//! `SemanticOutcome::Continue { pc_advance }` after writing register 0. The
-//! α thunk preserves the fusion behavior by reading register 0 after the
-//! semantic returns and going through `dispatch_next_with_value!`. The
-//! semantic body itself stays fusion-agnostic — fusion is a dispatch-time
-//! optimization, not part of opcode semantics.
+//! Family coverage (35 opcodes): `Move`; Lda* (constant loads into register 0);
+//! Load* (Abx, constant loads into explicit register); `Star0`–`Star7`;
+//! Lda* with operand (`LdaSmi8`, `LdaConst8`, `Ldar`); Load* with operand
+//! (`LoadSmi`, `LoadSmi8`, `LoadConst`, `LoadConst8`);
+//! `LoadLocal0..3`, `StoreLocal0..3`.
 
 use lyng_types::Value;
 
@@ -48,7 +25,7 @@ pub fn op_move_semantic(
     args: OpMoveArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let value = inner.vm.read_register_unchecked(registers, args.src);
     inner
         .vm
@@ -72,7 +49,7 @@ fn op_lda_constant_semantic(
     value: Value,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register_unchecked(registers, 0, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -136,7 +113,7 @@ fn op_load_constant_semantic(
     value: Value,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register_unchecked(registers, args.a, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -206,7 +183,7 @@ fn op_star_semantic(
     target: u16,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let value = inner.vm.read_register_unchecked(registers, 0);
     inner.vm.write_register_unchecked(registers, target, value);
     SemanticOutcome::Continue {
@@ -275,8 +252,7 @@ pub fn op_star_7_semantic(
 // =====================================================================
 
 pub struct OpLdaSmi8Args {
-    /// Decoded immediate byte from the bytecode (raw u32 for symmetry with
-    /// `decode_accumulator_byte_operands`; only the low byte is meaningful).
+    /// Raw `bx` operand; only the low byte is meaningful.
     pub bx: u32,
     pub instruction_len: u32,
 }
@@ -288,7 +264,7 @@ pub fn op_lda_smi8_semantic(
     let raw = i8::from_le_bytes([args.bx.to_le_bytes()[0]]);
     let value = Value::from_smi(i32::from(raw));
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register(registers, 0, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -309,7 +285,7 @@ pub fn op_lda_const8_semantic(
         Ok(v) => v,
         Err(error) => return SemanticOutcome::ExitError { error },
     };
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register_unchecked(registers, 0, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -326,7 +302,7 @@ pub fn op_ldar_semantic(
     args: OpLdarArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let value = inner.vm.read_register_unchecked(registers, args.a);
     inner.vm.write_register_unchecked(registers, 0, value);
     SemanticOutcome::Continue {
@@ -340,7 +316,7 @@ pub fn op_ldar_semantic(
 
 pub struct OpLoadSmiArgs {
     pub a: u16,
-    /// Decoded `bx` operand (low 16 bits hold the i16 immediate).
+    /// Low 16 bits hold the i16 immediate.
     pub bx: u32,
     pub instruction_len: u32,
 }
@@ -352,7 +328,7 @@ pub fn op_load_smi_semantic(
     let bytes = args.bx.to_le_bytes();
     let value = i16::from_le_bytes([bytes[0], bytes[1]]);
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register(registers, args.a, Value::from_smi(i32::from(value)));
@@ -373,7 +349,7 @@ pub fn op_load_smi8_semantic(
 ) -> SemanticOutcome {
     let value = i8::from_le_bytes([args.bx.to_le_bytes()[0]]);
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner
         .vm
         .write_register(registers, args.a, Value::from_smi(i32::from(value)));
@@ -397,7 +373,7 @@ pub fn op_load_const_semantic(
         Ok(v) => v,
         Err(error) => return SemanticOutcome::ExitError { error },
     };
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register_unchecked(registers, args.a, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -419,7 +395,7 @@ pub fn op_load_const8_semantic(
         Ok(v) => v,
         Err(error) => return SemanticOutcome::ExitError { error },
     };
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     inner.vm.write_register_unchecked(registers, args.a, value);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -441,7 +417,7 @@ fn op_load_local_semantic(
     local: u16,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let value = inner.vm.read_register_unchecked(registers, local);
     inner.vm.write_register_unchecked(registers, args.a, value);
     SemanticOutcome::Continue {
@@ -488,7 +464,7 @@ fn op_store_local_semantic(
     local: u16,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
-    let registers = inner.frame.registers();
+    let registers = inner.registers();
     let value = inner.vm.read_register_unchecked(registers, args.a);
     inner.vm.write_register_unchecked(registers, local, value);
     SemanticOutcome::Continue {

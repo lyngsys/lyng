@@ -2,26 +2,27 @@ use super::descriptors::{
     accessor_atom_property, builtin_function_atom_property, data_atom_property,
     readonly_builtin_attributes, writable_builtin_attributes,
 };
-use super::{install_public_builtin_function, FamilyInstallContext, ObjectFamilyBuiltins};
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use super::{FamilyInstallContext, ObjectFamilyBuiltins, install_public_builtin_function};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    object_assign_builtin, object_builtin, object_create_builtin, object_define_getter_builtin,
-    object_define_properties_builtin, object_define_property_builtin, object_define_setter_builtin,
-    object_entries_builtin, object_freeze_builtin, object_from_entries_builtin,
-    object_get_own_property_descriptor_builtin, object_get_own_property_descriptors_builtin,
-    object_get_own_property_names_builtin, object_get_own_property_symbols_builtin,
-    object_get_prototype_of_builtin, object_group_by_builtin, object_has_own_builtin,
-    object_has_own_property_builtin, object_is_builtin, object_is_extensible_builtin,
-    object_is_frozen_builtin, object_is_prototype_of_builtin, object_is_sealed_builtin,
-    object_keys_builtin, object_lookup_getter_builtin, object_lookup_setter_builtin,
-    object_prevent_extensions_builtin, object_property_is_enumerable_builtin,
-    object_proto_getter_builtin, object_proto_setter_builtin, object_seal_builtin,
-    object_set_prototype_of_builtin, object_to_locale_string_builtin, object_to_string_builtin,
-    object_value_of_builtin, object_values_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, object_assign_builtin, object_builtin,
+    object_create_builtin, object_define_getter_builtin, object_define_properties_builtin,
+    object_define_property_builtin, object_define_setter_builtin, object_entries_builtin,
+    object_freeze_builtin, object_from_entries_builtin, object_get_own_property_descriptor_builtin,
+    object_get_own_property_descriptors_builtin, object_get_own_property_names_builtin,
+    object_get_own_property_symbols_builtin, object_get_prototype_of_builtin,
+    object_group_by_builtin, object_has_own_builtin, object_has_own_property_builtin,
+    object_is_builtin, object_is_extensible_builtin, object_is_frozen_builtin,
+    object_is_prototype_of_builtin, object_is_sealed_builtin, object_keys_builtin,
+    object_lookup_getter_builtin, object_lookup_setter_builtin, object_prevent_extensions_builtin,
+    object_property_is_enumerable_builtin, object_proto_getter_builtin,
+    object_proto_setter_builtin, object_seal_builtin, object_set_prototype_of_builtin,
+    object_to_locale_string_builtin, object_to_string_builtin, object_value_of_builtin,
+    object_values_builtin,
 };
 
 #[allow(clippy::too_many_lines)]

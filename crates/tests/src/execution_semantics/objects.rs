@@ -1,7 +1,7 @@
 use super::support::{
     compile_and_run, compile_and_run_string, compile_unit, evaluate_with_registry,
 };
-use lyng_builtins::{bootstrap_realm, BootstrapMode, BootstrapRequest, BuiltinCache};
+use lyng_builtins::{BootstrapMode, BootstrapRequest, BuiltinCache, bootstrap_realm};
 use lyng_common::AtomTable;
 use lyng_gc::{AllocationLifetime, PrimitiveMutator};
 use lyng_objects::{
@@ -1387,15 +1387,17 @@ fn phase5_cross_realm_foundations_use_selected_builtin_and_receiver_realms() {
                 ("OtherTypeError", other_type_error),
             ] {
                 let atom = agent.atoms_mut().intern_collectible(name);
-                assert!(ordinary_create_data_property(
-                    agent,
-                    realm.global_object(),
-                    PropertyKey::from_atom(atom),
-                    Value::from_object_ref(value),
-                    AllocationLifetime::Default,
-                    &mut NoopAdaptiveProtoLoadDispatch,
-                )
-                .expect("cross-realm global should install"));
+                assert!(
+                    ordinary_create_data_property(
+                        agent,
+                        realm.global_object(),
+                        PropertyKey::from_atom(atom),
+                        Value::from_object_ref(value),
+                        AllocationLifetime::Default,
+                        &mut NoopAdaptiveProtoLoadDispatch,
+                    )
+                    .expect("cross-realm global should install")
+                );
             }
         },
         &mut registry,

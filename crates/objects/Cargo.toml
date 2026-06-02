@@ -8,3 +8,6 @@ lyng-common = { workspace = true }
 lyng-types = { workspace = true }
 lyng-gc = { workspace = true }
 regress = { version = "0.11.1", features = ["utf16"] }
+
+[lints]
+workspace = true

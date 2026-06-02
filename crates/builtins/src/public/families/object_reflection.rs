@@ -3,21 +3,21 @@ use super::descriptors::{
     readonly_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, ObjectReflectionFamilyBuiltins,
-    ObjectReflectionFamilyObjects,
+    FamilyInstallContext, ObjectReflectionFamilyBuiltins, ObjectReflectionFamilyObjects,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::AtomId;
 use lyng_env::Agent;
 use lyng_types::{
-    proxy_builtin, proxy_revocable_builtin, reflect_apply_builtin, reflect_construct_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId, proxy_builtin,
+    proxy_revocable_builtin, reflect_apply_builtin, reflect_construct_builtin,
     reflect_define_property_builtin, reflect_delete_property_builtin, reflect_get_builtin,
     reflect_get_own_property_descriptor_builtin, reflect_get_prototype_of_builtin,
     reflect_has_builtin, reflect_is_extensible_builtin, reflect_own_keys_builtin,
     reflect_prevent_extensions_builtin, reflect_set_builtin, reflect_set_prototype_of_builtin,
-    BuiltinFunctionId, ObjectRef, RealmRef, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_object_reflection_family(

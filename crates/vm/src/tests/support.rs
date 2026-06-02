@@ -1,8 +1,7 @@
 pub(super) use crate::{
-    seed_registers, FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FrameFlags, FrameRecord,
-    InstalledCode, RegisterWindow, TierStatus, Tiering, Vm, VmDebugCommand, VmDebugHook,
-    VmDebugPauseContext, VmDebugPauseReason, VmDebugSafepointKind, VmDebugStepMode, VmDebugger,
-    VmError,
+    FeedbackInlineCacheState, FeedbackKeyedPropertyFamily, FrameFlags, FrameRecord, InstalledCode,
+    RegisterWindow, TierStatus, Tiering, Vm, VmDebugCommand, VmDebugHook, VmDebugPauseContext,
+    VmDebugPauseReason, VmDebugSafepointKind, VmDebugStepMode, VmDebugger, VmError, seed_registers,
 };
 pub(super) use lyng_bytecode::{
     ArgumentsMode, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,
@@ -12,7 +11,7 @@ pub(super) use lyng_bytecode::{
     SafepointKind,
 };
 pub(super) use lyng_common::{AtomId, AtomTable, SourceId, WellKnownAtom};
-pub(super) use lyng_compiler::{compile_module, compile_script, CompiledModuleUnit};
+pub(super) use lyng_compiler::{CompiledModuleUnit, compile_module, compile_script};
 pub(super) use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
     ExecutableId, ExecutionContextKind, JobQueueKind, ModuleStatus, PromiseReactionHandler,
@@ -36,8 +35,8 @@ pub(super) use lyng_ops::object::{ordinary_create_data_property, ordinary_get};
 pub(super) use lyng_parser::{parse_module, parse_script};
 pub(super) use lyng_sema::{analyze_module, analyze_script};
 pub(super) use lyng_types::{
-    function_builtin, internal_function_call_builtin, symbol_builtin, CodeRef, EmbeddingFunctionId,
-    EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef, PropertyKey, RealmRef, Value,
+    CodeRef, EmbeddingFunctionId, EnvironmentRef, FeedbackSlotId, NativeFunctionId, ObjectRef,
+    PropertyKey, Value, function_builtin, internal_function_call_builtin, symbol_builtin,
 };
 pub(super) use std::fmt::Write;
 pub(super) use std::mem::size_of;
@@ -170,15 +169,17 @@ pub(super) fn install_global_value(
     name: AtomId,
     value: Value,
 ) {
-    assert!(ordinary_create_data_property(
-        agent,
-        realm.global_object(),
-        PropertyKey::from_atom(name),
-        value,
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            realm.global_object(),
+            PropertyKey::from_atom(name),
+            value,
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
 }
 
 pub(super) fn decode_string(view: &PrimitiveStringView<'_>) -> String {

@@ -1,6 +1,6 @@
 use super::typed_array_indices::{
-    typed_array_index_descriptor, typed_array_numeric_key, typed_array_own_property_keys,
-    TypedArrayNumericKey,
+    TypedArrayNumericKey, typed_array_index_descriptor, typed_array_numeric_key,
+    typed_array_own_property_keys,
 };
 use crate::errors::{internal_method_error, throw_type_error};
 use lyng_env::Agent;

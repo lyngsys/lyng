@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::metadata::{has_async_flag, variants_for_metadata, TestMetadata, TestVariant};
+use crate::metadata::{TestMetadata, TestVariant, has_async_flag, variants_for_metadata};
 
 const LOCAL_TEMPORAL_HELPERS_SOURCE: &str = include_str!("temporal_helpers.js");
 const ASYNC_DONE_GLOBAL_BRIDGE_SOURCE: &str = r"
@@ -843,7 +843,7 @@ mod tests {
 
     use crate::metadata::parse_metadata;
 
-    use super::{resolve_test262_root, HelperCatalog};
+    use super::{HelperCatalog, resolve_test262_root};
 
     fn workspace_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1047,8 +1047,11 @@ mod tests {
 
         assert!(source.contains("function buildStringFallback(args)"));
         assert!(source.contains("var nativeResult = $262.buildString(args);"));
-        assert!(source
-            .contains("return nativeResult === null ? buildStringFallback(args) : nativeResult;"));
+        assert!(
+            source.contains(
+                "return nativeResult === null ? buildStringFallback(args) : nativeResult;"
+            )
+        );
     }
 
     #[test]

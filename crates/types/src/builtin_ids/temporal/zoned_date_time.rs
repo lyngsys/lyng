@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     temporal_zoned_date_time_builtin => super::super::TEMPORAL_ZONED_DATE_TIME_RAW;

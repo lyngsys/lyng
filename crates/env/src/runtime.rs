@@ -1,7 +1,7 @@
 use super::{
-    merge_primitive_heap_accounting, total_live_bytes, Agent, AgentCluster, AgentId, ExecutableId,
-    HostHooks, HostJobKind, HostJobPhase, HostResult, HostThreadId, JobId, JobObservation,
-    RealmRef, RuntimeDomainAccounting, RuntimePhase6Accounting,
+    Agent, AgentCluster, AgentId, ExecutableId, HostHooks, HostJobKind, HostJobPhase, HostResult,
+    HostThreadId, JobId, JobObservation, RealmRef, RuntimeDomainAccounting,
+    RuntimePhase6Accounting, merge_primitive_heap_accounting, total_live_bytes,
 };
 use lyng_gc::PrimitiveHeapAccounting;
 use lyng_host::{

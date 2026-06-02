@@ -1,7 +1,7 @@
 use super::{
-    AbruptCompletion, Agent, AllocationLifetime, ArgumentsMode, FrameRecord, HostHooks, ModuleKey,
-    ModuleRecord, ModuleStatus, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
-    WellKnownAtom,
+    AbruptCompletion, Agent, AllocationLifetime, ArgumentsMode, CodeRef, EnvironmentRef, HostHooks,
+    ModuleKey, ModuleRecord, ModuleStatus, NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm,
+    VmError, VmResult, WellKnownAtom,
 };
 use crate::vm::values::alloc_code_unit_string;
 use crate::vm::values::encode_number;
@@ -57,7 +57,8 @@ struct VmToPrimitiveBridge<'a> {
     agent: &'a mut Agent,
     host: &'a dyn HostHooks,
     registry: &'a mut dyn NativeFunctionRegistry,
-    frame: &'a FrameRecord,
+    caller_realm: RealmRef,
+    caller_lexical_env: EnvironmentRef,
 }
 
 pub(super) struct VmProxyBridge<'a> {
@@ -65,7 +66,10 @@ pub(super) struct VmProxyBridge<'a> {
     pub(super) agent: &'a mut Agent,
     pub(super) host: &'a dyn HostHooks,
     pub(super) registry: &'a mut dyn NativeFunctionRegistry,
-    pub(super) frame: &'a FrameRecord,
+    pub(super) caller_realm: RealmRef,
+    pub(super) caller_lexical_env: EnvironmentRef,
+    pub(super) caller_code: CodeRef,
+    pub(super) caller_pc: u32,
 }
 
 impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
@@ -98,7 +102,10 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
+            self.caller_lexical_env,
+            self.caller_code,
+            self.caller_pc,
             receiver,
             key,
         )
@@ -114,7 +121,10 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
+            self.caller_lexical_env,
+            self.caller_code,
+            self.caller_pc,
             object,
             receiver,
             key,
@@ -130,7 +140,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
             object,
             key,
         )
@@ -148,7 +158,10 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
+            self.caller_lexical_env,
+            self.caller_code,
+            self.caller_pc,
             object,
             receiver,
             key,
@@ -167,7 +180,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
             object,
             key,
         )?;
@@ -175,7 +188,8 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
+            self.caller_lexical_env,
             object,
             key,
             descriptor,
@@ -195,7 +209,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
             object,
             key,
         )?;
@@ -210,7 +224,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
             object,
         )
     }
@@ -224,7 +238,7 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
             object,
             key,
         )
@@ -236,11 +250,16 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         this_value: Value,
         arguments: &[Value],
     ) -> Result<Value, Self::Error> {
+        let caller_frame = self
+            .vm
+            .frame()
+            .expect("call_to_completion invoked from proxy trap requires an active dispatch frame");
+        let caller = Vm::caller_context_from_record(self.agent, &caller_frame);
         self.vm.call_to_completion(
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            caller,
             callee_object,
             this_value,
             arguments,
@@ -253,11 +272,15 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         arguments: &[Value],
         new_target: Option<ObjectRef>,
     ) -> Result<ObjectRef, Self::Error> {
+        let caller_frame = self.vm.frame().expect(
+            "construct_to_completion invoked from proxy trap requires an active dispatch frame",
+        );
+        let caller = Vm::caller_context_from_record(self.agent, &caller_frame);
         self.vm.construct_to_completion(
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            caller,
             callee_object,
             arguments,
             new_target,
@@ -265,8 +288,16 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
     }
 
     fn to_property_key(&mut self, value: Value) -> Result<PropertyKey, Self::Error> {
-        self.vm
-            .property_key_from_value(self.agent, self.host, self.registry, self.frame, value)
+        self.vm.property_key_from_value(
+            self.agent,
+            self.host,
+            self.registry,
+            self.caller_realm,
+            self.caller_lexical_env,
+            self.caller_code,
+            self.caller_pc,
+            value,
+        )
     }
 
     fn to_property_descriptor(
@@ -375,11 +406,12 @@ impl proxy::ProxyTrapContext for VmProxyBridge<'_> {
         &mut self,
         descriptor: PropertyDescriptor,
     ) -> Result<Value, Self::Error> {
-        Vm::descriptor_object_from_descriptor(self.agent, self.frame.realm(), descriptor)
+        Vm::descriptor_object_from_descriptor(self.agent, self.caller_realm, descriptor)
     }
 
     fn create_array_from_values(&mut self, values: &[Value]) -> Result<ObjectRef, Self::Error> {
-        let array = Vm::create_array(self.agent, self.frame.realm(), values.len())?;
+        let realm = self.caller_realm;
+        let array = Vm::create_array(self.agent, realm, values.len())?;
         for (index, value) in values.iter().copied().enumerate() {
             let key = PropertyKey::Index(u32::try_from(index).unwrap_or(u32::MAX));
             let created = object::ordinary_create_data_property(
@@ -419,11 +451,18 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
         object: ObjectRef,
         key: PropertyKey,
     ) -> Result<Value, Self::Error> {
+        let (caller_code, caller_pc) = self
+            .vm
+            .current_code_and_pc()
+            .expect("to_primitive get_property called without an active dispatch frame");
         self.vm.get_property_from_object(
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            self.caller_realm,
+            self.caller_lexical_env,
+            caller_code,
+            caller_pc,
             object,
             Value::from_object_ref(object),
             key,
@@ -431,7 +470,7 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
     }
 
     fn require_callable_object(&mut self, value: Value) -> Result<ObjectRef, Self::Error> {
-        Vm::require_callable_object(self.agent, self.frame, value)
+        Vm::require_callable_object(self.agent, value)
     }
 
     fn call_to_completion(
@@ -440,11 +479,16 @@ impl ToPrimitiveContext for VmToPrimitiveBridge<'_> {
         this_value: Value,
         arguments: &[Value],
     ) -> Result<Value, Self::Error> {
+        let caller_frame = self
+            .vm
+            .frame()
+            .expect("to_primitive call_to_completion requires an active dispatch frame");
+        let caller = Vm::caller_context_from_record(self.agent, &caller_frame);
         self.vm.call_to_completion(
             self.agent,
             self.host,
             self.registry,
-            self.frame,
+            caller,
             callee_object,
             this_value,
             arguments,
@@ -458,21 +502,25 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         value: Value,
     ) -> VmResult<PropertyKey> {
         if let Some(symbol) = value.as_symbol_ref() {
             return Ok(PropertyKey::from_symbol(symbol));
         }
-        let primitive =
-            self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::String)?;
-        self.value_to_property_key(
+        let primitive = self.to_primitive(
             agent,
-            frame,
-            frame.code(),
-            frame.instruction_offset(),
-            primitive,
-        )
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            value,
+            ToPrimitiveHint::String,
+        )?;
+        self.value_to_property_key(agent, caller_code, caller_pc, primitive)
     }
 
     pub(super) fn get_property_from_value(
@@ -480,17 +528,40 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
         if let Some(string) = receiver.as_string_ref() {
             return self.get_property_from_string_primitive(
-                agent, host, registry, frame, string, receiver, key,
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                string,
+                receiver,
+                key,
             );
         }
-        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
-        self.get_property_from_object(agent, host, registry, frame, object, receiver, key)
+        let object = Self::to_object_for_value(agent, caller_realm, receiver)?;
+        self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            object,
+            receiver,
+            key,
+        )
     }
 
     #[expect(
@@ -502,7 +573,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         string: StringRef,
         receiver: Value,
         key: PropertyKey,
@@ -519,10 +593,21 @@ impl Vm {
         }
 
         let prototype = agent
-            .realm(frame.realm())
+            .realm(caller_realm)
             .and_then(|record| record.intrinsics().string_prototype())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        self.get_property_from_object(agent, host, registry, frame, prototype, receiver, key)
+        self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            prototype,
+            receiver,
+            key,
+        )
     }
 
     #[expect(
@@ -534,7 +619,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         receiver: Value,
         key: PropertyKey,
         value: Value,
@@ -542,14 +630,26 @@ impl Vm {
         if receiver.is_null() || receiver.is_undefined() {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        let object = Self::to_object_for_value(agent, frame.realm(), receiver)?;
+        let object = Self::to_object_for_value(agent, caller_realm, receiver)?;
         if let Some(index) = key.as_index()
             && let Some(result) = self.mapped_arguments_set(agent, object, index, value)
         {
             result?;
             return Ok(true);
         }
-        self.set_property_on_object(agent, host, registry, frame, object, receiver, key, value)
+        self.set_property_on_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            object,
+            receiver,
+            key,
+            value,
+        )
     }
 
     pub(super) fn try_direct_set_engine_array_index(
@@ -677,28 +777,33 @@ impl Vm {
             return None;
         }
 
-        let Some(active_index) = self
-            .frames
-            .iter()
-            .rposition(|frame| frame.callee() == Some(object))
+        // Walk the cfr chain to find the innermost frame whose `callee` matches `object`.
+        let depth = self.frame_depth();
+        let Some((active_index, _active_cfr)) = self
+            .frame_cfrs()
+            .enumerate()
+            .find(|&(_, cfr)| self.frame_header(cfr).callee() == Some(object))
+            .map(|(rev_index, cfr)| (depth - 1 - rev_index, cfr))
         else {
             return Some(Value::null());
         };
-        let Some(active_frame) = self.frames.get(active_index).copied() else {
-            return Some(Value::null());
-        };
-        if let Some(caller) = active_frame.tail_caller() {
-            if active_frame.tail_caller_strict()
-                || self.legacy_function_caller_is_restricted(agent, caller)
-            {
+        let cold = self.frame_cold.get(active_index);
+        if let Some(caller) = cold.tail_caller {
+            if cold.tail_caller_strict || self.legacy_function_caller_is_restricted(agent, caller) {
                 return Some(Value::null());
             }
             return Some(Value::from_object_ref(caller));
         }
-        let Some(caller) = self.frames[..active_index]
-            .iter()
-            .rev()
-            .find_map(FrameRecord::callee)
+        // The lexically-enclosing caller: the nearest frame BELOW `active_index`
+        // (toward the root) that itself has a callee. In cfr-walk order
+        // (innermost-first) that is the first callee-bearing frame after the active
+        // one, so skip the active frame and the frames above it (depth >
+        // active_index) and search the remainder.
+        let Some(caller) = self
+            .frame_cfrs()
+            .enumerate()
+            .filter(|&(rev_index, _)| depth - 1 - rev_index < active_index)
+            .find_map(|(_, cfr)| self.frame_header(cfr).callee())
         else {
             return Some(Value::null());
         };
@@ -747,12 +852,9 @@ impl Vm {
             return Ok(None);
         }
 
-        let Some(active_frame) = self
-            .frames
-            .iter()
-            .rposition(|frame| frame.callee() == Some(object))
-            .and_then(|index| self.frames.get(index))
-            .copied()
+        let Some(active_cfr) = self
+            .frame_cfrs()
+            .find(|&cfr| self.frame_header(cfr).callee() == Some(object))
         else {
             return Ok(Some(Value::null()));
         };
@@ -763,9 +865,12 @@ impl Vm {
         ) else {
             return Ok(None);
         };
+        // Use `variable_env` (the immutable activation env), not `lexical_env`
+        // (which a `with` or loop-iteration scope may temporarily reassign).
+        let variable_env = self.frame_header(active_cfr).variable_env();
         Ok(Some(Self::read_environment_slot_raw(
             agent,
-            active_frame.lexical_env(),
+            variable_env,
             arguments_slot,
         )?))
     }
@@ -779,7 +884,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         target: ObjectRef,
         source: Value,
         excluded_keys: Value,
@@ -787,18 +895,21 @@ impl Vm {
         if source.is_null() || source.is_undefined() {
             return Ok(());
         }
-        let source = Self::to_object_for_value(agent, frame.realm(), source)?;
+        let source = Self::to_object_for_value(agent, caller_realm, source)?;
         let mut excluded = HashSet::new();
 
         if !excluded_keys.is_undefined() {
-            let excluded_object = Self::to_object_for_value(agent, frame.realm(), excluded_keys)?;
+            let excluded_object = Self::to_object_for_value(agent, caller_realm, excluded_keys)?;
             let excluded_values = object::own_property_keys_in_context(
                 &mut VmProxyBridge {
                     vm: self,
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 excluded_object,
             )?;
@@ -810,7 +921,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                     excluded_object,
                     Value::from_object_ref(excluded_object),
                     excluded_index,
@@ -819,7 +933,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                     excluded_value,
                 )?);
             }
@@ -831,7 +948,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             source,
         )?;
@@ -845,7 +965,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 source,
                 key,
@@ -861,7 +984,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
                 source,
                 Value::from_object_ref(source),
                 key,
@@ -892,19 +1018,25 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
-        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller_realm, object, key)?;
         object::get_with_receiver_in_context(
             &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             object,
             key,
@@ -921,12 +1053,15 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
     ) -> VmResult<Value> {
-        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller_realm, object, key)?;
         if let Some(index) = key.as_index()
             && let Some(result) = self.mapped_arguments_get(agent, object, index)
         {
@@ -942,9 +1077,17 @@ impl Vm {
             if let Some(value) = descriptor.value() {
                 return Ok(value);
             }
-            if let Some(value) =
-                self.call_property_getter(agent, host, registry, caller, descriptor, receiver)?
-            {
+            if let Some(value) = self.call_property_getter(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                descriptor,
+                receiver,
+            )? {
                 return Ok(value);
             }
             return Ok(Value::undefined());
@@ -963,7 +1106,18 @@ impl Vm {
         let Some(prototype) = prototype else {
             return Ok(Value::undefined());
         };
-        self.get_property_from_object(agent, host, registry, caller, prototype, receiver, key)
+        self.get_property_from_object(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            prototype,
+            receiver,
+            key,
+        )
     }
 
     pub(in crate::vm) fn evaluate_deferred_module_namespace(
@@ -971,7 +1125,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<()> {
@@ -984,7 +1138,7 @@ impl Vm {
         if key.is_symbol() {
             return Ok(());
         }
-        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller, object)
+        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller_realm, object)
     }
 
     pub(in crate::vm) fn evaluate_deferred_module_namespace_for_own_keys(
@@ -992,10 +1146,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
         object: ObjectRef,
     ) -> VmResult<()> {
-        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller, object)
+        self.evaluate_deferred_module_namespace_object(agent, host, registry, caller_realm, object)
     }
 
     fn evaluate_deferred_module_namespace_object(
@@ -1003,7 +1157,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
         object: ObjectRef,
     ) -> VmResult<()> {
         let Some(key) = self.deferred_module_namespaces.get(&object).cloned() else {
@@ -1031,8 +1185,8 @@ impl Vm {
             | ModuleStatus::Linking
             | ModuleStatus::Linked => {
                 let realm = agent
-                    .realm(caller.realm())
-                    .ok_or_else(|| VmError::MissingRootShape(caller.realm()))?;
+                    .realm(caller_realm)
+                    .ok_or(VmError::MissingRootShape(caller_realm))?;
                 let module_env = self.link_module_graph(agent, &realm, &key)?;
                 if !self.ready_for_sync_module_execution(agent, &key, &mut Vec::new())? {
                     return Err(VmError::Abrupt(errors::throw_type_error(agent)));
@@ -1094,11 +1248,11 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
         object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<Option<PropertyDescriptor>> {
-        self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
+        self.evaluate_deferred_module_namespace(agent, host, registry, caller_realm, object, key)?;
         let mut descriptor =
             object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         let Some(index) = key.as_index() else {
@@ -1147,7 +1301,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
         object: ObjectRef,
         index: u32,
         value: Value,
@@ -1159,7 +1314,8 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            caller_realm,
+            caller_lexical_env,
             object,
             f64::from(index),
             value,
@@ -1240,7 +1396,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
         object: ObjectRef,
         key: PropertyKey,
         descriptor: PropertyDescriptor,
@@ -1271,7 +1428,8 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    caller,
+                    caller_realm,
+                    caller_lexical_env,
                     object,
                     numeric_index,
                     value,
@@ -1304,7 +1462,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -1316,7 +1477,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             object,
             key,
@@ -1335,7 +1499,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         object: ObjectRef,
         receiver: Value,
         key: PropertyKey,
@@ -1347,14 +1514,24 @@ impl Vm {
             // deferred imports use that to trigger EvaluateSync, and
             // uninitialized lexical bindings use it to surface a
             // ReferenceError.
-            self.evaluate_deferred_module_namespace(agent, host, registry, caller, object, key)?;
+            self.evaluate_deferred_module_namespace(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                object,
+                key,
+            )?;
             let descriptor_result = object::get_own_property_in_context(
                 &mut VmProxyBridge {
                     vm: self,
                     agent,
                     host,
                     registry,
-                    frame: caller,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 object,
                 key,
@@ -1367,7 +1544,14 @@ impl Vm {
         {
             if receiver.as_object_ref() == Some(object) {
                 return self.set_typed_array_numeric_index(
-                    agent, host, registry, caller, object, index, value,
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    object,
+                    index,
+                    value,
                 );
             }
             if !matches!(
@@ -1378,13 +1562,30 @@ impl Vm {
             }
         }
         if Self::is_engine_array_length_property(agent, object, key) {
-            value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
+            value = self.normalize_array_length_set_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                value,
+            )?;
         }
         let own_descriptor =
             object::ordinary_get_own_property(agent, object, key).map_err(VmError::Abrupt)?;
         if let Some(descriptor) = own_descriptor {
             return self.set_property_from_descriptor(
-                agent, host, registry, caller, descriptor, receiver, key, value,
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                descriptor,
+                receiver,
+                key,
+                value,
             );
         }
 
@@ -1394,12 +1595,31 @@ impl Vm {
             .map_err(|_error| VmError::Abrupt(errors::throw_type_error(agent)))?;
         if let Some(prototype) = prototype {
             return self.set_property_on_object(
-                agent, host, registry, caller, prototype, receiver, key, value,
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                prototype,
+                receiver,
+                key,
+                value,
             );
         }
 
         self.create_or_update_receiver_data_property(
-            agent, host, registry, caller, receiver, key, value,
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            receiver,
+            key,
+            value,
         )
     }
 
@@ -1416,14 +1636,16 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
         value: Value,
     ) -> VmResult<Value> {
         let primitive = self.to_primitive(
             agent,
             host,
             registry,
-            caller,
+            caller_realm,
+            caller_lexical_env,
             value,
             ToPrimitiveHint::Number,
         )?;
@@ -1432,7 +1654,8 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            caller_realm,
+            caller_lexical_env,
             value,
             ToPrimitiveHint::Number,
         )?;
@@ -1460,22 +1683,44 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         descriptor: PropertyDescriptor,
         receiver: Value,
         key: PropertyKey,
         value: Value,
     ) -> VmResult<bool> {
         if descriptor.has_get() || descriptor.has_set() {
-            return self
-                .call_property_setter(agent, host, registry, caller, descriptor, receiver, value);
+            return self.call_property_setter(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                descriptor,
+                receiver,
+                value,
+            );
         }
 
         if !descriptor.writable().unwrap_or(false) {
             return Ok(false);
         }
         self.create_or_update_receiver_data_property(
-            agent, host, registry, caller, receiver, key, value,
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            receiver,
+            key,
+            value,
         )
     }
 
@@ -1488,7 +1733,10 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         receiver: Value,
         key: PropertyKey,
         mut value: Value,
@@ -1502,14 +1750,24 @@ impl Vm {
             // its side effects (deferred-module EvaluateSync, lexical
             // binding TDZ check via Get) must run before we report back
             // that the assignment was refused.
-            self.evaluate_deferred_module_namespace(agent, host, registry, caller, receiver, key)?;
+            self.evaluate_deferred_module_namespace(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                receiver,
+                key,
+            )?;
             let descriptor_result = object::get_own_property_in_context(
                 &mut VmProxyBridge {
                     vm: self,
                     agent,
                     host,
                     registry,
-                    frame: caller,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 receiver,
                 key,
@@ -1518,7 +1776,14 @@ impl Vm {
             return Ok(false);
         }
         if Self::is_engine_array_length_property(agent, receiver, key) {
-            value = self.normalize_array_length_set_value(agent, host, registry, caller, value)?;
+            value = self.normalize_array_length_set_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                value,
+            )?;
         }
         let receiver_descriptor = object::get_own_property_in_context(
             &mut VmProxyBridge {
@@ -1526,7 +1791,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             receiver,
             key,
@@ -1546,7 +1814,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 receiver,
                 key,
@@ -1567,7 +1838,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             receiver,
             key,
@@ -1585,7 +1859,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
         object: ObjectRef,
         numeric_index: f64,
         value: Value,
@@ -1599,7 +1874,8 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
             };
             typed_array::storage_bits_from_value(&mut bridge, typed_array.kind(), value)?
         };
@@ -1635,7 +1911,8 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
         value: Value,
         hint: ToPrimitiveHint,
     ) -> VmResult<Value> {
@@ -1644,7 +1921,8 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
         };
         lyng_ops::object::to_primitive(&mut bridge, value, hint)
     }

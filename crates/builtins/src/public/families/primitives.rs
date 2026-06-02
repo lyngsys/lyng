@@ -4,10 +4,10 @@ use super::descriptors::{
     readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, PrimitiveFamilyBuiltins,
-    PrimitiveFamilyObjects, PrimitiveFamilyPrototypes,
+    FamilyInstallContext, PrimitiveFamilyBuiltins, PrimitiveFamilyObjects,
+    PrimitiveFamilyPrototypes, install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
@@ -15,16 +15,16 @@ use crate::{
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    array_species_getter_builtin, bigint_as_int_n_builtin, bigint_as_uint_n_builtin,
-    bigint_builtin, bigint_to_string_builtin, bigint_value_of_builtin, boolean_builtin,
-    boolean_to_string_builtin, boolean_value_of_builtin, math_abs_builtin, math_acos_builtin,
-    math_acosh_builtin, math_asin_builtin, math_asinh_builtin, math_atan2_builtin,
-    math_atan_builtin, math_atanh_builtin, math_cbrt_builtin, math_ceil_builtin,
-    math_clz32_builtin, math_cos_builtin, math_cosh_builtin, math_exp_builtin, math_expm1_builtin,
-    math_f16round_builtin, math_floor_builtin, math_fround_builtin, math_hypot_builtin,
-    math_imul_builtin, math_log10_builtin, math_log1p_builtin, math_log2_builtin, math_log_builtin,
-    math_max_builtin, math_min_builtin, math_pow_builtin, math_random_builtin, math_round_builtin,
-    math_sign_builtin, math_sin_builtin, math_sinh_builtin, math_sqrt_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId, array_species_getter_builtin,
+    bigint_as_int_n_builtin, bigint_as_uint_n_builtin, bigint_builtin, bigint_to_string_builtin,
+    bigint_value_of_builtin, boolean_builtin, boolean_to_string_builtin, boolean_value_of_builtin,
+    math_abs_builtin, math_acos_builtin, math_acosh_builtin, math_asin_builtin, math_asinh_builtin,
+    math_atan_builtin, math_atan2_builtin, math_atanh_builtin, math_cbrt_builtin,
+    math_ceil_builtin, math_clz32_builtin, math_cos_builtin, math_cosh_builtin, math_exp_builtin,
+    math_expm1_builtin, math_f16round_builtin, math_floor_builtin, math_fround_builtin,
+    math_hypot_builtin, math_imul_builtin, math_log_builtin, math_log1p_builtin, math_log2_builtin,
+    math_log10_builtin, math_max_builtin, math_min_builtin, math_pow_builtin, math_random_builtin,
+    math_round_builtin, math_sign_builtin, math_sin_builtin, math_sinh_builtin, math_sqrt_builtin,
     math_sum_precise_builtin, math_tan_builtin, math_tanh_builtin, math_trunc_builtin,
     number_builtin, number_is_finite_builtin, number_is_integer_builtin, number_is_nan_builtin,
     number_is_safe_integer_builtin, number_to_exponential_builtin, number_to_fixed_builtin,
@@ -32,7 +32,6 @@ use lyng_types::{
     number_value_of_builtin, parse_float_builtin, parse_int_builtin, symbol_builtin,
     symbol_description_getter_builtin, symbol_for_builtin, symbol_key_for_builtin,
     symbol_to_primitive_builtin, symbol_to_string_builtin, symbol_value_of_builtin,
-    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
 };
 
 pub(in crate::public) fn install_primitive_family(

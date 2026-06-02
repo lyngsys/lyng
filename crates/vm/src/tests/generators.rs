@@ -552,8 +552,10 @@ fn module_default_export_generator_declarations_lower_under_6e1() {
         agent.environment_slot(module_env, value_slot),
         Some(Value::from_smi(1))
     );
-    assert!(agent
-        .objects()
-        .function_data(default_export)
-        .is_some_and(|data| data.kind_flags().is_generator()));
+    assert!(
+        agent
+            .objects()
+            .function_data(default_export)
+            .is_some_and(|data| data.kind_flags().is_generator())
+    );
 }

@@ -1,7 +1,8 @@
 use super::{
-    code_index, Agent, AllocationLifetime, AtomId, DirectEvalEnvironmentState, EnvironmentLayoutId,
-    EnvironmentRef, FrameRecord, Vm, VmError, VmResult,
+    Agent, AllocationLifetime, AtomId, DirectEvalEnvironmentState, EnvironmentLayoutId,
+    EnvironmentRef, Vm, VmError, VmResult, code_index,
 };
+use crate::frame::FrameView;
 use lyng_bytecode::DirectEvalSiteFlags;
 use lyng_env::{
     EnvironmentBindingLayout, EnvironmentLayout, EnvironmentLayoutKind, EnvironmentSlotFlags,
@@ -125,7 +126,7 @@ impl Vm {
     pub(super) fn caller_direct_eval_lexical_environment(
         &mut self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         lexical_env: EnvironmentRef,
     ) -> VmResult<CallerDirectEvalLexicalEnvironment> {
         let Some(installed) = self
@@ -255,15 +256,16 @@ impl Vm {
             });
     }
 
-    pub(super) fn lexical_name_start_environment(&self, frame: &FrameRecord) -> EnvironmentRef {
-        self.active_loop_iteration_environment(frame.lexical_env())
-            .unwrap_or_else(|| frame.lexical_env())
+    pub(super) fn lexical_name_start_environment(&self, frame: FrameView) -> EnvironmentRef {
+        let lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        self.active_loop_iteration_environment(lexical_env)
+            .unwrap_or(lexical_env)
     }
 
     pub(super) fn dynamic_name_start_environment(
         &self,
         agent: &Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
     ) -> EnvironmentRef {
         let lexical_env = self.lexical_name_start_environment(frame);
         if matches!(
@@ -272,7 +274,7 @@ impl Vm {
         ) {
             return lexical_env;
         }
-        self.active_direct_eval_environment(self.frames.len())
+        self.active_direct_eval_environment(self.frame_depth())
             .unwrap_or(lexical_env)
     }
 

@@ -8,9 +8,9 @@ mod report;
 mod selection;
 
 pub use diagnostics::{
-    prepare_diagnostic_suite, Test262DiagnosticConfig, Test262DiagnosticOutcome,
-    Test262DiagnosticProposalStage, Test262DiagnosticSuite, Test262DiagnosticTest,
-    Test262DiagnosticTimings, Test262RuntimeDiagnostics,
+    Test262DiagnosticConfig, Test262DiagnosticOutcome, Test262DiagnosticProposalStage,
+    Test262DiagnosticSuite, Test262DiagnosticTest, Test262DiagnosticTimings,
+    Test262RuntimeDiagnostics, prepare_diagnostic_suite,
 };
 
 use std::collections::HashMap;
@@ -26,11 +26,11 @@ use execution::{PreparedTest, RunOutcome, WorkerHandle};
 use helpers::HelperCatalog;
 use metadata::{parse_metadata, variants_for_metadata};
 use report::{CategoryStats, SuiteReport, TestTiming};
+use selection::{ExclusionManifest, SkipDecision};
 use selection::{
     category_for_test, disabled_manifest, load_manifest, relative_test_path, select_test_paths,
     skip_decision,
 };
-use selection::{ExclusionManifest, SkipDecision};
 
 struct PreparedSuite {
     candidate_total: usize,
@@ -783,13 +783,13 @@ fn print_summary(summary: &SummaryView<'_>) {
 mod prepare_suite_tests {
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::cli::{RunnerConfig, DEFAULT_MANIFEST_PATH};
+    use crate::cli::{DEFAULT_MANIFEST_PATH, RunnerConfig};
     use crate::helpers::HelperCatalog;
-    use crate::selection::{disabled_manifest, ProposalStage};
+    use crate::selection::{ProposalStage, disabled_manifest};
 
     use super::prepare_suite;
 

@@ -4,10 +4,10 @@ use super::descriptors::{
     descriptor_tag_with_atom, readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, PromiseDisposalFamilyBuiltins,
-    PromiseDisposalFamilyPrototypes,
+    FamilyInstallContext, PromiseDisposalFamilyBuiltins, PromiseDisposalFamilyPrototypes,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
@@ -15,6 +15,7 @@ use crate::{
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
     add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
     async_disposable_stack_adopt_builtin, async_disposable_stack_builtin,
     async_disposable_stack_defer_builtin, async_disposable_stack_dispose_async_builtin,
@@ -27,8 +28,7 @@ use lyng_types::{
     promise_all_builtin, promise_all_settled_builtin, promise_any_builtin, promise_builtin,
     promise_catch_builtin, promise_finally_builtin, promise_race_builtin, promise_reject_builtin,
     promise_resolve_builtin, promise_species_getter_builtin, promise_then_builtin,
-    promise_try_builtin, promise_with_resolvers_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
-    Value, WellKnownSymbolId,
+    promise_try_builtin, promise_with_resolvers_builtin,
 };
 
 pub(in crate::public) fn install_promise_disposal_family(

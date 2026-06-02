@@ -27,3 +27,6 @@ lyng-sema = { workspace = true }
 lyng-test262-harness = { workspace = true }
 lyng-types = { workspace = true }
 lyng-vm = { workspace = true }
+
+[lints]
+workspace = true

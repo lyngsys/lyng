@@ -271,15 +271,19 @@ fn default_realm_shell_allocates_placeholders_and_typed_intrinsics() {
         Some(RealmBootstrapState::new())
     );
     assert!(agent.heap().view().realm(default_realm.id()).is_some());
-    assert!(agent
-        .objects()
-        .object(agent.heap().view(), default_realm.global_object())
-        .is_some());
-    assert!(agent
-        .heap()
-        .view()
-        .environment(default_realm.global_env())
-        .is_some());
+    assert!(
+        agent
+            .objects()
+            .object(agent.heap().view(), default_realm.global_object())
+            .is_some()
+    );
+    assert!(
+        agent
+            .heap()
+            .view()
+            .environment(default_realm.global_env())
+            .is_some()
+    );
 
     let global_this = agent
         .objects()
@@ -513,12 +517,14 @@ fn agent_bootstraps_builtin_symbol_state_and_global_symbol_registry() {
     assert_eq!(agent.global_symbol(registry_key), Some(first));
     assert_eq!(agent.global_symbol_key_for(first), Some(registry_key));
     assert_eq!(agent.global_symbol_registry().len(), 1);
-    assert!(agent
-        .heap()
-        .view()
-        .symbol_view(first)
-        .unwrap()
-        .is_ordinary());
+    assert!(
+        agent
+            .heap()
+            .view()
+            .symbol_view(first)
+            .unwrap()
+            .is_ordinary()
+    );
     assert_eq!(
         agent
             .heap()
@@ -1160,10 +1166,12 @@ fn cluster_owned_backing_store_handles_are_not_agent_local() {
             .backing_store_get_byte(store, 0),
         Some(7)
     );
-    assert!(cluster
-        .agent_mut(worker)
-        .unwrap()
-        .detach_backing_store(store));
+    assert!(
+        cluster
+            .agent_mut(worker)
+            .unwrap()
+            .detach_backing_store(store)
+    );
     assert_eq!(
         cluster.root_agent().backing_store_is_detached(store),
         Some(true)
@@ -1296,9 +1304,11 @@ fn shared_memory_wait_queue_preserves_fifo_after_cancellation_and_async_wake() {
         ParkedAgentRecord::new(worker, Some(worker_thread), false),
     );
 
-    assert!(cluster
-        .root_agent_mut()
-        .remove_shared_memory_waiter(location, first));
+    assert!(
+        cluster
+            .root_agent_mut()
+            .remove_shared_memory_waiter(location, first)
+    );
     let woken = cluster
         .root_agent_mut()
         .wake_shared_memory_waiters(location, 2);
@@ -1401,8 +1411,8 @@ fn shared_wait_queue_wakes_waiters_across_os_threads() {
 // ── Watchpoint dispatch tests (Task 1.5) ─────────────────────────────────────
 
 use lyng_objects::{
-    NamedPropertyStorageMode, ShapeInvalidationObserver, ShapePropertyKind, ShapeTransitionKey,
-    Watchpoint, WatchpointState, NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT,
+    NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT, NamedPropertyStorageMode,
+    ShapeInvalidationObserver, ShapePropertyKind, ShapeTransitionKey, Watchpoint, WatchpointState,
 };
 use lyng_types::{DescriptorAttributes, PropertyDescriptor, ShapeId};
 
@@ -2019,5 +2029,10 @@ fn running_context_round_trips() {
     assert!(agent.running_context().is_none());
     let realm = agent.default_realm_id().expect("default realm");
     agent.set_running_context(Some(crate::RunningContext::new(realm, None)));
-    assert_eq!(agent.running_context().map(|rc| rc.realm()), Some(realm));
+    assert_eq!(
+        agent
+            .running_context()
+            .map(super::execution::RunningContext::realm),
+        Some(realm)
+    );
 }

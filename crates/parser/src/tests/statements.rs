@@ -111,9 +111,11 @@ fn logical_assignment_disallows_annex_b_call_expression_target() {
 
 #[test]
 fn annex_b_call_expression_assignment_target_is_error_in_strict_script() {
-    assert!(script("\"use strict\"; f() = g();")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("\"use strict\"; f() = g();")
+            .diagnostics
+            .has_errors()
+    );
     assert!(script("\"use strict\"; ++f();").diagnostics.has_errors());
 }
 
@@ -184,9 +186,11 @@ fn annex_b_parse_sloppy_for_in_var_initializer() {
 
 #[test]
 fn strict_for_in_var_initializer_is_error() {
-    assert!(script("\"use strict\"; for (var x = 1 in obj) {}")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("\"use strict\"; for (var x = 1 in obj) {}")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]
@@ -513,23 +517,29 @@ fn annex_b_parse_sloppy_labeled_function_declaration() {
 
 #[test]
 fn annex_b_labeled_function_is_error_in_if_clause() {
-    assert!(script("if (false) label1: label2: function f() {}")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("if (false) label1: label2: function f() {}")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]
 fn annex_b_labeled_function_is_error_in_loop_body() {
-    assert!(script("while (false) label1: label2: function f() {}")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("while (false) label1: label2: function f() {}")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]
 fn annex_b_labeled_function_is_error_in_with_body() {
-    assert!(script("with (obj) label: function f() {}")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("with (obj) label: function f() {}")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]
@@ -539,9 +549,11 @@ fn generator_declaration_under_label_is_error() {
 
 #[test]
 fn strict_labeled_function_declaration_is_error() {
-    assert!(script("\"use strict\"; label: function f() {}")
-        .diagnostics
-        .has_errors());
+    assert!(
+        script("\"use strict\"; label: function f() {}")
+            .diagnostics
+            .has_errors()
+    );
 }
 
 #[test]

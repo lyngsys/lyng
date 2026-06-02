@@ -12,3 +12,6 @@ lyng-objects = { workspace = true }
 lyng-env = { workspace = true }
 lyng-host = { workspace = true }
 lyng-parser = { workspace = true }
+
+[lints]
+workspace = true

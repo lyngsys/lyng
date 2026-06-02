@@ -1,7 +1,7 @@
 use super::{
-    internal_get_template_object_builtin, internal_template_to_string_builtin, ExprId,
-    FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler, LoweringError, LoweringResult,
-    Opcode, SafepointKind, Span,
+    ExprId, FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler, LoweringError,
+    LoweringResult, Opcode, SafepointKind, Span, internal_get_template_object_builtin,
+    internal_template_to_string_builtin,
 };
 
 impl FunctionCompiler<'_, '_> {

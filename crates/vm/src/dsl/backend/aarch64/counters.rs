@@ -43,17 +43,15 @@
 //! so the small attribution gap is not worth an extra publish store on
 //! that path.
 //!
-//! ## Scratch-register convention per bank (DSL-1 Phase 1.B.0 Task 5)
+//! ## Scratch-register convention per bank
 //!
 //! - **Dispatch bank** (`inc_dispatch_counter!`) uses `x9, x10`. Emitted
-//!   as the FIRST body fragment, BEFORE the operand-decode prologue —
-//!   no live operand values to clobber.
+//!   before the operand-decode prologue — no live operand values to clobber.
 //! - **`Slow_semantic` / `Slow_safepoint` banks** use `x16, x17` (AAPCS64
-//!   IP0/IP1 scratch). Emitted INSIDE `call_slow!` / `poll_safepoint!`
-//!   AFTER the operand-decode prologue, so any live operands in x9..x15
-//!   are preserved. The `call_slow!` bridge subsequently reloads x16/x17
-//!   for its own pc-offset stash — the counter values are stored before
-//!   that point so the clobber is harmless.
+//!   IP0/IP1 scratch). Emitted inside `call_slow!` / `poll_safepoint!`
+//!   after the operand-decode prologue; operands in x9..x15 are preserved.
+//!   The `call_slow!` bridge reloads x16/x17 for its own pc-offset stash
+//!   after the counter values are stored.
 //!
 //! ## Bindings expected from the proc-macro lowerer (when feature is on)
 //!

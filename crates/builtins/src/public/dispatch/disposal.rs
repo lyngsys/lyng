@@ -1,11 +1,11 @@
 use super::{
-    error_objects,
+    PublicBuiltinDispatchContext, error_objects,
     promises::{
         invoke_then_method, new_promise_capability, promise_capability_promise,
         promise_capability_reject, promise_capability_resolve, promise_default_constructor,
         promise_resolve_method,
     },
-    reference_error, type_error, PublicBuiltinDispatchContext,
+    reference_error, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_env::DisposalCapabilityKind;

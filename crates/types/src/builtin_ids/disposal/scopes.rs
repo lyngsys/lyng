@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     create_sync_disposal_scope_builtin => super::super::CREATE_SYNC_DISPOSAL_SCOPE_RAW;

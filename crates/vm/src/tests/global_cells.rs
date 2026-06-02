@@ -170,11 +170,11 @@ fn load_global_var_hits_cell_ic() {
     );
 }
 
-/// Task 5: when the cold path resolves a `LoadGlobal` site to a `Cell` target it
-/// must project mode-7 metadata into the site's `PropertyMetadata` so a future
-/// asm hit can serve the load inline. `var g = 7; g; g` resolves the trailing
-/// load to a Cell; the load site's metadata must carry mode 7, a non-zero cell
-/// ref in `handler_bits`, and the live (captured) generation.
+/// When the cold path resolves a `LoadGlobal` site to a `Cell` target it must
+/// project mode-7 metadata into the site's `PropertyMetadata` so a future asm
+/// hit can serve the load inline. `var g = 7; g; g` resolves the trailing load
+/// to a Cell; the metadata must carry mode 7, a non-zero cell ref, and the
+/// live generation.
 #[test]
 fn cold_path_cell_resolution_projects_mode_7_metadata() {
     use crate::vm::metadata_table::LLINT_IC_MODE_GLOBAL_CELL_LOAD;
@@ -409,11 +409,10 @@ fn delete_of_cell_backed_global_bumps_structure_generation() {
     );
 }
 
-/// Task 4: the Vm-side global-IC generation mirror must equal the live agent
-/// generation after a script that triggers a structural global bump. Here a
-/// sloppy global creation + `delete x` both bump the generation through the
-/// slow path; after the run the mirror (refreshed at the slow-path choke point
-/// and re-primed at every run entry) must match.
+/// The Vm-side global-IC generation mirror must equal the live agent generation
+/// after a script that triggers a structural global bump. A sloppy global
+/// creation + `delete x` both bump the generation through the slow path; after
+/// the run the mirror must match.
 #[test]
 fn vm_global_ic_generation_mirror_tracks_structural_bumps() {
     let unit = compile_test_unit(7300, "var g = 1; delete globalThis.g; g = 2; g");
@@ -442,13 +441,10 @@ fn vm_global_ic_generation_mirror_tracks_structural_bumps() {
     );
 }
 
-/// Task 4 BACKSTOP: runtime `Object.defineProperty(globalThis, ...)` AND
-/// `delete globalThis.x` performed mid-dispatch (inside the executed script,
-/// from a function body that runs after earlier reads) must keep the mirror
-/// coherent with the live generation through the slow-path choke point, and
-/// reads must return the correct post-mutation values. This is the whole point:
-/// a stale-low mirror at an asm mode-7 hit would dereference a freed/reused
-/// value cell.
+/// Runtime `Object.defineProperty(globalThis, ...)` and `delete globalThis.x`
+/// performed mid-dispatch must keep the mirror coherent with the live generation
+/// through the slow-path choke point. A stale-low mirror at an asm mode-7 hit
+/// would dereference a freed/reused value cell.
 #[test]
 fn mirror_stays_coherent_across_runtime_define_and_delete() {
     let unit = compile_test_unit(
@@ -492,9 +488,9 @@ fn mirror_stays_coherent_across_runtime_define_and_delete() {
     );
 }
 
-/// Task 4: the mirror is primed at run entry, so after a run that pre-declares
-/// several globals (whose instantiation bumps the structure generation) the
-/// mirror equals the live generation — and crucially is NOT left at 0.
+/// The mirror is primed at run entry, so after a run that pre-declares several
+/// globals (whose instantiation bumps the structure generation) the mirror
+/// equals the live generation — and is NOT left at 0.
 #[test]
 fn baseline_global_ic_generation_primed_at_entry() {
     let mut src = String::new();
@@ -528,13 +524,12 @@ fn baseline_global_ic_generation_primed_at_entry() {
     );
 }
 
-/// Task 6 GUARD: serving a mode-7 (cell-backed) global read via the probe's thin
-/// fast path must remain correct across:
+/// Serving a mode-7 (cell-backed) global read via the probe's thin fast path
+/// must remain correct across:
 ///  - a plain warmed read (fast read returns the value),
-///  - a reassignment with no structural change (generation unchanged → the live
-///    cell read reflects the new value),
+///  - a reassignment with no structural change (live cell read reflects new value),
 ///  - a structural change (delete + re-`var`) that bumps the generation, so the
-///    fast read MUST bail and re-resolve rather than serve a stale cell.
+///    fast read bails and re-resolves rather than serving a stale cell.
 ///
 /// Encodes each read into the script result: `a` (=5) read after warming, `b`
 /// (=6) read after a plain reassignment, `c` (=7) read after delete+recreate.
@@ -567,13 +562,10 @@ fn mode_7_fast_read_returns_correct_value_through_mutation_and_invalidation() {
     );
 }
 
-/// Task 8 ASM STALENESS (a, delete+recreate): warm a mode-7 site through a
-/// function called twice, then `delete globalThis.g` + recreate the global
-/// with a NEW value. The asm hit's generation guard must bail on the bump and
-/// re-resolve, so the post-recreate read observes the new value — never the
-/// stale (freed) cell. Distinct from the trailing-load variant above by
-/// driving the warm reads through a called function (the canonical mode-7
-/// warming shape).
+/// Asm staleness (delete+recreate): warm a mode-7 site, then delete and
+/// recreate the global with a new value. The generation guard must bail and
+/// re-resolve so the post-recreate read returns the new value, not the stale
+/// (freed) cell.
 #[test]
 fn asm_mode_7_bails_on_delete_recreate() {
     let src = "var g = 11; function r(){ return g; } var w0 = r(); r();\n\
@@ -600,11 +592,10 @@ fn asm_mode_7_bails_on_delete_recreate() {
     );
 }
 
-/// Task 8 ASM STALENESS (b, data→accessor): warm a mode-7 data-cell site, then
-/// `Object.defineProperty(globalThis, 'g', { get() {...} })` to convert the
-/// data global into an accessor. This bumps the structure generation, so the
-/// next read MUST bail out of the cached cell and invoke the getter — returning
-/// the getter's value, not the stale data cell's value.
+/// Asm staleness (data→accessor): warm a mode-7 data-cell site, then
+/// redefine the global as an accessor via `Object.defineProperty`. The
+/// generation bump must cause the cached cell to be abandoned and the getter
+/// invoked — not the stale data value.
 #[test]
 fn asm_mode_7_bails_on_data_to_accessor_redefine() {
     let src = "var g = 5; function r(){ return g; } var w0 = r(); r();\n\
@@ -632,12 +623,10 @@ fn asm_mode_7_bails_on_data_to_accessor_redefine() {
     );
 }
 
-/// Task 8 ASM STALENESS (c, let-shadow): warm a mode-7 site reading a `var`
-/// global from one unit, then evaluate a second unit that declares a global
-/// `let` of the same name (shadowing the object property). Installing a global
-/// lexical binding that shadows the cell-backed property bumps the structure
-/// generation, so a subsequent read from a third unit must re-resolve to the
-/// lexical binding's value rather than serve the stale data cell.
+/// Asm staleness (let-shadow): warm a mode-7 site, then evaluate a unit that
+/// declares a global `let` of the same name. Installing a global lexical binding
+/// that shadows the cell-backed property bumps the structure generation, so a
+/// subsequent read must re-resolve to the lexical value, not the stale cell.
 #[test]
 fn asm_mode_7_bails_on_global_let_shadow() {
     let warm = compile_test_unit(7312, "var s = 1; s; s");

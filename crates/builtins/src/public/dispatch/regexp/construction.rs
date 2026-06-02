@@ -1,4 +1,4 @@
-use super::super::{syntax_error, type_error, PublicBuiltinDispatchContext};
+use super::super::{PublicBuiltinDispatchContext, syntax_error, type_error};
 use super::{
     allocate_regexp_object, is_regexp_object, is_regexp_value, regexp_object_source_and_flags,
 };

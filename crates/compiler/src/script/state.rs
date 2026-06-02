@@ -1,12 +1,12 @@
 use super::{
-    build_function_activation_plan, checked_u32_index, collect_arguments_owners,
-    collect_arrow_child_parents, parent_function_for, ArgumentsMode, AtomId, AtomTable,
-    BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags,
-    BytecodeFunction, BytecodeFunctionId, CompiledAtom, Decl, DeclId, DeclarationKind, Expr,
-    ExprId, ForInOfLeft, ForInit, FunctionActivationPlan, FunctionId, FunctionKind, FunctionSemaId,
-    HashMap, HashSet, LoweringError, LoweringResult, NonZeroU32, ParameterBindingIndex, Pattern,
-    ProgramRootKind, ProgramSemaView, ProgramSource, ScopeId, ScopeKind, SemanticBindingId, Span,
-    Stmt, StorageClass, WellKnownAtom,
+    ArgumentsMode, AtomId, AtomTable, BuiltinFunctionId, BytecodeBuilder,
+    BytecodeEnvironmentBinding, BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionId,
+    CompiledAtom, Decl, DeclId, DeclarationKind, Expr, ExprId, ForInOfLeft, ForInit,
+    FunctionActivationPlan, FunctionId, FunctionKind, FunctionSemaId, HashMap, HashSet,
+    LoweringError, LoweringResult, NonZeroU32, ParameterBindingIndex, Pattern, ProgramRootKind,
+    ProgramSemaView, ProgramSource, ScopeId, ScopeKind, SemanticBindingId, Span, Stmt,
+    StorageClass, WellKnownAtom, build_function_activation_plan, checked_u32_index,
+    collect_arguments_owners, collect_arrow_child_parents, parent_function_for,
 };
 
 struct ComputedEnvironmentLayouts {

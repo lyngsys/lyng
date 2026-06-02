@@ -3,10 +3,10 @@ use super::descriptors::{
     data_symbol_property, descriptor_tag, readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, FamilyInstallContext, StringFamilyBuiltins,
-    StringFamilyPrototypes,
+    FamilyInstallContext, StringFamilyBuiltins, StringFamilyPrototypes,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{
     BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic, BuiltinPropertyDescriptor,
@@ -14,8 +14,9 @@ use crate::{
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    string_anchor_builtin, string_at_builtin, string_big_builtin, string_blink_builtin,
-    string_bold_builtin, string_builtin, string_char_at_builtin, string_char_code_at_builtin,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId, string_anchor_builtin,
+    string_at_builtin, string_big_builtin, string_blink_builtin, string_bold_builtin,
+    string_builtin, string_char_at_builtin, string_char_code_at_builtin,
     string_code_point_at_builtin, string_concat_builtin, string_ends_with_builtin,
     string_fixed_builtin, string_fontcolor_builtin, string_fontsize_builtin,
     string_from_char_code_builtin, string_from_code_point_builtin, string_includes_builtin,
@@ -30,8 +31,7 @@ use lyng_types::{
     string_sup_builtin, string_to_locale_lower_case_builtin, string_to_locale_upper_case_builtin,
     string_to_lower_case_builtin, string_to_string_builtin, string_to_upper_case_builtin,
     string_to_well_formed_builtin, string_trim_builtin, string_trim_end_builtin,
-    string_trim_start_builtin, string_value_of_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
-    Value, WellKnownSymbolId,
+    string_trim_start_builtin, string_value_of_builtin,
 };
 
 #[allow(clippy::too_many_lines)]

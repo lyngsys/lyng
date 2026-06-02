@@ -9,3 +9,6 @@ lyng-host = { workspace = true }
 lyng-ops = { workspace = true }
 lyng-types = { workspace = true }
 lyng-vm = { workspace = true }
+
+[lints]
+workspace = true

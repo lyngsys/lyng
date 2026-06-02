@@ -135,15 +135,17 @@ fn named_property_load_ic_becomes_monomorphic_for_one_shape() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(7),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(7),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
@@ -202,15 +204,17 @@ fn named_property_load_ic_caches_prototype_data_one_hop() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(42),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(42),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -266,15 +270,17 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype_a,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(11),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype_a,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(11),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let prototype_b = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -283,15 +289,17 @@ fn named_property_load_ic_invalidates_proto_cache_on_prototype_swap() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype_b,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(22),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype_b,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(22),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -377,15 +385,17 @@ fn keyed_named_property_load_ic_caches_prototype_data_one_hop() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(99),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(99),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -449,15 +459,17 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        great_grandparent,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(77),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            great_grandparent,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(77),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let grandparent = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -505,13 +517,11 @@ fn named_property_load_ic_does_not_engage_proto_specialized_path_for_three_hop_c
 
 #[test]
 fn global_property_load_uses_cell_ic_for_cell_backed_global() {
-    // The realm's global object is a cell-backed dictionary from creation, so a
-    // global `var` is stored as a `NamedPropertyValue::DataCell` entry rather
-    // than a shape slot. Phase 3 of global property cells caches WHERE the global
-    // resolves in a per-site global cell IC, so repeated loads read the cell
-    // directly and never reach the shape-based named-property slow path. The
-    // named-property cache therefore stays uninitialized (`None`) for this site
-    // while the global cell IC carries a `Cell` target.
+    // The global object is a cell-backed dictionary, so a global `var` is stored
+    // as a `DataCell` entry. A per-site global cell IC caches WHERE the global
+    // resolves so repeated loads read the cell directly without reaching the
+    // shape-based named-property slow path. The named-property cache stays
+    // uninitialized while the global cell IC carries a `Cell` target.
     let unit = compile_test_unit(36, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -560,9 +570,9 @@ fn global_property_load_uses_cell_ic_for_cell_backed_global() {
 #[cfg(feature = "diagnostic-counters")]
 #[test]
 fn global_property_load_uses_cell_ic_fast_path_for_cell_backed_global() {
-    // Phase 3 of global property cells installs a per-site global cell IC on the
-    // cold `LoadGlobal`. Once warm, the load reads the backing cell directly via
-    // the global cell fast path and no longer enters the semantic slow bridge.
+    // The per-site global cell IC is installed on the cold `LoadGlobal`. Once
+    // warm, the load reads the backing cell directly via the global cell fast
+    // path without entering the semantic slow bridge.
     let unit = compile_test_unit(544, "globalValue;");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -705,25 +715,29 @@ fn named_property_load_ic_keeps_six_shape_polymorphic_cache() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(20_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -784,25 +798,29 @@ fn named_property_load_ic_orders_polymorphic_entries_by_shape() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(24_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(24_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         let shape = agent
             .objects()
             .object_header(agent.heap().view(), object)
@@ -875,25 +893,29 @@ fn named_property_load_ic_promotes_to_megamorphic_beyond_polymorphic_capacity() 
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(22_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(22_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -942,15 +964,17 @@ fn named_property_store_ic_caches_own_data_paths() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(1),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(1),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
@@ -1005,15 +1029,17 @@ fn named_property_store_ic_hit_avoids_semantic_slow_path() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(1),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(1),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
@@ -1196,15 +1222,17 @@ fn keyed_named_atom_ic_becomes_monomorphic() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(4),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(4),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
@@ -1258,25 +1286,29 @@ fn keyed_named_atom_ic_keeps_six_shape_polymorphic_cache() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(23_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(23_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -1329,25 +1361,29 @@ fn keyed_named_atom_ic_orders_polymorphic_entries_by_shape() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(25_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(25_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         let shape = agent
             .objects()
             .object_header(agent.heap().view(), object)
@@ -1502,15 +1538,17 @@ fn keyed_dense_index_load_cache_tracks_shape_changes_polymorphically() {
         ));
         object
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        second,
-        PropertyKey::from_atom(extra_name),
-        Value::from_smi(1),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            second,
+            PropertyKey::from_atom(extra_name),
+            Value::from_smi(1),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
 
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
@@ -1644,15 +1682,17 @@ fn mixed_named_and_dense_index_keyed_site_promotes_to_generic() {
         ));
         object
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(44),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(44),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
     install_global_value(agent, &realm, key_name, Value::from_smi(0));
 
@@ -1862,7 +1902,7 @@ fn engine_array_sparse_index_store_uses_specialized_path_without_feedback_slow_p
 }
 
 // -----------------------------------------------------------------------------
-// Phase 3f: polymorphic-OwnData inline IC shortcut
+// Polymorphic-OwnData inline IC shortcut
 // -----------------------------------------------------------------------------
 
 fn make_object_with_value(
@@ -1881,32 +1921,36 @@ fn make_object_with_value(
         )
     });
     for &raw_atom in extra_atoms {
-        assert!(ordinary_create_data_property(
+        assert!(
+            ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(AtomId::from_raw(raw_atom)),
+                Value::from_smi(0),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap()
+        );
+    }
+    assert!(
+        ordinary_create_data_property(
             agent,
             object,
-            PropertyKey::from_atom(AtomId::from_raw(raw_atom)),
-            Value::from_smi(0),
+            PropertyKey::from_atom(value_atom),
+            value,
             AllocationLifetime::Default,
             &mut NoopAdaptiveProtoLoadDispatch,
         )
-        .unwrap());
-    }
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_atom),
-        value,
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+        .unwrap()
+    );
     object
 }
 
 #[test]
 fn named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_two_shapes() {
     // After the polymorphic transition the inline shortcut walks the
-    // `polymorphic_own_data_handlers` sidecar (Phase 3f). Two distinct shapes both
+    // `polymorphic_own_data_handlers` sidecar. Two distinct shapes both
     // resolve to `.value`; each evaluation must return its receiver's
     // value, not the other shape's.
     let unit = compile_test_unit(540, "source.value;");
@@ -2261,15 +2305,17 @@ fn named_property_load_proto_ic_hit_avoids_semantic_slow_path() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(42),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(42),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -2402,11 +2448,10 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_falls_through_beyon
 
 #[test]
 fn named_property_store_ic_polymorphic_own_data_handlers_store_writes_correct_slot() {
-    // Phase 3f store-side polymorphic shortcut: two distinct shapes
-    // both have a writable `.value` slot. After the polymorphic
-    // transition, writes through each shape must land in that shape's
-    // slot (not the other shape's). The load that follows must read the
-    // freshly written value, not a stale cached one.
+    // Store-side polymorphic shortcut: two distinct shapes both have a writable
+    // `.value` slot. After the polymorphic transition, writes through each
+    // shape must land in that shape's slot, not the other shape's. The
+    // following load must read the freshly written value.
     let unit = compile_test_unit(542, "source.value = 99; source.value;");
     let entry = unit.function(unit.entry()).unwrap();
     let store_slot = entry
@@ -2580,10 +2625,9 @@ fn named_property_load_ic_polymorphic_own_data_handlers_load_invalidates_on_prot
 
 #[test]
 fn keyed_named_property_load_ic_polymorphic_own_data_handlers_load_returns_value_for_two_shapes() {
-    // Phase 3f keyed-named polymorphic shortcut: a keyed access
-    // `source[key]` (with key = "value") on two distinct receiver
-    // shapes. After the polymorphic transition the keyed sidecar walk
-    // must match both atom AND receiver shape per entry.
+    // Keyed-named polymorphic shortcut: `source[key]` (key = "value") on
+    // two distinct receiver shapes. After the polymorphic transition the
+    // keyed sidecar walk must match both atom AND receiver shape per entry.
     let unit = compile_test_unit(544, "source['value'];");
     let entry = unit.function(unit.entry()).unwrap();
     let slot = entry
@@ -2686,15 +2730,17 @@ fn adaptive_proto_load_orphan_watchpoint_noops_on_generation_mismatch() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(42),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(42),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -2814,15 +2860,17 @@ fn adaptive_proto_load_register_on_invalidated_chain_abandons_install() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(123),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(123),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let object = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -2936,15 +2984,17 @@ fn proto_chain_holder_mutation_clears_ic_slot() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(42),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(42),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let obj = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -2986,15 +3036,17 @@ fn proto_chain_holder_mutation_clears_ic_slot() {
     // Mutate the holder: add a new property to `proto`. This fires the
     // `AdaptiveProtoLoad` watchpoint registered on proto's current shape,
     // clearing the IC slot.
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(extra_name),
-        Value::from_smi(0),
-        AllocationLifetime::Default,
-        &mut vm,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(extra_name),
+            Value::from_smi(0),
+            AllocationLifetime::Default,
+            &mut vm,
+        )
+        .unwrap()
+    );
 
     // The IC slot must have been cleared by the watchpoint fire.
     assert!(
@@ -3060,15 +3112,17 @@ fn two_hop_chain_middle_proto_mutation_clears_ic() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        root,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(99),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            root,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(99),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let mid = agent.with_heap_and_objects(|heap, objects| {
         let mut mutator = heap.mutator();
         objects.alloc_object(
@@ -3119,15 +3173,17 @@ fn two_hop_chain_middle_proto_mutation_clears_ic() {
     // Mutate `mid`: add a new property. This transitions mid's shape,
     // firing the `AdaptiveProtoLoad` watchpoint registered on mid's old
     // shape at IC install time and clearing the IC slot.
-    assert!(ordinary_create_data_property(
-        agent,
-        mid,
-        PropertyKey::from_atom(extra_name),
-        Value::from_smi(0),
-        AllocationLifetime::Default,
-        &mut vm,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            mid,
+            PropertyKey::from_atom(extra_name),
+            Value::from_smi(0),
+            AllocationLifetime::Default,
+            &mut vm,
+        )
+        .unwrap()
+    );
 
     // The IC slot must have been cleared.
     assert!(
@@ -3198,25 +3254,29 @@ fn b1_polymorphic_two_entries_stay_inline_no_map() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_100 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_100 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -3283,25 +3343,29 @@ fn b2_polymorphic_third_entry_creates_chain_entry() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_200 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_200 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -3368,25 +3432,29 @@ fn b3_polymorphic_ninth_entry_transitions_to_mega_and_drops_chain() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_300 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_300 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -3453,25 +3521,29 @@ fn b4_polymorphic_walk_returns_correct_value_for_each_shape() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_400 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_400 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(1000 + i32::try_from(index).expect("index fits i32")),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(1000 + i32::try_from(index).expect("index fits i32")),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -3563,15 +3635,17 @@ fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(42),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(42),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
 
     // Three receivers, each with a distinct *own* shape (via differing
     // padding properties) but all sharing the same proto.
@@ -3586,15 +3660,17 @@ fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
-                agent,
-                object,
-                PropertyKey::from_atom(AtomId::from_raw(30_500 + extra)),
-                Value::from_smi(extra.cast_signed()),
-                AllocationLifetime::Default,
-                &mut NoopAdaptiveProtoLoadDispatch,
-            )
-            .unwrap());
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_500 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
         }
         sources.push(object);
     }
@@ -3646,15 +3722,17 @@ fn b5_adaptive_proto_load_fire_clears_inline_and_chain() {
     // pre-mutation shape — one watchpoint per cache entry (inline + chain),
     // all routed to `clear_ic_slot_if_generation_matches` which drops both
     // the inline slot and the chain map entry.
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(extra_name),
-        Value::from_smi(0),
-        AllocationLifetime::Default,
-        &mut vm,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(extra_name),
+            Value::from_smi(0),
+            AllocationLifetime::Default,
+            &mut vm,
+        )
+        .unwrap()
+    );
 
     // Both the inline slot and the chain map entry must be gone.
     assert!(
@@ -3711,25 +3789,29 @@ fn b6_polymorphic_chain_pruned_when_code_dies() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_600 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_600 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -3803,25 +3885,29 @@ fn b7_polymorphic_chain_retained_when_code_lives() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(30_700 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(30_700 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -4204,15 +4290,17 @@ fn d4_property_ic_state_clear_and_reinstall() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(99),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(99),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     let proto_shape = agent
         .objects()
         .object_header(agent.heap().view(), proto)
@@ -4260,15 +4348,17 @@ fn d4_property_ic_state_clear_and_reinstall() {
     // AdaptiveProtoLoad watchpoint on `proto_shape`, which calls
     // `clear_ic_slot_if_generation_matches`. That clears the
     // `FeedbackSiteState` slot to `None` AND removes the `PropertyIcState`.
-    assert!(ordinary_create_data_property(
-        agent,
-        proto,
-        PropertyKey::from_atom(extra_name),
-        Value::from_smi(0),
-        AllocationLifetime::Default,
-        &mut vm,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            proto,
+            PropertyKey::from_atom(extra_name),
+            Value::from_smi(0),
+            AllocationLifetime::Default,
+            &mut vm,
+        )
+        .unwrap()
+    );
 
     // Both feedback slot and PropertyIcState must be gone.
     assert!(
@@ -4485,17 +4575,14 @@ fn adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition() {
 }
 
 // -----------------------------------------------------------------------------
-// Construct IC eager-clear: reassigning F.prototype clears a registered
-// per-constructor construct IC slot (Task 3, EAGER-CLEAR invalidation model).
+// Construct IC eager-clear: reassigning F.prototype invalidates the
+// per-constructor construct IC slot (EAGER-CLEAR invalidation model).
 // -----------------------------------------------------------------------------
 //
-// Mirrors `adaptive_own_write_watchpoint_clears_ic_on_dictionary_transition`
-// for setup style, but for the per-constructor `.prototype` watchpoint path.
 // A `.prototype` reassignment overwrites an existing own data slot WITHOUT a
-// shape change, so the shape-keyed watchpoints cannot observe it; the construct
-// IC is invalidated at the write site instead. Task 7 will register the
-// watchpoint in the fast path — this test registers it manually to prove the
-// invalidation wiring fires and clears the slot.
+// shape change, so shape-keyed watchpoints cannot observe it; the construct IC
+// is invalidated at the write site instead. This test registers the watchpoint
+// manually to prove the invalidation wiring fires and clears the slot.
 
 #[test]
 fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
@@ -4541,8 +4628,7 @@ fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
         .expect("script should return the constructor F");
 
     // Confirm the construct IC slot is populated (monomorphic) and read its
-    // generation — that's the `(code, slot, generation)` Task 7's fast path
-    // would register a ConstructIcClear watchpoint with.
+    // generation — the `(code, slot, generation)` used to register the watchpoint.
     let code = warmup_installed.code();
     let status = vm
         .construct_status(code, construct_slot)
@@ -4559,7 +4645,7 @@ fn reassigning_function_prototype_clears_registered_construct_ic_slot() {
     let generation = status.generation;
 
     // Manually register a ConstructIcClear watchpoint on F's per-constructor
-    // set, matching the populated slot (simulating Task 7's fast path).
+    // set, matching the populated slot.
     agent
         .objects_mut()
         .construct_prototype_watchpoint_mut(f)
@@ -4691,9 +4777,8 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
     );
     let generation = status.generation;
 
-    // Task 7 arms the per-constructor `.prototype` watchpoint AT CACHE TIME, so
-    // warming the construct IC above already registered a `ConstructIcClear`
-    // watchpoint on F's set (no manual registration needed). Confirm it.
+    // Warming the construct IC registers a `ConstructIcClear` watchpoint on F's
+    // per-constructor set automatically. Confirm it is armed.
     let _ = generation;
     assert_eq!(
         agent
@@ -4776,10 +4861,8 @@ fn warm_function_prototype_store_still_clears_registered_construct_ic_slot() {
     // RE-WARM the construct IC against the SAME (still-global) `F`: the warming
     // write above already fired and invalidated F's per-constructor set, so a
     // fresh `new F()` loop must re-populate a construct slot AND re-arm a fresh
-    // watchpoint set on the SAME `f` (Task 7's re-arm-after-invalidation path).
-    // This script does NOT redeclare `F` — it references the existing global —
-    // so `new F()` still constructs the original `f`. We track this script's own
-    // construct slot for the final clear assertions.
+    // watchpoint set. This script does NOT redeclare `F` — it references the
+    // existing global. We track this script's construct slot for final assertions.
     let rewarm = compile_test_unit(
         70_033,
         r"

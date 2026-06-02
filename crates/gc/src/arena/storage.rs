@@ -1,11 +1,11 @@
 use super::{
     AllocationLifetime, BigIntRef, CodeRef, CodeSlotsRef, EnvironmentRef, EnvironmentSlotsRef,
-    FunctionPayloadRef, HeapGeneration, ObjectRef, ObjectSlotsRef, PrimitiveDomainStats,
-    PrimitiveValueCellRef, RealmRef, ShapeId, SideAllocationClass, SideAllocationRef,
-    SideAllocationStats, StringRef, SuspendedExecutionRef, SuspendedRegistersRef, SymbolRef, Value,
-    PRIMITIVE_SLOTS_PER_PAGE,
+    FunctionPayloadRef, HeapGeneration, ObjectRef, ObjectSlotsRef, PRIMITIVE_SLOTS_PER_PAGE,
+    PrimitiveDomainStats, PrimitiveValueCellRef, RealmRef, ShapeId, SideAllocationClass,
+    SideAllocationRef, SideAllocationStats, StringRef, SuspendedExecutionRef,
+    SuspendedRegistersRef, SymbolRef, Value,
 };
-use crate::{card_table::CARD_SIZE_BYTES, HeapWriter};
+use crate::{HeapWriter, card_table::CARD_SIZE_BYTES};
 use std::array::from_fn;
 use std::collections::BTreeMap;
 use std::marker::PhantomData;

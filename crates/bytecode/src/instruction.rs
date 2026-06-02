@@ -1,4 +1,4 @@
-use crate::{metadata::CallRange, Opcode};
+use crate::{Opcode, metadata::CallRange};
 use lyng_types::FeedbackSlotId;
 
 pub const INSTRUCTION_WIDTH: usize = 4;

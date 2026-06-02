@@ -1,8 +1,8 @@
 mod parsing;
 
 use super::{
-    map_completion, range_error, string_ref_text, string_value, temporal, to_number_for_builtin,
-    type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext, map_completion, range_error,
+    string_ref_text, string_value, temporal, to_number_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_gc::AllocationLifetime;
@@ -855,11 +855,7 @@ fn date_store_value<Cx: PublicBuiltinDispatchContext>(
         let mut mutator = heap.mutator();
         objects.set_date_value(&mut mutator, object, value)
     });
-    if stored {
-        Ok(())
-    } else {
-        Err(type_error(cx))
-    }
+    if stored { Ok(()) } else { Err(type_error(cx)) }
 }
 
 fn date_builtin<Cx: PublicBuiltinDispatchContext>(

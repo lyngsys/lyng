@@ -970,11 +970,7 @@ fn parse_group_name_contents(chars: &[char]) -> Option<String> {
         name.push(ch);
     }
 
-    if name.is_empty() {
-        None
-    } else {
-        Some(name)
-    }
+    if name.is_empty() { None } else { Some(name) }
 }
 
 fn parse_group_name_char(chars: &[char], index: &mut usize) -> Option<char> {

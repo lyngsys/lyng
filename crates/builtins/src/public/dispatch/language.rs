@@ -1,8 +1,8 @@
 use super::strings::push_code_point_units;
 use super::{
-    number_to_i32_after_range_check, number_value, string_from_code_units, string_ref_code_units,
-    string_value, to_number_for_builtin, to_number_value_for_builtin, to_string_string_ref,
-    type_error, uri_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, number_to_i32_after_range_check, number_value,
+    string_from_code_units, string_ref_code_units, string_value, to_number_for_builtin,
+    to_number_value_for_builtin, to_string_string_ref, type_error, uri_error,
 };
 use crate::BuiltinInvocation;
 use lyng_types::{BuiltinFunctionId, Value};

@@ -203,14 +203,48 @@ impl TraceHeapEdges for EntryExecutionOverride {
 
 impl TraceHeapEdges for ActiveVmRoots<'_> {
     fn trace_heap_edges(&self, tracer: &mut PrimitiveTracer<'_>) {
-        trace_frame_record(self.caller_frame, tracer);
-
-        for value in self.vm.register_stack() {
-            value.trace_heap_edges(tracer);
+        // Trace the LIVE arena frames via the cfr-walk. The frame layout is
+        // `[FrameHeader(7 slots)][window]`; header slots 0-1 and 3-6 hold packed
+        // integers (NOT valid `Value`s) — only slot 2 (`this_value`) is a real
+        // `Value`. So (a) scan each frame's WINDOW as `Value`s (never header slots)
+        // and (b) trace every header heap ref through its typed getter.
+        for cfr in self.vm.frame_cfrs() {
+            // (a) Register window only.
+            let base = cfr as usize + crate::frame_header::HEADER_SLOTS;
+            let len = usize::from(self.vm.frame_window_len(cfr));
+            for value in &self.vm.arena_slots()[base..base + len] {
+                value.trace_heap_edges(tracer);
+            }
+            // (b) Typed header refs (packed u32s not covered by the window scan)
+            // plus `this_value`.
+            let header = self.vm.frame_header(cfr);
+            header.code().trace_heap_edges(tracer);
+            header.callee().trace_heap_edges(tracer);
+            header.variable_env().trace_heap_edges(tracer);
+            header.private_env().trace_heap_edges(tracer);
+            header.new_target().trace_heap_edges(tracer);
+            header.lexical_env().trace_heap_edges(tracer);
+            header.construct_this().trace_heap_edges(tracer);
+            header.this_value().trace_heap_edges(tracer);
         }
-        for frame in &self.vm.frames {
-            trace_frame_record(frame, tracer);
+        // `tail_caller`/`resume_value` live in the cold side-table.
+        for cold in self.vm.frame_cold_live_slots() {
+            cold.tail_caller.trace_heap_edges(tracer);
+            cold.resume_value.trace_heap_edges(tracer);
         }
+        // Function-frame realms are reachable via the traced `callee`; callee-less
+        // root realms live on the establishment side-stack.
+        for realm in self.vm.establishment_realms() {
+            realm.trace_heap_edges(tracer);
+        }
+        // Trace the active `caller_frame`. For frames already pushed into the arena
+        // this is harmless over-tracing (covered by the cfr-walk above). For
+        // synthetic frames (e.g. `force_collect`) never pushed into the arena,
+        // this is the ONLY trace. Conservative: over-trace beats under-trace.
+        // The realm is NOT traced off the record; it is already rooted either via
+        // the traced `callee` (function frame) or via the establishment side-stack
+        // (callee-less / synthetic frames).
+        trace_all_frame_edges(self.caller_frame, tracer);
         self.vm.current_exception.trace_heap_edges(tracer);
 
         for installed in self.vm.installed.iter().flatten() {
@@ -290,16 +324,21 @@ impl TraceHeapEdges for ActiveVmRoots<'_> {
     }
 }
 
-fn trace_frame_record(frame: &FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
-    frame.code().trace_heap_edges(tracer);
-    frame.realm().trace_heap_edges(tracer);
-    frame.lexical_env().trace_heap_edges(tracer);
+/// Trace every heap edge a `FrameRecord` snapshot holds, for the synthetic
+/// `caller_frame` path where the record (not a live arena frame) is authoritative.
+///
+/// Trace all heap fields of a `FrameRecord`. `realm` is not traced (rooted via
+/// the establishment side-stack or `callee`). Used only for the `caller_frame`
+/// snapshot that may never have been pushed into the arena.
+fn trace_all_frame_edges(frame: &FrameRecord, tracer: &mut PrimitiveTracer<'_>) {
     frame.variable_env().trace_heap_edges(tracer);
     frame.private_env().trace_heap_edges(tracer);
-    frame.this_value().trace_heap_edges(tracer);
-    frame.construct_this().trace_heap_edges(tracer);
     frame.new_target().trace_heap_edges(tracer);
     frame.callee().trace_heap_edges(tracer);
+    frame.code().trace_heap_edges(tracer);
+    frame.this_value().trace_heap_edges(tracer);
+    frame.lexical_env().trace_heap_edges(tracer);
+    frame.construct_this().trace_heap_edges(tracer);
     frame.tail_caller().trace_heap_edges(tracer);
     frame.resume_value().trace_heap_edges(tracer);
 }

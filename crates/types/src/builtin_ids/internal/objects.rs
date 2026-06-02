@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     internal_instance_of_builtin => super::super::INTERNAL_INSTANCE_OF_RAW;

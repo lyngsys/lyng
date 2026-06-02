@@ -2,11 +2,12 @@ mod basic;
 mod normalization;
 
 use super::{
-    allocate_array_like_result, callable_object_from_value, define_data_property_with_attrs,
-    number_to_usize_after_range_check, range_error, regexp, string_from_code_units,
-    string_ref_code_units, string_this_ref, to_integer_or_infinity_for_builtin,
-    to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
-    type_error, usize_index_as_number, usize_index_value, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, allocate_array_like_result, callable_object_from_value,
+    define_data_property_with_attrs, number_to_usize_after_range_check, range_error, regexp,
+    string_from_code_units, string_ref_code_units, string_this_ref,
+    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_number_for_builtin,
+    to_string_string_ref, to_uint32_for_builtin, type_error, usize_index_as_number,
+    usize_index_value,
 };
 use crate::BuiltinInvocation;
 use basic::{

@@ -5,7 +5,7 @@ use super::super::super::{
     typed_array_reduce_builtin, typed_array_reduce_right_builtin, typed_array_some_builtin,
 };
 use super::super::{
-    length_value_u64, to_boolean_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, length_value_u64, to_boolean_for_builtin, type_error,
 };
 use super::{
     typed_array_read_element_value, typed_array_species_create,

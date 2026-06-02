@@ -29,7 +29,6 @@ fn frame_record_carries_bytecode_execution_state() {
         4,
         RegisterWindow::new(8, 2),
         Some(1),
-        RealmRef::from_raw(1).unwrap(),
         EnvironmentRef::from_raw(3).unwrap(),
         EnvironmentRef::from_raw(4).unwrap(),
         ExecutionContextKind::Function,
@@ -40,7 +39,6 @@ fn frame_record_carries_bytecode_execution_state() {
 
     assert_eq!(size_of::<FrameFlags>(), size_of::<u8>());
     assert_eq!(frame.instruction_offset(), 4);
-    assert_eq!(frame.realm(), RealmRef::from_raw(1).unwrap());
     assert_eq!(frame.lexical_env(), EnvironmentRef::from_raw(3).unwrap());
     assert_eq!(frame.variable_env(), EnvironmentRef::from_raw(4).unwrap());
     assert_eq!(frame.this_value(), Value::from_smi(9));
@@ -77,7 +75,7 @@ fn completed_bytecode_calls_keep_register_storage_inactive_for_reuse() {
         .unwrap();
 
     assert_eq!(result, Value::from_smi(6));
-    assert!(vm.register_stack().is_empty());
+    assert!(vm.live_register_slots().is_empty());
     assert!(vm.register_stack_storage_len_for_tests() > 0);
 }
 
@@ -231,7 +229,7 @@ fn vm_installs_script_units_into_code_storage_and_executes_basic_dispatch() {
 
     assert_eq!(result, Value::from_smi(41));
     assert!(vm.frames().is_empty());
-    assert!(vm.register_stack().is_empty());
+    assert!(vm.live_register_slots().is_empty());
     assert!(agent.running_context().is_none());
 }
 
@@ -267,18 +265,13 @@ fn vm_opcode_dispatch_counters_are_opt_in_and_record_executed_opcodes() {
         let mut vm = Vm::new();
         let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
-        // DSL-1 Phase 1.B.0 Task 1: counters are now always allocated;
-        // `opcode_dispatch_counts()` returns `Some` even before the
-        // first dispatch. Total starts at 0.
+        // Counters are always allocated; total starts at 0 before the first dispatch.
         assert_eq!(vm.opcode_counters().dispatch_counts().total(), 0);
         let result = vm
             .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
             .run()
             .unwrap();
         assert_eq!(result, Value::from_smi(42));
-        // Until Task 4 wires the asm-side increment, the dispatch
-        // bank stays at zero across runs. Reset to be explicit before
-        // the enable/run round.
         vm.opcode_counters_mut().reset_dispatch_counts();
 
         let result = vm
@@ -694,17 +687,9 @@ fn jump_if_false8_bool_hit_avoids_semantic_slow_path() {
 #[cfg(feature = "diagnostic-counters")]
 #[test]
 fn vm_lda_star_pair_dispatches_each_handler_under_dsl() {
-    // Originally Phase 4b's `vm_star_fusion_elides_star_dispatch_after_lda`
-    // regression: the α dispatch loop's `dispatch_next_with_value!` peephole
-    // fused `LdaX; StarN` so the pair produced a single dispatch (LdaOne)
-    // with Star2 elided. DSL-0c deleted the α loop in favor of the
-    // standalone asm-DSL handlers, and the DSL has no equivalent fusion
-    // peephole — each opcode runs its own handler and bumps its own
-    // dispatch counter. DSL-1 Phase 1.B.0 Task 4 wired the asm-side
-    // increment, so the LdaOne / Star2 split is now directly observable
-    // here. Reintroducing fusion is a future optimisation; for now the
-    // test pins the current expected counts (each handler fires once) so
-    // a regression would be caught.
+    // Each handler runs independently and bumps its own dispatch counter;
+    // there is no LdaX;StarN fusion peephole. The test pins the current
+    // expected counts (each handler fires once) as a regression guard.
     let mut builder = BytecodeBuilder::new(
         BytecodeFunctionId::from_raw(17).unwrap(),
         BytecodeFunctionKind::Script,
@@ -1754,15 +1739,17 @@ fn global_script_instantiation_uses_dictionary_storage_for_bulk_var_bindings() {
         Some(NamedPropertyStorageMode::Dictionary)
     );
     let last_atom = agent.atoms_mut().intern_collectible("binding_95");
-    assert!(agent
-        .objects()
-        .get_own_property(
-            agent.heap().view(),
-            realm.global_object(),
-            PropertyKey::from_atom(last_atom),
-        )
-        .unwrap()
-        .is_some());
+    assert!(
+        agent
+            .objects()
+            .get_own_property(
+                agent.heap().view(),
+                realm.global_object(),
+                PropertyKey::from_atom(last_atom),
+            )
+            .unwrap()
+            .is_some()
+    );
 }
 
 #[test]
@@ -1963,15 +1950,17 @@ fn direct_named_property_definitions_preserve_all_named_slots() {
         ("NaN", 7),
     ] {
         let atom = agent.atoms_mut().intern_collectible(name);
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(atom),
-            Value::from_smi(value),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+        assert!(
+            ordinary_create_data_property(
+                agent,
+                object,
+                PropertyKey::from_atom(atom),
+                Value::from_smi(value),
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap()
+        );
     }
 
     for (name, value) in [
@@ -2424,7 +2413,7 @@ fn function_call_builtin_rebinds_nested_targets_without_frame_leaks() {
 
     assert_eq!(result, Value::from_smi(19));
     assert!(vm.frames().is_empty());
-    assert!(vm.register_stack().is_empty());
+    assert!(vm.live_register_slots().is_empty());
     assert!(agent.running_context().is_none());
 }
 
@@ -2478,24 +2467,28 @@ fn for_in_state_is_cleared_when_return_exits_loop_body() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(1),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
-    assert!(ordinary_create_data_property(
-        agent,
-        realm.global_object(),
-        PropertyKey::from_atom(source_name),
-        Value::from_object_ref(object),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(1),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            realm.global_object(),
+            PropertyKey::from_atom(source_name),
+            Value::from_object_ref(object),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
 
     let mut builder = BytecodeBuilder::new(
         BytecodeFunctionId::from_raw(1).unwrap(),
@@ -2611,13 +2604,9 @@ fn throw_transfers_control_to_matching_catch_handler() {
     assert_eq!(result, Value::from_smi(13));
 }
 
-/// SP-0a Task 4: an environment reachable ONLY through a live frame's
-/// `private_env` must survive collection. The VM traces its active frames as GC
-/// roots via `trace_frame_record` (`crates/vm/src/vm/state.rs`), invoked from the
-/// major collection path (`force_collect_with_active_roots` ->
-/// `Agent::force_collect_with_additional_roots` -> `ActiveVmRoots`). Before this
-/// task `private_env` was not among the traced frame edges, so an environment
-/// held only via `with_private_env(Some(env))` was silently reclaimed.
+/// An environment reachable ONLY through a live frame's `private_env` must
+/// survive collection. The VM traces active frames as GC roots via
+/// `trace_frame_record`, invoked from the major collection path.
 ///
 /// This test allocates a fresh declarative environment (Default lifetime, no
 /// outer, not otherwise rooted), stores a sentinel SMI in slot 0, builds a frame
@@ -2675,7 +2664,6 @@ fn major_gc_frame_private_env_survives() {
         0,
         RegisterWindow::new(0, 1),
         None,
-        realm.id(),
         realm.global_env(),
         realm.global_env(),
         ExecutionContextKind::Function,
@@ -2699,5 +2687,397 @@ fn major_gc_frame_private_env_survives() {
         Some(sentinel),
         "REGRESSION: environment reachable only via frame.private_env was COLLECTED — \
          `trace_frame_record` must trace `frame.private_env()` as a GC root"
+    );
+}
+
+/// Unbounded recursion must surface a clean `RangeError` rather than panicking
+/// or exhausting memory. Deep recursion hits either the `MAX_BYTECODE_CALL_DEPTH`
+/// frame cap or the arena soft limit; both throw via the same mechanism. The VM
+/// must remain usable afterward.
+///
+/// NOTE: the recursive call must NOT be in tail position — `return f(n + 1)`
+/// is a proper tail call recycled in place, looping forever without growing the
+/// stack. The trailing `+ 1` keeps the caller frame live.
+#[test]
+fn deep_recursion_throws_range_error_not_panic() {
+    let unit = compile_test_unit(
+        926,
+        r"
+        function f(n) { return f(n + 1) + 1; }
+        f(0);
+        ",
+    );
+
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let error = vm
+        .evaluate_script(agent, realm, &unit)
+        .run()
+        .expect_err("unbounded recursion must throw, not return a value");
+
+    let VmError::Abrupt(reason) = error else {
+        panic!("expected an abrupt RangeError throw, got {error:?}");
+    };
+    let thrown = reason
+        .thrown_value()
+        .expect("recursion overflow should throw a value")
+        .as_object_ref()
+        .expect("recursion overflow should throw an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, thrown, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(|view| decode_string(&view))
+        .expect("error name should be a string");
+    assert_eq!(name, "RangeError");
+
+    // The VM must still be usable after the clean throw — the frame/register
+    // cursors should have unwound back to empty so a fresh evaluation works.
+    assert!(vm.live_register_slots().is_empty());
+    let followup = compile_test_unit(927, "1 + 2;");
+    let realm = agent.default_realm().expect("default realm should exist");
+    let result = vm
+        .evaluate_script(agent, realm, &followup)
+        .run()
+        .expect("VM should remain usable after a clean RangeError");
+    assert_eq!(result, Value::from_smi(3));
+}
+
+/// After a stack-overflow `RangeError` the arena cursor, `current_cfr`, and
+/// frame state must be fully unwound so the SAME `Vm` can execute a fresh
+/// script without any corrupted state.
+///
+/// The non-tail-recursive form `return f(n + 1) + 1` is required — a proper
+/// tail call would recycle frames in place and never trigger the overflow guard.
+#[test]
+fn soft_limit_throw_leaves_the_vm_reusable() {
+    // First run: unbounded non-tail recursion hits the depth cap / arena soft
+    // limit and throws a RangeError.
+    let overflow_unit = compile_test_unit(928, "function f(n) { return f(n + 1) + 1; } f(0);");
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let mut vm = Vm::new();
+    let error = vm
+        .evaluate_script(agent, realm, &overflow_unit)
+        .run()
+        .expect_err("unbounded recursion must throw");
+
+    let VmError::Abrupt(reason) = error else {
+        panic!("expected an abrupt RangeError throw, got {error:?}");
+    };
+    let thrown = reason
+        .thrown_value()
+        .expect("recursion overflow should throw a value")
+        .as_object_ref()
+        .expect("recursion overflow should throw an error object");
+    let name_atom = agent.atoms_mut().intern_collectible("name");
+    let name = ordinary_get(agent, thrown, PropertyKey::from_atom(name_atom))
+        .expect("error name should be readable")
+        .as_string_ref()
+        .and_then(|string| agent.heap().view().string_view(string))
+        .map(|view| decode_string(&view))
+        .expect("error name should be a string");
+    assert_eq!(name, "RangeError", "overflow must throw a RangeError");
+
+    // The arena cursor must have unwound back to empty.
+    assert!(
+        vm.live_register_slots().is_empty(),
+        "arena cursor must be back at zero after the clean throw",
+    );
+
+    // Second run on the SAME Vm/agent: a trivial eval must produce the right
+    // value — proving the frame/register state is not corrupted.
+    let trivial_unit = compile_test_unit(929, "40 + 2;");
+    let realm = agent.default_realm().expect("default realm should exist");
+    let result = vm
+        .evaluate_script(agent, realm, &trivial_unit)
+        .run()
+        .expect("VM must be reusable after a clean RangeError stack overflow");
+    assert_eq!(
+        result,
+        Value::from_smi(42),
+        "post-overflow eval must return 42"
+    );
+}
+
+/// Build a 3-register function unit and install it, returning the installed code.
+/// The window length the GC trace bounds each frame by is `window_len_for(code)`,
+/// so the reserved `register_len` for a pushed test frame MUST equal this code's
+/// register count (3) for the per-window scan to cover the right slots.
+#[cfg(test)]
+fn install_three_register_function(
+    vm: &mut Vm,
+    agent: &mut lyng_env::Agent,
+    realm: &lyng_env::RealmRecord,
+) -> InstalledCode {
+    let mut builder = BytecodeBuilder::new(
+        BytecodeFunctionId::from_raw(61).unwrap(),
+        BytecodeFunctionKind::Function,
+    );
+    builder
+        .try_alloc_registers(3)
+        .expect("three registers should allocate");
+    let function = builder.finish().expect("test bytecode should build");
+    let unit = CompiledFunctionUnit::new(SourceId::new(610), function.id(), vec![function]);
+    let installed = vm
+        .install_function(agent, realm.id(), &unit)
+        .expect("function unit should install");
+    assert_eq!(
+        vm.window_len_for(installed.code()),
+        3,
+        "the test code must have a 3-register window so register_len matches",
+    );
+    installed
+}
+
+/// Allocate a fresh young (Default-lifetime) ordinary object with a sentinel SMI
+/// property, and return `(object, sentinel_key, sentinel_value)`. The sentinel lets
+/// callers prove a SURVIVING object's record is intact (not just an unreclaimed
+/// slot). It is NOT a heap ref, so survival depends purely on the object being
+/// marked.
+#[cfg(test)]
+fn alloc_sentinel_object(
+    agent: &mut lyng_env::Agent,
+    realm: &lyng_env::RealmRecord,
+    sentinel_name: &str,
+    sentinel: i32,
+) -> (ObjectRef, PropertyKey, Value) {
+    let root_shape = realm
+        .root_shape()
+        .expect("default realm should expose a root shape");
+    let object = agent.with_heap_and_objects(|heap, objects| {
+        let mut mutator = heap.mutator();
+        objects.alloc_object(
+            &mut mutator,
+            ObjectAllocation::ordinary(root_shape),
+            AllocationLifetime::Default,
+        )
+    });
+    let atom = agent.atoms_mut().intern_collectible(sentinel_name);
+    let key = PropertyKey::from_atom(atom);
+    let value = Value::from_smi(sentinel);
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            key,
+            value,
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
+    (object, key, value)
+}
+
+/// An object reachable ONLY through a live frame's REGISTER WINDOW (a local)
+/// must survive collection. The GC uses a per-frame window walk over
+/// `arena_slots()[cfr+HEADER_SLOTS .. +frame_window_len(cfr)]` to root
+/// frame-local heap values.
+///
+/// (Named `minor_gc_*` for historical reasons, but the frame-root trace lives
+/// on the MAJOR path: `force_collect_with_active_roots` is a stop-the-world
+/// major collect that re-marks young+old.)
+#[test]
+fn minor_gc_object_only_in_register_window_survives() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+    let mut vm = Vm::new();
+    let installed = install_three_register_function(&mut vm, agent, &realm);
+
+    let (window_object, sentinel_key, sentinel) =
+        alloc_sentinel_object(agent, &realm, "__window_sentinel__", 0x1234);
+
+    // Push a real arena frame with a 3-slot window, seeding the object ONLY into
+    // window slot 0. Nothing else references it.
+    vm.push_test_root_frame(
+        agent,
+        3,
+        &[
+            Value::from_object_ref(window_object),
+            Value::undefined(),
+            Value::undefined(),
+        ],
+        |window| {
+            FrameRecord::new(
+                installed.code(),
+                0,
+                window,
+                None,
+                global_env,
+                global_env,
+                ExecutionContextKind::Function,
+            )
+        },
+    );
+    let caller_frame = vm.frame().expect("pushed frame should be active");
+
+    let _report = vm.force_collect_with_active_roots(agent, caller_frame);
+
+    assert!(
+        agent.heap().view().object(window_object).is_some(),
+        "REGRESSION: object held only in a live frame's register window was COLLECTED — \
+         the GC per-frame window walk must trace [cfr+HEADER_SLOTS .. +frame_window_len]"
+    );
+    assert_eq!(
+        ordinary_get(agent, window_object, sentinel_key).unwrap(),
+        sentinel,
+        "the surviving window object's sentinel slot must read back intact"
+    );
+}
+
+/// A callee object reachable ONLY through a live frame's HEADER (`callee`, a
+/// packed-u32 ref in the overlay) must survive collection. The window walk
+/// excludes header slots, so header refs are traced via the typed cfr-walk
+/// getters; this confirms `header.callee()` is among them.
+#[test]
+fn minor_gc_header_callee_survives() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+    let mut vm = Vm::new();
+    let installed = install_three_register_function(&mut vm, agent, &realm);
+
+    let (callee_object, sentinel_key, sentinel) =
+        alloc_sentinel_object(agent, &realm, "__callee_sentinel__", 0x4567);
+
+    // The frame's ONLY reference to `callee_object` is its header `callee` field
+    // (set from the record by `write_header_from_record`). The window holds no
+    // reference to it.
+    vm.push_test_root_frame(agent, 3, &[Value::undefined(); 3], |window| {
+        FrameRecord::new(
+            installed.code(),
+            0,
+            window,
+            None,
+            global_env,
+            global_env,
+            ExecutionContextKind::Function,
+        )
+        .with_callee(Some(callee_object))
+    });
+    let cfr = vm.frame_cfrs().next().expect("a live frame should exist");
+    assert_eq!(
+        vm.frame_header(cfr).callee(),
+        Some(callee_object),
+        "the frame must hold the callee only via the header overlay"
+    );
+    let caller_frame = vm.frame().expect("pushed frame should be active");
+
+    let _report = vm.force_collect_with_active_roots(agent, caller_frame);
+
+    assert!(
+        agent.heap().view().object(callee_object).is_some(),
+        "REGRESSION: callee reachable only via a live frame header was COLLECTED — \
+         the GC cfr-walk must trace `header.callee()`"
+    );
+    assert_eq!(
+        ordinary_get(agent, callee_object, sentinel_key).unwrap(),
+        sentinel,
+        "the surviving callee object's sentinel slot must read back intact"
+    );
+}
+
+/// The GC must NEVER read a frame's packed-integer HEADER slots as `Value`s.
+///
+/// We exercise the hazard concretely: plant the verbatim bit pattern of
+/// `Value::from_object_ref(dead)` for an OTHERWISE-DEAD object directly into
+/// header slot 3 (the geometry slot — none of those fields are heap refs).
+/// The chosen pattern leaves slots 0/1 (`caller_cfr/code`) intact so the
+/// cfr-walk and window bound stay correct. The GC must not read slot 3 as a
+/// `Value`, so `dead` is collected while a live window object survives.
+#[test]
+fn gc_does_not_mistrace_header_slots() {
+    let mut runtime = Runtime::new(NoopHostHooks);
+    let agent = runtime.root_agent_mut();
+    let realm = agent.default_realm().expect("default realm should exist");
+    let global_env = realm.global_env();
+    let mut vm = Vm::new();
+    let installed = install_three_register_function(&mut vm, agent, &realm);
+
+    // A genuinely-live object: held only in the window, MUST survive.
+    let (live_object, live_key, live_sentinel) =
+        alloc_sentinel_object(agent, &realm, "__live_sentinel__", 0x1111);
+    // A dead object: referenced from NOWHERE legitimate. We will plant its
+    // object-ref bits into a packed-int HEADER slot. It MUST be collected.
+    let (dead_object, _dead_key, _dead_sentinel) =
+        alloc_sentinel_object(agent, &realm, "__dead_sentinel__", 0x2222);
+
+    let window_base = vm.push_test_root_frame(
+        agent,
+        3,
+        &[
+            Value::from_object_ref(live_object),
+            Value::undefined(),
+            Value::undefined(),
+        ],
+        |window| {
+            FrameRecord::new(
+                installed.code(),
+                0,
+                window,
+                None,
+                global_env,
+                global_env,
+                ExecutionContextKind::Function,
+            )
+        },
+    );
+    let cfr = window_base - crate::frame_header::HEADER_SLOTS as u32;
+
+    // Plant the hazard. Header slot 3 is `cfr + 3` (each slot is one Value-sized
+    // slot). Writing the dead object's Value bits there models a packed-int slot
+    // whose raw bits, if mis-read as a `Value`, resolve to a live heap ref.
+    let dead_value = Value::from_object_ref(dead_object);
+    let hazard_slot = cfr + 3;
+    vm.write_arena_slot_for_tests(hazard_slot, dead_value);
+    assert_eq!(
+        vm.arena_slot_for_tests(hazard_slot),
+        dead_value,
+        "the hazard bits should be planted in header slot 3",
+    );
+    // The control-flow-relevant header fields must remain intact: the cfr-walk
+    // reads `caller_cfr` (slot 0) and `frame_window_len` reads `code`/`kind`. Our
+    // chosen slot-3 pattern must NOT corrupt the window bound (kind decodes to a
+    // non-Job kind → window stays `window_len_for(code) == 3`).
+    assert_eq!(
+        vm.frame_header(cfr).code(),
+        installed.code(),
+        "planting the hazard must not disturb the header `code`",
+    );
+    assert_eq!(
+        vm.frame_window_len(cfr),
+        3,
+        "the planted slot-3 bits must keep `frame_window_len` at the real window (3)",
+    );
+    let caller_frame = vm.frame().expect("pushed frame should be active");
+
+    // Run the trace. Must not panic / mismark.
+    let _report = vm.force_collect_with_active_roots(agent, caller_frame);
+
+    // The live window object survived (window walk traced it).
+    assert!(
+        agent.heap().view().object(live_object).is_some(),
+        "the genuinely-live window object must survive the collection"
+    );
+    assert_eq!(
+        ordinary_get(agent, live_object, live_key).unwrap(),
+        live_sentinel,
+        "the surviving live object's sentinel slot must read back intact"
+    );
+    // The dead object, reachable ONLY via the planted header-slot bits, must be
+    // collected: the GC must not have read the header slot as a `Value`.
+    assert!(
+        agent.heap().view().object(dead_object).is_none(),
+        "REGRESSION: a dead object reachable only via a packed-int HEADER slot's raw \
+         bits SURVIVED — the GC mistraced a header slot as a `Value`. The GC must \
+         trace only each frame's window, never the header slots."
     );
 }

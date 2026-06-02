@@ -1,8 +1,8 @@
 //! `NamedPropertyStatus` projection (Spec 2 Phase E).
 
 use lyng_objects::{
-    NamedPropertyCacheEntry, NamedPropertyCachePath, PropertyCacheDependency,
-    PROPERTY_CACHE_MAX_DEPENDENCIES,
+    NamedPropertyCacheEntry, NamedPropertyCachePath, PROPERTY_CACHE_MAX_DEPENDENCIES,
+    PropertyCacheDependency,
 };
 use lyng_types::{ObjectRef, ShapeId};
 

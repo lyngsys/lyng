@@ -5,21 +5,21 @@ use super::super::super::{
     uint8_array_slice_builtin, uint8_array_subarray_builtin,
 };
 use super::super::{
-    array_like_index_property_key, array_like_length_u64, arrays, get_property_from_object,
-    length_value_u64, normalize_relative_index_u64, range_error, to_index_for_builtin,
-    to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, array_like_index_property_key, array_like_length_u64, arrays,
+    get_property_from_object, length_value_u64, normalize_relative_index_u64, range_error,
+    to_index_for_builtin, to_integer_or_infinity_for_builtin, type_error,
 };
 use super::{
     typed_array_current_length, typed_array_read_element_value, typed_array_read_storage_bits,
     typed_array_same_kind_create, typed_array_snapshot_storage_bits, typed_array_species_create,
     typed_array_species_create_with_arguments, typed_array_storage_bits_from_builtin_value,
-    typed_array_storage_bits_to_value, typed_array_storage_u16_bits, typed_array_storage_u32_bits,
-    typed_array_storage_u8_bits, typed_array_this_object, typed_array_this_record,
+    typed_array_storage_bits_to_value, typed_array_storage_u8_bits, typed_array_storage_u16_bits,
+    typed_array_storage_u32_bits, typed_array_this_object, typed_array_this_record,
     typed_array_validated_object_record_and_length, typed_array_validated_record,
     typed_array_validated_record_and_length, typed_array_write_storage_bits,
 };
 use crate::BuiltinInvocation;
-use lyng_objects::{float16_bits_to_f64, TypedArrayElementKind};
+use lyng_objects::{TypedArrayElementKind, float16_bits_to_f64};
 use lyng_types::{BuiltinFunctionId, ObjectRef, Value};
 
 pub(in crate::public::dispatch::binary_data) fn dispatch_typed_array_mutation_builtin<

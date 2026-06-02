@@ -12,14 +12,14 @@ use dispatch_context::VmBuiltinDispatch;
 use super::property_access::VmProxyBridge;
 use super::values::{alloc_code_unit_string, alloc_string, to_f64_number};
 use super::{
-    Agent, AllocationLifetime, FrameRecord, NativeFunctionRegistry, ObjectRef, TemplateCacheKey,
+    Agent, AllocationLifetime, CallerContext, NativeFunctionRegistry, ObjectRef, TemplateCacheKey,
     ThisState, Value, Vm, VmError, VmResult, WellKnownAtom, WellKnownSymbolId,
 };
 use crate::extensions::{EmbeddingFunctionContext, EmbeddingInvocation};
 use crate::frame::GeneratorResumeKind;
 use lyng_builtins::{
-    builtin_metadata, dispatch_builtin, BuiltinInvocation, DynamicFunctionKind,
-    InternalBuiltinDispatchContext, PublicBuiltinDispatchContext,
+    BuiltinInvocation, DynamicFunctionKind, InternalBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, builtin_metadata, dispatch_builtin,
 };
 use lyng_common::AtomTable;
 use lyng_env::{
@@ -39,10 +39,10 @@ use lyng_ops::object::ToPrimitiveHint;
 use lyng_ops::{errors, object, proxy, read};
 use lyng_parser::parse_script;
 use lyng_types::{
-    eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
+    AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId, PropertyDescriptor, PropertyKey,
+    RealmRef, eval_builtin, internal_dynamic_import_builtin, internal_import_meta_builtin,
     internal_regexp_literal_builtin, object_to_string_builtin, promise_capability_executor_builtin,
-    string_from_code_point_builtin, AbruptCompletion, BuiltinFunctionId, EmbeddingFunctionId,
-    PropertyDescriptor, PropertyKey, RealmRef,
+    string_from_code_point_builtin,
 };
 
 impl Vm {
@@ -88,7 +88,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
@@ -104,7 +104,7 @@ impl Vm {
                 host,
                 registry,
                 &provider,
-                caller_frame,
+                caller,
                 callee_object,
             );
             let invocation = EmbeddingInvocation::new(this_value, arguments, new_target);
@@ -123,22 +123,22 @@ impl Vm {
             return Ok(None);
         };
         if entry == internal_import_meta_builtin() {
-            return Self::import_meta_builtin(agent, caller_frame).map(Some);
+            return Self::import_meta_builtin(agent, caller).map(Some);
         }
         if entry == internal_dynamic_import_builtin() {
             return self
-                .dynamic_import_builtin(agent, host, registry, caller_frame, arguments)
+                .dynamic_import_builtin(agent, host, registry, caller, arguments)
                 .map(Some);
         }
         if entry == internal_regexp_literal_builtin() {
-            return Self::regexp_literal_builtin(agent, caller_frame, arguments).map(Some);
+            return Self::regexp_literal_builtin(agent, caller, arguments).map(Some);
         }
         let mut bridge = VmBuiltinDispatch {
             vm: self,
             agent,
             host,
             registry,
-            caller_frame,
+            caller,
             callee_object,
         };
         dispatch_builtin(
@@ -157,7 +157,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callee_object: ObjectRef,
         entry: BuiltinFunctionId,
         this_value: Value,
@@ -169,7 +169,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller,
             callee_object,
         };
         dispatch_builtin(
@@ -179,15 +179,11 @@ impl Vm {
         )
     }
 
-    fn builtin_realm(
-        agent: &Agent,
-        callee_object: ObjectRef,
-        caller_frame: &FrameRecord,
-    ) -> RealmRef {
+    fn builtin_realm(agent: &Agent, callee_object: ObjectRef, caller_realm: RealmRef) -> RealmRef {
         agent
             .objects()
             .function_data(callee_object)
             .and_then(lyng_objects::FunctionObjectData::realm)
-            .unwrap_or_else(|| caller_frame.realm())
+            .unwrap_or(caller_realm)
     }
 }

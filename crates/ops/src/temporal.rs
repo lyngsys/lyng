@@ -13,8 +13,8 @@ use std::fmt::Write as _;
 mod parse;
 
 pub use parse::{
-    parse_instant, parse_plain_date, parse_plain_date_time, parse_plain_month_day,
-    parse_plain_time, parse_plain_year_month, ParsedPlainDateTime,
+    ParsedPlainDateTime, parse_instant, parse_plain_date, parse_plain_date_time,
+    parse_plain_month_day, parse_plain_time, parse_plain_year_month,
 };
 
 pub const SAFE_INTEGER_MAX: i128 = 9_007_199_254_740_991;
@@ -254,8 +254,15 @@ pub fn round_duration_exact(
         increment,
         rounding_mode,
     )?;
-    let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_duration_nanoseconds_for_exact_largest_unit(rounded, largest_unit);
+    let [
+        days,
+        hours,
+        minutes,
+        seconds,
+        milliseconds,
+        microseconds,
+        nanoseconds,
+    ] = distribute_duration_nanoseconds_for_exact_largest_unit(rounded, largest_unit);
     Some(TemporalDurationObjectData::new(
         0,
         0,
@@ -393,8 +400,15 @@ fn combine_durations(
         .checked_mul(NANOS_PER_DAY)?
         .checked_add(duration_time_nanoseconds(left))?
         .checked_add(duration_time_nanoseconds(right).checked_mul(right_sign)?)?;
-    let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_additive_duration_nanoseconds(day_time_nanoseconds, largest_unit);
+    let [
+        days,
+        hours,
+        minutes,
+        seconds,
+        milliseconds,
+        microseconds,
+        nanoseconds,
+    ] = distribute_additive_duration_nanoseconds(day_time_nanoseconds, largest_unit);
     Some(TemporalDurationObjectData::new(
         years,
         months,
@@ -667,8 +681,15 @@ fn round_duration_to_fractional_digits(
         .checked_mul(NANOS_PER_DAY)?
         .checked_add(duration_time_nanoseconds(data))?;
     let rounded = round_i128_to_increment(day_time_nanoseconds, increment, rounding_mode)?;
-    let [days, hours, minutes, seconds, milliseconds, microseconds, nanoseconds] =
-        distribute_duration_nanoseconds_for_largest_unit(rounded, duration_largest_time_unit(data));
+    let [
+        days,
+        hours,
+        minutes,
+        seconds,
+        milliseconds,
+        microseconds,
+        nanoseconds,
+    ] = distribute_duration_nanoseconds_for_largest_unit(rounded, duration_largest_time_unit(data));
     Some(TemporalDurationObjectData::new(
         data.years(),
         data.months(),
@@ -1174,11 +1195,7 @@ fn iso_weeks_in_year(year: i32) -> i32 {
 }
 
 pub const fn iso_days_in_year(year: i32) -> i32 {
-    if is_iso_leap_year(year) {
-        366
-    } else {
-        365
-    }
+    if is_iso_leap_year(year) { 366 } else { 365 }
 }
 
 pub fn plain_date_ordinal_day(data: TemporalPlainDateObjectData) -> i128 {

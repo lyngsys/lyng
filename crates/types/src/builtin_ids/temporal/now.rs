@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     temporal_now_instant_builtin => super::super::TEMPORAL_NOW_INSTANT_RAW;

@@ -1,5 +1,5 @@
 use crate::error::VmResult;
-use crate::{FrameRecord, Vm, VmError};
+use crate::{CallerContext, Vm, VmError};
 use lyng_builtins::BootstrapArtifacts;
 use lyng_env::Agent;
 use lyng_gc::{AllocationLifetime, PrimitiveCollectionReport};
@@ -266,7 +266,7 @@ pub struct EmbeddingFunctionContext<'a> {
     host: &'a dyn HostHooks,
     registry: &'a mut dyn NativeFunctionRegistry,
     provider: &'a SharedRealmExtensionProvider,
-    caller_frame: &'a FrameRecord,
+    caller: CallerContext,
     callee_object: ObjectRef,
 }
 
@@ -278,7 +278,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
         host: &'a dyn HostHooks,
         registry: &'a mut dyn NativeFunctionRegistry,
         provider: &'a SharedRealmExtensionProvider,
-        caller_frame: &'a FrameRecord,
+        caller: CallerContext,
         callee_object: ObjectRef,
     ) -> Self {
         Self {
@@ -287,7 +287,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
             host,
             registry,
             provider,
-            caller_frame,
+            caller,
             callee_object,
         }
     }
@@ -304,7 +304,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
 
     #[inline]
     pub const fn caller_realm(&self) -> RealmRef {
-        self.caller_frame.realm()
+        self.caller.realm
     }
 
     pub fn function_realm(&self) -> RealmRef {
@@ -312,7 +312,7 @@ impl<'a> EmbeddingFunctionContext<'a> {
             .objects()
             .function_data(self.callee_object)
             .and_then(lyng_objects::FunctionObjectData::realm)
-            .unwrap_or_else(|| self.caller_frame.realm())
+            .unwrap_or(self.caller.realm)
     }
 
     /// # Errors
@@ -346,9 +346,13 @@ impl<'a> EmbeddingFunctionContext<'a> {
     }
 
     pub fn force_collect(&mut self) -> PrimitiveCollectionReport {
+        // The embedding context no longer holds a live `&FrameRecord`; rebuild a
+        // synthetic caller frame from the CallerContext for the GC root trace.
+        // Heap-edge-equivalent to the former trace (see `synthetic_caller_frame`).
+        let caller_record = Vm::synthetic_caller_frame(self.caller);
         let mut report = self
             .vm
-            .force_collect_with_active_roots(self.agent, *self.caller_frame);
+            .force_collect_with_active_roots(self.agent, caller_record);
         let next_budget = report.next_budget_bytes.max(
             report
                 .after

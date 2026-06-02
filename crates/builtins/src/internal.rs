@@ -1,4 +1,4 @@
-use crate::public::{dispatch_internal_spec_like_builtin, PublicBuiltinDispatchContext};
+use crate::public::{PublicBuiltinDispatchContext, dispatch_internal_spec_like_builtin};
 use crate::{BuiltinEntryMetadata, BuiltinInvocation};
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
@@ -8,14 +8,16 @@ use lyng_objects::{
     ObjectColdData, ObjectFlags, OrdinaryObjectData, PrimitiveWrapperKind,
 };
 use lyng_types::{
-    internal_array_index_of_builtin, internal_array_pop_builtin, internal_array_push_builtin,
-    internal_bind_function_private_env_builtin, internal_capture_arrow_context_builtin,
-    internal_construct_super_array_like_builtin, internal_construct_super_builtin,
-    internal_construct_super_spread_builtin, internal_define_class_getter_property_builtin,
-    internal_define_class_setter_property_builtin, internal_define_getter_property_builtin,
-    internal_define_method_property_builtin, internal_define_private_field_builtin,
-    internal_define_setter_property_builtin, internal_direct_eval_builtin,
-    internal_dynamic_import_builtin, internal_function_call_builtin,
+    BuiltinFunctionId, EnvironmentRef, INTERNAL_BUILTIN_NAMESPACE_END,
+    INTERNAL_BUILTIN_NAMESPACE_START, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    ShapeId, Value, internal_array_index_of_builtin, internal_array_pop_builtin,
+    internal_array_push_builtin, internal_bind_function_private_env_builtin,
+    internal_capture_arrow_context_builtin, internal_construct_super_array_like_builtin,
+    internal_construct_super_builtin, internal_construct_super_spread_builtin,
+    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
+    internal_define_getter_property_builtin, internal_define_method_property_builtin,
+    internal_define_private_field_builtin, internal_define_setter_property_builtin,
+    internal_direct_eval_builtin, internal_dynamic_import_builtin, internal_function_call_builtin,
     internal_get_instance_field_key_builtin, internal_get_template_object_builtin,
     internal_import_meta_builtin, internal_install_instance_field_key_builtin,
     internal_instance_of_builtin, internal_object_has_own_property_builtin,
@@ -27,9 +29,7 @@ use lyng_types::{
     internal_string_replace_builtin, internal_super_base_builtin,
     internal_super_constructor_builtin, internal_super_property_get_builtin,
     internal_super_property_set_builtin, internal_template_to_string_builtin,
-    internal_throw_type_error_builtin, BuiltinFunctionId, EnvironmentRef, ObjectRef,
-    PropertyDescriptor, PropertyKey, RealmRef, ShapeId, Value, INTERNAL_BUILTIN_NAMESPACE_END,
-    INTERNAL_BUILTIN_NAMESPACE_START,
+    internal_throw_type_error_builtin,
 };
 use std::collections::HashMap;
 

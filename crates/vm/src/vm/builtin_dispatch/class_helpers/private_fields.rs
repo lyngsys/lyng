@@ -1,7 +1,8 @@
 use super::{
-    errors, object, Agent, AllocationLifetime, ClassPrivateElementKind, FrameRecord, HostHooks,
-    NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
+    Agent, AllocationLifetime, ClassPrivateElementKind, HostHooks, NativeFunctionRegistry,
+    ObjectRef, Value, Vm, VmError, VmResult, errors, object,
 };
+use crate::frame::FrameView;
 
 impl Vm {
     pub(in crate::vm::builtin_dispatch) fn bind_function_private_env_builtin(
@@ -28,7 +29,10 @@ impl Vm {
             .objects()
             .function_data(function)
             .and_then(lyng_objects::FunctionObjectData::private_env)
-            .or_else(|| self.frame().and_then(|frame| frame.private_env()));
+            .or_else(|| {
+                self.current_frame_header()
+                    .and_then(crate::frame_header::FrameHeader::private_env)
+            });
         let installs_private_names = arguments
             .get(3)
             .copied()
@@ -61,7 +65,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let class_object = arguments
@@ -76,7 +80,18 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let key_value = arguments.get(2).copied().unwrap_or(Value::undefined());
-        let key = self.property_key_from_value(agent, host, registry, caller, key_value)?;
+        let caller_realm = self.realm_of(agent, caller.cfr());
+        let caller_lexical_env = self.frame_header(caller.cfr()).lexical_env();
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller.code(),
+            caller.instruction_offset(),
+            key_value,
+        )?;
         let canonical_key = self.property_key_to_enumeration_value(agent, key);
         object::install_instance_public_field_key(agent, class_object, field_index, canonical_key)
             .map_err(VmError::Abrupt)
@@ -101,20 +116,28 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_context_class_key(
+        &self,
         agent: &Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         receiver: ObjectRef,
         descriptor_index: u32,
         class_depth: u32,
     ) -> ObjectRef {
-        if let Some(class_key) =
-            Self::private_context_from_private_env(agent, caller, descriptor_index, class_depth)
-        {
+        if let Some(class_key) = Self::private_context_from_private_env_view(
+            self,
+            agent,
+            caller,
+            descriptor_index,
+            class_depth,
+        ) {
             return class_key;
         }
 
+        let cfr = caller.cfr();
+        let header = self.frame_header(cfr);
+        let callee_object = header.callee();
+        let caller_lexical_env = header.lexical_env();
         let mut remaining = class_depth;
-        let callee_object = caller.callee();
         if let Some(home_object) = callee_object.and_then(|callee| {
             agent
                 .objects()
@@ -127,7 +150,7 @@ impl Vm {
             remaining = remaining.saturating_sub(1);
         }
 
-        let mut current = Some(caller.lexical_env());
+        let mut current = Some(caller_lexical_env);
 
         while let Some(environment) = current {
             let Some(record) = agent.environment(environment) else {
@@ -158,13 +181,14 @@ impl Vm {
         receiver
     }
 
-    pub(in crate::vm::builtin_dispatch) fn private_context_from_private_env(
+    fn private_context_from_private_env_view(
+        &self,
         agent: &Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         descriptor_index: u32,
         class_depth: u32,
     ) -> Option<ObjectRef> {
-        let mut current = caller.private_env();
+        let mut current = self.frame_header(caller.cfr()).private_env();
         let mut remaining = class_depth;
 
         while let Some(environment) = current {
@@ -186,7 +210,7 @@ impl Vm {
 
     pub(in crate::vm::builtin_dispatch) fn define_private_field_builtin(
         agent: &mut Agent,
-        _caller: &FrameRecord,
+        _caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let class_object = arguments
@@ -229,8 +253,9 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_field_init_builtin(
+        &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -252,7 +277,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         object::private_field_init(agent, receiver, class_key, descriptor_index, value)
             .map_err(VmError::Abrupt)
     }
@@ -262,7 +287,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -283,7 +308,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let kind = object::private_element_kind(agent, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         match kind {
@@ -309,11 +334,13 @@ impl Vm {
                 let getter =
                     object::private_shared_element_value(agent, class_key, descriptor_index)
                         .map_err(VmError::Abrupt)?;
+                let caller_record = self.frame_record_for_view(caller);
+                let caller_ctx = Self::caller_context_from_record(agent, &caller_record);
                 self.call_optional_callback(
                     agent,
                     host,
                     registry,
-                    caller,
+                    caller_ctx,
                     getter,
                     Value::from_object_ref(receiver),
                     &[],
@@ -331,7 +358,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -353,7 +380,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let kind = object::private_element_kind(agent, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         match kind {
@@ -371,11 +398,13 @@ impl Vm {
                     object::private_shared_element_value(agent, class_key, descriptor_index)
                         .map_err(VmError::Abrupt)?;
                 let arguments = [value];
+                let caller_record = self.frame_record_for_view(caller);
+                let caller_ctx = Self::caller_context_from_record(agent, &caller_record);
                 let _ = self.call_optional_callback(
                     agent,
                     host,
                     registry,
-                    caller,
+                    caller_ctx,
                     setter,
                     Value::from_object_ref(receiver),
                     &arguments,
@@ -389,8 +418,9 @@ impl Vm {
     }
 
     pub(in crate::vm::builtin_dispatch) fn private_has_builtin(
+        &self,
         agent: &mut Agent,
-        caller: &FrameRecord,
+        caller: FrameView,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let receiver = arguments
@@ -411,7 +441,7 @@ impl Vm {
             .and_then(|value| u32::try_from(value).ok())
             .unwrap_or(0);
         let class_key =
-            Self::private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
+            self.private_context_class_key(agent, caller, receiver, descriptor_index, class_depth);
         let has = object::private_has(agent, receiver, class_key, descriptor_index)
             .map_err(VmError::Abrupt)?;
         Ok(Value::from_bool(has))

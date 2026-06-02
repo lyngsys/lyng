@@ -1,4 +1,4 @@
-use super::{string_value, type_error, BuiltinProxyBridge, PublicBuiltinDispatchContext};
+use super::{BuiltinProxyBridge, PublicBuiltinDispatchContext, string_value, type_error};
 use crate::{BuiltinInvocation, DynamicFunctionKind};
 use lyng_common::WellKnownAtom;
 use lyng_env::Agent;

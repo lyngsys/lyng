@@ -33,10 +33,9 @@
 
 use proc_macro2::{Span, TokenStream};
 use syn::{
-    braced,
+    Ident, LitInt, Result, Token, braced,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    Ident, LitInt, Result, Token,
 };
 
 /// A single statement of a handler body.

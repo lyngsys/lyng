@@ -1,10 +1,7 @@
-//! Phase 1 trampoline-dispatch parity tests (lyng-5zrf).
+//! Trampoline-dispatch parity tests.
 //!
-//! Built progressively across sub-3..sub-7 as families of handlers were
-//! ported off the legacy match. Post sub-8 cutover (`lyng-9gyk`),
-//! `Vm::run` is the trampoline path — these tests now exercise the only
-//! dispatch path and serve as anti-regression coverage for the per-family
-//! handlers under `vm/dispatch_handlers/`.
+//! Anti-regression coverage for the per-family handlers under
+//! `vm/dispatch_handlers/`.
 
 use super::support::*;
 

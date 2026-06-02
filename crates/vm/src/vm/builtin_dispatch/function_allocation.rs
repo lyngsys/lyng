@@ -1,8 +1,8 @@
 use super::{
-    builtin_metadata, errors, Agent, AllocationLifetime, BuiltinFunctionId, EmbeddingFunctionId,
-    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, ObjectAllocation,
-    ObjectColdData, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef, Value, Vm, VmError,
-    VmResult, WellKnownAtom,
+    Agent, AllocationLifetime, BuiltinFunctionId, EmbeddingFunctionId, FunctionConstructorFlags,
+    FunctionObjectData, FunctionThisMode, ObjectAllocation, ObjectColdData, ObjectRef,
+    PropertyDescriptor, PropertyKey, RealmRef, Value, Vm, VmError, VmResult, WellKnownAtom,
+    builtin_metadata, errors,
 };
 use lyng_objects::NoopAdaptiveProtoLoadDispatch;
 

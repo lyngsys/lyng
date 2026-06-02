@@ -8,3 +8,6 @@ lyng-common = { workspace = true }
 lyng-lexer = { workspace = true }
 lyng-ast = { workspace = true }
 unicode-id-start = { workspace = true }
+
+[lints]
+workspace = true

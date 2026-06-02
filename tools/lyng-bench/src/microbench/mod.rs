@@ -19,7 +19,7 @@ use lyng_vm::{Vm, VmError};
 
 mod snippets;
 mod timing;
-pub use snippets::{all_snippets, for_opcode, Snippet};
+pub use snippets::{Snippet, all_snippets, for_opcode};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MicrobenchOptions {
@@ -291,7 +291,7 @@ fn parse_args(args: &[String]) -> Result<MicrobenchOptions, String> {
                 return Err(format!(
                     "microbench: unknown arg {other}\n\n{}",
                     help_text()
-                ))
+                ));
             }
         }
     }

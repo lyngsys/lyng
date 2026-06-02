@@ -25,7 +25,7 @@ pub const LLINT_IC_MODE_NAMED_OWN_INLINE_WRITE: u8 = 5;
 /// Asm IC mode: global cell load. `handler_bits` = the `PrimitiveValueCellRef`
 /// raw u32; `generation` = the global-IC generation captured at install. The asm
 /// hit loads the cell value when `generation` matches the live Vm mirror. Mode 6
-/// is reserved for a future GlobalCellConstant (constant-fold) mode.
+/// is reserved for a future `GlobalCellConstant` (constant-fold) mode.
 pub const LLINT_IC_MODE_GLOBAL_CELL_LOAD: u8 = 7;
 
 pub const PROPERTY_METADATA_STRIDE: usize = std::mem::size_of::<PropertyMetadata>();

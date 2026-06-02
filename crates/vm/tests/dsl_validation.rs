@@ -1,10 +1,7 @@
-//! Consolidated DSL-0b/0c validation test binary.
+//! Consolidated DSL validation test binary.
 //!
-//! Each submodule below corresponds to one of the original
-//! `dsl_validation_<case>.rs` integration test files. They are grouped
-//! into a single binary to amortize cargo's per-binary link cost across
-//! the 10 cases (the suite as a whole runs in milliseconds; the wall-time
-//! cost was almost entirely cargo overhead).
+//! Each submodule corresponds to one validation case; grouped into a single
+//! binary to amortize cargo's per-binary link cost.
 
 #[path = "dsl_validation/empty.rs"]
 mod empty;

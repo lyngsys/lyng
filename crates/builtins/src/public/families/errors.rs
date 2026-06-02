@@ -3,19 +3,19 @@ use super::descriptors::{
     writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, install_public_builtin_function_with_function_prototype,
     ErrorFamilyBuiltins, ErrorFamilyPrototypes, FamilyInstallContext,
+    install_public_builtin_function, install_public_builtin_function_with_function_prototype,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    aggregate_error_builtin, error_builtin, error_is_error_builtin, error_to_string_builtin,
-    eval_error_builtin, range_error_builtin, reference_error_builtin, suppressed_error_builtin,
-    syntax_error_builtin, type_error_builtin, uri_error_builtin, BuiltinFunctionId, ObjectRef,
-    RealmRef, Value,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, aggregate_error_builtin, error_builtin,
+    error_is_error_builtin, error_to_string_builtin, eval_error_builtin, range_error_builtin,
+    reference_error_builtin, suppressed_error_builtin, syntax_error_builtin, type_error_builtin,
+    uri_error_builtin,
 };
 
 pub(in crate::public) fn install_error_family(

@@ -2,15 +2,15 @@ use std::fmt::Write as _;
 use std::fs;
 use std::hint::black_box;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use lyng_test262::{
-    prepare_diagnostic_suite, Test262DiagnosticConfig, Test262DiagnosticOutcome,
-    Test262DiagnosticProposalStage, Test262DiagnosticSuite,
+    Test262DiagnosticConfig, Test262DiagnosticOutcome, Test262DiagnosticProposalStage,
+    Test262DiagnosticSuite, prepare_diagnostic_suite,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 pub const DEFAULT_REPORT_PATH: &str = "reports/lyng/test262-perf.md";
 pub const DEFAULT_JSON_PATH: &str = "reports/lyng/test262-perf.json";
@@ -417,20 +417,22 @@ fn run_scan(
 
     std::thread::scope(|scope| {
         for _ in 0..job_count {
-            scope.spawn(|| loop {
-                let index = next_index.fetch_add(1, Ordering::Relaxed);
-                if index >= suite.tests().len() {
-                    break;
-                }
-                match suite.run_diagnostic(index) {
-                    Ok(outcome) => match outcomes.lock() {
-                        Ok(mut outcomes) => outcomes.push(outcome),
-                        Err(poisoned) => poisoned.into_inner().push(outcome),
-                    },
-                    Err(error) => match errors.lock() {
-                        Ok(mut errors) => errors.push(error),
-                        Err(poisoned) => poisoned.into_inner().push(error),
-                    },
+            scope.spawn(|| {
+                loop {
+                    let index = next_index.fetch_add(1, Ordering::Relaxed);
+                    if index >= suite.tests().len() {
+                        break;
+                    }
+                    match suite.run_diagnostic(index) {
+                        Ok(outcome) => match outcomes.lock() {
+                            Ok(mut outcomes) => outcomes.push(outcome),
+                            Err(poisoned) => poisoned.into_inner().push(outcome),
+                        },
+                        Err(error) => match errors.lock() {
+                            Ok(mut errors) => errors.push(error),
+                            Err(poisoned) => poisoned.into_inner().push(error),
+                        },
+                    }
                 }
             });
         }

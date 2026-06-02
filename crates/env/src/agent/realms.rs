@@ -1,7 +1,7 @@
 use super::Agent;
 use crate::{
-    realm_index, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutKind, Intrinsics,
-    RealmBootstrapState, RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord,
+    AllocationLifetime, EnvironmentLayout, EnvironmentLayoutKind, Intrinsics, RealmBootstrapState,
+    RealmMetadata, RealmRecord, RegExpLegacyStaticState, RuntimeRealmRecord, realm_index,
 };
 use lyng_objects::{NoopAdaptiveProtoLoadDispatch, ObjectAllocation};
 use lyng_types::{EnvironmentRef, ObjectRef, RealmRef, ShapeId};

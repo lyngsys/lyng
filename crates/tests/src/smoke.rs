@@ -9,7 +9,7 @@ use lyng_lexer::Token;
 use lyng_parser::parse_script;
 use lyng_sema::analyze_script;
 
-/// Phase 1 exit gate: 100k lines, under 5s, no token vector.
+/// 100k lines must parse + analyze in under 5s.
 #[test]
 #[ignore = "Slow (~0.6s+). Run with: cargo test -p lyng-tests -- --ignored"]
 fn large_script_100k_lines_under_5s() {

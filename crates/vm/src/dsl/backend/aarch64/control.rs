@@ -94,19 +94,16 @@ macro_rules! dispatch {
 /// expands one match arm per arity, hardcoding `w1..w5` so the
 /// per-operand mov has the correct destination register.
 ///
-/// ## Opcode-byte injection (DSL-1 Phase 1.B.0 Task 5)
+/// ## Opcode-byte injection
 ///
-/// The lowerer rewrites every `call_slow!(...)` body invocation to
-/// append `, opcode_byte = <N>` — the handler's own opcode discriminant
-/// from its `llint_handler!` signature. The macro emits
-/// `inc_slow_semantic_counter!(N)` before the rest of the bridge,
-/// bumping the slow-semantic bank slot for this opcode whenever the
-/// inline hit path falls through (or always, for cold-stub-only opcodes).
+/// The lowerer appends `, opcode_byte = <N>` to every `call_slow!(...)`
+/// invocation. The macro emits `inc_slow_semantic_counter!(N)` before
+/// the bridge, bumping the slow-semantic bank slot for this opcode.
 ///
 /// Each arity has two match arms:
 /// - With `opcode_byte = N` (preferred — emitted by the lowerer).
-/// - Without `opcode_byte` (fallback — only fires if a hand-written
-///   call site bypasses the lowerer; emits no counter inc).
+/// - Without `opcode_byte` (fallback for hand-written call sites; emits
+///   no counter inc).
 ///
 /// Bindings: `<shim>` (per call site), `{state_pb}`, `{state_pc}`,
 /// `{vm_counter_base}` (when `diagnostic-counters` feature is on).
@@ -426,15 +423,11 @@ macro_rules! dispatch_after_slow {
             // Common case first: tag == Continue (0).
             "cbnz   x0, 1f\n", // → "unusual" handling
             // Continue path: PC = pb_base + new_offset (low 32 of x1).
-            // Also reload REGS / MT from state — a nested call in the
-            // slow path (e.g. ToPrimitive invoking valueOf bytecode)
-            // can resize `Vm::register_stack`, leaving the asm-side
-            // REGS pin (`x20`) pointing into freed storage even when
-            // frame depth is unchanged. The Rust-side
-            // `translate_outcome` Continue arm refreshes
-            // `state.frame_regs_base` / `state.frame_metadata_table_base`
-            // from the live VM on every Continue egress; we reload x20 / x21
-            // here so the next handler sees the up-to-date pins.
+            // Reload REGS / MT from state: translate_outcome re-derives the
+            // per-frame REGS offset on every Continue egress and refreshes
+            // state.frame_regs_base / state.frame_metadata_table_base from
+            // the live VM; we reload x20 / x21 here so the next handler
+            // sees the up-to-date pins.
             "ldr    x16, [x24, {state_pb}]\n",
             "add    x19, x16, x1\n",
             "ldr    x20, [x24, {state_regs}]\n",
@@ -655,15 +648,9 @@ macro_rules! label {
 
 /// Compare two registers and branch to `$label` if equal.
 ///
-/// Two instructions: `cmp x{a}, x{b}; b.eq {label}`. The label is
-/// substituted by the lowerer (DSL `.slow` → `<handler_name>slow`),
-/// matching the existing `.slow:` body-label convention used by hot
-/// handlers like `op_add` (see `crates/vm/src/dsl/handlers/hot.rs`).
-///
-/// Used by Phase 1.B.2's `op_load_this` inline port to bail to the
-/// slow path when `frame_this_value` holds the
-/// `Value::uninitialized_lexical()` sentinel (i.e., `ThisState` was
-/// `Uninitialized` or `Lexical` at trampoline entry).
+/// Two instructions: `cmp x{a}, x{b}; b.eq {label}`. Used to bail to
+/// the slow path when `frame_this_value` holds the
+/// `Value::uninitialized_lexical()` sentinel.
 #[macro_export]
 macro_rules! cmp_branch_eq {
     ($a:tt, $b:tt, $label:tt) => {
@@ -730,11 +717,9 @@ macro_rules! cmp_eq_payload {
 /// `$kind` is the prefix discriminator (1 for `wide`, 2 for
 /// `extra_wide`) — a literal u8.
 ///
-/// **TODO (Batch 7+):** `Ldouble_prefix` currently hits `brk #0` because
-/// `op_double_prefix_slow_rs` doesn't exist yet. When the `op_wide` /
-/// `op_extra_wide` ports land, replace the `brk #0` with a
-/// `call_slow!(op_double_prefix_slow_rs, args = [])` + a proper exit
-/// path.
+/// **TODO:** `Ldouble_prefix` currently hits `brk #0` because
+/// `op_double_prefix_slow_rs` doesn't exist yet. Replace with
+/// `call_slow!(op_double_prefix_slow_rs, args = [])` + a proper exit path.
 ///
 /// Bindings: `{state_prefix}`.
 #[macro_export]
@@ -755,7 +740,7 @@ macro_rules! dispatch_prefixed {
             "ldr    x17, [x23, x8, lsl #3]\n",
             "br     x17\n",
             "1:\n", // double-prefix:
-            // TODO: call op_double_prefix_slow_rs once Batch 7 lands.
+            // TODO: replace with call_slow!(op_double_prefix_slow_rs, args = []).
             "brk    #0\n",
         )
     };

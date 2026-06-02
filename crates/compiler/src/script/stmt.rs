@@ -1,13 +1,12 @@
 use super::{
-    add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin, checked_u32_index,
-    create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
-    dispose_scope_async_builtin, dispose_scope_builtin, internal_private_field_set_builtin,
     AssignOp, AtomId, CompletionKind, ControlTargetKind, Decl, DeclId, DeclarationKind,
     DirectEvalLexicalScope, ExceptionHandler, ExceptionHandlerKind, Expr, ExprId, ForInOfLeft,
     ForInit, FunctionCompiler, FunctionId, FunctionKind, LoweringError, LoweringResult, Opcode,
     Pattern, PreparedReferenceTarget, ReferenceUsage, ResolutionKind, SafepointKind, ScopeId,
     ScopeKind, SemanticBindingId, Span, Stmt, StmtId, StorageClass, SwitchCase, VariableKind,
-    WellKnownAtom,
+    WellKnownAtom, add_async_disposable_resource_builtin, add_sync_disposable_resource_builtin,
+    checked_u32_index, create_async_disposal_scope_builtin, create_sync_disposal_scope_builtin,
+    dispose_scope_async_builtin, dispose_scope_builtin, internal_private_field_set_builtin,
 };
 use lyng_bytecode::DirectEvalSiteFlags;
 

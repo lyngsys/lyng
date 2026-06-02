@@ -1,12 +1,12 @@
 use super::super::{
-    code_unit_range_value, create_array_from_values, map_completion, string_ref_code_units,
-    string_value, to_length_for_builtin, to_string_string_ref, to_uint32_for_builtin, type_error,
-    usize_index_value, with_string_ref_code_units, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, code_unit_range_value, create_array_from_values, map_completion,
+    string_ref_code_units, string_value, to_length_for_builtin, to_string_string_ref,
+    to_uint32_for_builtin, type_error, usize_index_value, with_string_ref_code_units,
 };
 use super::{
-    advance_string_index, regexp_exec, regexp_exec_result, regexp_match_all_with_string,
-    regexp_replace_with_string, regexp_result_capture_count, regexp_species_constructor,
-    set_property_on_object_or_throw, RegExpExecResult,
+    RegExpExecResult, advance_string_index, regexp_exec, regexp_exec_result,
+    regexp_match_all_with_string, regexp_replace_with_string, regexp_result_capture_count,
+    regexp_species_constructor, set_property_on_object_or_throw,
 };
 use crate::BuiltinInvocation;
 use lyng_ops::read;

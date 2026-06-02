@@ -4,14 +4,6 @@
 //! a stack-local [`LlIntState`], then jumps into the asm trampoline.
 //! The trampoline runs the DSL handler chain until a cold stub writes
 //! `rust_ctx.exit` and the chain unwinds back to [`_interpreter_exit`].
-//!
-//! DSL-0c (Task C1) replaces the DSL-0b `naked_asm!("ret")` stub with a
-//! real trampoline body: save callee-saved registers, load the pinned
-//! registers from `state` + the trailing args, and tail-jump to the
-//! first handler. `_interpreter_exit` is the symmetric epilogue: when
-//! a slow-path shim returns `SlowPathTag::Exit` and the backend's
-//! `dispatch_after_slow!` does `b {exit}`, we land here, restore the
-//! saved callee-saved regs, and return to `run_via_dsl`.
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -25,7 +17,7 @@ use lyng_host::HostHooks;
 use lyng_objects::NativeFunctionRegistry;
 use lyng_types::Value;
 
-use crate::dsl::handlers::{DslHandler, DSL_DISPATCH_TABLE};
+use crate::dsl::handlers::{DSL_DISPATCH_TABLE, DslHandler};
 use crate::dsl::llint_state::{
     ExitKind, LlIntExitSlot, LlIntRustContext, LlIntRustContextOpaque, LlIntState,
 };
@@ -33,13 +25,10 @@ use crate::error::{VmError, VmResult};
 use crate::vm::install::InstalledFunction;
 use crate::{FrameRecord, Vm};
 
-/// New entry point used after DSL-0c flips dispatch.
-///
-/// Sets up an [`LlIntState`] and an [`LlIntRustContext`] capturing the
-/// current frame's PC / register window / feedback vector base, then
-/// hands control to the asm trampoline. The trampoline runs the
-/// dispatch chain until a slow-path shim sets `rust_ctx.exit` and the
-/// chain unwinds back to [`_interpreter_exit`].
+/// Sets up an [`LlIntState`] and an [`LlIntRustContext`] for the current
+/// frame, then hands control to the asm trampoline. The trampoline runs
+/// the dispatch chain until a slow-path shim sets `rust_ctx.exit` and
+/// the chain unwinds back to [`_interpreter_exit`].
 pub(crate) fn run_via_dsl(
     vm: &mut Vm,
     agent: &mut Agent,
@@ -59,34 +48,23 @@ pub(crate) fn run_via_dsl(
             .map_or(std::ptr::null_mut(), |t| t.buffer_ptr().cast_mut())
     };
 
-    // DSL-0c: REGS pin must point at the active frame's register
-    // window base. Handler bodies (e.g. `op_move`, `op_add`) load
-    // through `[x20, x_idx, lsl #3]` where `x_idx` is a validated
-    // bytecode register index; the trampoline never dereferences past
-    // `register_stack[base + window.len()]`. Computed BEFORE we move
-    // `vm` into `rust_ctx` because the `&mut Vm` is consumed by the
-    // borrow; `as_mut_ptr().add(base)` is well-defined even when
-    // base == register_stack.len() (one-past-the-end is valid to
-    // compute, just not to deref — which the handlers don't do for
-    // out-of-window indices).
+    // REGS pin: active frame's register window base. Handlers load
+    // through `[x20, x_idx, lsl #3]`; the trampoline never dereferences
+    // past the window. Computed before `vm` is moved into `rust_ctx`
+    // since `base_mut_ptr().add(base)` is well-defined at
+    // one-past-the-end.
     let regs_base = {
         let base = frame.registers().base() as usize;
-        // SAFETY: `register_stack` is grown to cover the active
-        // frame's window before run_via_dsl is invoked (window
+        // SAFETY: the never-realloc arena is reserved to cover the
+        // active frame's window before run_via_dsl is invoked (window
         // reservation happens at install / call entry). `add(base)`
         // is in-range (or one-past-the-end, which is well-defined).
         unsafe { vm.register_stack_storage_mut_ptr().add(base) }
     };
 
-    // Phase 1.B.1: derive `frame_const_base` from the pre-resolved
-    // constants array. Reuses the existing arena slot owned by
-    // `RuntimeCodeRecord::constants` (populated at install time by
-    // `Vm::install_constants`). Pointer is stable for the lifetime
-    // of the code record; refreshed on every Refresh egress.
-    // See spec §3.4.
-    //
-    // The chain mirrors `Vm::read_constant` in
-    // crates/vm/src/vm/values.rs:795-806.
+    // `frame_const_base`: pointer into the code record's pre-resolved
+    // constants array. Stable for the lifetime of the code record;
+    // refreshed on every Refresh egress (spec §3.4).
     let const_base: *const Value = agent
         .heap()
         .view()
@@ -95,26 +73,20 @@ pub(crate) fn run_via_dsl(
         .and_then(|slots| agent.heap().view().code_slots(slots))
         .map_or(std::ptr::null(), <[lyng_types::Value]>::as_ptr);
 
-    // Phase 1.B.1: derive `frame_this_value`. Pre-resolves the
-    // active execution context's ThisState into either the real
-    // Value or Value::uninitialized_lexical() sentinel.
-    // See spec §3.3.
+    // `frame_this_value`: ThisState pre-resolved to a Value or
+    // uninitialized_lexical() sentinel (spec §3.3).
     let this_value: Value = crate::dsl::llint_state::resolve_initial_this_value(&frame);
     let object_records_base = agent.heap().view().object_record_ptr_table();
     let object_slots_base = agent.heap().view().object_slots_ptr_table();
-    // Task 7: value-cell pointer table base for the asm mode-7
-    // GlobalCellLoad hit (Task 8). Mirrors the object-table bases above.
+    // Value-cell pointer table base for the asm mode-7 GlobalCellLoad hit.
     let value_cells_base = agent.heap().view().value_cell_ptr_table_base();
 
     let vm_ptr: *mut Vm = vm as *mut Vm;
     let frame_check_epoch = vm.dispatch_frame_check_epoch_for_dsl();
 
-    // Build a DispatchState directly so the asm-path slow-path bridge
-    // can call `LlIntDispatchState::dispatch_state()` and get the same
-    // shape the α handlers use. Semantic bodies under
-    // `crate::vm::semantics::` all consume `DispatchState`; threading
-    // it through both dispatch paths keeps the single-implementation
-    // invariant.
+    // DispatchState is consumed by semantic bodies in
+    // `crate::vm::semantics::`, keeping a single implementation across
+    // both dispatch paths.
     let dispatch = crate::vm::dispatch_state::DispatchState::new_for_dsl_entry(
         vm,
         agent,
@@ -138,8 +110,7 @@ pub(crate) fn run_via_dsl(
         frame_metadata_table_base: mt_base,
         object_records_base,
         object_slots_base,
-        // Phase 1.B.1 Task 3: real values derived above before the
-        // installed/frame move into DispatchState.
+        // Derived above, before installed/frame move into DispatchState.
         frame_const_base: const_base,
         frame_this_value: this_value,
         frame_depth: frame_depth as u32,
@@ -205,7 +176,7 @@ pub(crate) fn run_via_dsl(
 /// |---|---|---|
 /// | PC | x19 | `pb_base + pc_offset` (live byte in bytecode) |
 /// | REGS | x20 | `*mut Value` (register-file base) |
-/// | MT | x21 | `*mut u8` (`MetadataTable` buffer base; Phase C.4) |
+/// | MT | x21 | `*mut u8` (`MetadataTable` buffer base) |
 /// | VM | x22 | `*mut Vm` |
 /// | TABLE | x23 | `*const DslHandler` |
 /// | STATE | x24 | `*mut LlIntState` |

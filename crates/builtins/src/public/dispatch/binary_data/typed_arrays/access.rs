@@ -6,8 +6,9 @@ use super::super::super::{
     uint8_array_values_builtin,
 };
 use super::super::{
-    iterators, length_value_u64, normalize_relative_index_u64, property_key_from_text, range_error,
-    string_value, to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, iterators, length_value_u64, normalize_relative_index_u64,
+    property_key_from_text, range_error, string_value, to_integer_or_infinity_for_builtin,
+    type_error,
 };
 use super::{
     typed_array_is_out_of_bounds, typed_array_read_element_value, typed_array_read_storage_bits,

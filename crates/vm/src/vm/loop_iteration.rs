@@ -1,18 +1,19 @@
 use super::{
     Agent, AllocationLifetime, EnvironmentLayout, EnvironmentLayoutId, EnvironmentLayoutKind,
-    EnvironmentRef, FrameRecord, LoopIterationEnvironment, Value, Vm, VmError, VmResult,
+    EnvironmentRef, LoopIterationEnvironment, Value, Vm, VmError, VmResult,
 };
+use crate::frame::FrameView;
 use lyng_bytecode::{CaptureDescriptor, CaptureSource};
 
 impl Vm {
     pub(in crate::vm) fn push_loop_iteration_environment(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         site: Option<lyng_bytecode::LoopIterationEnvironmentSite>,
         mirrored_slot: Option<u32>,
     ) -> VmResult<()> {
-        let source_environment = frame.lexical_env();
+        let source_environment = self.frame_header(frame.cfr()).lexical_env();
         let (iteration_slots, shared_slots, detached_slots) = site.map_or_else(
             || (mirrored_slot.into_iter().collect(), Vec::new(), Vec::new()),
             |site| {
@@ -35,7 +36,7 @@ impl Vm {
         let iteration_environment =
             self.create_loop_iteration_environment(agent, source_environment, &iteration_slots)?;
         self.loop_iteration_envs.push(LoopIterationEnvironment {
-            frame_depth: self.frames.len(),
+            frame_depth: self.frame_depth(),
             source_environment,
             iteration_environment,
             iteration_slots,
@@ -48,7 +49,7 @@ impl Vm {
 
     pub(in crate::vm) fn pop_loop_iteration_environment(&mut self) {
         if let Some(index) = self.loop_iteration_envs.iter().rposition(|environment| {
-            environment.active && environment.frame_depth == self.frames.len()
+            environment.active && environment.frame_depth == self.frame_depth()
         }) {
             if self.loop_iteration_envs[index].shared_slots.is_empty() {
                 let _ = self.loop_iteration_envs.remove(index);
@@ -424,7 +425,7 @@ impl Vm {
             .rev()
             .find(|record| {
                 record.active
-                    && record.frame_depth == self.frames.len()
+                    && record.frame_depth == self.frame_depth()
                     && record.source_environment == environment
             })
             .map(|record| record.iteration_environment)
@@ -438,7 +439,7 @@ impl Vm {
             .loop_iteration_envs
             .iter()
             .rev()
-            .find(|record| record.active && record.frame_depth == self.frames.len())?;
+            .find(|record| record.active && record.frame_depth == self.frame_depth())?;
         let uses_loop_environment = captures.iter().any(|capture| match capture.source() {
             CaptureSource::EnvironmentSlot { slot, .. } => {
                 let slot = u32::from(slot);
@@ -466,7 +467,7 @@ impl Vm {
             .rev()
             .find(|record| {
                 record.active
-                    && record.frame_depth == self.frames.len()
+                    && record.frame_depth == self.frame_depth()
                     && record.source_environment == environment
                     && (record.iteration_slots.contains(&slot)
                         || record.shared_slots.contains(&slot))

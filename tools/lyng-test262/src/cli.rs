@@ -176,8 +176,8 @@ mod tests {
     use crate::selection::ProposalStage;
 
     use super::{
-        parse_args_from, parse_proposal_stage_arg, RunnerConfig, DEFAULT_MANIFEST_PATH,
-        DEFAULT_TIMEOUT_MS, WORKER_FLAG,
+        DEFAULT_MANIFEST_PATH, DEFAULT_TIMEOUT_MS, RunnerConfig, WORKER_FLAG, parse_args_from,
+        parse_proposal_stage_arg,
     };
 
     #[test]

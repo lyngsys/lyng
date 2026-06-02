@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     async_disposable_stack_builtin => super::super::ASYNC_DISPOSABLE_STACK_RAW;

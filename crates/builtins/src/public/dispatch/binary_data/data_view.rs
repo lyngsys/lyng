@@ -1,7 +1,7 @@
 use super::{
-    length_value_u64, range_error, to_bigint_for_builtin, to_boolean_for_builtin,
-    to_index_for_builtin, to_number_for_builtin, to_uint32_for_builtin, to_uint8_for_builtin,
-    type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, length_value_u64, range_error, to_bigint_for_builtin,
+    to_boolean_for_builtin, to_index_for_builtin, to_number_for_builtin, to_uint8_for_builtin,
+    to_uint32_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_env::Agent;
@@ -1225,11 +1225,7 @@ const fn round_shift_signif(signif: u64, shift: u32) -> u64 {
         return high + 1;
     }
     // Exactly half: ties-to-even.
-    if (high & 1) == 1 {
-        high + 1
-    } else {
-        high
-    }
+    if (high & 1) == 1 { high + 1 } else { high }
 }
 
 fn data_view_get_float16_builtin<Cx: PublicBuiltinDispatchContext>(

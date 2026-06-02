@@ -1,4 +1,4 @@
-use super::super::{string_ref_code_units, string_value, type_error, PublicBuiltinDispatchContext};
+use super::super::{PublicBuiltinDispatchContext, string_ref_code_units, string_value, type_error};
 use crate::BuiltinInvocation;
 use lyng_types::Value;
 use std::fmt::Write as _;

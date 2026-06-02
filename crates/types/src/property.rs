@@ -285,11 +285,7 @@ impl PropertyDescriptor {
 
     #[inline]
     pub const fn getter(self) -> Option<Value> {
-        if self.has_get() {
-            Some(self.get)
-        } else {
-            None
-        }
+        if self.has_get() { Some(self.get) } else { None }
     }
 
     #[inline]
@@ -299,11 +295,7 @@ impl PropertyDescriptor {
 
     #[inline]
     pub const fn setter(self) -> Option<Value> {
-        if self.has_set() {
-            Some(self.set)
-        } else {
-            None
-        }
+        if self.has_set() { Some(self.set) } else { None }
     }
 
     #[inline]

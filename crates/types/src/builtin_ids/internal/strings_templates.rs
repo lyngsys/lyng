@@ -1,4 +1,4 @@
-use super::super::{builtin_id, BuiltinFunctionId};
+use super::super::{BuiltinFunctionId, builtin_id};
 
 builtin_id_accessors! {
     internal_string_replace_builtin => super::super::INTERNAL_STRING_REPLACE_RAW;

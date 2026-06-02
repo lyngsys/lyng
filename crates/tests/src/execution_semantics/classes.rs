@@ -2211,13 +2211,9 @@ fn phase6_default_derived_constructors_do_not_iterate_rest_arguments_for_super()
     assert_eq!(result, Value::from_smi(5));
 }
 
-// Behavior regression guards for the construct fast-path `.prototype`
-// invalidation (Task 3, eager-clear model). These pass via the slow path today
-// and MUST keep passing after Task 7 wires the construct fast path: they prove
-// each `.prototype` write path produces the correct prototype for subsequent
-// `new`. Each script does few writes and stays below the IC warmup threshold,
-// so the assignment runs through the real slow store (which fires the
-// construct watchpoint at the VM dispatch site).
+// Regression guards: each `.prototype` write path must produce the correct
+// prototype for subsequent `new`. Scripts stay below the IC warmup threshold
+// so assignments run through the slow store (firing the construct watchpoint).
 
 #[test]
 fn reassigning_function_prototype_observed_by_construct() {
@@ -2261,8 +2257,6 @@ fn reflect_set_on_function_prototype_observed_by_construct() {
     );
     assert_eq!(r, "via-reflect,false");
 }
-
-// ── Construct fast path (Task 7) ─────────────────────────────────────────────
 
 #[test]
 fn construct_fast_path_produces_correct_instances() {

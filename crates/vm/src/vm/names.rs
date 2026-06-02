@@ -1,7 +1,10 @@
+#[cfg(test)]
+use super::FrameRecord;
 use super::{
-    ActiveEnvScopeRange, Agent, AtomId, CodeRef, EnvironmentRef, FrameRecord, ObjectRef, Value, Vm,
-    VmError, VmResult, WellKnownSymbolId,
+    ActiveEnvScopeRange, Agent, AtomId, CodeRef, EnvironmentRef, ObjectRef, Value, Vm, VmError,
+    VmResult, WellKnownSymbolId,
 };
+use crate::frame::FrameView;
 use crate::name_refs::{CapturedNameReference, CapturedNameTarget};
 #[cfg(test)]
 use crate::vm::call::RejectingNativeRegistry;
@@ -45,7 +48,7 @@ impl Vm {
     }
 
     fn active_env_scope_contains(&self, environment: EnvironmentRef, slot: u32) -> bool {
-        let frame_depth = self.frames.len();
+        let frame_depth = self.frame_depth();
         if self
             .active_env_scopes
             .iter()
@@ -73,14 +76,18 @@ impl Vm {
     pub(in crate::vm) fn enter_env_scope(
         &mut self,
         agent: &Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         base: u16,
         count: u32,
     ) -> VmResult<()> {
-        let environment =
-            self.environment_for_slot_access(agent, frame.lexical_env(), 0, u32::from(base))?;
+        let environment = self.environment_for_slot_access(
+            agent,
+            self.frame_header(frame.cfr()).lexical_env(),
+            0,
+            u32::from(base),
+        )?;
         self.active_env_scopes.push(ActiveEnvScopeRange::new(
-            self.frames.len(),
+            self.frame_depth(),
             environment,
             u32::from(base),
             count,
@@ -88,15 +95,16 @@ impl Vm {
         Ok(())
     }
 
-    pub(in crate::vm) fn leave_env_scope(&mut self, frame: &FrameRecord, base: u16, count: u32) {
+    pub(in crate::vm) fn leave_env_scope(&mut self, frame: FrameView, base: u16, count: u32) {
         let start = u32::from(base);
         let end = start.saturating_add(count);
-        let frame_depth = self.frames.len();
+        let frame_depth = self.frame_depth();
+        let frame_lexical_env = self.frame_header(frame.cfr()).lexical_env();
         if let Some(index) = self.active_env_scopes.iter().rposition(|range| {
             range.frame_depth == frame_depth
                 && range.start == start
                 && range.end == end
-                && range.environment == frame.lexical_env()
+                && range.environment == frame_lexical_env
         }) {
             let _ = self.active_env_scopes.remove(index);
         }
@@ -136,20 +144,27 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         record: ObjectEnvironmentRecord,
         name: AtomId,
     ) -> VmResult<bool> {
         let key = PropertyKey::from_atom(name);
         let binding_object = record.binding_object();
         let receiver = Value::from_object_ref(binding_object);
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let found = {
             let mut bridge = VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -168,7 +183,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             binding_object,
             receiver,
             PropertyKey::from_symbol(unscopables_symbol),
@@ -180,7 +198,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             unscopables_object,
             Value::from_object_ref(unscopables_object),
             key,
@@ -197,20 +218,27 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         record: ObjectEnvironmentRecord,
         name: AtomId,
         strict: bool,
     ) -> VmResult<Value> {
         let key = PropertyKey::from_atom(name);
         let binding_object = record.binding_object();
+        let caller_realm_x = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env_x = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code_x = frame.code();
+        let caller_pc_x = frame.instruction_offset();
         let still_exists = {
             let mut bridge = VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm: caller_realm_x,
+                caller_lexical_env: caller_lexical_env_x,
+                caller_code: caller_code_x,
+                caller_pc: caller_pc_x,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -224,7 +252,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             binding_object,
             Value::from_object_ref(binding_object),
             key,
@@ -240,7 +271,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         record: ObjectEnvironmentRecord,
         name: AtomId,
         value: Value,
@@ -248,13 +279,20 @@ impl Vm {
     ) -> VmResult<()> {
         let key = PropertyKey::from_atom(name);
         let binding_object = record.binding_object();
+        let caller_realm_x = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env_x = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code_x = frame.code();
+        let caller_pc_x = frame.instruction_offset();
         let still_exists = {
             let mut bridge = VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm: caller_realm_x,
+                caller_lexical_env: caller_lexical_env_x,
+                caller_code: caller_code_x,
+                caller_pc: caller_pc_x,
             };
             object::has_property_in_context(&mut bridge, binding_object, key)?
         };
@@ -266,7 +304,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             binding_object,
             Value::from_object_ref(binding_object),
             key,
@@ -283,16 +324,23 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         record: ObjectEnvironmentRecord,
         name: AtomId,
     ) -> VmResult<bool> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let mut bridge = VmProxyBridge {
             vm: self,
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
         };
         proxy::delete_property(
             &mut bridge,
@@ -310,7 +358,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         start: EnvironmentRef,
         name: AtomId,
         strict: bool,
@@ -417,7 +465,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<CapturedNameTarget> {
@@ -510,7 +558,8 @@ impl Vm {
                 }
             }
         }
-        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        let global =
+            Self::find_global_environment(agent, self.frame_header(frame.cfr()).variable_env())?;
         Ok(CapturedNameTarget::Unresolvable {
             global_environment: global.id(),
         })
@@ -525,20 +574,20 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
         code: CodeRef,
         feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<Value> {
-        let global = Self::find_global_environment_ref(agent, frame.variable_env())?;
+        let global = Self::find_global_environment_ref(
+            agent,
+            self.frame_header(frame.cfr()).variable_env(),
+        )?;
 
-        // Phase 3 global cell IC FAST PATH. If this site previously resolved a
-        // global and the coarse `global_structure_generation` is unchanged, read
-        // the cached cell/slot directly — no name hashing, no descriptor build,
-        // O(1) and independent of dictionary size. The generation check happens
-        // BEFORE any cell deref, so a structural change (delete / data<->accessor
-        // redefine / new shadowing lexical) that bumped the generation forces
-        // re-resolution and never dereferences a freed cell.
+        // Global cell IC direct path: if the `global_structure_generation` is
+        // unchanged, read the cached cell/slot directly. The generation check
+        // precedes any cell deref so structural changes (delete/redefine/new
+        // shadowing lexical) force re-resolution rather than stale deref.
         if let Some(slot) = feedback_slot
             && let Some(ic) = self.global_cell_ic_state(code, slot)
             && ic.structure_gen == agent.global_structure_generation(global)
@@ -558,8 +607,7 @@ impl Vm {
         }
 
         if let Some(binding) = Self::lookup_global_lexical_binding_ref(agent, global, name) {
-            // COLD/miss install: a global lexical binding resolves to an
-            // environment slot, read live (with TDZ) on subsequent hits.
+            // Miss: install env-slot IC so subsequent hits read live (with TDZ).
             if let Some(slot) = feedback_slot {
                 let current_gen = agent.global_structure_generation(global);
                 self.install_global_cell_ic(
@@ -578,29 +626,23 @@ impl Vm {
             .global_environment_object(global)
             .ok_or(VmError::MissingEnvironment(global))?;
 
-        // COLD/miss install for a cell-backed global-object data entry. Capture
-        // the cell now so subsequent hits read it live via `stored_value()`.
+        // Miss: install cell IC so subsequent hits read live via `stored_value()`.
         // Defer the mode-7 metadata projection until after the named-property
-        // slow-path observation below (which projects mode 1-4/0 into the SAME
-        // slot); the Cell projection must have the final say so the asm hit
-        // sees mode 7. ONLY for the Cell target — EnvSlot resolutions never set
-        // mode 7, so the asm bails to the cold path.
+        // slow-path observation (which may write modes 1-4/0 into the same slot);
+        // the Cell projection must win so asm sees mode 7.
+        // Invariant: `plan_named_property_cache_entry` returns `None` for
+        // dictionary receivers, so no named handler exists for a cell-backed global
+        // and the early-return paths below can never fire while `resolved_cell.is_some()`.
+        #[allow(
+            clippy::useless_let_if_seq,
+            reason = "the if-block has side effects (install_global_cell_ic + debug_assert); collapsing to an expression is less clear"
+        )]
         let mut resolved_cell: Option<(FeedbackSlotId, PrimitiveValueCellRef, u32)> = None;
         if let Some(slot) = feedback_slot
             && let Some(cell) = agent.cell_backed_entry(global_object, PropertyKey::from_atom(name))
         {
             let current_gen = agent.global_structure_generation(global);
             self.install_global_cell_ic(code, slot, GlobalCellTarget::Cell(cell), current_gen);
-            // Load-bearing invariant: the deferred mode-7 projection below is
-            // only reached because none of the named-property hit paths
-            // (own-data / polymorphic / proto-data / chain, lines below) can
-            // fire for a cell-backed (dictionary) global —
-            // `plan_named_property_cache_entry` returns `None` for dictionary
-            // receivers, so no named handler is ever installed for a global
-            // site. If a named hit DID fire while `resolved_cell.is_some()` it
-            // would early-return before the projection, leaving the cell IC
-            // installed but the metadata stuck on a named mode (asm would never
-            // hit mode 7). Assert no named own-data handler exists for this site.
             debug_assert!(
                 self.named_property_own_data_handler(code, feedback_slot)
                     .is_none(),
@@ -609,10 +651,7 @@ impl Vm {
             );
             resolved_cell = Some((slot, cell, current_gen));
         }
-        // Phase 3c inline IC cache hit path (mirrors Phase 3a's load-side inlining):
-        // packed-handler load, shape compare, epoch compare, slot read. Bypasses
-        // the 4-deep IC chain on the monomorphic OwnData hit. Polymorphic /
-        // PrototypeData / megamorphic still fall through to the chain below.
+        // Monomorphic OwnData IC hit: shape compare + slot read.
         if let Some(handler) = self.named_property_own_data_handler(code, feedback_slot) {
             let view = agent.heap().view();
             if let Some(record) = view.object_ref(global_object)
@@ -633,9 +672,7 @@ impl Vm {
                 }
             }
         }
-        // Phase 3f polymorphic OwnData cache hit path on the global object.
-        // Same packed-handler walk as the named-property load above, just
-        // applied to the global object's IC site.
+        // Polymorphic OwnData IC hit on the global object.
         if let Some(value) = self.try_named_property_polymorphic_own_data_load(
             agent,
             code,
@@ -644,10 +681,7 @@ impl Vm {
         ) {
             return Ok(value);
         }
-        // Phase 3e one-hop PrototypeData inline cache hit path. Globals frequently
-        // resolve through the global object's prototype chain (e.g.
-        // `Math` accessed via the window proto), so this is the second
-        // tier before the slow chain.
+        // One-hop PrototypeData IC hit (common for globals like `Math`).
         if let Some(value) =
             self.try_named_property_proto_data_load(agent, code, feedback_slot, global_object)
         {
@@ -667,7 +701,7 @@ impl Vm {
                 host,
                 registry,
                 frame,
-                frame.variable_env(),
+                self.frame_header(frame.cfr()).variable_env(),
                 name,
             )?
             .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))?;
@@ -679,22 +713,14 @@ impl Vm {
             name,
             lyng_objects::NamedPropertyCachePurpose::Load,
         );
-        // Project mode-7 metadata for a resolved Cell target AFTER the
-        // named-property slow-path observation, so it overrides any mode 1-4/0
-        // that observation wrote into the same slot and the asm hit (Task 8)
-        // serves the global cell load inline. The execution_count source mirrors
-        // `named_property_install_slow_path` (reads `PropertyIcState`); the
-        // metadata access (`metadata_table_mut` / `property_mut`) matches it.
+        // Project mode-7 metadata AFTER the slow-path observation so it overrides
+        // any mode 1-4/0 that observation wrote.
         if let Some((slot, cell, current_gen)) = resolved_cell {
-            // SAFETY INVARIANT: `cell` is a cell-backed global entry's value cell,
-            // which is always allocated `AllocationLifetime::LongLived` (tenured)
-            // at `objects/.../named_properties.rs`. The asm mode-7 hit derefs this
-            // cell via the `value_cells_base` table guarded only by the generation
-            // compare; tenuring is what guarantees a bound global's cell is never
-            // young-swept out from under a live mode-7 site (a minor GC neither
-            // bumps the generation nor nulls the table entry). If a future path
-            // ever cell-backs a global with a non-tenured cell, that invariant
-            // breaks. Regression tripwire: `minor_gc_cell_backed_global_value_survives`.
+            // SAFETY: `cell` is a cell-backed global entry's value cell, always
+            // allocated `LongLived` (tenured). The asm mode-7 hit derefs it via
+            // `value_cells_base` guarded only by the generation compare; tenuring
+            // ensures a minor GC never sweeps it while a mode-7 site is live.
+            // Tripwire: `minor_gc_cell_backed_global_value_survives`.
             let execution_count = self
                 .property_ic_state(code, slot)
                 .map_or(0, |state| state.execution_count);
@@ -720,22 +746,21 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
         value: Value,
         code: CodeRef,
         feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<()> {
-        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        let global =
+            Self::find_global_environment(agent, self.frame_header(frame.cfr()).variable_env())?;
         if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
             return self.write_environment_slot(agent, environment, binding.slot(), value);
         }
         let global_object = global.global_object();
-        // Phase 3c inline IC cache hit path (store side, mirrors Phase 3b). Non-writable
-        // own-data hit short-circuits to stored=false; for SetNamedProperty this
-        // is a silent no-op (just like the slow chain).
+        // Monomorphic OwnData store IC hit. Non-writable → silent no-op.
         if let Some(target_opt) = self
             .named_property_own_data_handler(code, feedback_slot)
             .and_then(|handler| {
@@ -768,11 +793,7 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Phase 3f polymorphic OwnData store cache hit path on the global object.
-        // The inner `Option<bool>` matches the slow-chain semantics —
-        // `Some(true|false)` is a writable hit; `None` is non-writable.
-        // For SetGlobal the result is discarded (silent no-op on miss),
-        // matching the Phase 3c monomorphic branch above.
+        // Polymorphic OwnData store IC hit. Result discarded (silent no-op).
         if let Some(target_opt) = self.try_named_property_polymorphic_own_data_store(
             agent,
             code,
@@ -829,13 +850,14 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
         value: Value,
         code: CodeRef,
         feedback_slot: Option<FeedbackSlotId>,
     ) -> VmResult<()> {
-        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        let global =
+            Self::find_global_environment(agent, self.frame_header(frame.cfr()).variable_env())?;
         if let Some(binding) = Self::lookup_global_lexical_binding(agent, &global, name) {
             let environment =
                 self.environment_for_slot_access(agent, binding.environment(), 0, binding.slot())?;
@@ -850,9 +872,7 @@ impl Vm {
 
         let key = PropertyKey::from_atom(name);
         let global_object = global.global_object();
-        // Phase 3c inline IC cache hit path (assign side). Same as store, but on
-        // !stored in strict mode we throw a TypeError (sloppy mode silently
-        // ignores the failed store) — preserving the slow chain's behavior.
+        // Monomorphic OwnData assign IC hit. Strict: TypeError on !stored.
         if let Some(target_opt) = self
             .named_property_own_data_handler(code, feedback_slot)
             .and_then(|handler| {
@@ -888,11 +908,7 @@ impl Vm {
             self.record_feedback_slot(code, feedback_slot);
             return Ok(());
         }
-        // Phase 3f polymorphic OwnData assign cache hit path on the global object.
-        // Same Option<Option<bool>> encoding as the monomorphic branch
-        // above: outer Some = take cache hit path; inner Some(true|false) = stored
-        // bool from the writable hit; inner None = non-writable hit. Strict
-        // mode throws TypeError when stored=false.
+        // Polymorphic OwnData assign IC hit. Strict: TypeError on !stored.
         if let Some(target_opt) = self.try_named_property_polymorphic_own_data_store(
             agent,
             code,
@@ -957,7 +973,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<CapturedNameReference> {
         let lexical_env = self.dynamic_name_start_environment(agent, frame);
@@ -981,7 +997,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         environment: EnvironmentRef,
         name: AtomId,
         strict: bool,
@@ -1009,7 +1025,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -1052,7 +1068,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         global_environment: EnvironmentRef,
         name: AtomId,
         value: Value,
@@ -1079,7 +1095,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         reference_register: u16,
     ) -> VmResult<Value> {
         let reference = self
@@ -1121,7 +1137,7 @@ impl Vm {
 
     pub(in crate::vm) fn load_captured_name_this_with_context(
         &self,
-        frame: &FrameRecord,
+        frame: FrameView,
         reference_register: u16,
     ) -> VmResult<Value> {
         let reference = self
@@ -1147,7 +1163,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         reference_register: u16,
         value: Value,
     ) -> VmResult<()> {
@@ -1208,7 +1224,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<Value> {
         let lexical_env = self.dynamic_name_start_environment(agent, frame);
@@ -1229,7 +1245,7 @@ impl Vm {
                 host,
                 registry,
                 frame,
-                frame.variable_env(),
+                self.frame_header(frame.cfr()).variable_env(),
                 name,
             )?
             .unwrap_or_else(Value::undefined))
@@ -1240,7 +1256,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<Value> {
         Ok(self
@@ -1249,7 +1265,7 @@ impl Vm {
                 host,
                 registry,
                 frame,
-                frame.variable_env(),
+                self.frame_header(frame.cfr()).variable_env(),
                 name,
             )?
             .unwrap_or_else(Value::undefined))
@@ -1260,7 +1276,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<Value> {
         let lexical_env = self.dynamic_name_start_environment(agent, frame);
@@ -1280,7 +1296,7 @@ impl Vm {
             host,
             registry,
             frame,
-            frame.variable_env(),
+            self.frame_header(frame.cfr()).variable_env(),
             name,
         )?
         .ok_or_else(|| VmError::Abrupt(errors::throw_reference_error(agent)))
@@ -1291,7 +1307,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         reference_register: u16,
         name: AtomId,
     ) -> VmResult<()> {
@@ -1310,7 +1326,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
         value: Value,
     ) -> VmResult<()> {
@@ -1366,7 +1382,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
         value: Value,
     ) -> VmResult<()> {
@@ -1375,7 +1391,7 @@ impl Vm {
             host,
             registry,
             frame,
-            frame.variable_env(),
+            self.frame_header(frame.cfr()).variable_env(),
             name,
         )?;
         match target {
@@ -1428,7 +1444,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<bool> {
         let lexical_env = self.dynamic_name_start_environment(agent, frame);
@@ -1478,16 +1494,23 @@ impl Vm {
     ) -> VmResult<Value> {
         let host = NoopHostHooks;
         let mut registry = RejectingNativeRegistry;
-        self.load_name_with_context(agent, &host, &mut registry, frame, name)
+        self.load_name_with_context(
+            agent,
+            &host,
+            &mut registry,
+            FrameView::from_record(frame),
+            name,
+        )
     }
 
     pub(super) fn delete_global(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         name: AtomId,
     ) -> VmResult<bool> {
-        let global = Self::find_global_environment(agent, frame.variable_env())?;
+        let global =
+            Self::find_global_environment(agent, self.frame_header(frame.cfr()).variable_env())?;
         if Self::global_chain_has_lexical_binding(agent, global.id(), name)
             || Self::global_chain_has_var_name(agent, global.id(), name)
         {
@@ -1646,7 +1669,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         global_object: ObjectRef,
         name: AtomId,
     ) -> VmResult<bool> {
@@ -1665,17 +1688,24 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         global_object: ObjectRef,
         key: PropertyKey,
     ) -> VmResult<bool> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         object::has_property_in_context(
             &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             global_object,
             key,
@@ -1691,7 +1721,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         global_object: ObjectRef,
         name: AtomId,
         value: Value,
@@ -1716,7 +1746,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         global_object: ObjectRef,
         key: PropertyKey,
         value: Value,
@@ -1725,7 +1755,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             global_object,
             Value::from_object_ref(global_object),
             key,
@@ -1738,7 +1771,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         start: EnvironmentRef,
         name: AtomId,
     ) -> VmResult<Option<Value>> {
@@ -1754,7 +1787,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            self.realm_of(agent, frame.cfr()),
+            self.frame_header(frame.cfr()).lexical_env(),
+            frame.code(),
+            frame.instruction_offset(),
             global_object,
             Value::from_object_ref(global_object),
             key,
@@ -1855,7 +1891,7 @@ impl Vm {
         Some(GlobalLexicalBindingRecord::new(name, global.id(), index))
     }
 
-    pub(in crate::vm) fn frame_is_strict(&self, frame: &FrameRecord) -> bool {
+    pub(in crate::vm) fn frame_is_strict(&self, frame: FrameView) -> bool {
         self.installed_function(frame.code())
             .is_some_and(|function| function.flags().strict())
     }

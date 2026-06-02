@@ -1,9 +1,10 @@
 use super::{
-    Agent, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult,
+    Agent, CallerContext, FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, Value, Vm,
+    VmError, VmResult,
 };
 use crate::vm::property_access::VmProxyBridge;
 use lyng_ops::{errors, object, proxy};
-use lyng_types::PropertyDescriptor;
+use lyng_types::{CodeRef, EnvironmentRef, PropertyDescriptor, RealmRef};
 
 impl Vm {
     fn callback_object(agent: &Agent, value: Value) -> Option<ObjectRef> {
@@ -18,13 +19,10 @@ impl Vm {
         prior_frame_depth: usize,
         prior_register_len: usize,
     ) -> VmResult<()> {
-        while self.frames.len() > prior_frame_depth {
-            let leaked = self
-                .frames
-                .pop()
-                .expect("frame count should be greater than baseline");
-            self.close_loop_iteration_frames(self.frames.len());
-            self.close_direct_eval_frames(self.frames.len());
+        while self.frame_depth() > prior_frame_depth {
+            let leaked = self.pop_current_frame();
+            self.close_loop_iteration_frames(self.frame_depth());
+            self.close_direct_eval_frames(self.frame_depth());
             self.for_in_states.clear_window(leaked.registers());
             self.iterator_states.clear_window(leaked.registers());
             self.captured_name_references
@@ -33,8 +31,9 @@ impl Vm {
             let _ = self
                 .async_generator_frame_states
                 .remove(&leaked.registers().base());
-            self.finalize_mapped_arguments(agent, leaked.lexical_env())?;
-            self.release_register_window(leaked.registers().base());
+            let lexical_env = self.frame_header(Self::cfr_of(&leaked)).lexical_env();
+            self.finalize_mapped_arguments(agent, lexical_env)?;
+            self.release_frame_to_caller(Self::cfr_of(&leaked));
         }
         // Internal calls inherit the referrer rather than establishing one, so
         // no scope is pushed here. Unwind any referrer scopes established by
@@ -55,7 +54,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
@@ -67,18 +66,19 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
+                caller,
                 bound.target(),
                 bound.this_value(),
                 &combined_arguments,
             );
         }
-        Self::reject_class_constructor_call(agent, callee_object, caller_frame.realm())?;
+        let caller_realm = caller.realm;
+        Self::reject_class_constructor_call(agent, callee_object, caller_realm)?;
         if let Some(result) = self.call_builtin(
             agent,
             host,
             registry,
-            caller_frame,
+            caller,
             callee_object,
             this_value,
             arguments,
@@ -93,7 +93,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller_frame,
+                    caller_realm,
+                    caller_lexical_env: caller.lexical_env,
+                    caller_code: caller.code,
+                    caller_pc: caller.pc,
                 },
                 callee_object,
                 this_value,
@@ -105,12 +108,10 @@ impl Vm {
                 .map_err(VmError::Abrupt);
         }
 
-        let prior_frame_depth = self.frames.len();
+        let prior_frame_depth = self.frame_depth();
         let prior_register_len = self.register_stack_top();
         let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
-        let register_base =
-            u32::try_from(prior_register_len).expect("register stack length should fit u32");
+            self.prepare_bytecode_call(agent, caller.lexical_env, callee_object, this_value, None)?;
         if self
             .installed_function(prepared.code)
             .is_some_and(|function| function.flags().generator())
@@ -127,15 +128,7 @@ impl Vm {
                 self.instantiate_async_function_call(agent, host, registry, prepared, arguments)?;
             return Ok(Value::from_object_ref(promise));
         }
-        self.install_prepared_bytecode_call(
-            agent,
-            prepared,
-            arguments,
-            register_base,
-            None,
-            None,
-            false,
-        )?;
+        self.install_prepared_bytecode_call(agent, prepared, arguments, None, None, false)?;
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -156,7 +149,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callee_object: ObjectRef,
         arguments: &[Value],
         new_target: Option<ObjectRef>,
@@ -170,6 +163,7 @@ impl Vm {
             &mut effective_new_target,
             &mut combined_arguments,
         )?;
+        let caller_realm = caller.realm;
         if agent.objects().is_proxy_object(callee) {
             return proxy::construct(
                 &mut VmProxyBridge {
@@ -177,7 +171,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller_frame,
+                    caller_realm,
+                    caller_lexical_env: caller.lexical_env,
+                    caller_code: caller.code,
+                    caller_pc: caller.pc,
                 },
                 callee,
                 &combined_arguments,
@@ -192,7 +189,7 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
+                caller,
                 callee,
                 Value::undefined(),
                 &combined_arguments,
@@ -212,7 +209,7 @@ impl Vm {
             .map_err(VmError::Abrupt);
         }
 
-        let prior_frame_depth = self.frames.len();
+        let prior_frame_depth = self.frame_depth();
         let prior_register_len = self.register_stack_top();
         let derived_construct = Self::bytecode_entry(agent, callee)
             .and_then(|code| self.installed_function(code))
@@ -224,25 +221,22 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
-                caller_frame.realm(),
+                caller,
+                caller_realm,
                 effective_new_target,
             )?)
         };
         let prepared = self.prepare_bytecode_call(
             agent,
-            caller_frame,
+            caller.lexical_env,
             callee,
             construct_this.map_or(Value::undefined(), Value::from_object_ref),
             Some(effective_new_target),
         )?;
-        let register_base =
-            u32::try_from(prior_register_len).expect("register stack length should fit u32");
         self.install_prepared_bytecode_call(
             agent,
             prepared,
             &combined_arguments,
-            register_base,
             None,
             construct_this,
             true,
@@ -269,7 +263,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callback: Value,
         this_value: Value,
         arguments: &[Value],
@@ -277,15 +271,9 @@ impl Vm {
         if callback == Value::undefined() {
             return Ok(None);
         }
-        let callback = Self::require_callable_object(agent, caller_frame, callback)?;
+        let callback = Self::require_callable_object(agent, callback)?;
         self.call_to_completion(
-            agent,
-            host,
-            registry,
-            caller_frame,
-            callback,
-            this_value,
-            arguments,
+            agent, host, registry, caller, callback, this_value, arguments,
         )
         .map(Some)
     }
@@ -299,7 +287,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         callback: Value,
         this_value: Value,
         arguments: &[Value],
@@ -308,13 +296,7 @@ impl Vm {
             return Ok(None);
         };
         self.call_to_completion(
-            agent,
-            host,
-            registry,
-            caller_frame,
-            callback,
-            this_value,
-            arguments,
+            agent, host, registry, caller, callback, this_value, arguments,
         )
         .map(Some)
     }
@@ -324,12 +306,26 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         descriptor: PropertyDescriptor,
         receiver: Value,
     ) -> VmResult<Option<Value>> {
         let getter = descriptor.getter().unwrap_or(Value::undefined());
-        self.call_optional_callback(agent, host, registry, caller_frame, getter, receiver, &[])
+        if getter == Value::undefined() {
+            return Ok(None);
+        }
+        let getter_object = Self::require_callable_object(agent, getter)?;
+        let caller = CallerContext {
+            realm: caller_realm,
+            lexical_env: caller_lexical_env,
+            code: caller_code,
+            pc: caller_pc,
+        };
+        self.call_to_completion(agent, host, registry, caller, getter_object, receiver, &[])
+            .map(Some)
     }
 
     #[expect(
@@ -341,22 +337,59 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_realm: RealmRef,
+        caller_lexical_env: EnvironmentRef,
+        caller_code: CodeRef,
+        caller_pc: u32,
         descriptor: PropertyDescriptor,
         receiver: Value,
         value: Value,
     ) -> VmResult<bool> {
         let setter = descriptor.setter().unwrap_or(Value::undefined());
+        if setter == Value::undefined() {
+            return Ok(false);
+        }
+        let setter_object = Self::require_callable_object(agent, setter)?;
         let arguments = [value];
-        self.call_optional_callback(
+        let caller = CallerContext {
+            realm: caller_realm,
+            lexical_env: caller_lexical_env,
+            code: caller_code,
+            pc: caller_pc,
+        };
+        self.call_to_completion(
             agent,
             host,
             registry,
-            caller_frame,
-            setter,
+            caller,
+            setter_object,
             receiver,
             &arguments,
         )
-        .map(|result| result.is_some())
+        .map(|_| true)
+    }
+
+    /// Build a minimal `FrameRecord` from a [`CallerContext`] for the embedding
+    /// `force_collect` GC-root path (the embedding function context no longer
+    /// holds a `&FrameRecord`). The synthetic frame carries no registers (window
+    /// `[0, 0)`), no callee (`None`), and the caller's `lexical_env`/`code`.
+    ///
+    /// Heap-edge-equivalent to the former caller-frame trace: for a live caller
+    /// the arena cfr-walk already covers the real roots (this is redundant
+    /// over-tracing); for a synthetic caller it reproduces exactly the
+    /// `lexical_env`/`code` edges (the realm is not traced off the record). See
+    /// `ActiveVmRoots::trace_heap_edges`.
+    pub(crate) const fn synthetic_caller_frame(caller: CallerContext) -> FrameRecord {
+        use crate::frame::RegisterWindow;
+        use lyng_env::ExecutionContextKind;
+        FrameRecord::new(
+            caller.code,
+            0,
+            RegisterWindow::new(0, 0),
+            None,
+            caller.lexical_env,
+            caller.lexical_env,
+            ExecutionContextKind::Function,
+        )
     }
 }

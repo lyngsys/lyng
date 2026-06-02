@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{OPCODE_COUNT, Opcode};
 
 use crate::slow_path_counts::{SlowPathCounterStore, SlowPathCounts};
 
@@ -146,8 +146,9 @@ impl Default for OpcodeCounters {
 }
 
 /// Sentinel stored in `DispatchCounters::current_opcode` when no opcode
-/// has been dispatched yet (set at construction and on `reset`). Samples
-/// that observe this value are attributed to the "non-opcode / native"
+/// has been dispatched yet (set at construction and on `reset`).
+///
+/// Samples that observe this value are attributed to the "non-opcode / native"
 /// bucket rather than to any opcode.
 pub const CURRENT_OPCODE_IDLE: u64 = u64::MAX;
 
@@ -433,7 +434,7 @@ impl CallArgumentCopyCounts {
 
 #[cfg(test)]
 mod current_opcode_tests {
-    use super::{decode_current_opcode, CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT};
+    use super::{CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT, decode_current_opcode};
     use lyng_bytecode::Opcode;
 
     #[test]

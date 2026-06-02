@@ -4,15 +4,16 @@ use super::descriptors::{
     readonly_builtin_attributes, writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, install_public_builtin_function_with_metadata,
     FamilyInstallContext, IteratorFamilyBuiltins, IteratorFamilyPrototypes,
+    install_public_builtin_function, install_public_builtin_function_with_metadata,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinDescriptorTable, BuiltinEntryMetadata, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::AtomId;
 use lyng_env::Agent;
 use lyng_types::{
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
     async_iterator_dispose_builtin, iterator_builtin, iterator_concat_builtin,
     iterator_constructor_getter_builtin, iterator_constructor_setter_builtin,
     iterator_dispose_builtin, iterator_drop_builtin, iterator_every_builtin,
@@ -22,8 +23,7 @@ use lyng_types::{
     iterator_reduce_builtin, iterator_some_builtin, iterator_take_builtin,
     iterator_to_array_builtin, iterator_to_string_tag_getter_builtin,
     iterator_to_string_tag_setter_builtin, iterator_zip_builtin, iterator_zip_keyed_builtin,
-    map_iterator_next_builtin, set_iterator_next_builtin, BuiltinFunctionId, ObjectRef, RealmRef,
-    Value, WellKnownSymbolId,
+    map_iterator_next_builtin, set_iterator_next_builtin,
 };
 
 #[allow(

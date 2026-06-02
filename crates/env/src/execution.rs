@@ -35,10 +35,10 @@ pub enum ThisState {
     Value(Value),
 }
 
-/// The single ambient running-context snapshot (realm + script/module referrer),
-/// the analog of JSC's `vm.topCallFrame`-derived realm. Refreshed by the VM from
-/// the active frame; the only ambient execution state after ExecutionContext is
-/// removed. Not a stack.
+/// The single ambient running-context snapshot (realm + script/module referrer).
+///
+/// The analog of JSC's `vm.topCallFrame`-derived realm, refreshed by the VM from
+/// the active frame. The only ambient execution state; not a stack.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RunningContext {
     realm: RealmRef,

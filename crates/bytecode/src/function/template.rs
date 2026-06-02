@@ -2,7 +2,7 @@ use super::binding::BytecodeEnvironmentBinding;
 use super::header::BytecodeFunctionHeader;
 use crate::decoder::decode_instruction_bytes;
 use crate::ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-use crate::instruction::{Instruction, INSTRUCTION_WIDTH};
+use crate::instruction::{INSTRUCTION_WIDTH, Instruction};
 use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CaptureDescriptor, ConstantValue,
     DeoptSnapshot, DirectEvalLexicalSite, ExceptionHandler, FeedbackSiteDescriptor,

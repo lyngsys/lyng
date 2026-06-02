@@ -18,14 +18,15 @@ mod module;
 mod script;
 
 pub use environment::{
-    derive_environment_layout_plan, install_environment_layout_plan, seed_global_var_names,
     EnvironmentLayoutPlan, EnvironmentLayoutPlanError, EnvironmentLayoutPlanResult,
     FunctionEnvironmentLayoutPlan, InstalledEnvironmentLayouts, ScopeEnvironmentLayoutPlan,
+    derive_environment_layout_plan, install_environment_layout_plan, seed_global_var_names,
 };
 pub use error::{LoweringError, LoweringResult};
 pub use module::{
-    compile_module, CompiledModuleUnit, DynamicImportSite, IndirectExportEntry, LocalExportEntry,
+    CompiledModuleUnit, DynamicImportSite, IndirectExportEntry, LocalExportEntry,
     ModuleImportEntry, ModuleImportKind, ModuleRequestPhase, RequestedModule, StarExportEntry,
+    compile_module,
 };
 pub use script::compile_script;
 

@@ -1,12 +1,13 @@
 use super::super::{
-    append_string_ref_code_units, array_like_index_property_key,
+    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext, append_string_ref_code_units,
+    array_like_index_property_key,
     iterators::{string_iterator_builtin, string_iterator_next_builtin},
     map_completion, number_to_u32_after_range_check, number_to_usize_after_range_check,
     numbers_are_equal, primitive_wrapper_constructor, property_key_from_text, range_error,
     string_from_code_units, string_ref_code_unit_at, string_ref_code_unit_len, string_this_ref,
     string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin,
     to_length_for_builtin, to_number_for_builtin, to_string_string_ref, to_uint32_for_builtin,
-    type_error, usize_index_as_number, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    type_error, usize_index_as_number,
 };
 use crate::BuiltinInvocation;
 use lyng_common::WellKnownAtom;

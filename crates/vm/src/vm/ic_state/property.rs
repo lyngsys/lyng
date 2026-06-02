@@ -192,8 +192,8 @@ impl Default for PropertyIcState {
 #[cfg(test)]
 mod tests {
     use lyng_objects::{
-        NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyInlineWriteHandler,
-        INLINE_SLOT_OFFSET_FLAG, PROPERTY_CACHE_MAX_DEPENDENCIES,
+        INLINE_SLOT_OFFSET_FLAG, NamedPropertyCacheEntry, NamedPropertyCachePath,
+        NamedPropertyInlineWriteHandler, PROPERTY_CACHE_MAX_DEPENDENCIES,
     };
     use lyng_types::{DescriptorAttributes, ObjectRef, ShapeId};
 

@@ -24,7 +24,7 @@
 use std::fmt::Write as _;
 
 use lyng_builtins::BootstrapMode;
-use lyng_bytecode::{Opcode, OPCODE_COUNT};
+use lyng_bytecode::{OPCODE_COUNT, Opcode};
 use lyng_common::{AtomTable, SourceId};
 use lyng_compiler::compile_script;
 use lyng_env::Runtime;
@@ -32,7 +32,7 @@ use lyng_host::NoopHostHooks;
 use lyng_parser::parse_script;
 use lyng_sema::analyze_script;
 use lyng_vm::{OpcodeDispatchCounts, SlowPathCounts, Vm};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::hint::black_box;
 use std::path::{Path, PathBuf};

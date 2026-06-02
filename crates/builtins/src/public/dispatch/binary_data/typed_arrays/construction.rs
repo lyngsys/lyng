@@ -1,14 +1,14 @@
 use super::super::super::{
     big_int64_array_builtin, big_uint64_array_builtin, float16_array_builtin,
-    float32_array_builtin, float64_array_builtin, int16_array_builtin, int32_array_builtin,
-    int8_array_builtin, set_property_on_object, typed_array_builtin, typed_array_from_builtin,
-    typed_array_of_builtin, uint16_array_builtin, uint32_array_builtin, uint8_array_builtin,
-    uint8_clamped_array_builtin,
+    float32_array_builtin, float64_array_builtin, int8_array_builtin, int16_array_builtin,
+    int32_array_builtin, set_property_on_object, typed_array_builtin, typed_array_from_builtin,
+    typed_array_of_builtin, uint8_array_builtin, uint8_clamped_array_builtin, uint16_array_builtin,
+    uint32_array_builtin,
 };
 use super::super::{
-    array_like_index_property_key, array_like_length_u64, buffers::allocate_array_buffer_object,
-    get_property_from_object, iterable_to_values_list, length_value_u64, range_error,
-    to_index_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, array_like_index_property_key, array_like_length_u64,
+    buffers::allocate_array_buffer_object, get_property_from_object, iterable_to_values_list,
+    length_value_u64, range_error, to_index_for_builtin, type_error,
 };
 use super::{
     allocate_typed_array_object, typed_array_default_prototype,

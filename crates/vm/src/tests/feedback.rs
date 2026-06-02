@@ -270,10 +270,12 @@ fn construct_status_records_polymorphic_targets() {
     assert_eq!(status.state(), FeedbackInlineCacheState::Polymorphic);
     assert_eq!(status.entries.len(), 2);
     assert_ne!(status.entries[0].function, status.entries[1].function);
-    assert!(status
-        .entries
-        .iter()
-        .all(|entry| entry.created_shape.is_some()));
+    assert!(
+        status
+            .entries
+            .iter()
+            .all(|entry| entry.created_shape.is_some())
+    );
 }
 
 #[test]
@@ -380,11 +382,12 @@ fn metadata_table_footprint_reports_scalar_sites_for_tier_decisions() {
         .expect("add should have installed code");
 
     for _ in 0..2 {
-        assert!(vm
-            .evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
-            .run()
-            .unwrap()
-            .is_object());
+        assert!(
+            vm.evaluate_installed(agent, installed, realm.global_env(), realm.global_env())
+                .run()
+                .unwrap()
+                .is_object()
+        );
     }
 
     let footprint = vm
@@ -623,25 +626,29 @@ fn named_property_status_reports_cache_state_without_mutable_entries() {
             )
         });
         for extra in 0..index {
-            assert!(ordinary_create_data_property(
+            assert!(
+                ordinary_create_data_property(
+                    agent,
+                    object,
+                    PropertyKey::from_atom(AtomId::from_raw(21_000 + extra)),
+                    Value::from_smi(extra.cast_signed()),
+                    AllocationLifetime::Default,
+                    &mut NoopAdaptiveProtoLoadDispatch,
+                )
+                .unwrap()
+            );
+        }
+        assert!(
+            ordinary_create_data_property(
                 agent,
                 object,
-                PropertyKey::from_atom(AtomId::from_raw(21_000 + extra)),
-                Value::from_smi(extra.cast_signed()),
+                PropertyKey::from_atom(value_name),
+                Value::from_smi(index.cast_signed()),
                 AllocationLifetime::Default,
                 &mut NoopAdaptiveProtoLoadDispatch,
             )
-            .unwrap());
-        }
-        assert!(ordinary_create_data_property(
-            agent,
-            object,
-            PropertyKey::from_atom(value_name),
-            Value::from_smi(index.cast_signed()),
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+            .unwrap()
+        );
         sources.push(object);
     }
 
@@ -709,15 +716,17 @@ fn keyed_property_status_reports_classifiers() {
             AllocationLifetime::Default,
         )
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        object,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(4),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            object,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(4),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(object));
 
     let mut vm = Vm::new();
@@ -848,15 +857,17 @@ fn prototype_cache_status_replan_after_object_owned_invalidation() {
         );
         (receiver, replacement)
     });
-    assert!(ordinary_create_data_property(
-        agent,
-        replacement,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(13),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            replacement,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(13),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
     install_global_value(agent, &realm, source_name, Value::from_object_ref(receiver));
 
     let mut vm = Vm::new();
@@ -864,15 +875,17 @@ fn prototype_cache_status_replan_after_object_owned_invalidation() {
     let original_prototype = agent
         .with_heap_and_objects(|heap, _| heap.view().object(receiver).unwrap().prototype())
         .expect("receiver should keep its original prototype");
-    assert!(ordinary_create_data_property(
-        agent,
-        original_prototype,
-        PropertyKey::from_atom(value_name),
-        Value::from_smi(7),
-        AllocationLifetime::Default,
-        &mut NoopAdaptiveProtoLoadDispatch,
-    )
-    .unwrap());
+    assert!(
+        ordinary_create_data_property(
+            agent,
+            original_prototype,
+            PropertyKey::from_atom(value_name),
+            Value::from_smi(7),
+            AllocationLifetime::Default,
+            &mut NoopAdaptiveProtoLoadDispatch,
+        )
+        .unwrap()
+    );
 
     for _ in 0..2 {
         assert_eq!(
@@ -1174,15 +1187,10 @@ fn closures_sharing_one_code_ref_share_tiering_hotness() {
 
 #[test]
 fn loop_execution_preserves_tier_state_invalidation_resets_hotness() {
-    // DSL-0c C6: tier-accounting on backedges deleted with the α path.
-    // After DSL-0c the interpreter has no tier-up accounting on backedges —
-    // intentional per design §6 + §10 (JIT is out of scope, §2). A loop
-    // no longer bumps hotness; only feedback-site events do. This test
-    // exercises the same workload as the pre-DSL-0c
-    // `loop_backedges_make_eligible_code_ready_and_invalidation_resets_hotness`
-    // test, but only checks invariants that survive the backedge-deletion:
-    // the tier state remains Collecting (since no backedge events fire),
-    // invalidation still resets hotness, and reruns still execute cleanly.
+    // The interpreter has no tier-up accounting on backedges (JIT is out of
+    // scope). A loop no longer bumps hotness; only feedback-site events do.
+    // Checks: tier state remains Collecting (no backedge events), invalidation
+    // resets hotness, reruns execute cleanly.
     let unit = compile_test_unit(
         27,
         r"
@@ -1438,7 +1446,7 @@ fn metadata_table_kind_offsets_partition_buffer() {
 
 #[test]
 fn metadata_table_in_kind_indices_are_monotone_per_kind() {
-    use crate::vm::metadata_table::{MetadataKind, METADATA_KIND_COUNT};
+    use crate::vm::metadata_table::{METADATA_KIND_COUNT, MetadataKind};
 
     let src = r"
         var source = { x: 1, y: 2 };

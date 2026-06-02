@@ -1,19 +1,18 @@
 use super::state::ClassInstanceElementPlan;
 use super::{
-    checked_u32_index, internal_bind_function_private_env_builtin,
-    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
-    internal_define_method_property_builtin, internal_define_private_field_builtin,
-    internal_get_instance_field_key_builtin, internal_install_instance_field_key_builtin,
-    internal_private_field_get_builtin, internal_private_field_init_builtin,
-    internal_private_field_set_builtin, internal_private_has_builtin,
-    internal_set_function_home_object_builtin, object_set_prototype_of_builtin, ActiveClassContext,
-    AtomId, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
+    ActiveClassContext, AtomId, BuiltinFunctionId, BytecodeBuilder, BytecodeEnvironmentBinding,
     BytecodeEnvironmentSlotFlags, BytecodeFunction, BytecodeFunctionFlags, BytecodeFunctionId,
     BytecodeFunctionKind, CallRange, ConstantValue, DeclId, DeclarationKind, DeoptFrameValue,
     DeoptSnapshot, DeoptValueSource, Expr, ExprId, FunctionCompiler, FunctionId, HashMap, HashSet,
     LoweringError, LoweringResult, NodeList, Opcode, RuntimeStateCapture, SafepointDescriptor,
     SafepointKind, ScopeId, ScopeKind, SemanticBindingId, Span, StmtId, StorageClass, ThisMode,
-    WellKnownAtom,
+    WellKnownAtom, checked_u32_index, internal_bind_function_private_env_builtin,
+    internal_define_class_getter_property_builtin, internal_define_class_setter_property_builtin,
+    internal_define_method_property_builtin, internal_define_private_field_builtin,
+    internal_get_instance_field_key_builtin, internal_install_instance_field_key_builtin,
+    internal_private_field_get_builtin, internal_private_field_init_builtin,
+    internal_private_field_set_builtin, internal_private_has_builtin,
+    internal_set_function_home_object_builtin, object_set_prototype_of_builtin,
 };
 use lyng_types::{
     internal_construct_super_array_like_builtin, internal_require_constructor_builtin,

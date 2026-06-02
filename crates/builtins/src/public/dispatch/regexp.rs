@@ -4,13 +4,13 @@ mod escape;
 mod symbols;
 
 use super::{
-    allocate_array_like_result, append_string_ref_code_units, builtin_function_entry,
-    callable_object_from_value, code_unit_range_value, define_data_property_with_attrs, iterators,
-    number_to_usize_after_range_check, range_error, set_data_property_value,
-    string_from_code_units, string_from_string_ref_range, string_ref_code_units, string_value,
-    syntax_error, to_boolean_for_builtin, to_integer_or_infinity_for_builtin,
-    to_length_for_builtin, to_string_string_ref, type_error, usize_index_as_number,
-    usize_index_value, with_string_ref_code_units, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, allocate_array_like_result, append_string_ref_code_units,
+    builtin_function_entry, callable_object_from_value, code_unit_range_value,
+    define_data_property_with_attrs, iterators, number_to_usize_after_range_check, range_error,
+    set_data_property_value, string_from_code_units, string_from_string_ref_range,
+    string_ref_code_units, string_value, syntax_error, to_boolean_for_builtin,
+    to_integer_or_infinity_for_builtin, to_length_for_builtin, to_string_string_ref, type_error,
+    usize_index_as_number, usize_index_value, with_string_ref_code_units,
 };
 use crate::BuiltinInvocation;
 use accessors::{
@@ -386,11 +386,7 @@ fn record_regexp_legacy_static_match<Cx: PublicBuiltinDispatchContext>(
             })
             .is_some()
     };
-    if updated {
-        Ok(())
-    } else {
-        Err(type_error(cx))
-    }
+    if updated { Ok(()) } else { Err(type_error(cx)) }
 }
 
 const REGEXP_STRING_ITERATOR_REGEXP_SLOT: u32 = 0;

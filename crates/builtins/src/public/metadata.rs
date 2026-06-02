@@ -1,4 +1,4 @@
-use crate::{internal::internal_builtin_metadata, BuiltinEntryMetadata};
+use crate::{BuiltinEntryMetadata, internal::internal_builtin_metadata};
 use lyng_types::BuiltinFunctionId;
 
 mod binary_data;

@@ -587,6 +587,60 @@ fn array_copying_methods_throw_errors_from_their_function_realm() {
     assert_eq!(result, "ok");
 }
 
+/// A function defined in a non-default realm and called from the default realm
+/// must observe its OWN realm. A `throw` inside selects the child realm's
+/// `Error.prototype`, and allocated objects are identified to the child realm.
+#[test]
+fn function_defined_in_child_realm_observes_its_own_realm_when_called_cross_realm() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function record(label, condition) {
+            if (!condition) failures += label + ";";
+        }
+
+        let childGlobal = embedding.createRealm();
+        // Functions defined IN the child realm; invoked from the default realm.
+        childGlobal.eval(
+            "function childThrows() { throw new TypeError('from child'); }" +
+            "function childMakesObject() { return {}; }" +
+            "function childMakesError() { return new RangeError('child range'); }"
+        );
+
+        // A throw inside the child-realm function selects the CHILD realm's
+        // Error.prototype chain, not the default realm's.
+        try {
+            childGlobal.childThrows();
+            failures += "throw:missing;";
+        } catch (error) {
+            record("throw:child-typeerror", error instanceof childGlobal.TypeError);
+            record("throw:not-default-typeerror", !(error instanceof TypeError));
+        }
+
+        // An object allocated by the child-realm function is identified to the
+        // child realm (its prototype is the child realm's Object.prototype).
+        let obj = childGlobal.childMakesObject();
+        record("object:child-instance", obj instanceof childGlobal.Object);
+        record("object:not-default-instance", !(obj instanceof Object));
+
+        // An error VALUE returned (not thrown) likewise carries the child realm's
+        // prototype — exercises the realm-of-callee derivation on the normal return.
+        let err = childGlobal.childMakesError();
+        record("return:child-rangeerror", err instanceof childGlobal.RangeError);
+        record("return:not-default-rangeerror", !(err instanceof RangeError));
+
+        // Sanity: the two realms really are distinct.
+        record("realms-distinct", childGlobal.TypeError !== TypeError);
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
+}
+
 #[test]
 fn array_copying_methods_create_results_in_their_function_realm() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
@@ -635,24 +689,17 @@ fn indirect_eval_uses_eval_functions_realm() {
     assert_eq!(result, "undefined:23");
 }
 
-/// Cross-realm mode-7 staleness guard (Task 8 / global-cell asm load).
+/// Cross-realm mode-7 staleness guard.
 ///
-/// The asm `LoadGlobal` mode-7 cell hit compares the site's captured
-/// generation against the `Vm::dsl_global_ic_generation` mirror. That mirror
-/// must track the EXECUTING realm, not just the entry realm
-/// (`refresh_global_ic_generation_for_realm`, refreshed from the active
-/// frame's realm at every slow egress). If it tracked only realm A, a warmed
-/// mode-7 site running in realm B could compare B's site against A's
-/// generation and serve a stale (or freed) cell after B mutates its own
-/// global.
+/// The `LoadGlobal` mode-7 cell hit compares the site's captured generation
+/// against `Vm::dsl_global_ic_generation`, which must track the EXECUTING
+/// realm. If it tracked only the entry realm, a warmed mode-7 site in realm B
+/// could compare against realm A's generation and serve a stale cell.
 ///
-/// Here realm A warms its own global `g` (advancing A's generation and warming
-/// an A-side mode-7 site); then realm B's code (`childGlobal.embedding.evalScript`,
-/// which runs with B's global env) declares `g`, warms it through a function
-/// called twice (→ mode-7 site installed in B), then structurally mutates B's
-/// `g` (delete + recreate, bumping B's generation) and reads it again. The
-/// post-mutation read must observe the NEW value — proving B's hit re-resolved
-/// against B's own generation rather than serving a cell validated by A's.
+/// Realm A warms its own `g` (establishing A's mode-7 site); realm B warms its
+/// own `g`, then structurally mutates it (delete + recreate, bumping B's
+/// generation). The post-mutation read must observe the new value — proving B's
+/// hit re-resolved against B's own generation.
 #[test]
 fn cross_realm_mode_7_reads_track_executing_realm_generation() {
     let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
@@ -693,4 +740,76 @@ fn cross_realm_mode_7_reads_track_executing_realm_generation() {
     // B observed 567 across its own assign + delete/recreate (no stale read
     // against A's generation); A's global is unchanged at 100.
     assert_eq!(result, "567:100");
+}
+
+/// Derived-constructor construct-finalization errors must be created in the
+/// CALLER's realm, not the callee's.
+///
+/// Two cases:
+/// 1. Derived class with `return null` → `TypeError` from the parent realm.
+/// 2. Derived class with no `super()` → `ReferenceError` from the parent realm.
+#[test]
+fn cross_realm_derived_constructor_error_uses_caller_realm() {
+    let provider: SharedRealmExtensionProvider = Arc::new(DemoExtensionProvider);
+    let result = compile_and_run_string(
+        r#"
+        let failures = "";
+        function record(label, condition) {
+            if (!condition) failures += label + ";";
+        }
+
+        let childGlobal = embedding.createRealm();
+
+        // The two realms must be distinct for the test to have any meaning.
+        record("realms-distinct:TypeError",  childGlobal.TypeError !== TypeError);
+        record("realms-distinct:ReferenceError", childGlobal.ReferenceError !== ReferenceError);
+
+        // ── Case 1: bad return (non-object, non-undefined) from a derived ctor ──
+        // The derived class is defined in the CHILD realm and captured as a value
+        // (the class EXPRESSION returned by eval) into a parent-realm variable —
+        // a class *declaration* inside eval only creates a lexical binding in the
+        // eval scope, not a property on the child global, so we must capture the
+        // expression value (mirrors Test262 `derived-return-val-realm.js`). Then
+        // `new C()` from the parent genuinely invokes the child-realm derived
+        // constructor; its construct-finalization TypeError must come from the
+        // PARENT realm's TypeError intrinsic.
+        let C = childGlobal.eval("(0, class extends Object { constructor() { return null; } })");
+
+        try {
+            new C();
+            failures += "bad-return:no-throw;";
+        } catch (err) {
+            // Must be a TypeError from the PARENT realm.
+            record("bad-return:is-parent-TypeError",   err instanceof TypeError);
+            record("bad-return:ctor-is-parent-TypeError", err.constructor === TypeError);
+            // Must NOT be from the child realm's TypeError.
+            record("bad-return:not-child-TypeError",  !(err instanceof childGlobal.TypeError));
+            record("bad-return:ctor-not-child-TypeError", err.constructor !== childGlobal.TypeError);
+        }
+
+        // ── Case 2: no super() call in derived ctor (uninitialized `this`) ──
+        // Same capture pattern (mirrors Test262 `derived-this-uninitialized-realm.js`):
+        // `new D()` from the parent invokes the child-realm derived constructor,
+        // which never calls super(), so construct-finalization throws a
+        // ReferenceError that must come from the PARENT realm's ReferenceError.
+        let D = childGlobal.eval("(0, class extends Object { constructor() { /* no super() */ } })");
+
+        try {
+            new D();
+            failures += "no-super:no-throw;";
+        } catch (err) {
+            // Must be a ReferenceError from the PARENT realm.
+            record("no-super:is-parent-ReferenceError",   err instanceof ReferenceError);
+            record("no-super:ctor-is-parent-ReferenceError", err.constructor === ReferenceError);
+            // Must NOT be from the child realm's ReferenceError.
+            record("no-super:not-child-ReferenceError",  !(err instanceof childGlobal.ReferenceError));
+            record("no-super:ctor-not-child-ReferenceError", err.constructor !== childGlobal.ReferenceError);
+        }
+
+        failures || "ok";
+        "#,
+        Some(&provider),
+    );
+
+    assert_eq!(result, "ok");
 }

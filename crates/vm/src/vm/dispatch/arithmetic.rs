@@ -1,10 +1,11 @@
 use crate::error::VmResult;
+use crate::frame::FrameView;
 use crate::vm::property_access::ToPrimitiveHint;
 use crate::vm::values::{
     bigint_bitwise_and_values, bigint_bitwise_or_values, bigint_bitwise_xor_values,
     bigint_shift_left_values, bigint_shift_right_values, compare_numeric_values, encode_number,
 };
-use crate::{FrameRecord, Vm, VmError};
+use crate::{Vm, VmError};
 use lyng_bytecode::Opcode;
 use lyng_env::Agent;
 use lyng_host::HostHooks;
@@ -43,7 +44,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -63,7 +64,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -79,7 +80,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -99,7 +100,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -115,7 +116,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -135,7 +136,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -152,7 +153,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -168,7 +169,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -188,7 +189,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -207,7 +208,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -223,7 +224,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -240,7 +241,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -257,7 +258,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -277,7 +278,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: u16,
     ) -> VmResult<Value> {
@@ -293,7 +294,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -310,7 +311,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -327,7 +328,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -344,7 +345,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -361,7 +362,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -380,7 +381,7 @@ impl Vm {
     pub(in crate::vm) fn execute_strict_equal_opcode(
         &self,
         agent: &Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -401,7 +402,7 @@ impl Vm {
 
     pub(in crate::vm) fn execute_equal_zero_opcode(
         &self,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> Value {
         let value = self.read_register(frame.registers(), register);
@@ -413,7 +414,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -432,7 +433,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -451,7 +452,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -470,7 +471,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         right: u16,
     ) -> VmResult<Value> {
@@ -484,71 +485,51 @@ impl Vm {
         })
     }
 
-    fn try_smi_add(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+    fn try_smi_add(&self, frame: FrameView, left: u16, right: u16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         let right = self.read_register(frame.registers(), right).as_smi()?;
         left.checked_add(right).map(Value::from_smi)
     }
 
-    fn try_smi_add_immediate(
-        &self,
-        frame: &FrameRecord,
-        left: u16,
-        immediate: i16,
-    ) -> Option<Value> {
+    fn try_smi_add_immediate(&self, frame: FrameView, left: u16, immediate: i16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         left.checked_add(i32::from(immediate)).map(Value::from_smi)
     }
 
-    fn try_smi_sub(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+    fn try_smi_sub(&self, frame: FrameView, left: u16, right: u16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         let right = self.read_register(frame.registers(), right).as_smi()?;
         left.checked_sub(right).map(Value::from_smi)
     }
 
-    fn try_smi_sub_immediate(
-        &self,
-        frame: &FrameRecord,
-        left: u16,
-        immediate: i16,
-    ) -> Option<Value> {
+    fn try_smi_sub_immediate(&self, frame: FrameView, left: u16, immediate: i16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         left.checked_sub(i32::from(immediate)).map(Value::from_smi)
     }
 
-    fn try_smi_mul(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+    fn try_smi_mul(&self, frame: FrameView, left: u16, right: u16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         let right = self.read_register(frame.registers(), right).as_smi()?;
         smi_mul_result(left, right)
     }
 
-    fn try_smi_mul_immediate(
-        &self,
-        frame: &FrameRecord,
-        left: u16,
-        immediate: i16,
-    ) -> Option<Value> {
+    fn try_smi_mul_immediate(&self, frame: FrameView, left: u16, immediate: i16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         smi_mul_result(left, i32::from(immediate))
     }
 
-    fn try_smi_mod(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+    fn try_smi_mod(&self, frame: FrameView, left: u16, right: u16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         let right = self.read_register(frame.registers(), right).as_smi()?;
         smi_mod_result(left, right)
     }
 
-    fn try_smi_mod_immediate(
-        &self,
-        frame: &FrameRecord,
-        left: u16,
-        immediate: i16,
-    ) -> Option<Value> {
+    fn try_smi_mod_immediate(&self, frame: FrameView, left: u16, immediate: i16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         smi_mod_result(left, i32::from(immediate))
     }
 
-    fn try_smi_bitand(&self, frame: &FrameRecord, left: u16, right: u16) -> Option<Value> {
+    fn try_smi_bitand(&self, frame: FrameView, left: u16, right: u16) -> Option<Value> {
         let left = self.read_register(frame.registers(), left).as_smi()?;
         let right = self.read_register(frame.registers(), right).as_smi()?;
         Some(Value::from_smi(left & right))
@@ -556,7 +537,7 @@ impl Vm {
 
     fn try_smi_bitand_immediate(
         &self,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: u16,
         immediate: i16,
     ) -> Option<Value> {
@@ -570,7 +551,7 @@ impl Vm {
     )]
     fn try_primitive_number_binary_opcode(
         &self,
-        frame: &FrameRecord,
+        frame: FrameView,
         opcode: Opcode,
         left: u16,
         right: u16,
@@ -680,7 +661,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: Value,
         right: Value,
     ) -> VmResult<bool> {
@@ -693,16 +674,28 @@ impl Vm {
             return Ok(false);
         }
         if left.is_object() && !right.is_object() {
-            let left =
-                self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
+            let caller_realm = self.realm_of(agent, frame.cfr());
+            let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+            let left = self.to_primitive(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                left,
+                ToPrimitiveHint::Default,
+            )?;
             return self.loosely_equal(agent, host, registry, frame, left, right);
         }
         if right.is_object() && !left.is_object() {
+            let caller_realm = self.realm_of(agent, frame.cfr());
+            let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
             let right = self.to_primitive(
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
                 right,
                 ToPrimitiveHint::Default,
             )?;
@@ -728,14 +721,17 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
         let primitive = self.to_primitive(
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
             self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
@@ -752,7 +748,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
         increment: bool,
     ) -> VmResult<(Value, Value)> {
@@ -770,16 +766,19 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
         compare_op: impl FnOnce(std::cmp::Ordering) -> bool,
     ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
         let left = self.to_primitive(
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
             self.read_register(frame.registers(), left_register),
             ToPrimitiveHint::Number,
         )?;
@@ -787,7 +786,8 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
             self.read_register(frame.registers(), right_register),
             ToPrimitiveHint::Number,
         )?;
@@ -829,7 +829,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -851,7 +851,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -876,7 +876,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -903,7 +903,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -930,7 +930,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -952,7 +952,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -974,7 +974,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -996,7 +996,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -1018,7 +1018,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -1093,30 +1093,28 @@ const fn number_to_u32_after_range_check(number: f64) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::RegisterWindow;
-    use lyng_env::ExecutionContextKind;
-    use lyng_types::{CodeRef, EnvironmentRef, RealmRef};
+    use crate::frame_header::HEADER_SLOTS;
+    use lyng_types::CodeRef;
 
-    fn test_frame() -> FrameRecord {
-        FrameRecord::new(
-            CodeRef::from_raw(1).expect("test code ref should be non-zero"),
-            0,
-            RegisterWindow::new(0, 2),
-            None,
-            RealmRef::from_raw(1).expect("test realm ref should be non-zero"),
-            EnvironmentRef::from_raw(1).expect("test lexical env should be non-zero"),
-            EnvironmentRef::from_raw(1).expect("test variable env should be non-zero"),
-            ExecutionContextKind::Script,
-        )
+    /// Construct a `FrameView` for a test window that starts at arena slot
+    /// `HEADER_SLOTS` (cfr = 0, registers base = `HEADER_SLOTS`). Callers must
+    /// seed register values at arena slots `HEADER_SLOTS + index`.
+    fn test_frame_view() -> FrameView {
+        let code = CodeRef::from_raw(1).expect("test code ref should be non-zero");
+        FrameView::new(0, 0, 2, code)
     }
 
     #[test]
     fn number_binary_opcode_smi_shortcut_handles_double_operands() {
         let mut vm = Vm::new();
-        vm.register_stack = vec![Value::from_f64(1.5), Value::from_f64(2.25)];
-        vm.register_stack_top = vm.register_stack.len();
+        // Seed at HEADER_SLOTS offset because FrameView with cfr=0 gives
+        // registers().base() = HEADER_SLOTS.
+        let mut seed = [Value::undefined(); HEADER_SLOTS + 2];
+        seed[HEADER_SLOTS] = Value::from_f64(1.5);
+        seed[HEADER_SLOTS + 1] = Value::from_f64(2.25);
+        vm.seed_register_stack_for_tests(&seed);
 
-        let value = vm.try_primitive_number_binary_opcode(&test_frame(), Opcode::Add, 0, 1);
+        let value = vm.try_primitive_number_binary_opcode(test_frame_view(), Opcode::Add, 0, 1);
 
         assert_eq!(
             value.and_then(Value::as_f64),

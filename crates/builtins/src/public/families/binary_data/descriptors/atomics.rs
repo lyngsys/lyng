@@ -3,11 +3,11 @@ use crate::{
 };
 use lyng_common::AtomId;
 use lyng_types::{
-    atomics_add_builtin, atomics_and_builtin, atomics_compare_exchange_builtin,
-    atomics_exchange_builtin, atomics_is_lock_free_builtin, atomics_load_builtin,
-    atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin, atomics_store_builtin,
-    atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin, atomics_xor_builtin,
-    Value, WellKnownSymbolId,
+    Value, WellKnownSymbolId, atomics_add_builtin, atomics_and_builtin,
+    atomics_compare_exchange_builtin, atomics_exchange_builtin, atomics_is_lock_free_builtin,
+    atomics_load_builtin, atomics_notify_builtin, atomics_or_builtin, atomics_pause_builtin,
+    atomics_store_builtin, atomics_sub_builtin, atomics_wait_async_builtin, atomics_wait_builtin,
+    atomics_xor_builtin,
 };
 
 pub(super) struct AtomicsDescriptorAtoms {

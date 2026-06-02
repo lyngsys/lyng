@@ -1,6 +1,6 @@
 use super::{
-    length_value_u64, normalize_relative_index_u64, range_error, to_index_for_builtin,
-    to_integer_or_infinity_for_builtin, type_error, PublicBuiltinDispatchContext,
+    PublicBuiltinDispatchContext, length_value_u64, normalize_relative_index_u64, range_error,
+    to_index_for_builtin, to_integer_or_infinity_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_common::WellKnownAtom;

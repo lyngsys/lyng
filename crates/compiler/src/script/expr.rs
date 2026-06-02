@@ -1,6 +1,7 @@
 use super::{
-    bigint_builtin, Expr, ExprId, FeedbackSiteKind, FunctionCompiler, FunctionId, FunctionKind,
+    Expr, ExprId, FeedbackSiteKind, FunctionCompiler, FunctionId, FunctionKind,
     ImportExpressionPhase, LoweringError, LoweringResult, Opcode, SafepointKind, WellKnownAtom,
+    bigint_builtin,
 };
 
 impl FunctionCompiler<'_, '_> {

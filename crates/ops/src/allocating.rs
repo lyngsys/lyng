@@ -1,6 +1,6 @@
 use crate::{
-    convert::{bigint_view_to_string, number_to_string, primitive_type_error},
     PrimitiveContext,
+    convert::{bigint_view_to_string, number_to_string, primitive_type_error},
 };
 use lyng_common::AtomId;
 use lyng_gc::{AllocationLifetime, PrimitiveStringView};

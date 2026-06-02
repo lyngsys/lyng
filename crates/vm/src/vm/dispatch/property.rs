@@ -3,11 +3,11 @@
     reason = "Property dispatch helpers sit on named/keyed access hot paths and are intentionally forced through small inline probes"
 )]
 
-use super::advance_dispatch_frame;
 use crate::error::VmResult;
+use crate::frame::FrameView;
 use crate::vm::property_access::VmProxyBridge;
 use crate::vm::registers::absolute_register;
-use crate::{FrameRecord, Vm, VmError};
+use crate::{Vm, VmError};
 use lyng_bytecode::Opcode;
 use lyng_common::AtomId;
 use lyng_env::Agent;
@@ -21,58 +21,52 @@ use lyng_ops::{errors, object};
 use lyng_types::{CodeRef, FeedbackSlotId, ObjectRef, PropertyDescriptor, PropertyKey, Value};
 
 impl Vm {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
-    )]
     pub(in crate::vm) fn execute_in_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        target: u16,
+        frame: FrameView,
         key_register: u16,
         receiver_register: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let key_value = self.read_register(frame.registers(), key_register);
         let receiver = self.read_register(frame.registers(), receiver_register);
-        let object_result = receiver
+        let object = receiver
             .as_object_ref()
-            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)));
-        let Some(object) = self.handle_dispatch_result(agent, frame_depth, frame, object_result)?
-        else {
-            return Ok(());
-        };
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
+            .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        let key = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        )?;
         let has_property = {
             let mut bridge = VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             };
             object::has_property_in_context(&mut bridge, object, key)
-        };
-        let Some(has_property) =
-            self.handle_dispatch_result(agent, frame_depth, frame, has_property)?
-        else {
-            return Ok(());
-        };
-        self.write_register(frame.registers(), target, Value::from_bool(has_property));
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        }?;
+        Ok(Value::from_bool(has_property))
     }
 
     #[expect(
         clippy::too_many_arguments,
-        clippy::too_many_lines,
         reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
     )]
     #[inline]
@@ -81,40 +75,31 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         feedback_slot: Option<FeedbackSlotId>,
-        target: u16,
         receiver_register: u16,
         atom_operand: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let registers = frame.registers();
         let receiver_index = absolute_register(registers, receiver_register);
-        let target_index = absolute_register(registers, target);
-        let receiver = self.register_stack[receiver_index];
+        let receiver = self.arena.slots()[receiver_index];
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
-        // Phase D.4.2 (C4 invariant): this function is the asm slow-path entry
-        // for `GetNamedProperty`. If the asm bailed because `meta.mode == 0`
-        // while the Rust-side IC is still live, repaint PropertyMetadata before
-        // returning so the next asm execution can take the inline IC route
-        // again. The common case (mode already non-zero) costs a single byte
-        // load + predicted-not-taken branch.
+        // Asm slow-path entry: repaint PropertyMetadata if stale so the next asm
+        // execution can take the inline IC route. Common case (mode non-zero) is a
+        // single byte load + predicted-not-taken branch.
         if let Some(slot) = feedback_slot {
             self.refresh_named_property_metadata_if_stale(frame.code(), slot);
         }
         let value = if let Some(object) = receiver.as_object_ref() {
-            // Phase 3 inline IC cache hit path: a single packed-handler load,
-            // one shape compare, one slot read. Bypasses the 4-deep
-            // try_named_property_load_inline_cache_hit ->
-            // try_load -> load_from_named_property_cache -> validated_holder
-            // chain on the monomorphic OwnData hit. Polymorphic /
-            // PrototypeData / megamorphic still fall through to the existing
-            // chain below. The epoch compare has been removed (Task A.2):
-            // AdaptiveProtoLoad watchpoints (Task A.1) clear the IC slot on
-            // any proto-chain mutation before the next cache-hit read, so the
-            // epoch check is now redundant.
+            // Monomorphic OwnData inline IC hit path: single packed-handler load,
+            // shape compare, slot read. Polymorphic / PrototypeData / megamorphic
+            // fall through below. AdaptiveProtoLoad watchpoints clear the IC slot
+            // on any proto-chain mutation, so no epoch check is needed.
             if let Some(handler) = self.named_property_own_data_handler(frame.code(), feedback_slot)
             {
                 let heap_view = agent.heap().view();
@@ -132,41 +117,27 @@ impl Vm {
                         if let Some(slot) = feedback_slot {
                             self.record_named_property_cache_hit(frame.code(), slot);
                         }
-                        self.register_stack[target_index] = value;
-                        advance_dispatch_frame(frame, instruction_len);
-                        return Ok(());
+                        return Ok(value);
                     }
                 }
             }
-            // Phase 3f polymorphic OwnData cache hit path. Walks the inline
-            // [NamedPropertyHandler; POLY_LIMIT] sidecar for a shape match
-            // before falling to the proto-data / slow chain below. This is
-            // the 2..POLY_LIMIT cached-shape equivalent of the Phase 3a
-            // monomorphic check above — same packed-handler decode, but
-            // chosen from a small fixed-size lookup rather than a single word.
+            // Polymorphic OwnData hit path: walks the [NamedPropertyHandler; POLY_LIMIT]
+            // sidecar for a shape match before falling to the proto-data or slow chain.
             if let Some(value) = self.try_named_property_polymorphic_own_data_load(
                 agent,
                 frame.code(),
                 feedback_slot,
                 object,
             ) {
-                self.register_stack[target_index] = value;
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
-            // Phase 3e one-hop PrototypeData inline cache hit path. Class method
-            // dispatch and Object.prototype lookups are PrototypeData with
-            // dependency_count==2 — the OwnData handler above rejected them,
-            // but this branch validates receiver shape+epoch and prototype
-            // shape+epoch in straight-line code before reading the cached
-            // slot off the prototype. Multi-hop PrototypeData and any other
-            // shape still fall through to the slow chain below.
+            // One-hop PrototypeData hit path: validates receiver shape + prototype shape
+            // before reading the cached slot off the prototype. Multi-hop and other
+            // shapes fall through to the slow chain.
             if let Some(value) =
                 self.try_named_property_proto_data_load(agent, frame.code(), feedback_slot, object)
             {
-                self.register_stack[target_index] = value;
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
             // Slow path: entries[POLY_LIMIT..entry_count] / multi-hop
             // PrototypeData / megamorphic / miss.
@@ -176,9 +147,7 @@ impl Vm {
                 feedback_slot,
                 object,
             ) {
-                self.register_stack[target_index] = value;
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
             if let Some(direct_get) =
                 agent
@@ -198,26 +167,25 @@ impl Vm {
                         value
                     }
                     NamedPropertyDirectGet::Absent => {
-                        // Phase D.4.2: absent loads only need a warmup ping; they
-                        // must not promote the slot to Megamorphic, and the
-                        // PropertyIcState lazy creation is not load-bearing in
-                        // production (the only reader of the absent-load
-                        // execution_count was a `#[cfg(test)]` snapshot helper).
+                        // Absent loads only need a warmup ping; must not promote to Megamorphic.
                         self.record_feedback_slot(frame.code(), feedback_slot);
                         Value::undefined()
                     }
                 };
-                self.register_stack[target_index] = value;
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
-            let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) =
-                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-            else {
-                return Ok(());
-            };
+            let property_result = self.get_property_from_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                receiver,
+                key,
+            );
+            let value = property_result?;
             self.observe_named_property_slow_path(
                 agent,
                 frame.code(),
@@ -228,25 +196,26 @@ impl Vm {
             );
             value
         } else {
-            let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) =
-                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-            else {
-                return Ok(());
-            };
-            value
+            let property_result = self.get_property_from_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                receiver,
+                key,
+            );
+            property_result?
         };
-        self.register_stack[target_index] = value;
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        Ok(value)
     }
 
     pub(crate) fn try_assign_named_property_rust_probe_for_dsl(
         &mut self,
         agent: &mut Agent,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         feedback_slot: Option<FeedbackSlotId>,
         receiver_register: u16,
         value_register: u16,
@@ -283,7 +252,6 @@ impl Vm {
             });
             if stored {
                 self.record_feedback_slot(frame.code(), feedback_slot);
-                advance_dispatch_frame(frame, instruction_len);
                 return true;
             }
             return false;
@@ -298,7 +266,6 @@ impl Vm {
         ) == Some(Some(true))
         {
             self.record_feedback_slot(frame.code(), feedback_slot);
-            advance_dispatch_frame(frame, instruction_len);
             return true;
         }
 
@@ -315,34 +282,31 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
         value_register: u16,
         atom_operand: u16,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let assignment = matches!(
             opcode,
             Opcode::AssignNamedProperty | Opcode::StrictAssignNamedProperty
         );
         let strict_assignment = matches!(opcode, Opcode::StrictAssignNamedProperty);
         let registers = frame.registers();
-        let receiver = self.register_stack[absolute_register(registers, receiver_register)];
-        let value = self.register_stack[absolute_register(registers, value_register)];
+        let receiver = self.arena.slots()[absolute_register(registers, receiver_register)];
+        let value = self.arena.slots()[absolute_register(registers, value_register)];
         let atom = self.read_atom_constant(frame.code(), u32::from(atom_operand))?;
         let key = PropertyKey::from_atom(atom);
         if let Some(object) = receiver.as_object_ref() {
-            // Phase 3b inline IC cache hit path (store side). Mirrors the Phase 3a
-            // load-side inlining: packed-handler load, shape compare, epoch
-            // compare, writable check, then a barrier-aware store via
-            // mut_store_value. Polymorphic / PrototypeData / megamorphic /
-            // proxy / miss continue through the existing chain below.
-            //
-            // Encodes the hit decision into Option<Option<ValueStoreTarget>>:
-            //   - Outer Some => take the cache hit path; stored = inner branch
+            // Monomorphic OwnData inline IC hit path (store side). Encodes the hit
+            // decision into Option<Option<ValueStoreTarget>>:
+            //   - Outer Some => take the cache hit path
             //   - Outer None => fall through to slow chain
             //   - Inner Some(target) => writable, do the store
             //   - Inner None        => read-only (writable bit clear), no store
@@ -384,24 +348,13 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 self.record_feedback_slot(frame.code(), feedback_slot);
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Phase 3f polymorphic OwnData store cache hit path. Walks the inline
-            // sidecar for a shape match across the same Option<Option<bool>>
-            // encoding as the monomorphic branch above:
-            //   Some(Some(true|false)) -> writable hit, store completed; the
-            //     inner bool is the stored-ness reported back to the
-            //     assignment-result check.
-            //   Some(None)             -> non-writable hit, stored=false.
-            //   None                   -> fall through to slow chain.
+            // Polymorphic OwnData store hit path. Same Option<Option<bool>> encoding:
+            // Some(Some(_))=writable hit, Some(None)=non-writable, None=fall through.
             if let Some(target_opt) = self.try_named_property_polymorphic_own_data_store(
                 agent,
                 frame.code(),
@@ -417,14 +370,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 self.record_feedback_slot(frame.code(), feedback_slot);
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             // Slow path: entries[POLY_LIMIT..entry_count] / PrototypeData /
@@ -444,14 +392,9 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 self.record_feedback_slot(frame.code(), feedback_slot);
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             match Self::try_named_property_transition_store(
@@ -470,15 +413,7 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
                     self.observe_named_property_cache_entry(
                         agent,
@@ -487,7 +422,6 @@ impl Vm {
                         Some(plan),
                         NamedPropertyCachePurpose::Store,
                     );
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 Ok(None) => {}
@@ -499,7 +433,18 @@ impl Vm {
                 // Proxy-chain assignment funnels existing-own-data writes through
                 // `Agent::define_own_property` (with this Vm as `vm_dispatch`), so
                 // the construct `.prototype` watchpoint is fired there.
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value)
+                self.set_property_on_value(
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
+                    receiver,
+                    key,
+                    value,
+                )
             } else {
                 // Non-proxy assignment stores in place via the objects-layer
                 // define, which carries no `vm_dispatch` and fires no watchpoints.
@@ -521,24 +466,26 @@ impl Vm {
                         }
                         Ok(result)
                     }
-                    Err(VmError::Abrupt(_)) => self
-                        .set_property_on_value(agent, host, registry, frame, receiver, key, value),
+                    Err(VmError::Abrupt(_)) => self.set_property_on_value(
+                        agent,
+                        host,
+                        registry,
+                        caller_realm,
+                        caller_lexical_env,
+                        caller_code,
+                        caller_pc,
+                        receiver,
+                        key,
+                        value,
+                    ),
                     Err(error) => Err(error),
                 }
             };
-            let Some(stored) =
-                self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
-            else {
-                return Ok(());
-            };
+            let stored = set_result?;
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                else {
-                    return Ok(());
-                };
+                assignment_result?;
             }
             self.observe_named_property_slow_path(
                 agent,
@@ -549,24 +496,25 @@ impl Vm {
                 NamedPropertyCachePurpose::Store,
             );
         } else {
-            let store_result =
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-            let Some(stored) =
-                self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
-            else {
-                return Ok(());
-            };
+            let store_result = self.set_property_on_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                receiver,
+                key,
+                value,
+            );
+            let stored = store_result?;
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                else {
-                    return Ok(());
-                };
+                assignment_result?;
             }
         }
-        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -579,9 +527,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         object_register: u16,
         value_register: u16,
         atom_operand: u16,
@@ -590,17 +536,7 @@ impl Vm {
         let value = self.read_register(frame.registers(), value_register);
         let key =
             PropertyKey::from_atom(self.read_atom_constant(frame.code(), u32::from(atom_operand))?);
-        self.define_data_property(
-            agent,
-            host,
-            registry,
-            frame_depth,
-            frame,
-            object,
-            key,
-            value,
-        )?;
-        advance_dispatch_frame(frame, instruction_len);
+        self.define_data_property(agent, host, registry, frame, object, key, value)?;
         Ok(())
     }
 
@@ -615,27 +551,25 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         feedback_slot: Option<FeedbackSlotId>,
-        target: u16,
         receiver_register: u16,
         key_register: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let receiver = self.read_register(frame.registers(), receiver_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
-        else {
-            return Ok(());
-        };
+        coercible_result?;
         if let Some(object) = receiver.as_object_ref()
             && let Some(index) = key_value
                 .as_smi()
                 .and_then(|index| u32::try_from(index).ok())
         {
-            // Phase 3d dense-index inline IC cache hit path (SMI key).
+            // Dense-index monomorphic IC hit (SMI key).
             if let Some(value) = self.try_keyed_dense_index_cache_load(
                 agent,
                 frame.code(),
@@ -643,11 +577,9 @@ impl Vm {
                 object,
                 index,
             ) {
-                self.write_register(frame.registers(), target, value);
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
-            // Phase 3f polymorphic dense-index OwnData cache hit path.
+            // Dense-index polymorphic IC hit (SMI key).
             if let Some(value) = self.try_keyed_dense_polymorphic_cache_load(
                 agent,
                 frame.code(),
@@ -655,9 +587,7 @@ impl Vm {
                 object,
                 index,
             ) {
-                self.write_register(frame.registers(), target, value);
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
             // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
             if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
@@ -667,15 +597,10 @@ impl Vm {
                 object,
                 index,
             ) {
-                self.write_register(frame.registers(), target, value);
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
             let value = if let Some(result) = self.mapped_arguments_get(agent, object, index) {
-                let Some(value) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
-                else {
-                    return Ok(());
-                };
+                let value = result?;
                 Some(value)
             } else if let Some(value) =
                 Self::try_direct_typed_array_index_value(agent, object, index)
@@ -686,18 +611,23 @@ impl Vm {
             };
             if let Some(value) = value {
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
-                self.write_register(frame.registers(), target, value);
-                advance_dispatch_frame(frame, instruction_len);
-                return Ok(());
+                return Ok(value);
             }
         }
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
+        let key_result = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        );
+        let key = key_result?;
         let value = if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
-                // Phase 3d dense-index inline IC cache hit path (post-coercion index).
+                // Dense-index monomorphic IC hit (post-coercion index).
                 if let Some(value) = self.try_keyed_dense_index_cache_load(
                     agent,
                     frame.code(),
@@ -705,11 +635,9 @@ impl Vm {
                     object,
                     index,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
-                // Phase 3f polymorphic dense-index OwnData cache hit path.
+                // Dense-index polymorphic IC hit (post-coercion index).
                 if let Some(value) = self.try_keyed_dense_polymorphic_cache_load(
                     agent,
                     frame.code(),
@@ -717,9 +645,7 @@ impl Vm {
                     object,
                     index,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
                 // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
                 if let Some(value) = self.try_keyed_dense_index_load_inline_cache_hit(
@@ -729,17 +655,10 @@ impl Vm {
                     object,
                     index,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
                 let value = if let Some(result) = self.mapped_arguments_get(agent, object, index) {
-                    let Some(value) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, result)?
-                    else {
-                        return Ok(());
-                    };
-                    value
+                    result?
                 } else if let Some(value) =
                     Self::try_direct_typed_array_index_value(agent, object, index)
                 {
@@ -748,19 +667,23 @@ impl Vm {
                 {
                     value
                 } else {
-                    let property_result =
-                        self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                    let Some(value) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-                    else {
-                        return Ok(());
-                    };
-                    value
+                    let property_result = self.get_property_from_value(
+                        agent,
+                        host,
+                        registry,
+                        caller_realm,
+                        caller_lexical_env,
+                        caller_code,
+                        caller_pc,
+                        receiver,
+                        key,
+                    );
+                    property_result?
                 };
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
                 value
             } else if let Some(atom) = key.as_atom() {
-                // Phase 3d named-keyed (atom) inline IC cache hit path.
+                // Named-keyed monomorphic OwnData IC hit.
                 if let Some(value) = self.try_keyed_named_own_data_load(
                     agent,
                     frame.code(),
@@ -768,13 +691,9 @@ impl Vm {
                     object,
                     atom,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
-                // Phase 3f polymorphic named-keyed (atom) OwnData cache hit path.
-                // Same inline-sidecar walk as the non-keyed variant, but with
-                // an extra atom-equality check inside the lookup.
+                // Named-keyed polymorphic OwnData IC hit (extra atom-equality check).
                 if let Some(value) = self.try_keyed_named_polymorphic_own_data_load(
                     agent,
                     frame.code(),
@@ -782,11 +701,9 @@ impl Vm {
                     object,
                     atom,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
-                // Phase 3e named-keyed (atom) one-hop PrototypeData cache hit path.
+                // Named-keyed one-hop PrototypeData IC hit.
                 if let Some(value) = self.try_keyed_named_proto_data_load(
                     agent,
                     frame.code(),
@@ -794,9 +711,7 @@ impl Vm {
                     object,
                     atom,
                 ) {
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
                 // Slow path: named_entries[POLY_LIMIT..] / multi-hop
                 // PrototypeData / megamorphic / Generic / miss.
@@ -808,17 +723,20 @@ impl Vm {
                     atom,
                 ) {
                     self.record_feedback_slot(frame.code(), feedback_slot);
-                    self.write_register(frame.registers(), target, value);
-                    advance_dispatch_frame(frame, instruction_len);
-                    return Ok(());
+                    return Ok(value);
                 }
-                let property_result =
-                    self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                let Some(value) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-                else {
-                    return Ok(());
-                };
+                let property_result = self.get_property_from_value(
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
+                    receiver,
+                    key,
+                );
+                let value = property_result?;
                 self.observe_keyed_atom_slow_path(
                     agent,
                     frame.code(),
@@ -829,29 +747,36 @@ impl Vm {
                 );
                 value
             } else {
-                let property_result =
-                    self.get_property_from_value(agent, host, registry, frame, receiver, key);
-                let Some(value) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-                else {
-                    return Ok(());
-                };
+                let property_result = self.get_property_from_value(
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
+                    receiver,
+                    key,
+                );
+                let value = property_result?;
                 self.observe_keyed_generic_slow_path(frame.code(), feedback_slot);
                 value
             }
         } else {
-            let property_result =
-                self.get_property_from_value(agent, host, registry, frame, receiver, key);
-            let Some(value) =
-                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-            else {
-                return Ok(());
-            };
-            value
+            let property_result = self.get_property_from_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                receiver,
+                key,
+            );
+            property_result?
         };
-        self.write_register(frame.registers(), target, value);
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        Ok(value)
     }
 
     #[expect(
@@ -864,15 +789,17 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         feedback_slot: Option<FeedbackSlotId>,
         opcode: Opcode,
         receiver_register: u16,
         value_register: u16,
         key_register: u16,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let assignment = matches!(
             opcode,
             Opcode::AssignKeyedProperty | Opcode::StrictAssignKeyedProperty
@@ -882,16 +809,13 @@ impl Vm {
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
-        else {
-            return Ok(());
-        };
+        coercible_result?;
         if let Some(object) = receiver.as_object_ref()
             && let Some(index) = key_value
                 .as_smi()
                 .and_then(|index| u32::try_from(index).ok())
         {
-            // Phase 3d dense-index inline IC cache hit path (SMI key, store side).
+            // Dense-index monomorphic IC hit (SMI key, store).
             if let Some(stored) = self.try_keyed_dense_index_cache_store(
                 agent,
                 frame.code(),
@@ -907,16 +831,11 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
-            // Phase 3f polymorphic dense-index OwnData store cache hit path.
+            // Dense-index polymorphic IC hit (SMI key, store).
             if let Some(stored) = self.try_keyed_dense_polymorphic_cache_store(
                 agent,
                 frame.code(),
@@ -932,13 +851,8 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
@@ -957,62 +871,48 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
             let mut used_index_direct_path = false;
-            let stored = if let Some(result) =
-                self.mapped_arguments_set(agent, object, index, value)
-            {
-                let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
-                else {
-                    return Ok(());
-                };
-                Some(true)
-            } else {
-                let direct_result = self.try_direct_set_typed_array_index(
-                    agent, host, registry, frame, object, index, value,
-                );
-                let Some(direct_result) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, direct_result)?
-                else {
-                    return Ok(());
-                };
-                if let Some(stored) = direct_result {
-                    used_index_direct_path = true;
-                    Some(stored)
+            let stored =
+                if let Some(result) = self.mapped_arguments_set(agent, object, index, value) {
+                    result?;
+                    Some(true)
                 } else {
-                    let direct_result =
-                        Self::try_direct_set_engine_array_index(agent, object, index, value);
-                    let Some(direct_result) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, direct_result)?
-                    else {
-                        return Ok(());
-                    };
+                    let direct_result = self.try_direct_set_typed_array_index(
+                        agent,
+                        host,
+                        registry,
+                        caller_realm,
+                        caller_lexical_env,
+                        object,
+                        index,
+                        value,
+                    );
+                    let direct_result = direct_result?;
                     if let Some(stored) = direct_result {
                         used_index_direct_path = true;
                         Some(stored)
                     } else {
-                        let direct_result = Self::try_direct_set_ordinary_index_data_property(
-                            agent, object, index, value,
-                        );
-                        let Some(direct_result) =
-                            self.handle_dispatch_result(agent, frame_depth, frame, direct_result)?
-                        else {
-                            return Ok(());
-                        };
-                        direct_result.inspect(|_| {
+                        let direct_result =
+                            Self::try_direct_set_engine_array_index(agent, object, index, value);
+                        let direct_result = direct_result?;
+                        if let Some(stored) = direct_result {
                             used_index_direct_path = true;
-                        })
+                            Some(stored)
+                        } else {
+                            let direct_result = Self::try_direct_set_ordinary_index_data_property(
+                                agent, object, index, value,
+                            );
+                            let direct_result = direct_result?;
+                            direct_result.inspect(|_| {
+                                used_index_direct_path = true;
+                            })
+                        }
                     }
-                }
-            };
+                };
             if let Some(stored) = stored {
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
@@ -1021,27 +921,29 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 if !used_index_direct_path {
                     Self::sync_engine_array_length(agent, object)?;
                 }
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
-                advance_dispatch_frame(frame, instruction_len);
                 return Ok(());
             }
         }
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
+        let key_result = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        );
+        let key = key_result?;
         if let Some(object) = receiver.as_object_ref() {
             if let Some(index) = key.as_index() {
-                // Phase 3d dense-index inline IC cache hit path (post-coercion index, store side).
+                // Dense-index monomorphic IC hit (post-coercion index, store).
                 if let Some(stored) = self.try_keyed_dense_index_cache_store(
                     agent,
                     frame.code(),
@@ -1057,20 +959,11 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Phase 3f polymorphic dense-index OwnData store cache hit path.
+                // Dense-index polymorphic IC hit (post-coercion index, store).
                 if let Some(stored) = self.try_keyed_dense_polymorphic_cache_store(
                     agent,
                     frame.code(),
@@ -1086,17 +979,8 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 // Slow path: dense_entries[POLY_LIMIT..] / Generic / megamorphic / miss.
@@ -1115,49 +999,35 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 let mut used_index_direct_path = false;
                 let stored = if let Some(result) =
                     self.mapped_arguments_set(agent, object, index, value)
                 {
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, result)?
-                    else {
-                        return Ok(());
-                    };
+                    result?;
                     true
                 } else {
                     let direct_result = self.try_direct_set_typed_array_index(
-                        agent, host, registry, frame, object, index, value,
+                        agent,
+                        host,
+                        registry,
+                        caller_realm,
+                        caller_lexical_env,
+                        object,
+                        index,
+                        value,
                     );
-                    let Some(direct_result) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, direct_result)?
-                    else {
-                        return Ok(());
-                    };
+                    let direct_result = direct_result?;
                     if let Some(stored) = direct_result {
                         used_index_direct_path = true;
                         stored
                     } else {
                         let direct_result =
                             Self::try_direct_set_engine_array_index(agent, object, index, value);
-                        let Some(direct_result) =
-                            self.handle_dispatch_result(agent, frame_depth, frame, direct_result)?
-                        else {
-                            return Ok(());
-                        };
+                        let direct_result = direct_result?;
                         if let Some(stored) = direct_result {
                             used_index_direct_path = true;
                             stored
@@ -1165,32 +1035,24 @@ impl Vm {
                             let direct_result = Self::try_direct_set_ordinary_index_data_property(
                                 agent, object, index, value,
                             );
-                            let Some(direct_result) = self.handle_dispatch_result(
-                                agent,
-                                frame_depth,
-                                frame,
-                                direct_result,
-                            )?
-                            else {
-                                return Ok(());
-                            };
+                            let direct_result = direct_result?;
                             if let Some(stored) = direct_result {
                                 used_index_direct_path = true;
                                 stored
                             } else {
                                 let set_result = self.set_property_on_value(
-                                    agent, host, registry, frame, receiver, key, value,
-                                );
-                                let Some(stored) = self.handle_dispatch_result(
                                     agent,
-                                    frame_depth,
-                                    frame,
-                                    set_result,
-                                )?
-                                else {
-                                    return Ok(());
-                                };
-                                stored
+                                    host,
+                                    registry,
+                                    caller_realm,
+                                    caller_lexical_env,
+                                    caller_code,
+                                    caller_pc,
+                                    receiver,
+                                    key,
+                                    value,
+                                );
+                                set_result?
                             }
                         }
                     }
@@ -1202,18 +1064,14 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 if !used_index_direct_path {
                     Self::sync_engine_array_length(agent, object)?;
                 }
                 self.observe_keyed_index_access(agent, frame.code(), feedback_slot, object, index);
             } else if let Some(atom) = key.as_atom() {
-                // Phase 3d named-keyed (atom) inline IC cache hit path (store side).
+                // Named-keyed monomorphic OwnData IC hit (store).
                 if let Some(stored) = self.try_keyed_named_own_data_store(
                     agent,
                     frame.code(),
@@ -1229,22 +1087,11 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                // Phase 3f polymorphic named-keyed (atom) OwnData store cache
-                // path. Walks the inline sidecar for a shape+atom match
-                // before falling to the slow chain.
+                // Named-keyed polymorphic OwnData IC hit (store).
                 if let Some(stored) = self.try_keyed_named_polymorphic_own_data_store(
                     agent,
                     frame.code(),
@@ -1260,17 +1107,8 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
                 // Slow path: named_entries[POLY_LIMIT..] / megamorphic /
@@ -1290,27 +1128,24 @@ impl Vm {
                             stored,
                             strict_assignment,
                         );
-                        let Some(()) = self.handle_dispatch_result(
-                            agent,
-                            frame_depth,
-                            frame,
-                            assignment_result,
-                        )?
-                        else {
-                            return Ok(());
-                        };
+                        assignment_result?;
                     }
                     self.record_feedback_slot(frame.code(), feedback_slot);
-                    advance_dispatch_frame(frame, instruction_len);
                     return Ok(());
                 }
-                let set_result =
-                    self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-                let Some(stored) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
-                else {
-                    return Ok(());
-                };
+                let set_result = self.set_property_on_value(
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
+                    receiver,
+                    key,
+                    value,
+                );
+                let stored = set_result?;
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
                         agent,
@@ -1318,11 +1153,7 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 self.observe_keyed_atom_slow_path(
                     agent,
@@ -1333,13 +1164,19 @@ impl Vm {
                     NamedPropertyCachePurpose::Store,
                 );
             } else {
-                let set_result =
-                    self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-                let Some(stored) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, set_result)?
-                else {
-                    return Ok(());
-                };
+                let set_result = self.set_property_on_value(
+                    agent,
+                    host,
+                    registry,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
+                    receiver,
+                    key,
+                    value,
+                );
+                let stored = set_result?;
                 if assignment {
                     let assignment_result = self.check_property_assignment_result(
                         agent,
@@ -1347,33 +1184,30 @@ impl Vm {
                         stored,
                         strict_assignment,
                     );
-                    let Some(()) =
-                        self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                    else {
-                        return Ok(());
-                    };
+                    assignment_result?;
                 }
                 self.observe_keyed_generic_slow_path(frame.code(), feedback_slot);
             }
         } else {
-            let store_result =
-                self.set_property_on_value(agent, host, registry, frame, receiver, key, value);
-            let Some(stored) =
-                self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
-            else {
-                return Ok(());
-            };
+            let store_result = self.set_property_on_value(
+                agent,
+                host,
+                registry,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
+                receiver,
+                key,
+                value,
+            );
+            let stored = store_result?;
             if assignment {
                 let assignment_result =
                     self.check_property_assignment_result(agent, frame, stored, strict_assignment);
-                let Some(()) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, assignment_result)?
-                else {
-                    return Ok(());
-                };
+                assignment_result?;
             }
         }
-        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
@@ -1386,107 +1220,108 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         object_register: u16,
         value_register: u16,
         key_register: u16,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let object = self.object_register(frame, object_register)?;
         let value = self.read_register(frame.registers(), value_register);
         let key_value = self.read_register(frame.registers(), key_register);
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
-        self.define_data_property(
+        let key_result = self.property_key_from_value(
             agent,
             host,
             registry,
-            frame_depth,
-            frame,
-            object,
-            key,
-            value,
-        )?;
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        );
+        let key = key_result?;
+        self.define_data_property(agent, host, registry, frame, object, key, value)?;
         if key.as_index().is_some() {
             Self::sync_engine_array_length(agent, object)?;
         }
-        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and dispatch state explicitly at call sites"
-    )]
     pub(in crate::vm) fn execute_to_property_key_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        target: u16,
+        frame: FrameView,
         key_register: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let key_value = self.read_register(frame.registers(), key_register);
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
+        let key_result = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        );
+        let key = key_result?;
         let value = self.property_key_to_enumeration_value(agent, key);
-        self.write_register(frame.registers(), target, value);
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        Ok(value)
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
-    )]
     pub(in crate::vm) fn execute_delete_property_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        target: u16,
+        frame: FrameView,
         receiver_register: u16,
         key_register: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let receiver = self.read_register(frame.registers(), receiver_register);
         let key_value = self.read_register(frame.registers(), key_register);
         let coercible_result = Self::check_object_coercible(agent, receiver);
-        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, coercible_result)?
-        else {
-            return Ok(());
-        };
-        let key_result = self.property_key_from_value(agent, host, registry, frame, key_value);
-        let Some(key) = self.handle_dispatch_result(agent, frame_depth, frame, key_result)? else {
-            return Ok(());
-        };
-        let delete_result =
-            self.delete_property_from_value(agent, host, registry, frame, receiver, key);
-        let Some(deleted) =
-            self.handle_dispatch_result(agent, frame_depth, frame, delete_result)?
-        else {
-            return Ok(());
-        };
+        coercible_result?;
+        let key_result = self.property_key_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            key_value,
+        );
+        let key = key_result?;
+        let delete_result = self.delete_property_from_value(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            receiver,
+            key,
+        );
+        let deleted = delete_result?;
         if !deleted && self.frame_is_strict(frame) {
-            let type_error = Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, type_error)?
-            else {
-                return Ok(());
-            };
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        self.write_register(frame.registers(), target, Value::from_bool(deleted));
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        Ok(Value::from_bool(deleted))
     }
 
     #[expect(
@@ -1498,22 +1333,31 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         target_register: u16,
         source_register: u16,
         excluded_register: u16,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let target = self.object_register(frame, target_register)?;
         let source = self.read_register(frame.registers(), source_register);
         let excluded_keys = self.read_register(frame.registers(), excluded_register);
-        let copy_result =
-            self.copy_data_properties(agent, host, registry, frame, target, source, excluded_keys);
-        let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, copy_result)? else {
-            return Ok(());
-        };
-        advance_dispatch_frame(frame, instruction_len);
+        let copy_result = self.copy_data_properties(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
+            target,
+            source,
+            excluded_keys,
+        );
+        copy_result?;
         Ok(())
     }
 
@@ -1526,13 +1370,15 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
+        frame: FrameView,
         receiver_register: u16,
         value_register: u16,
         index_operand: u16,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let receiver = self.read_register(frame.registers(), receiver_register);
         let value = self.read_register(frame.registers(), value_register);
         if let Some(object) = receiver.as_object_ref() {
@@ -1556,45 +1402,37 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
                 receiver,
                 PropertyKey::Index(u32::from(index_operand)),
                 value,
             );
-            let Some(_) = self.handle_dispatch_result(agent, frame_depth, frame, store_result)?
-            else {
-                return Ok(());
-            };
+            store_result?;
         }
-        advance_dispatch_frame(frame, instruction_len);
         Ok(())
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper keeps dispatch state explicit while isolating the property opcode family"
-    )]
     pub(in crate::vm) fn execute_load_dense_element_opcode(
         &mut self,
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
-        instruction_len: u32,
-        target: u16,
+        frame: FrameView,
         receiver_register: u16,
         index_operand: u16,
-    ) -> VmResult<()> {
+    ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let receiver = self.read_register(frame.registers(), receiver_register);
         let value = if let Some(object) = receiver.as_object_ref() {
             if let Some(result) = self.mapped_arguments_get(agent, object, u32::from(index_operand))
             {
-                let Some(value) = self.handle_dispatch_result(agent, frame_depth, frame, result)?
-                else {
-                    return Ok(());
-                };
-                value
+                result?
             } else if let Some(value) =
                 Self::try_direct_own_index_value(agent, object, u32::from(index_operand))?
             {
@@ -1604,16 +1442,14 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                     receiver,
                     PropertyKey::Index(u32::from(index_operand)),
                 );
-                let Some(value) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-                else {
-                    return Ok(());
-                };
-                value
+                property_result?
             } else {
                 let element = object::ordinary_get(
                     agent,
@@ -1621,32 +1457,23 @@ impl Vm {
                     PropertyKey::Index(u32::from(index_operand)),
                 )
                 .map_err(VmError::Abrupt);
-                let Some(value) =
-                    self.handle_dispatch_result(agent, frame_depth, frame, element)?
-                else {
-                    return Ok(());
-                };
-                value
+                element?
             }
         } else {
             let property_result = self.get_property_from_value(
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
                 receiver,
                 PropertyKey::Index(u32::from(index_operand)),
             );
-            let Some(value) =
-                self.handle_dispatch_result(agent, frame_depth, frame, property_result)?
-            else {
-                return Ok(());
-            };
-            value
+            property_result?
         };
-        self.write_register(frame.registers(), target, value);
-        advance_dispatch_frame(frame, instruction_len);
-        Ok(())
+        Ok(value)
     }
 
     #[expect(
@@ -1658,12 +1485,15 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         object: lyng_types::ObjectRef,
         key: PropertyKey,
         value: Value,
     ) -> VmResult<()> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let caller_code = frame.code();
+        let caller_pc = frame.instruction_offset();
         let mut descriptor = PropertyDescriptor::new();
         descriptor.set_value(value);
         descriptor.set_writable(true);
@@ -1675,24 +1505,19 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             object,
             key,
             descriptor,
             AllocationLifetime::Default,
         );
-        let Some(created) =
-            self.handle_dispatch_result(agent, frame_depth, frame, define_result)?
-        else {
-            return Ok(());
-        };
+        let created = define_result?;
         if !created {
-            let type_error = Err(VmError::Abrupt(errors::throw_type_error(agent)));
-            let Some(()) = self.handle_dispatch_result(agent, frame_depth, frame, type_error)?
-            else {
-                return Ok(());
-            };
+            return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
         Ok(())
     }
@@ -1700,7 +1525,7 @@ impl Vm {
     fn check_property_assignment_result(
         &self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         stored: bool,
         strict_override: bool,
     ) -> VmResult<()> {
@@ -1733,20 +1558,15 @@ impl Vm {
                 objects.store_to_named_property_cache(&mut mutator, object, key, plan, value)?;
             Ok(stored.map(|stored| (stored, plan)))
         });
-        // Fire watchpoints on the parent (pre-transition) shape whenever a
-        // transition was planned — receiver_shape() is the parent shape that
-        // was passed to ObjectRuntime::transition_shape inside the plan call.
+        // Fire watchpoints on the pre-transition shape for any successful plan.
         if let Ok(Some((_, plan))) = result {
             agent.fire_watchpoints_for_shape(plan.receiver_shape(), vm_dispatch);
         }
         result
     }
 
-    /// Phase 3d dense-keyed load cache hit path. Returns the cached element
-    /// value on a monomorphic-DenseIndex hit, falling through to `None`
-    /// on shape/flags miss, hole, or any cache state other than monomorphic.
-    /// Records tier bookkeeping on hit. Mirrors the trailing two lines of
-    /// `try_keyed_dense_index_load_inline_cache_hit`.
+    /// Monomorphic dense-index load IC hit. Returns the cached element value,
+    /// or `None` on shape/flags miss, hole, or non-monomorphic cache state.
     #[inline(always)]
     fn try_keyed_dense_index_cache_load(
         &mut self,
@@ -1778,10 +1598,8 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3d dense-keyed store cache hit path. Returns `Some(true)` on a
-    /// successful barrier-aware write, `None` on miss / hole / shape
-    /// mismatch / out-of-bounds. Mirrors the guards in
-    /// `KeyedPropertyFeedback::try_dense_index_store`.
+    /// Monomorphic dense-index store IC hit. Returns `Some(true)` on a successful
+    /// barrier-aware write, `None` on miss / hole / shape mismatch / out-of-bounds.
     #[inline(always)]
     fn try_keyed_dense_index_cache_store(
         &mut self,
@@ -1828,10 +1646,8 @@ impl Vm {
         Some(true)
     }
 
-    /// Phase 3d named-keyed (atom) load cache hit path. Returns the cached
-    /// slot value on a monomorphic-NamedAtom hit, `None` on miss.
-    /// Records the slot via `record_feedback_slot` (matching the slow
-    /// chain's bookkeeping on atom hit).
+    /// Monomorphic named-keyed (atom) `OwnData` load IC hit. Returns the cached slot
+    /// value, or `None` on miss.
     #[inline(always)]
     fn try_keyed_named_own_data_load(
         &mut self,
@@ -1858,17 +1674,10 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3e named-property (non-keyed) one-hop `PrototypeData` cache
-    /// path. Returns the cached slot value from the prototype holder on a
-    /// monomorphic + one-hop `PrototypeData` hit, `None` on any miss
-    /// (shape mismatch on receiver or prototype, missing prototype, etc.).
-    /// Bypasses the slow chain on the dominant class-method-dispatch /
-    /// `Object.prototype` lookup pattern.
-    ///
-    /// The epoch comparisons have been removed (Task A.2): `AdaptiveProtoLoad`
-    /// watchpoints registered at IC install time (Task A.1) fire on any
-    /// proto-chain mutation and clear the IC slot before the next read,
-    /// making the epoch checks on both receiver and prototype redundant.
+    /// Monomorphic one-hop `PrototypeData` load IC hit (non-keyed). Validates
+    /// receiver shape + prototype shape, then reads the cached slot from the
+    /// prototype. Returns `None` on any miss. `AdaptiveProtoLoad` watchpoints
+    /// clear the IC slot on proto-chain mutation, so no epoch check is needed.
     #[inline(always)]
     pub(in crate::vm) fn try_named_property_proto_data_load(
         &mut self,
@@ -1901,12 +1710,8 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3e named-keyed (atom) one-hop `PrototypeData` cache hit path.
-    /// Returns the cached slot value from the prototype holder on a
-    /// monomorphic + `NamedAtom` + one-hop `PrototypeData` hit, `None` on
-    /// miss (shape/epoch mismatch on receiver or prototype, missing
-    /// prototype, etc.). Records the slot via `record_feedback_slot`
-    /// matching the `OwnData` sibling.
+    /// Monomorphic named-keyed (atom) one-hop `PrototypeData` load IC hit.
+    /// Returns the cached slot value from the prototype, or `None` on miss.
     #[inline(always)]
     fn try_keyed_named_proto_data_load(
         &mut self,
@@ -1938,11 +1743,8 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3d named-keyed (atom) store cache hit path. Returns `Some(stored)`
-    /// on a monomorphic-NamedAtom hit, `None` on miss. Non-writable
-    /// hits return `Some(false)` (matching slow-chain semantics — the
-    /// caller's `assignment` logic converts this to a `TypeError` in
-    /// strict mode).
+    /// Monomorphic named-keyed (atom) `OwnData` store IC hit. Returns `Some(stored)`
+    /// on hit (`Some(false)` for non-writable), `None` on miss.
     #[inline(always)]
     fn try_keyed_named_own_data_store(
         &mut self,
@@ -1979,17 +1781,9 @@ impl Vm {
         Some(stored)
     }
 
-    /// Phase 3f named-property (non-keyed) polymorphic `OwnData` cache hit path.
-    /// Walks the receiver shape through the inline polymorphic sidecar
-    /// (up to `POLY_LIMIT` cached shapes), returning the slot value on
-    /// hit. Returns `None` on any miss — shape not in the sidecar or
-    /// unloadable slot — so the caller can fall through to the proto-cache
-    /// hit path or the slow chain. The receiver shape is loaded once and
-    /// reused for the inline walk + slot read.
-    ///
-    /// The epoch comparison has been removed (Task A.2): `AdaptiveProtoLoad`
-    /// watchpoints clear the IC slot on proto-chain mutations before the
-    /// next cache-hit read, making the epoch check redundant.
+    /// Polymorphic `OwnData` load IC hit (non-keyed). Walks the inline sidecar
+    /// (up to `POLY_LIMIT` shapes) for a shape match. Returns `None` on miss.
+    /// `AdaptiveProtoLoad` watchpoints clear the IC on proto-chain mutation.
     #[inline(always)]
     pub(in crate::vm) fn try_named_property_polymorphic_own_data_load(
         &mut self,
@@ -2016,19 +1810,12 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3f named-property (non-keyed) polymorphic `OwnData` store cache
-    /// path. Mirrors [`Self::try_named_property_polymorphic_own_data_load`]
-    /// for the Set / Assign / `StrictAssign` / `StoreGlobal` / `AssignGlobal`
-    /// opcode family.
+    /// Polymorphic `OwnData` store IC hit (non-keyed). Mirrors
+    /// [`Self::try_named_property_polymorphic_own_data_load`] for Set /
+    /// Assign / `StrictAssign` / global-store opcodes.
     ///
-    /// Encodes the hit decision into `Option<Option<bool>>` to match the
-    /// Phase 3a–3c store-side pattern:
-    /// - `None` — fall through to the slow chain.
-    /// - `Some(Some(true))` — writable hit, value stored.
-    /// - `Some(Some(false))` — writable hit, but the heap write barrier
-    ///   declined the store (e.g. immutable target).
-    /// - `Some(None)` — non-writable hit; slow-chain analog returns
-    ///   `Ok(Some(false))` and the caller handles the strict-mode error.
+    /// `Option<Option<bool>>` encoding: `None`=miss, `Some(None)`=non-writable
+    /// hit, `Some(Some(stored))`=writable hit with barrier result.
     #[inline(always)]
     #[allow(
         clippy::option_option,
@@ -2064,11 +1851,8 @@ impl Vm {
         Some(Some(stored))
     }
 
-    /// Phase 3f named-keyed (atom) polymorphic `OwnData` load cache hit path.
-    /// Walks the keyed-atom polymorphic sidecar matching both the atom
-    /// and the receiver shape. Mirrors
-    /// [`Self::try_named_property_polymorphic_own_data_load`] for the keyed
-    /// IC family.
+    /// Polymorphic named-keyed (atom) `OwnData` load IC hit. Matches atom + shape
+    /// in the keyed polymorphic sidecar. Returns `None` on miss.
     #[inline(always)]
     fn try_keyed_named_polymorphic_own_data_load(
         &mut self,
@@ -2098,9 +1882,8 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3f dense-keyed polymorphic cache load. Walks the inline
-    /// `[KeyedDenseIndexHandler; POLY_LIMIT]` sidecar for a shape+flags
-    /// match before falling to the slow chain. Mirrors
+    /// Polymorphic dense-index load IC hit. Walks the `[KeyedDenseIndexHandler; POLY_LIMIT]`
+    /// sidecar for a shape+flags match. Mirrors
     /// [`Self::try_keyed_dense_index_cache_load`] for shapes `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_dense_polymorphic_cache_load(
@@ -2138,7 +1921,7 @@ impl Vm {
         Some(value)
     }
 
-    /// Phase 3f dense-keyed polymorphic cache store. Mirrors
+    /// Polymorphic dense-index store IC hit. Mirrors
     /// [`Self::try_keyed_dense_index_cache_store`] for shapes `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_dense_polymorphic_cache_store(
@@ -2191,9 +1974,8 @@ impl Vm {
         Some(true)
     }
 
-    /// Phase 3f named-keyed (atom) polymorphic `OwnData` store cache hit path.
-    /// Mirrors [`Self::try_keyed_named_own_data_store`] for shapes
-    /// `2..POLY_LIMIT`.
+    /// Polymorphic named-keyed (atom) `OwnData` store IC hit. Mirrors
+    /// [`Self::try_keyed_named_own_data_store`] for shapes `2..POLY_LIMIT`.
     #[inline(always)]
     fn try_keyed_named_polymorphic_own_data_store(
         &mut self,

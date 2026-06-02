@@ -49,7 +49,9 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
 
     // Write a summary report at output_dir/README.md.
-    let mut summary = String::from("# JSC LLInt reference asm\n\nCaptured by `lyng-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n");
+    let mut summary = String::from(
+        "# JSC LLInt reference asm\n\nCaptured by `lyng-bench capture-llint`.\n\n| Opcode | Source mode |\n|---|---|\n",
+    );
     for (opcode, mode) in &produced {
         writeln!(summary, "| `{opcode}` | {mode:?} |").expect("writing to a String cannot fail");
     }
@@ -310,7 +312,7 @@ fn parse_args(args: &[String]) -> Result<CaptureLlintOptions, String> {
                 return Err(format!(
                     "capture-llint: unknown arg {other}\n\n{}",
                     help_text()
-                ))
+                ));
             }
         }
     }

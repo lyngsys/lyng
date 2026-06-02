@@ -8,7 +8,7 @@ use lyng_env::{
 use lyng_host::HostJobKind;
 use lyng_ops::{errors, read};
 use lyng_types::{
-    abstract_module_source_builtin, EmbeddingFunctionId, ObjectRef, PropertyKey, Value,
+    EmbeddingFunctionId, ObjectRef, PropertyKey, Value, abstract_module_source_builtin,
 };
 use lyng_vm::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,

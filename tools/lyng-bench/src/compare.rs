@@ -1,6 +1,6 @@
 mod v8_v7;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,8 +21,7 @@ const ARRAY_OBJECT_NOTE: &str =
     "Array growth, dense indexed reads, object literals, and named property reads.";
 const POLYMORPHIC_PROPERTY_NOTE: &str =
     "Single named-property load site cycling through six receiver shapes.";
-const PAIR_INSTANCEOF_NOTE: &str =
-    "EarleyBoyer-shaped global constructor calls, pair allocation, car/cdr property traffic, and instanceof checks.";
+const PAIR_INSTANCEOF_NOTE: &str = "EarleyBoyer-shaped global constructor calls, pair allocation, car/cdr property traffic, and instanceof checks.";
 const BUILTIN_NOTE: &str =
     "String case mapping, RegExp replacement, URI decoding, and character access.";
 
@@ -1548,15 +1547,21 @@ mod tests {
         assert_eq!(workload.file_name, "v8-v7-richards.js");
         assert_eq!(workload.metric_kind, MetricKind::Score);
         assert!(workload.requires_lyng_shell);
-        assert!(workload
-            .source
-            .contains("function Benchmark(name, run, setup, tearDown)"));
-        assert!(workload
-            .source
-            .contains("var Richards = new BenchmarkSuite('Richards'"));
-        assert!(!workload
-            .source
-            .contains("var DeltaBlue = new BenchmarkSuite"));
+        assert!(
+            workload
+                .source
+                .contains("function Benchmark(name, run, setup, tearDown)")
+        );
+        assert!(
+            workload
+                .source
+                .contains("var Richards = new BenchmarkSuite('Richards'")
+        );
+        assert!(
+            !workload
+                .source
+                .contains("var DeltaBlue = new BenchmarkSuite")
+        );
         assert!(workload.source.contains("LyngV8V7PrintResult"));
         assert!(workload.source.contains("BenchmarkSuite.RunSuites"));
     }
@@ -1641,9 +1646,11 @@ mod tests {
             assert!(workload.source.contains("var __lyngBenchTrips = 16;"));
             assert!(workload.source.contains("var __lyngBenchSink"));
             assert!(workload.source.contains("throw new Error"));
-            assert!(Path::new(workload.file_name)
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("js")));
+            assert!(
+                Path::new(workload.file_name)
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("js"))
+            );
         }
     }
 

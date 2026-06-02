@@ -295,9 +295,8 @@ impl Vm {
         environment: EnvironmentRef,
     ) -> VmResult<()> {
         if self
-            .frames
-            .iter()
-            .any(|frame| frame.lexical_env() == environment)
+            .frame_cfrs()
+            .any(|cfr| self.frame_header(cfr).lexical_env() == environment)
         {
             return Ok(());
         }

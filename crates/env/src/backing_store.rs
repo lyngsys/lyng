@@ -123,11 +123,7 @@ pub struct LocalBackingStoreRecord {
 
 impl LocalBackingStoreRecord {
     const fn byte_length(&self) -> usize {
-        if self.detached {
-            0
-        } else {
-            self.bytes.len()
-        }
+        if self.detached { 0 } else { self.bytes.len() }
     }
 
     const fn is_detached(&self) -> bool {

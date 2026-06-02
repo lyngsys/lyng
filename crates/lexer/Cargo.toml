@@ -9,3 +9,6 @@ lyng-common = { workspace = true }
 unicode-id-start = { workspace = true }
 
 [dev-dependencies]
+
+[lints]
+workspace = true

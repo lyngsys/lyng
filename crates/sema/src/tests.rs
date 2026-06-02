@@ -500,9 +500,11 @@ fn duplicate_let_bindings_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("duplicate lexical")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("duplicate lexical"))
+    );
 }
 
 #[test]
@@ -623,11 +625,13 @@ fn sloppy_block_async_function_duplicates_still_error() {
     let atoms = atoms();
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
-    assert!(result
-        .diagnostics
-        .as_slice()
-        .iter()
-        .any(|d| d.message.contains("duplicate lexical")));
+    assert!(
+        result
+            .diagnostics
+            .as_slice()
+            .iter()
+            .any(|d| d.message.contains("duplicate lexical"))
+    );
 }
 
 #[test]
@@ -710,11 +714,13 @@ fn sloppy_switch_generator_function_duplicates_still_error() {
     let atoms = atoms();
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
-    assert!(result
-        .diagnostics
-        .as_slice()
-        .iter()
-        .any(|d| d.message.contains("duplicate lexical")));
+    assert!(
+        result
+            .diagnostics
+            .as_slice()
+            .iter()
+            .any(|d| d.message.contains("duplicate lexical"))
+    );
 }
 
 #[test]
@@ -775,11 +781,13 @@ fn strict_duplicate_block_functions_still_error() {
     let atoms = atoms();
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
-    assert!(result
-        .diagnostics
-        .as_slice()
-        .iter()
-        .any(|d| d.message.contains("duplicate lexical")));
+    assert!(
+        result
+            .diagnostics
+            .as_slice()
+            .iter()
+            .any(|d| d.message.contains("duplicate lexical"))
+    );
 }
 
 #[test]
@@ -796,9 +804,11 @@ fn break_outside_loop_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("outside of loop or switch")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("outside of loop or switch"))
+    );
 }
 
 #[test]
@@ -832,9 +842,11 @@ fn return_outside_function_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("outside of function")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("outside of function"))
+    );
 }
 
 #[test]
@@ -940,9 +952,11 @@ fn strict_mode_eval_binding_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("'eval' cannot be used")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("'eval' cannot be used"))
+    );
 }
 
 #[test]
@@ -975,9 +989,11 @@ fn strict_mode_arguments_binding_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("'arguments' cannot be used")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("'arguments' cannot be used"))
+    );
 }
 
 #[test]
@@ -1557,9 +1573,11 @@ fn strict_mode_duplicate_params_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("duplicate parameter")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("duplicate parameter"))
+    );
 }
 
 #[test]
@@ -1626,9 +1644,11 @@ fn with_in_strict_mode_error() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("'with' statement not allowed")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("'with' statement not allowed"))
+    );
 }
 
 // ===================================================================
@@ -2231,9 +2251,11 @@ fn use_strict_directive_enables_strict() {
     let result = analyze_script(&parsed, &atoms);
     assert!(result.diagnostics.has_errors());
     let errors = result.diagnostics.as_slice();
-    assert!(errors
-        .iter()
-        .any(|d| d.message.contains("'eval' cannot be used")));
+    assert!(
+        errors
+            .iter()
+            .any(|d| d.message.contains("'eval' cannot be used"))
+    );
 }
 
 // ===================================================================

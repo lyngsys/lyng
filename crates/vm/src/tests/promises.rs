@@ -240,11 +240,9 @@ fn current_referrer_survives_inner_call_in_promise_reaction() {
     // deep pause (frame_count >= 2) must exist AND carry the captured referrer.
     // Without the job-root-frame fix the inner call's cleanup would unwind the
     // job's referrer scope and this deep pause would read None.
-    let deep_reaction_sample = samples
-        .iter()
-        .find(|(side_stack, frame_count)| {
-            *frame_count >= 2 && *side_stack == Some(expected_referrer)
-        });
+    let deep_reaction_sample = samples.iter().find(|(side_stack, frame_count)| {
+        *frame_count >= 2 && *side_stack == Some(expected_referrer)
+    });
     assert!(
         deep_reaction_sample.is_some(),
         "expected a mid-job reaction-frame pause carrying Some({expected_referrer:?}); samples: {samples:?}"

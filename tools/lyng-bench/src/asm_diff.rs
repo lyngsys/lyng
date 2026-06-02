@@ -201,7 +201,7 @@ fn parse_args(args: &[String]) -> Result<AsmDiffOptions, String> {
                 return Err(format!(
                     "asm-diff: unknown argument {other}\n\n{}",
                     help_text()
-                ))
+                ));
             }
         }
     }

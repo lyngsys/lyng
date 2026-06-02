@@ -1,8 +1,9 @@
 use super::values::alloc_string;
 use super::{
-    Agent, AllocationLifetime, EntryExecutionOverride, FrameRecord, NativeFunctionRegistry,
-    ObjectRef, Value, Vm, VmError, VmResult, WellKnownAtom,
+    Agent, AllocationLifetime, CodeRef, EntryExecutionOverride, FrameRecord,
+    NativeFunctionRegistry, ObjectRef, Value, Vm, VmError, VmResult, WellKnownAtom,
 };
+use crate::frame::FrameView;
 use lyng_builtins::DynamicFunctionKind as BuiltinDynamicFunctionKind;
 use lyng_common::{AtomId, SourceId, Span};
 use lyng_compiler::dynamic;
@@ -157,8 +158,8 @@ impl Vm {
         }
     }
 
-    pub(super) fn caller_is_strict(&self, caller: FrameRecord) -> bool {
-        self.installed_function(caller.code())
+    pub(super) fn caller_is_strict(&self, caller_code: CodeRef) -> bool {
+        self.installed_function(caller_code)
             .is_some_and(|function| function.flags().strict())
     }
 
@@ -439,7 +440,7 @@ impl Vm {
         };
         let script_referrer = Self::active_script_or_module_referrer(agent)
             .map(|key| agent.atoms_mut().intern_collectible(key.as_str()));
-        self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
+        self.push_direct_eval_environment(self.frame_depth() + 1, lexical_env);
         let mut builder = self
             .evaluate_installed(agent, installed, lexical_env, variable_env)
             .with_host(host)
@@ -601,7 +602,7 @@ impl Vm {
             Some(lyng_bytecode::BytecodeFunctionKind::Function) => true,
             Some(lyng_bytecode::BytecodeFunctionKind::Arrow) => {
                 let global_object = agent
-                    .realm(caller.realm())
+                    .realm(Self::frame_record_realm(agent, &caller))
                     .map(|realm| realm.global_object());
                 Self::this_environment_record(agent, caller.lexical_env()).is_ok_and(|record| {
                     record.is_some_and(|record| Some(record.function_object()) != global_object)
@@ -658,16 +659,14 @@ impl Vm {
         agent: &Agent,
         caller: FrameRecord,
     ) -> Option<lyng_types::EnvironmentRef> {
-        caller
-            .private_env()
-            .or_else(|| {
-                caller.callee().and_then(|callee| {
-                    agent
-                        .objects()
-                        .function_data(callee)
-                        .and_then(lyng_objects::FunctionObjectData::private_env)
-                })
+        caller.private_env().or_else(|| {
+            caller.callee().and_then(|callee| {
+                agent
+                    .objects()
+                    .function_data(callee)
+                    .and_then(lyng_objects::FunctionObjectData::private_env)
             })
+        })
     }
 
     fn caller_direct_eval_call_state(
@@ -678,7 +677,7 @@ impl Vm {
         if let ThisState::Value(value) = caller.this_state() {
             return Ok((value, caller.new_target()));
         }
-        Self::lexical_call_state(agent, lexical_env, &caller)
+        Self::lexical_call_state(agent, lexical_env, caller.this_value(), caller.new_target())
     }
 
     const fn sema_private_element_kind(
@@ -1210,7 +1209,7 @@ impl Vm {
             lyng_env::EnvironmentRecord::Module(record) => record.layout(),
             lyng_env::EnvironmentRecord::Global(record) => record.layout(),
             lyng_env::EnvironmentRecord::Private(_) | lyng_env::EnvironmentRecord::Object(_) => {
-                return None
+                return None;
             }
         };
         agent
@@ -1436,7 +1435,7 @@ impl Vm {
         source_text: &str,
         this_override: Option<Value>,
     ) -> VmResult<Value> {
-        let realm = caller.realm();
+        let realm = Self::frame_record_realm(agent, &caller);
         if source_is_empty_block_sequence(source_text) {
             return Ok(Value::undefined());
         }
@@ -1447,14 +1446,19 @@ impl Vm {
             return Ok(value);
         }
 
-        let caller_name_env_start = self.lexical_name_start_environment(&caller);
+        let caller_name_env_start =
+            self.lexical_name_start_environment(FrameView::from_record(&caller));
         let (
             caller_lexical_env,
             direct_eval_site_flags,
             annex_b_catch_environments,
             annex_b_catch_names,
             direct_eval_parameter_names,
-        ) = self.caller_direct_eval_lexical_environment(agent, &caller, caller_name_env_start)?;
+        ) = self.caller_direct_eval_lexical_environment(
+            agent,
+            FrameView::from_record(&caller),
+            caller_name_env_start,
+        )?;
         let caller_variable_env = caller.variable_env();
         let caller_home_object =
             self.caller_direct_eval_home_object(agent, caller_name_env_start, caller);
@@ -1481,7 +1485,7 @@ impl Vm {
             source_id,
             source_text,
             dynamic::DynamicScriptAnalysisMode::DirectEval {
-                initial_strict: self.caller_is_strict(caller),
+                initial_strict: self.caller_is_strict(caller.code()),
                 options: DirectEvalScriptAnalysisOptions::new()
                     .with_ambient_private_layouts(direct_eval_private_layouts)
                     .with_annex_b_blocked_var_names(annex_b_blocked_var_names)
@@ -1650,9 +1654,9 @@ impl Vm {
         let entry_private_env = Self::caller_direct_eval_private_env(agent, caller);
         let entry_lexical_this = this_override.is_none() && entry_active_function.is_some();
         if let Some(environment) = persistent_direct_eval_env {
-            self.push_direct_eval_environment(self.frames.len(), environment);
+            self.push_direct_eval_environment(self.frame_depth(), environment);
         }
-        self.push_direct_eval_environment(self.frames.len() + 1, lexical_env);
+        self.push_direct_eval_environment(self.frame_depth() + 1, lexical_env);
         let result = {
             let mut builder = self
                 .evaluate_installed(agent, installed, lexical_env, variable_env)

@@ -5,6 +5,7 @@ use super::{
     ThisBindingStatus, ThisState, Value, Vm, VmDebugSafepointKind, VmError, VmResult,
     WellKnownAtom,
 };
+use crate::frame::{CallerContext, FrameView};
 use lyng_objects::{FunctionEntryIdentity, FunctionThisMode, NativeFunctionRegistry};
 use lyng_ops::errors;
 use lyng_types::PropertyKey;
@@ -21,7 +22,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_frame: FrameView,
         result_register: u16,
         callee_object: ObjectRef,
         this_value: Value,
@@ -29,10 +30,14 @@ impl Vm {
         new_target: Option<ObjectRef>,
         construct_call: bool,
     ) -> VmResult<()> {
-        let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, new_target)?;
-        let register_base = u32::try_from(self.register_stack_top())
-            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
+        let caller_cfr = caller_frame.cfr();
+        let prepared = self.prepare_bytecode_call(
+            agent,
+            self.frame_header(caller_cfr).lexical_env(),
+            callee_object,
+            this_value,
+            new_target,
+        )?;
         if self
             .installed_function(prepared.code)
             .is_some_and(|function| function.flags().generator())
@@ -66,45 +71,57 @@ impl Vm {
             agent,
             prepared,
             arguments,
-            register_base,
             Some(result_register),
             construct_this,
             construct_call,
         )
+        .map(|_register_base| ())
     }
 
     pub(super) fn recycle_tail_bytecode_call(
         &mut self,
         agent: &mut Agent,
-        caller_frame: &FrameRecord,
+        caller_frame: FrameView,
         callee_object: ObjectRef,
         this_value: Value,
         arguments: &[Value],
     ) -> VmResult<()> {
-        let tail_caller = caller_frame.callee();
+        let caller_cfr = caller_frame.cfr();
+        let tail_caller = self.frame_header(caller_cfr).callee();
         let tail_caller_strict = self.frame_is_strict(caller_frame);
-        let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, None)?;
-        let register_base = caller_frame.registers().base();
-        let construct_this = caller_frame.construct_this().or_else(|| {
-            caller_frame
-                .flags()
+        let prepared = self.prepare_bytecode_call(
+            agent,
+            self.frame_header(caller_cfr).lexical_env(),
+            callee_object,
+            this_value,
+            None,
+        )?;
+        let caller_flags =
+            crate::frame::FrameFlags::from_raw(self.frame_header(caller_cfr).flags_bits());
+        let construct_this = self.frame_header(caller_cfr).construct_this().or_else(|| {
+            caller_flags
                 .contains(FrameFlags::construct())
                 .then_some(())
-                .and_then(|()| caller_frame.this_value().as_object_ref())
+                .and_then(|()| self.frame_header(caller_cfr).this_value().as_object_ref())
         });
+        let caller_return_register = self.frame_header(caller_cfr).return_register();
+        // Tear the caller frame down first: `teardown_tail_frame` releases its
+        // `[header][window]` run back to the caller's cfr and restores
+        // `current_cfr` to the caller's caller. The install below then reserves a
+        // fresh run starting at that same cfr — recycling the caller's slot for
+        // the tail callee, as the old register-base reuse did.
         self.teardown_tail_frame(agent, caller_frame)?;
         self.install_prepared_bytecode_call(
             agent,
             prepared,
             arguments,
-            register_base,
-            caller_frame.return_register(),
+            caller_return_register,
             construct_this,
-            caller_frame.flags().contains(FrameFlags::construct()),
+            caller_flags.contains(FrameFlags::construct()),
         )?;
-        if let Some(frame) = self.frames.last_mut() {
-            frame.set_tail_caller(tail_caller, tail_caller_strict);
+        if let Some(cold) = self.current_cold_mut() {
+            cold.tail_caller = tail_caller;
+            cold.tail_caller_strict = tail_caller_strict;
         }
         Ok(())
     }
@@ -116,7 +133,7 @@ impl Vm {
     pub(super) fn prepare_bytecode_call(
         &self,
         agent: &mut Agent,
-        caller_frame: &FrameRecord,
+        caller_lexical_env: EnvironmentRef,
         callee_object: ObjectRef,
         this_value: Value,
         new_target: Option<ObjectRef>,
@@ -161,16 +178,33 @@ impl Vm {
 
         let outer_environment = function_data
             .environment()
-            .ok_or_else(|| VmError::MissingEnvironment(caller_frame.lexical_env()))?;
-        let realm = function_data
-            .realm()
-            .unwrap_or_else(|| caller_frame.realm());
+            .ok_or(VmError::MissingEnvironment(caller_lexical_env))?;
+        // Every real bytecode callee carries `Some(realm)` (the `bytecode()`
+        // constructor required by the `entry == Bytecode` match above sets it), so
+        // the fallback is unreachable in practice. Derive the caller's realm from the
+        // active arena frame (the caller IS the current frame at every call site).
+        let realm = function_data.realm().unwrap_or_else(|| {
+            self.current_realm_of(agent)
+                .expect("active frame realm for bytecode call")
+        });
         let derived_construct_call = new_target.is_some() && derived_class_constructor;
+        // For the Lexical this-mode fallback, derive caller this/new_target from the
+        // current arena frame; default to undefined/None when no frame is active
+        // (synthetic-frame callers that reach the Lexical branch always have a live
+        // environment record, so the fallback is unreachable for synthetic frames).
+        let (caller_this_value, caller_new_target) =
+            self.frame().map_or((Value::undefined(), None), |f| {
+                (f.this_value(), f.new_target())
+            });
         let (effective_this, execution_this_state, env_this_status, effective_new_target) =
             match function_data.this_mode() {
                 FunctionThisMode::Lexical => {
-                    let (lexical_this, lexical_new_target) =
-                        Self::lexical_call_state(agent, outer_environment, caller_frame)?;
+                    let (lexical_this, lexical_new_target) = Self::lexical_call_state(
+                        agent,
+                        outer_environment,
+                        caller_this_value,
+                        caller_new_target,
+                    )?;
                     (
                         lexical_this,
                         ThisState::Lexical,
@@ -242,28 +276,30 @@ impl Vm {
         })
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "VM helper threads interpreter, host, registry, and spec state explicitly at call sites"
-    )]
+    /// Reserves the callee frame, copies arguments, pushes it, and returns the
+    /// callee window base (`register_base`) so callers that key side-tables on
+    /// the frame's window (e.g. `async_frame_states`) match the value
+    /// `frame.registers().base()` reports.
     pub(super) fn install_prepared_bytecode_call(
         &mut self,
         agent: &mut Agent,
         prepared: PreparedBytecodeCall,
         arguments: &[Value],
-        register_base: u32,
         return_register: Option<u16>,
         construct_this: Option<ObjectRef>,
         construct_call: bool,
-    ) -> VmResult<()> {
-        if self.frames.len() >= MAX_BYTECODE_CALL_DEPTH {
+    ) -> VmResult<u32> {
+        // Frame-count guard: cheap O(1) pre-check. The arena soft-limit in
+        // `reserve_frame` is the byte-budget backstop that also covers entry
+        // and generator-resume paths where no depth counter is maintained.
+        if self.frame_depth() >= MAX_BYTECODE_CALL_DEPTH {
             return Err(VmError::Abrupt(errors::throw_range_error(agent)));
         }
         let register_len = prepared
             .register_count
             .checked_add(prepared.hidden_register_count)
             .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        self.reserve_register_window(register_base, register_len);
+        let (cfr, register_base) = self.reserve_frame(agent, register_len)?;
         self.copy_arguments_into_frame(register_base, prepared.parameter_count, arguments);
 
         if let Err(error) = self.initialize_activation_objects(
@@ -278,9 +314,9 @@ impl Vm {
                 callee: Value::from_object_ref(prepared.callee),
             },
         ) {
-            let register_base = usize::try_from(register_base)
-                .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
-            self.release_register_stack_to(register_base);
+            // Reclaim the just-reserved `[header][window]` run; no frame was
+            // pushed, so `current_cfr` is unchanged.
+            self.arena.release_to(cfr);
             return Err(error);
         }
         let frame = FrameRecord::new(
@@ -288,7 +324,6 @@ impl Vm {
             0,
             RegisterWindow::new(register_base, register_len),
             return_register,
-            prepared.realm,
             prepared.lexical_env,
             prepared.variable_env,
             ExecutionContextKind::Function,
@@ -310,30 +345,32 @@ impl Vm {
                 ),
         );
         self.note_executed_code(frame.code());
-        self.frames.push(frame);
+        self.push_frame_with_header(cfr, frame);
         self.refresh_running_context(agent);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
         self.request_dispatch_frame_check();
-        Ok(())
+        Ok(register_base)
     }
 
-    fn teardown_tail_frame(&mut self, agent: &mut Agent, frame: &FrameRecord) -> VmResult<()> {
-        let Some(active) = self.frames.pop() else {
+    fn teardown_tail_frame(&mut self, agent: &mut Agent, frame: FrameView) -> VmResult<()> {
+        if self.current_cfr_opt().is_none() {
             debug_assert!(false, "tail-call recycling requires one active frame");
             return Err(VmError::MissingActiveFrame);
-        };
-        debug_assert_eq!(active, *frame);
-        self.close_loop_iteration_frames(self.frames.len());
-        self.close_env_scope_frames(self.frames.len());
+        }
+        debug_assert_eq!(self.current_cfr, frame.cfr());
+        self.pop_frame_depth();
+        self.close_loop_iteration_frames(self.frame_depth());
+        self.close_env_scope_frames(self.frame_depth());
         self.for_in_states.clear_window(frame.registers());
         self.iterator_states.clear_window(frame.registers());
         self.captured_name_references
             .clear_window(frame.registers());
-        self.finalize_mapped_arguments(agent, frame.lexical_env())?;
-        let register_base = usize::try_from(frame.registers().base())
-            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        self.release_register_stack_to(register_base);
+        self.finalize_mapped_arguments(agent, self.frame_header(frame.cfr()).lexical_env())?;
+        // Release the caller's `[header][window]` run (to its cfr) and restore
+        // `current_cfr` to its caller. The recycled tail-callee then re-reserves
+        // from this same cfr.
+        self.release_frame_to_caller(frame.cfr());
         let _ = self.current_exception.take();
         self.refresh_running_context(agent);
         Ok(())
@@ -351,7 +388,7 @@ impl Vm {
         };
         for index in 0..usize::from(parameter_count) {
             let absolute = register_base + index;
-            if let Some(slot) = self.register_stack.get_mut(absolute) {
+            if let Some(slot) = self.arena.slots_mut().get_mut(absolute) {
                 *slot = arguments.get(index).copied().unwrap_or(Value::undefined());
             }
         }
@@ -371,7 +408,7 @@ impl Vm {
     pub(super) fn enter_bytecode_call_from_caller_registers(
         &mut self,
         agent: &mut Agent,
-        caller_frame: &FrameRecord,
+        caller_frame: FrameView,
         result_register: u16,
         callee_object: ObjectRef,
         this_value: Value,
@@ -381,18 +418,20 @@ impl Vm {
         construct_this: Option<ObjectRef>,
         construct_call: bool,
     ) -> VmResult<()> {
-        let prepared =
-            self.prepare_bytecode_call(agent, caller_frame, callee_object, this_value, new_target)?;
+        let prepared = self.prepare_bytecode_call(
+            agent,
+            self.frame_header(caller_frame.cfr()).lexical_env(),
+            callee_object,
+            this_value,
+            new_target,
+        )?;
         debug_assert_eq!(prepared.arguments_mode, ArgumentsMode::None);
         debug_assert!(!prepared.has_rest_parameter);
-        let register_base = u32::try_from(self.register_stack_top())
-            .map_err(|_| VmError::Abrupt(errors::throw_range_error(agent)))?;
         self.install_prepared_bytecode_call_from_registers(
             agent,
             prepared,
             caller_arg_base,
             arg_count,
-            register_base,
             Some(result_register),
             construct_this,
             construct_call,
@@ -415,19 +454,24 @@ impl Vm {
         prepared: PreparedBytecodeCall,
         caller_arg_base: u32,
         arg_count: u16,
-        register_base: u32,
         return_register: Option<u16>,
         construct_this: Option<ObjectRef>,
         construct_call: bool,
     ) -> VmResult<()> {
-        if self.frames.len() >= MAX_BYTECODE_CALL_DEPTH {
+        // Frame-count guard: cheap O(1) pre-check. The arena soft-limit in
+        // `reserve_frame` is the byte-budget backstop that also covers entry
+        // and generator-resume paths where no depth counter is maintained.
+        if self.frame_depth() >= MAX_BYTECODE_CALL_DEPTH {
             return Err(VmError::Abrupt(errors::throw_range_error(agent)));
         }
         let register_len = prepared
             .register_count
             .checked_add(prepared.hidden_register_count)
             .ok_or_else(|| VmError::Abrupt(errors::throw_range_error(agent)))?;
-        self.reserve_register_window(register_base, register_len);
+        // Reserve first: the new window base sits HEADER_SLOTS above the current
+        // arena top, which already lies at or above `caller_arg_base + arg_count`,
+        // so the caller-register copy below still satisfies `dest >= src_end`.
+        let (cfr, register_base) = self.reserve_frame(agent, register_len)?;
         self.copy_arguments_from_caller_registers(
             register_base,
             prepared.parameter_count,
@@ -440,7 +484,6 @@ impl Vm {
             0,
             RegisterWindow::new(register_base, register_len),
             return_register,
-            prepared.realm,
             prepared.lexical_env,
             prepared.variable_env,
             ExecutionContextKind::Function,
@@ -462,7 +505,7 @@ impl Vm {
                 ),
         );
         self.note_executed_code(frame.code());
-        self.frames.push(frame);
+        self.push_frame_with_header(cfr, frame);
         self.refresh_running_context(agent);
         self.note_frame_depth();
         self.poll_debug_safepoint(agent, VmDebugSafepointKind::FunctionEntry);
@@ -497,7 +540,8 @@ impl Vm {
             dest_start >= src_end,
             "direct caller arg window must sit entirely before the callee frame"
         );
-        self.register_stack
+        self.arena
+            .slots_mut()
             .copy_within(src_start..src_end, dest_start);
         let copy_count_u64 = u64::try_from(copy_count).unwrap_or(u64::MAX);
         self.record_argument_frame_copies(copy_count_u64);
@@ -511,11 +555,7 @@ impl Vm {
         }
     }
 
-    pub(super) fn require_callable_object(
-        agent: &mut Agent,
-        _frame: &FrameRecord,
-        value: Value,
-    ) -> VmResult<ObjectRef> {
+    pub(super) fn require_callable_object(agent: &mut Agent, value: Value) -> VmResult<ObjectRef> {
         let object = value
             .as_object_ref()
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
@@ -547,21 +587,22 @@ impl Vm {
     pub(super) fn lexical_call_state(
         agent: &Agent,
         start: EnvironmentRef,
-        caller_frame: &FrameRecord,
+        caller_this_value: Value,
+        caller_new_target: Option<ObjectRef>,
     ) -> VmResult<(Value, Option<ObjectRef>)> {
         if let Some(record) = Self::this_environment_record(agent, start)? {
             return Ok((record.this_value(), record.new_target()));
         }
-        Ok((caller_frame.this_value(), caller_frame.new_target()))
+        Ok((caller_this_value, caller_new_target))
     }
 
     pub(in crate::vm) fn resolve_this_binding(
         agent: &mut Agent,
         start: EnvironmentRef,
-        caller_frame: &FrameRecord,
+        caller_this_value: Value,
     ) -> VmResult<Value> {
         let Some(record) = Self::this_environment_record(agent, start)? else {
-            return Ok(caller_frame.this_value());
+            return Ok(caller_this_value);
         };
         match record.this_binding_status() {
             ThisBindingStatus::Initialized => Ok(record.this_value()),
@@ -570,7 +611,7 @@ impl Vm {
             }
             ThisBindingStatus::Lexical => {
                 debug_assert!(false, "lexical this environments are skipped");
-                Ok(caller_frame.this_value())
+                Ok(caller_this_value)
             }
         }
     }
@@ -578,7 +619,7 @@ impl Vm {
     pub(super) fn resolve_super_home_object(
         agent: &mut Agent,
         start: EnvironmentRef,
-        caller_frame: &FrameRecord,
+        caller_callee: Option<ObjectRef>,
     ) -> VmResult<ObjectRef> {
         if let Some(record) = Self::this_environment_record(agent, start)? {
             if let Some(home_object) = record.home_object() {
@@ -592,8 +633,7 @@ impl Vm {
                 return Ok(home_object);
             }
         }
-        caller_frame
-            .callee()
+        caller_callee
             .and_then(|callee| {
                 agent
                     .objects()
@@ -653,7 +693,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller: CallerContext,
         realm: RealmRef,
         new_target: ObjectRef,
     ) -> VmResult<ObjectRef> {
@@ -661,7 +701,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            caller.realm,
+            caller.lexical_env,
+            caller.code,
+            caller.pc,
             new_target,
             Value::from_object_ref(new_target),
             PropertyKey::from_atom(WellKnownAtom::prototype.id()),
@@ -773,27 +816,15 @@ mod tests {
                 AllocationLifetime::Default,
             )
         });
-        let caller_frame = FrameRecord::new(
-            installed.code(),
-            0,
-            RegisterWindow::new(0, 0),
-            None,
-            realm.id(),
-            global_env,
-            global_env,
-            ExecutionContextKind::Function,
-        );
-
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, global_env, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         assert_eq!(prepared.private_env, Some(private_env));
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], None, None, false)
             .expect("bytecode call should install");
 
-        let frame = *vm
-            .frames
-            .last()
+        let frame = vm
+            .frame()
             .expect("installed call should leave one active frame");
         assert_eq!(frame.private_env(), Some(private_env));
     }
@@ -843,30 +874,18 @@ mod tests {
                 AllocationLifetime::Default,
             )
         });
-        let caller_frame = FrameRecord::new(
-            installed.code(),
-            0,
-            RegisterWindow::new(0, 0),
-            None,
-            realm.id(),
-            global_env,
-            global_env,
-            ExecutionContextKind::Function,
-        );
-
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, global_env, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
         // Capture the prepared values before install; the installed frame must
         // carry these directly (the frame is now the single source of truth).
         let expected_this_state = prepared.execution_this_state;
         let expected_private_env = prepared.private_env;
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], None, None, false)
             .expect("bytecode call should install");
 
-        let frame = *vm
-            .frames
-            .last()
+        let frame = vm
+            .frame()
             .expect("prepared call should leave one active frame");
 
         // The frame is authoritative; it must carry the prepared this_state /
@@ -929,26 +948,14 @@ mod tests {
                 AllocationLifetime::Default,
             )
         });
-        let caller_frame = FrameRecord::new(
-            installed.code(),
-            0,
-            RegisterWindow::new(0, 0),
-            None,
-            realm.id(),
-            global_env,
-            global_env,
-            ExecutionContextKind::Function,
-        );
-
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller_frame, callee, Value::undefined(), None)
+            .prepare_bytecode_call(agent, global_env, callee, Value::undefined(), None)
             .expect("bytecode call should prepare");
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], None, None, false)
             .expect("bytecode call should install");
 
-        let frame = *vm
-            .frames
-            .last()
+        let frame = vm
+            .frame()
             .expect("prepared call should leave one active frame");
         let eval_atom = agent.atoms_mut().intern_collectible("eval");
         let eval_value = vm
@@ -1006,21 +1013,25 @@ mod tests {
             0,
             RegisterWindow::new(0, 0),
             None,
-            realm.id(),
             realm.global_env(),
             realm.global_env(),
             ExecutionContextKind::Script,
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(
+                agent,
+                caller.lexical_env(),
+                function_object,
+                Value::undefined(),
+                None,
+            )
             .expect("bytecode call should prepare");
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], None, None, false)
             .expect("bytecode call should install");
 
-        let frame = *vm
-            .frames
-            .last()
+        let frame = vm
+            .frame()
             .expect("prepared call should leave one active frame");
         let math_atom = agent.atoms_mut().intern_collectible("Math");
         let math_value = vm
@@ -1064,16 +1075,21 @@ mod tests {
             0,
             RegisterWindow::new(0, 0),
             None,
-            realm.id(),
             realm.global_env(),
             realm.global_env(),
             ExecutionContextKind::Script,
         );
 
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(
+                agent,
+                caller.lexical_env(),
+                function_object,
+                Value::undefined(),
+                None,
+            )
             .expect("bytecode call should prepare");
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 0, None, None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], None, None, false)
             .expect("bytecode call should install");
 
         let mut registry = RejectingNativeRegistry;
@@ -1111,24 +1127,29 @@ mod tests {
         else {
             panic!("function expression should remain backed by installed bytecode");
         };
-        let caller = FrameRecord::new(
-            code,
-            0,
-            RegisterWindow::new(0, 4),
-            None,
-            realm.id(),
-            realm.global_env(),
-            realm.global_env(),
-            ExecutionContextKind::Script,
-        );
-        vm.register_stack.resize(4, Value::undefined());
-        vm.register_stack_top = vm.register_stack.len();
-        vm.frames.push(caller);
+        vm.push_test_root_frame(agent, 4, &[Value::undefined(); 4], |window| {
+            FrameRecord::new(
+                code,
+                0,
+                window,
+                None,
+                realm.global_env(),
+                realm.global_env(),
+                ExecutionContextKind::Script,
+            )
+        });
+        let caller = vm.frame().expect("test root frame should be active");
 
         let prepared = vm
-            .prepare_bytecode_call(agent, &caller, function_object, Value::undefined(), None)
+            .prepare_bytecode_call(
+                agent,
+                caller.lexical_env(),
+                function_object,
+                Value::undefined(),
+                None,
+            )
             .expect("bytecode call should prepare");
-        vm.install_prepared_bytecode_call(agent, prepared, &[], 4, Some(0), None, false)
+        vm.install_prepared_bytecode_call(agent, prepared, &[], Some(0), None, false)
             .expect("bytecode call should install");
 
         let mut registry = RejectingNativeRegistry;
@@ -1188,29 +1209,30 @@ mod tests {
         });
 
         // Seed a minimal caller frame with one register slot so
-        // caller_arg_base is valid and lies before the callee frame.
-        let caller_frame = FrameRecord::new(
-            installed.code(),
-            0,
-            RegisterWindow::new(0, 1),
-            None,
-            realm.id(),
-            global_env,
-            global_env,
-            ExecutionContextKind::Function,
-        );
-        vm.register_stack.resize(1, Value::undefined());
-        vm.register_stack_top = vm.register_stack.len();
-        vm.frames.push(caller_frame);
+        // caller_arg_base is valid and lies before the callee frame. The frame
+        // is reserved through the real path, so its window base sits HEADER_SLOTS
+        // above its cfr (not at arena base 0).
+        let caller_arg_base =
+            vm.push_test_root_frame(agent, 1, &[Value::undefined(); 1], |window| {
+                FrameRecord::new(
+                    installed.code(),
+                    0,
+                    window,
+                    None,
+                    global_env,
+                    global_env,
+                    ExecutionContextKind::Function,
+                )
+            }) + 1; // caller_arg_base points past the single register in the caller window
+        let caller_frame = vm.frame().expect("test root frame should be active");
 
         vm.enter_bytecode_call_from_caller_registers(
             agent,
-            &caller_frame,
+            FrameView::from_record(&caller_frame),
             0,
             callee,
             Value::from_object_ref(construct_this_obj),
-            // caller_arg_base points past the single register in the caller window
-            1,
+            caller_arg_base,
             0,
             Some(callee),
             Some(construct_this_obj),
@@ -1218,7 +1240,7 @@ mod tests {
         )
         .expect("register-window construct entry should succeed");
 
-        let frame = *vm.frames.last().expect("entry should push a callee frame");
+        let frame = vm.frame().expect("entry should push a callee frame");
 
         assert_eq!(
             frame.this_value(),

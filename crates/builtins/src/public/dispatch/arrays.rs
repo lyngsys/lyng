@@ -4,17 +4,18 @@ pub(super) use iteration::array_index_of_builtin;
 use iteration::dispatch_array_iteration_builtin;
 
 use super::{
+    BuiltinIteratorBridge, MAX_SAFE_INTEGER_U64, PublicBuiltinDispatchContext,
     array_like_index_property_key, array_like_join_value_for_length, array_like_length,
     array_like_length_u64, array_result_capacity_hint, array_species_create_for_length,
     close_iterator_after_error, create_array_result, create_array_result_for_length,
     create_array_result_with_prototype, create_data_property_or_throw, define_array_length,
     delete_property_from_object, get_property_from_object, has_property_on_object,
     is_array_for_species, is_concat_spreadable,
-    iterators::{array_iterator_factory_builtin, array_iterator_next_builtin, ArrayIterationKind},
+    iterators::{ArrayIterationKind, array_iterator_factory_builtin, array_iterator_next_builtin},
     length_value_u64, normalize_relative_index_u64, objects, property_key_from_text, range_error,
     set_length_property, set_property_on_object, string_ref_code_units, string_value,
     to_integer_or_infinity_for_builtin, to_number_for_builtin, to_string_string_ref, type_error,
-    valid_array_length, BuiltinIteratorBridge, PublicBuiltinDispatchContext, MAX_SAFE_INTEGER_U64,
+    valid_array_length,
 };
 use crate::{BuiltinInvocation, DynamicFunctionKind};
 use lyng_common::WellKnownAtom;

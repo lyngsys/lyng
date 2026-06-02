@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use lyng_test262::{prepare_diagnostic_suite, Test262DiagnosticConfig};
+use lyng_test262::{Test262DiagnosticConfig, prepare_diagnostic_suite};
 
 static TEMP_DIR_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

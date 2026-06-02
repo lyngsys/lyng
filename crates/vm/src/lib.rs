@@ -27,6 +27,9 @@ mod enumeration;
 mod error;
 mod extensions;
 mod frame;
+mod frame_arena;
+mod frame_cold;
+mod frame_header;
 mod installed;
 mod name_refs;
 #[cfg(feature = "diagnostic-counters")]
@@ -45,14 +48,18 @@ pub use extensions::{
     EmbeddingFunctionContext, EmbeddingFunctionMetadata, EmbeddingInvocation,
     RealmExtensionInstallation, RealmExtensionProvider, SharedRealmExtensionProvider,
 };
+pub(crate) use frame::CallerContext;
 pub use frame::{
-    seed_registers, FrameFlags, FrameMetadata, FrameRecord, FrameState, RegisterWindow,
+    FrameFlags, FrameMetadata, FrameRecord, FrameState, FrameView, RegisterWindow, seed_registers,
 };
+pub use frame_arena::{ARENA_CAPACITY_SLOTS, ARENA_SOFT_LIMIT_SLOTS, FrameArena};
+pub use frame_cold::{FrameColdState, FrameColdTable};
+pub use frame_header::{FrameHeader, HEADER_SLOTS};
 pub use installed::InstalledCode;
 #[cfg(feature = "diagnostic-counters")]
 pub use opcode_counts::{
-    decode_current_opcode, CallArgumentCopyCounts, DispatchCounters, OpcodeCounters,
-    OpcodeDispatchCount, OpcodeDispatchCounts, CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT,
+    CURRENT_OPCODE_IDLE, CURRENT_OPCODE_SLOW_BIT, CallArgumentCopyCounts, DispatchCounters,
+    OpcodeCounters, OpcodeDispatchCount, OpcodeDispatchCounts, decode_current_opcode,
 };
 #[cfg(feature = "diagnostic-counters")]
 pub use sampling_profiler::{SampleHistogram, SamplingProfiler};

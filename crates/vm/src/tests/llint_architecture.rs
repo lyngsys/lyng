@@ -29,9 +29,7 @@ fn llint_rust_probes_are_explicitly_enumerated() {
     let cold_handlers = include_str!("../dsl/handlers/cold.rs");
     let probe_call_count = cold_handlers.matches("call_rust_probe!(").count();
 
-    // LoadGlobal previously used a Rust probe for its mode-7 cell read; Task 8
-    // replaced it with an inline asm fast read (branch_global_cell_mode! etc.),
-    // so it no longer appears here.
+    // LoadGlobal mode-7 uses an inline asm cell read, not a Rust probe.
     assert!(
         !cold_handlers.contains("call_rust_probe!(op_load_global_rust_probe_rs"),
         "LoadGlobal mode-7 cell load is now an inline asm fast path, not a Rust probe"
@@ -54,7 +52,9 @@ fn llint_rust_probe_hits_use_no_refresh_dispatch() {
     let cold_handlers = include_str!("../dsl/handlers/cold.rs");
 
     assert_eq!(
-        cold_handlers.matches("dispatch_probe_hit_no_refresh!();").count(),
+        cold_handlers
+            .matches("dispatch_probe_hit_no_refresh!();")
+            .count(),
         2,
         "AssignNamedProperty and StrictAssignNamedProperty probe hits must use the documented no-refresh dispatch form (LoadGlobal is now an inline asm cell read)"
     );
@@ -112,13 +112,11 @@ fn llint_handlers_do_not_use_hit_side_feedback_bridges() {
 fn llint_feedback_addressing_uses_precomputed_entry_offset() {
     let feedback_backend = include_str!("../dsl/backend/aarch64/feedback.rs");
 
-    // Phase C precomputed-offset optimization: all four feedback macros
-    // (load_feedback_site!, record_smi!, record_object!, record_double!)
-    // resolve a slot to its entry via a 3-instruction sequence:
+    // All four feedback macros resolve a slot to its entry via a 3-instruction
+    // sequence using the precomputed slot_to_entry_offset table:
     //   sub  x17, x{slot}, #1
     //   ldr  w16, [x21, x17, lsl #2]   ← reads slot_to_entry_offset table
     //   add  x{dst}, x21, x16          ← buffer_base + precomputed_offset
-    // No in-buffer header/kind-offsets dispatch; no stride shifts in asm.
     assert!(
         feedback_backend.contains("ldr    w16, [x21, x17, lsl #2]"),
         "LLInt feedback slot addressing should load the precomputed entry offset via [x21, x17, lsl #2]"

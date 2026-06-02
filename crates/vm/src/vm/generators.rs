@@ -1,12 +1,11 @@
 use super::bytecode_calls::PreparedBytecodeCall;
-use super::dispatch::advance_dispatch_frame;
 use super::runtime_objects::VmIteratorBridge;
 use super::{
     Agent, AsyncGeneratorFrameState, AsyncGeneratorRequest, FrameFlags, FrameRecord, HostHooks,
     NativeFunctionRegistry, ObjectRef, RealmRef, RegisterWindow, SuspendedExecutionSideState, Vm,
     VmError, VmResult,
 };
-use crate::frame::GeneratorResumeKind;
+use crate::frame::{FrameView, GeneratorResumeKind};
 use lyng_common::WellKnownAtom;
 use lyng_env::{ExecutionContextKind, ThisState};
 use lyng_gc::{AllocationLifetime, RuntimeSuspendedExecutionRecord};
@@ -54,17 +53,9 @@ impl Vm {
         let is_async_generator = self
             .installed_function(prepared.code)
             .is_some_and(|function| function.flags().async_function());
-        let prior_frame_depth = self.frames.len();
+        let prior_frame_depth = self.frame_depth();
         let prior_register_len = self.register_stack_top();
-        self.install_prepared_bytecode_call(
-            agent,
-            prepared,
-            arguments,
-            u32::try_from(prior_register_len).expect("register stack length should fit u32"),
-            None,
-            None,
-            false,
-        )?;
+        self.install_prepared_bytecode_call(agent, prepared, arguments, None, None, false)?;
         self.internal_completion_targets.push(prior_frame_depth);
         let result = self.run(agent, host, registry);
         if self.internal_completion_targets.last().copied() == Some(prior_frame_depth) {
@@ -90,7 +81,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_realm: RealmRef,
         generator: ObjectRef,
         resume_kind: GeneratorResumeKind,
         value: Value,
@@ -110,7 +101,7 @@ impl Vm {
         match state {
             GeneratorState::Executing => Err(VmError::Abrupt(errors::throw_type_error(agent))),
             GeneratorState::Completed => {
-                Self::generator_completion_result(agent, caller_frame.realm(), resume_kind, value)
+                Self::generator_completion_result(agent, caller_realm, resume_kind, value)
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Throw => {
                 Self::complete_generator_object(agent, generator);
@@ -118,7 +109,7 @@ impl Vm {
             }
             GeneratorState::SuspendedStart if resume_kind == GeneratorResumeKind::Return => {
                 Self::complete_generator_object(agent, generator);
-                Self::generator_result_object(agent, caller_frame.realm(), value, true)
+                Self::generator_result_object(agent, caller_realm, value, true)
             }
             GeneratorState::SuspendedStart | GeneratorState::SuspendedYield => {
                 let suspended =
@@ -151,7 +142,7 @@ impl Vm {
                 self.generator_resume_depth -= 1;
                 match outcome? {
                     GeneratorExecutionOutcome::Complete(value) => {
-                        Self::generator_result_object(agent, caller_frame.realm(), value, true)
+                        Self::generator_result_object(agent, caller_realm, value, true)
                     }
                     GeneratorExecutionOutcome::Yield {
                         value,
@@ -160,7 +151,7 @@ impl Vm {
                         if raw_iterator_result {
                             Ok(value)
                         } else {
-                            Self::generator_result_object(agent, caller_frame.realm(), value, false)
+                            Self::generator_result_object(agent, caller_realm, value, false)
                         }
                     }
                     GeneratorExecutionOutcome::Throw(thrown) => {
@@ -184,7 +175,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_realm: RealmRef,
         generator: ObjectRef,
         resume_kind: GeneratorResumeKind,
         value: Value,
@@ -192,7 +183,7 @@ impl Vm {
         if !self.is_async_generator_object(generator) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
-        let capability = Self::create_intrinsic_promise_capability(agent, caller_frame.realm())?;
+        let capability = Self::create_intrinsic_promise_capability(agent, caller_realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         self.async_generator_queues
             .entry(generator)
@@ -201,7 +192,7 @@ impl Vm {
                 kind: resume_kind,
                 value,
                 capability,
-                realm: caller_frame.realm(),
+                realm: caller_realm,
             });
         self.drain_async_generator_queue(agent, host, registry, generator)?;
         Ok(Value::from_object_ref(promise))
@@ -216,16 +207,16 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller_realm: RealmRef,
         this_value: Value,
         resume_kind: GeneratorResumeKind,
         value: Value,
     ) -> VmResult<Value> {
-        let capability = Self::create_intrinsic_promise_capability(agent, caller_frame.realm())?;
+        let capability = Self::create_intrinsic_promise_capability(agent, caller_realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
         let realm = agent
-            .realm(caller_frame.realm())
-            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
+            .realm(caller_realm)
+            .ok_or(VmError::MissingRootShape(caller_realm))?;
         let Some(generator) = this_value.as_object_ref() else {
             let type_error_value = errors::throw_type_error(agent)
                 .thrown_value()
@@ -263,7 +254,7 @@ impl Vm {
                 kind: resume_kind,
                 value,
                 capability,
-                realm: caller_frame.realm(),
+                realm: caller_realm,
             });
         self.drain_async_generator_queue(agent, host, registry, generator)?;
         Ok(Value::from_object_ref(promise))
@@ -600,12 +591,13 @@ impl Vm {
         let realm = agent
             .realm(request.realm)
             .ok_or(VmError::MissingRootShape(request.realm))?;
-        let caller = self.synthetic_job_caller_frame(&realm);
+        let caller_frame = self.synthetic_job_caller_frame(&realm);
+        let caller = Self::caller_context_from_record(agent, &caller_frame);
         let promise = match self.promise_resolve_in_realm(
             agent,
             host,
             registry,
-            &caller,
+            caller,
             request.realm,
             request.value,
         ) {
@@ -650,12 +642,13 @@ impl Vm {
         let realm = agent
             .realm(request.realm)
             .ok_or(VmError::MissingRootShape(request.realm))?;
-        let caller = self.synthetic_job_caller_frame(&realm);
+        let caller_frame = self.synthetic_job_caller_frame(&realm);
+        let caller = Self::caller_context_from_record(agent, &caller_frame);
         let promise = match self.promise_resolve_in_realm(
             agent,
             host,
             registry,
-            &caller,
+            caller,
             request.realm,
             request.value,
         ) {
@@ -706,16 +699,17 @@ impl Vm {
         generator: ObjectRef,
         async_generator_state: Option<AsyncGeneratorFrameState>,
     ) -> VmResult<GeneratorExecutionOutcome> {
-        let frame_base = self
+        let active_frame = self
             .frame()
-            .map(|frame| frame.registers().base())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
+        // Keyed by window base to match the `cleanup_internal_completion` removal key.
+        let frame_base = active_frame.registers().base();
         if let Some(state) = async_generator_state {
             self.async_generator_frame_states.insert(frame_base, state);
         }
-        let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_register_len =
-            usize::try_from(frame_base).expect("prior register length should fit usize");
+        let prior_frame_depth = self.frame_depth().saturating_sub(1);
+        let prior_register_len = usize::try_from(Self::cfr_of(&active_frame))
+            .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -761,23 +755,20 @@ impl Vm {
     pub(in crate::vm) fn suspend_current_generator_frame(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         yielded_value: Value,
         resume_instruction_offset: u32,
         raw_iterator_result: bool,
     ) -> VmResult<()> {
         let suspended =
             self.snapshot_suspended_execution(agent, frame, resume_instruction_offset)?;
-        let active = self
-            .frames
-            .pop()
-            .expect("generator suspension requires one active frame");
-        debug_assert_eq!(active, *frame);
+        debug_assert_eq!(self.current_cfr, frame.cfr());
+        self.pop_frame_depth();
         self.request_dispatch_frame_check();
-        self.release_register_window(frame.registers().base());
-        // The generator's establishment scope is removed while suspended; the
-        // referrer is already saved in side-state and re-established at restore.
-        let suspend_frame_depth = self.frames.len();
+        self.release_frame_to_caller(frame.cfr());
+        // The establishment scope is removed while suspended; the referrer is saved
+        // in side-state and re-established at restore.
+        let suspend_frame_depth = self.frame_depth();
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         self.refresh_running_context(agent);
@@ -791,21 +782,18 @@ impl Vm {
     pub(in crate::vm) fn suspend_generator_start(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         resume_instruction_offset: u32,
     ) -> VmResult<()> {
         let suspended =
             self.snapshot_suspended_execution(agent, frame, resume_instruction_offset)?;
-        let active = self
-            .frames
-            .pop()
-            .expect("generator start suspension requires one active frame");
-        debug_assert_eq!(active, *frame);
+        debug_assert_eq!(self.current_cfr, frame.cfr());
+        self.pop_frame_depth();
         self.request_dispatch_frame_check();
-        self.release_register_window(frame.registers().base());
-        // The generator's establishment scope is removed while suspended; the
-        // referrer is already saved in side-state and re-established at restore.
-        let suspend_frame_depth = self.frames.len();
+        self.release_frame_to_caller(frame.cfr());
+        // The establishment scope is removed while suspended; referrer saved in
+        // side-state and re-established at restore.
+        let suspend_frame_depth = self.frame_depth();
         self.unwind_referrer_scopes_to(suspend_frame_depth);
         let _ = self.current_exception.take();
         self.refresh_running_context(agent);
@@ -826,7 +814,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
@@ -853,17 +841,19 @@ impl Vm {
             );
         }
 
+        let cold_index = frame_depth - 1;
+        let resume_kind = self.frame_cold.get(cold_index).resume_kind;
+        let resume_value = self.frame_cold.get(cold_index).resume_value;
         let outcome = {
+            let iter_caller = self.caller_context_from_view(agent, frame);
             let mut bridge = VmIteratorBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller: iter_caller,
             };
             let receiver = Value::from_object_ref(record.iterator());
-            let resume_kind = frame.resume_kind();
-            let resume_value = frame.resume_value();
 
             match resume_kind {
                 GeneratorResumeKind::Next => {
@@ -878,7 +868,6 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame_depth,
                             frame,
                             iterator_register,
                             record,
@@ -911,12 +900,13 @@ impl Vm {
                         )?;
                         if !return_method.is_undefined() && !return_method.is_null() {
                             let return_method =
-                                Self::require_callable_object(bridge.agent, frame, return_method)?;
+                                Self::require_callable_object(bridge.agent, return_method)?;
+                            let caller = bridge.vm.caller_context_from_view(bridge.agent, frame);
                             let close_result = bridge.vm.call_to_completion(
                                 bridge.agent,
                                 bridge.host,
                                 bridge.registry,
-                                frame,
+                                caller,
                                 return_method,
                                 receiver,
                                 &[],
@@ -927,13 +917,13 @@ impl Vm {
                         }
                         return Err(VmError::Abrupt(errors::throw_type_error(bridge.agent)));
                     }
-                    let throw_method =
-                        Self::require_callable_object(bridge.agent, frame, throw_method)?;
+                    let throw_method = Self::require_callable_object(bridge.agent, throw_method)?;
+                    let caller = bridge.vm.caller_context_from_view(bridge.agent, frame);
                     let result = bridge.vm.call_to_completion(
                         bridge.agent,
                         bridge.host,
                         bridge.registry,
-                        frame,
+                        caller,
                         throw_method,
                         receiver,
                         &[resume_value],
@@ -944,7 +934,6 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame_depth,
                             frame,
                             iterator_register,
                             record,
@@ -974,7 +963,6 @@ impl Vm {
                             agent,
                             host,
                             registry,
-                            frame_depth,
                             frame,
                             instruction_len,
                             iterator_register,
@@ -994,12 +982,13 @@ impl Vm {
                         }
                     } else {
                         let return_method =
-                            Self::require_callable_object(bridge.agent, frame, return_method)?;
+                            Self::require_callable_object(bridge.agent, return_method)?;
+                        let caller = bridge.vm.caller_context_from_view(bridge.agent, frame);
                         let result = bridge.vm.call_to_completion(
                             bridge.agent,
                             bridge.host,
                             bridge.registry,
-                            frame,
+                            caller,
                             return_method,
                             receiver,
                             &[resume_value],
@@ -1026,7 +1015,6 @@ impl Vm {
 
         self.finish_delegate_yield_outcome(
             agent,
-            frame_depth,
             frame,
             instruction_len,
             result_register,
@@ -1046,8 +1034,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
@@ -1057,12 +1044,13 @@ impl Vm {
     ) -> VmResult<()> {
         let receiver = Value::from_object_ref(record.iterator());
         let outcome = {
+            let iter_caller = self.caller_context_from_view(agent, frame);
             let mut bridge = VmIteratorBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame,
+                caller: iter_caller,
             };
             let return_method = bridge.get_property_value(
                 receiver,
@@ -1074,7 +1062,6 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame_depth,
                         frame,
                         iterator_register,
                         record,
@@ -1087,13 +1074,13 @@ impl Vm {
                     value: resume_value,
                 }
             } else {
-                let return_method =
-                    Self::require_callable_object(bridge.agent, frame, return_method)?;
+                let return_method = Self::require_callable_object(bridge.agent, return_method)?;
+                let caller = bridge.vm.caller_context_from_view(bridge.agent, frame);
                 let result = bridge.vm.call_to_completion(
                     bridge.agent,
                     bridge.host,
                     bridge.registry,
-                    frame,
+                    caller,
                     return_method,
                     receiver,
                     &[resume_value],
@@ -1104,7 +1091,6 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame_depth,
                         frame,
                         iterator_register,
                         record,
@@ -1132,7 +1118,6 @@ impl Vm {
 
         self.finish_delegate_yield_outcome(
             agent,
-            frame_depth,
             frame,
             instruction_len,
             result_register,
@@ -1150,8 +1135,7 @@ impl Vm {
     fn finish_delegate_yield_outcome(
         &mut self,
         agent: &mut Agent,
-        frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         result_register: u16,
         done_register: u16,
@@ -1169,7 +1153,7 @@ impl Vm {
                     .insert(register_base, iterator_register, record);
                 self.write_register(frame.registers(), result_register, value);
                 self.write_register(frame.registers(), done_register, Value::from_bool(false));
-                self.sync_dispatch_frame(frame_depth, *frame);
+                self.park_caller_pc(frame.cfr(), frame.instruction_offset());
                 self.suspend_current_generator_frame(
                     agent,
                     frame,
@@ -1181,7 +1165,12 @@ impl Vm {
             DelegateYieldOutcome::Complete { value } => {
                 self.write_register(frame.registers(), result_register, value);
                 self.write_register(frame.registers(), done_register, Value::from_bool(true));
-                advance_dispatch_frame(frame, instruction_len);
+                // Park the advanced PC so `op_delegate_yield` can mirror it into
+                // the thin view (same pattern as `op_await`).
+                self.park_caller_pc(
+                    frame.cfr(),
+                    frame.instruction_offset().wrapping_add(instruction_len),
+                );
                 Ok(())
             }
         }
@@ -1196,8 +1185,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &FrameRecord,
+        frame: FrameView,
         iterator_register: u16,
         record: iterator::IteratorRecord,
         argument: Option<Value>,
@@ -1205,8 +1193,7 @@ impl Vm {
         match record.kind() {
             iterator::IteratorKind::Async => {
                 let receiver = Value::from_object_ref(record.iterator());
-                let next_method =
-                    Self::require_callable_object(agent, frame, record.next_method())?;
+                let next_method = Self::require_callable_object(agent, record.next_method())?;
                 let mut arguments = [Value::undefined(); 1];
                 let arguments = if let Some(argument) = argument {
                     arguments[0] = argument;
@@ -1214,11 +1201,12 @@ impl Vm {
                 } else {
                     &arguments[..0]
                 };
+                let caller = self.caller_context_from_view(agent, frame);
                 let result = self.call_to_completion(
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller,
                     next_method,
                     receiver,
                     arguments,
@@ -1227,7 +1215,6 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame_depth,
                     frame,
                     iterator_register,
                     record,
@@ -1237,22 +1224,24 @@ impl Vm {
             }
             iterator::IteratorKind::AsyncFromSync => {
                 let iter_result = {
+                    let iter_caller = self.caller_context_from_view(agent, frame);
                     let mut bridge = VmIteratorBridge {
                         vm: self,
                         agent,
                         host,
                         registry,
-                        frame,
+                        caller: iter_caller,
                     };
                     iterator::iterator_next(&mut bridge, &record, argument)?
                 };
                 let (done, value) = {
+                    let iter_caller = self.caller_context_from_view(agent, frame);
                     let mut bridge = VmIteratorBridge {
                         vm: self,
                         agent,
                         host,
                         registry,
-                        frame,
+                        caller: iter_caller,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -1263,7 +1252,6 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame_depth,
                     frame,
                     iterator_register,
                     record,
@@ -1285,21 +1273,22 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &FrameRecord,
+        frame: FrameView,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         result: Value,
         return_completion: bool,
     ) -> VmResult<()> {
+        let frame_realm = self.realm_of(agent, frame.cfr());
+        let caller = self.caller_context_from_view(agent, frame);
         let promise =
-            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), result)?;
+            self.promise_resolve_in_realm(agent, host, registry, caller, frame_realm, result)?;
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::IteratorResult {
             return_completion,
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(frame.cfr(), frame.instruction_offset());
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -1312,45 +1301,48 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame_depth: usize,
-        frame: &FrameRecord,
+        frame: FrameView,
         iterator_register: u16,
         mut record: iterator::IteratorRecord,
         value: Value,
         done: bool,
         return_completion: bool,
     ) -> VmResult<()> {
-        let promise =
-            match self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)
-            {
-                Ok(promise) => promise,
-                Err(VmError::Abrupt(completion)) if record.is_async_from_sync() && !done => {
-                    let mut record = record;
-                    let mut bridge = VmIteratorBridge {
-                        vm: self,
-                        agent,
-                        host,
-                        registry,
-                        frame,
-                    };
-                    match iterator::iterator_close::<_, ()>(
-                        &mut bridge,
-                        &mut record,
-                        Err(completion),
-                    ) {
-                        Ok(()) => return Err(VmError::Abrupt(completion)),
-                        Err(error) => return Err(error),
-                    }
+        let frame_realm = self.realm_of(agent, frame.cfr());
+        let caller = self.caller_context_from_view(agent, frame);
+        let promise = match self.promise_resolve_in_realm(
+            agent,
+            host,
+            registry,
+            caller,
+            frame_realm,
+            value,
+        ) {
+            Ok(promise) => promise,
+            Err(VmError::Abrupt(completion)) if record.is_async_from_sync() && !done => {
+                let mut record = record;
+                let iter_caller = self.caller_context_from_view(agent, frame);
+                let mut bridge = VmIteratorBridge {
+                    vm: self,
+                    agent,
+                    host,
+                    registry,
+                    caller: iter_caller,
+                };
+                match iterator::iterator_close::<_, ()>(&mut bridge, &mut record, Err(completion)) {
+                    Ok(()) => return Err(VmError::Abrupt(completion)),
+                    Err(error) => return Err(error),
                 }
-                Err(error) => return Err(error),
-            };
+            }
+            Err(error) => return Err(error),
+        };
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::Value {
             done,
             return_completion,
         });
         self.iterator_states
             .insert(frame.registers().base(), iterator_register, record);
-        self.sync_dispatch_frame(frame_depth, *frame);
+        self.park_caller_pc(frame.cfr(), frame.instruction_offset());
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -1368,7 +1360,7 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         iterator_register: u16,
         result_register: u16,
@@ -1377,19 +1369,21 @@ impl Vm {
     ) -> VmResult<()> {
         let await_state = record.delegate_yield_await_state();
         record.set_delegate_yield_await_state(iterator::DelegateYieldAwaitState::None);
-        let resume_kind = frame.resume_kind();
-        let resume_value = frame.resume_value();
-        frame.clear_resume();
+        let cold_index = frame_depth - 1;
+        let resume_kind = self.frame_cold.get(cold_index).resume_kind;
+        let resume_value = self.frame_cold.get(cold_index).resume_value;
+        self.frame_cold.get_mut(cold_index).resume_active = false;
         if resume_kind == GeneratorResumeKind::Throw {
             if let iterator::DelegateYieldAwaitState::Value { done: false, .. } = await_state
                 && record.is_async_from_sync()
             {
+                let iter_caller = self.caller_context_from_view(agent, frame);
                 let mut bridge = VmIteratorBridge {
                     vm: self,
                     agent,
                     host,
                     registry,
-                    frame,
+                    caller: iter_caller,
                 };
                 let _: () = iterator::iterator_close(
                     &mut bridge,
@@ -1408,12 +1402,13 @@ impl Vm {
                     .as_object_ref()
                     .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
                 let (done, value) = {
+                    let iter_caller = self.caller_context_from_view(agent, frame);
                     let mut bridge = VmIteratorBridge {
                         vm: self,
                         agent,
                         host,
                         registry,
-                        frame,
+                        caller: iter_caller,
                     };
                     (
                         iterator::iterator_complete(&mut bridge, iter_result)?,
@@ -1425,7 +1420,6 @@ impl Vm {
                         agent,
                         host,
                         registry,
-                        frame_depth,
                         frame,
                         iterator_register,
                         record,
@@ -1446,7 +1440,6 @@ impl Vm {
                 };
                 self.finish_delegate_yield_outcome(
                     agent,
-                    frame_depth,
                     frame,
                     instruction_len,
                     result_register,
@@ -1463,11 +1456,16 @@ impl Vm {
                 if done {
                     record.set_done(true);
                     if return_completion {
-                        *frame = (*frame).with_resume(GeneratorResumeKind::Return, resume_value);
+                        // `finish_delegate_yield_outcome` (Complete branch) parks only
+                        // the PC; write the resume state to cold here so `LoadResume*`
+                        // reads observe it.
+                        let c = self.frame_cold.get_mut(cold_index);
+                        c.resume_kind = GeneratorResumeKind::Return;
+                        c.resume_value = resume_value;
+                        c.resume_active = true;
                     }
                     self.finish_delegate_yield_outcome(
                         agent,
-                        frame_depth,
                         frame,
                         instruction_len,
                         result_register,
@@ -1481,7 +1479,6 @@ impl Vm {
                 } else {
                     self.finish_delegate_yield_outcome(
                         agent,
-                        frame_depth,
                         frame,
                         instruction_len,
                         result_register,
@@ -1530,15 +1527,13 @@ impl Vm {
                 .free_suspended_execution(suspended);
         }
 
-        let register_base =
-            u32::try_from(self.register_stack_top()).expect("register stack length should fit u32");
         let register_len = u16::try_from(saved_registers.len())
             .expect("suspended register window length should fit u16");
-        self.reserve_register_window(register_base, register_len);
+        let (cfr, register_base) = self.reserve_frame(agent, register_len)?;
         let start =
             usize::try_from(register_base).expect("suspended register base should fit usize");
         for (index, value) in saved_registers.into_iter().enumerate() {
-            self.register_stack[start + index] = value;
+            self.arena.slots_mut()[start + index] = value;
         }
 
         let side_state = self.suspended_side_states.remove(&suspended);
@@ -1553,7 +1548,6 @@ impl Vm {
             0,
             RegisterWindow::new(register_base, register_len),
             None,
-            record.realm(),
             record.lexical_env(),
             record.variable_env(),
             context_kind,
@@ -1576,11 +1570,16 @@ impl Vm {
         // the rebuilt context above) rather than inheriting the resume-time
         // stack's. The restored frame sits at `restore_frame_depth`, so the
         // scope unwinds when that frame next suspends or returns.
-        let restore_frame_depth = self.frames.len();
+        let restore_frame_depth = self.frame_depth();
+        let restore_realm = record.realm();
         self.note_executed_code(frame.code());
-        self.frames.push(frame);
+        self.push_frame_with_header(cfr, frame);
         self.note_frame_depth();
-        self.push_referrer_scope(restore_frame_depth, script_or_module_referrer);
+        self.push_referrer_scope(
+            restore_frame_depth,
+            restore_realm,
+            script_or_module_referrer,
+        );
         self.refresh_running_context(agent);
         self.request_dispatch_frame_check();
 
@@ -1591,16 +1590,16 @@ impl Vm {
                 .restore_window(frame.registers(), side_state.for_in_states);
             self.captured_name_references
                 .restore_window(frame.registers(), side_state.captured_name_references);
-            self.restore_loop_iteration_state(self.frames.len(), side_state.loop_iteration_envs);
+            self.restore_loop_iteration_state(self.frame_depth(), side_state.loop_iteration_envs);
             self.restore_with_environment_state(
-                self.frames.len(),
+                self.frame_depth(),
                 side_state.with_environment_states,
             );
             self.restore_direct_eval_environment_state(
-                self.frames.len(),
+                self.frame_depth(),
                 side_state.direct_eval_environment_states,
             );
-            self.restore_env_scope_state(self.frames.len(), side_state.active_env_scopes);
+            self.restore_env_scope_state(self.frame_depth(), side_state.active_env_scopes);
             if let Some(async_state) = side_state.async_frame_state {
                 self.async_frame_states
                     .insert(frame.registers().base(), async_state);
@@ -1613,17 +1612,25 @@ impl Vm {
         Ok(())
     }
 
+    #[allow(
+        clippy::unnecessary_wraps,
+        reason = "returns VmResult for signature uniformity with the suspend-helper family"
+    )]
     pub(super) fn snapshot_suspended_execution(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         instruction_offset: u32,
     ) -> VmResult<SuspendedExecutionRef> {
         let register_base =
             usize::try_from(frame.registers().base()).expect("register base should fit usize");
         let register_end =
             usize::try_from(frame.registers().end()).expect("register end should fit usize");
-        let register_values = self.register_stack[register_base..register_end].to_vec();
+        let register_values = self.arena.slots()[register_base..register_end].to_vec();
+        // Capture the frame's realm before the heap mutator borrows `agent`. The
+        // suspended record stores it so a later resume re-establishes the same
+        // realm (the resume push feeds it back into the establishment side-stack).
+        let frame_realm = self.realm_of(agent, frame.cfr());
 
         let registers = {
             let mut mutator = agent.heap_mut().mutator();
@@ -1649,31 +1656,57 @@ impl Vm {
             }
         };
 
+        let frame_cfr = frame.cfr();
+        let handler_cursor = self.frame_cold.get(self.frame_depth() - 1).handler_cursor;
         let suspended = {
+            let hdr = self.frame_header(frame_cfr);
+            let (
+                hdr_lexical_env,
+                hdr_variable_env,
+                hdr_private_env,
+                hdr_this_value,
+                hdr_this_state,
+                hdr_construct_this,
+                hdr_new_target,
+                hdr_callee,
+                hdr_flags_raw,
+                hdr_kind,
+            ) = (
+                hdr.lexical_env(),
+                hdr.variable_env(),
+                hdr.private_env(),
+                hdr.this_value(),
+                hdr.this_state(),
+                hdr.construct_this(),
+                hdr.new_target(),
+                hdr.callee(),
+                crate::frame::FrameFlags::from_raw(hdr.flags_bits()).raw(),
+                hdr.kind(),
+            );
             let mut mutator = agent.heap_mut().mutator();
             mutator.alloc_suspended_execution(
                 RuntimeSuspendedExecutionRecord::new(
-                    frame.realm(),
+                    frame_realm,
                     frame.code(),
                     instruction_offset,
-                    frame.lexical_env(),
-                    frame.variable_env(),
-                    frame.private_env(),
-                    frame.this_value(),
-                    encode_this_state_kind(frame.this_state()),
-                    frame.construct_this(),
-                    frame.new_target(),
-                    frame.callee(),
-                    frame.handler_cursor(),
-                    frame.flags().raw(),
-                    encode_execution_context_kind(frame.kind()),
+                    hdr_lexical_env,
+                    hdr_variable_env,
+                    hdr_private_env,
+                    hdr_this_value,
+                    encode_this_state_kind(hdr_this_state),
+                    hdr_construct_this,
+                    hdr_new_target,
+                    hdr_callee,
+                    handler_cursor,
+                    hdr_flags_raw,
+                    encode_execution_context_kind(hdr_kind),
                     registers,
                 ),
                 AllocationLifetime::Default,
             )
         };
 
-        let frame_depth = self.frames.len();
+        let frame_depth = self.frame_depth();
         let side_state = SuspendedExecutionSideState {
             iterator_states: self.iterator_states.drain_window(frame.registers()),
             for_in_states: self.for_in_states.drain_window(frame.registers()),

@@ -1,8 +1,8 @@
 use super::{
-    alloc_string, errors, object, promise_capability_executor_builtin, Agent, AllocationLifetime,
-    FrameRecord, HostHooks, ImportMetaValue, ModuleImportAttribute, ModuleKey, ModuleSourceRequest,
-    NativeFunctionRegistry, ObjectAllocation, ObjectRef, PromiseResolvingFunctionKind, PropertyKey,
-    RealmRef, ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult,
+    Agent, AllocationLifetime, CallerContext, HostHooks, ImportMetaValue, ModuleImportAttribute,
+    ModuleKey, ModuleSourceRequest, NativeFunctionRegistry, ObjectAllocation, ObjectRef,
+    PromiseResolvingFunctionKind, PropertyKey, RealmRef, ToPrimitiveHint, Value, Vm, VmError,
+    VmProxyBridge, VmResult, alloc_string, errors, object, promise_capability_executor_builtin,
 };
 use crate::vm::DynamicImportPhase;
 use crate::vm::{DynamicImportRequest, PendingDynamicImport};
@@ -23,12 +23,9 @@ enum DynamicImportEvaluationOutcome {
 }
 
 impl Vm {
-    pub(super) fn import_meta_builtin(
-        agent: &mut Agent,
-        caller_frame: &FrameRecord,
-    ) -> VmResult<Value> {
+    pub(super) fn import_meta_builtin(agent: &mut Agent, caller: CallerContext) -> VmResult<Value> {
         let module_key = agent
-            .module_key_for_environment(caller_frame.lexical_env())
+            .module_key_for_environment(caller.lexical_env)
             .ok_or(VmError::MissingModuleRecord)?;
         let (cached_object, host_properties) = {
             let record = agent
@@ -43,12 +40,13 @@ impl Vm {
             return Ok(Value::from_object_ref(import_meta));
         }
 
+        let caller_realm = caller.realm;
         let realm = agent
-            .realm(caller_frame.realm())
-            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
+            .realm(caller_realm)
+            .ok_or(VmError::MissingRootShape(caller_realm))?;
         let root_shape = realm
             .root_shape()
-            .ok_or_else(|| VmError::MissingRootShape(caller_frame.realm()))?;
+            .ok_or(VmError::MissingRootShape(caller_realm))?;
         let import_meta = agent.with_heap_and_objects(|heap, objects| {
             let mut mutator = heap.mutator();
             objects.alloc_object(
@@ -100,21 +98,16 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         arguments: &[Value],
     ) -> VmResult<Value> {
-        let realm = caller_frame.realm();
+        let realm = caller.realm;
         let constructor = agent
             .realm(realm)
             .and_then(|realm| realm.intrinsics().promise())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let capability = self.create_dynamic_import_capability(
-            agent,
-            host,
-            registry,
-            caller_frame,
-            constructor,
-        )?;
+        let capability =
+            self.create_dynamic_import_capability(agent, host, registry, caller, constructor)?;
         let promise = agent
             .promise_capability(capability)
             .and_then(lyng_env::PromiseCapabilityRecord::promise)
@@ -129,7 +122,8 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    caller_frame,
+                    caller.realm,
+                    caller.lexical_env,
                     specifier,
                     ToPrimitiveHint::String,
                 )
@@ -137,7 +131,7 @@ impl Vm {
             let specifier = Self::value_to_string_text(agent, specifier)
                 .map_err(|error| Self::dynamic_import_error_value(agent, error))?;
             let attributes = self
-                .normalize_dynamic_import_attributes(agent, host, registry, caller_frame, options)
+                .normalize_dynamic_import_attributes(agent, host, registry, caller, options)
                 .map_err(|error| Self::dynamic_import_error_value(agent, error))?;
             if phase == DynamicImportPhase::Source {
                 return Err(errors::syntax_error_value(agent));
@@ -166,13 +160,14 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         constructor: ObjectRef,
     ) -> VmResult<lyng_env::PromiseCapabilityId> {
         let capability = agent.alloc_promise_capability();
+        let caller_realm = caller.realm;
         let executor = Self::allocate_builtin_function_object(
             agent,
-            caller_frame.realm(),
+            caller_realm,
             promise_capability_executor_builtin(),
         )?;
         let _ = agent.alloc_promise_resolving_function(
@@ -186,7 +181,7 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller,
             constructor,
             &[Value::from_object_ref(executor)],
             Some(constructor),
@@ -206,7 +201,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         options: Value,
     ) -> VmResult<Vec<ModuleImportAttribute>> {
         if options.is_undefined() {
@@ -220,7 +215,10 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller.realm,
+            caller.lexical_env,
+            caller.code,
+            caller.pc,
             options_object,
             Value::from_object_ref(options_object),
             with_key,
@@ -231,13 +229,20 @@ impl Vm {
         let Some(attributes_object) = with_value.as_object_ref() else {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         };
+        let caller_realm = caller.realm;
+        let caller_lexical_env = caller.lexical_env;
+        let caller_code = caller.code;
+        let caller_pc = caller.pc;
         let keys = object::own_property_keys_in_context(
             &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame: caller_frame,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             attributes_object,
         )?;
@@ -249,7 +254,10 @@ impl Vm {
                     agent,
                     host,
                     registry,
-                    frame: caller_frame,
+                    caller_realm,
+                    caller_lexical_env,
+                    caller_code,
+                    caller_pc,
                 },
                 attributes_object,
                 key,
@@ -265,7 +273,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller_frame,
+                caller.realm,
+                caller.lexical_env,
+                caller.code,
+                caller.pc,
                 attributes_object,
                 Value::from_object_ref(attributes_object),
                 key,

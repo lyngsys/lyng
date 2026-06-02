@@ -1,9 +1,9 @@
 use super::{
-    eval_builtin, internal_construct_super_builtin, internal_direct_eval_builtin,
-    internal_private_field_get_builtin, internal_super_constructor_builtin, CallBridgeRegisters,
-    CallRange, Expr, ExprId, FeedbackSiteKind, FeedbackSiteMetadata, FunctionCompiler,
-    FunctionKind, LoweringError, LoweringResult, Opcode, ResolutionKind, SafepointKind, Span,
-    WellKnownAtom,
+    CallBridgeRegisters, CallRange, Expr, ExprId, FeedbackSiteKind, FeedbackSiteMetadata,
+    FunctionCompiler, FunctionKind, LoweringError, LoweringResult, Opcode, ResolutionKind,
+    SafepointKind, Span, WellKnownAtom, eval_builtin, internal_construct_super_builtin,
+    internal_direct_eval_builtin, internal_private_field_get_builtin,
+    internal_super_constructor_builtin,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

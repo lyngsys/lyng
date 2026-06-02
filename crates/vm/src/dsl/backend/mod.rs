@@ -1,9 +1,9 @@
 //! Per-arch DSL backend dispatch. Today: `AArch64` only.
 //!
-//! Each `backend::*` module exports a vocabulary of `macro_rules!` macros
-//! that emit `&'static str` asm fragments (via `concat!`). The DSL
-//! proc-macro lowerer (Batch 1's `lower.rs`) collects those fragments
-//! into a single `core::arch::naked_asm!(...)` block per handler. See
+//! Each `backend::*` module exports `macro_rules!` macros that emit
+//! `&'static str` asm fragments (via `concat!`). The DSL proc-macro
+//! lowerer collects those fragments into a single
+//! `core::arch::naked_asm!(...)` block per handler. See
 //! `crates/vm/src/dsl/ops.md` for the full vocabulary.
 
 #[cfg(target_arch = "aarch64")]

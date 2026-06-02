@@ -1,8 +1,8 @@
 use super::{
     Agent, AtomId, BytecodeFunctionId, CodeRef, CompiledAtom, ConstantValue, EnvironmentRef,
-    FrameRecord, HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm, VmError,
-    VmResult,
+    HostHooks, NativeFunctionRegistry, ObjectRef, RealmRef, Value, Vm, VmError, VmResult,
 };
+use crate::frame::FrameView;
 use crate::vm::property_access::ToPrimitiveHint;
 use lyng_gc::{AllocationLifetime, BigIntSign, PrimitiveStringView, StringEncoding};
 use lyng_ops::{errors, number_to_string, object, read};
@@ -58,7 +58,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -77,7 +77,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -106,17 +106,27 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left: Value,
         right: Value,
     ) -> VmResult<Value> {
-        let left =
-            self.to_primitive(agent, host, registry, frame, left, ToPrimitiveHint::Default)?;
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let left = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            left,
+            ToPrimitiveHint::Default,
+        )?;
         let right = self.to_primitive(
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
             right,
             ToPrimitiveHint::Default,
         )?;
@@ -163,7 +173,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -185,7 +195,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -212,14 +222,17 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> VmResult<Value> {
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
         let value = self.to_primitive(
             agent,
             host,
             registry,
-            frame,
+            caller_realm,
+            caller_lexical_env,
             self.read_register(frame.registers(), register),
             ToPrimitiveHint::Number,
         )?;
@@ -235,7 +248,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> VmResult<Value> {
         let value = self.numeric_value(agent, host, registry, frame, register)?;
@@ -282,7 +295,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -304,7 +317,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         immediate: i16,
     ) -> VmResult<Value> {
@@ -331,7 +344,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -353,7 +366,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -379,7 +392,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         left_register: u16,
         right_register: u16,
     ) -> VmResult<Value> {
@@ -404,7 +417,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> VmResult<Value> {
         self.numeric_value_operand(
@@ -421,11 +434,20 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        frame: FrameView,
         value: Value,
     ) -> VmResult<Value> {
-        let primitive =
-            self.to_primitive(agent, host, registry, frame, value, ToPrimitiveHint::Number)?;
+        let caller_realm = self.realm_of(agent, frame.cfr());
+        let caller_lexical_env = self.frame_header(frame.cfr()).lexical_env();
+        let primitive = self.to_primitive(
+            agent,
+            host,
+            registry,
+            caller_realm,
+            caller_lexical_env,
+            value,
+            ToPrimitiveHint::Number,
+        )?;
         read::to_numeric(agent.heap().view(), primitive)
             .map_err(|abrupt| numeric_conversion_error(agent, abrupt))
     }
@@ -512,14 +534,14 @@ impl Vm {
 
     pub(in crate::vm) fn object_register(
         &self,
-        frame: &FrameRecord,
+        frame: FrameView,
         register: u16,
     ) -> VmResult<ObjectRef> {
         let value = self.read_register(frame.registers(), register);
         Self::require_object(frame, value)
     }
 
-    pub(super) fn require_object(frame: &FrameRecord, value: Value) -> VmResult<ObjectRef> {
+    pub(super) fn require_object(frame: FrameView, value: Value) -> VmResult<ObjectRef> {
         value
             .as_object_ref()
             .ok_or_else(|| VmError::ExpectedObject {
@@ -532,7 +554,6 @@ impl Vm {
     pub(super) fn value_to_property_key(
         &mut self,
         agent: &mut Agent,
-        _frame: &FrameRecord,
         code: CodeRef,
         instruction_offset: u32,
         value: Value,

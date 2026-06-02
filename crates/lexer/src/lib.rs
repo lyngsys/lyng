@@ -22,7 +22,7 @@ mod trivia;
 
 pub use lexer::{Lexer, LexerMode};
 pub use literals::{BigIntLiteral, LiteralTable, RegExpLiteral, StringLiteral, TemplateChunk};
-pub use token::{LiteralId, Token, TokenFlags, TokenKind, TokenPayload, KEYWORD_TOKEN_KIND};
+pub use token::{KEYWORD_TOKEN_KIND, LiteralId, Token, TokenFlags, TokenKind, TokenPayload};
 pub use trivia::next_non_trivia;
 
 #[cfg(test)]

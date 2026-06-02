@@ -1,11 +1,6 @@
-//! Warm DSL handlers. Populated by tasks B43–B45.
-//!
-//! Warm handlers are mid-frequency opcodes that need either a backedge
-//! safepoint poll (`op_loop_header`, conditional backward jumps) or a
-//! prefix decode (`op_wide`, `op_extra_wide`). They run on top of the
-//! same backend macros as the hot handlers; the distinction is
-//! categorical (used to determine inlining heuristics in the DSL
-//! optimizer + dispatch table organization later in DSL-1).
+//! Warm DSL handlers — mid-frequency opcodes that poll a safepoint on
+//! backedges (`op_loop_header`, conditional backward jumps) or decode a
+//! prefix (`op_wide`, `op_extra_wide`).
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -15,9 +10,9 @@
 
 #[cfg(target_arch = "aarch64")]
 use crate::{
-    branch_i16_negative, branch_i8_negative, branch_nonzero, branch_zero, call_slow, check_bool,
+    branch_i8_negative, branch_i16_negative, branch_nonzero, branch_zero, call_slow, check_bool,
     decode_a, decode_ab, decode_abx, decode_ax, dispatch, dispatch_after_slow,
-    jump_relative_i16_and_dispatch, jump_relative_i8_and_dispatch, load_reg, poll_safepoint,
+    jump_relative_i8_and_dispatch, jump_relative_i16_and_dispatch, load_reg, poll_safepoint,
     untag_bool,
 };
 
@@ -25,8 +20,8 @@ use crate::{
 use lyng_vm_dsl::llint_handler;
 
 // =====================================================================
-// op_loop_header (B43) — Ax layout, length = 4. Polls the safepoint
-// flag on every backedge; on pending work, jumps to the slow path.
+// op_loop_header — Ax layout, length = 4. Polls safepoint on every
+// backedge; delegates pending work to the slow path.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
@@ -40,16 +35,13 @@ llint_handler! {
     }
 }
 
-/// Slow-path shim for `op_loop_header`'s safepoint poll. Invoked when
-/// `poll_safepoint!` sees a non-zero `vm.poll_pending` byte. Delegates
-/// to the shared `crate::dsl::poll::run_poll` consumer.
+/// Slow-path shim for `op_loop_header`'s safepoint poll.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_loop_header_poll_rs(
     state: *mut crate::dsl::llint_state::LlIntState,
 ) -> crate::dsl::slow_path::SlowPathReturn {
-    // SAFETY: state is a valid LlIntState pointer for the duration of
-    // the call per the DSL-0b ABI contract on `from_raw`.
+    // SAFETY: state is valid for the duration of this call; see `from_raw` contract.
     let mut dispatch = unsafe { crate::dsl::slow_path::LlIntDispatchState::from_raw(state) };
     dispatch.sync_from_asm();
     let outcome = crate::dsl::poll::run_poll(&mut dispatch, crate::dsl::poll::PollArgs);
@@ -57,10 +49,8 @@ pub extern "C" fn op_loop_header_poll_rs(
 }
 
 // =====================================================================
-// op_jump8 (B44) — 1-byte i8 delta variant. Layout A in the DSL
-// (single byte at PC+1), length = 2. Mirrors `op_jump`'s inline shape:
-// forward and backward (no pending poll) paths apply the signed i8
-// delta inline; pending-poll hands off to `op_jump8_poll_rs`.
+// op_jump8 — A layout, length = 2. Mirrors `op_jump`'s inline shape
+// with an i8 delta; backward jumps poll safepoint first.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
@@ -77,10 +67,8 @@ llint_handler! {
     }
 }
 
-/// Pending-poll shim for backward `op_jump8`. Mirrors `op_jump_poll_rs`:
-/// runs `run_poll` to consume `vm.poll_pending`, then applies the
-/// sign-extended i8 delta and returns `Continue { pc_advance }` so the
-/// asm bridge advances PC past the whole jump.
+/// Pending-poll shim for backward `op_jump8`. Runs the poll then applies
+/// the sign-extended i8 delta, returning `Continue { pc_advance }`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_jump8_poll_rs(
@@ -97,7 +85,7 @@ pub extern "C" fn op_jump8_poll_rs(
     let instruction_offset = dispatch.current_instruction_offset();
     let target = i64::from(instruction_offset) + 2 + i64::from(delta);
     if target < 0 || target > i64::from(u32::MAX) {
-        let code = dispatch.dispatch_state().frame.code();
+        let code = dispatch.dispatch_state().code();
         return dispatch.translate_outcome(crate::dsl::slow_path::SemanticOutcome::ExitError {
             error: crate::error::VmError::InvalidJumpTarget {
                 code,
@@ -131,20 +119,9 @@ pub extern "C" fn op_jump8_slow_rs(
 }
 
 // =====================================================================
-// op_jump_if_true / op_jump_if_false — Abx layout (1-byte reg + 2-byte
-// i16 delta), length = 4.
+// op_jump_if_true / op_jump_if_false — Abx layout (1-byte reg + i16
+// delta), length = 4. Backward jumps poll safepoint.
 // =====================================================================
-
-// `op_jump_if_true` and `op_jump_if_false` use an i16 delta (Abx
-// layout: `ldrh` into the offset scratch zero-extends the raw u16).
-// The inline path mirrors `op_jump_if_true8` / `op_jump_if_false8`
-// (i8) shape on the Abx operand, sign-testing bit 15 instead of bit 7
-// and sign-extending with `sxth` instead of `sxtb`.
-//
-// op_jump_if_true: fallthrough is "take" when the bool is true, so the
-// not-taken branch fires on `t0 == 0` (mirrors `op_jump_if_true8`).
-// op_jump_if_false: fallthrough is "take" when the bool is false, so
-// the not-taken branch fires on `t0 != 0`.
 #[cfg(target_arch = "aarch64")]
 llint_handler! {
     op_jump_if_true, opcode_byte = 64, layout = Abx, length = 4, |condition, offset| {
@@ -225,8 +202,8 @@ pub extern "C" fn op_jump_if_false_slow_rs(
 }
 
 // =====================================================================
-// op_jump_if_true8 / op_jump_if_false8 — Ab layout in the DSL (1-byte
-// reg + 1-byte i8 delta), length = 3.
+// op_jump_if_true8 / op_jump_if_false8 — Ab layout (1-byte reg + i8
+// delta), length = 3. Backward jumps poll safepoint.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
@@ -310,24 +287,13 @@ pub extern "C" fn op_jump_if_false8_slow_rs(
 }
 
 // =====================================================================
-// op_wide / op_extra_wide (DSL-0c C2) — None layout, length = 1.
+// op_wide / op_extra_wide — None layout, length = 1.
 //
-// The DSL prefix handlers drive wide-form dispatch entirely through
-// `crate::dsl::handlers::cold::dispatch_wide_form` — a centralized
-// Rust function whose match arms decode + execute each prefix-accepting
-// opcode's wide-form encoding. The shim:
-//
-//   1. Checks for a stacked prefix (returns `DoublePrefix` if set).
-//   2. Calls `dispatch_wide_form(state, Wide | ExtraWide)`, which reads
-//      `bytes[pc+1]` (the semantic byte), invokes the matching opcode's
-//      decoder + semantic body, and returns a `SemanticOutcome` whose
-//      `pc_advance` is the full wide-form instruction length.
-//   3. Translates the outcome via `translate_outcome` so the asm bridge
-//      advances PC past the entire wide instruction.
-//
-// This replaces the legacy `op_prefix_via_alpha` bridge that delegated
-// wide-form dispatch through the α dispatch table. The α tables and
-// `dispatch_handlers/` are now unreferenced and can be deleted.
+// Prefix handlers delegate to `dispatch_wide_form`, which reads the
+// semantic byte at `bytes[pc+1]`, decodes wide-form operands, calls
+// the matching semantic body, and returns `SemanticOutcome` with
+// `pc_advance` = full wide-form instruction length. A stacked prefix
+// is rejected with `DoublePrefix`.
 // =====================================================================
 
 #[cfg(target_arch = "aarch64")]
@@ -346,9 +312,7 @@ llint_handler! {
     }
 }
 
-/// Slow-path shim for `op_wide`. Delegates the full wide-form
-/// instruction to `dispatch_wide_form`, which decodes operands and
-/// runs the semantic body for the byte at `bytes[pc+1]`.
+/// Slow-path shim for `op_wide`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_wide_set_prefix_rs(
@@ -360,9 +324,7 @@ pub extern "C" fn op_wide_set_prefix_rs(
     dispatch.translate_outcome(outcome)
 }
 
-/// Slow-path shim for `op_extra_wide`. Counterpart to
-/// `op_wide_set_prefix_rs`; routes through `dispatch_wide_form` with
-/// the `ExtraWide` prefix.
+/// Slow-path shim for `op_extra_wide`.
 #[cfg(target_arch = "aarch64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn op_extra_wide_set_prefix_rs(
@@ -374,13 +336,9 @@ pub extern "C" fn op_extra_wide_set_prefix_rs(
     dispatch.translate_outcome(outcome)
 }
 
-/// Shared body of `op_wide_set_prefix_rs` /
-/// `op_extra_wide_set_prefix_rs`. Mirrors the α prefix handler:
-/// rejects a stacked prefix (`state.prefix.is_some()`) with
-/// `VmError::DoublePrefix`, then delegates the full wide-form
-/// instruction to `dispatch_wide_form`. The dispatcher's
-/// `SemanticOutcome` carries the total instruction length so PC
-/// advances past the entire wide-form instruction in one step.
+/// Shared body for `op_wide_set_prefix_rs` / `op_extra_wide_set_prefix_rs`.
+/// Rejects a stacked prefix with `DoublePrefix`, sets `state.prefix`,
+/// delegates to `dispatch_wide_form`, then clears the prefix.
 #[cfg(target_arch = "aarch64")]
 fn run_prefix(
     dispatch: &mut crate::dsl::slow_path::LlIntDispatchState<'_, '_>,
@@ -392,22 +350,20 @@ fn run_prefix(
         if inner.prefix.is_some() {
             return SemanticOutcome::ExitError {
                 error: crate::error::VmError::DoublePrefix {
-                    code: inner.frame.code(),
-                    instruction_offset: inner.frame.instruction_offset(),
+                    code: inner.code(),
+                    instruction_offset: inner.pc(),
                 },
             };
         }
         inner.prefix = Some(prefix);
     }
     let outcome = crate::dsl::handlers::cold::dispatch_wide_form(dispatch, prefix);
-    // Clear the prefix on the way out — the dispatcher's semantic
-    // bodies consume it via their args, but the trampoline must see
-    // `prefix = None` before the next instruction dispatches.
+    // Clear prefix — must be None before the next instruction dispatches.
     dispatch.dispatch_state().prefix = None;
     outcome
 }
 
-/// Non-aarch64 stubs.
+/// Non-aarch64 placeholder stubs.
 #[cfg(not(target_arch = "aarch64"))]
 pub unsafe extern "C" fn op_loop_header() -> ! {
     loop {}

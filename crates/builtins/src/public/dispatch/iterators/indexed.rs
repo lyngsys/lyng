@@ -1,10 +1,9 @@
 use super::{
-    array_like_length, create_array_result, get_property_from_object, iterator, length_value,
-    map_completion, set_property_on_object, string_from_code_units, string_ref_code_units,
-    string_this_ref, type_error, typed_array_is_out_of_bounds,
-    typed_array_validated_object_and_record, Agent, AllocationLifetime, BuiltinInvocation,
-    ObjectAllocation, ObjectColdData, ObjectRef, OrdinaryObjectData, PropertyKey,
-    PublicBuiltinDispatchContext, Value,
+    Agent, AllocationLifetime, BuiltinInvocation, ObjectAllocation, ObjectColdData, ObjectRef,
+    OrdinaryObjectData, PropertyKey, PublicBuiltinDispatchContext, Value, array_like_length,
+    create_array_result, get_property_from_object, iterator, length_value, map_completion,
+    set_property_on_object, string_from_code_units, string_ref_code_units, string_this_ref,
+    type_error, typed_array_is_out_of_bounds, typed_array_validated_object_and_record,
 };
 
 pub(in crate::public::dispatch) enum ArrayIterationKind {
@@ -142,11 +141,7 @@ pub(in crate::public::dispatch) fn set_iterator_slot_value_for_builtin<
         let mut mutator = heap.mutator();
         objects.mut_named_slot(&mut mutator, object_ref, slot_index, value)
     });
-    if updated {
-        Ok(())
-    } else {
-        Err(type_error(cx))
-    }
+    if updated { Ok(()) } else { Err(type_error(cx)) }
 }
 
 pub(in crate::public::dispatch) fn array_iterator_factory_builtin<

@@ -1,6 +1,6 @@
 use super::super::{
-    map_completion, radix_argument, range_error, string_value, to_bigint_for_builtin,
-    to_index_for_builtin, type_error, BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext, map_completion, radix_argument,
+    range_error, string_value, to_bigint_for_builtin, to_index_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use lyng_env::Agent;

@@ -1,10 +1,11 @@
+use crate::Opcode;
 use crate::decoder::decode_instruction_bytes;
 use crate::function::{
     BytecodeEnvironmentBinding, BytecodeFunction, BytecodeFunctionBody, BytecodeFunctionHeader,
     InstructionStream,
 };
 use crate::ids::{BytecodeFunctionId, EnvironmentLayoutRef};
-use crate::instruction::{Instruction, INSTRUCTION_WIDTH};
+use crate::instruction::{INSTRUCTION_WIDTH, Instruction};
 use crate::metadata::{
     ArgumentsMode, BytecodeFunctionFlags, BytecodeFunctionKind, CallRange, CaptureDescriptor,
     ConstantValue, DeoptSnapshot, DirectEvalLexicalScope, DirectEvalLexicalSite,
@@ -12,7 +13,6 @@ use crate::metadata::{
     FeedbackSiteMetadata, LoopIterationEnvironmentSite, RuntimeStateCapture, SafepointDescriptor,
     SafepointKind, SourceMapEntry, ThisMode, WideAbcOperands, WideAbxOperands,
 };
-use crate::Opcode;
 use lyng_common::{AtomId, SourceId, Span};
 use lyng_types::FeedbackSlotId;
 use std::collections::HashMap;
@@ -1644,7 +1644,7 @@ impl BytecodeBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{disassemble, CaptureSource, ExceptionHandlerKind};
+    use crate::{CaptureSource, ExceptionHandlerKind, disassemble};
     use std::num::NonZeroU32;
 
     #[test]
@@ -1729,8 +1729,8 @@ mod tests {
     }
 
     #[test]
-    fn builder_inlines_feedback_slot_operand_on_semantic_profiled_instructions(
-    ) -> BytecodeBuildResult<()> {
+    fn builder_inlines_feedback_slot_operand_on_semantic_profiled_instructions()
+    -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(90).unwrap()),
             BytecodeFunctionKind::Function,
@@ -1764,8 +1764,8 @@ mod tests {
     }
 
     #[test]
-    fn final_function_metadata_uses_semantic_profiled_instruction_byte_offsets(
-    ) -> BytecodeBuildResult<()> {
+    fn final_function_metadata_uses_semantic_profiled_instruction_byte_offsets()
+    -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(91).unwrap()),
             BytecodeFunctionKind::Function,
@@ -1822,8 +1822,8 @@ mod tests {
     }
 
     #[test]
-    fn peephole_threads_jump_to_jump_targets_and_removes_unreachable_jump_chain(
-    ) -> BytecodeBuildResult<()> {
+    fn peephole_threads_jump_to_jump_targets_and_removes_unreachable_jump_chain()
+    -> BytecodeBuildResult<()> {
         let mut builder = BytecodeBuilder::new(
             BytecodeFunctionId::new(NonZeroU32::new(12).unwrap()),
             BytecodeFunctionKind::Function,

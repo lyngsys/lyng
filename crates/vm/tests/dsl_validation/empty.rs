@@ -1,22 +1,7 @@
-//! DSL-0b validation case 1 (design §10): an empty naked handler
-//! compiles and is callable.
+//! DSL validation case: an empty naked handler compiles and is callable.
 //!
-//! This is the load-bearing test of the asm-DSL design — see B30 in the
-//! plan. It exercises the full proc-macro + backend-macro +
-//! `naked_asm!` integration:
-//!
-//! 1. `llint_handler!` parses the syntax in `lyng-vm-dsl::parse`.
-//! 2. The lowerer (`lyng-vm-dsl::lower`) emits an
-//!    `#[unsafe(naked)] pub extern "C" fn` whose body is a single
-//!    `core::arch::naked_asm!` call. Each body statement becomes a
-//!    comma-separated template argument; the trailing
-//!    `length = const N as u32` is the only named binding needed for
-//!    this minimal case.
-//! 3. `dispatch!(advance = 0)` is a `#[macro_export]`-ed backend macro
-//!    living at `lyng_vm::dispatch`. It expands to a `concat!(...)`
-//!    yielding a four-instruction tail-jump asm fragment.
-//! 4. rustc composes everything into a single asm template and produces
-//!    a real `extern "C" fn` whose symbol can be taken at runtime.
+//! Exercises the full proc-macro + backend-macro + `naked_asm!` pipeline:
+//! `llint_handler!` → lowerer → `naked_asm!` → addressable `extern "C" fn`.
 
 #[cfg(target_arch = "aarch64")]
 use lyng_vm::dispatch;
@@ -39,7 +24,7 @@ fn empty_handler_symbol_exists() {
 
 // On non-aarch64 hosts the backend macros aren't compiled in, so we
 // skip the validation case entirely. The trampoline / handler family
-// is aarch64-only in DSL-0b per design §3.
+// is aarch64-only per design.
 #[cfg(not(target_arch = "aarch64"))]
 #[test]
 fn empty_handler_symbol_exists() {

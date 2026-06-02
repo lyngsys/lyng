@@ -97,7 +97,6 @@ const _: () = {
     assert!(Value::null().bits() == VALUE_NULL_BITS);
     assert!(Value::from_bool(true).bits() == VALUE_TRUE_BITS);
     assert!(Value::from_bool(false).bits() == VALUE_FALSE_BITS);
-    // Phase 1.B.2: pin sentinel bits to the runtime constructor.
     assert!(Value::uninitialized_lexical().bits() == VALUE_UNINIT_LEX_BITS);
 };
 

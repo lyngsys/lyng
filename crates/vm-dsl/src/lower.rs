@@ -1,12 +1,9 @@
 //! AST → `naked_asm!` body lowerer.
 //!
-//! The lowerer is where the design's "DSL surface ≈ asm shape" decision
-//! pays out: each body statement is one DSL-op invocation, and the
-//! lowerer composes them all into a single `naked_asm!` template. Each
-//! per-arch DSL-op `macro_rules!` macro (under
-//! `crates/vm/src/dsl/backend/aarch64/`, added in Batch 4 /
-//! tasks B20–B28) expands at the *consumer crate's* call site into a
-//! `concat!`-produced `&'static str` fragment.
+//! Each body statement is one DSL-op invocation; the lowerer composes them
+//! into a single `naked_asm!` template. Each per-arch `macro_rules!` macro
+//! (under `crates/vm/src/dsl/backend/aarch64/`) expands at the consumer
+//! crate's call site into a `concat!`-produced `&'static str` fragment.
 //!
 //! ## Emission shape
 //!
@@ -123,57 +120,28 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
     let name = &ast.name;
     let length = &ast.length;
     let opcode_byte = &ast.opcode_byte;
-    // Counter-increment fragment, emitted as the FIRST body fragment
-    // BEFORE the operand-decode prologue. When the `diagnostic-counters`
-    // feature is on the macro emits 4 instructions bumping the
-    // dispatch-bank slot for this opcode; when off it expands to the
-    // empty string and is invisible. Either way the `vm_counter_base`
-    // binding below is supplied (with a fallback `= 0` sentinel const
-    // when the feature is off — see `reg_convention.rs`) so rustc
-    // never complains about an unused named arg.
+    // Counter-increment fragment: emitted BEFORE the operand-decode prologue.
+    // When `diagnostic-counters` is off it expands to the empty string;
+    // `vm_counter_base` is always bound (fallback `= 0`) to keep rustc quiet.
     let counter_increment = quote! {
         ::lyng_vm::inc_dispatch_counter!(#opcode_byte)
     };
     let prologue_raw = handler_decode_prologue(layout, ast.decode_mode, &operands);
-    // The prologue invokes `decode_xxx!(<operand idents>)`. The backend
-    // macros stringify their args verbatim — feeding them `dst, src`
-    // yields invalid asm like `wdst, wsrc`. Substitute the operand idents
-    // here so the prologue sees `9, 10, ...` register-number literals
-    // just like the body does.
+    // Substitute operand idents so the prologue sees register-number literals.
     let label_prefix_for_prologue = format!("L{name}__");
     let prologue = substitute_idents(prologue_raw, &mut scratch, &label_prefix_for_prologue)?;
 
-    // Substitute operand/t-scratch idents in the body, and harvest
-    // call_slow! shim names for sym bindings.
-    //
-    // Label prefix: `L<handler_name>__` — namespaces every body label
-    // (e.g. `.slow` → `Lop_add__slow`) so multiple `naked_asm!` blocks
-    // in the same translation unit can't collide. `L*` keeps the
-    // label assembler-local; the handler-name infix makes them
-    // unique across handlers.
+    // Substitute operand/t-scratch idents and harvest call_slow! shim names.
+    // Label prefix `L<name>__` namespaces body labels (e.g. `.slow` →
+    // `Lop_add__slow`) so labels can't collide across handlers.
     let label_prefix = format!("L{name}__");
     let mut shim_names: BTreeSet<String> = BTreeSet::new();
     let mut body_tokens: Vec<TokenStream> = Vec::with_capacity(ast.body.len());
-    // Track whether we've crossed the first `.label:` declaration. The
-    // counter-injection discipline differs for labeled inline handlers
-    // vs label-free cold stubs:
-    //
-    // - `call_slow!` BEFORE any label in a handler that later declares
-    //   a label: these are hit-side tail invocations. They run on every
-    //   successful inline dispatch, NOT just on slow-path entry.
-    //   Injecting `opcode_byte = N` here would emit
-    //   `inc_slow_semantic_counter!` on every dispatch and falsely
-    //   report ~100% slow-path-share for that opcode.
-    // - `call_slow!` AFTER the first label: these are inside a label
-    //   scope (typically `.slow:`), executed only when the inline hit path
-    //   bails. Counter-injection here is semantically correct.
-    // - `call_slow!` in a label-free handler: this is a pure cold stub,
-    //   so every dispatch is a semantic slow-path entry and must be
-    //   counted.
-    //
-    // `poll_safepoint!` is unaffected — its asm shape uses a runtime
-    // `cbz`/`cbnz` so the counter-bump fires only on the pending-poll
-    // branch regardless of label position; injection is safe everywhere.
+    // Gate call_slow! counter injection on label scope:
+    // - Before any label in a labeled handler: hit-side tail, must NOT count.
+    // - After first label (typically `.slow:`): slow entry, MUST count.
+    // - Label-free handler: every dispatch is a slow entry, always count.
+    // poll_safepoint! is always injected (its cbz/cbnz fires only on pending).
     let handler_has_label = ast
         .body
         .iter()
@@ -182,22 +150,8 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
     for stmt in &ast.body {
         match stmt {
             BodyStmt::MacroCall(tokens) => {
-                // Inject `opcode_byte = N` into call_slow!() and
-                // poll_safepoint!() invocations (DSL-1 Phase 1.B.0
-                // Task 5). The handler's opcode discriminant from the
-                // `llint_handler!` signature is threaded through so the
-                // backend macros emit `inc_slow_semantic_counter!(N)` /
-                // `inc_slow_safepoint_counter!(N)` for slow-path-share
-                // accounting. Idempotent — if the user already wrote
-                // `opcode_byte = N` explicitly, the injection is skipped.
-                //
-                // `gate_call_slow` suppresses injection into
-                // `call_slow!` invocations on the hit-side tail
-                // (before any `.label:` in a handler that has labels)
-                // to avoid double-counting hit-side record-smi shim
-                // calls as slow-path entries. Label-free cold stubs are
-                // always semantic slow-path entries, so they are not
-                // gated.
+                // Inject `opcode_byte = N` into call_slow! / poll_safepoint!
+                // for slow-path-share accounting. Idempotent if already present.
                 let gate_call_slow = handler_has_label && !seen_label;
                 let injected = inject_opcode_byte(tokens.clone(), opcode_byte, gate_call_slow);
                 let rewritten = substitute_idents(injected, &mut scratch, &label_prefix)?;
@@ -212,37 +166,20 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
         }
     }
 
-    // Emission order: counter-inc → operand-decode prologue → body
-    // statements. The counter increment must precede the prologue so
-    // it bumps the dispatch counter regardless of which inline
-    // branch the body's later `dispatch!`/`dispatch_after_slow!` takes
-    // (slow-path round-trips re-enter the dispatch table; their target
-    // handler's own counter increment fires on entry there).
+    // Emission order: counter-inc → decode prologue → body statements.
     let template_entries = std::iter::once(counter_increment)
         .chain(std::iter::once(prologue))
         .chain(body_tokens)
         .map(|tokens| quote! { #tokens, });
 
-    // Per-shim `<name> = sym <path>` bindings. The body author writes
-    // `call_slow!(op_add_slow_rs, args = [a, b, c, slot])`; the lowerer
-    // turns that into `bl {op_add_slow_rs}` in asm, then supplies the
-    // binding `op_add_slow_rs = sym op_add_slow_rs` so the asm references
-    // the linker symbol.
+    // Per-shim `<name> = sym <name>` bindings for linker symbols.
     let shim_bindings = shim_names.iter().map(|name| {
         let ident = Ident::new(name, Span::call_site());
         quote! { #ident = sym #ident, }
     });
 
-    // Emit a sibling `pub const <NAME>_LENGTH: u32 = N;` so a runtime
-    // consistency test can cross-check the declared length against the
-    // canonical `Opcode::encoded_len()`. The const name is the uppercase
-    // of the handler ident (`op_move` → `OP_MOVE_LENGTH`).
-    //
-    // This is "Option C-light" from DSL-0c's commit-3 plan: the
-    // proc-macro emits the const, the hand-written test imports it and
-    // compares against `Opcode::<Variant>.encoded_len()`. The const lives
-    // in the same module as its handler — no extra symbol-management
-    // ceremony.
+    // Emit `pub const <NAME>_LENGTH: u32 = N` so tests can cross-check
+    // the declared length against `Opcode::encoded_len()`.
     let length_const_name = Ident::new(
         &format!("{}_LENGTH", name.to_string().to_uppercase()),
         name.span(),
@@ -256,12 +193,8 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
 
         #[unsafe(naked)]
         pub extern "C" fn #name() -> ! {
-            // `naked_asm!` implies `noreturn`; explicit `options(noreturn)`
-            // is rejected. The leading "/* len={length} ... */" comment
-            // fragment references every named binding so rustc never
-            // complains about an unused named arg, regardless of which
-            // backend macros the body uses. Asm comments are stripped
-            // by the assembler — this is free at runtime.
+            // The leading comment references every named binding (rustc
+            // unused-named-arg suppression). Stripped by the assembler.
             ::core::arch::naked_asm!(
                 "/* len={length} pc={state_pc} pb={state_pb} regs={state_regs} mt={state_mt} objects={state_object_records} object_slots={state_object_slots} prefix={state_prefix} poll={vm_poll} fb_mode={feedback_mode} fb_named_handler={feedback_named_handler_bits} fb_named_aux_bits={feedback_named_aux_bits} fb_gen={feedback_generation} vm_gic={vm_global_ic_gen} state_value_cells={state_value_cells} cell_stored={cell_stored_value} arith_obs={arith_metadata_observed_bits_offset} arith_cnt={arith_metadata_exec_count_offset} obj_shape={object_shape} obj_prototype={object_prototype} obj_named_slots={object_named_slots} obj_inline_slots={object_inline_slots} ctr={vm_counter_base} const_base={vm_const_base} this_value={state_this_value} uninit_lex={value_uninit_lex_bits} exit={exit} */\n",
                 #(#template_entries)*
@@ -269,76 +202,37 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
                 state_pc = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PC_OFFSET,
                 state_pb = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_PB_BASE,
                 state_regs = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_REGS_BASE,
-                // Phase C.4: byte offset of `LlIntState::frame_metadata_table_base`.
-                // x21 (MT pin) holds this pointer. `load_feedback_site!` and `record_*!`
-                // macros both resolve through x21 = MetadataTable buffer base.
+                // x21 (MT pin) holds the MetadataTable buffer base.
                 state_mt = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_METADATA_TABLE_BASE,
                 state_object_records = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_RECORDS_BASE,
                 state_object_slots = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_OBJECT_SLOTS_BASE,
                 state_prefix = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_PREFIX,
                 vm_poll = const ::lyng_vm::dsl::reg_convention::VM_POLL_PENDING_OFFSET,
-                // Phase D.2.3: feedback_mode/handler/aux now sourced from PropertyMetadata
-                // (same layout as the old FeedbackEntry IC header — mode @0, handler @8, aux @16).
                 feedback_mode = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_MODE_OFFSET,
                 feedback_named_handler_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_HANDLER_BITS_OFFSET,
                 feedback_named_aux_bits = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_AUX_BITS_OFFSET,
-                // Task 8: byte offset of `PropertyMetadata::generation` (u32),
-                // read by `branch_global_cell_generation_mismatch!` to compare a
-                // mode-7 cell hit's captured generation against the live mirror.
+                // `PropertyMetadata::generation` — compared by `branch_global_cell_generation_mismatch!`.
                 feedback_generation = const ::lyng_vm::dsl::reg_convention::PROPERTY_METADATA_GENERATION_OFFSET,
-                // Task 8: byte offset (within `Vm`) of the `dsl_global_ic_generation`
-                // u32 mirror, read by `branch_global_cell_generation_mismatch!` via x22.
+                // `Vm::dsl_global_ic_generation` — live realm IC generation mirror.
                 vm_global_ic_gen = const ::lyng_vm::dsl::reg_convention::VM_GLOBAL_IC_GENERATION_OFFSET,
-                // Task 8: byte offset (within `LlIntState`) of the value-cell
-                // pointer table base, read by `load_global_cell_value_or_branch!`
-                // via x24 to resolve a 1-based cell ref to its record pointer.
+                // `LlIntState` value-cell table base — resolves 1-based cell refs.
                 state_value_cells = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_VALUE_CELLS_BASE,
-                // Task 8: byte offset of the stored value within a
-                // `PrimitiveValueCellRecord` (= 0), read by
-                // `load_global_cell_value_or_branch!`.
+                // Stored-value offset within `PrimitiveValueCellRecord` (= 0).
                 cell_stored_value = const ::lyng_gc::PRIMITIVE_VALUE_CELL_RECORD_STORED_VALUE_OFFSET,
-                // Phase C precomputed-offset optimization: `load_feedback_site!` and
-                // `record_*!` macros now resolve slots via the slot_to_entry_offset
-                // table at buffer[0..N*4]. Only the field-level offsets are needed.
                 arith_metadata_observed_bits_offset = const ::lyng_vm::dsl::reg_convention::ARITH_METADATA_OBSERVED_BITS_OFFSET,
                 arith_metadata_exec_count_offset = const ::lyng_vm::dsl::reg_convention::ARITH_METADATA_EXEC_COUNT_OFFSET,
                 object_shape = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_SHAPE_OFFSET,
                 object_prototype = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_PROTOTYPE_OFFSET,
                 object_named_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_NAMED_SLOTS_OFFSET,
                 object_inline_slots = const ::lyng_vm::dsl::reg_convention::RUNTIME_OBJECT_INLINE_NAMED_SLOTS_OFFSET,
-                // `vm_counter_base` is the byte offset of `Vm::dispatch_counters`
-                // (a `Box<DispatchCounters>` whose raw pointer reads through the
-                // `*mut DispatchCounters` repr-equivalence). When the
-                // `diagnostic-counters` feature is off the binding falls back to `0`
-                // via the sentinel const in `reg_convention.rs`; the counter
-                // macros themselves emit empty strings in that config, so the
-                // binding is referenced only by the leading comment.
+                // `Vm::dispatch_counters` pointer offset; falls back to 0 when
+                // `diagnostic-counters` is off.
                 vm_counter_base = const ::lyng_vm::dsl::reg_convention::VM_DISPATCH_COUNTERS_PTR_OFFSET,
-                // Phase 1.B.1: byte offset of `LlIntState::frame_const_base`,
-                // the pre-resolved constants-array pointer. Read by
-                // `load_constant!` (backend/aarch64/constants.rs). Universally
-                // bound even when no handler in this translation unit uses the
-                // macro — the leading reference comment keeps rustc quiet about
-                // unused named args.
+                // Pre-resolved constants-array pointer in `LlIntState`.
                 vm_const_base = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_CONST_BASE,
-                // Phase 1.B.1: byte offset of `LlIntState::frame_this_value`,
-                // the asm-side `this` mirror (either the real `this` Value or
-                // `Value::uninitialized_lexical()` sentinel — see
-                // `resolve_initial_this_value`). Targeted by `load_state_value!`
-                // (backend/aarch64/frame.rs) via
-                // `load_state_value!(dst, vm_state_offset = state_this_value)`.
-                // Universally bound; unused-binding warning is suppressed by
-                // the reference comment above.
+                // Asm-side `this` mirror (real `this` or `uninitialized_lexical` sentinel).
                 state_this_value = const ::lyng_vm::dsl::reg_convention::LLINT_STATE_FRAME_THIS_VALUE,
-                // Phase 1.B.2: 64-bit bit pattern of
-                // `Value::uninitialized_lexical()`, used by
-                // `load_uninit_lex_sentinel!` (backend/aarch64/values.rs)
-                // to materialize the sentinel in a scratch register for
-                // the `op_load_this` sentinel-bail comparison. Mirrors
-                // the `state_this_value` pattern; universally bound and
-                // referenced by the leading comment so unused-binding
-                // warnings stay silent in translation units that don't
-                // expand the macro.
+                // Bit pattern of `Value::uninitialized_lexical()` for sentinel-bail comparison.
                 value_uninit_lex_bits = const ::lyng_vm::dsl::backend::aarch64::prelude::VALUE_UNINIT_LEX_BITS,
                 exit = sym ::lyng_vm::dsl::entry::_interpreter_exit,
                 #(#shim_bindings)*
@@ -348,17 +242,10 @@ pub fn lower_handler(ast: &HandlerAst) -> Result<TokenStream> {
 }
 
 /// Walk `tokens` and:
+/// 1. Rewrite `.label` references into `<label_prefix><label>`.
+/// 2. Replace recognized scratch idents (operands + `t0..t6`) with register numbers.
 ///
-/// 1. Rewrite `.label` references (the DSL's label-reference syntax)
-///    into `<label_prefix><label>` — an assembler-local label
-///    identifier scoped to the current handler. The `label_prefix`
-///    is built from the handler name so labels never collide across
-///    `naked_asm!` blocks in the same translation unit.
-/// 2. Replace recognized scratch idents (operands + `t0..t6`) with
-///    their assigned scratch register numbers.
-///
-/// Other tokens pass through unchanged. Recurses into groups so macro
-/// arguments inside `(..)` / `[..]` / `{..}` are rewritten too.
+/// Other tokens pass through unchanged. Recurses into groups.
 fn substitute_idents(
     tokens: TokenStream,
     scratch: &mut ScratchAllocator,
@@ -397,31 +284,12 @@ fn substitute_idents(
     Ok(out.into_iter().collect())
 }
 
-/// Inject `, opcode_byte = <N>` into the argument group of every
-/// `call_slow!(...)` / `poll_safepoint!(...)` macro call found in
-/// `tokens`. This threads the handler's opcode discriminant (from the
-/// `llint_handler!` signature) into the slow-path bridge macros so they
-/// can emit `inc_slow_semantic_counter!(N)` / `inc_slow_safepoint_counter!(N)`
-/// at the correct site (DSL-1 Phase 1.B.0 Task 5).
+/// Inject `, opcode_byte = <N>` into every `call_slow!(...)` /
+/// `poll_safepoint!(...)` in `tokens`. Idempotent if already present.
 ///
-/// Skipped if the user already wrote `opcode_byte = N` explicitly in
-/// the invocation. This keeps the rewrite idempotent and allows hand
-/// override during testing.
-///
-/// `gate_call_slow` controls whether `call_slow!` injection is
-/// suppressed. The caller (`lower_handler`) sets this to `true` for
-/// statements emitted BEFORE the first `.label:` declaration — those
-/// `call_slow!`s are hit-side tail invocations (e.g. record-smi shim
-/// calls for feedback recording) and must not be counted as slow-path
-/// semantic entries. When `gate_call_slow` is `true`, only
-/// `poll_safepoint!` invocations receive injection (their asm shape
-/// branches on a runtime flag, so counter-bumping is naturally
-/// hit-side safe — see `safepoint.rs`). When `false`, both macros are
-/// rewritten (the original DSL-1 Phase 1.B.0 Task 5 behavior).
-///
-/// Each statement passed in is a single macro call of the shape
-/// `<path>!(<args>)`, but we still recurse into groups so any nested
-/// invocations are also rewritten.
+/// `gate_call_slow = true` suppresses injection into `call_slow!` (hit-side
+/// tail invocations must not be counted as slow-path entries); only
+/// `poll_safepoint!` is injected in that mode.
 fn inject_opcode_byte(
     tokens: TokenStream,
     opcode_byte: &LitInt,
@@ -442,10 +310,6 @@ fn inject_opcode_byte(
             i += 1;
             continue;
         };
-        // `call_slow!` is suppressed when `gate_call_slow` (hit-side
-        // tail). Poll shims are counted by the paired `poll_safepoint!`
-        // branch, so they must not also increment the semantic bank.
-        // `poll_safepoint!` itself is always a candidate.
         let is_target = match name.as_str() {
             "call_slow" => !gate_call_slow && !is_poll_shim_call(&trees, i),
             "poll_safepoint" => true,
@@ -516,11 +380,8 @@ fn is_poll_shim_call(trees: &[TokenTree], ident_index: usize) -> bool {
     )
 }
 
-/// Recurse into a `TokenTree::Group`, applying `inject_opcode_byte` to
-/// the inner stream. Non-group trees pass through unchanged. The
-/// `gate_call_slow` flag is propagated so the label-scope discipline is
-/// preserved inside nested groups (a `call_slow!` nested inside another
-/// macro's args still respects the hit-side-tail suppression).
+/// Recurse into a `TokenTree::Group` and apply `inject_opcode_byte`.
+/// Non-group trees pass through unchanged.
 fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt, gate_call_slow: bool) -> TokenTree {
     match tt {
         TokenTree::Group(g) => {
@@ -531,29 +392,22 @@ fn rewrite_group(tt: TokenTree, opcode_byte: &LitInt, gate_call_slow: bool) -> T
     }
 }
 
-/// Returns `true` if the token stream of a `call_slow!` / `poll_safepoint!`
-/// argument group already contains a top-level `opcode_byte = ...` named
-/// arg. Used to keep the lowerer's injection idempotent so hand-written
-/// callsites can opt out.
+/// Returns `true` if the arg-group stream already contains `opcode_byte`
+/// (keeps injection idempotent).
 fn arg_group_has_opcode_byte(stream: TokenStream) -> bool {
     for tt in stream {
-        if let TokenTree::Ident(id) = tt {
-            if id == "opcode_byte" {
-                return true;
-            }
+        if let TokenTree::Ident(id) = tt
+            && id == "opcode_byte"
+        {
+            return true;
         }
     }
     false
 }
 
-/// Scan `tokens` for bridge invocations of the shape
-/// `call_slow!(<shim_name>, args = [...])` or
-/// `call_rust_probe!(<shim_name>, args = [...])` and collect the shim name.
-/// The shim name is a bare ident; we treat it as a linker symbol that
-/// must be supplied as `<name> = sym <name>` to `naked_asm!`.
+/// Collect shim names from `call_slow!` / `call_rust_probe!` invocations.
+/// Each shim name must be supplied as `<name> = sym <name>` to `naked_asm!`.
 fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
-    // Heuristic: walk the stream looking for
-    // `(call_slow|call_rust_probe) ! ( IDENT , ...)`.
     let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
     for i in 0..trees.len() {
         let TokenTree::Ident(id) = &trees[i] else {
@@ -576,14 +430,11 @@ fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
         if g.delimiter() != Delimiter::Parenthesis {
             continue;
         }
-        // Read the first ident inside the group — that's the shim name.
         let inner: Vec<TokenTree> = g.stream().into_iter().collect();
         if let Some(TokenTree::Ident(name)) = inner.first() {
             out.insert(name.to_string());
         }
     }
-    // Recurse into groups so bridge calls inside nested macro args are
-    // found too (rare but defensive).
     for tt in tokens.clone() {
         if let TokenTree::Group(g) = tt {
             collect_shim_names(&g.stream(), out);
@@ -593,28 +444,13 @@ fn collect_shim_names(tokens: &TokenStream, out: &mut BTreeSet<String>) {
 
 #[cfg(test)]
 mod tests {
-    //! Token-level unit tests for `inject_opcode_byte`'s label-scope
-    //! discipline (DSL-1 Phase 1.C followup #1).
-    //!
-    //! The lowerer can't be exercised end-to-end here — proc-macro
-    //! crates can only emit tokens for downstream crates to compile —
-    //! but the `inject_opcode_byte` helper operates on
-    //! `proc_macro2::TokenStream` and is fully testable in-crate.
-    //!
-    //! Strategy: parse a representative macro-call statement, run it
-    //! through `inject_opcode_byte` with both `gate_call_slow` settings,
-    //! and assert the presence/absence of the `opcode_byte = N` named
-    //! arg in the output stream. This mirrors what the lowerer does
-    //! before each `BodyStmt::MacroCall` is spliced into `naked_asm!`.
+    //! Token-level unit tests for `inject_opcode_byte` label-scope discipline.
     use super::*;
     use proc_macro2::TokenStream;
     use syn::LitInt;
 
-    /// Returns `true` if the output stream contains a top-level
-    /// `opcode_byte` ident (the marker for "injection happened").
-    /// Mirrors `arg_group_has_opcode_byte` but walks the OUTER stream —
-    /// the helper emits `call_slow ! ( ... , opcode_byte = N )` so the
-    /// marker sits inside the parenthesized arg group.
+    /// Returns `true` if the output stream for `name!()` contains `opcode_byte`
+    /// inside its arg group.
     fn output_has_opcode_byte_for(name: &str, tokens: &TokenStream) -> bool {
         let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
         for i in 0..trees.len() {
@@ -780,9 +616,7 @@ mod tests {
 
     #[test]
     fn pre_label_call_slow_skipped_when_gated() {
-        // A pre-label call_slow is a hit-side tail bridge, not a semantic
-        // slow-path entry. The lowerer must not inject slow-path counters
-        // there.
+        // Hit-side tail: must NOT receive counter injection.
         let tokens: TokenStream = syn::parse_str("call_slow!(op_tail_bridge_rs, args = [slot])")
             .expect("parse hit-side call_slow!");
         let rewritten = inject_opcode_byte(tokens, &lit31(), /*gate_call_slow=*/ true);
@@ -796,9 +630,7 @@ mod tests {
 
     #[test]
     fn slow_path_call_slow_injected_when_not_gated() {
-        // The slow-path call_slow inside a `.slow:` label scope. The
-        // lowerer flips `gate_call_slow` to `false` once it has seen
-        // any `BodyStmt::Label`.
+        // Inside `.slow:` scope: MUST receive injection.
         let tokens: TokenStream =
             syn::parse_str("call_slow!(op_add_slow_rs, args = [a, b, c, slot])")
                 .expect("parse slow-path call_slow!");
@@ -854,10 +686,7 @@ mod tests {
 
     #[test]
     fn poll_safepoint_always_injected() {
-        // `poll_safepoint!` is structurally hit-side safe: the
-        // counter-bump emission sits behind a runtime `cbz`/`cbnz`
-        // branch on `vm.poll_pending`. Injection is correct in both
-        // pre- and post-label contexts.
+        // cbz/cbnz guards the counter-bump, so injection is safe in all contexts.
         let tokens: TokenStream =
             syn::parse_str("poll_safepoint!(.poll_pending)").expect("parse poll_safepoint!");
         let gated = inject_opcode_byte(tokens.clone(), &lit31(), true);
@@ -876,15 +705,11 @@ mod tests {
 
     #[test]
     fn idempotent_when_opcode_byte_already_present() {
-        // Hand-written call sites can opt out by spelling
-        // `opcode_byte = N` explicitly. The injection must be a no-op
-        // in both gating modes.
+        // Explicit `opcode_byte = N` must suppress injection (no duplicate).
         let tokens: TokenStream =
             syn::parse_str("call_slow!(op_add_slow_rs, args = [a, b, c, slot], opcode_byte = 99)")
                 .expect("parse call_slow! with explicit opcode_byte");
         let rewritten = inject_opcode_byte(tokens, &lit31(), false);
-        // The output stream should still contain exactly one
-        // `opcode_byte = 99` (no duplicate `opcode_byte = 31` appended).
         let s = rewritten.to_string();
         let count_99 = s.matches("opcode_byte = 99").count();
         let count_31 = s.matches("opcode_byte = 31").count();
@@ -902,8 +727,6 @@ mod tests {
 
     #[test]
     fn non_target_macros_pass_through_unchanged() {
-        // `dispatch!()`, `check_smi!(...)`, etc. should not be
-        // rewritten by either gating mode.
         let tokens: TokenStream =
             syn::parse_str("check_smi!(t0, .slow)").expect("parse check_smi!");
         let gated = inject_opcode_byte(tokens.clone(), &lit31(), true);

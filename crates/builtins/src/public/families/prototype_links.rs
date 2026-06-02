@@ -1,4 +1,4 @@
-use crate::public::{reparent_builtin_object, PublicRealmBuiltins};
+use crate::public::{PublicRealmBuiltins, reparent_builtin_object};
 use lyng_env::Agent;
 
 pub(in crate::public) fn link_installed_family_prototypes(

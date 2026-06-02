@@ -19,3 +19,6 @@ lyng-bytecode = { workspace = true }
 lyng-compiler = { workspace = true }
 lyng-vm = { workspace = true }
 lyng-builtins = { workspace = true }
+
+[lints]
+workspace = true

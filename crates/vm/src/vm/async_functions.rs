@@ -1,18 +1,17 @@
 use super::bytecode_calls::PreparedBytecodeCall;
-use super::dispatch::advance_dispatch_frame;
 use super::{
-    Agent, AsyncFrameState, FrameRecord, HostHooks, ModuleStatus, NativeFunctionRegistry,
+    Agent, AsyncFrameState, CallerContext, HostHooks, ModuleStatus, NativeFunctionRegistry,
     ObjectRef, RealmRef, Vm, VmError, VmResult, WellKnownAtom,
 };
-use crate::frame::GeneratorResumeKind;
+use crate::frame::{FrameView, GeneratorResumeKind};
 use lyng_env::{
     PromiseCapabilityId, PromiseReactionHandler, PromiseReactionKind, PromiseReactionRecord,
     PromiseResolvingFunctionKind, PromiseResolvingFunctionRecord, RealmRecord,
 };
 use lyng_ops::errors;
 use lyng_types::{
-    promise_reject_function_builtin, promise_resolve_function_builtin, AbruptCompletion,
-    PropertyKey, SuspendedExecutionRef, Value,
+    AbruptCompletion, PropertyKey, SuspendedExecutionRef, Value, promise_reject_function_builtin,
+    promise_resolve_function_builtin,
 };
 
 impl Vm {
@@ -31,18 +30,17 @@ impl Vm {
             GeneratorResumeKind::Next
         };
         self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
-        let resumed_frame_base = self
+        let resumed_frame = self
             .frame()
-            .map(|frame| frame.registers().base())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let resumed_module_key = self.frame().and_then(|frame| {
-            agent
-                .module_key_for_environment(frame.variable_env())
-                .or_else(|| agent.module_key_for_environment(frame.lexical_env()))
-        });
-        let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_register_len =
-            usize::try_from(resumed_frame_base).expect("prior register length should fit usize");
+        let resumed_module_key = agent
+            .module_key_for_environment(resumed_frame.variable_env())
+            .or_else(|| agent.module_key_for_environment(resumed_frame.lexical_env()));
+        let prior_frame_depth = self.frame_depth().saturating_sub(1);
+        // Reclaim the whole `[header][window]` run on cleanup: target the resumed
+        // frame's cfr, not its window base.
+        let prior_register_len = usize::try_from(Self::cfr_of(&resumed_frame))
+            .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -76,20 +74,14 @@ impl Vm {
     ) -> VmResult<ObjectRef> {
         let capability = Self::create_intrinsic_promise_capability(agent, prepared.realm)?;
         let promise = Self::promise_capability_promise(agent, capability)?;
-        let prior_frame_depth = self.frames.len();
+        let prior_frame_depth = self.frame_depth();
         let prior_register_len = self.register_stack_top();
-        let register_base =
-            u32::try_from(prior_register_len).expect("register stack length should fit u32");
 
-        self.install_prepared_bytecode_call(
-            agent,
-            prepared,
-            arguments,
-            register_base,
-            None,
-            None,
-            false,
-        )?;
+        // `install_prepared_bytecode_call` reserves the frame and returns the
+        // callee window base (== `frame.registers().base()`), which is the key
+        // `cleanup_internal_completion` removes by.
+        let register_base =
+            self.install_prepared_bytecode_call(agent, prepared, arguments, None, None, false)?;
         self.async_frame_states
             .insert(register_base, AsyncFrameState { capability });
         self.internal_completion_targets.push(prior_frame_depth);
@@ -144,31 +136,42 @@ impl Vm {
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
         frame_depth: usize,
-        frame: &mut FrameRecord,
+        frame: FrameView,
         instruction_len: u32,
         register: u16,
     ) -> VmResult<()> {
-        if frame.resume_active() {
-            let resume_value = frame.resume_value();
-            let resume_kind = frame.resume_kind();
-            frame.clear_resume();
+        let cold_index = frame_depth - 1;
+        if self.frame_cold.get(cold_index).resume_active {
+            let resume_value = self.frame_cold.get(cold_index).resume_value;
+            let resume_kind = self.frame_cold.get(cold_index).resume_kind;
+            self.frame_cold.get_mut(cold_index).resume_active = false;
             if resume_kind == GeneratorResumeKind::Throw {
-                self.sync_dispatch_frame(frame_depth, *frame);
+                // Park the throw PC (the await op) so the handler search covers it;
+                // `transfer_to_exception_handler` then overwrites `saved_pc` with the
+                // caught-handler PC, which `op_await` mirrors into the thin view.
+                // await's caught resume-throw is always same-frame (no epoch bump).
+                self.park_caller_pc(frame.cfr(), frame.instruction_offset());
                 if self.transfer_to_exception_handler(agent, resume_value)? {
-                    self.refresh_dispatch_frame(frame_depth, frame);
                     return Ok(());
                 }
                 return Err(VmError::Abrupt(AbruptCompletion::Throw(resume_value)));
             }
             self.write_register(frame.registers(), register, resume_value);
-            advance_dispatch_frame(frame, instruction_len);
+            // Resume past the await: park the next-instruction PC into `saved_pc`
+            // for `op_await` to mirror into the thin view.
+            self.park_caller_pc(
+                frame.cfr(),
+                frame.instruction_offset().wrapping_add(instruction_len),
+            );
             return Ok(());
         }
 
         let value = self.read_register(frame.registers(), register);
+        let frame_realm = self.realm_of(agent, frame.cfr());
+        let caller = self.caller_context_from_view(agent, frame);
         let promise =
-            self.promise_resolve_in_realm(agent, host, registry, frame, frame.realm(), value)?;
-        self.sync_dispatch_frame(frame_depth, *frame);
+            self.promise_resolve_in_realm(agent, host, registry, caller, frame_realm, value)?;
+        self.park_caller_pc(frame.cfr(), frame.instruction_offset());
         self.suspend_for_await_promise(agent, frame, promise)
     }
 
@@ -198,13 +201,17 @@ impl Vm {
             GeneratorResumeKind::Next
         };
         self.restore_suspended_execution(agent, suspended, resume_kind, argument)?;
-        let async_frame_base = self
+        let resumed_frame = self
             .frame()
-            .map(|frame| frame.registers().base())
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
-        let prior_frame_depth = self.frames.len().saturating_sub(1);
-        let prior_register_len =
-            usize::try_from(async_frame_base).expect("prior register length should fit usize");
+        // `async_frame_states` is keyed by the window base (`registers().base()`),
+        // matching the key `cleanup_internal_completion` removes by; but the arena
+        // reset must reclaim the whole `[header][window]` run, so it targets the
+        // resumed frame's cfr (window base shifted back by HEADER_SLOTS).
+        let async_frame_base = resumed_frame.registers().base();
+        let prior_frame_depth = self.frame_depth().saturating_sub(1);
+        let prior_register_len = usize::try_from(Self::cfr_of(&resumed_frame))
+            .expect("prior register length should fit usize");
         self.internal_completion_targets.push(prior_frame_depth);
 
         let result = self.run(agent, host, registry);
@@ -236,7 +243,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller: CallerContext,
         realm: RealmRef,
         value: Value,
     ) -> VmResult<ObjectRef> {
@@ -252,7 +259,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame,
+                caller.realm,
+                caller.lexical_env,
+                caller.code,
+                caller.pc,
                 Value::from_object_ref(promise),
                 PropertyKey::from_atom(WellKnownAtom::constructor.id()),
             )?;
@@ -325,18 +335,15 @@ impl Vm {
     pub(super) fn suspend_for_await_promise(
         &mut self,
         agent: &mut Agent,
-        frame: &FrameRecord,
+        frame: FrameView,
         promise: ObjectRef,
     ) -> VmResult<()> {
         let suspended =
             self.snapshot_suspended_execution(agent, frame, frame.instruction_offset())?;
-        let active = self
-            .frames
-            .pop()
-            .expect("await suspension requires one active frame");
-        debug_assert_eq!(active, *frame);
+        debug_assert_eq!(self.current_cfr, frame.cfr());
+        self.pop_frame_depth();
         self.request_dispatch_frame_check();
-        self.release_register_window(frame.registers().base());
+        self.release_frame_to_caller(frame.cfr());
         let _ = self.current_exception.take();
         self.refresh_running_context(agent);
         Self::enqueue_await_resume(agent, promise, suspended)?;

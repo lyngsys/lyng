@@ -667,15 +667,17 @@ mod tests {
     }
 
     fn install_property(agent: &mut Agent, object_ref: ObjectRef, key: PropertyKey, value: Value) {
-        assert!(object::ordinary_create_data_property(
-            agent,
-            object_ref,
-            key,
-            value,
-            AllocationLifetime::Default,
-            &mut NoopAdaptiveProtoLoadDispatch,
-        )
-        .unwrap());
+        assert!(
+            object::ordinary_create_data_property(
+                agent,
+                object_ref,
+                key,
+                value,
+                AllocationLifetime::Default,
+                &mut NoopAdaptiveProtoLoadDispatch,
+            )
+            .unwrap()
+        );
     }
 
     fn install_iterator_pair(

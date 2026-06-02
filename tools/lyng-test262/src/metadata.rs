@@ -214,7 +214,7 @@ pub fn effective_parse_source(source: &str, variant: TestVariant) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_metadata, variants_for_metadata, TestVariant};
+    use super::{TestVariant, parse_metadata, variants_for_metadata};
 
     #[test]
     fn parse_metadata_preserves_negative_type() {

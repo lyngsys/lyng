@@ -22,7 +22,7 @@ mod strings;
 
 use crate::bootstrap::BuiltinBootstrapError;
 use crate::public::{
-    allocate_builtin_function_object, public_builtin_metadata, BuiltinCache, PublicRealmBuiltins,
+    BuiltinCache, PublicRealmBuiltins, allocate_builtin_function_object, public_builtin_metadata,
 };
 use lyng_env::Agent;
 use lyng_types::{BuiltinFunctionId, EnvironmentRef, ObjectRef, RealmRef, ShapeId};
@@ -35,7 +35,7 @@ pub(super) use errors::error_builtin_object;
 pub(super) use functions::function_builtin_object;
 pub(super) use globals::global_function_builtin_object;
 pub(super) use installed::InstalledBuiltinFamilies;
-pub(super) use intrinsics::{install_public_realm_intrinsics, PublicRealmPrototypeHandles};
+pub(super) use intrinsics::{PublicRealmPrototypeHandles, install_public_realm_intrinsics};
 pub(super) use iterators::iterator_builtin_object;
 pub(super) use json::json_builtin_object;
 pub(super) use modules::module_builtin_object;
@@ -46,7 +46,7 @@ pub(super) use promises::promise_disposal_builtin_object;
 pub(super) use prototype_links::link_installed_family_prototypes;
 pub(super) use regexp::regexp_builtin_object;
 pub(super) use scaffolding::{
-    allocate_public_realm_scaffolding, PublicRealmScaffolding, ScaffoldingRequest,
+    PublicRealmScaffolding, ScaffoldingRequest, allocate_public_realm_scaffolding,
 };
 pub(super) use strings::string_builtin_object;
 

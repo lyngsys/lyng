@@ -1,35 +1,18 @@
-//! Test fixtures for DSL-0b validation cases (B30–B38).
+//! Test fixtures for DSL handler and slow-path bridge validation.
 //!
-//! [`DslHarness`] exposes two surfaces, both designed around the fact
-//! that DSL-0b's `run_dsl_trampoline` is still a `naked_asm!("ret")`
-//! stub (see [`crate::dsl::entry`]):
+//! [`DslHarness`] exposes two surfaces:
 //!
 //! 1. [`DslHarness::assert_handler_symbol_exists`] — link-time check
 //!    that an `llint_handler!`-expanded symbol is present and non-null.
-//!    Used by B30 and as a structural floor for the deferred cases
-//!    (B33–B37).
 //! 2. [`DslHarness::invoke_semantic_directly`] — calls a semantic
 //!    function with a manually-constructed `LlIntDispatchState::Asm`
-//!    variant, bypassing the trampoline. Mirrors exactly what
-//!    [`crate::dsl_cold_shim`]-emitted shims do at runtime: build the
-//!    dispatch state via `from_raw`, call `sync_from_asm`, dispatch to
-//!    the semantic, then `translate_outcome`. Used by B31 and B32 to
-//!    exercise the Batch-2 slow-path bridge end-to-end without the
-//!    asm trampoline.
+//!    variant, bypassing the trampoline. Mirrors what
+//!    `dsl_cold_shim!`-emitted shims do at runtime: build the dispatch
+//!    state via `from_raw`, call `sync_from_asm`, dispatch to the
+//!    semantic, then `translate_outcome`.
 //!
-//! Runtime trampoline-based assertions are deferred to Batch 7 (after
-//! `op_move`/`op_add` ports land real handlers and `run_dsl_trampoline`
-//! is wired up). The deferred cases live in their own test files with
-//! `#[ignore = "..."]` markers that point back to this design note.
-//!
-//! ## Why the harness lives here
-//!
-//! The `LlIntRustContext` fields are `pub(crate)` and the
-//! `LlIntDispatchInner::Asm` constructor needs to reach through those
-//! fields, so the harness can only be authored from inside the crate.
-//! Integration tests under `crates/vm/tests/` consume the
-//! harness via the `#[doc(hidden)] pub` re-export in
-//! [`crate::dsl::test_helpers`].
+//! The `LlIntRustContext` fields are `pub(crate)`, so the harness lives
+//! here and is re-exported via `#[doc(hidden)] pub` for integration tests.
 
 #![allow(
     dead_code,
@@ -59,23 +42,18 @@ use crate::error::VmError;
 use crate::vm::install::InstalledFunction;
 use crate::{FrameRecord, Vm};
 
-/// Decoded view of the result of [`DslHarness::invoke_semantic_directly`].
+/// Decoded result of [`DslHarness::invoke_semantic_directly`].
 ///
-/// Mirrors the four [`SemanticOutcome`] variants after they've gone
-/// through the asm-facing [`crate::dsl::slow_path::SlowPathReturn`]
-/// ABI. The harness reconstructs the high-level outcome by reading
-/// both the `SlowPathTag` and the `LlIntRustContext.exit` slot.
+/// Reconstructed from the `SlowPathTag` and the `LlIntRustContext.exit` slot.
 #[derive(Debug)]
 pub enum HarnessOutcome {
-    /// `SemanticOutcome::Continue { pc_advance }` arrived as
-    /// `SlowPathTag::Continue` with the new PC offset reflected in
-    /// `state.frame_pc_offset`.
+    /// `SlowPathTag::Continue`; new PC offset in `state.frame_pc_offset`.
     Continued { new_pc_offset: u32 },
-    /// `SemanticOutcome::Refresh` arrived as `SlowPathTag::Refresh`.
+    /// `SlowPathTag::Refresh`.
     Refreshed,
-    /// `SemanticOutcome::ExitDone { value }` set `exit.kind = Done`.
+    /// `SlowPathTag::Exit` with `exit.kind = Done`.
     Done { value: Value },
-    /// `SemanticOutcome::ExitError { error }` set `exit.kind = Error`.
+    /// `SlowPathTag::Exit` with `exit.kind = Error`.
     Error { error: Box<VmError> },
 }
 
@@ -159,17 +137,20 @@ impl DslHarness {
                 .installed_for_dsl_harness(code_ref)
                 .expect("installed function should be present after install_script");
 
-            // Build a synthesized FrameRecord whose RegisterWindow
-            // points to a zero-sized window — semantic bodies under
-            // test don't read it, but the FrameRecord constructor
-            // enforces a sane shape.
-            let registers = crate::frame::RegisterWindow::new(0, 0);
+            // Build a synthesized FrameRecord whose RegisterWindow is a
+            // zero-width window placed at the base a real `cfr == 0` frame
+            // would use: a frame's window starts at `cfr + HEADER_SLOTS`, so
+            // window base `HEADER_SLOTS` represents the valid frame at cfr 0.
+            // Semantic bodies under test don't read this window, but the
+            // `DispatchState` thin-view seed derives `cfr` via `Vm::cfr_of`
+            // (`window_base - HEADER_SLOTS`); a base-0 window would underflow.
+            let registers =
+                crate::frame::RegisterWindow::new(crate::frame_header::HEADER_SLOTS as u32, 0);
             let frame = FrameRecord::new(
                 code_ref,
                 0,
                 registers,
                 None,
-                realm.id(),
                 realm.global_env(),
                 realm.global_env(),
                 lyng_env::ExecutionContextKind::Script,
@@ -187,38 +168,17 @@ impl DslHarness {
         }
     }
 
-    /// Cheap structural assertion that a `llint_handler!`-expanded
-    /// symbol exists at link time. Used by the deferred validation
-    /// cases (B33–B37) and B30 as a load-bearing first proof.
+    /// Link-time check that a `llint_handler!`-expanded symbol is present.
     pub fn assert_handler_symbol_exists(handler: unsafe extern "C" fn() -> !) {
         let ptr = handler as *const ();
         assert!(!ptr.is_null(), "DSL handler symbol should not be null");
     }
 
-    /// Drive a semantic function directly through the slow-path
-    /// bridge, simulating what a `dsl_cold_shim!`-emitted shim does
-    /// at runtime.
-    ///
-    /// This is the workhorse for B31 (slow-path round-trip) and B32
-    /// (PC-sync). It:
-    ///
-    /// 1. Constructs an [`LlIntRustContext`] from the harness's owned
-    ///    Vm/Agent/installed/frame.
-    /// 2. Builds an [`LlIntState`] with `frame_pc_offset = entry_pc`.
-    /// 3. Calls [`LlIntDispatchState::from_raw`] (the same call the
-    ///    asm bridge makes), then `sync_from_asm` (mirrors asm-side
-    ///    `frame_pc_offset` into `rust.frame.instruction_offset()`).
-    /// 4. Invokes the caller-provided semantic.
-    /// 5. Calls `translate_outcome`, mirroring the shim's exit path.
-    /// 6. Reads back the resulting `SlowPathReturn` + `exit` slot to
-    ///    materialize a [`HarnessOutcome`].
-    ///
-    /// The `entry_pc` argument is the value the harness writes to
-    /// `state.frame_pc_offset` before calling `sync_from_asm`. The
-    /// semantic body sees this value via
-    /// [`LlIntDispatchState::current_instruction_offset`] — for B32
-    /// the test passes `0x42` and asserts the value reads back
-    /// unchanged.
+    /// Drive a semantic body through the slow-path bridge, bypassing
+    /// the trampoline. Mirrors what a `dsl_cold_shim!`-emitted shim
+    /// does at runtime: `from_raw` → `sync_from_asm` → semantic →
+    /// `translate_outcome`. Returns a [`HarnessOutcome`] decoded from
+    /// the resulting `SlowPathReturn` + `exit` slot.
     pub fn invoke_semantic_directly<F>(&mut self, entry_pc: u32, semantic: F) -> HarnessOutcome
     where
         F: for<'vm, 'borrow> FnOnce(&mut LlIntDispatchState<'vm, 'borrow>) -> SemanticOutcome,
@@ -244,11 +204,8 @@ impl DslHarness {
             exit: LlIntExitSlot::default(),
         };
 
-        // Build the asm-visible state record. `frame_regs_base` /
-        // `frame_pb_base` aren't touched by the slow-path bridge logic
-        // under test in B31/B32, so null / dangling placeholders are
-        // safe — the semantic body the test passes in only reads what
-        // it explicitly chooses to read.
+        // `frame_regs_base` / `frame_pb_base` are not read by the bridge
+        // logic under test; null placeholders are safe.
         let mut state = LlIntState {
             frame_pc_offset: entry_pc,
             _pad1: 0,
@@ -257,8 +214,7 @@ impl DslHarness {
             frame_metadata_table_base: core::ptr::null_mut(),
             object_records_base: core::ptr::null(),
             object_slots_base: core::ptr::null(),
-            // Phase 1.B.1: harness doesn't exercise these fields;
-            // null / undefined placeholders are safe.
+            // Not exercised by the harness; null/undefined placeholders are safe.
             frame_const_base: core::ptr::null(),
             frame_this_value: Value::undefined(),
             frame_depth: 0,
@@ -266,8 +222,7 @@ impl DslHarness {
             rust_context: (&raw mut rust_ctx).cast::<LlIntRustContextOpaque>(),
             prefix: 0,
             _pad2: [0; 7],
-            // Task 7: harness doesn't exercise the value-cell table base;
-            // a null placeholder is safe (nothing under test reads it).
+            // Not exercised by the harness; null placeholder is safe.
             value_cells_base: core::ptr::null(),
         };
 
@@ -310,15 +265,9 @@ impl DslHarness {
         }
     }
 
-    /// Drive a `pub(crate)` semantic body through the Alpha variant
-    /// of [`LlIntDispatchState`] — i.e. through the legacy
-    /// `DispatchState`. Used by B38 (double-prefix rejection), where
-    /// the semantic reads `state.dispatch_state().prefix` which is
-    /// only populated on the Alpha variant.
-    ///
-    /// The caller specifies `init_prefix` to seed
-    /// `DispatchState.prefix` before the body runs (e.g. `Some(Wide)`
-    /// for the double-prefix-rejection path).
+    /// Drive a semantic body through the Alpha variant of
+    /// [`LlIntDispatchState`]. `init_prefix` seeds `DispatchState.prefix`
+    /// before the body runs.
     pub fn with_alpha_dispatch<R>(
         &mut self,
         init_prefix: Option<lyng_bytecode::Opcode>,
@@ -350,21 +299,14 @@ impl Default for DslHarness {
     }
 }
 
-/// Re-exports of prefix-family semantic bodies for the DSL-0b
-/// validation cases. The originals are `pub(crate)` inside
-/// `crate::vm::semantics::prefix`; the harness needs an integration-
-/// test-visible path so B38 can drive them directly.
-///
-/// The wrappers deliberately avoid the `op_xxx_semantic` naming
-/// convention used elsewhere in the crate — the `dsl_manifest_grep`
-/// guard rejects any `op_*` function definition outside
-/// `semantics/`, `dispatch_handlers/`, and `dsl/handlers/`. The
-/// `_via_dsl_harness` suffix keeps the symbols distinct.
+/// Re-exports of prefix-family semantic bodies for integration tests.
+/// The `_via_dsl_harness` suffix avoids the `op_*` naming convention
+/// which is guarded by `dsl_manifest_grep`.
 pub mod prefix_semantics {
     use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
     use crate::vm::semantics::prefix::{
-        op_extra_wide_semantic as inner_op_extra_wide_semantic,
-        op_wide_semantic as inner_op_wide_semantic, OpPrefixArgs,
+        OpPrefixArgs, op_extra_wide_semantic as inner_op_extra_wide_semantic,
+        op_wide_semantic as inner_op_wide_semantic,
     };
 
     /// `op_wide_semantic` made visible to integration tests.

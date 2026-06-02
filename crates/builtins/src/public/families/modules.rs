@@ -1,15 +1,15 @@
 use super::{
-    install_public_builtin_function, FamilyInstallContext, ModuleFamilyBuiltins,
-    ModuleFamilyPrototypes,
+    FamilyInstallContext, ModuleFamilyBuiltins, ModuleFamilyPrototypes,
+    install_public_builtin_function,
 };
 use crate::public::{
-    define_builtin_accessor_property, define_builtin_data_property, PublicRealmBuiltins,
+    PublicRealmBuiltins, define_builtin_accessor_property, define_builtin_data_property,
 };
 use lyng_common::WellKnownAtom;
 use lyng_env::Agent;
 use lyng_types::{
-    abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
     BuiltinFunctionId, ObjectRef, PropertyKey, Value, WellKnownSymbolId,
+    abstract_module_source_builtin, abstract_module_source_to_string_tag_getter_builtin,
 };
 
 pub(in crate::public) fn install_module_family(

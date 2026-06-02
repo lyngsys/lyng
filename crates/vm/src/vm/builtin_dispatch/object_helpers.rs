@@ -1,10 +1,10 @@
 use super::{
-    errors, object, proxy, read, Agent, AllocationLifetime, FrameRecord, FunctionEntryIdentity,
-    HostHooks, NativeFunctionRegistry, ObjectAllocation, ObjectRef, PropertyDescriptor,
-    PropertyKey, RealmRef, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
-    WellKnownSymbolId,
+    Agent, AllocationLifetime, CallerContext, FunctionEntryIdentity, HostHooks,
+    NativeFunctionRegistry, ObjectAllocation, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom, WellKnownSymbolId, errors, object,
+    proxy, read,
 };
-use lyng_types::{function_symbol_has_instance_builtin, NativeFunctionId};
+use lyng_types::{NativeFunctionId, function_symbol_has_instance_builtin};
 
 impl Vm {
     pub(in crate::vm) fn allocate_ordinary_object_with_prototype(
@@ -112,7 +112,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller: CallerContext,
         object_ref: ObjectRef,
         freeze: bool,
     ) -> VmResult<bool> {
@@ -121,7 +121,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            caller_realm: caller.realm,
+            caller_lexical_env: caller.lexical_env,
+            caller_code: caller.code,
+            caller_pc: caller.pc,
         };
         if !proxy::prevent_extensions(&mut bridge, object_ref)? {
             return Ok(false);
@@ -157,7 +160,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        frame: &FrameRecord,
+        caller: CallerContext,
         object_ref: ObjectRef,
         frozen: bool,
     ) -> VmResult<bool> {
@@ -166,7 +169,10 @@ impl Vm {
             agent,
             host,
             registry,
-            frame,
+            caller_realm: caller.realm,
+            caller_lexical_env: caller.lexical_env,
+            caller_code: caller.code,
+            caller_pc: caller.pc,
         };
         if proxy::is_extensible(&mut bridge, object_ref)? {
             return Ok(false);
@@ -195,7 +201,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: CallerContext,
         arguments: &[Value],
     ) -> VmResult<Value> {
         let value = arguments.first().copied().unwrap_or(Value::undefined());
@@ -208,12 +214,19 @@ impl Vm {
             .map(PropertyKey::from_symbol)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
         let has_instance = {
+            let caller_realm = caller.realm;
+            let caller_lexical_env = caller.lexical_env;
+            let caller_code = caller.code;
+            let caller_pc = caller.pc;
             let mut bridge = VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             };
             object::get_with_receiver_in_context(
                 &mut bridge,
@@ -234,7 +247,7 @@ impl Vm {
                 )?;
                 return Ok(Value::from_bool(is_instance));
             }
-            let has_instance = Self::require_callable_object(agent, caller, has_instance)?;
+            let has_instance = Self::require_callable_object(agent, has_instance)?;
             let result = self.call_to_completion(
                 agent,
                 host,
@@ -248,16 +261,23 @@ impl Vm {
             return Ok(Value::from_bool(is_instance));
         }
 
-        let constructor = Self::require_callable_object(agent, caller, constructor_value)?;
+        let constructor = Self::require_callable_object(agent, constructor_value)?;
         let Some(object) = value.as_object_ref() else {
             return Ok(Value::from_bool(false));
         };
+        let caller_realm = caller.realm;
+        let caller_lexical_env = caller.lexical_env;
+        let caller_code = caller.code;
+        let caller_pc = caller.pc;
         let mut bridge = VmProxyBridge {
             vm: self,
             agent,
             host,
             registry,
-            frame: caller,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,
@@ -298,7 +318,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: CallerContext,
         constructor: Value,
         value: Value,
     ) -> VmResult<bool> {
@@ -322,12 +342,19 @@ impl Vm {
             return Ok(false);
         };
 
+        let caller_realm = caller.realm;
+        let caller_lexical_env = caller.lexical_env;
+        let caller_code = caller.code;
+        let caller_pc = caller.pc;
         let mut bridge = VmProxyBridge {
             vm: self,
             agent,
             host,
             registry,
-            frame: caller,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
         };
         let prototype = object::get_with_receiver_in_context(
             &mut bridge,

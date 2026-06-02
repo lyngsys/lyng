@@ -1,12 +1,12 @@
 use crate::{
-    nursery::NurseryDomain, AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef,
-    FunctionPayloadRef, ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView,
-    PrimitiveCollectionReport, PrimitiveCollectionTrigger, PrimitiveDomainStats, PrimitiveHeap,
-    PrimitiveHeapAccounting, PrimitiveRoots, PrimitiveStringRecord, PrimitiveStringView,
-    PrimitiveSymbolRecord, PrimitiveSymbolView, PrimitiveValueCellRecord, PrimitiveValueCellRef,
-    RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord,
-    RuntimeRealmRecord, RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, StringEncoding,
-    SuspendedRegistersRef, WeakHeapRef,
+    AllocationLifetime, BigIntSign, CodeSlotsRef, EnvironmentSlotsRef, FunctionPayloadRef,
+    ObjectSlotsRef, PrimitiveBigIntRecord, PrimitiveBigIntView, PrimitiveCollectionReport,
+    PrimitiveCollectionTrigger, PrimitiveDomainStats, PrimitiveHeap, PrimitiveHeapAccounting,
+    PrimitiveRoots, PrimitiveStringRecord, PrimitiveStringView, PrimitiveSymbolRecord,
+    PrimitiveSymbolView, PrimitiveValueCellRecord, PrimitiveValueCellRef, RuntimeCodeRecord,
+    RuntimeEnvironmentRecord, RuntimeFunctionRecord, RuntimeObjectRecord, RuntimeRealmRecord,
+    RuntimeShapeRecord, RuntimeSuspendedExecutionRecord, StringEncoding, SuspendedRegistersRef,
+    WeakHeapRef, nursery::NurseryDomain,
 };
 use lyng_common::AtomId;
 use lyng_types::{
@@ -206,7 +206,7 @@ impl<'a> PrimitiveHeapView<'a> {
     }
 
     /// Raw base of the value-cell pointer table (mirrors `object_record_ptr_table`).
-    /// The asm GlobalCellLoad fast path indexes this with a cached cell ref.
+    /// The asm `GlobalCellLoad` fast path indexes this with a cached cell ref.
     #[inline]
     pub const fn value_cell_ptr_table_base(self) -> *const *const PrimitiveValueCellRecord {
         self.heap.value_cell_ptr_table()
@@ -1227,10 +1227,10 @@ mod tests {
     use super::*;
     use crate::{
         CodeHandleStoreTarget, EnvironmentHandleStoreTarget, ObjectHandleStoreTarget,
-        ObjectSlotsHandleStoreTarget, PrimitiveRoots, RealmHandleStoreTarget, RuntimeCodeRecord,
-        RuntimeEnvironmentRecord, RuntimeObjectRecord, RuntimeRealmRecord, RuntimeShapeRecord,
-        ShapeHandleStoreTarget, StringHandleStoreTarget, SymbolFlags, ValueStoreTarget,
-        PRIMITIVE_SLOTS_PER_PAGE,
+        ObjectSlotsHandleStoreTarget, PRIMITIVE_SLOTS_PER_PAGE, PrimitiveRoots,
+        RealmHandleStoreTarget, RuntimeCodeRecord, RuntimeEnvironmentRecord, RuntimeObjectRecord,
+        RuntimeRealmRecord, RuntimeShapeRecord, ShapeHandleStoreTarget, StringHandleStoreTarget,
+        SymbolFlags, ValueStoreTarget,
     };
     use lyng_common::AtomId;
 
@@ -1650,8 +1650,10 @@ mod tests {
             ObjectHandleStoreTarget::ObjectPrototype(object),
             Some(proto),
         ));
-        assert!(mutator
-            .init_store_shape_handle(ShapeHandleStoreTarget::ObjectShape(object), Some(shape),));
+        assert!(
+            mutator
+                .init_store_shape_handle(ShapeHandleStoreTarget::ObjectShape(object), Some(shape),)
+        );
         assert!(mutator.init_store_value(
             ValueStoreTarget::ObjectSlot(object_slots, 0),
             Value::from_string_ref(string),
@@ -1705,10 +1707,18 @@ mod tests {
             EnvironmentHandleStoreTarget::RealmGlobalEnv(realm),
             Some(env),
         ));
-        assert!(mutator
-            .init_store_code_handle(CodeHandleStoreTarget::RealmBootstrapCode(realm), Some(code),));
-        assert!(mutator
-            .init_store_shape_handle(ShapeHandleStoreTarget::RealmRootShape(realm), Some(shape),));
+        assert!(
+            mutator.init_store_code_handle(
+                CodeHandleStoreTarget::RealmBootstrapCode(realm),
+                Some(code),
+            )
+        );
+        assert!(
+            mutator.init_store_shape_handle(
+                ShapeHandleStoreTarget::RealmRootShape(realm),
+                Some(shape),
+            )
+        );
         assert!(mutator.init_store_shape_handle(
             ShapeHandleStoreTarget::ShapeParent(shape),
             Some(shape_parent),
@@ -2245,10 +2255,12 @@ mod tests {
         assert_ne!(ordinary_view.identity(), other_view.identity());
         assert!(ordinary_view.is_ordinary());
         assert!(well_known_view.is_well_known());
-        assert!(ordinary_view
-            .description_view()
-            .unwrap()
-            .equals(other_view.description_view().unwrap()));
+        assert!(
+            ordinary_view
+                .description_view()
+                .unwrap()
+                .equals(other_view.description_view().unwrap())
+        );
         assert_eq!(ordinary_view.class(), crate::PrimitiveSymbolClass::Ordinary);
         assert_eq!(
             well_known_view.class(),
@@ -2306,7 +2318,9 @@ mod tests {
         assert!(mutator.free_value_cell(cell).is_some());
         assert!(mutator.free_symbol(symbol).is_some());
         assert!(!mutator.init_store_value(ValueStoreTarget::ValueCell(cell), Value::from_smi(1)));
-        assert!(!mutator
-            .mut_store_string_handle(StringHandleStoreTarget::SymbolDescription(symbol), None,));
+        assert!(
+            !mutator
+                .mut_store_string_handle(StringHandleStoreTarget::SymbolDescription(symbol), None,)
+        );
     }
 }

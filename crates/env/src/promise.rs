@@ -1,9 +1,9 @@
 use super::{
+    RealmRef,
     ids::{
         PromiseCapabilityId, PromiseCombinatorElementId, PromiseCombinatorId,
         PromiseFinallyFunctionId, PromiseId, PromiseReactionId, PromiseResolvingFunctionId,
     },
-    RealmRef,
 };
 use lyng_common::AtomId;
 use lyng_gc::{PrimitiveTracer, TraceHeapEdges};

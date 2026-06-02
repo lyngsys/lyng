@@ -9,3 +9,6 @@ lyng-types = { workspace = true }
 lyng-gc = { workspace = true }
 lyng-objects = { workspace = true }
 lyng-host = { workspace = true }
+
+[lints]
+workspace = true

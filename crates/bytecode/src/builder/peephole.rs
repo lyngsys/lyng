@@ -7,8 +7,8 @@ use crate::metadata::{
 use crate::{Instruction, Opcode};
 
 use super::{
-    full_conditional_jump_opcode, short_conditional_jump_opcode, signed_i8_fits,
     BytecodeBuildError, BytecodeBuildResult, BytecodeBuilder, BytecodeLimitKind,
+    full_conditional_jump_opcode, short_conditional_jump_opcode, signed_i8_fits,
 };
 
 pub(super) fn optimize(builder: &mut BytecodeBuilder) -> BytecodeBuildResult<()> {

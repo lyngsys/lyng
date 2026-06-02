@@ -1,10 +1,10 @@
 use super::{
-    errors, AbruptCompletion, Agent, AllocationLifetime, BuiltinFunctionId, DynamicFunctionKind,
+    AbruptCompletion, Agent, AllocationLifetime, BuiltinFunctionId, DynamicFunctionKind,
     GeneratorResumeKind, ObjectRef, PropertyDescriptor, PropertyKey, PublicBuiltinDispatchContext,
     RealmRef, TemporalCivilTime, TemporalCivilToInstantRequest, TemporalCurrentInstantRequest,
     TemporalDefaultTimeZone, TemporalDefaultTimeZoneRequest, TemporalInstant,
     TemporalInstantToCivilRequest, TemporalInstantWithOffset, Value, Vm, VmBuiltinDispatch,
-    VmError,
+    VmError, errors,
 };
 
 const MAX_REUSABLE_STRING_CODE_UNITS: usize = 1 << 20;
@@ -33,15 +33,15 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn builtin_realm(&self) -> RealmRef {
-        Vm::builtin_realm(self.agent, self.callee_object, self.caller_frame)
+        Vm::builtin_realm(self.agent, self.callee_object, self.caller.realm)
     }
 
     fn caller_realm(&self) -> RealmRef {
-        self.caller_frame.realm()
+        self.caller.realm
     }
 
     fn caller_is_strict(&self) -> bool {
-        self.vm.caller_is_strict(*self.caller_frame)
+        self.vm.caller_is_strict(self.caller.code)
     }
 
     fn abrupt(&mut self, completion: AbruptCompletion) -> Self::Error {
@@ -81,7 +81,10 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
+            self.caller.lexical_env,
+            self.caller.code,
+            self.caller.pc,
             object,
             receiver,
             key,
@@ -97,7 +100,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
             object,
             key,
         )
@@ -114,7 +117,10 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
+            self.caller.lexical_env,
+            self.caller.code,
+            self.caller.pc,
             object,
             receiver,
             key,
@@ -133,7 +139,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
             object,
             key,
         )?;
@@ -141,7 +147,8 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
+            self.caller.lexical_env,
             object,
             key,
             descriptor,
@@ -195,7 +202,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
             object,
             key,
         )?;
@@ -210,7 +217,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
             object,
         )
     }
@@ -224,7 +231,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller.realm,
             object,
             key,
         )
@@ -290,14 +297,9 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         freeze: bool,
     ) -> Result<bool, Self::Error> {
-        self.vm.set_integrity_level(
-            self.agent,
-            self.host,
-            self.registry,
-            self.caller_frame,
-            object,
-            freeze,
-        )
+        let caller = self.caller;
+        self.vm
+            .set_integrity_level(self.agent, self.host, self.registry, caller, object, freeze)
     }
 
     fn test_integrity_level(
@@ -305,14 +307,9 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         object: ObjectRef,
         frozen: bool,
     ) -> Result<bool, Self::Error> {
-        self.vm.test_integrity_level(
-            self.agent,
-            self.host,
-            self.registry,
-            self.caller_frame,
-            object,
-            frozen,
-        )
+        let caller = self.caller;
+        self.vm
+            .test_integrity_level(self.agent, self.host, self.registry, caller, object, frozen)
     }
 
     fn park_agent(
@@ -389,7 +386,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller,
             callee_object,
             this_value,
             arguments,
@@ -435,7 +432,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            self.caller,
             callee_object,
             arguments,
             new_target,
@@ -447,11 +444,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         realm: RealmRef,
         value: Value,
     ) -> Result<Vec<Value>, Self::Error> {
+        let caller = self.caller;
         self.vm.collect_array_like_arguments(
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller,
             realm,
             value,
         )
@@ -463,11 +461,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         bound_this: Value,
         bound_arguments: &[Value],
     ) -> Result<ObjectRef, Self::Error> {
+        let caller = self.caller;
         self.vm.create_bound_function(
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller,
             target,
             bound_this,
             bound_arguments,
@@ -517,12 +516,13 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
     }
 
     fn generator_next(&mut self, generator: ObjectRef, value: Value) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         if self.vm.is_async_generator_object(generator) {
             return self.vm.resume_async_generator(
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                caller_realm,
                 generator,
                 GeneratorResumeKind::Next,
                 value,
@@ -532,7 +532,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             generator,
             GeneratorResumeKind::Next,
             value,
@@ -544,12 +544,13 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         generator: ObjectRef,
         value: Value,
     ) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         if self.vm.is_async_generator_object(generator) {
             return self.vm.resume_async_generator(
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                caller_realm,
                 generator,
                 GeneratorResumeKind::Return,
                 value,
@@ -559,7 +560,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             generator,
             GeneratorResumeKind::Return,
             value,
@@ -571,12 +572,13 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         generator: ObjectRef,
         value: Value,
     ) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         if self.vm.is_async_generator_object(generator) {
             return self.vm.resume_async_generator(
                 self.agent,
                 self.host,
                 self.registry,
-                self.caller_frame,
+                caller_realm,
                 generator,
                 GeneratorResumeKind::Throw,
                 value,
@@ -586,7 +588,7 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             generator,
             GeneratorResumeKind::Throw,
             value,
@@ -598,11 +600,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         this_value: Value,
         value: Value,
     ) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         self.vm.resume_async_generator_from_value(
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             this_value,
             GeneratorResumeKind::Next,
             value,
@@ -614,11 +617,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         this_value: Value,
         value: Value,
     ) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         self.vm.resume_async_generator_from_value(
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             this_value,
             GeneratorResumeKind::Return,
             value,
@@ -630,11 +634,12 @@ impl PublicBuiltinDispatchContext for VmBuiltinDispatch<'_, '_, '_> {
         this_value: Value,
         value: Value,
     ) -> Result<Value, Self::Error> {
+        let caller_realm = self.caller.realm;
         self.vm.resume_async_generator_from_value(
             self.agent,
             self.host,
             self.registry,
-            self.caller_frame,
+            caller_realm,
             this_value,
             GeneratorResumeKind::Throw,
             value,

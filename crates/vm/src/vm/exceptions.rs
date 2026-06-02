@@ -1,4 +1,5 @@
-use super::{code_index, Agent, FrameRecord, InstalledFunction, Value, Vm, VmResult};
+use super::{Agent, InstalledFunction, Value, Vm, VmResult, code_index};
+use crate::frame::FrameView;
 use lyng_bytecode::{ExceptionHandler, ExceptionHandlerKind, Instruction, Opcode};
 
 impl Vm {
@@ -8,25 +9,34 @@ impl Vm {
         thrown: Value,
     ) -> VmResult<bool> {
         loop {
-            let Some(frame) = self.frames.last().copied() else {
+            // The PC is the parked `saved_pc`: callers sync before calling here,
+            // so the handler search runs against the correct PC.
+            let Some(cfr) = self.current_cfr_opt() else {
                 return Ok(false);
             };
+            let frame = FrameView::new(
+                cfr,
+                self.frame_header(cfr).saved_pc(),
+                self.frame_window_len(cfr),
+                self.frame_header(cfr).code(),
+            );
             if self
                 .internal_completion_targets
                 .last()
                 .copied()
-                .is_some_and(|depth| self.frames.len() <= depth)
+                .is_some_and(|depth| self.frame_depth() <= depth)
             {
                 return Ok(false);
             }
-            if let Some((index, handler)) = self.select_exception_handler(&frame) {
+            if let Some((index, handler)) = self.select_exception_handler(frame) {
                 self.current_exception = Some(thrown);
-                let frame = self
-                    .frames
-                    .last_mut()
-                    .expect("checked above that one frame is active");
-                frame.set_instruction_offset(handler.handler());
-                frame.set_handler_cursor(u16::try_from(index + 1).unwrap_or(u16::MAX));
+                // Park the handler PC so the Refresh arm reloads `instruction_offset`
+                // from it on the next frame switch.
+                self.frame_header_mut(cfr).set_saved_pc(handler.handler());
+                let handler_cursor = u16::try_from(index + 1).unwrap_or(u16::MAX);
+                if let Some(cold) = self.current_cold_mut() {
+                    cold.handler_cursor = handler_cursor;
+                }
                 let handled = matches!(
                     handler.kind(),
                     ExceptionHandlerKind::Catch | ExceptionHandlerKind::Finally
@@ -36,14 +46,14 @@ impl Vm {
                 }
                 return Ok(handled);
             }
-            if self.frames.len() == 1 {
+            if self.frame_depth() == 1 {
                 return Ok(false);
             }
             self.unwind_exception_frame(agent)?;
         }
     }
 
-    fn select_exception_handler(&self, frame: &FrameRecord) -> Option<(usize, ExceptionHandler)> {
+    fn select_exception_handler(&self, frame: FrameView) -> Option<(usize, ExceptionHandler)> {
         let installed = self
             .installed
             .get(code_index(frame.code()))
@@ -70,7 +80,7 @@ impl Vm {
     }
 
     fn suspended_call_instruction_offset(
-        frame: &FrameRecord,
+        frame: FrameView,
         installed: &InstalledFunction,
     ) -> Option<u32> {
         let (instruction_offset, instruction) =
@@ -93,18 +103,16 @@ impl Vm {
     }
 
     fn unwind_exception_frame(&mut self, agent: &mut Agent) -> VmResult<()> {
-        let frame = self
-            .frames
-            .pop()
-            .expect("exception unwinding requires one active frame");
-        self.close_loop_iteration_frames(self.frames.len());
-        self.close_direct_eval_frames(self.frames.len());
+        let frame = self.pop_current_frame();
+        self.close_loop_iteration_frames(self.frame_depth());
+        self.close_direct_eval_frames(self.frame_depth());
         self.for_in_states.clear_window(frame.registers());
         self.iterator_states.clear_window(frame.registers());
         self.captured_name_references
             .clear_window(frame.registers());
-        self.finalize_mapped_arguments(agent, frame.lexical_env())?;
-        self.release_register_window(frame.registers().base());
+        let lexical_env = self.frame_header(Self::cfr_of(&frame)).lexical_env();
+        self.finalize_mapped_arguments(agent, lexical_env)?;
+        self.release_frame_to_caller(Self::cfr_of(&frame));
         let _ = self.current_exception.take();
         self.refresh_running_context(agent);
         Ok(())

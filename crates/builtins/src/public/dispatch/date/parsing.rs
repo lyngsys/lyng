@@ -1,7 +1,7 @@
 use super::super::PublicBuiltinDispatchContext;
 use super::{
-    date_days_in_month, date_i64_as_number, date_make_local_value, date_make_utc_value,
-    date_time_clip_value, DATE_MONTH_NAMES, DATE_MS_PER_MINUTE,
+    DATE_MONTH_NAMES, DATE_MS_PER_MINUTE, date_days_in_month, date_i64_as_number,
+    date_make_local_value, date_make_utc_value, date_time_clip_value,
 };
 use lyng_types::Value;
 

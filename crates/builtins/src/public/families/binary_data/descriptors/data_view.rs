@@ -4,16 +4,16 @@ use crate::{
 };
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_types::{
-    data_view_buffer_getter_builtin, data_view_byte_length_getter_builtin,
-    data_view_byte_offset_getter_builtin, data_view_get_big_int64_builtin,
-    data_view_get_big_uint64_builtin, data_view_get_float16_builtin, data_view_get_float32_builtin,
-    data_view_get_float64_builtin, data_view_get_int16_builtin, data_view_get_int32_builtin,
-    data_view_get_int8_builtin, data_view_get_uint16_builtin, data_view_get_uint32_builtin,
-    data_view_get_uint8_builtin, data_view_set_big_int64_builtin, data_view_set_big_uint64_builtin,
+    Value, WellKnownSymbolId, data_view_buffer_getter_builtin,
+    data_view_byte_length_getter_builtin, data_view_byte_offset_getter_builtin,
+    data_view_get_big_int64_builtin, data_view_get_big_uint64_builtin,
+    data_view_get_float16_builtin, data_view_get_float32_builtin, data_view_get_float64_builtin,
+    data_view_get_int8_builtin, data_view_get_int16_builtin, data_view_get_int32_builtin,
+    data_view_get_uint8_builtin, data_view_get_uint16_builtin, data_view_get_uint32_builtin,
+    data_view_set_big_int64_builtin, data_view_set_big_uint64_builtin,
     data_view_set_float16_builtin, data_view_set_float32_builtin, data_view_set_float64_builtin,
-    data_view_set_int16_builtin, data_view_set_int32_builtin, data_view_set_int8_builtin,
-    data_view_set_uint16_builtin, data_view_set_uint32_builtin, data_view_set_uint8_builtin, Value,
-    WellKnownSymbolId,
+    data_view_set_int8_builtin, data_view_set_int16_builtin, data_view_set_int32_builtin,
+    data_view_set_uint8_builtin, data_view_set_uint16_builtin, data_view_set_uint32_builtin,
 };
 
 pub(super) struct DataViewDescriptorAtoms {

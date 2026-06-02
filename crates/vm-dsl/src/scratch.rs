@@ -84,13 +84,12 @@ impl ScratchAllocator {
             return Ok(Some(reg));
         }
         // Reserved internal-scratch slots t0..t6.
-        if let Some(rest) = s.strip_prefix('t') {
-            if let Ok(idx) = rest.parse::<u8>() {
-                if idx < Self::BUDGET {
-                    let reg = self.assign(name)?;
-                    return Ok(Some(reg));
-                }
-            }
+        if let Some(rest) = s.strip_prefix('t')
+            && let Ok(idx) = rest.parse::<u8>()
+            && idx < Self::BUDGET
+        {
+            let reg = self.assign(name)?;
+            return Ok(Some(reg));
         }
         Ok(None)
     }

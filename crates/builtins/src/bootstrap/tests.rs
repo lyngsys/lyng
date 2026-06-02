@@ -9,7 +9,7 @@ use lyng_env::RealmBootstrapState;
 use lyng_gc::{AllocationLifetime, AtomGcSweep};
 use lyng_host::NoopHostHooks;
 use lyng_types::{
-    array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
+    PropertyKey, Value, array_buffer_byte_length_getter_builtin, array_buffer_is_view_builtin,
     array_buffer_slice_builtin, array_from_async_builtin, array_iterator_next_builtin,
     array_species_getter_builtin, array_values_builtin,
     async_disposable_stack_dispose_async_builtin, async_iterator_dispose_builtin,
@@ -28,7 +28,7 @@ use lyng_types::{
     string_iterator_next_builtin, string_trim_builtin, symbol_description_getter_builtin,
     symbol_for_builtin, symbol_to_primitive_builtin, typed_array_from_builtin,
     typed_array_to_string_tag_getter_builtin, uint8_array_buffer_getter_builtin,
-    uint8_array_values_builtin, unescape_builtin, weak_ref_deref_builtin, PropertyKey, Value,
+    uint8_array_values_builtin, unescape_builtin, weak_ref_deref_builtin,
 };
 
 fn assert_reachable_object_atom_keys_are_permanent(
@@ -714,10 +714,12 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
     assert_eq!(decode_uri.writable(), Some(true));
     assert_eq!(decode_uri.enumerable(), Some(false));
     assert_eq!(decode_uri.configurable(), Some(true));
-    assert!(decode_uri_component
-        .value()
-        .and_then(Value::as_object_ref)
-        .is_some());
+    assert!(
+        decode_uri_component
+            .value()
+            .and_then(Value::as_object_ref)
+            .is_some()
+    );
     assert_eq!(decode_uri_component.writable(), Some(true));
     assert_eq!(decode_uri_component.enumerable(), Some(false));
     assert_eq!(decode_uri_component.configurable(), Some(true));
@@ -725,10 +727,12 @@ fn shared_default_realm_bootstrap_installs_typed_global_descriptors() {
     assert_eq!(encode_uri.writable(), Some(true));
     assert_eq!(encode_uri.enumerable(), Some(false));
     assert_eq!(encode_uri.configurable(), Some(true));
-    assert!(encode_uri_component
-        .value()
-        .and_then(Value::as_object_ref)
-        .is_some());
+    assert!(
+        encode_uri_component
+            .value()
+            .and_then(Value::as_object_ref)
+            .is_some()
+    );
     assert_eq!(encode_uri_component.writable(), Some(true));
     assert_eq!(encode_uri_component.enumerable(), Some(false));
     assert_eq!(encode_uri_component.configurable(), Some(true));
@@ -1054,10 +1058,12 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
         PropertyKey::from_symbol(async_iterator_symbol),
         "AsyncIterator.prototype[Symbol.asyncIterator]",
     );
-    assert!(async_iterator
-        .value()
-        .and_then(Value::as_object_ref)
-        .is_some());
+    assert!(
+        async_iterator
+            .value()
+            .and_then(Value::as_object_ref)
+            .is_some()
+    );
     assert_eq!(async_iterator.writable(), Some(true));
     assert_eq!(async_iterator.enumerable(), Some(false));
     assert_eq!(async_iterator.configurable(), Some(true));
@@ -1079,10 +1085,12 @@ fn shared_bootstrap_installs_iterator_family_descriptors() {
         PropertyKey::from_symbol(to_string_tag_symbol),
         "AsyncIterator.prototype[Symbol.toStringTag]",
     );
-    assert!(async_iterator_tag
-        .value()
-        .and_then(Value::as_string_ref)
-        .is_some());
+    assert!(
+        async_iterator_tag
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some()
+    );
     assert_eq!(async_iterator_tag.writable(), Some(false));
     assert_eq!(async_iterator_tag.enumerable(), Some(false));
     assert_eq!(async_iterator_tag.configurable(), Some(true));
@@ -1750,10 +1758,12 @@ fn shared_bootstrap_installs_primitive_family_descriptors() {
         PropertyKey::from_atom(agent.bootstrap_atoms().nan()),
         "Number.NaN",
     );
-    assert!(number_nan
-        .value()
-        .and_then(Value::as_f64)
-        .is_some_and(f64::is_nan));
+    assert!(
+        number_nan
+            .value()
+            .and_then(Value::as_f64)
+            .is_some_and(f64::is_nan)
+    );
     assert_eq!(number_nan.writable(), Some(false));
     assert_eq!(number_nan.enumerable(), Some(false));
     assert_eq!(number_nan.configurable(), Some(false));
@@ -2030,10 +2040,12 @@ fn shared_bootstrap_installs_binary_data_family_descriptors() {
         PropertyKey::from_symbol(to_string_tag_symbol),
         "ArrayBuffer.prototype[Symbol.toStringTag]",
     );
-    assert!(array_buffer_tag
-        .value()
-        .and_then(Value::as_string_ref)
-        .is_some());
+    assert!(
+        array_buffer_tag
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some()
+    );
     assert_eq!(array_buffer_tag.writable(), Some(false));
     assert_eq!(array_buffer_tag.enumerable(), Some(false));
     assert_eq!(array_buffer_tag.configurable(), Some(true));
@@ -2508,10 +2520,12 @@ fn shared_bootstrap_installs_error_family_descriptors() {
         PropertyKey::from_atom(message_atom),
         "TypeError.prototype.message",
     );
-    assert!(type_error_message
-        .value()
-        .and_then(Value::as_string_ref)
-        .is_some());
+    assert!(
+        type_error_message
+            .value()
+            .and_then(Value::as_string_ref)
+            .is_some()
+    );
     assert_eq!(type_error_message.writable(), Some(true));
     assert_eq!(type_error_message.enumerable(), Some(false));
     assert_eq!(type_error_message.configurable(), Some(true));

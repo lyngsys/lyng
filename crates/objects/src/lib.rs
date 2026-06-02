@@ -44,18 +44,18 @@ pub use self::core::{
     ObjectKind,
 };
 use self::descriptors::{
-    complete_descriptor_update, dense_element_growth_capacity, descriptor_from_payload,
-    descriptor_kind, descriptor_same_value, flattened_property_lookup, ordinary_property_attrs,
-    payload_from_complete_descriptor, resolve_get_from_descriptor, trim_dense_logical_len,
-    update_integrity_flags, validate_descriptor_change, write_named_payload, DescriptorKind,
+    DescriptorKind, complete_descriptor_update, dense_element_growth_capacity,
+    descriptor_from_payload, descriptor_kind, descriptor_same_value, flattened_property_lookup,
+    ordinary_property_attrs, payload_from_complete_descriptor, resolve_get_from_descriptor,
+    trim_dense_logical_len, update_integrity_flags, validate_descriptor_change,
+    write_named_payload,
 };
 pub use self::functions::{
-    f64_to_float16_bits, float16_bits_to_f64, ArrayBufferObjectData, DataViewObjectData,
-    FunctionConstructorFlags, FunctionEntryIdentity, FunctionKindFlags, FunctionObjectData,
-    FunctionThisMode, GeneratorState, MapEntry, MapObjectData, NativeCallRequest,
-    NativeConstructRequest, NativeFunctionRegistry, ObjectColdData, OrdinaryObjectData,
-    PrimitiveWrapperKind, ProxyObjectData, SetObjectData, TypedArrayElementKind,
-    TypedArrayObjectData,
+    ArrayBufferObjectData, DataViewObjectData, FunctionConstructorFlags, FunctionEntryIdentity,
+    FunctionKindFlags, FunctionObjectData, FunctionThisMode, GeneratorState, MapEntry,
+    MapObjectData, NativeCallRequest, NativeConstructRequest, NativeFunctionRegistry,
+    ObjectColdData, OrdinaryObjectData, PrimitiveWrapperKind, ProxyObjectData, SetObjectData,
+    TypedArrayElementKind, TypedArrayObjectData, f64_to_float16_bits, float16_bits_to_f64,
 };
 use self::module_namespace::ModuleNamespaceObject;
 pub use self::module_namespace::{ModuleNamespaceExport, ModuleNamespaceExportTarget};
@@ -71,18 +71,19 @@ pub use self::regexp::{
 };
 pub(crate) use self::runtime::MIN_DENSE_ELEMENT_CAPACITY;
 pub use self::runtime::{
-    ObjectRuntime, DENSE_ELEMENT_SPARSE_GAP_THRESHOLD,
-    NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT, NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD,
-    NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD, SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
+    DENSE_ELEMENT_SPARSE_GAP_THRESHOLD, NAMED_PROPERTY_ADDITION_CHAIN_DICTIONARY_LIMIT,
+    NAMED_PROPERTY_CHURN_DICTIONARY_THRESHOLD,
+    NAMED_PROPERTY_STRUCTURAL_CHURN_DICTIONARY_THRESHOLD, ObjectRuntime,
+    SMALL_SHAPE_INLINE_PROPERTY_LIMIT,
 };
 pub use self::shapes::{
-    ElementMode, KeyedDenseIndexHandler, NamedPropertyCacheEntry, NamedPropertyCachePath,
-    NamedPropertyCachePurpose, NamedPropertyDictionaryEntry, NamedPropertyDirectGet,
-    NamedPropertyHandler, NamedPropertyInlineWriteHandler, NamedPropertyProtoHandler,
-    NamedPropertyStorageMode, NamedPropertyValue, PropertyCacheDependency, ShapeAllocation,
+    ElementMode, INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG, KeyedDenseIndexHandler,
+    NamedPropertyCacheEntry, NamedPropertyCachePath, NamedPropertyCachePurpose,
+    NamedPropertyDictionaryEntry, NamedPropertyDirectGet, NamedPropertyHandler,
+    NamedPropertyInlineWriteHandler, NamedPropertyProtoHandler, NamedPropertyStorageMode,
+    NamedPropertyValue, PROPERTY_CACHE_MAX_DEPENDENCIES, PropertyCacheDependency, ShapeAllocation,
     ShapeProperty, ShapePropertyKind, ShapeRecord, ShapeTransitionKey, SlotLocation,
-    SparseElementEntry, INLINE_NAMED_SLOT_COUNT, INLINE_SLOT_OFFSET_FLAG,
-    PROPERTY_CACHE_MAX_DEPENDENCIES,
+    SparseElementEntry,
 };
 pub use self::temporal::{
     TemporalDurationObjectData, TemporalInstantObjectData, TemporalObjectData, TemporalObjectKind,

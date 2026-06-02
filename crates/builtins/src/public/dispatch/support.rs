@@ -1,4 +1,4 @@
-use super::{binary_data, PublicBuiltinDispatchContext};
+use super::{PublicBuiltinDispatchContext, binary_data};
 use crate::BuiltinInvocation;
 use lyng_common::WellKnownAtom;
 use lyng_env::Agent;
@@ -10,8 +10,8 @@ use lyng_objects::{
 };
 use lyng_ops::{errors, iterator, object, proxy, read, typed_array};
 use lyng_types::{
-    object_to_string_builtin, AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor,
-    PropertyKey, RealmRef, StringRef, Value, WellKnownSymbolId,
+    AbruptCompletion, BuiltinFunctionId, ObjectRef, PropertyDescriptor, PropertyKey, RealmRef,
+    StringRef, Value, WellKnownSymbolId, object_to_string_builtin,
 };
 use std::ops::Range;
 

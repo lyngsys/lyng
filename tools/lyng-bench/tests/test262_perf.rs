@@ -1,10 +1,10 @@
 use std::time::Duration;
 
 use lyng_bench::test262::{
-    aggregate_sampled_variants, cause_hints_for_aggregate, parse_options_for_test,
-    render_json_report, render_markdown_report, render_profile_counter_summary, Test262Aggregate,
-    Test262Mode, Test262Options, Test262PhaseTimings, Test262Sample, Test262VariantDiagnostics,
-    Test262VariantIdentity,
+    Test262Aggregate, Test262Mode, Test262Options, Test262PhaseTimings, Test262Sample,
+    Test262VariantDiagnostics, Test262VariantIdentity, aggregate_sampled_variants,
+    cause_hints_for_aggregate, parse_options_for_test, render_json_report, render_markdown_report,
+    render_profile_counter_summary,
 };
 use serde_json::json;
 
@@ -58,15 +58,21 @@ fn aggregates_samples_for_agent_triage() {
     assert_eq!(aggregate[0].min_total, Duration::from_millis(800));
     assert_eq!(aggregate[0].max_total, Duration::from_millis(1_000));
     assert_eq!(aggregate[0].dominant_phase, "evaluation");
-    assert!(aggregate[0]
-        .cause_hints
-        .contains(&"evaluation dominated".to_string()));
-    assert!(aggregate[0]
-        .cause_hints
-        .contains(&"Date/timezone candidate".to_string()));
-    assert!(aggregate[0]
-        .cause_hints
-        .contains(&"megamorphic inline-cache activity".to_string()));
+    assert!(
+        aggregate[0]
+            .cause_hints
+            .contains(&"evaluation dominated".to_string())
+    );
+    assert!(
+        aggregate[0]
+            .cause_hints
+            .contains(&"Date/timezone candidate".to_string())
+    );
+    assert!(
+        aggregate[0]
+            .cause_hints
+            .contains(&"megamorphic inline-cache activity".to_string())
+    );
 }
 
 #[test]
@@ -115,11 +121,13 @@ fn renders_markdown_and_json_for_agents() {
         json["aggregates"][0]["samples"][0]["diagnostics"]["feedback_slots"],
         6
     );
-    assert!(json["aggregates"][0]["cause_hints"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|hint| hint == "Date/timezone candidate"));
+    assert!(
+        json["aggregates"][0]["cause_hints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|hint| hint == "Date/timezone candidate")
+    );
 }
 
 #[test]
@@ -200,9 +208,11 @@ fn refined_runtime_phases_drive_dominant_phase_and_reports() {
     )]);
 
     assert_eq!(aggregate[0].dominant_phase, "bytecode_execution");
-    assert!(aggregate[0]
-        .cause_hints
-        .contains(&"bytecode execution dominated".to_string()));
+    assert!(
+        aggregate[0]
+            .cause_hints
+            .contains(&"bytecode execution dominated".to_string())
+    );
 
     let markdown = render_markdown_report(&options, &aggregate, None);
     assert!(markdown.contains("bytecode_execution"));

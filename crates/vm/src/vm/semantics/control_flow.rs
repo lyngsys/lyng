@@ -1,55 +1,21 @@
-//! Control-flow family semantic bodies (DSL-0a Task A10).
-//!
-//! Each `op_xxx_semantic` function implements the semantic effect of one
-//! control-flow opcode. The α handler in `dispatch_handlers/control_flow.rs`
-//! decodes operands, constructs `OpXxxArgs`, calls the semantic body, and
-//! translates the returned `SemanticOutcome` to `Step`. The DSL-0b cold-stub
-//! shim in `dsl/handlers/cold/control_flow.rs` will reach the same functions
-//! from the asm-DSL path.
+//! Control-flow family semantic bodies.
 //!
 //! Family coverage (10 opcodes):
 //! - Unconditional jumps: `Jump`, `Jump8`.
 //! - Conditional jumps: `JumpIfTrue`, `JumpIfTrue8`, `JumpIfFalse`,
 //!   `JumpIfFalse8`.
-//! - `LoopHeader` — marker plus tier-backedge + incremental-mark safepoint
-//!   (and a debug-poll safepoint when the debug hook is installed).
+//! - `LoopHeader` — incremental-mark safepoint + optional debug-poll.
 //! - `Return`, `ReturnUndefined` — pop the active frame.
-//! - `Nop` — no-op; advance PC.
+//! - `Nop` — advance PC.
 //!
-//! ### PC-advance convention
+//! PC-advance convention: every jumping semantic returns
+//! `Continue { pc_advance: instruction_len + delta }` so `state.advance`
+//! produces the correct absolute target. Non-branching paths return
+//! `Continue { pc_advance: instruction_len }`.
 //!
-//! The α handler `jump_dispatch_frame` sets
-//! `pc = current_pc + instruction_len + delta`. The
-//! `translate_outcome_to_step` `Continue` arm calls
-//! `state.advance(pc_advance)`, which adds `pc_advance` to the *current* PC
-//! (the entry PC at the start of the handler). Therefore every jumping
-//! semantic body must return `Continue { pc_advance: instruction_len + delta }`
-//! to reproduce the absolute target the α handler would have computed.
-//! Non-branching paths return `Continue { pc_advance: instruction_len }`.
-//!
-//! ### `LoopHeader` debug-poll safepoint (DSL-0a transitional)
-//!
-//! In the transitional α body, `LoopHeader` triggers a debug-poll safepoint
-//! (when the hook is installed) and a tier-backedge event + incremental-mark
-//! poll. Per design §10 DSL-0c, tier accounting goes away when α is deleted —
-//! but for DSL-0a, this body keeps the calls intact (they get removed in
-//! Task C6). The debug-poll path mirrors the α body's
-//! `sync_active_frame` → poll → `refresh_from_active_frame` ordering so a
-//! debugger step that mutates the active frame leaves the next PC consistent
-//! with the unchanged `pc_advance: instruction_len` advance below.
-//!
-//! ### Conditional jumps and caught abrupt completions
-//!
-//! `JumpIfTrue` / `JumpIfFalse` and their `*8` variants call
-//! `to_boolean_agent`, which may throw. Routing through
-//! `handle_dispatch_result` gives three cases:
-//!  1. `Ok(Some(truthy))` — proceed with `truthy` as the predicate value.
-//!  2. `Ok(None)` — the abrupt completion was caught by an active handler;
-//!     `transfer_to_exception_handler` already rewrote the PC to the catch
-//!     target. Return `Continue { pc_advance: 0 }` so the trampoline runs
-//!     the new PC's opcode next (the epoch bump triggers a frame refresh on
-//!     the next iteration, mirroring the unary-arithmetic semantic bodies).
-//!  3. `Err(error)` — abrupt completion escapes; return `ExitError`.
+//! `JumpIfTrue` / `JumpIfFalse` route `to_boolean_agent` through
+//! `handle_dispatch_result`: `Ok(Some(truthy))` proceeds, `Ok(None)` means
+//! the throw was caught (return `Continue { pc_advance: 0 }`), `Err` escapes.
 
 #![allow(
     clippy::cast_possible_truncation,
@@ -60,63 +26,45 @@
 use lyng_ops::read;
 use lyng_types::Value;
 
+use crate::VmDebugSafepointKind;
 use crate::dsl::slow_path::{LlIntDispatchState, SemanticOutcome};
 use crate::error::VmError;
 use crate::vm::Vm;
-use crate::VmDebugSafepointKind;
 
 // =====================================================================
 // Jumps (unconditional) — `Jump`, `Jump8`.
 // =====================================================================
 
-/// Operands for an unconditional jump (Ax / Ax8 layout).
-///
-/// `delta` is the sign-extended relative offset (i24 for `Jump`,
-/// i8 → i32 for `Jump8`). `instruction_len` is the encoded instruction
-/// length the handler consumed during decode.
+/// Operands for an unconditional jump. `delta` is the sign-extended relative
+/// offset; `instruction_len` is the encoded instruction length.
 pub struct OpJumpArgs {
     pub delta: i32,
     pub instruction_len: u32,
 }
 
-/// Shared body for `Jump` / `Jump8`. On a backedge (`delta < 0`) the body
-/// observes a tier-backedge event and polls the incremental-mark safepoint;
-/// then it returns `Continue { pc_advance: instruction_len + delta }`.
-///
-/// The α handler computed `pc = current_pc + instruction_len + delta` via
-/// `jump_dispatch_frame`. `translate_outcome_to_step` re-derives that same
-/// absolute PC by calling `state.advance(pc_advance)` from the entry PC.
-/// We preserve `jump_dispatch_frame`'s overflow check (returns
-/// `VmError::InvalidJumpTarget` on under/overflow) so any backward jump
-/// past the start of the bytecode buffer still surfaces the same diagnostic
-/// the α path produced.
+/// Shared body for `Jump` / `Jump8`. Polls the incremental-mark safepoint on
+/// backedges. Returns `Continue { pc_advance: instruction_len + delta }`.
 fn op_jump_shared_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     args: OpJumpArgs,
 ) -> SemanticOutcome {
     let inner = state.dispatch_state();
     if args.delta < 0 {
-        // DSL-0c C6: tier-accounting on backedges deleted with the α path.
-        // Per design §6 + §10: the interpreter has no tier-up accounting —
-        // intentional, per §2 (JIT is out of scope).
         Vm::poll_incremental_mark_safepoint(inner.agent);
     }
-    let instruction_offset = inner.frame.instruction_offset();
+    let instruction_offset = inner.pc();
     let target =
         i64::from(instruction_offset) + i64::from(args.instruction_len) + i64::from(args.delta);
     if target < 0 || target > i64::from(u32::MAX) {
         return SemanticOutcome::ExitError {
             error: VmError::InvalidJumpTarget {
-                code: inner.frame.code(),
+                code: inner.code(),
                 instruction_offset,
                 target_offset: target,
             },
         };
     }
-    // `state.advance(pc_advance)` does `pc.wrapping_add(pc_advance)`, so the
-    // signed `instruction_len + delta` cast to u32 (via the `as` wrapping
-    // cast on i64) reproduces the absolute target. The overflow check above
-    // guarantees the absolute target fits in u32.
+    // Wrapping cast is safe: the overflow check above guarantees the target fits in u32.
     let pc_advance = (i64::from(args.instruction_len) + i64::from(args.delta)) as u32;
     SemanticOutcome::Continue { pc_advance }
 }
@@ -140,11 +88,8 @@ pub fn op_jump8_semantic(
 // `JumpIfFalse8`.
 // =====================================================================
 
-/// Operands for a conditional jump (Abx / Abx8 layout).
-///
-/// `condition_register` (`a`) holds the value to test; `delta` is the
-/// sign-extended relative offset (i32 for `JumpIf*`, i8 → i32 for the
-/// `*8` variants).
+/// Operands for a conditional jump. `condition_register` holds the value to
+/// test; `delta` is the sign-extended relative offset.
 pub struct OpJumpIfArgs {
     pub condition_register: u16,
     pub delta: i32,
@@ -161,14 +106,12 @@ fn op_jump_if_shared_semantic(
     let inner = state.dispatch_state();
     let condition = inner
         .vm
-        .read_register_unchecked(inner.frame.registers(), args.condition_register);
+        .read_register_unchecked(inner.registers(), args.condition_register);
     let truthy_result = read::to_boolean_agent(inner.agent, condition).map_err(VmError::Abrupt);
     let truthy = match inner.handle_dispatch_result(truthy_result) {
         Ok(Some(t)) => t,
         Ok(None) => {
-            // The abrupt completion was caught — handler PC was rewritten
-            // by `transfer_to_exception_handler`. The next opcode lives at
-            // the current PC, so resume dispatch with no advance.
+            // Caught: handler PC already rewritten; resume with no advance.
             return SemanticOutcome::Continue { pc_advance: 0 };
         }
         Err(error) => return SemanticOutcome::ExitError { error },
@@ -178,13 +121,13 @@ fn op_jump_if_shared_semantic(
         if args.delta < 0 {
             Vm::poll_incremental_mark_safepoint(inner.agent);
         }
-        let instruction_offset = inner.frame.instruction_offset();
+        let instruction_offset = inner.pc();
         let target =
             i64::from(instruction_offset) + i64::from(args.instruction_len) + i64::from(args.delta);
         if target < 0 || target > i64::from(u32::MAX) {
             return SemanticOutcome::ExitError {
                 error: VmError::InvalidJumpTarget {
-                    code: inner.frame.code(),
+                    code: inner.code(),
                     instruction_offset,
                     target_offset: target,
                 },
@@ -250,9 +193,6 @@ pub fn op_loop_header_semantic(
             return SemanticOutcome::ExitError { error };
         }
     }
-    // DSL-0c C6: tier-accounting on backedges deleted with the α path.
-    // Per design §6 + §10: the interpreter has no tier-up accounting —
-    // intentional, per §2 (JIT is out of scope).
     Vm::poll_incremental_mark_safepoint(inner.agent);
     SemanticOutcome::Continue {
         pc_advance: args.instruction_len,
@@ -271,11 +211,7 @@ pub struct OpReturnArgs {
 
 pub struct OpReturnUndefinedArgs;
 
-/// Shared epilogue for `Return` / `ReturnUndefined`. Routes
-/// `Vm::finish_frame` outcomes through `SemanticOutcome`:
-///  - `Ok(Some(result))` → `ExitDone` (the entry frame returned).
-///  - `Ok(None)` → `Refresh` (a nested return; caller frame is now active).
-///  - `Err(error)` → `ExitError`.
+/// Shared epilogue for `Return` / `ReturnUndefined`.
 fn op_return_finish_semantic(
     state: &mut LlIntDispatchState<'_, '_>,
     value: Value,
@@ -297,7 +233,7 @@ pub fn op_return_semantic(
         let inner = state.dispatch_state();
         inner
             .vm
-            .read_register_unchecked(inner.frame.registers(), args.register)
+            .read_register_unchecked(inner.registers(), args.register)
     };
     op_return_finish_semantic(state, value)
 }

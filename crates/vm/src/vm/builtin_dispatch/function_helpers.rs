@@ -1,9 +1,9 @@
 use super::{
-    alloc_code_unit_string, alloc_string, errors, object, parse_script, read,
-    string_from_code_point_builtin, Agent, AllocationLifetime, AtomTable, FrameRecord,
-    FunctionConstructorFlags, FunctionObjectData, FunctionThisMode, HostHooks,
-    NativeFunctionRegistry, ObjectAllocation, ObjectColdData, ObjectRef, PropertyKey, RealmRef,
-    ToPrimitiveHint, Value, Vm, VmError, VmProxyBridge, VmResult, WellKnownAtom,
+    Agent, AllocationLifetime, AtomTable, CallerContext, FunctionConstructorFlags,
+    FunctionObjectData, FunctionThisMode, HostHooks, NativeFunctionRegistry, ObjectAllocation,
+    ObjectColdData, ObjectRef, PropertyKey, RealmRef, ToPrimitiveHint, Value, Vm, VmError,
+    VmProxyBridge, VmResult, WellKnownAtom, alloc_code_unit_string, alloc_string, errors, object,
+    parse_script, read, string_from_code_point_builtin,
 };
 
 const MAX_SPECIALIZED_APPLY_STRING_CODE_UNITS: usize = 1 << 20;
@@ -22,7 +22,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller: &FrameRecord,
+        caller: CallerContext,
         target: ObjectRef,
         bound_this: Value,
         bound_arguments: &[Value],
@@ -30,13 +30,20 @@ impl Vm {
         if !agent.objects().is_callable(target) {
             return Err(VmError::Abrupt(errors::throw_type_error(agent)));
         }
+        let caller_realm = caller.realm;
+        let caller_lexical_env = caller.lexical_env;
+        let caller_code = caller.code;
+        let caller_pc = caller.pc;
         let target_prototype = object::get_prototype_of_in_context(
             &mut VmProxyBridge {
                 vm: self,
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             target,
         )?;
@@ -44,7 +51,7 @@ impl Vm {
         let realm = target_data
             .as_ref()
             .and_then(FunctionObjectData::realm)
-            .unwrap_or_else(|| caller.realm());
+            .unwrap_or(caller_realm);
         let realm_record = agent
             .realm(realm)
             .ok_or_else(|| VmError::Abrupt(errors::throw_type_error(agent)))?;
@@ -90,7 +97,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                frame: caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
             },
             target,
             length_key,
@@ -101,7 +111,10 @@ impl Vm {
                 agent,
                 host,
                 registry,
-                caller,
+                caller_realm,
+                caller_lexical_env,
+                caller_code,
+                caller_pc,
                 target,
                 Value::from_object_ref(target),
                 length_key,
@@ -114,7 +127,10 @@ impl Vm {
             agent,
             host,
             registry,
-            caller,
+            caller_realm,
+            caller_lexical_env,
+            caller_code,
+            caller_pc,
             target,
             Value::from_object_ref(target),
             PropertyKey::from_atom(WellKnownAtom::name.id()),
@@ -152,7 +168,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         realm: RealmRef,
         value: Value,
     ) -> VmResult<Vec<Value>> {
@@ -169,20 +185,25 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller.realm,
+            caller.lexical_env,
+            caller.code,
+            caller.pc,
             object,
             Value::from_object_ref(object),
             PropertyKey::from_atom(WellKnownAtom::length.id()),
         )?;
-        let length =
-            self.array_like_arguments_length(agent, host, registry, caller_frame, length)?;
+        let length = self.array_like_arguments_length(agent, host, registry, caller, length)?;
         let mut arguments = Vec::with_capacity(usize::try_from(length).unwrap_or(usize::MAX));
         for index in 0..length {
             arguments.push(self.get_property_from_object(
                 agent,
                 host,
                 registry,
-                caller_frame,
+                caller.realm,
+                caller.lexical_env,
+                caller.code,
+                caller.pc,
                 object,
                 Value::from_object_ref(object),
                 PropertyKey::Index(index),
@@ -196,7 +217,7 @@ impl Vm {
         agent: &mut Agent,
         host: &dyn HostHooks,
         registry: &mut dyn NativeFunctionRegistry,
-        caller_frame: &FrameRecord,
+        caller: CallerContext,
         value: Value,
     ) -> VmResult<u32> {
         const MAX_SAFE_LENGTH: f64 = 9_007_199_254_740_991.0;
@@ -204,7 +225,8 @@ impl Vm {
             agent,
             host,
             registry,
-            caller_frame,
+            caller.realm,
+            caller.lexical_env,
             value,
             ToPrimitiveHint::Number,
         )?;

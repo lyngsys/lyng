@@ -2,7 +2,7 @@ use super::{Agent, AgentCollectionSnapshot};
 use crate::{ExecutableId, RuntimeJobPayload};
 use lyng_gc::{PrimitiveCollectionReport, PrimitiveTracer, TraceHeapEdges, WeakHeapRef};
 use lyng_host::HostJobKind;
-use lyng_types::{internal_finalization_registry_cleanup_job_builtin, ObjectRef, Value};
+use lyng_types::{ObjectRef, Value, internal_finalization_registry_cleanup_job_builtin};
 
 struct AgentCollectionRoots<'a, T: TraceHeapEdges + ?Sized> {
     snapshot: AgentCollectionSnapshot,

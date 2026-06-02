@@ -2,8 +2,8 @@ use lyng_ast::{FunctionId, ParsedModule, ParsedScript, PatternId};
 use lyng_common::{AtomId, AtomTable, DiagnosticList};
 
 use crate::{
-    analyzer, BindingTable, ClassPrivateElementRecord, ClassPrivateLayoutTable, FunctionSemaTable,
-    PrivateNameTable, PrivateUseTable, ScopeTable, SemanticBindingId, UseSiteTable,
+    BindingTable, ClassPrivateElementRecord, ClassPrivateLayoutTable, FunctionSemaTable,
+    PrivateNameTable, PrivateUseTable, ScopeTable, SemanticBindingId, UseSiteTable, analyzer,
 };
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

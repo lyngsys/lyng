@@ -1,19 +1,12 @@
 //! Per-frame dispatch state shared by semantic bodies.
 //!
 //! `DispatchState<'vm>` bundles every reference a semantic body needs — the
-//! live `Vm`, `Agent`, host hooks, native-function registry, the active
-//! `FrameRecord`, and the `Arc<InstalledFunction>` whose `instruction_bytes()`
-//! the handler is decoding.
-//!
-//! DSL-0c finished α deletion: the `run_trampoline*` / `Vm::run_via_trampoline`
-//! / `still_active` α trampoline, the per-handler `extern "C"` ABI (`Step` /
-//! `Handler` / `DISPATCH_TABLE`), and the `dispatch_handlers/` family modules
-//! were all removed. `DispatchState` survives because (a) every semantic body
-//! in `vm/semantics/` consumes it through
-//! `LlIntDispatchState::dispatch_state()`, (b) the
-//! `LlIntRustContext::dispatch` field on the asm side holds one, and (c) the
-//! wide-form prefix bridge passes one to the codegen-emitted
-//! `dispatch_wide_form` function.
+//! live `Vm`, `Agent`, host hooks, native-function registry, and the
+//! `Arc<InstalledFunction>` whose `instruction_bytes()` the handler is decoding.
+//! Every semantic body in `vm/semantics/` consumes it through
+//! `LlIntDispatchState::dispatch_state()`; the `LlIntRustContext::dispatch`
+//! field on the asm side holds one; the wide-form prefix bridge passes one to
+//! the codegen-emitted `dispatch_wide_form`.
 
 use std::sync::Arc;
 
@@ -23,21 +16,25 @@ use lyng_host::HostHooks;
 use lyng_objects::NativeFunctionRegistry;
 use lyng_types::{CodeRef, Value};
 
-use crate::error::{VmError, VmResult};
 use crate::FrameRecord;
+use crate::error::{VmError, VmResult};
 
 use super::install::InstalledFunction;
-use super::{code_index, Vm};
+use super::{Vm, code_index};
 
 /// Per-frame execution state threaded through every semantic body.
 ///
-/// All references share the `'vm` lifetime — the state exists only for one
-/// dispatch invocation. Semantic bodies split-borrow the fields when they
-/// need both `&mut vm` and another `&mut` field at once:
+/// All references share the `'vm` lifetime. Frame fields are read on demand from
+/// the arena overlay via `vm.frame_header(self.cfr)`; the register window, live
+/// PC, and code come from the thin view (`cfr`/`regs_len`/`pc`/`code_ref`).
+/// Semantic bodies split-borrow the fields when they need both `&mut vm` and
+/// another `&mut` field at once — pull any needed overlay value into a `Copy`
+/// local *before* the destructure:
 ///
 /// ```ignore
-/// let DispatchState { vm, agent, host, registry, frame, .. } = &mut *state;
-/// let result = vm.execute_add_opcode(agent, host, registry, frame, b, c);
+/// let registers = inner.registers();
+/// let DispatchState { vm, agent, host, registry, .. } = &mut *state;
+/// let result = vm.execute_add_opcode(agent, host, registry, registers, b, c);
 /// ```
 pub struct DispatchState<'vm> {
     pub(crate) vm: &'vm mut Vm,
@@ -45,7 +42,16 @@ pub struct DispatchState<'vm> {
     pub(crate) host: &'vm dyn HostHooks,
     pub(crate) registry: &'vm mut (dyn NativeFunctionRegistry + 'vm),
     pub(crate) installed: Arc<InstalledFunction>,
-    pub(crate) frame: FrameRecord,
+    /// Active frame's cfr (arena slot index of its `FrameHeader`).
+    pub(crate) cfr: u32,
+    /// Live program counter. Not parked in the overlay mid-frame; synced
+    /// to/from the asm side's `LlIntState.frame_pc_offset` at slow-path
+    /// boundaries.
+    pub(crate) pc: u32,
+    /// Cached active `CodeRef`. Hot in the decode + jump paths.
+    pub(crate) code_ref: CodeRef,
+    /// Active register-window length (window base = `cfr + HEADER_SLOTS`).
+    pub(crate) regs_len: u16,
     pub(crate) frame_depth: usize,
     pub(crate) frame_check_epoch: u32,
     /// Set by `op_wide` / `op_extra_wide` to widen the next handler's
@@ -55,13 +61,7 @@ pub struct DispatchState<'vm> {
 }
 
 impl<'vm> DispatchState<'vm> {
-    /// DSL-0b validation-case helper: construct a `DispatchState` from
-    /// pre-built components for the `crate::dsl::test_helpers` harness.
-    /// Production code now builds `DispatchState` inline inside
-    /// [`Self::new_for_dsl_entry`] (called from `dsl::entry::run_via_dsl`);
-    /// the harness needs a public path because
-    /// [`crate::dsl::test_helpers::DslHarness::with_alpha_dispatch`]
-    /// lives in a module that the integration tests can see.
+    /// Construct a `DispatchState` for the `crate::dsl::test_helpers` harness.
     #[doc(hidden)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_for_dsl_harness(
@@ -79,19 +79,18 @@ impl<'vm> DispatchState<'vm> {
             host,
             registry,
             installed,
-            frame,
+            cfr: Vm::cfr_of(&frame),
+            pc: frame.instruction_offset(),
+            code_ref: frame.code(),
+            regs_len: frame.registers().len(),
             frame_depth: 0,
             frame_check_epoch: 0,
             prefix: init_prefix,
         }
     }
 
-    /// DSL-0c entry helper: construct a `DispatchState` for the
-    /// [`crate::dsl::entry::run_via_dsl`] path. The DSL entry shim
-    /// then wraps it in an [`crate::dsl::llint_state::LlIntRustContext`]
-    /// so the asm-path slow-path bridge can call
-    /// [`crate::dsl::slow_path::LlIntDispatchState::dispatch_state`]
-    /// and reach the same `DispatchState` α handlers see.
+    /// Construct a `DispatchState` for the [`crate::dsl::entry::run_via_dsl`]
+    /// path.
     #[doc(hidden)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new_for_dsl_entry(
@@ -110,26 +109,77 @@ impl<'vm> DispatchState<'vm> {
             host,
             registry,
             installed,
-            frame,
+            cfr: Vm::cfr_of(&frame),
+            pc: frame.instruction_offset(),
+            code_ref: frame.code(),
+            regs_len: frame.registers().len(),
             frame_depth,
             frame_check_epoch,
             prefix: None,
         }
     }
 
+    /// Cold-table index of the active (top) frame: `frame_depth - 1`.
     #[inline]
-    pub(crate) const fn code(&self) -> CodeRef {
-        self.frame.code()
+    const fn cold_index(&self) -> usize {
+        self.frame_depth - 1
     }
 
-    /// Write `self.frame` back to `vm.frames[frame_depth - 1]`. Used before
-    /// any handler operation that may inspect the live frame stack
-    /// (return-from-frame, debugger safepoints, etc.).
+    #[inline]
+    pub(crate) fn resume_kind(&self) -> crate::frame::GeneratorResumeKind {
+        self.vm.frame_cold.get(self.cold_index()).resume_kind
+    }
+
+    #[inline]
+    pub(crate) fn resume_value(&self) -> Value {
+        self.vm.frame_cold.get(self.cold_index()).resume_value
+    }
+
+    #[allow(
+        dead_code,
+        reason = "completes the cold resume reader set; mirror of resume_kind/value"
+    )]
+    #[inline]
+    pub(crate) fn resume_active(&self) -> bool {
+        self.vm.frame_cold.get(self.cold_index()).resume_active
+    }
+
+    #[inline]
+    pub(crate) fn clear_resume(&mut self) {
+        let i = self.cold_index();
+        self.vm.frame_cold.get_mut(i).resume_active = false;
+    }
+
+    #[inline]
+    pub(crate) const fn frame_view(&self) -> crate::frame::FrameView {
+        crate::frame::FrameView::new(self.cfr, self.pc, self.regs_len, self.code_ref)
+    }
+
+    #[inline]
+    pub(crate) const fn code(&self) -> CodeRef {
+        self.code_ref
+    }
+
+    #[inline]
+    pub(crate) const fn pc(&self) -> u32 {
+        self.pc
+    }
+
+    #[inline]
+    pub(crate) const fn registers(&self) -> crate::frame::RegisterWindow {
+        crate::frame::RegisterWindow::new(
+            self.cfr + crate::frame_header::HEADER_SLOTS as u32,
+            self.regs_len,
+        )
+    }
+
+    /// Park the live PC into the active frame's overlay `saved_pc`. Call before
+    /// any handler operation that may inspect or switch the active frame.
     #[inline]
     pub(crate) fn sync_active_frame(&mut self) {
-        let frame_depth = self.frame_depth;
-        let frame = self.frame;
-        self.vm.sync_dispatch_frame(frame_depth, frame);
+        if self.frame_depth != 0 {
+            self.vm.park_caller_pc(self.cfr, self.pc);
+        }
     }
 
     #[inline]
@@ -150,49 +200,50 @@ impl<'vm> DispatchState<'vm> {
     /// requires.
     #[inline]
     pub(crate) fn read_constant(&mut self, bx: u32) -> VmResult<Value> {
-        let code = self.frame.code();
+        let code = self.code_ref;
         let DispatchState { vm, agent, .. } = self;
         vm.read_constant(agent, code, bx)
     }
 
-    /// Route a possibly-abrupt operation result through the exception
-    /// transfer machinery. Returns `Ok(Some(value))` for success,
-    /// `Ok(None)` if the abrupt completion was caught by an active handler
-    /// (the semantic body should continue at the new PC), or
-    /// `Err(error)` if the abrupt completion escapes the current code.
+    /// Route a possibly-abrupt result through exception-transfer machinery.
     ///
-    /// Frame-state refresh after a cross-frame catch happens in the asm
-    /// dispatch loop's epoch check (mirrored in
-    /// `LlIntDispatchState::translate_outcome`), not here —
-    /// `Vm::handle_dispatch_result` bumps the dispatch-frame-check epoch via
-    /// `request_dispatch_frame_check`, so the dispatcher picks up the unwind
-    /// on the next iteration.
+    /// Returns `Ok(Some(value))` on success, `Ok(None)` if the abrupt
+    /// completion was caught by an active handler (continue at new PC), or
+    /// `Err(error)` if it escapes. Cross-frame catch triggers a
+    /// dispatch-frame-check epoch bump so the dispatcher refreshes on the
+    /// next iteration.
     #[inline]
     pub(crate) fn handle_dispatch_result<T>(&mut self, result: VmResult<T>) -> VmResult<Option<T>> {
-        let DispatchState {
-            vm,
-            agent,
-            frame,
-            frame_depth,
-            ..
-        } = self;
-        vm.handle_dispatch_result(agent, *frame_depth, frame, result)
+        let cfr = self.cfr;
+        let pc = self.pc;
+        let frame_depth = self.frame_depth;
+        let handled = {
+            let DispatchState { vm, agent, .. } = &mut *self;
+            vm.handle_dispatch_result(agent, frame_depth, cfr, pc, result)?
+        };
+        // On a same-frame caught throw (`handled.is_none()`), `transfer_to_exception_handler`
+        // parked the handler PC into the overlay `saved_pc` — reload from it. On success the
+        // thin-view PC is already correct. On a cross-frame result leave the thin view stale
+        // so the slow-path egress promotes Continue→Refresh.
+        if self.vm.frame_depth() == self.frame_depth && handled.is_none() {
+            self.pc = self.vm.frame_header(self.cfr).saved_pc();
+        }
+        Ok(handled)
     }
 
-    /// Re-snapshot frame/depth/installed/epoch after a frame-changing
-    /// operation. Required after a return that didn't terminate the script
-    /// (caller frame is now active) or after a call (callee frame is now
-    /// active).
+    /// Reload thin-view state from the now-active frame after a call or return.
     pub(crate) fn refresh_from_active_frame(&mut self) -> VmResult<()> {
-        self.frame_depth = self.vm.frames().len();
-        let frame = self
+        let depth = self.vm.frame_depth();
+        self.frame_depth = depth;
+        let cfr = self
             .vm
-            .frames()
-            .last()
-            .copied()
+            .current_cfr_opt()
             .ok_or(VmError::MissingActiveFrame)?;
-        self.frame = frame;
-        let code = frame.code();
+        let code = self.vm.frame_header(cfr).code();
+        self.cfr = cfr;
+        self.pc = self.vm.frame_header(cfr).saved_pc();
+        self.code_ref = code;
+        self.regs_len = self.vm.frame_window_len(cfr);
         let installed = self
             .vm
             .installed_for_code(code)
@@ -217,10 +268,8 @@ impl Vm {
             .cloned()
     }
 
-    /// DSL-0b validation-case helper: same lookup as
-    /// [`Vm::installed_for_code`] but visible from the
-    /// `crate::dsl::test_helpers` module (which is `pub` for
-    /// integration-test consumption).
+    /// Same as [`Vm::installed_for_code`] but visible from
+    /// `crate::dsl::test_helpers`.
     #[doc(hidden)]
     #[inline]
     pub(crate) fn installed_for_dsl_harness(
@@ -230,12 +279,8 @@ impl Vm {
         self.installed_for_code(code)
     }
 
-    /// DSL-0c: crate-visible wrapper around
-    /// [`Vm::installed_for_code`] for the slow-path `Refresh`
-    /// machinery in [`crate::dsl::slow_path`]. Returns the
-    /// `Arc<InstalledFunction>` for the post-frame-switch active
-    /// frame so the asm bridge can recompute `pb_base` and
-    /// `frame_metadata_table_base` from a single source of truth.
+    /// Same as [`Vm::installed_for_code`]; used by the slow-path `Refresh`
+    /// machinery in [`crate::dsl::slow_path`].
     #[inline]
     pub(crate) fn installed_for_dsl_runtime(
         &self,
@@ -244,9 +289,7 @@ impl Vm {
         self.installed_for_code(code)
     }
 
-    /// Read the for-in enumerator slot off the side table. Mirrors the
-    /// legacy `self.for_in_states.advance(agent, base, register)` direct
-    /// access from a trampoline-safe wrapper.
+    /// Advance the for-in enumerator at `(base, register)`.
     #[inline]
     pub(in crate::vm) fn for_in_advance(
         &mut self,
@@ -290,7 +333,4 @@ impl Vm {
     pub(in crate::vm) fn current_exception_value(&self) -> Value {
         self.current_exception().unwrap_or_else(Value::undefined)
     }
-
-    // DSL-0c C5: run_via_trampoline deleted with the α trampoline.
-    // `Vm::run` routes through `Vm::run_via_dsl` (see `dsl/entry.rs`).
 }

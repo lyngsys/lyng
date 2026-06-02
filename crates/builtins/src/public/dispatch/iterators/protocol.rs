@@ -1,6 +1,6 @@
 use super::{
-    iterator, property_key_from_text, type_error, BuiltinInvocation, PropertyKey,
-    PublicBuiltinDispatchContext, Value, WellKnownAtom,
+    BuiltinInvocation, PropertyKey, PublicBuiltinDispatchContext, Value, WellKnownAtom, iterator,
+    property_key_from_text, type_error,
 };
 
 pub(super) fn iterator_builtin<Cx: PublicBuiltinDispatchContext>(

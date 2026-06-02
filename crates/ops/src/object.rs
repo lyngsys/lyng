@@ -14,7 +14,7 @@ pub use self::bigint::{
     bigint_to_string, integral_number_to_radix_string, primitive_to_bigint, string_to_bigint_value,
 };
 pub use self::conversions::{
-    ordinary_to_primitive, to_number, to_numeric, to_primitive, ToPrimitiveContext, ToPrimitiveHint,
+    ToPrimitiveContext, ToPrimitiveHint, ordinary_to_primitive, to_number, to_numeric, to_primitive,
 };
 pub use self::ordinary::{
     call, construct, ordinary_create_data_property, ordinary_define_property,

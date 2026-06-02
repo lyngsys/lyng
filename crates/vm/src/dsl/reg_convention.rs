@@ -47,14 +47,9 @@ pub const LLINT_STATE_FRAME_REGS_BASE: usize = offset_of!(LlIntState, frame_regs
 pub const LLINT_STATE_FRAME_METADATA_TABLE_BASE: usize =
     offset_of!(LlIntState, frame_metadata_table_base);
 
-// Phase C Task 4.3 / optimization: MetadataTable per-field constants re-exported
-// here so the proc-macro lowerer (which emits `::lyng_vm::dsl::reg_convention::`
-// paths reachable from all crates) can reference them via a fully-public path.
-//
-// The buffer-layout constants (METADATA_TABLE_HEADER_SIZE, KIND_OFFSETS_OFFSET,
-// SLOT_INDEX_TABLE_OFFSET, ARITH_KIND_OFFSET) have been removed: the new
-// precomputed-offset layout has no in-buffer header or kind-offsets table.
-// Asm resolves a slot via the slot_to_entry_offset table at buffer[0..N*4].
+// MetadataTable per-field constants re-exported here so the proc-macro lowerer
+// (which emits `::lyng_vm::dsl::reg_convention::` paths) can reference them
+// via a fully-public path.
 pub use crate::vm::metadata_table::arith::{
     ARITH_METADATA_EXEC_COUNT_OFFSET, ARITH_METADATA_OBSERVED_BITS_OFFSET,
     ARITH_METADATA_STRIDE_SHIFT,
@@ -66,33 +61,52 @@ pub use crate::vm::metadata_table::property::{
 };
 pub const LLINT_STATE_OBJECT_RECORDS_BASE: usize = offset_of!(LlIntState, object_records_base);
 pub const LLINT_STATE_OBJECT_SLOTS_BASE: usize = offset_of!(LlIntState, object_slots_base);
-// Phase 1.B.1: pre-resolved constants array base + this-mirror.
-// Populated at trampoline entry (entry.rs::run_via_dsl) and refreshed
-// in the slow-path Refresh arm (slow_path.rs::translate_outcome).
+// Pre-resolved constants array base + this-mirror.
 pub const LLINT_STATE_FRAME_CONST_BASE: usize = offset_of!(LlIntState, frame_const_base);
 pub const LLINT_STATE_FRAME_THIS_VALUE: usize = offset_of!(LlIntState, frame_this_value);
 pub const LLINT_STATE_PREFIX: usize = offset_of!(LlIntState, prefix);
-// Task 7: value-cell pointer table base, for the asm mode-7
-// GlobalCellLoad hit (Task 8). Mirrors LLINT_STATE_OBJECT_SLOTS_BASE.
-// Populated at trampoline entry (entry.rs::run_via_dsl) from
-// `agent.heap().view().value_cell_ptr_table_base()`.
+// Value-cell pointer table base for the asm mode-7 GlobalCellLoad hit.
 pub const LLINT_STATE_VALUE_CELLS_BASE: usize = offset_of!(LlIntState, value_cells_base);
 
-// VM_POLL_PENDING_OFFSET is now derived from `Vm::dsl_poll_pending`,
-// added in DSL-0c to give `poll_safepoint!` a known-zero byte to
-// dereference on the warm path (`op_loop_header`, conditional
-// backward jumps). The field is initialized to 0 in `Vm::new` and
-// never written during DSL-0; B41 will give it real semantics.
-//
-// VM_OPCODE_COUNTER_OFFSET / VM_HEAP_POOL_OFFSET stay as placeholders
-// until Tasks B27 / B23 land their respective `Vm` fields. The asm
-// bridge never reads through these in DSL-0c; they're declared here
-// so backend macros can name them.
+// =============================================================================
+// FrameHeader field offsets — read at constant byte offsets from the frame
+// pointer (cfr). Derived from `FrameHeader` via `offset_of!` and locked in
+// by `frame_header::tests::frame_header_abi_offsets_match_reg_convention`.
+// =============================================================================
+
+/// Byte offset of `FrameHeader::caller_cfr` (slot 0, low u32).
+pub const FRAME_HEADER_CALLER_CFR: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, caller_cfr);
+/// Byte offset of `FrameHeader::saved_pc` (slot 0, high u32).
+pub const FRAME_HEADER_SAVED_PC: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, saved_pc);
+/// Byte offset of `FrameHeader::code` (slot 1, low u32).
+pub const FRAME_HEADER_CODE: usize = core::mem::offset_of!(crate::frame_header::FrameHeader, code);
+/// Byte offset of `FrameHeader::callee` (slot 1, high u32; 0 = None).
+pub const FRAME_HEADER_CALLEE: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, callee);
+/// Byte offset of `FrameHeader::this_value` (slot 2, full 8-byte Value).
+pub const FRAME_HEADER_THIS_VALUE: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, this_value);
+/// Byte offset of `FrameHeader::arg_count` (slot 3, u16).
+pub const FRAME_HEADER_ARG_COUNT: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, arg_count);
+/// Byte offset of `FrameHeader::flags` (slot 3, u8; low nibble = `FrameFlags`,
+/// bit 4 = `HAS_RETURN_REGISTER`).
+pub const FRAME_HEADER_FLAGS: usize =
+    core::mem::offset_of!(crate::frame_header::FrameHeader, flags);
+
+/// Number of Value-sized (8-byte) slots the header occupies at the front of
+/// every frame. The register-file base is `arena_base + cfr + FRAME_HEADER_SLOTS`.
+pub const FRAME_HEADER_SLOTS: usize = crate::frame_header::HEADER_SLOTS;
+
+// `dsl_poll_pending`: zero on fast path; set by the host to trigger a
+// safepoint. VM_OPCODE_COUNTER_OFFSET / VM_HEAP_POOL_OFFSET are
+// placeholders; backend macros reference them by name but the asm
+// bridge does not read through them yet.
 pub const VM_POLL_PENDING_OFFSET: usize = offset_of!(crate::vm::Vm, dsl_poll_pending);
-// Task 7: byte offset (within `Vm`) of the `dsl_global_ic_generation`
-// u32 mirror (Task 4). The asm mode-7 GlobalCellLoad hit (Task 8) reads
-// it via `[x22, #VM_GLOBAL_IC_GENERATION_OFFSET]` to validate a cached
-// global IC against the live generation. Mirrors VM_POLL_PENDING_OFFSET.
+// Byte offset of `dsl_global_ic_generation` within `Vm`. The asm mode-7
+// GlobalCellLoad hit reads it to validate a cached global IC.
 pub const VM_GLOBAL_IC_GENERATION_OFFSET: usize =
     offset_of!(crate::vm::Vm, dsl_global_ic_generation);
 pub const VM_OPCODE_COUNTER_OFFSET: usize = 0;

@@ -1,4 +1,5 @@
 use super::{
+    BuiltinFunctionId, BuiltinInvocation, PropertyKey, PublicBuiltinDispatchContext, Value,
     allocate_json_raw_object, array_like_index_property_key, array_like_length,
     callable_object_from_value, create_array_result, create_data_property_or_throw,
     get_property_from_object, is_array_for_species, number_to_usize_after_range_check,
@@ -6,8 +7,7 @@ use super::{
     proxy_own_property_keys, string_from_code_units, string_ref_code_units, string_ref_text,
     string_value, syntax_error, to_integer_or_infinity_for_builtin, to_number_for_builtin,
     to_number_value_for_builtin, to_string_string_ref, try_create_data_property,
-    try_delete_property_from_object, type_error, BuiltinFunctionId, BuiltinInvocation, PropertyKey,
-    PublicBuiltinDispatchContext, Value,
+    try_delete_property_from_object, type_error,
 };
 use lyng_objects::{ObjectKind, PrimitiveWrapperKind};
 use lyng_types::{ObjectRef, StringRef};

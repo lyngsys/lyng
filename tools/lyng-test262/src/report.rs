@@ -915,7 +915,7 @@ mod tests {
 
     use crate::selection::{ExclusionManifest, ProposalStage};
 
-    use super::{format_pass_rate, write_report, CategoryStats, SuiteReport, TestTiming};
+    use super::{CategoryStats, SuiteReport, TestTiming, format_pass_rate, write_report};
 
     #[test]
     fn pass_rate_counts_skips_as_non_passing_selected_tests() {
@@ -1165,7 +1165,9 @@ mod tests {
         assert!(output.contains("## Delta From Previous Report"));
         assert!(output.contains("| Passed files | `0` | `1` | `+1` |"));
         assert!(output.contains("| Excluded files from selection | `2` | `1` | `-1` |"));
-        assert!(output.contains("| Pass rate (selected files) | `0.00%` | `50.00%` | `+50.00pp` |"));
+        assert!(
+            output.contains("| Pass rate (selected files) | `0.00%` | `50.00%` | `+50.00pp` |")
+        );
         assert!(output.contains("| Selected variant executions | `1` | `2` | `+1` |"));
         assert!(output.contains("- Jobs: `4`"));
     }
@@ -1280,8 +1282,10 @@ mod tests {
             "| Unsupported ECMA-262 feature | unsupported feature: iterator-helpers | `2` |"
         ));
         assert!(output.contains("| Manifest/out of scope | manifest exclusion (suite): ECMA-402 Intl is out of scope for Lyng JS core | `3` |"));
-        assert!(output
-            .contains("| Harness capability | unsupported harness include: sm/foo.js | `4` |"));
+        assert!(
+            output
+                .contains("| Harness capability | unsupported harness include: sm/foo.js | `4` |")
+        );
         assert!(output.contains("| Runtime safety | runtime abort: oversize ArrayBuffer allocation guard missing | `1` |"));
     }
 

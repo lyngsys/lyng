@@ -1,8 +1,8 @@
 use super::{
-    errors, new_promise_capability, perform_promise_then_with_capability,
+    BuiltinInvocation, PromiseCapabilityId, PromiseReactionHandler, PublicBuiltinDispatchContext,
+    Value, errors, new_promise_capability, perform_promise_then_with_capability,
     promise_capability_promise, promise_capability_reject, promise_capability_resolve,
-    promise_default_constructor, promise_resolve_method, property_key_from_text, BuiltinInvocation,
-    PromiseCapabilityId, PromiseReactionHandler, PublicBuiltinDispatchContext, Value,
+    promise_default_constructor, promise_resolve_method, property_key_from_text,
 };
 
 pub(super) fn iterator_dispose_builtin<Cx: PublicBuiltinDispatchContext>(

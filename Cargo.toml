@@ -32,6 +32,25 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Allowed with rationale — these fire pervasively on intentional patterns where
+# "fixing" them would be net-negative for an interpreter/codegen codebase:
+#   - casts: arena slot indices, register-window lengths, and frame offsets are
+#     statically bounded well under u32::MAX; `try_from().unwrap()` would add
+#     panics on hot paths for values that cannot overflow.
+#   - too_many_lines / too_many_arguments: spec-shaped VM routines stay cohesive,
+#     and dispatch helpers thread interpreter/host/registry/frame state explicitly.
+#   - similar_names: short domain bindings (cfr/pc/code, lhs/rhs) collide trivially.
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+too_many_lines = "allow"
+too_many_arguments = "allow"
+similar_names = "allow"
+
 [workspace.dependencies]
 bitflags = "2"
 hashbrown = "0.15"

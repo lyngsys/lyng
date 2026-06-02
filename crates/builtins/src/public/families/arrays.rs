@@ -4,28 +4,28 @@ use super::descriptors::{
     writable_builtin_attributes,
 };
 use super::{
-    install_public_builtin_function, ArrayFamilyBuiltins, ArrayFamilyPrototypes,
-    FamilyInstallContext,
+    ArrayFamilyBuiltins, ArrayFamilyPrototypes, FamilyInstallContext,
+    install_public_builtin_function,
 };
-use crate::bootstrap::{install_descriptor_tables, BuiltinBootstrapError};
+use crate::bootstrap::{BuiltinBootstrapError, install_descriptor_tables};
 use crate::public::{BuiltinCache, PublicRealmBuiltins};
 use crate::{BuiltinAttributes, BuiltinDescriptorTable, BuiltinInstallTarget, BuiltinIntrinsic};
 use lyng_common::{AtomId, WellKnownAtom};
 use lyng_env::Agent;
 use lyng_types::{
-    array_at_builtin, array_builtin, array_concat_builtin, array_copy_within_builtin,
-    array_entries_builtin, array_every_builtin, array_fill_builtin, array_filter_builtin,
-    array_find_builtin, array_find_index_builtin, array_find_last_builtin,
-    array_find_last_index_builtin, array_flat_builtin, array_flat_map_builtin,
-    array_for_each_builtin, array_from_async_builtin, array_from_builtin, array_includes_builtin,
-    array_index_of_builtin, array_is_array_builtin, array_iterator_next_builtin,
-    array_join_builtin, array_keys_builtin, array_last_index_of_builtin, array_map_builtin,
-    array_of_builtin, array_pop_builtin, array_push_builtin, array_reduce_builtin,
-    array_reduce_right_builtin, array_reverse_builtin, array_shift_builtin, array_slice_builtin,
-    array_some_builtin, array_sort_builtin, array_species_getter_builtin, array_splice_builtin,
-    array_to_locale_string_builtin, array_to_reversed_builtin, array_to_sorted_builtin,
-    array_to_spliced_builtin, array_to_string_builtin, array_unshift_builtin, array_values_builtin,
-    array_with_builtin, BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId,
+    BuiltinFunctionId, ObjectRef, RealmRef, Value, WellKnownSymbolId, array_at_builtin,
+    array_builtin, array_concat_builtin, array_copy_within_builtin, array_entries_builtin,
+    array_every_builtin, array_fill_builtin, array_filter_builtin, array_find_builtin,
+    array_find_index_builtin, array_find_last_builtin, array_find_last_index_builtin,
+    array_flat_builtin, array_flat_map_builtin, array_for_each_builtin, array_from_async_builtin,
+    array_from_builtin, array_includes_builtin, array_index_of_builtin, array_is_array_builtin,
+    array_iterator_next_builtin, array_join_builtin, array_keys_builtin,
+    array_last_index_of_builtin, array_map_builtin, array_of_builtin, array_pop_builtin,
+    array_push_builtin, array_reduce_builtin, array_reduce_right_builtin, array_reverse_builtin,
+    array_shift_builtin, array_slice_builtin, array_some_builtin, array_sort_builtin,
+    array_species_getter_builtin, array_splice_builtin, array_to_locale_string_builtin,
+    array_to_reversed_builtin, array_to_sorted_builtin, array_to_spliced_builtin,
+    array_to_string_builtin, array_unshift_builtin, array_values_builtin, array_with_builtin,
 };
 
 #[allow(clippy::too_many_lines)]

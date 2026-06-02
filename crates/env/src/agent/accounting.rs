@@ -1,5 +1,5 @@
 use super::Agent;
-use crate::{total_live_bytes, AgentPhase6Accounting, RuntimeDomainAccounting};
+use crate::{AgentPhase6Accounting, RuntimeDomainAccounting, total_live_bytes};
 
 impl Agent {
     pub fn phase6_accounting(&self) -> AgentPhase6Accounting {

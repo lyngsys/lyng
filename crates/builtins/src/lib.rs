@@ -22,8 +22,8 @@ mod public;
 mod registry;
 
 pub use bootstrap::{
-    bootstrap_default_realm, bootstrap_realm, BootstrapArtifacts, BootstrapMode, BootstrapRequest,
-    BuiltinBootstrap, BuiltinBootstrapError, BuiltinBootstrapResult,
+    BootstrapArtifacts, BootstrapMode, BootstrapRequest, BuiltinBootstrap, BuiltinBootstrapError,
+    BuiltinBootstrapResult, bootstrap_default_realm, bootstrap_realm,
 };
 pub use context::{
     BuiltinCallContext, BuiltinFunctionAllocation, BuiltinHandler, BuiltinInvocation,
@@ -34,12 +34,12 @@ pub use descriptors::{
     BuiltinPropertyDescriptor, BuiltinPropertyKeySpec, BuiltinPropertyValueSpec,
 };
 pub use internal::{
-    dispatch_internal_builtin, internal_builtin_metadata, InternalBuiltinCache,
-    InternalBuiltinDispatchContext, InternalRealmBuiltins,
+    InternalBuiltinCache, InternalBuiltinDispatchContext, InternalRealmBuiltins,
+    dispatch_internal_builtin, internal_builtin_metadata,
 };
 pub use public::{
-    builtin_metadata, dispatch_builtin, public_builtin_metadata, BuiltinCache,
-    PublicBuiltinDispatchContext, PublicRealmBuiltins, RealmBuiltins,
+    BuiltinCache, PublicBuiltinDispatchContext, PublicRealmBuiltins, RealmBuiltins,
+    builtin_metadata, dispatch_builtin, public_builtin_metadata,
 };
 pub use registry::{
     BuiltinEntryMetadata, BuiltinRegistry, BuiltinRegistryEntry, BuiltinRegistryError,

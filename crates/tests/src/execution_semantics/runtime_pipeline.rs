@@ -1,9 +1,8 @@
 //! Cross-crate coverage for the public compile, install, and evaluate pipeline.
 
 use lyng_bytecode::{
-    disassemble, BytecodeBuilder, BytecodeFunctionId, BytecodeFunctionKind, CompiledScriptUnit,
-    DeoptFrameValue, DeoptValueSource, FeedbackSiteKind, FeedbackSiteMetadata, Opcode,
-    SafepointKind,
+    BytecodeBuilder, BytecodeFunctionId, BytecodeFunctionKind, CompiledScriptUnit, DeoptFrameValue,
+    DeoptValueSource, FeedbackSiteKind, FeedbackSiteMetadata, Opcode, SafepointKind, disassemble,
 };
 use lyng_common::{AtomTable, SourceId, WellKnownAtom};
 use lyng_compiler::{compile_module, compile_script};
@@ -11,8 +10,8 @@ use lyng_env::{ExecutionContextKind, ModuleStatus, Runtime};
 use lyng_host::{ModuleKey, NoopHostHooks};
 use lyng_parser::{parse_module, parse_script};
 use lyng_sema::{analyze_module, analyze_script};
-use lyng_types::{CodeRef, EnvironmentRef, RealmRef, Value};
-use lyng_vm::{seed_registers, FrameRecord, RegisterWindow, Vm};
+use lyng_types::{CodeRef, EnvironmentRef, Value};
+use lyng_vm::{FrameRecord, RegisterWindow, Vm, seed_registers};
 
 #[test]
 fn runtime_frame_records_seed_register_windows() {
@@ -21,7 +20,6 @@ fn runtime_frame_records_seed_register_windows() {
         4,
         RegisterWindow::new(8, 2),
         Some(1),
-        RealmRef::from_raw(1).unwrap(),
         EnvironmentRef::from_raw(3).unwrap(),
         EnvironmentRef::from_raw(3).unwrap(),
         ExecutionContextKind::Function,
@@ -76,7 +74,7 @@ fn vm_installs_and_executes_hand_authored_bytecode() {
     assert_eq!(installed.entry(), BytecodeFunctionId::from_raw(1).unwrap());
     assert_eq!(result, Value::from_smi(12));
     assert!(vm.frames().is_empty());
-    assert!(vm.register_stack().is_empty());
+    assert!(vm.live_register_slots().is_empty());
     assert!(agent.running_context().is_none());
 }
 
@@ -213,22 +211,24 @@ fn public_vm_metadata_accessors_resolve_installed_template_records() {
     let mut vm = Vm::new();
     let installed = vm.install_script(agent, realm.id(), &unit).unwrap();
 
-    assert!(vm
-        .source_map_entry(installed.code(), exception.instruction_offset())
-        .is_some());
+    assert!(
+        vm.source_map_entry(installed.code(), exception.instruction_offset())
+            .is_some()
+    );
     assert_eq!(
         vm.safepoint_by_id(installed.code(), exception.id())
             .expect("installed code should expose the exception safepoint")
             .kind(),
         SafepointKind::ExceptionEdge
     );
-    assert!(vm
-        .deopt_snapshot(installed.code(), exception.id())
-        .expect("installed code should expose the exception deopt snapshot")
-        .values()
-        .contains(&DeoptValueSource::FrameValue(
-            DeoptFrameValue::ExceptionValue,
-        )));
+    assert!(
+        vm.deopt_snapshot(installed.code(), exception.id())
+            .expect("installed code should expose the exception deopt snapshot")
+            .values()
+            .contains(&DeoptValueSource::FrameValue(
+                DeoptFrameValue::ExceptionValue,
+            ))
+    );
 }
 
 #[test]

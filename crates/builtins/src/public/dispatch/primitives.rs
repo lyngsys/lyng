@@ -2,10 +2,10 @@ mod bigint;
 mod math;
 
 use super::{
-    format_to_exponential, format_to_precision, is_integral_number, map_completion,
-    number_to_i32_after_range_check, primitive_wrapper_constructor, radix_argument, range_error,
-    string_value, symbol_descriptive_string, to_integer_or_infinity_for_builtin, type_error,
-    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext,
+    BuiltinToPrimitiveBridge, PublicBuiltinDispatchContext, format_to_exponential,
+    format_to_precision, is_integral_number, map_completion, number_to_i32_after_range_check,
+    primitive_wrapper_constructor, radix_argument, range_error, string_value,
+    symbol_descriptive_string, to_integer_or_infinity_for_builtin, type_error,
 };
 use crate::BuiltinInvocation;
 use bigint::{bigint_to_number_value, dispatch_bigint_builtin};

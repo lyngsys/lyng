@@ -1,7 +1,7 @@
 use super::{
-    checked_u32_index, ArgumentsMode, AtomId, DeclarationKind, FunctionKind, FunctionSemaId,
-    HashMap, HashSet, Pattern, ProgramSemaView, ProgramSource, ScopeId, SemanticBindingId,
-    WellKnownAtom,
+    ArgumentsMode, AtomId, DeclarationKind, FunctionKind, FunctionSemaId, HashMap, HashSet,
+    Pattern, ProgramSemaView, ProgramSource, ScopeId, SemanticBindingId, WellKnownAtom,
+    checked_u32_index,
 };
 
 #[derive(Clone, Debug)]
